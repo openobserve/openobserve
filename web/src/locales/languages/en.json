@@ -1665,6 +1665,8 @@
     },
     "loadError": "Unable To Load Workflow",
     "deleteNode": "Delete Node",
+    "deleteNodeTitle": "Delete Step",
+    "deleteNodeConfirm": "Are you sure you want to delete this step? This can't be undone.",
     "backToList": "Back To Workflows",
     "namePlaceholder": "Untitled Workflow",
     "test": "Test",

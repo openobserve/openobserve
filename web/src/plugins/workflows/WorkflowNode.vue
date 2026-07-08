@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon"
         class="tw:min-w-[20px]! tw:w-[20px]! tw:h-[20px]! tw:p-0! tw:rounded! tw:bg-[rgba(255,255,255,0.95)]! tw:border! tw:border-[#dc2626]! tw:text-[#dc2626]!"
         :data-test="`workflow-node-${data?.node_type}-delete-btn`"
-        @click.stop="deleteNode(id)"
+        @click.stop="requestDeleteNode(id)"
       >
         <OIcon name="delete" size="sm" />
       </OButton>
@@ -121,7 +121,7 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18n();
-const { editNode, deleteNode, openStepPicker } = useWorkflowCanvas();
+const { editNode, requestDeleteNode, openStepPicker } = useWorkflowCanvas();
 const showButtons = ref(false);
 const meta = computed(() => nodeMeta(props.data?.node_type));
 

@@ -102,6 +102,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          node forms) so the drawer renders already-open without replaying the
          enter animation each time. -->
     <WorkflowNodeDrawer v-if="workflowObj.dialog.show" />
+
+    <!-- shared node-delete confirmation (both the hover-delete and the drawer's
+         Delete button funnel through workflowObj.deleteConfirm). -->
+    <ConfirmDialog
+      v-model="workflowObj.deleteConfirm.show"
+      :title="t('workflow.deleteNodeTitle')"
+      :message="t('workflow.deleteNodeConfirm')"
+      :ok-label="t('common.delete')"
+      @update:ok="deleteNode(workflowObj.deleteConfirm.nodeId)"
+      @update:cancel="cancelDeleteNode"
+    />
   </div>
 </template>
 
@@ -121,6 +132,7 @@ import { getUUID } from "@/utils/zincutils";
 import WorkflowFlow from "@/plugins/workflows/WorkflowFlow.vue";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
 import WorkflowStepDialog from "./WorkflowStepDialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useWorkflowCanvas, {
   workflowObj,
   hydrateWorkflow,
@@ -130,7 +142,8 @@ import workflowService from "@/services/workflows";
 const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
-const { resetWorkflowData, editNode } = useWorkflowCanvas();
+const { resetWorkflowData, editNode, deleteNode, cancelDeleteNode } =
+  useWorkflowCanvas();
 
 const orgId = () => store.state.selectedOrganization.identifier as string;
 

@@ -196,6 +196,10 @@ const defaultObject = {
   stepPicker: { show: false, source: "", handle: "out" },
   // Node type currently being dragged from the palette (drag-and-drop add).
   draggedNodeType: "",
+  // Pending node-delete confirmation. Both delete entry points (hover-`x` on the
+  // card and the drawer's Delete button) funnel through this so the ConfirmDialog
+  // (rendered once in WorkflowEditor) can guard the removal.
+  deleteConfirm: { show: false, nodeId: "" },
   currentSelectedWorkflow: <any>JSON.parse(JSON.stringify(defaultWorkflow)),
   workflowWithoutChange: <any>JSON.parse(JSON.stringify(defaultWorkflow)),
   nameError: false,
@@ -334,6 +338,25 @@ export default function useWorkflowCanvas() {
     return true;
   }
 
+  // Ask before removing a node — opens the ConfirmDialog (rendered in
+  // WorkflowEditor) rather than deleting outright. The trigger anchors the
+  // workflow, so it's rejected here without a prompt.
+  function requestDeleteNode(nodeId: string) {
+    const wf = workflowObj.currentSelectedWorkflow;
+    const node = wf.nodes.find((n: any) => n.id === nodeId);
+    if (node?.data?.node_type === "workflow_trigger") {
+      toast({
+        message: "The trigger starts the workflow and can't be deleted",
+        variant: "warning",
+      });
+      return;
+    }
+    workflowObj.deleteConfirm = { show: true, nodeId };
+  }
+  function cancelDeleteNode() {
+    workflowObj.deleteConfirm = { show: false, nodeId: "" };
+  }
+
   function deleteNode(nodeId: string) {
     const wf = workflowObj.currentSelectedWorkflow;
     const node = wf.nodes.find((n: any) => n.id === nodeId);
@@ -353,6 +376,7 @@ export default function useWorkflowCanvas() {
       workflowObj.currentSelectedNodeData = null;
       workflowObj.dialog.show = false;
     }
+    workflowObj.deleteConfirm = { show: false, nodeId: "" };
     if (workflowObj.isEditWorkflow) workflowObj.dirtyFlag = true;
   }
 
@@ -588,6 +612,8 @@ export default function useWorkflowCanvas() {
     commitNode,
     cancelNodeDrawer,
     editNode,
+    requestDeleteNode,
+    cancelDeleteNode,
     deleteNode,
     resetWorkflowData,
     // helpers (exported for the StepMenu slice + tests)

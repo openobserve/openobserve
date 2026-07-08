@@ -89,7 +89,7 @@ import useWorkflowCanvas, {
 } from "@/plugins/workflows/useWorkflowCanvas";
 
 const { t } = useI18n();
-const { commitNode, cancelNodeDrawer, deleteNode } = useWorkflowCanvas();
+const { commitNode, cancelNodeDrawer, requestDeleteNode } = useWorkflowCanvas();
 
 const meta = computed(() => nodeMeta(workflowObj.dialog.name));
 const title = computed(() =>
@@ -146,10 +146,11 @@ const onSave = () => {
   commitNode({});
 };
 const onCancel = () => cancelNodeDrawer();
+// Route through the shared confirm (rendered in WorkflowEditor). On confirm,
+// deleteNode() also closes this drawer (it clears the open dialog for the node).
 const onDelete = () => {
   const id = workflowObj.currentSelectedNodeData?.id;
-  if (id) deleteNode(id);
-  cancelNodeDrawer();
+  if (id) requestDeleteNode(id);
 };
 const onOpenChange = (open: boolean) => {
   if (!open) cancelNodeDrawer();
