@@ -266,5 +266,3 @@ defineExpose({
   onSubmit,
 });
 </script>
-
-<style lang="scss" scoped></style>

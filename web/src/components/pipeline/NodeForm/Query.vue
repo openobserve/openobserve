@@ -30,10 +30,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-toolbar"
         @click="scheduledPipelineRef?.toggleAIChat()"
         data-test="menu-link-ai-item"
-        class="ai-hover-btn"
-        :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+        class="bg-[linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]! transition-[background,box-shadow] duration-300 hover:bg-[linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]"
+        :class="store.state.isAiChatEnabled ? 'ai-btn-active bg-[linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]!' : ''"
       >
-        <img :src="scheduledPipelineRef?.getBtnLogo" class="header-icon ai-icon" />
+        <img :src="scheduledPipelineRef?.getBtnLogo" class="header-icon ai-icon opacity-70 transition-[transform] duration-[0.6s] ease-[ease]" :class="store.state.isAiChatEnabled ? 'opacity-100!' : ''" />
       </OButton>
       <div class="flex items-center app-tabs-container">
         <AppTabs
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div
       data-test="add-stream-query-routing-section"
-      class="w-full stream-routing-section"
+      class="w-full h-full stream-routing-section"
       :class="[
         store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white',
         { 'fullscreen-mode': isFullscreenMode },
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          The schema (makeQuerySchema) replaces ScheduledPipeline.validateInputs();
          the SQL editor stays bare so validateSqlQuery() remains a pre-submit
          guard inside saveQueryData (the form's onSubmit). -->
-    <OForm :form="form" class="stream-routing-container">
+    <OForm :form="form" class="w-full h-full rounded-lg stream-routing-container">
       <scheduled-pipeline
         ref="scheduledPipelineRef"
         :columns="filteredColumns"
@@ -732,64 +732,3 @@ defineExpose({
 });
 
 </script>
-
-<style scoped>
-.stream-routing-title {
-  font-size: 20px;
-}
-.stream-routing-container {
-  width: 100%;
-  height: 100%;
-  border-radius: 8px;
-  /* box-shadow: 0px 0px 10px 0px #d2d1d1; */
-}
-
-.stream-routing-section {
-  height: 100%;
-  width: 100% !important;
-}
-
-/* ── AI button — mirrors MainLayout.vue ─────────────────────────── */
-.ai-hover-btn {
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.15) 0%,
-    rgba(236, 72, 153, 0.15) 100%
-  ) !important;
-  transition: background 0.3s ease, box-shadow 0.3s ease;
-}
-
-.ai-hover-btn:hover {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
-}
-
-.ai-btn-active {
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.15) 0%,
-    rgba(236, 72, 153, 0.15) 100%
-  ) !important;
-
-  .header-icon {
-    opacity: 1 !important;
-  }
-}
-
-.ai-btn-active:hover {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-}
-
-.header-icon {
-  opacity: 0.7;
-}
-
-.ai-icon {
-  transition: transform 0.6s ease;
-}
-
-.ai-hover-btn:hover .ai-icon {
-  transform: rotate(180deg);
-  filter: brightness(0) invert(1);
-}
-</style>

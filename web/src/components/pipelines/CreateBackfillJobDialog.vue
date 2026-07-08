@@ -63,9 +63,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Advanced Options -->
-          <div class="collapsible-section card-container" data-test="advanced-options-section">
+          <div class="collapsible-section card-container flex flex-col transition-all overflow-hidden bg-(--o2-card-bg) rounded-md shadow-[0_0_5px_1px_var(--o2-hover-shadow)] border border-[var(--o2-border-color,rgba(0,0,0,0.08))]" data-test="advanced-options-section">
             <div
-              class="section-header flex items-center justify-between px-4 py-3 cursor-pointer"
+              class="section-header flex items-center justify-between px-4 py-3 cursor-pointer shrink-0 border-b border-[rgba(0,0,0,0.08)] transition-all rounded-t-md select-none hover:bg-[rgba(0,0,0,0.04)] active:bg-[rgba(0,0,0,0.06)]"
               @click="showAdvanced = !showAdvanced"
             >
               <div class="flex items-center gap-2">
@@ -78,10 +78,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="showAdvanced ? 'Collapse' : 'Expand'"
                 :icon-left="showAdvanced ? 'unfold-less' : 'unfold-more'"
                 @click.stop="showAdvanced = !showAdvanced"
-                class="expand-toggle-btn-wrapper"
+                class="opacity-50 transition-all duration-200 hover:opacity-100"
               />
             </div>
-            <div v-show="showAdvanced" class="section-content">
+            <div v-show="showAdvanced" class="flex flex-col flex-1 overflow-hidden p-4">
               <div class="space-y-4">
               <!-- Chunk Period -->
               <div class="grid grid-cols-12 gap-4 items-start">
@@ -450,64 +450,3 @@ const createBackfillJobRequest = async (value: BackfillForm) => {
   }
 };
 </script>
-
-<style scoped lang="scss">
-.text-h6 {
-  font-size: 1.125rem;
-  font-weight: 600;
-}
-
-.text-subtitle2 {
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.text-caption {
-  font-size: 0.75rem;
-}
-
-// Advanced Options Collapsible Styling - matching AlertWizardRightColumn.vue
-.collapsible-section {
-  display: flex;
-  flex-direction: column;
-  transition: all 0.3s ease;
-  background-color: var(--o2-card-bg);
-  border-radius: 0.375rem;
-  box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
-  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
-  overflow: hidden;
-
-  .section-header {
-    flex-shrink: 0;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-    transition: all 0.2s ease;
-    border-radius: 0.375rem 0.375rem 0 0;
-    user-select: none;
-
-    &:hover {
-      background: rgba(0, 0, 0, 0.04);
-    }
-
-    &:active {
-      background: rgba(0, 0, 0, 0.06);
-    }
-  }
-
-  .section-content {
-    flex: 1;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    padding: 16px;
-  }
-
-  .expand-toggle-btn-wrapper {
-    opacity: 0.5;
-    transition: all 0.2s ease;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-}
-</style>

@@ -44,34 +44,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-sm font-medium mb-3" style="font-weight: 500">
             Select Destination Type <span class="text-red">*</span>
           </div>
-          <div class="destination-type-grid">
+          <div class="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 mb-4">
             <div
               v-for="destType in destinationTypes"
               :key="destType.value"
               :data-test="`destination-type-card-${destType.value}`"
-              class="destination-type-card"
-              :class="{
-                selected: destinationType === destType.value,
-                'dark-mode': store.state.theme === 'dark',
-              }"
+              class="destination-type-card relative flex flex-col items-center justify-center py-[20px] px-3 border-2 rounded-xl cursor-pointer [transition:all_0.3s_ease] min-h-[120px] hover:-translate-y-0.5"
+              :class="[
+                { selected: destinationType === destType.value },
+                store.state.theme === 'dark'
+                  ? 'border-[#424242] bg-[#1e1e1e] hover:border-[#5d9cec] hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]'
+                  : 'border-[var(--o2-border)] bg-white hover:border-[var(--o2-border-color)] hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
+              ]"
               @click="form.setFieldValue('destination_type', destType.value)"
             >
               <img
                 v-if="destType.image"
                 :src="destType.image"
                 :alt="destType.label"
-                class="card-image"
+                class="w-12 h-12 mb-2 object-contain [transition:all_0.3s_ease]"
               />
               <OIcon
                 v-else
                 :name="destType.icon"
                 size="lg"
-                class="card-icon"
+                class="card-icon mb-2 text-[#666] [transition:color_0.3s_ease]"
               />
-              <div class="card-label">{{ destType.label }}</div>
+              <div class="card-label text-[13px] font-medium text-center leading-[1.3] mt-1 text-[var(--o2-text-primary)]">{{ destType.label }}</div>
               <div
                 v-if="destinationType === destType.value"
-                class="check-icon"
+                class="absolute top-[0.375rem] right-[0.375rem] w-5 h-5 rounded-full overflow-hidden bg-[var(--o2-positive)] text-white flex items-center justify-center z-[1]"
               >
                 <!-- eslint-disable-next-line vue/max-attributes-per-line -->
                 <OIcon name="check" size="xs" />
@@ -199,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Destination-specific Metadata Section -->
           <div v-if="showMetadataFields" class="flex flex-col gap-4 mt-4">
-            <div class="w-full text-[14px] font-bold header-label">
+            <div class="w-full text-[14px] font-bold text-(--o2-input-label-text-color)">
               Metadata Configuration
             </div>
 
@@ -335,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Connection Notes Card -->
           <OCard
-            class="connection-notes-card mb-6 mt-4 !bg-[var(--color-banner-info-bg)]"
+            class="connection-notes-card rounded-lg border border-[#e3f2fd] mb-6 mt-4 bg-(--color-banner-info-bg)!"
           >
             <OCardSection role="body">
               <div class="flex items-center mb-2">
@@ -344,29 +346,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="md"
                   class="mr-2"
                 />
-                <div class="text-sm font-medium text-weight-medium">
+                <div class="text-sm font-medium">
                   {{ connectionNotes.title }}
                 </div>
               </div>
               <div class="text-sm">
-                <ol class="connection-steps pl-3 mb-0">
+                <ol class="leading-[1.8] pl-3 mb-0">
                   <li
                     v-for="(stepText, index) in connectionNotes.steps"
                     :key="index"
-                    class="mb-1"
+                    class="mb-2"
                   >
                     {{ stepText }}
                   </li>
                 </ol>
                 <div
                   v-if="connectionNotes.example"
-                  class="mt-2 p-2 example-url"
-                  :class="
-                    store.state.theme === 'dark' ? 'bg-gray-600' : 'bg-white'
-                  "
+                  class="mt-2 p-2 rounded-md text-[13px]"
+                  :class="store.state.theme === 'dark' ? 'bg-gray-600' : 'bg-white'"
                 >
                   <strong>Example:</strong>
-                  <code class="ml-1">{{ connectionNotes.example }}</code>
+                  <code class="ml-1 bg-transparent p-0 font-[Monaco,Menlo,'Ubuntu_Mono',monospace] text-[#1976d2]">{{ connectionNotes.example }}</code>
                 </div>
               </div>
             </OCardSection>
@@ -1283,168 +1283,32 @@ defineExpose({
 });
 </script>
 
-<style lang="scss" scoped>
-// Destination Type Cards Grid
-.destination-type-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
+<style>
+.destination-type-card.selected {
+  border-color: var(--o2-border-color);
+  background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
+  box-shadow: 0 4px 16px rgba(25, 118, 210, 0.2);
 }
 
-.destination-type-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 20px 12px;
-  border: 2px solid #e0e0e0;
-  border-radius: 12px;
-  background: #ffffff;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  min-height: 120px;
-
-  &:hover {
-    border-color: var(--o2-border-color);
-    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.15);
-    transform: translateY(-2px);
-  }
-
-  &.selected {
-    border-color: var(--o2-border-color);
-    background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
-    box-shadow: 0 4px 16px rgba(25, 118, 210, 0.2);
-
-    .card-icon {
-      color: var(--o2-border-color);
-    }
-
-    .card-label {
-      color: #333333;
-    }
-  }
-
-  &.dark-mode {
-    background: #1e1e1e;
-    border-color: #424242;
-
-    &:hover {
-      border-color: #5d9cec;
-      box-shadow: 0 4px 12px rgba(93, 156, 236, 0.2);
-    }
-
-    &.selected {
-      border-color: #5d9cec;
-      background: linear-gradient(135deg, #1a3a52 0%, #1e1e1e 100%);
-      box-shadow: 0 4px 16px rgba(93, 156, 236, 0.25);
-
-      .card-icon {
-        color: #5d9cec;
-      }
-
-      .card-label {
-        color: #ffffff;
-      }
-    }
-  }
-
-  .card-icon {
-    margin-bottom: 8px;
-    color: #666;
-    transition: color 0.3s ease;
-  }
-
-  .card-image {
-    width: 48px;
-    height: 48px;
-    margin-bottom: 8px;
-    object-fit: contain;
-    transition: all 0.3s ease;
-  }
-
-  .card-label {
-    font-size: 13px;
-    font-weight: 500;
-    text-align: center;
-    line-height: 1.3;
-    margin-top: 4px;
-    color: var(--o2-text-primary);
-  }
-
-  .check-icon {
-    position: absolute;
-    top: 0.375rem;
-    right: 0.375rem;
-    width: 1.25rem;
-    height: 1.25rem;
-    border-radius: 50%;
-    overflow: hidden;
-    background: var(--o2-positive);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1;
-  }
+.destination-type-card.selected .card-icon {
+  color: var(--o2-border-color);
 }
 
-// Connection Notes Card
-.connection-notes-card {
-  border-radius: 8px;
-  border: 1px solid #e3f2fd;
-
-  .connection-steps {
-    line-height: 1.8;
-
-    li {
-      margin-bottom: 8px;
-      color: inherit;
-    }
-  }
-
-  .example-url {
-    border-radius: 6px;
-    font-size: 13px;
-
-    code {
-      background: transparent;
-      padding: 0;
-      font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-      color: #1976d2;
-    }
-  }
+.destination-type-card.selected .card-label {
+  color: #333333;
 }
 
-// Enhanced input fields
-.showLabelOnTop {
-  :deep(.q-field__prepend) {
-    padding-right: 8px;
-  }
+.dark .destination-type-card.selected {
+  border-color: #5d9cec;
+  background: linear-gradient(135deg, #1a3a52 0%, #1e1e1e 100%);
+  box-shadow: 0 4px 16px rgba(93, 156, 236, 0.25);
 }
 
-.headers-btns {
-  .q-btn {
-    &.icon-dark {
-      filter: none !important;
-    }
-  }
+.dark .destination-type-card.selected .card-icon {
+  color: #5d9cec;
 }
 
-.header-label {
-  color: var(--o2-input-label-text-color);
-}
-</style>
-
-<style lang="scss">
-.create-destination-form {
-  .q-field--labeled.showLabelOnTop .q-field__bottom {
-    padding: 0.275rem 0 0 !important;
-  }
-
-  .q-field--labeled.showLabelOnTop {
-    padding-top: 24px;
-  }
+.dark .destination-type-card.selected .card-label {
+  color: #ffffff;
 }
 </style>

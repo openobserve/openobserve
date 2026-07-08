@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       data-test="add-function-node-routing-section"
       class="flex flex-col h-full"
-      :class="store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'"
+      :class="store.state.theme === 'dark' ? 'bg-(--o2-bg-card-dark,#1a1a1a)' : 'bg-white'"
     >
 
 
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else
       data-test="associate-function-routing-container"
-      class="stream-routing-container w-full pt-3 pb-3 flex flex-col gap-4 flex-1 min-h-0"
+      class="rounded-lg w-full pt-3 pb-3 flex flex-col gap-4 flex-1 min-h-0"
     >
       <div class="flex items-center gap-3 px-(--spacing-dialog-header-px)">
         <OSwitch
@@ -91,18 +91,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               pipelineObj.functions[selectedFunction]
             "
             data-test="associate-function-definition-section"
-            class="function-definition-section"
+            class="mt-4 mb-4"
           >
-            <OCard class="function-definition-card">
-              <OCardSection role="header" class="function-definition-header">
-                <div class="text-base text-weight-medium text-primary">
+            <OCard class="function-definition-card border border-[#e1e5e9] dark:border-[#2d3748] rounded-lg shadow-[0_2px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] overflow-hidden dark:bg-[#1a202c]">
+              <OCardSection role="header" class="function-definition-header bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)] dark:bg-[linear-gradient(135deg,#2d3748_0%,#1a202c_100%)] border-b border-b-[#e2e8f0] dark:border-b-[#4a5568]">
+                <div class="text-base font-semibold text-[#2d3748] dark:text-white">
                   {{ t("function.function_definition") }}
                 </div>
               </OCardSection>
               <OSeparator />
               <OCardSection class="p-0 function-definition-content">
-                <div class="function-code-container">
-                  <pre class="function-code">{{
+                <div class="function-code-container bg-[#fafbfc] dark:bg-[#0d1117] dark:border dark:border-[#21262d] rounded-none max-w-[584px] max-h-[250px] overflow-y-auto relative">
+                  <pre class="function-code text-[#2d3748] dark:text-[#f7fafc] bg-transparent m-0 p-4 font-[JetBrains_Mono,Fira_Code,Monaco,Menlo,Ubuntu_Mono,monospace] text-[13px] leading-normal whitespace-pre-wrap break-words border-0 font-normal cursor-default select-text">{{
                     pipelineObj.functions[selectedFunction]?.function ||
                     "No definition available"
                   }}</pre>
@@ -119,11 +119,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <!-- Info note explaining RAF/RBF -->
-            <div class="note-container rounded-md p-3 flex flex-col gap-2">
-              <div class="text-sm text-gray-800">
+            <div class="bg-[#f9f290] text-[#2d3748] w-full rounded-md p-3 flex flex-col gap-2">
+              <div class="text-sm text-[#2d3748]">
                 Function Execution Guidelines:
               </div>
-              <div class="flex flex-col gap-1 text-sm text-gray-800">
+              <div class="flex flex-col gap-1 text-sm text-[#2d3748]">
                 <div class="flex items-start gap-2">
                   <OIcon
                     name="info"
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="shrink-0 mt-0.5 text-amber-500"
                   />
                   <span>
-                    <span class="highlight">RBF (Run Before Flattening):</span>
+                    <span class="font-bold text-[#007bff]">RBF (Run Before Flattening):</span>
                     Function executes before data structure is flattened
                   </span>
                 </div>
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="shrink-0 mt-0.5 text-amber-500"
                   />
                   <span>
-                    <span class="highlight">RAF (Run After Flattening):</span>
+                    <span class="font-bold text-[#007bff]">RAF (Run After Flattening):</span>
                     Function executes after data structure is flattened
                   </span>
                 </div>
@@ -426,84 +426,11 @@ const filterFunctions = (val: any, update: any) => {
 };
 </script>
 
-<style scoped lang="scss">
-.stream-routing-title {
-  font-size: 18px;
-  padding-top: 16px;
-}
-.stream-routing-container {
-  border-radius: 8px;
-  /* box-shadow: 0px 0px 10px 0px #d2d1d1; */
-}
-
-.pipeline-add-function {
-  :deep(.add-function-back-btn),
-  :deep(.add-function-fullscreen-btn),
-  :deep(.add-function-title) {
-    display: none;
-  }
-}
-
-.note-container {
-  background-color: #f9f290;
-  color: #2d3748;
-  width: 100%;
-}
-
-.note-container .highlight {
-  font-weight: bold;
-  color: #007bff;
-}
-
-
-
-/* Function definition display - OpenObserve style */
-.function-definition-section {
-  margin-top: 16px;
-  margin-bottom: 16px;
-}
-
-.function-definition-card {
-  border: 1px solid #e1e5e9;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  overflow: hidden;
-}
-
-.function-definition-header {
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.function-definition-header .text-primary {
-  color: #2d3748 !important;
-  font-weight: 600;
-}
-
-.function-code-container {
-  background-color: #fafbfc;
-  border-radius: 0;
-  max-width: 584px;
-  max-height: 250px;
-  overflow-y: auto;
-  position: relative;
-}
-
-.function-code {
-  color: #2d3748;
-  background-color: transparent;
-  margin: 0;
-  padding: 16px;
-  font-family:
-    "JetBrains Mono", "Fira Code", "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 13px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  border: none;
-  font-weight: 400;
-  cursor: default;
-  user-select: text;
+<style>
+.pipeline-add-function :deep(.add-function-back-btn),
+.pipeline-add-function :deep(.add-function-fullscreen-btn),
+.pipeline-add-function :deep(.add-function-title) {
+  display: none;
 }
 
 .function-code::selection {
@@ -528,74 +455,37 @@ const filterFunctions = (val: any, update: any) => {
   background: #a0aec0;
 }
 
-/* Dark mode - Enhanced OpenObserve style */
-.body--dark .function-definition-card {
-  border-color: #2d3748;
-  background-color: #1a202c;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-
-.body--dark .function-definition-header {
-  background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
-  border-bottom-color: #4a5568;
-}
-
-.body--dark .function-definition-header .text-primary {
-  color: #ffffff !important;
-  font-weight: 600;
-}
-
-.body--dark .readonly-chip {
-  background-color: #2d3748 !important;
-  border-color: #4a5568 !important;
-  color: #a0aec0 !important;
-}
-
-.body--dark .function-code-container {
-  background-color: #0d1117;
-  border: 1px solid #21262d;
-}
-
-.body--dark .function-code {
-  color: #f7fafc;
-  background-color: transparent;
-}
-
-.body--dark .function-code::selection {
+.dark .function-code::selection {
   background-color: #2b6cb0;
   color: #ffffff;
 }
 
-.body--dark .function-code-container::-webkit-scrollbar {
+.dark .function-code-container::-webkit-scrollbar {
   width: 8px;
 }
 
-.body--dark .function-code-container::-webkit-scrollbar-track {
+.dark .function-code-container::-webkit-scrollbar-track {
   background: #0d1117;
   border-radius: 4px;
 }
 
-.body--dark .function-code-container::-webkit-scrollbar-thumb {
+.dark .function-code-container::-webkit-scrollbar-thumb {
   background: #4a5568;
   border-radius: 4px;
   border: 1px solid #2d3748;
 }
 
-.body--dark .function-code-container::-webkit-scrollbar-thumb:hover {
+.dark .function-code-container::-webkit-scrollbar-thumb:hover {
   background: #718096;
 }
-</style>
 
-<style lang="scss">
-.pipeline-add-function {
-  .add-function-name-input {
-    width: 100%;
-    margin-left: 0px !important;
+.pipeline-add-function .add-function-name-input {
+  width: 100%;
+  margin-left: 0px !important;
+}
 
-    label {
-      width: 100%;
-      padding-left: 0;
-    }
-  }
+.pipeline-add-function .add-function-name-input label {
+  width: 100%;
+  padding-left: 0;
 }
 </style>

@@ -62,7 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="'Destination'"
           required
           :options="getFormattedDestinations"
-          class="destination-method-select"
           tabindex="0"
         />
       </OForm>
@@ -254,20 +253,3 @@ defineExpose({
   handleCancel,
 });
 </script>
-
-<style lang="scss" scoped>
-.destination-method-select {
-  .q-field__native > :first-child {
-    text-transform: uppercase !important;
-  }
-}
-
-.truncate-url {
-  display: inline-block;
-  max-width: calc(40vw - 200px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: bottom;
-}
-</style>
