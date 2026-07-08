@@ -22,14 +22,15 @@ const FIELD_FORMAT_MESSAGE =
 
 export const makeOrganizationSettingsSchema = (t: (_key: string) => string) =>
   z.object({
+    // NO .trim(): OForm/TanStack validates with the schema but SAVES the raw value,
+    // so .trim() would let "trace_id " pass yet persist the space (breaks field lookup).
+    // Validate the raw value; the regex already rejects spaces.
     traceIdFieldName: z
       .string()
-      .trim()
       .min(1, t("common.nameRequired"))
       .regex(orgSettingsFieldNameRegex, FIELD_FORMAT_MESSAGE),
     spanIdFieldName: z
       .string()
-      .trim()
       .min(1, t("common.nameRequired"))
       .regex(orgSettingsFieldNameRegex, FIELD_FORMAT_MESSAGE),
     // Non-validated form state (R1-strict: still form-owned via OFormSwitch).

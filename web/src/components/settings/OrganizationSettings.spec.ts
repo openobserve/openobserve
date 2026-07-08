@@ -213,6 +213,23 @@ describe("OrganizationSettings", () => {
       expect(mockPostOrganizationSettings).not.toHaveBeenCalled();
     });
 
+    it("blocks submit when a field name has trailing whitespace (regression: no schema .trim to mask it)", async () => {
+      // Before the fix, .trim() validated a trimmed copy so "trace_id " passed
+      // and was saved raw with the space. The regex must now reject it directly.
+      mockStore.state.organizationData.organizationSettings = {
+        trace_id_field_name: "trace_id ",
+        span_id_field_name: "span_id",
+      };
+      const wrapper = createWrapper();
+      const form = getForm(wrapper);
+
+      await form.vm.form.handleSubmit();
+      await flushPromises();
+
+      expect(form.vm.form.state.isValid).toBe(false);
+      expect(mockPostOrganizationSettings).not.toHaveBeenCalled();
+    });
+
     it("submits when both field names are valid", async () => {
       const wrapper = createWrapper();
       const form = getForm(wrapper);
