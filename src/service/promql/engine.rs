@@ -1389,12 +1389,14 @@ async fn selector_load_data_from_datafusion(
     let start2 = std::time::Instant::now();
     let label_cache = label_cache::LABEL_CACHE.as_ref();
     let ctx_fp = label_cache::context_fingerprint(&query_ctx.org_id, table_name, &label_col_names);
-    // hashes that already have labels; the extraction loop below skips them
-    let mut hash_label_set: HashSet<u64> = HashSet::with_capacity(metrics.len());
     let mut missing_hashes: Vec<u64> = Vec::new();
     if let Some(cache) = label_cache {
-        for (hash, range_val) in metrics.iter_mut() {
-            match cache.get(ctx_fp, *hash) {
+        // attach cached labels in parallel; millions of series make the
+        // lookup+clone loop CPU-bound
+        let mut entries: Vec<(&u64, &mut RangeValue)> = metrics.iter_mut().collect();
+        missing_hashes = entries
+            .par_iter_mut()
+            .filter_map(|(hash, range_val)| match cache.get(ctx_fp, **hash) {
                 Some(labels) => {
                     range_val.labels = if query_ctx.query_data {
                         let mut with_hash = Vec::with_capacity(labels.len() + 1);
@@ -1407,17 +1409,22 @@ async fn selector_load_data_from_datafusion(
                     } else {
                         labels
                     };
-                    hash_label_set.insert(*hash);
+                    None
                 }
-                None => missing_hashes.push(*hash),
-            }
-        }
+                None => Some(**hash),
+            })
+            .collect();
     } else {
         missing_hashes.extend(metrics.keys().copied());
     }
-    let cache_hits = hash_label_set.len();
+    let cache_hits = metrics.len() - missing_hashes.len();
 
     if !missing_hashes.is_empty() {
+        // membership test for the extraction loop below: only rows of
+        // cache-missed series need label extraction
+        let missing_set: HashSet<u64> = missing_hashes.iter().copied().collect();
+        // hashes whose labels were extracted in this scan (dedup)
+        let mut labeled_set: HashSet<u64> = HashSet::new();
         // Each missing series has a row at its own max timestamp, so scanning
         // those timestamps yields at least one label row per missing series.
         let series_timestamps = missing_hashes
@@ -1496,7 +1503,7 @@ async fn selector_load_data_from_datafusion(
                     .unwrap();
                 for i in 0..batch.num_rows() {
                     let hash = hash_values.value(i);
-                    if hash_label_set.contains(&hash) {
+                    if !missing_set.contains(&hash) || labeled_set.contains(&hash) {
                         continue;
                     }
                     let Some(range_val) = metrics.get_mut(&hash) else {
@@ -1512,7 +1519,7 @@ async fn selector_load_data_from_datafusion(
                             value: value.value(i).to_string(),
                         }));
                     }
-                    hash_label_set.insert(hash);
+                    labeled_set.insert(hash);
                     if let Some(cache) = label_cache {
                         cache.put(ctx_fp, hash, labels.clone());
                     }
@@ -1537,7 +1544,7 @@ async fn selector_load_data_from_datafusion(
                     .unwrap();
                 for i in 0..batch.num_rows() {
                     let hash: u64 = gxhash::new().sum64(hash_values.value(i));
-                    if hash_label_set.contains(&hash) {
+                    if !missing_set.contains(&hash) || labeled_set.contains(&hash) {
                         continue;
                     }
                     let Some(range_val) = metrics.get_mut(&hash) else {
@@ -1553,7 +1560,7 @@ async fn selector_load_data_from_datafusion(
                             value: value.value(i).to_string(),
                         }));
                     }
-                    hash_label_set.insert(hash);
+                    labeled_set.insert(hash);
                     if let Some(cache) = label_cache {
                         cache.put(ctx_fp, hash, labels.clone());
                     }
