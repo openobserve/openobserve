@@ -105,6 +105,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @ask-ai="onAskAiFixQuery"
                       />
                     </div>
+                    <!--
+                      No stream selected — the org has streams but none is
+                      chosen. This is more fundamental than any error / loading /
+                      no-events state (all meaningless without a stream), so it is
+                      checked first and is NOT gated on errorMsg/loading/
+                      loadingStream flags. Those could be stale (e.g. a stuck
+                      loadingStream after an early-return in extractFields, or a
+                      leftover errorMsg after resetSearchObj) and previously left
+                      the center blank by falling through to the results branch.
+                    -->
+                    <div
+                      v-else-if="
+                        searchObj.data.stream.streamLists.length > 0 &&
+                        searchObj.data.stream.selectedStream.length == 0
+                      "
+                      class="tw:h-full"
+                    >
+                      <LogsNoStreamState
+                        :org-id="store.state.selectedOrganization.identifier"
+                        data-test="logs-search-no-stream-selected-text"
+                        @select-stream="onSelectStream"
+                        @pick-stream="onPickStream"
+                      />
+                    </div>
                     <div
                       v-else-if="
                         searchObj.data.filterErrMsg !== '' &&
@@ -139,19 +163,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @fix-query="onFixQuery"
                         @configure-stream="onConfigureStream"
                         @widen-range="onWidenRange"
-                      />
-                    </div>
-                    <div
-                      v-else-if="
-                        searchObj.data.stream.selectedStream.length == 0 &&
-                        searchObj.loading == false
-                      "
-                    >
-                      <LogsNoStreamState
-                        :org-id="store.state.selectedOrganization.identifier"
-                        data-test="logs-search-no-stream-selected-text"
-                        @select-stream="onSelectStream"
-                        @pick-stream="onPickStream"
                       />
                     </div>
                     <div
@@ -403,6 +414,7 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LogsNoEventsState from "@/plugins/logs/LogsNoEventsState.vue";
 import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
+import LogsNoStreamState from "@/plugins/logs/LogsNoStreamState.vue";
 import LogsErrorState from "@/plugins/logs/LogsErrorState.vue";
 import {
   saveLogsStream,
@@ -437,6 +449,7 @@ export default defineComponent({
     OEmptyState,
     LogsNoEventsState,
     LogsNoDataState,
+    LogsNoStreamState,
     LogsErrorState,
 },
   mixins: [MainLayoutCloudMixin],
