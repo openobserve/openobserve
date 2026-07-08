@@ -64,6 +64,10 @@
               size="hero"
               preset="no-score-configs"
               :filtered="hasFilters"
+              :actions="[
+                { id: 'create', icon: 'add', titleKey: 'emptyState.noScoreConfigs.action', descriptionKey: 'emptyState.noScoreConfigs.actionDesc' },
+                { id: 'import', icon: 'upload-file', titleKey: 'emptyState.noScoreConfigs.import', descriptionKey: 'emptyState.noScoreConfigs.importDesc' },
+              ]"
               data-test="score-config-empty-state"
               @action="onEmptyAction"
             />
@@ -317,6 +321,7 @@ const hasFilters = computed(
 
 function onEmptyAction(id?: string) {
   if (id === "create") emit("create");
+  else if (id === "import") emit("import-custom");
   else if (id === "clear-filters") {
     emit("update:search", "");
     typeFilter.value = null;

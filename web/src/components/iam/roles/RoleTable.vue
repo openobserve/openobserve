@@ -25,7 +25,16 @@ const emit = defineEmits<{
   edit: [row: any];
   delete: [row: any];
   "bulk-delete": [];
+  create: [];
 }>();
+
+const onEmptyStateAction = (id?: string) => {
+  if (id === "clear-filters") {
+    emit("update:globalFilter", "");
+    return;
+  }
+  if (id === "create") emit("create");
+};
 
 const columns: OTableColumnDef[] = [
   {
@@ -123,8 +132,7 @@ const columns: OTableColumnDef[] = [
         size="hero"
         preset="no-roles"
         :filtered="!!globalFilter"
-        :hide-action="!globalFilter"
-        @action="emit('update:globalFilter', '')"
+        @action="onEmptyStateAction"
       />
     </template>
 

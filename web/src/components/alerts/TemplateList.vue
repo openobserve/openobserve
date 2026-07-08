@@ -106,8 +106,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="hero"
             preset="no-alert-templates"
             :filtered="!!filterQuery"
-            :hide-action="!filterQuery"
-            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+            :actions="[
+              { id: 'create', icon: 'add', titleKey: 'emptyState.noAlertTemplates.action', descriptionKey: 'emptyState.noAlertTemplates.actionDesc' },
+              { id: 'import', icon: 'upload-file', titleKey: 'emptyState.noAlertTemplates.import', descriptionKey: 'emptyState.noAlertTemplates.importDesc' },
+            ]"
+            @action="(id) => id === 'clear-filters' ? (filterQuery = '') : id === 'import' ? importTemplate() : editTemplate(null)"
           />
         </template>
         <template #cell-name="{ row }">

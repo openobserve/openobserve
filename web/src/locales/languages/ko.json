@@ -12,13 +12,20 @@
       "action": "시간 범위 확대",
       "actionDesc": "더 긴 기간에 걸친 검색"
     },
+    "noPatterns": {
+      "title": "패턴을 찾을 수 없음",
+      "description": "시간 범위를 늘리거나 로그 데이터가 더 많은 다른 스트림을 선택해 보세요.패턴 추출은 최소 1,000개의 로그에서 가장 잘 작동합니다.",
+      "logsAnalyzed": "{count} 개의 로그만 분석되었습니다."
+    },
     "noStreamSelected": {
       "title": "시작하려면 스트림을 선택하세요",
       "description": "스트림을 선택한 다음 쿼리를 실행하여 데이터를 탐색합니다.필터와 사용자 지정 시간 범위로 결과를 세분화하세요."
     },
     "noQueryApplied": {
       "title": "쿼리를 실행하여 로그 보기",
-      "description": "필터를 조정하고 '쿼리 실행'을 클릭하여 이 스트림에 대한 이벤트를 로드합니다."
+      "description": "필터를 조정하고 '쿼리 실행'을 클릭하여 이 스트림에 대한 이벤트를 로드합니다.",
+      "action": "쿼리 실행",
+      "actionDesc": "선택한 필터의 로드 이벤트"
     },
     "noDashboards": {
       "title": "첫 대시보드 만들기",
@@ -80,7 +87,9 @@
       "title": "아직 목적지가 없습니다",
       "description": "목적지는 Slack, 이메일, 웹후크 등 경고 알림이 전송되는 위치를 정의합니다.",
       "action": "새 목적지",
-      "actionDesc": "알림 채널 연결"
+      "actionDesc": "알림 채널 연결",
+      "import": "목적지 가져오기",
+      "importDesc": "JSON 파일에서 가져오기"
     },
     "noPipelineDestinations": {
       "title": "아직 목적지가 없습니다",
@@ -92,7 +101,9 @@
       "title": "아직 템플릿이 없습니다",
       "description": "템플릿은 경고 알림 메시지의 형식을 정의합니다.",
       "action": "새 템플릿",
-      "actionDesc": "알림 템플릿 만들기"
+      "actionDesc": "알림 템플릿 만들기",
+      "import": "템플릿 가져오기",
+      "importDesc": "JSON 파일에서 가져오기"
     },
     "noEvalTemplates": {
       "title": "평가 템플릿이 아직 없습니다.",
@@ -142,6 +153,20 @@
       "title": "백필 작업 없음",
       "description": "백필 작업은 파이프라인을 통해 과거 데이터를 재처리합니다.시작하려면 하나를 실행하세요."
     },
+    "noRegexPatterns": {
+      "title": "정규식 패턴은 아직 없습니다",
+      "description": "재사용 가능한 패턴을 만들어 민감한 데이터를 수정하거나 라이브러리에서 가져올 수 있습니다.",
+      "action": "새 패턴",
+      "actionDesc": "새 정규식 패턴 정의",
+      "import": "패턴 가져오기",
+      "importDesc": "라이브러리의 패턴 재사용"
+    },
+    "noStorageConfig": {
+      "title": "버킷이 구성되지 않음",
+      "description": "이 조직의 데이터를 다른 조직 및 글로벌 기본값과 독립적으로 전용 버킷으로 라우팅합니다.",
+      "action": "스토리지 구성",
+      "actionDesc": "S3, GCS 또는 Azure 버킷 연결"
+    },
     "noPipelineHistory": {
       "title": "아직 파이프라인 기록이 없습니다.",
       "description": "파이프라인이 실행되면 파이프라인 실행 기록이 여기에 표시됩니다."
@@ -161,10 +186,12 @@
       "actionDesc": "새 VRL 함수 작성"
     },
     "noStreams": {
-      "title": "첫 번째 데이터를 기다리는 중",
-      "description": "아직 데이터가 도착하지 않았습니다.소스를 연결하면 스트림이 여기에 자동으로 표시됩니다.",
+      "title": "소스를 연결하여 첫 번째 스트림 만들기",
+      "description": "스트림은 데이터가 도착하는 순간 자동으로 생성됩니다.앱, 에이전트 또는 컬렉터에서 수집을 설정하여 시작하세요.",
       "action": "인제스트 설정",
-      "actionDesc": "데이터 소스 연결"
+      "actionDesc": "데이터 소스 연결",
+      "createAction": "새 스트림",
+      "createActionDesc": "스트림 스키마를 수동으로 정의"
     },
     "noAlerts": {
       "title": "첫 번째 알림 만들기",
@@ -174,7 +201,7 @@
     },
     "noIncidents": {
       "title": "활성 인시던트 없음",
-      "description": "당신은 모두 사로잡혔습니다. 지금 당장 주의를 기울일 필요는 없습니다.트리거된 인시던트가 여기에 표시됩니다."
+      "description": "경고가 트리거될 때 인시던트가 생성되며 아직 발생한 인시던트는 없습니다.알림이 설정되면 트리거된 모든 인시던트가 여기에 표시됩니다."
     },
     "noLLMInsights": {
       "title": "LLM 활동이 아직 없습니다",
@@ -191,20 +218,24 @@
     "noScorers": {
       "title": "아직 득점자 없음",
       "description": "채점자는 점수 구성을 기준으로 LLM 응답을 채점합니다. LLM 심사위원으로 시작하거나 라이브러리에서 가져올 수 있습니다.",
-      "action": "채점자 생성",
-      "actionDesc": "LLM 심사위원 또는 원격 채점자 정의"
+      "action": "새 득점자",
+      "actionDesc": "LLM 심사위원 또는 원격 채점자 정의",
+      "import": "채점자 가져오기",
+      "importDesc": "JSON 파일에서 가져오기"
     },
     "noEvalJobs": {
       "title": "아직 평가 작업이 없습니다",
       "description": "작업은 LLM 스트림을 기준으로 채점자를 스케줄링합니다.하나씩 생성하여 단계별로 대화를 채점할 수 있습니다.",
-      "action": "평가 작업 생성",
+      "action": "새 직업",
       "actionDesc": "스트림 선택+득점자+케이던스"
     },
     "noScoreConfigs": {
       "title": "점수 구성이 아직 없습니다",
       "description": "점수 구성은 채점자가 생성하는 스키마 (숫자, 불리언 또는 범주형) 를 정의합니다.하나를 추가하여 채점을 시작하세요.",
-      "action": "점수 구성 생성",
-      "actionDesc": "점수 모양+정상 범위 정의"
+      "action": "새 점수 구성",
+      "actionDesc": "점수 모양+정상 범위 정의",
+      "import": "점수 구성 가져오기",
+      "importDesc": "JSON 파일에서 가져오기"
     },
     "loadError": {
       "title": "뭔가 잘못됐어",
@@ -271,6 +302,7 @@
     },
     "nouns": {
       "logs": "로그",
+      "patterns": "패턴",
       "dashboards": "대시보드",
       "pipelines": "파이프라인",
       "functions": "기능",
@@ -305,7 +337,8 @@
       "scorers": "스코어러",
       "evalJobs": "평가 작업",
       "scoreConfigs": "점수 구성",
-      "pipelineHistory": "파이프라인 기록"
+      "pipelineHistory": "파이프라인 기록",
+      "regexPatterns": "정규식 패턴"
     }
   },
   "common": {
@@ -1612,6 +1645,11 @@
     "subtitle": "인덱스 관리 및 스트림 구성",
     "streamNameHelpText": "영숫자, 밑줄 및 콜론만 사용하십시오.",
     "search": "검색 스트림",
+    "emptyOr": "또는:",
+    "emptyKubernetes": "쿠버네티스",
+    "emptyAws": "AWS/ 클라우드워치",
+    "emptyLinux": "리눅스",
+    "emptyWindows": "윈도우",
     "name": "이름",
     "docNum": "문서 번호",
     "storageSize": "인제스트된 데이터",
@@ -3017,9 +3055,9 @@
     "searchAllFolders": "모든 폴더",
     "streamConfig": "스트림 구성",
     "alertRules": "경고 규칙",
-    "noTemplatesMsg": "아직 템플릿을 만들지 않은 것 같습니다.알림을 생성하려면 최소한 하나의 목적지와 하나의 템플릿이 있어야 합니다.",
+    "noTemplatesMsg": "알림을 생성하려면 최소 하나의 템플릿과 하나의 대상이 필요합니다.템플릿은 알림 메시지의 형식을 정의합니다. 먼저 템플릿을 만들어 보세요.",
     "createTemplateBtn": "템플릿 생성",
-    "noDestinationsMsg": "아직 목적지를 만들지 않은 것 같습니다.알림을 생성하려면 최소한 하나의 목적지와 하나의 템플릿이 있어야 합니다.",
+    "noDestinationsMsg": "알림을 생성하려면 적어도 하나의 대상과 하나의 템플릿이 필요합니다.목적지는 알림이 전송되는 위치를 정의합니다. 먼저 알림을 생성하세요.",
     "createDestinationBtn": "목적지 생성",
     "add": "알림 추가",
     "edit": "편집",
@@ -5245,6 +5283,7 @@
     },
     "quality": {
       "scopeLabel": "이 작업 공간의 모든 품질 치수",
+      "agentPlaceholder": "모든 상담원",
       "timeRange": {
         "label": "시간 범위",
         "last1h": "지난 1시간",

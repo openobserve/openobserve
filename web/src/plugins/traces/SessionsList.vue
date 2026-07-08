@@ -142,24 +142,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Empty / error body — rendered inside the frame so the toolbar (and
            thus the stream selector) stays visible. -->
       <template #empty>
-        <EvalEmptyState
+        <OEmptyState
           v-if="error && hasLoadedOnce"
+          size="hero"
+          illustration="broken-panel"
+          variant="error"
           data-test="sessions-empty-error"
-          icon="error-outline"
           :title="t('traces.sessionsList.failedToLoad')"
           :description="error || ''"
-          :cta-label="t('traces.sessionsList.retry')"
-          cta-data-test="sessions-empty-retry-btn"
-          @create="loadSessions()"
+          :action-label="t('traces.sessionsList.retry')"
+          action-icon="refresh"
+          @action="loadSessions()"
         />
-        <EvalEmptyState
+        <OEmptyState
           v-else-if="agentEmpty"
+          size="hero"
+          illustration="constellation"
           data-test="sessions-empty-no-agents"
-          icon="groups"
           title="No Agents In This Range"
           description="No GenAI agents were detected for the selected time window. Try a wider range or switch back to stream view."
-          cta-label="View by Stream"
-          @create="onFilterModeChange('stream')"
+          action-label="View by Stream"
+          @action="onFilterModeChange('stream')"
         />
         <div
           v-else
@@ -253,7 +256,6 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import useStreams from "@/composables/useStreams";
 import { useSessions, type SessionRow } from "./composables/useSessions";
-import EvalEmptyState from "@/components/EvalEmptyState.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

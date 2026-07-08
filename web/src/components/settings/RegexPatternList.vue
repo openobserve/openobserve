@@ -81,16 +81,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
       <template #empty>
-        <div v-if="!listLoading && filterQuery == ''">
-          <NoRegexPatterns @create-new-regex-pattern="createRegexPattern" @import-regex-pattern="importRegexPattern" />
-        </div>
         <OEmptyState
-          v-else-if="!listLoading && filterQuery != ''"
+          v-if="!listLoading"
           size="hero"
-          filtered
-          :title="t('emptyState.filtered.title', { noun: t('regex_patterns.header').toLowerCase() })"
-          :description="t('emptyState.filtered.description', { noun: t('regex_patterns.header').toLowerCase() })"
-          @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+          preset="no-regex-patterns"
+          :filtered="filterQuery !== ''"
+          @action="(id) => id === 'clear-filters' ? (filterQuery = '') : id === 'import' ? importRegexPattern() : createRegexPattern()"
         />
       </template>
       <template #cell-pattern="{ row }">
@@ -193,7 +189,6 @@ import { convertUnixToQuasarFormat } from "@/utils/zincutils";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import NoRegexPatterns from "./NoRegexPatterns.vue";
 import regexPatternsService from "@/services/regex_pattern";
 import AddRegexPattern from "./AddRegexPattern.vue";
 import ImportRegexPattern from "./ImportRegexPattern.vue";
@@ -216,7 +211,6 @@ export default defineComponent({
   name: "RegexPatternList",
   components: {
     AppPageHeader,
-    NoRegexPatterns,
     ConfirmDialog,
     AddRegexPattern,
     ImportRegexPattern,

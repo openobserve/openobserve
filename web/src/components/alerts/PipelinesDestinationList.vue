@@ -80,8 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="hero"
             preset="no-pipeline-destinations"
             :filtered="!!filterQuery"
-            :hide-action="!filterQuery"
-            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+            @action="(id) => id === 'clear-filters' ? (filterQuery = '') : editDestination(null)"
           />
         </template>
 

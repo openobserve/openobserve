@@ -83,8 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="hero"
             preset="no-cipher-keys"
             :filtered="!!filterQuery"
-            :hide-action="!filterQuery"
-            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+            @action="(id) => id === 'clear-filters' ? (filterQuery = '') : addCipherKey()"
           />
         </template>
         <template #cell-actions="{ row }">
