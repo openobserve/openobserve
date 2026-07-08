@@ -4242,6 +4242,51 @@
     "querySource": "쿼리 소스"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "검색 서비스",
+      "noStreamsDetected": "스트림이 감지되지 않았습니다.서비스 그래프 메트릭에 stream_name 레이블이 포함되어 있는지 확인하세요.",
+      "streamOnlyInfo": "서비스 그래프는 인메모리 상태가 0인 스트림 전용 아키텍처를 사용합니다.",
+      "borderColor": "테두리 색상",
+      "borderColorMetric": "오류",
+      "nodeSize": "노드 크기",
+      "nodeSizeMetric": "요청",
+      "sizeLow": "낮음",
+      "sizeHigh": "높음",
+      "status": {
+        "healthy": "건강한",
+        "degraded": "저하됨",
+        "warning": "경고",
+        "critical": "크리티컬"
+      },
+      "range": {
+        "healthy": "1% 미만",
+        "degraded": "1 — 5%",
+        "warning": "5 — 10%",
+        "critical": "10% 이상"
+      },
+      "entities": "항목",
+      "distribution": "배포",
+      "total": "합계",
+      "showTypes": "유형 보기",
+      "typesFiltered": "일부 유형은 숨겨져 있습니다.열어서 표시된 내용을 변경할 수 있습니다.",
+      "zoomIn": "줌 인",
+      "zoomOut": "줌 아웃",
+      "fitToScreen": "화면에 맞추기",
+      "layout": "레이아웃",
+      "types": "유형",
+      "mode": {
+        "auto": "자동",
+        "expanded": "확장됨",
+        "collapsed": "무너졌다"
+      },
+      "kind": {
+        "service": "서비스",
+        "database": "데이터스토어",
+        "queue": "대기열",
+        "external": "외부",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "전체 화면으로 열기",
     "viewLogs": "로그 보기",
     "viewRelated": "관련 보기",
@@ -4520,6 +4565,7 @@
     "servicesCatalog": {
       "tabLabel": "서비스 카탈로그",
       "title": "서비스 카탈로그",
+      "footerTitle": "서비스",
       "filterPlaceholder": "서비스 이름별 필터링...",
       "noServicesFound": "선택한 시간 범위에서 서비스를 찾을 수 없습니다.",
       "loading": "서비스 로드 중...",
@@ -4546,6 +4592,15 @@
       "servicesLabel": "서비스",
       "viewTraces": "트레이스 보기",
       "exportCsv": "CSV 내보내기",
+      "types": {
+        "all": "모두",
+        "service": "서비스",
+        "datastore": "데이터스토어",
+        "queue": "대기열",
+        "external": "외부",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{개수} {상태}",
       "legend": {
         "title": "오류율"
       }

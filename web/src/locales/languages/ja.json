@@ -4242,6 +4242,51 @@
     "querySource": "クエリーソース"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "検索サービス",
+      "noStreamsDetected": "ストリームは検出されませんでした。サービスグラフのメトリクスに stream_name ラベルが含まれていることを確認してください。",
+      "streamOnlyInfo": "Service Graphは、メモリ内状態がゼロのストリーム専用アーキテクチャを使用しています",
+      "borderColor": "ボーダーカラー",
+      "borderColorMetric": "エラー",
+      "nodeSize": "ノードサイズ",
+      "nodeSizeMetric": "リクエスト",
+      "sizeLow": "低い",
+      "sizeHigh": "ハイ",
+      "status": {
+        "healthy": "ヘルシー",
+        "degraded": "劣化しました",
+        "warning": "警告",
+        "critical": "クリティカル"
+      },
+      "range": {
+        "healthy": "1% 未満",
+        "degraded": "1 — 5%",
+        "warning": "5 — 10%",
+        "critical": "> 10%"
+      },
+      "entities": "エンティティ",
+      "distribution": "ディストリビューション",
+      "total": "合計",
+      "showTypes": "タイプを表示",
+      "typesFiltered": "一部のタイプは非表示になっています。開くと表示内容を変更できます。",
+      "zoomIn": "ズームイン",
+      "zoomOut": "[ズームアウト]",
+      "fitToScreen": "画面に合わせる",
+      "layout": "[レイアウト]",
+      "types": "タイプ",
+      "mode": {
+        "auto": "オート",
+        "expanded": "拡張",
+        "collapsed": "折りたたまれた"
+      },
+      "kind": {
+        "service": "サービス",
+        "database": "データストア",
+        "queue": "キュー",
+        "external": "外部",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "フルビューで開く",
     "viewLogs": "ログを表示",
     "viewRelated": "関連を表示",
@@ -4520,6 +4565,7 @@
     "servicesCatalog": {
       "tabLabel": "サービスカタログ",
       "title": "サービスカタログ",
+      "footerTitle": "サービス",
       "filterPlaceholder": "サービス名で絞り込み...",
       "noServicesFound": "選択した時間範囲にサービスが見つかりません。",
       "loading": "サービスを読み込んでいます...",
@@ -4546,6 +4592,15 @@
       "servicesLabel": "サービス",
       "viewTraces": "トレースを表示",
       "exportCsv": "CSV をエクスポート",
+      "types": {
+        "all": "[すべて]",
+        "service": "サービス",
+        "datastore": "データストア",
+        "queue": "キュー",
+        "external": "外部",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{カウント} {ステータス}",
       "legend": {
         "title": "エラー率"
       }
