@@ -28,14 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #title><span data-test="log-stream-title-text">{{ t('logStream.header') }}</span></template>
           <template #actions>
             <OButton
-              data-test="log-stream-refresh-stats-btn"
-              variant="outline"
-              size="sm-action"
-              @click="getLogStream(true)"
-            >
-              {{ t(`logStream.refreshStats`) }}
-            </OButton>
-            <OButton
               v-if="isSchemaUDSEnabled"
               data-test="log-stream-add-stream-btn"
               variant="primary"
@@ -123,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-sm"
               icon-left="refresh"
               :loading="loadingState"
-              data-test="log-stream-refresh-btn"
+              data-test="log-stream-refresh-stats-btn"
               @click="() => getLogStream(true)"
             >
               <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="streamsRefresh" />
