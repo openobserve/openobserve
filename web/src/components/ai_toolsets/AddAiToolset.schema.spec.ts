@@ -98,13 +98,14 @@ describe("AddAiToolset.schema", () => {
       expect(msgs).toContain("aiToolset.mcpUrlRequired");
     });
 
-    it("treats a whitespace-only url as missing", () => {
+    it("accepts a whitespace-only url (BEFORE baseline used a bare !url check)", () => {
       expect(
-        messagesFor(
-          { ...base(), kind: "mcp", mcp: { url: "   ", timeout_seconds: 30 } },
-          "mcp.url",
-        ),
-      ).toContain("aiToolset.mcpUrlRequired");
+        errorPaths({
+          ...base(),
+          kind: "mcp",
+          mcp: { url: "   ", timeout_seconds: 30 },
+        }),
+      ).not.toContain("mcp.url");
     });
 
     it("is NOT required when kind is cli", () => {
@@ -140,6 +141,16 @@ describe("AddAiToolset.schema", () => {
         "cli.command",
       );
       expect(msgs).toContain("aiToolset.cliCommandRequired");
+    });
+
+    it("accepts a whitespace-only command (BEFORE baseline used a bare !command check)", () => {
+      expect(
+        errorPaths({
+          ...base(),
+          kind: "cli",
+          cli: { ...addAiToolsetDefaults().cli, command: "   " },
+        }),
+      ).not.toContain("cli.command");
     });
 
     it("is NOT required when kind is mcp", () => {

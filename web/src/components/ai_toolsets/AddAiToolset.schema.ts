@@ -88,16 +88,20 @@ export const makeAddAiToolsetSchema = (t: (_key: string) => string) =>
       }),
     })
     .superRefine((val, ctx) => {
-      // mcp.url required when kind === "mcp" (BEFORE: !!v || mcpUrlRequired).
-      if (val.kind === "mcp" && !String(val.mcp?.url ?? "").trim()) {
+      // mcp.url required when kind === "mcp". Bare empty check (NO trim) to match
+      // the BEFORE baseline's `!url` — main accepted a whitespace-only url. (Note
+      // main's asymmetry: skill.content below DOES trim; url/command do not.)
+      if (val.kind === "mcp" && !String(val.mcp?.url ?? "")) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["mcp", "url"],
           message: t("aiToolset.mcpUrlRequired"),
         });
       }
-      // cli.command required when kind === "cli" (BEFORE: !!v || cliCommandRequired).
-      if (val.kind === "cli" && !String(val.cli?.command ?? "").trim()) {
+      // cli.command required when kind === "cli". Bare empty check (NO trim) to
+      // match the BEFORE baseline's `!command` — main accepted a whitespace-only
+      // command.
+      if (val.kind === "cli" && !String(val.cli?.command ?? "")) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["cli", "command"],
@@ -105,7 +109,8 @@ export const makeAddAiToolsetSchema = (t: (_key: string) => string) =>
         });
       }
       // skill.content required when kind === "skill" (BEFORE: imperative check in
-      // onSubmit). Monaco value is bridged into the form, so the rule lives here.
+      // onSubmit that used `!content.trim()`). Trim is KEPT here to match main —
+      // unlike url/command above, main's skill check trimmed.
       if (val.kind === "skill" && !String(val.skill?.content ?? "").trim()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
