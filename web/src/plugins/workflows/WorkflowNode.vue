@@ -172,7 +172,7 @@ const complete = computed(() => {
       return !!(d.conditions || (d.field && d.operator));
     case "function":
       return !!(d.name || d.vrl);
-    case "send_to_destination":
+    case "remote_stream":
       return !!d.destination_name;
     default:
       return true;
@@ -196,7 +196,7 @@ const bodySummary = computed(() => {
       return d.name
         ? t("workflow.node.functionBodySet", { name: d.name })
         : t("workflow.node.functionBody");
-    case "send_to_destination":
+    case "remote_stream":
       return d.destination_name
         ? t("workflow.node.destinationBodySet", { name: d.destination_name })
         : t("workflow.node.destinationBody");

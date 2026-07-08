@@ -31,8 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :width="drawerWidth"
     :size="drawerSize"
     :show-close="true"
-    :primary-button-label="hideFooter || readonlyBody ? undefined : 'Save'"
-    :secondary-button-label="hideFooter || readonlyBody ? undefined : 'Cancel'"
+    :primary-button-label="
+      hideFooter || readonlyBody || bodyCreatingNew ? undefined : 'Save'
+    "
+    :secondary-button-label="
+      hideFooter || readonlyBody || bodyCreatingNew ? undefined : 'Cancel'
+    "
     :neutral-button-label="
       !hideFooter &&
       !bodyCreatingNew &&
@@ -97,21 +101,21 @@ const BODY_COMPONENTS: Record<string, any> = {
   workflow_trigger: WorkflowAlertTrigger,
   condition: WorkflowCondition,
   function: WorkflowFunction,
-  send_to_destination: WorkflowDestination,
+  remote_stream: WorkflowDestination,
 };
 const bodyComponent = computed(() => BODY_COMPONENTS[workflowObj.dialog.name]);
 // Match the pipeline node-form drawer widths per type:
 //   condition -> width 45, function -> width 30 (97 while creating inline),
-//   send_to_destination -> size "lg", trigger -> size "md".
+//   remote_stream -> size "lg", trigger -> size "md".
 // `width` (vw) takes precedence in ODrawer; when it's undefined, `size` applies.
 const drawerWidth = computed(() => {
   if (workflowObj.dialog.expand) return 97; // full-width (inline function editor)
   if (workflowObj.dialog.name === "condition") return 45;
   if (workflowObj.dialog.name === "function") return 30;
-  return undefined; // send_to_destination + trigger fall back to `size`
+  return undefined; // remote_stream + trigger fall back to `size`
 });
 const drawerSize = computed(() =>
-  workflowObj.dialog.name === "send_to_destination" ? "lg" : "md",
+  workflowObj.dialog.name === "remote_stream" ? "lg" : "md",
 );
 
 // Ref to the active body so Save can pull its payload / let it veto.
@@ -122,8 +126,8 @@ const bodyRef = ref<any>(null);
 const hideFooter = computed(() => workflowObj.dialog.expand);
 
 // A body showing its own inline create form (the destination node's "Create New
-// Destination"). The drawer keeps its sticky footer but routes Save/Cancel to
-// the create form and hides Delete while creating.
+// Destination") — it carries its own Save/Cancel, so the drawer hides its footer
+// while creating (pipeline ExternalDestination pattern).
 const bodyCreatingNew = computed(() => !!bodyRef.value?.createNewDestination);
 
 // The trigger is a read-only payload reference — nothing to save/cancel, so the
@@ -133,12 +137,6 @@ const readonlyBody = computed(() => meta.value?.category === "trigger");
 // Save: if a body form is mounted, ask it for its payload (null → invalid,
 // abort). Otherwise commit the staged node as-is (placeholder types).
 const onSave = () => {
-  // Creating a new destination inline: the drawer Save saves the destination
-  // (body handles the API + returns to select mode); don't commit the node yet.
-  if (bodyCreatingNew.value) {
-    bodyRef.value?.saveInlineDestination?.();
-    return;
-  }
   if (bodyComponent.value) {
     const payload = bodyRef.value?.submit?.();
     if (payload == null) return;
@@ -147,15 +145,7 @@ const onSave = () => {
   }
   commitNode({});
 };
-const onCancel = () => {
-  // Creating a new destination inline: Cancel returns to the picker, it doesn't
-  // close the whole drawer.
-  if (bodyCreatingNew.value) {
-    bodyRef.value?.cancelCreate?.();
-    return;
-  }
-  cancelNodeDrawer();
-};
+const onCancel = () => cancelNodeDrawer();
 const onDelete = () => {
   const id = workflowObj.currentSelectedNodeData?.id;
   if (id) deleteNode(id);

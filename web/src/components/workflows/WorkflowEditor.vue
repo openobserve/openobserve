@@ -261,14 +261,6 @@ const serializeNode = (node: any) => {
     meta.trigger_kind = data.trigger_kind || "alert_fired";
   }
 
-  // Send To Destination: NodeData::SendToDestination only carries
-  // `destination_name`; the display type (webhook/email/action) is UI-only, so
-  // move it out of `data` into `meta`.
-  if (nodeType === "send_to_destination" && data.destination_type) {
-    meta.destination_type = data.destination_type;
-    delete data.destination_type;
-  }
-
   const out: any = {
     id: node.id,
     position: {

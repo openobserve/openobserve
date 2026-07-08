@@ -85,16 +85,16 @@ export const WORKFLOW_NODE_TYPES: Record<string, WorkflowNodeMeta> = {
     icon: "code",
     ioType: "default",
   },
-  // Serialized node_type is `send_to_destination` — the planned backend
-  // NodeData::SendToDestination ({ destination_name }) that dispatches to an
-  // existing Alert Destination (webhook / email / action). Backend task B3 adds
-  // this variant + `is_workflow_node()` entry; until then saving a destination
-  // node is gated on that. The user-facing label stays "Send To Destination".
+  // Serialized node_type is `remote_stream` — the existing backend
+  // NodeData::RemoteStream ({ org_id, destination_name }) that forwards records
+  // to a Pipeline (remote) Destination, the same node the pipeline "External
+  // Destination" uses. v1 reuses this instead of a new alert-dispatch node;
+  // backend just needs to add RemoteStream to `is_workflow_node()`. User-facing
+  // label stays "Send To Destination".
   //
   // `ioType: "default"` (not "output") so an action isn't a dead end — it has
-  // an output handle + hover-`+` and can chain onward (send to Slack, then
-  // PagerDuty, then run another condition, …).
-  send_to_destination: {
+  // an output handle + hover-`+` and can chain onward.
+  remote_stream: {
     category: "action",
     kindKey: "workflow.node.kindAction",
     titleKey: "workflow.node.sendToDestination",
@@ -109,11 +109,7 @@ export const nodeMeta = (nodeType: string): WorkflowNodeMeta | undefined =>
 
 // Node types offered by the hover-`+` StepMenu (everything but the trigger,
 // which is fixed and can only be the first node).
-export const ADDABLE_NODE_TYPES = [
-  "condition",
-  "function",
-  "send_to_destination",
-];
+export const ADDABLE_NODE_TYPES = ["condition", "function", "remote_stream"];
 
 // Trigger kinds the user chooses from when creating a workflow. `key` maps to
 // the future backend WorkflowTriggerKind (B1). Only Alert Fired is enabled in
@@ -229,16 +225,6 @@ export const hydrateWorkflow = (wf: any) => {
         ...node.data,
         trigger_kind:
           node.meta.trigger_kind || node.data.trigger_kind || "alert_fired",
-      };
-    }
-    // The destination's display type (webhook/email/action) lives in `meta`
-    // since it isn't part of NodeData::SendToDestination. Rehydrate it so the
-    // node card / form can show it without re-fetching the destination.
-    if (node.data?.node_type === "send_to_destination" && node.meta) {
-      node.data = {
-        ...node.data,
-        destination_type:
-          node.meta.destination_type || node.data.destination_type || "",
       };
     }
     return node;
