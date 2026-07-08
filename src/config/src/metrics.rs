@@ -1406,7 +1406,7 @@ pub static SELF_REPORTING_DROPPED_TRIGGERS: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &[],
+        &["queue_type"], // "usage" or "error"
     )
     .expect("Metric created")
 });
@@ -1419,7 +1419,7 @@ pub static SELF_REPORTING_TIMEOUT_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &[],
+        &["queue_type"], // "usage" or "error"
     )
     .expect("Metric created")
 });
