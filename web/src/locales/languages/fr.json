@@ -4242,6 +4242,51 @@
     "querySource": "Source de la requête"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "Services de recherche",
+      "noStreamsDetected": "Aucun flux n'a été détecté. Assurez-vous que les métriques du graphique de service incluent les libellés stream_name.",
+      "streamOnlyInfo": "Service Graph utilise une architecture en flux uniquement avec aucun état en mémoire",
+      "borderColor": "Couleur de la bordure",
+      "borderColorMetric": "Erreurs",
+      "nodeSize": "Taille du nœud",
+      "nodeSizeMetric": "Demandes",
+      "sizeLow": "Faible",
+      "sizeHigh": "Haut",
+      "status": {
+        "healthy": "En bonne santé",
+        "degraded": "Dégradé",
+        "warning": "Avertissement",
+        "critical": "Critique"
+      },
+      "range": {
+        "healthy": "< 1 %",
+        "degraded": "Entre 1 et 5 %",
+        "warning": "Entre 5 et 10 %",
+        "critical": "> 10 %"
+      },
+      "entities": "entités",
+      "distribution": "Distribution",
+      "total": "Total",
+      "showTypes": "Afficher les types",
+      "typesFiltered": "Certains types sont masqués. Ouvrez pour modifier ce qui est affiché.",
+      "zoomIn": "Zoomer",
+      "zoomOut": "Zoom arrière",
+      "fitToScreen": "Adapté à l'écran",
+      "layout": "Disposition",
+      "types": "Types",
+      "mode": {
+        "auto": "Automatique",
+        "expanded": "Élargi",
+        "collapsed": "Effondré"
+      },
+      "kind": {
+        "service": "Des services",
+        "database": "Banques de données",
+        "queue": "Files d'attente",
+        "external": "Externe",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "Ouvrir en plein écran",
     "viewLogs": "Afficher les journaux",
     "viewRelated": "Afficher les articles connexes",
@@ -4520,6 +4565,7 @@
     "servicesCatalog": {
       "tabLabel": "Catalogue de services",
       "title": "Catalogue de services",
+      "footerTitle": "Des services",
       "filterPlaceholder": "Filtrer par nom de service...",
       "noServicesFound": "Aucun service n'a été trouvé dans la plage horaire sélectionnée.",
       "loading": "Services de chargement...",
@@ -4546,6 +4592,15 @@
       "servicesLabel": "services",
       "viewTraces": "Afficher les traces",
       "exportCsv": "Exporter au format CSV",
+      "types": {
+        "all": "Tous",
+        "service": "Des services",
+        "datastore": "Banques de données",
+        "queue": "Files d'attente",
+        "external": "Externe",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{count} {statut}",
       "legend": {
         "title": "Taux d'erreur"
       }
