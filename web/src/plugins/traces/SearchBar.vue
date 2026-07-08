@@ -352,19 +352,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="services-catalog-date-time-picker"
-            class="h-[2rem]!"
+            class="h-[2rem]! mr-[0.375rem]"
             @on:date-change="updateDateTime"
           />
-          <OButton
-            data-test="services-catalog-refresh-btn"
-            variant="outline"
-            size="icon-toolbar"
-            class="mr-[0.375rem]"
-            @click="$emit('services-catalog-refresh')"
-          >
-            <OIcon name="refresh" size="sm" />
-            <OTooltip :content="t('common.refresh')" />
-          </OButton>
         </div>
       </div>
       </div><!-- /toolbarRightRef wrapper -->

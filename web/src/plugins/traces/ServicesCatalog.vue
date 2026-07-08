@@ -184,13 +184,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div> -->
 
-      <!-- Column-visibility toggle — pinned to the right end of the filter bar. -->
+      <!-- Column-visibility toggle + refresh — pinned to the right end of the
+           filter bar so the catalog matches the other list pages (column
+           toggle, then refresh). -->
       <OTableColumnToggle
         :columns="tableColumns"
         :column-visibility="columnVisibility"
         @update:column-visibility="setColumnVisibility"
         class="shrink-0"
       />
+      <OButton
+        variant="outline"
+        size="icon-sm"
+        icon-left="refresh"
+        :loading="isLoading"
+        class="shrink-0 ml-2"
+        data-test="services-catalog-refresh-btn"
+        @click="loadServicesCatalog"
+      >
+        <OTooltip side="bottom" :content="t('common.refresh')" />
+      </OButton>
     </div>
 
     <!-- Body: left rail (entity-type filter) + table — mirrors the Dashboards
@@ -448,6 +461,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
