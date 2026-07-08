@@ -534,7 +534,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Traces List -->
-            <div style="height: calc(100% - 4rem)">
+            <div class="tw:h-full">
               <TracesSearchResultList
                 :hits="tracesForDimensions"
                 :loading="false"
@@ -910,6 +910,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :viewOnly="true"
                   :allowAlertCreation="false"
                   searchType="dashboards"
+                  class="tw:border-none"
                 />
                 <div
                   v-else
@@ -968,7 +969,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="
             traceCorrelationMode === 'direct' && traceSpanList.length > 0
           "
-          class="tw:h-full tw:overflow-hidden telemetry-correlation-traces"
+          class="tw:h-full tw:overflow-auto telemetry-correlation-traces"
         >
           <TraceDetails
             mode="embedded"
@@ -999,7 +1000,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             traceCorrelationMode === 'dimension-based' &&
             tracesForDimensions.length > 0
           "
-          class="tw:h-full"
+          class="tw:h-full tw:flex tw:flex-col"
         >
           <!-- Header -->
           <div
@@ -1035,7 +1036,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Traces List -->
-          <div style="height: calc(100vh - 11rem)">
+          <div class="tw:flex-1">
             <TracesSearchResultList
               :hits="tracesForDimensions"
               :loading="false"

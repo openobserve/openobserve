@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:flex-col tw:flex-nowrap searchdetaildialog"
+    class="tw:flex tw:flex-col tw:h-full tw:flex-nowrap searchdetaildialog"
     data-test="dialog-box"
   >
     <!-- Single Tab Row -->
@@ -72,12 +72,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OSeparator />
 
-    <div :class="['tab-panels-container tw:h-screen tw:overflow-y-auto', tab.startsWith('correlated-') ? 'full-height-panels' : '']">
+    <div :class="['tab-panels-container tw:h-full tw:overflow-y-auto', tab.startsWith('correlated-') ? 'full-height-panels' : '']">
     <OTabPanels
       data-test="log-detail-tab-container"
       v-model="tab"
       keep-alive
       grow
+      class="tw:overflow-y-auto!"
     >
       <OTabPanel name="json">
         <OCardSection
@@ -532,7 +533,7 @@ export default defineComponent({
     ) {
       this.$emit("add:searchterm", field, field_value, action);
     },
-    searchTimeBoxed(rowData: any, size: number) { 
+    searchTimeBoxed(rowData: any, size: number) {
       this.$emit("search:timeboxed", {
         key: rowData[this.store.state.zoConfig.timestamp_column],
         size: size,
