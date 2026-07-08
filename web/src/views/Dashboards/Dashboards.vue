@@ -32,6 +32,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :subtitle="t('dashboard.subtitle')"
       >
       <template #actions>
+        <!-- Org home dashboard shortcut: shows which dashboard is pinned to
+             the home page and jumps straight to it. -->
+        <OButton
+          v-if="homeDashboard"
+          variant="outline"
+          size="sm"
+          icon-left="keep"
+          class="max-w-60"
+          data-test="dashboard-home-shortcut"
+          @click="openHomeDashboard"
+        >
+          <span class="truncate">{{ homeDashboard.label }}</span>
+        </OButton>
+        <OTooltip
+          v-if="homeDashboard"
+          side="bottom"
+          :content="t('dashboard.openHomeDashboard')"
+        />
         <!-- import dashboard button with dropdown -->
         <ODropdown side="bottom" align="end">
           <template #trigger>
@@ -178,12 +196,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <template #cell-name="{ row, value }">
-              <span
-                class="text-text-primary"
-                :data-test="`dashboard-name-cell-${value}`"
-                :title="value"
-                >{{ value }}</span
-              >
+              <span class="inline-flex items-center gap-1">
+                <span
+                  class="text-text-primary"
+                  :data-test="`dashboard-name-cell-${value}`"
+                  :title="value"
+                  >{{ value }}</span
+                >
+                <!-- At-a-glance indicator: shows which dashboard is the org
+                     home dashboard without an interactive icon on every row. -->
+                <OIcon
+                  v-if="isHome(row.id)"
+                  name="keep"
+                  size="xs"
+                  class="text-primary shrink-0"
+                  :data-test="`dashboard-home-indicator-${value}`"
+                />
+                <OTooltip
+                  v-if="isHome(row.id)"
+                  side="bottom"
+                  :content="t('dashboard.pinnedOnHome')"
+                />
+              </span>
             </template>
             <template #cell-identifier="{ value }">
               <span
@@ -221,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-actions="{ row }">
               <span
-                class="row-actions flex items-center justify-center gap-0.5"
+                class="row-actions flex items-center justify-end gap-0.5"
               >
                 <OButton
                   v-if="row.actions == 'true'"
@@ -252,6 +286,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-row-action="delete"
                   @click.stop="showDeleteDialogFn({ row })"
                 />
+                <!-- Overflow menu (rightmost) — houses the low-frequency "set as
+                     home" action so it doesn't clutter every row with an
+                     always-on icon. Move/Duplicate/Delete stay inline. -->
+                <ODropdown
+                  v-if="row.actions == 'true'"
+                  side="bottom"
+                  align="end"
+                >
+                  <template #trigger>
+                    <OButton
+                      icon-left="more-vert"
+                      :title="t('dashboard.moreActions')"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      data-test="dashboard-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    :icon-left="isHome(row.id) ? 'keep' : 'keep-outline'"
+                    data-test="dashboard-list-set-home-btn"
+                    @select="toggleHome(row)"
+                  >
+                    <span>{{
+                      isHome(row.id)
+                        ? t("dashboard.removeFromHome")
+                        : t("dashboard.setAsHome")
+                    }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </span>
             </template>
             <template #empty>
@@ -478,6 +542,7 @@ import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -550,6 +615,42 @@ export default defineComponent({
 
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
+
+    const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } =
+      useHomeDashboard();
+    const openHomeDashboard = () => {
+      if (!homeDashboard.value) return;
+      router.push({
+        path: "/dashboards/view",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          dashboard: homeDashboard.value.dashboardId,
+          folder: homeDashboard.value.folderId || "default",
+        },
+      });
+    };
+    const toggleHome = (row: any) => {
+      const org = store.state.selectedOrganization?.identifier;
+      if (isHome(row.id)) {
+        clearHomeDashboard(org);
+      } else {
+        // Resolve the folder the SAME way routeToViewD does: row.folder_id is
+        // only populated in search-across-folders mode; in the normal folder
+        // view it is undefined, so fall back to the active folder (default).
+        // This keeps the home dashboard id (dash:<folderId>:<id>) identical to
+        // the one ViewDashboard produces, so setting home from either place is
+        // idempotent and the home dashboard is fetched with a valid folder
+        // (never "undefined").
+        const folderId = searchAcrossFolders.value
+          ? row.folder_id
+          : activeFolderId.value || "default";
+        setHomeDashboard(org, {
+          dashboardId: row.id,
+          folderId,
+          label: row.name,
+        });
+      }
+    };
 
     // Listen for AI assistant dashboard mutations to auto-refresh the list
     const { on: onDashboardEvent, off: offDashboardEvent } =
@@ -640,7 +741,7 @@ export default defineComponent({
           sortable: false,
           isAction: true,
           size: 124,
-          meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
+          meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
         },
       ];
 
@@ -1359,6 +1460,10 @@ export default defineComponent({
       openBulkDeleteDialog,
       bulkDeleteDashboards,
       confirmBulkDelete,
+      isHome,
+      toggleHome,
+      homeDashboard,
+      openHomeDashboard,
     };
   },
   methods: {
