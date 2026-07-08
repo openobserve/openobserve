@@ -327,6 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             v-model="searchObj.meta.serviceGraphLayoutType"
             :options="serviceGraphLayoutOptions"
+            :searchable="false"
             class="w-[7.5rem] min-h-[2rem]! h-[2rem]!"
             :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
             @update:model-value="onServiceGraphLayoutChange"

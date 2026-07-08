@@ -213,9 +213,60 @@ describe("OTable", () => {
         },
       });
       // Should have active sort icon on the sorted column
+      const activeIcon = wrapper.find(
+        '[data-test="o2-table-sort-icon-active"]',
+      );
+      expect(activeIcon.exists()).toBe(true);
+      // The active icon must expose its direction for e2e sort assertions.
+      expect(activeIcon.attributes("data-test-sort-direction")).toBe("asc");
+    });
+
+    it("exposes data-test-sort-direction on every sort icon (asc/desc/none)", () => {
+      // e2e tests read this attribute to detect sort state. Missing it makes
+      // sortByColumn() time out (as it did in CI), so lock it in here.
+      const asc = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns: makeColumns(),
+          sorting: "client",
+          sortBy: "id",
+          sortOrder: "asc",
+        },
+      });
       expect(
-        wrapper.find('[data-test="o2-table-sort-icon-active"]').exists(),
-      ).toBe(true);
+        asc
+          .find('[data-test="o2-table-sort-icon-active"]')
+          .attributes("data-test-sort-direction"),
+      ).toBe("asc");
+
+      const desc = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns: makeColumns(),
+          sorting: "client",
+          sortBy: "id",
+          sortOrder: "desc",
+        },
+      });
+      expect(
+        desc
+          .find('[data-test="o2-table-sort-icon-active"]')
+          .attributes("data-test-sort-direction"),
+      ).toBe("desc");
+
+      // An unsorted sortable column shows the inactive icon with direction none.
+      const none = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns: makeColumns(),
+          sorting: "client",
+        },
+      });
+      expect(
+        none
+          .find('[data-test="o2-table-sort-icon-inactive"]')
+          .attributes("data-test-sort-direction"),
+      ).toBe("none");
     });
   });
 
