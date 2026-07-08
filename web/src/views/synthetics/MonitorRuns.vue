@@ -104,8 +104,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Charts row -->
             <div class="tw:grid tw:grid-cols-2 tw:gap-[0.875rem]">
-              <div class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden">
-                <div class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]">
+              <div
+                class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden"
+              >
+                <div
+                  class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]"
+                >
                   <span class="tw:font-bold tw:text-sm tw:text-text-heading">
                     Response Time
                   </span>
@@ -122,8 +126,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
-              <div class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden">
-                <div class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]">
+              <div
+                class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden"
+              >
+                <div
+                  class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]"
+                >
                   <span class="tw:font-bold tw:text-sm tw:text-text-heading">
                     Errors Over Time
                   </span>
@@ -144,9 +152,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Breakdown cards -->
             <div class="tw:grid tw:grid-cols-3 tw:gap-[0.875rem]">
-              <div class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden">
-                <div class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]">
-                  <OIcon name="public" size="sm" class="tw:text-primary-700" />
+              <div
+                class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden"
+              >
+                <div
+                  class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]"
+                >
+                  <OIcon name="language" size="sm" class="tw:text-primary-700" />
                   <span class="tw:font-bold tw:text-sm tw:text-text-heading">
                     Pass Rate by Browser
                   </span>
@@ -169,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ b.name }}
                     </span>
                     <div
-                      class="tw:flex-1 tw:h-1.5 tw:rounded-full tw:bg-grey-100 tw:overflow-hidden tw:min-w-[40px]"
+                      class="tw:flex-1 tw:h-1.5 tw:rounded-full tw:bg-text-disabled/25! tw:overflow-hidden tw:min-w-[40px]"
                     >
                       <div
                         class="tw:h-full tw:rounded-full"
@@ -185,13 +197,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-              <div class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden">
-                <div class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]">
+              <div
+                class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden"
+              >
+                <div
+                  class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]"
+                >
                   <OIcon
-                    name="distance"
-                    size="sm"
-                    class="tw:text-primary-700"
-                  />
+                  <OIcon name="location-on" size="sm" class="tw:text-primary-700" />
                   <span class="tw:font-bold tw:text-sm tw:text-text-heading">
                     Pass Rate by Location
                   </span>
@@ -203,9 +216,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="l.name"
                     class="tw:flex tw:items-center tw:gap-3 tw:py-[9px] tw:border-b tw:border-border-default tw:last:border-b-0"
                   >
-                    <span
-                      class="tw:w-2 tw:h-2 tw:rounded-full tw:flex-none"
-                      :style="{ background: l.dot }"
+                    <OIcon
+                      :name="l.icon"
+                      size="sm"
+                      class="tw:text-text-secondary tw:flex-none"
                     />
                     <span
                       class="tw:w-[110px] tw:flex-none tw:font-semibold tw:text-xs tw:text-text-heading"
@@ -213,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ l.name }}
                     </span>
                     <div
-                      class="tw:flex-1 tw:h-1.5 tw:rounded-full tw:bg-grey-100 tw:overflow-hidden tw:min-w-[40px]"
+                      class="tw:flex-1 tw:h-1.5 tw:rounded-full tw:bg-text-disabled/25! tw:overflow-hidden tw:min-w-[40px]"
                     >
                       <div
                         class="tw:h-full tw:rounded-full"
@@ -229,8 +243,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-              <div class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden">
-                <div class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]">
+              <div
+                class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden"
+              >
+                <div
+                  class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]"
+                >
                   <OIcon name="devices" size="sm" class="tw:text-primary-700" />
                   <span class="tw:font-bold tw:text-sm tw:text-text-heading">
                     Pass Rate by Device
@@ -254,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ d.name }}
                     </span>
                     <div
-                      class="tw:flex-1 tw:h-1.5 tw:rounded-full tw:bg-grey-100 tw:overflow-hidden tw:min-w-[40px]"
+                      class="tw:flex-1 tw:h-1.5 tw:rounded-full tw:bg-text-disabled/25! tw:overflow-hidden tw:min-w-[40px]"
                     >
                       <div
                         class="tw:h-full tw:rounded-full"
@@ -390,7 +408,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OBadge>
                 </template>
                 <template #cell-scheduled_at="{ row }">
-                  <span class="tw:text-xs tw:text-text-secondary tw:font-mono tw:tabular-nums">
+                  <span
+                    class="tw:text-xs tw:text-text-secondary tw:font-mono tw:tabular-nums"
+                  >
                     {{ (row as VisibleRun).scheduledAt }}
                   </span>
                 </template>
@@ -522,7 +542,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ g.failRate }}
                       </span>
                       <div
-                        class="tw:h-[5px] tw:rounded-full tw:bg-grey-100 tw:overflow-hidden"
+                        class="tw:h-[5px] tw:rounded-full tw:bg-text-disabled/25! tw:overflow-hidden"
                       >
                         <div
                           class="tw:h-full tw:rounded-full"
@@ -540,7 +560,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ g.avgDuration }}
                       </span>
                       <div
-                        class="tw:h-[5px] tw:rounded-full tw:bg-grey-100 tw:overflow-hidden"
+                        class="tw:h-[5px] tw:rounded-full tw:bg-text-disabled/25! tw:overflow-hidden"
                       >
                         <div
                           class="tw:h-full tw:rounded-full tw:bg-primary-400"
@@ -607,7 +627,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >{{ br.name }}</span
                         >
                         <div
-                          class="tw:flex-1 tw:h-1.5 tw:rounded-full tw:bg-grey-100 tw:overflow-hidden"
+                          class="tw:flex-1 tw:h-1.5 tw:rounded-full tw:bg-text-disabled/25! tw:overflow-hidden"
                         >
                           <div
                             class="tw:h-full tw:rounded-full"
@@ -636,7 +656,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >{{ lr.name }}</span
                         >
                         <div
-                          class="tw:flex-1 tw:h-1.5 tw:rounded-full tw:bg-grey-100 tw:overflow-hidden"
+                          class="tw:flex-1 tw:h-1.5 tw:rounded-full tw:tw:bg-text-disabled/25! tw:overflow-hidden"
                         >
                           <div
                             class="tw:h-full tw:rounded-full"
@@ -736,6 +756,11 @@ import MonitorStatusTimelineCustom from "@/views/synthetics/MonitorStatusTimelin
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
 import type { SyntheticRun } from "@/composables/synthetics/syntheticResultsSchema";
+import awsSvgUrl from "@/assets/images/ingestion/aws.svg";
+import gcpSvgUrl from "@/assets/images/ingestion/gcp.svg";
+import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
+import firefoxSvgUrl from "@/assets/images/synthetics/firefox.svg";
+import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";
 
 defineOptions({ name: "SyntheticMonitorRuns" });
 
@@ -873,9 +898,10 @@ interface MockRun {
   };
 }
 
-function generateRuns(
-  timeRange?: { startTimeMs: number; endTimeMs: number },
-): MockRun[] {
+function generateRuns(timeRange?: {
+  startTimeMs: number;
+  endTimeMs: number;
+}): MockRun[] {
   const r = seedRand(77);
   const locations = ["us-east-1", "eu-west-1", "ap-south-1"];
   const browsers = ["Chromium", "Firefox", "WebKit"];
@@ -892,7 +918,11 @@ function generateRuns(
 
   const NUM_LOGICAL_RUNS = 26;
   let idCounter = 1;
-  for (let logicalRunIdx = 0; logicalRunIdx < NUM_LOGICAL_RUNS; logicalRunIdx++) {
+  for (
+    let logicalRunIdx = 0;
+    logicalRunIdx < NUM_LOGICAL_RUNS;
+    logicalRunIdx++
+  ) {
     const runId = "run-" + String(5000 - logicalRunIdx);
     const numExecutions = 3 + Math.floor(r() * 16); // 3–18 executions per run
     const intervalFraction = logicalRunIdx / NUM_LOGICAL_RUNS;
@@ -921,7 +951,9 @@ function generateRuns(
         failedStep,
         locator,
         action: failedStep
-          ? ["Place order", "Go to checkout", "Add to cart"].includes(failedStep)
+          ? ["Place order", "Go to checkout", "Add to cart"].includes(
+              failedStep,
+            )
             ? "click"
             : "type"
           : null,
@@ -968,7 +1000,9 @@ function sparkPts(seed: number, n: number, base: number, vol: number): string {
 // ── State ────────────────────────────────────────────────────────────────
 const activeTab = ref("overview");
 /** Time range from the parent (microseconds). Updated on each refresh call. */
-const timeRangeMicros = ref<{ startTime: number; endTime: number } | null>(null);
+const timeRangeMicros = ref<{ startTime: number; endTime: number } | null>(
+  null,
+);
 
 /** Human-readable window label derived from the time range duration. */
 function formatWindowLabel(startMicros: number, endMicros: number): string {
@@ -983,7 +1017,10 @@ function formatWindowLabel(startMicros: number, endMicros: number): string {
 }
 const windowLabel = computed(() =>
   timeRangeMicros.value
-    ? formatWindowLabel(timeRangeMicros.value.startTime, timeRangeMicros.value.endTime)
+    ? formatWindowLabel(
+        timeRangeMicros.value.startTime,
+        timeRangeMicros.value.endTime,
+      )
     : "Last 24 hours",
 );
 const statusFilter = ref("all");
@@ -1144,8 +1181,7 @@ const kpiCards = computed<KpiCard[]>(() => {
           k.totalRuns > 0
             ? ((k.retriedRuns / k.totalRuns) * 100).toFixed(1) + "%"
             : "—",
-        valueClass:
-          k.retriedRuns > 0 ? "tw:text-text-body!" : undefined,
+        valueClass: k.retriedRuns > 0 ? "tw:text-text-body!" : undefined,
       },
       {
         key: "failed-runs",
@@ -1267,7 +1303,11 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
         ? "All " + executions.length + " passed"
         : status === "all-fail"
           ? "All " + executions.length + " failed"
-          : passCount + " passed, " + failCount + " failed of " + executions.length;
+          : passCount +
+            " passed, " +
+            failCount +
+            " failed of " +
+            executions.length;
 
     const execDetails: TimelineExecution[] = executions.map((e) => ({
       location: e.location,
@@ -1304,12 +1344,25 @@ const timelineMixedCount = computed(() =>
 function formatTimelineDate(ms: number): string {
   const d = new Date(ms);
   const now = new Date();
-  const opts: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit", hourCycle: "h23" };
+  const opts: Intl.DateTimeFormatOptions = {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  };
   if (d.getFullYear() !== now.getFullYear()) {
-    return d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", ...opts });
+    return d.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      ...opts,
+    });
   }
   if (d.getMonth() !== now.getMonth() || d.getDate() !== now.getDate()) {
-    return d.toLocaleString("en-US", { month: "short", day: "numeric", ...opts });
+    return d.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      ...opts,
+    });
   }
   return d.toLocaleTimeString("en-US", opts);
 }
@@ -1327,7 +1380,6 @@ const timelineEndLabel = computed(() => {
 interface BreakdownItem {
   name: string;
   icon?: string;
-  dot?: string;
   pct: string;
   barColor: string;
   textColor: string;
@@ -1341,28 +1393,20 @@ const browserBreakdown = computed<BreakdownItem[]>(() => {
     if (run.status === "pass") g.pass++;
     groups.set(key, g);
   }
-  const icons = ["language", "travel_explore", "explore"];
-  let iconIdx = 0;
+  const browserIconMap: Record<string, string> = {
+    Chromium: "img:" + chromiumSvgUrl,
+    Firefox: "img:" + firefoxSvgUrl,
+    WebKit: "img:" + webkitSvgUrl,
+  };
   return Array.from(groups.entries()).map(([name, g]) => {
     const pct = g.total > 0 ? Math.round((g.pass / g.total) * 100) : 100;
     const entry: BreakdownItem = {
       name,
-      icon: icons[iconIdx % icons.length],
+      icon: browserIconMap[name] || "open-in-browser",
       pct: pct + "%",
-      barColor:
-        pct >= 95
-          ? "var(--o2-status-success-text)"
-          : pct >= 85
-            ? "var(--o2-warning-500)"
-            : "var(--o2-status-error-text)",
-      textColor:
-        pct >= 95
-          ? "var(--o2-success-700)"
-          : pct >= 85
-            ? "var(--o2-warning-700)"
-            : "var(--o2-status-error-text)",
+      barColor: "var(--o2-status-success-text)",
+      textColor: "var(--o2-success-700)",
     };
-    iconIdx++;
     return entry;
   });
 });
@@ -1375,34 +1419,32 @@ const locationBreakdown = computed<BreakdownItem[]>(() => {
     if (run.status === "pass") g.pass++;
     groups.set(key, g);
   }
-  const dotColors = [
-    "var(--o2-status-success-text)",
-    "var(--o2-warning-500)",
-    "var(--o2-status-error-text)",
-    "var(--o2-primary-500)",
-    "var(--o2-text-secondary)",
-  ];
-  let dotIdx = 0;
+
+  function getIconForRegion(region: string): string {
+    // Handle prefixed names like "aws-us-east-1", "gcp-us-central1", "azure-eastus"
+    const prefix = region.split("-")[0].toLowerCase();
+    if (prefix === "aws") return "img:" + awsSvgUrl;
+    if (prefix === "gcp") return "img:" + gcpSvgUrl;
+
+    // AWS format: xx-xxxx-N (us-east-1, eu-west-1, ap-south-1)
+    if (/^[a-z]{2}-[a-z]+-\d+$/.test(region))
+      return "img:" + awsSvgUrl;
+    // GCP format: xxx-xxxxN (us-central1, europe-west1)
+    if (/^[a-z]+-[a-z]+\d*$/.test(region))
+      return "img:" + gcpSvgUrl;
+    // Azure or just a single word like "eastus", "westeurope"
+    return "location-on";
+  }
+
   return Array.from(groups.entries()).map(([name, g]) => {
     const pct = g.total > 0 ? Math.round((g.pass / g.total) * 100) : 100;
     const entry: BreakdownItem = {
       name,
-      dot: dotColors[dotIdx % dotColors.length],
+      icon: getIconForRegion(name),
       pct: pct + "%",
-      barColor:
-        pct >= 95
-          ? "var(--o2-status-success-text)"
-          : pct >= 85
-            ? "var(--o2-warning-500)"
-            : "var(--o2-status-error-text)",
-      textColor:
-        pct >= 95
-          ? "var(--o2-success-700)"
-          : pct >= 85
-            ? "var(--o2-warning-700)"
-            : "var(--o2-status-error-text)",
+      barColor: "var(--o2-status-success-text)",
+      textColor: "var(--o2-success-700)",
     };
-    dotIdx++;
     return entry;
   });
 });
@@ -1416,8 +1458,8 @@ const deviceBreakdown = computed<BreakdownItem[]>(() => {
     groups.set(key, g);
   }
   const iconMap: Record<string, string> = {
-    Desktop: "computer",
-    Mobile: "smartphone",
+    Desktop: "window",
+    Mobile: "touch-app",
   };
   return Array.from(groups.entries()).map(([name, g]) => {
     const pct = g.total > 0 ? Math.round((g.pass / g.total) * 100) : 100;
@@ -1425,18 +1467,8 @@ const deviceBreakdown = computed<BreakdownItem[]>(() => {
       name,
       icon: iconMap[name] || "devices",
       pct: pct + "%",
-      barColor:
-        pct >= 95
-          ? "var(--o2-status-success-text)"
-          : pct >= 85
-            ? "var(--o2-warning-500)"
-            : "var(--o2-status-error-text)",
-      textColor:
-        pct >= 95
-          ? "var(--o2-success-700)"
-          : pct >= 85
-            ? "var(--o2-warning-700)"
-            : "var(--o2-status-error-text)",
+      barColor: "var(--o2-status-success-text)",
+      textColor: "var(--o2-success-700)",
     };
   });
 });
@@ -1500,7 +1532,12 @@ const visibleRuns = computed<VisibleRun[]>(() => {
 
 const runColumns: OTableColumnDef[] = [
   { id: "status", header: "Status", accessorKey: "status", size: 110 },
-  { id: "scheduled_at", header: "Scheduled At", accessorKey: "scheduledAt", size: 160 },
+  {
+    id: "scheduled_at",
+    header: "Scheduled At",
+    accessorKey: "scheduledAt",
+    size: 160,
+  },
   {
     id: "duration",
     header: "Duration",
@@ -1511,7 +1548,12 @@ const runColumns: OTableColumnDef[] = [
   { id: "location", header: "Location", accessorKey: "location", size: 110 },
   { id: "browser", header: "Browser", accessorKey: "browser", size: 100 },
   { id: "device", header: "Device", accessorKey: "device", size: 90 },
-  { id: "trigger_type", header: "Trigger", accessorKey: "triggerType", size: 90 },
+  {
+    id: "trigger_type",
+    header: "Trigger",
+    accessorKey: "triggerType",
+    size: 90,
+  },
 ];
 
 // ── Step groups ──────────────────────────────────────────────────────────
@@ -1691,7 +1733,9 @@ const responseChartOption = computed(() => {
   let seriesData: [number, number][];
   if (synthetics.hasLoadedOnce.value && synthetics.buckets.value.length > 0) {
     // p95 per bucket
-    seriesData = synthetics.buckets.value.map((b) => [b.tsMs, b.p95Ms] as [number, number]);
+    seriesData = synthetics.buckets.value.map(
+      (b) => [b.tsMs, b.p95Ms] as [number, number],
+    );
   } else {
     const rB = seedRand(31);
     const bucketCount = 24;
@@ -1761,7 +1805,10 @@ const errorChartOption = computed(() => {
   if (synthetics.hasLoadedOnce.value && synthetics.buckets.value.length > 0) {
     categories = synthetics.buckets.value.map((b) => {
       const d = new Date(b.tsMs);
-      return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+      return d.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     });
     data = synthetics.buckets.value.map((b) => b.failedRuns);
   } else {
@@ -1773,7 +1820,10 @@ const errorChartOption = computed(() => {
     for (let i = 0; i < bucketCount; i++) {
       const date = new Date(now - (bucketCount - i) * 3600000);
       categories.push(
-        date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+        date.toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
       );
       data.push(Math.max(0, Math.round(rB() < 0.25 ? 1 + rB() * 2 : 0)));
     }
