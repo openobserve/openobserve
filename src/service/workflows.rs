@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use config::meta::pipeline::components::NodeData;
 use infra::table::workflows::{self, Workflow, WorkflowError, WorkflowRunErrors};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
@@ -126,7 +127,7 @@ async fn get_inputs_file_data(errors: &WorkflowRunErrors) -> Result<bytes::Bytes
     ))
 }
 
-fn validate_workflow(workflow: &Workflow) -> Result<(), anyhow::Error> {
+async fn validate_workflow(workflow: &Workflow) -> Result<(), anyhow::Error> {
     for node in &workflow.nodes {
         if !node.data.is_workflow_node() {
             return Err(anyhow::anyhow!(
@@ -134,19 +135,33 @@ fn validate_workflow(workflow: &Workflow) -> Result<(), anyhow::Error> {
                 node.id
             ));
         }
+        if let NodeData::Destination(ref destination) = node.data {
+            let (dest, _) = crate::service::alerts::destinations::get_with_template(
+                &workflow.org_id,
+                &destination.destination_id,
+            )
+            .await?;
+            if !dest.is_pipeline_destination() {
+                return Err(anyhow::anyhow!(
+                    "destination {} is not a workflow compatible destination",
+                    destination.destination_id
+                ));
+            }
+        }
     }
+
     config::meta::pipeline::validate_nodes_edges(&workflow.nodes, &workflow.edges)?;
     Ok(())
 }
 
 pub async fn save_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
-    validate_workflow(&workflow)?;
+    validate_workflow(&workflow).await?;
     db::workflows::save_workflow(workflow).await?;
     Ok(())
 }
 
 pub async fn update_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
-    validate_workflow(&workflow)?;
+    validate_workflow(&workflow).await?;
     db::workflows::update_workflow(workflow).await?;
     Ok(())
 }

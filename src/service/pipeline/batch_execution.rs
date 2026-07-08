@@ -26,10 +26,14 @@ use async_trait::async_trait;
 use chrono::Utc;
 use config::{
     meta::{
+        destinations::Module,
         function::{Transform, VRLResultResolver},
-        pipeline::{Pipeline, PipelineKind, components::NodeData},
+        pipeline::{
+            Pipeline, PipelineKind,
+            components::{NodeData, WorkflowDestination},
+        },
         self_reporting::error::{ErrorData, ErrorSource, NodeErrors, PipelineError},
-        stream::{StreamParams, StreamType},
+        stream::{RemoteStreamParams, StreamParams, StreamType},
     },
     metrics,
     stats::MemorySize,
@@ -1062,6 +1066,7 @@ impl ExecutableNode {
             NodeData::Query(_) => "query".to_string(),
             NodeData::LlmEvaluation(p) => format!("llm_evaluation:{}", p.name),
             NodeData::WorkflowTrigger => "workflow_trigger".to_string(),
+            NodeData::Destination(d) => format!("destination:{}", d.destination_id),
         }
     }
 }
@@ -1076,6 +1081,7 @@ impl std::fmt::Display for ExecutableNode {
             NodeData::RemoteStream(_) => write!(f, "remote_stream"),
             NodeData::LlmEvaluation(_) => write!(f, "llm_evaluation"),
             NodeData::WorkflowTrigger => write!(f, "workflow_trigger"),
+            NodeData::Destination(_) => write!(f, "destination"),
         }
     }
 }
@@ -1247,6 +1253,27 @@ async fn process_node(
             }
             log::info!(
                 "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {node_idx} skipped {skipped_count} records",
+                metadata.pipeline_name
+            );
+            0
+        }
+
+        #[cfg(feature = "enterprise")]
+        NodeData::Destination(dest) => {
+            process_destination_node(metadata, channels, &node, dest).await?
+        }
+        #[cfg(not(feature = "enterprise"))]
+        NodeData::Destination(dest) => {
+            log::warn!(
+                "[Workflow] {} [inv={inv_id}]: Destination node {node_idx} skipped because workflows are enterprise-only",
+                metadata.pipeline_name
+            );
+            let mut skipped_count = 0usize;
+            while channels.receiver.recv().await.is_some() {
+                skipped_count += 1;
+            }
+            log::info!(
+                "[Pipeline] {} [inv={inv_id}]: destination {node_idx} skipped {skipped_count} records",
                 metadata.pipeline_name
             );
             0
@@ -2297,6 +2324,52 @@ async fn process_stream_node(
         );
     }
     count
+}
+
+async fn process_destination_node(
+    metadata: ProcessMetadata,
+    channels: ProcessChannels,
+    node: &ExecutableNode,
+    destination: &WorkflowDestination,
+) -> Result<usize, anyhow::Error> {
+    let (dest, _) = crate::service::alerts::destinations::get_with_template(
+        &metadata.org_id,
+        &destination.destination_id,
+    )
+    .await?;
+
+    match dest.module {
+        Module::Alert { .. } => {
+            if let Err(send_err) = channels
+                .error_sender
+                .send((
+                    node.id.to_string(),
+                    node.node_type(),
+                    format!(
+                        "destination {} is an alert destination and not not supported in workflows",
+                        destination.destination_id
+                    ),
+                    None,
+                    None,
+                ))
+                .await
+            {
+                log::error!(
+                    "[Pipeline] {} [inv={}]: LeafNode failed sending errors for collection caused by: {send_err}",
+                    metadata.pipeline_name,
+                    metadata.inv_id,
+                );
+            }
+            return Ok(0);
+        }
+        Module::Pipeline { .. } => {
+            let params = RemoteStreamParams {
+                org_id: metadata.org_id.clone().into(),
+                destination_name: destination.destination_id.clone().into(),
+            };
+            return process_remote_stream_node(&params, metadata, node, channels).await;
+        }
+    }
 }
 
 #[cfg(feature = "enterprise")]

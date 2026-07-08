@@ -73,6 +73,8 @@ pub enum DestinationError {
     EmailSendFailed(String),
     #[error("LLM Evaluation destinations are only supported for pipelines, not alerts")]
     NotSupportedAlertDestinationType,
+    #[error("Destination is currently used by workflow: {0}")]
+    UsedByWorkflow(String),
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationError> {

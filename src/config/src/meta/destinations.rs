@@ -36,6 +36,9 @@ impl Destination {
     pub fn is_alert_destinations(&self) -> bool {
         matches!(&self.module, Module::Alert { .. })
     }
+    pub fn is_pipeline_destination(&self) -> bool {
+        matches!(&self.module, Module::Pipeline { .. })
+    }
 }
 
 impl MemorySize for Destination {

@@ -112,6 +112,19 @@ impl MemorySize for DerivedStream {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct WorkflowDestination {
+    pub destination_id: String,
+    pub template_override: Option<String>,
+}
+impl MemorySize for WorkflowDestination {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<WorkflowDestination>()
+            + self.destination_id.mem_size()
+            + self.template_override.mem_size()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct Node {
@@ -228,6 +241,7 @@ pub enum NodeData {
     Condition(ConditionParams),
     LlmEvaluation(LlmEvaluationParams),
     WorkflowTrigger,
+    Destination(WorkflowDestination),
 }
 
 impl MemorySize for NodeData {
@@ -241,6 +255,7 @@ impl MemorySize for NodeData {
                 NodeData::Condition(condition_params) => condition_params.mem_size(),
                 NodeData::LlmEvaluation(llm_evaluation_params) => llm_evaluation_params.mem_size(),
                 NodeData::WorkflowTrigger => 0, // no sub-members
+                NodeData::Destination(dest) => dest.mem_size(),
             }
     }
 }
@@ -259,7 +274,11 @@ impl NodeData {
     }
     pub fn is_workflow_node(&self) -> bool {
         match self {
-            Self::WorkflowTrigger | Self::Query(_) | Self::Function(_) | Self::Condition(_) => true,
+            Self::WorkflowTrigger
+            | Self::Query(_)
+            | Self::Function(_)
+            | Self::Condition(_)
+            | Self::Destination(_) => true,
             _ => false,
         }
     }
