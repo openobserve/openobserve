@@ -16,17 +16,11 @@ test.describe("Unflattened testcases", () => {
     return text.replace(/[^\x00-\x7F]/g, " ");
   }
   async function applyQueryButton(page) {
-    // After stream selection, an auto-search may be in progress (button shows
-    // "Cancel").  Clicking refresh while a search is running just cancels it
-    // without starting a new one.  We click twice: first to cancel any
-    // in-flight search, then again to start a fresh one.
-    await page.waitForTimeout(3000);
-
-    // First click — cancels any in-progress auto-search.
-    await pageManager.logsPage.runQueryAndWaitForResults();
-
-    // Second click — reliably starts a new search now that no search is running.
-    await page.waitForTimeout(1000);
+    // runQueryAndWaitForResults already handles an in-flight auto-search internally:
+    // it waits for the button to exit the "Cancel" state before clicking, and if the
+    // state never clears it cancels and re-clicks Run itself. The old double-click
+    // wrapper (3s sleep + run + 1s sleep + run) duplicated that logic and added ~5s
+    // of fixed sleep to every call.
     await pageManager.logsPage.runQueryAndWaitForResults();
 
     // 2-minute timeout: cloud re-indexing after Store Original Data changes takes longer than the default 30s
@@ -42,11 +36,12 @@ test.describe("Unflattened testcases", () => {
       await pageManager.loginPage.loginAsInternalUser();
       await pageManager.loginPage.login();
     }
-    await page.waitForTimeout(2000);
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('domcontentloaded');
     await ingestion(page);
-    // Wait for data to be indexed before navigating to logs
-    await page.waitForTimeout(2000);
+    // Wait for the stream to actually be queryable instead of a blind 2s sleep —
+    // deterministic (usually instant once the stream exists) and more tolerant on
+    // slow CI runners than a fixed pause.
+    await pageManager.logsPage.waitForStreamAvailable('e2e_automate', 30000, 1000);
 
     // Check and disable Store Original Data if it's enabled.
     // Navigate directly to the streams URL with the correct org — clicking the
