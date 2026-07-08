@@ -15,15 +15,29 @@
 import { PrebuiltConfig } from './types';
 
 const TEAMS_WEBHOOK_ALLOWED_HOSTS = ['outlook.office.com', 'webhook.office.com'];
+const LOGIC_APPS_HOST_REGEX = /(^|\.)logic\.azure\.com$/;
+
+const POWER_AUTOMATE_HOST_REGEX =
+  /^[a-z0-9]+\.[0-9]+\.environment\.api\.powerplatform\.com$/;
+const POWER_AUTOMATE_PATH_REGEX =
+  /^\/powerautomate\/automations\/direct(?:\/cu\/[0-9]+)?\/workflows\/[a-f0-9-]+\/triggers\/manual\/paths\/invoke\/?$/;
 
 function isValidTeamsWebhookUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') return false;
+
     const hostname = parsed.hostname.toLowerCase();
-    return (
-      parsed.protocol === 'https:' &&
-      TEAMS_WEBHOOK_ALLOWED_HOSTS.includes(hostname)
-    );
+
+    const isLegacyWebhook =
+      TEAMS_WEBHOOK_ALLOWED_HOSTS.includes(hostname) ||
+      LOGIC_APPS_HOST_REGEX.test(hostname);
+
+    const isPowerAutomateWebhook =
+      POWER_AUTOMATE_HOST_REGEX.test(hostname) &&
+      POWER_AUTOMATE_PATH_REGEX.test(parsed.pathname);
+
+    return isLegacyWebhook || isPowerAutomateWebhook;
   } catch {
     return false;
   }

@@ -58,9 +58,24 @@ describe('msteams template', () => {
       expect(typeof msteamsConfig.urlValidator).toBe('function');
     });
 
-    it('URL validator accepts valid MS Teams webhook URLs', () => {
+    it('URL validator accepts valid legacy MS Teams webhook URLs', () => {
       expect(msteamsConfig.urlValidator('https://outlook.office.com/webhook/xxx')).toBe(true);
       expect(msteamsConfig.urlValidator('https://webhook.office.com/webhookb2/xxx')).toBe(true);
+      expect(msteamsConfig.urlValidator('https://default.logic.azure.com/workflows/xxx/triggers/manual/paths/invoke')).toBe(true);
+    });
+
+    it('URL validator accepts valid Power Automate webhook URLs', () => {
+      expect(
+        msteamsConfig.urlValidator(
+          'https://default.1.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/abc123/triggers/manual/paths/invoke?api-version=1&sig=abc123'
+        )
+      ).toBe(true);
+      // Optional "cu/<n>" segment some tenants show (appears before "workflows")
+      expect(
+        msteamsConfig.urlValidator(
+          'https://default.1.environment.api.powerplatform.com/powerautomate/automations/direct/cu/1/workflows/abc123/triggers/manual/paths/invoke'
+        )
+      ).toBe(true);
     });
 
     it('URL validator rejects invalid URLs', () => {
@@ -68,6 +83,12 @@ describe('msteams template', () => {
       expect(msteamsConfig.urlValidator('http://outlook.office.com/webhook/xxx')).toBe(false);
       expect(msteamsConfig.urlValidator('https://evil.com?outlook.office.com=fake')).toBe(false);
       expect(msteamsConfig.urlValidator('invalid-url')).toBe(false);
+      expect(
+        msteamsConfig.urlValidator(
+          'https://default.1.environment.api.powerplatform.com/powerautomate/automations/direct/workflows/abc123/triggers/manual/paths/wrong'
+        )
+      ).toBe(false);
+      expect(msteamsConfig.urlValidator('http://default.1.environment.api.powerplatform.com/powerautomate/automations/direct/workflows/abc123/triggers/manual/paths/invoke')).toBe(false);
     });
 
     it('webhook URL validator validates MS Teams URLs', () => {
