@@ -26,9 +26,14 @@ import { z } from "zod";
 export const functionNameRegex = /^[A-Z_][A-Z0-9_]*$/i;
 
 export const addFunctionSchema = z.object({
+  // NO .trim(): OForm/TanStack validates with the schema but SAVES the raw form
+  // value, so a .trim() would let "myfunc " PASS validation (the regex judges the
+  // trimmed copy) yet persist the space — breaking pipeline/query references to
+  // the function. Validate the RAW value; the anchored regex already rejects any
+  // leading/trailing whitespace (a leading space fails the first-char class, a
+  // trailing space fails the `$`).
   name: z
     .string()
-    .trim()
     .min(1, "Field is required!")
     .regex(
       functionNameRegex,

@@ -33,10 +33,15 @@ describe("AddFunction.schema", () => {
       }
     });
 
-    it("trims the name", () => {
-      const res = addFunctionSchema.safeParse({ name: "  myFn  " });
-      expect(res.success).toBe(true);
-      if (res.success) expect(res.data.name).toBe("myFn");
+    it("rejects a name with leading/trailing whitespace (validated raw, no schema .trim())", () => {
+      // Regression guard: OForm/TanStack validates with the schema but SAVES the
+      // raw form value, so a schema .trim() would let a padded name PASS yet
+      // persist the space. The name must be validated raw and rejected.
+      expect(addFunctionSchema.safeParse({ name: "  myFn  " }).success).toBe(false);
+      expect(addFunctionSchema.safeParse({ name: "myfunc " }).success).toBe(false);
+      expect(addFunctionSchema.safeParse({ name: " myfunc" }).success).toBe(false);
+      // A clean name still passes.
+      expect(addFunctionSchema.safeParse({ name: "myfunc" }).success).toBe(true);
     });
   });
 

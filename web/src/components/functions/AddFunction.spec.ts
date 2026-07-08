@@ -194,6 +194,23 @@ describe('AddFunction.vue Branch Coverage', () => {
       expect(form.state.isValid).toBe(false);
       expect(createSpy).not.toHaveBeenCalled();
     });
+
+    it('blocks submit for a name with trailing whitespace — raw value validated, service NOT called', async () => {
+      // End-to-end regression guard: OForm SAVES the raw form value, so a schema
+      // .trim() would let "myfunc " pass validation yet persist the space. The
+      // raw value must be rejected and the save blocked (no auto-strip-then-save).
+      const jsTransformService = (await import('@/services/jstransform')).default;
+      const createSpy = vi.spyOn(jsTransformService, 'create');
+
+      const wrapper = mountAddFunction({ ...defaultProps, isUpdated: false });
+      const form = getForm(wrapper);
+      form.setFieldValue('name', 'myfunc ');
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(form.state.isValid).toBe(false);
+      expect(createSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('Error Handling Branch Coverage', () => {
