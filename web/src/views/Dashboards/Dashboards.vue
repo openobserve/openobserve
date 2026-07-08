@@ -32,6 +32,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :subtitle="t('dashboard.subtitle')"
       >
       <template #actions>
+        <!-- Org home dashboard shortcut: shows which dashboard is pinned to
+             the home page and jumps straight to it. -->
+        <OButton
+          v-if="homeDashboard"
+          variant="outline"
+          size="sm"
+          icon-left="keep"
+          class="max-w-60"
+          data-test="dashboard-home-shortcut"
+          @click="openHomeDashboard"
+        >
+          <span class="truncate">{{ homeDashboard.label }}</span>
+        </OButton>
+        <OTooltip
+          v-if="homeDashboard"
+          side="bottom"
+          :content="t('dashboard.openHomeDashboard')"
+        />
         <!-- import dashboard button with dropdown -->
         <ODropdown side="bottom" align="end">
           <template #trigger>
@@ -192,8 +210,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="keep"
                   size="xs"
                   class="text-primary shrink-0"
-                  :title="t('dashboard.isHomeDashboard')"
                   :data-test="`dashboard-home-indicator-${value}`"
+                />
+                <OTooltip
+                  v-if="isHome(row.id)"
+                  side="bottom"
+                  :content="t('dashboard.pinnedOnHome')"
                 />
               </span>
             </template>
@@ -594,8 +616,19 @@ export default defineComponent({
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
 
-    const { isHome, setHomeDashboard, clearHomeDashboard } =
+    const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } =
       useHomeDashboard();
+    const openHomeDashboard = () => {
+      if (!homeDashboard.value) return;
+      router.push({
+        path: "/dashboards/view",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          dashboard: homeDashboard.value.dashboardId,
+          folder: homeDashboard.value.folderId || "default",
+        },
+      });
+    };
     const toggleHome = (row: any) => {
       const org = store.state.selectedOrganization?.identifier;
       if (isHome(row.id)) {
@@ -1429,6 +1462,8 @@ export default defineComponent({
       confirmBulkDelete,
       isHome,
       toggleHome,
+      homeDashboard,
+      openHomeDashboard,
     };
   },
   methods: {

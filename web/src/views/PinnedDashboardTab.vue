@@ -14,11 +14,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="pinned-dashboard-tab h-full flex flex-col min-h-0">
-    <div v-if="isLoading" class="flex flex-col gap-2 q-pa-sm">
+    <div v-if="isLoading" class="flex flex-col gap-2">
       <OSkeleton v-for="i in 3" :key="i" class="h-[8rem]" />
     </div>
     <template v-else-if="dashboardData">
-      <div class="flex justify-end items-center gap-2 q-px-sm q-py-sm shrink-0">
+      <div class="flex justify-end items-center gap-2 px-4 py-2 shrink-0 border-b border-border-default">
         <DateTimePickerDashboard
           v-if="selectedDate"
           ref="dateTimePicker"
@@ -34,12 +34,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @trigger="refreshData"
           size="sm"
         />
+        <OButton
+          variant="outline"
+          size="icon-toolbar"
+          icon-left="refresh"
+          data-test="pinned-dashboard-refresh-btn"
+          @click="refreshData"
+        >
+          <OTooltip content="Refresh" />
+        </OButton>
       </div>
       <div class="flex-1 min-h-0 overflow-auto">
         <RenderDashboardCharts
           ref="renderRef"
           :view-only="true"
           :show-tabs="true"
+          :frame="false"
           :dashboard-data="dashboardData"
           :current-time-obj="currentTimeObj"
           :initial-variable-values="{}"
@@ -58,6 +68,8 @@ import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue"
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const props = defineProps<{ dashboardId: string; folderId: string }>();
 const emit = defineEmits<{

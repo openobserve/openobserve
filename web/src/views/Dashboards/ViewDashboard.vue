@@ -63,8 +63,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
               :variant="isHome(dashboardId) ? 'secondary' : 'outline'"
-              size="sm"
-              :class="isHome(dashboardId) ? 'text-primary' : ''"
+              size="sm-toolbar"
+              :class="
+                isHome(dashboardId)
+                  ? 'text-primary border border-button-outline-border'
+                  : ''
+              "
               @click="toggleHomeDashboard"
               data-test="dashboard-view-set-home-btn"
               :icon-left="isHome(dashboardId) ? 'keep' : 'keep-outline'"
@@ -74,14 +78,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? t("dashboard.isHomeDashboard")
                   : t("dashboard.setAsHome")
               }}
-              <OTooltip
-                :content="
-                  isHome(dashboardId)
-                    ? t('dashboard.removeFromHome')
-                    : t('dashboard.setAsHomeDesc')
-                "
-              />
             </OButton>
+            <OTooltip
+              v-if="!isFullscreen && store.state.printMode !== true"
+              :content="
+                isHome(dashboardId)
+                  ? t('dashboard.removeFromHome')
+                  : t('dashboard.setAsHomeDesc')
+              "
+            />
             <OButton
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"

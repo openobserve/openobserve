@@ -66,21 +66,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="home-tab-close q-ml-xs"
                 :data-test="`home-tab-close-${tab.id}`"
                 :aria-label="t('home.removeHomeDashboard')"
-                :title="t('home.removeHomeDashboard')"
                 @mousedown.stop.prevent
                 @pointerdown.stop.prevent
                 @click.stop.prevent="onCloseTab(tab.id)"
               >
                 &times;
               </button>
+              <OTooltip
+                v-if="tab.id.startsWith('dash:')"
+                side="bottom"
+                :content="t('home.removeHomeDashboard')"
+              />
             </OTab>
           </OTabs>
         </template>
       </AppPageHeader>
 
       <!-- Body: padded wrapper that holds the active tab panel. Padding lives
-           here (not on the root) so the header above stays full-bleed. -->
-      <div class="flex-1 min-h-0 flex flex-col pt-px px-2.5 pb-2.5">
+           here (not on the root) so the header above stays full-bleed. The
+           pinned dashboard tab opts out: its actions row draws a full-bleed
+           divider (like the header's) and the dashboard grid pads itself. -->
+      <div
+        class="flex-1 min-h-0 flex flex-col"
+        :class="activeHomeTab.startsWith('dash:') ? '' : 'pt-px px-2.5 pb-2.5'"
+      >
         <!-- O2 AI Assistant tab -->
         <div v-if="activeHomeTab === 'ai'" class="home-ai-panel flex-1 min-h-0 flex flex-row overflow-hidden">
           <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
@@ -142,6 +151,7 @@ import O2AIChat from "@/components/O2AIChat.vue";
 import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import PinnedDashboardTab from "@/views/PinnedDashboardTab.vue";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
@@ -334,6 +344,7 @@ export default defineComponent({
     HomeChatHistory,
     OTabs,
     OTab,
+    OTooltip,
     AppPageHeader,
     PinnedDashboardTab,
   },
