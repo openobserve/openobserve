@@ -260,7 +260,11 @@
               v-else-if="!graphData.nodes.length"
               class="flex h-full items-center justify-center"
             >
-              <ServiceGraphNoDataState />
+              <ServiceGraphNoDataState
+                @jump-to-stream-data="
+                  (from, to) => $emit('jump-to-stream-data', from, to)
+                "
+              />
             </div>
             <div
               v-else
@@ -436,7 +440,7 @@ export default defineComponent({
     OToggleGroupItem,
     ServiceGraphNoDataState,
   },
-  emits: ["view-traces", "request:stream-change"],
+  emits: ["view-traces", "request:stream-change", "jump-to-stream-data"],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();

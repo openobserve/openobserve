@@ -16,9 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   EmptyBox — clean, object-only "nothing here yet" illustration: an open box with
-  a dashed placeholder item hovering above it. No character. Micro-animation: the
-  placeholder lifts/settles and pulses, sparkles twinkle. Brand-recoloured; CSS
-  motion gated by `animated` + prefers-reduced-motion.
+  a static dashed content-card outline above it (no +/add glyph — that read as
+  a clickable button) and twinkling sparkles. No character. Brand-recoloured;
+  CSS motion gated by `animated` + prefers-reduced-motion.
 -->
 <template>
   <svg
@@ -42,11 +42,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <circle cx="46" cy="50" r="2" /><circle cx="198" cy="56" r="2" /><circle cx="38" cy="108" r="1.6" /><circle cx="206" cy="100" r="1.6" /><circle cx="58" cy="34" r="1.6" />
     </g>
 
-    <!-- hovering placeholder item -->
-    <g class="es-item">
+    <!-- drifting fragment above the box — a plain outline, no +/add glyph so it
+         can't be mistaken for a button -->
+    <g opacity="0.7">
       <rect x="100" y="34" width="40" height="34" rx="7" fill="none" stroke="var(--color-primary-400)" stroke-width="2" stroke-dasharray="5 5" />
-      <line x1="120" y1="44" x2="120" y2="58" stroke="var(--color-primary-500)" stroke-width="2.5" stroke-linecap="round" />
-      <line x1="113" y1="51" x2="127" y2="51" stroke="var(--color-primary-500)" stroke-width="2.5" stroke-linecap="round" />
+      <line x1="108" y1="46" x2="132" y2="46" stroke="var(--color-primary-300)" stroke-width="2" stroke-linecap="round" />
+      <line x1="108" y1="54" x2="126" y2="54" stroke="var(--color-primary-300)" stroke-width="2" stroke-linecap="round" />
     </g>
 
     <!-- open box -->
@@ -80,13 +81,9 @@ withDefaults(
 </script>
 
 <style>
-.es-item,
 .es-spark {
   transform-box: fill-box;
   transform-origin: center;
-}
-.es-item {
-  animation: es-hover 3s ease-in-out infinite;
 }
 .es-spark-a {
   animation: es-twinkle 2.4s ease-in-out infinite;
@@ -96,17 +93,6 @@ withDefaults(
   animation-delay: -1s;
 }
 
-@keyframes es-hover {
-  0%,
-  100% {
-    transform: translateY(0);
-    opacity: 0.75;
-  }
-  50% {
-    transform: translateY(-6px);
-    opacity: 1;
-  }
-}
 @keyframes es-twinkle {
   0%,
   100% {
@@ -119,11 +105,11 @@ withDefaults(
   }
 }
 
-.es-static :where(.es-item, .es-spark) {
+.es-static :where(.es-spark) {
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  :where(.es-item, .es-spark) {
+  :where(.es-spark) {
     animation: none;
   }
 }

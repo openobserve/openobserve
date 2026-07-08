@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Each card routes to a distinct, real ingestion path in OpenObserve.
 -->
 <template>
-  <OEmptyState illustration="hourglass" size="hero" :hide-action="true">
+  <OEmptyState illustration="connect" size="hero" :hide-action="true">
     <template #title>{{ t("logs.noData.title") }}</template>
 
     <template #description>
