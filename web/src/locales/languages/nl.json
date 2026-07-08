@@ -2586,7 +2586,17 @@
     "maxSeriesPerQueryValidation": "De waarde moet tussen 1.000 en 1.000.000 liggen, of als standaardwaarde leeg laten",
     "systemDefault": "standaardinstelling van het systeem",
     "usageStreamEnabledLabel": "Usage Stream inschakelen",
-    "aiToolsets": "AI-toolsets"
+    "aiToolsets": "AI-toolsets",
+    "blockSpecificUsers": "Blokkeer alleen specifieke gebruikers van {domain}",
+    "blockAllUsersFromDomain": "Blokkeer alle gebruikers van {domain}",
+    "allUsersBlockedMessage": "Alle externe SSO-gebruikers met e-mailadressen die eindigen op {domain} worden uit het systeem geblokkeerd (gebruikersinterface, API en opname).",
+    "blockedUsersHint": "Geblokkeerde vermeldingen zijn alleen van toepassing op externe SSO-identiteiten (SSO-gebruikers en SSO-/tokenserviceaccounts). Ze negeren elke toestemingsregel en hebben betrekking op de gebruikersinterface, API en opname. Native accounts en door de API aangemaakte accounts worden niet beïnvloed. Verwijder ze in plaats daarvan.",
+    "addBlockedEmail": "E-mailadres blokkeren",
+    "blockedEmailPlaceholder": "bijv. gebruiker {domain}",
+    "domainNeedsBlockedEmails": "Domein '{domain}' moet minstens één e-mailadres hebben om specifieke gebruikers te kunnen blokkeren",
+    "confirmRemoveBlockedEmail": "Weet je zeker dat je de e-mail '{email}' wilt deblokkeren?",
+    "blockedEmailAdded": "E-mailadres succesvol geblokkeerd",
+    "blockedEmailRemoved": "E-mailadres succesvol gedeblokkeerd"
   },
   "iam": {
     "users": "Gebruikers",

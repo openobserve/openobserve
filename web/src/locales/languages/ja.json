@@ -2596,7 +2596,17 @@
     "maxSeriesPerQueryValidation": "値は1,000から1,000,000の間でなければなりません。デフォルトでは空白のままにしてください",
     "systemDefault": "システムデフォルト",
     "usageStreamEnabledLabel": "使用ストリームを有効にする",
-    "aiToolsets": "AI ツールセット"
+    "aiToolsets": "AI ツールセット",
+    "blockSpecificUsers": "{domain} の特定のユーザーのみをブロックする",
+    "blockAllUsersFromDomain": "{domain} のすべてのユーザーをブロックする",
+    "allUsersBlockedMessage": "メールアドレスが {domain} で終わるすべての外部SSOユーザーは、システム（UI、API、インジェスト）からブロックされます。",
+    "blockedUsersHint": "ブロックされたエントリは、外部 SSO ID (SSO ユーザーと SSO/トークンサービスアカウント) にのみ適用されます。これらは許可ルールよりも優先され、UI、API、インジェストが対象となります。ネイティブアカウントと API で作成されたアカウントは影響を受けません。代わりに削除してください。",
+    "addBlockedEmail": "メールをブロック",
+    "blockedEmailPlaceholder": "例:ユーザー {ドメイン}",
+    "domainNeedsBlockedEmails": "特定のユーザーをブロックする場合、ドメイン '{domain}' には少なくとも 1 つのメールアドレスが必要です",
+    "confirmRemoveBlockedEmail": "メール '{email}' のブロックを解除してよろしいですか？",
+    "blockedEmailAdded": "Eメールアドレスが正常にブロックされました",
+    "blockedEmailRemoved": "メールアドレスのブロックが正常に解除されました"
   },
   "iam": {
     "users": "ユーザー",

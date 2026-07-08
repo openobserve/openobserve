@@ -2575,7 +2575,17 @@
     "maxSeriesPerQueryValidation": "Der Wert muss zwischen 1.000 und 1.000.000 liegen oder als Standardeinstellung leer lassen",
     "systemDefault": "Systemstandard",
     "usageStreamEnabledLabel": "Nutzungsstream aktivieren",
-    "aiToolsets": "KI-Toolsets"
+    "aiToolsets": "KI-Toolsets",
+    "blockSpecificUsers": "Blockiere nur bestimmte Benutzer von {domain}",
+    "blockAllUsersFromDomain": "Blockiere alle Benutzer von {domain}",
+    "allUsersBlockedMessage": "Alle externen SSO-Benutzer mit E-Mail-Adressen, die auf {domain} enden, werden vom System blockiert (UI, API und Ingestion).",
+    "blockedUsersHint": "Blockierte Einträge gelten nur für externe SSO-Identitäten (SSO-Benutzer und SSO-/Token-Dienstkonten). Sie setzen alle Zulassungsregeln außer Kraft und decken UI, API und Ingestion ab. Systemeigene und API-erstellte Konten sind nicht betroffen — löschen Sie sie stattdessen.",
+    "addBlockedEmail": "E-Mail blockieren",
+    "blockedEmailPlaceholder": "z. B. user {domain}",
+    "domainNeedsBlockedEmails": "Domain '{domain}' muss mindestens eine E-Mail-Adresse haben, wenn bestimmte Benutzer blockiert werden",
+    "confirmRemoveBlockedEmail": "Bist du sicher, dass du die E-Mail '{email}' entsperren möchtest?",
+    "blockedEmailAdded": "E-Mail-Adresse wurde erfolgreich gesperrt",
+    "blockedEmailRemoved": "E-Mail-Adresse wurde erfolgreich entsperrt"
   },
   "iam": {
     "users": "Nutzer",

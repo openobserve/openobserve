@@ -2586,7 +2586,17 @@
     "maxSeriesPerQueryValidation": "Değer 1.000 ile 1.000.000 arasında olmalı veya varsayılan olarak boş bırakılmalıdır",
     "systemDefault": "sistem varsayılan",
     "usageStreamEnabledLabel": "Kullanım Akışını Etkinleştir",
-    "aiToolsets": "Yapay Zeka Araç Setleri"
+    "aiToolsets": "Yapay Zeka Araç Setleri",
+    "blockSpecificUsers": "{domain} 'den yalnızca belirli kullanıcıları engelleyin",
+    "blockAllUsersFromDomain": "{domain} adresindeki tüm kullanıcıları engelleyin",
+    "allUsersBlockedMessage": "{domain} ile biten e-posta adresleri olan tüm harici SSO kullanıcıları sistemden engellenecektir (UI, API ve alım).",
+    "blockedUsersHint": "Engellenen girişler yalnızca harici SSO kimlikleri için geçerlidir (SSO kullanıcıları ve SSO/belirteç hizmet hesapları). Herhangi bir izin kuralını geçersiz kılar ve kullanıcı arayüzü, API ve alımı kapsar. Yerel ve API tarafından oluşturulan hesaplar etkilenmez - bunun yerine bunları silin.",
+    "addBlockedEmail": "E-postayı Engelle",
+    "blockedEmailPlaceholder": "örn. kullanıcı {domain}",
+    "domainNeedsBlockedEmails": "Etki alanı '{domain}' belirli kullanıcıları engellerken en az bir e-posta adresine sahip olmalıdır",
+    "confirmRemoveBlockedEmail": "'{ email} 'e-postasının engelini kaldırmak istediğinizden emin misiniz?",
+    "blockedEmailAdded": "E-posta adresi başarıyla engellendi",
+    "blockedEmailRemoved": "E-posta adresi başarıyla kaldırıldı"
   },
   "iam": {
     "users": "Kullanıcılar",
