@@ -28,9 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
     >
-      <span class="font-bold text-xs text-text-heading">
-        Status Timeline
-      </span>
+      <span class="font-bold text-xs text-text-heading"> Status Timeline </span>
       <span class="flex-1" />
       <span
         class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
@@ -46,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           class="w-[7px] h-[7px] rounded-full bg-[var(--o2-status-warning-text)]"
         />
-        {{ mixedCount }} Mixed
+        {{ mixedCount }} Warning
       </span>
       <span
         class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
@@ -81,33 +79,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OTooltip side="top" :delay="0" :max-width="'auto'">
               <template #content>
-                <div class="px-1 py-0.5 min-w-[200px]">
+                <div class="py-0.5 min-w-[200px]">
                   <div
-                    class="font-semibold text-text-heading mb-1.5 text-xs"
-                  >
-                    {{ seg.title }}
-                  </div>
-                  <div
-                    v-for="(exec, eIdx) in seg.executions"
-                    :key="eIdx"
-                    class="flex items-center gap-2 py-0.5"
+                    class="px-1 font-semibold text-text-heading mb-1.5 text-xs flex items-center gap-1.5 flex-wrap border-b pb-1"
                   >
                     <span
-                      class="w-2 h-2 rounded-full shrink-0"
-                      :class="
-                        exec.status === 'pass'
-                          ? 'bg-[var(--o2-status-success-text)]'
-                          : 'bg-[var(--o2-status-error-text)]'
-                      "
+                      class="w-2 h-2 rounded-full shrink-0 bg-[var(--o2-status-success-text)]"
                     />
-                    <span class="text-text-body">{{ exec.location }}</span>
-                    <span class="text-text-secondary">{{
-                      exec.browserEngine
-                    }}</span>
-                    <span class="text-text-secondary">{{
-                      exec.device
-                    }}</span>
+                    <span class="text-text-secondary"
+                      >{{ passCountLocal(seg.executions) }} passed</span
+                    >
+                    <span
+                      class="w-2 h-2 rounded-full shrink-0 bg-[var(--o2-status-error-text)]"
+                    />
+                    <span class="text-text-secondary"
+                      >{{ failCountLocal(seg.executions) }} failed</span
+                    >
                   </div>
+                  <template
+                    v-for="(group, gIdx) in groupedByLocation(seg.executions)"
+                    :key="gIdx"
+                  >
+                    <div
+                      class="px-1 flex items-center gap-1.5 mb-0.5 mt-1 first:mt-0"
+                    >
+                      <span
+                        class="w-2 h-2 rounded-full shrink-0"
+                        :class="{
+                          'bg-[var(--o2-status-success-text)]':
+                            group.status === 'all-pass',
+                          'bg-[var(--o2-status-warning-text)]':
+                            group.status === 'mixed',
+                          'bg-[var(--o2-status-error-text)]':
+                            group.status === 'all-fail',
+                        }"
+                      />
+                      <span class="text-text-secondary text-xs font-semibold">
+                        {{ group.location }}
+                      </span>
+                    </div>
+                    <div
+                      v-for="(exec, eIdx) in group.executions"
+                      :key="eIdx"
+                      class="flex items-center gap-1.5 py-0.5 pl-4"
+                    >
+                      <span
+                        class="w-2 h-2 rounded-full shrink-0"
+                        :class="
+                          exec.status === 'pass'
+                            ? 'bg-[var(--o2-status-success-text)]'
+                            : 'bg-[var(--o2-status-error-text)]'
+                        "
+                      />
+                      <img
+                        v-if="browserIconUrl(exec.browserEngine)"
+                        :src="browserIconUrl(exec.browserEngine)"
+                        class="w-3.5 h-3.5"
+                        alt=""
+                      />
+                      <span class="text-text-secondary text-xs">{{
+                        exec.device
+                      }}</span>
+                    </div>
+                  </template>
                 </div>
               </template>
             </OTooltip>
@@ -137,6 +171,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
+import firefoxSvgUrl from "@/assets/images/synthetics/firefox.svg";
+import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";
 
 defineOptions({ name: "MonitorStatusTimeline" });
 
@@ -169,6 +206,47 @@ interface Props {
   endLabel: string;
 }
 const props = defineProps<Props>();
+
+const browserIconUrl = (name: string): string => {
+  switch (name) {
+    case "Chromium":
+      return chromiumSvgUrl;
+    case "Firefox":
+      return firefoxSvgUrl;
+    case "WebKit":
+      return webkitSvgUrl;
+    default:
+      return "";
+  }
+};
+
+interface ExecGroup {
+  location: string;
+  status: "all-pass" | "mixed" | "all-fail";
+  executions: TimelineExecution[];
+}
+
+function passCountLocal(execs: TimelineExecution[]): number {
+  return execs.filter((e) => e.status === "pass").length;
+}
+function failCountLocal(execs: TimelineExecution[]): number {
+  return execs.filter((e) => e.status === "fail").length;
+}
+
+function groupedByLocation(execs: TimelineExecution[]): ExecGroup[] {
+  const map = new Map<string, TimelineExecution[]>();
+  for (const exec of execs) {
+    const list = map.get(exec.location);
+    if (list) list.push(exec);
+    else map.set(exec.location, [exec]);
+  }
+  return Array.from(map, ([location, executions]) => {
+    const allPass = executions.every((e) => e.status === "pass");
+    const allFail = executions.every((e) => e.status === "fail");
+    const status = allPass ? "all-pass" : allFail ? "all-fail" : "mixed";
+    return { location, status, executions };
+  });
+}
 
 // ── Scroll state ────────────────────────────────────────────────────────
 const scrollRef = ref<HTMLElement | null>(null);
