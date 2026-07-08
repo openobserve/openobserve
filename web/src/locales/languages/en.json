@@ -4238,6 +4238,51 @@
     "querySource": "Query Source"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "Search Services",
+      "noStreamsDetected": "No streams detected. Ensure service graph metrics include stream_name labels.",
+      "streamOnlyInfo": "Service graph uses stream-only architecture with zero in-memory state",
+      "borderColor": "Border Color",
+      "borderColorMetric": "Errors",
+      "nodeSize": "Node Size",
+      "nodeSizeMetric": "Requests",
+      "sizeLow": "Low",
+      "sizeHigh": "High",
+      "status": {
+        "healthy": "Healthy",
+        "degraded": "Degraded",
+        "warning": "Warning",
+        "critical": "Critical"
+      },
+      "range": {
+        "healthy": "< 1%",
+        "degraded": "1 – 5%",
+        "warning": "5 – 10%",
+        "critical": "> 10%"
+      },
+      "entities": "entities",
+      "distribution": "Distribution",
+      "total": "Total",
+      "showTypes": "Show types",
+      "typesFiltered": "Some types are hidden. Open to change what's shown.",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fitToScreen": "Fit to screen",
+      "layout": "Layout",
+      "types": "Types",
+      "mode": {
+        "auto": "Auto",
+        "expanded": "Expanded",
+        "collapsed": "Collapsed"
+      },
+      "kind": {
+        "service": "Services",
+        "database": "Datastores",
+        "queue": "Queues",
+        "external": "External",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "Open in full view",
     "viewLogs": "View Logs",
     "viewRelated": "View Related",
@@ -4516,6 +4561,7 @@
     "servicesCatalog": {
       "tabLabel": "Service Catalog",
       "title": "Service Catalog",
+      "footerTitle": "Services",
       "filterPlaceholder": "Filter by service name...",
       "noServicesFound": "No services found in the selected time range.",
       "loading": "Loading services...",
@@ -4542,6 +4588,15 @@
       "servicesLabel": "services",
       "viewTraces": "View Traces",
       "exportCsv": "Export CSV",
+      "types": {
+        "all": "All",
+        "service": "Services",
+        "datastore": "Datastores",
+        "queue": "Queues",
+        "external": "External",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{count} {status}",
       "legend": {
         "title": "Error Rate"
       }
