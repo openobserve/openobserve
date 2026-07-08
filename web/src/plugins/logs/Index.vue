@@ -203,6 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         preset="no-query-applied"
                         size="hero"
                         data-test="logs-search-apply-search-text"
+                        @action="() => searchBarRef?.handleRunQueryFn?.()"
                       />
                     </div>
                     <div
@@ -217,6 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         preset="no-query-applied"
                         size="hero"
                         data-test="logs-search-patterns-apply-search-text"
+                        @action="() => searchBarRef?.handleRunQueryFn?.()"
                       />
                     </div>
                     <div
@@ -227,12 +229,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <search-result
                         ref="searchResultRef"
                         :expandedLogs="expandedLogs"
+                        :stream-doc-time-range="streamDocTimeRange"
+                        :query-window-us="queryWindowUs"
                         @update:datetime="setHistogramDate"
                         @update:scroll="getMoreData"
                         @update:recordsPerPage="getMoreDataRecordsPerPage"
                         @expandlog="toggleExpandLog"
                         @send-to-ai-chat="sendToAiChat"
                         @run-query="searchData"
+                        @jump-to-stream-data="onJumpToStreamData"
                       />
                     </div>
                   </div>
@@ -1570,7 +1575,15 @@ export default defineComponent({
       searchObj.data.datetime.startTime = fromUs;
       searchObj.data.datetime.endTime = toUs;
       searchObj.data.datetime.type = "absolute";
-      searchObj.runQuery = true;
+      // The `runQuery` flag only drives the logs table search. Patterns are
+      // extracted through handleRunQueryFn (the same path as the Run query
+      // button), so a jump from the patterns empty state must route there —
+      // otherwise the new window is set but patterns never re-extract.
+      if (searchObj.meta.logsVisualizeToggle === "patterns") {
+        handleRunQueryFn();
+      } else {
+        searchObj.runQuery = true;
+      }
       nextTick(() => {
         searchObj.shouldIgnoreWatcher = false;
       });

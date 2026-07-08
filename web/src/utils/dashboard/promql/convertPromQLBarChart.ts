@@ -19,6 +19,7 @@ import { buildCategoryXAxis, buildCategoryYAxis, buildValueAxis, buildTooltip } 
 import { buildLegendConfig } from "./shared/gridBuilder";
 import { getSeriesColor } from "../colorPalette";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
+import { calculateWidthText } from "../chartDimensionUtils";
 
 /**
  * Converter for bar chart variants (h-bar, stacked, h-stacked)
@@ -216,12 +217,12 @@ export class BarConverter implements PromQLChartConverter {
     // Configure axes based on orientation
     const axisConfig = isHorizontal
       ? {
-          xAxis: buildValueAxis(panelSchema),
-          yAxis: buildCategoryYAxis(categories, panelSchema),
+          xAxis: buildValueAxis(panelSchema, store),
+          yAxis: buildCategoryYAxis(categories, panelSchema, store),
         }
       : {
-          xAxis: buildCategoryXAxis(categories, panelSchema),
-          yAxis: buildValueAxis(panelSchema),
+          xAxis: buildCategoryXAxis(categories, panelSchema, store),
+          yAxis: buildValueAxis(panelSchema, store),
         };
 
     if (isHorizontal) {
@@ -232,17 +233,28 @@ export class BarConverter implements PromQLChartConverter {
       };
     }
 
+    // containLabel reserves the label area; fixed px insets avoid the waste
+    // of percentage margins on wide panels and starvation on short ones.
+    const legendAtBottom =
+      config.show_legends && config.legends_position !== "right";
+    // the last category label centers under the final tick and spills half
+    // its width past the plot edge — reserve that much on the right
+    const lastCategory = String(categories[categories.length - 1] ?? "");
+    const rightInset = isHorizontal
+      ? "4%"
+      : Math.max(20, Math.ceil(calculateWidthText(lastCategory, "12px") / 2) + 6);
     return {
       series,
       ...axisConfig,
       grid: {
-        left: isHorizontal ? "15%" : "3%",
-        right: "4%",
-        bottom: "10%",
+        left: 8,
+        right: rightInset,
+        top: 8,
+        bottom: legendAtBottom ? 40 : 12,
         containLabel: true,
         ...(config.axis_width && { left: config.axis_width }),
       },
-      tooltip: buildTooltip(panelSchema, "axis"),
+      tooltip: buildTooltip(panelSchema, "axis", store, extras?.hoveredSeriesState),
       // Legend config will be applied by applyLegendConfiguration in convertPromQLChartData
       // This ensures consistent behavior with SQL charts (applies to stacked and non-stacked)
     };

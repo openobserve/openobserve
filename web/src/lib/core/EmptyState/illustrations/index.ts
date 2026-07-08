@@ -37,6 +37,7 @@ import EmptyDataScene from "./EmptyDataScene.vue";
 import EmptyBox from "./EmptyBox.vue";
 import EmptyBoard from "./EmptyBoard.vue";
 import EmptyHourglass from "./EmptyHourglass.vue";
+import EmptyConnect from "./EmptyConnect.vue";
 import EmptyBrokenPanel from "./EmptyBrokenPanel.vue";
 import EmptyCheck from "./EmptyCheck.vue";
 import EmptyLogs from "./EmptyLogs.vue";
@@ -52,6 +53,7 @@ import EmptyAlert from "./EmptyAlert.vue";
 import EmptyExplorer from "./EmptyExplorer.vue";
 import EmptyServiceGraph from "./EmptyServiceGraph.vue";
 import EmptyServicesCatalog from "./EmptyServicesCatalog.vue";
+import EmptyStreamSelect from "./EmptyStreamSelect.vue";
 
 export const illustrations = {
   // ---- object / metaphor illustrations (the DEFAULT — no character) --------
@@ -59,12 +61,14 @@ export const illustrations = {
   box: EmptyBox,
   board: EmptyBoard,
   hourglass: EmptyHourglass,
+  connect: EmptyConnect,
   "broken-panel": EmptyBrokenPanel,
   check: EmptyCheck,
   logs: EmptyLogs,
   trace: EmptyTrace,
   "service-graph": EmptyServiceGraph,
   "services-catalog": EmptyServicesCatalog,
+  "stream-select": EmptyStreamSelect,
   pipeline: EmptyPipeline,
   function: EmptyFunction,
   history: EmptyHistory,

@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @edit="editRole"
           @delete="showConfirmDialog"
           @bulk-delete="openBulkDeleteDialog"
+          @create="addRole"
         />
       </div>
     </div>
