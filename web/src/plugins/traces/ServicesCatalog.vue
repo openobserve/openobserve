@@ -183,6 +183,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div> -->
+
+      <!-- Column-visibility toggle — pinned to the right end of the filter bar. -->
+      <OTableColumnToggle
+        :columns="tableColumns"
+        :column-visibility="columnVisibility"
+        @update:column-visibility="setColumnVisibility"
+        class="shrink-0"
+      />
     </div>
 
     <!-- Body: left rail (entity-type filter) + table — mirrors the Dashboards
@@ -280,6 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="oTableRef"
             :data="sortedServices"
             :columns="tableColumns"
+            :column-visibility="columnVisibility"
             row-key="service_name"
             :loading="isLoading"
             :frame="false"
@@ -416,6 +425,8 @@ import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import TraceServiceCell from "./components/TraceServiceCell.vue";
 import ServiceCatalogBarCell from "./components/ServiceCatalogBarCell.vue";
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
@@ -444,6 +455,8 @@ import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
 
 const { t } = useI18n();
 const store = useStore();
+const { columnVisibility, setColumnVisibility } =
+  useExternalColumnToggle("services-catalog");
 const catalogContainerRef = ref<HTMLElement | null>(null);
 const { searchObj } = useTraces();
 const { getStreams } = useStreams();
@@ -591,6 +604,7 @@ let currentTraceId: string | null = null;
 const tableColumns = computed(() => [
   {
     id: "service_name",
+    hideable: true,
     header: t("traces.servicesCatalog.columns.serviceName"),
     accessorKey: "service_name",
     sortable: true,
@@ -601,6 +615,7 @@ const tableColumns = computed(() => [
   },
   {
     id: "status",
+    hideable: true,
     header: t("traces.servicesCatalog.columns.status"),
     accessorKey: "status",
     sortable: true,
@@ -610,6 +625,7 @@ const tableColumns = computed(() => [
   },
   {
     id: "total_requests",
+    hideable: true,
     header: t("traces.servicesCatalog.columns.requests"),
     accessorKey: "total_requests",
     sortable: true,
@@ -619,6 +635,7 @@ const tableColumns = computed(() => [
   },
   {
     id: "error_count",
+    hideable: true,
     header: t("traces.servicesCatalog.columns.errors"),
     accessorKey: "error_count",
     sortable: true,
@@ -628,6 +645,7 @@ const tableColumns = computed(() => [
   },
   {
     id: "error_rate",
+    hideable: true,
     header: t("traces.servicesCatalog.columns.errorRate"),
     accessorKey: "error_rate",
     sortable: true,
@@ -637,6 +655,7 @@ const tableColumns = computed(() => [
   },
   {
     id: "p50_latency_ns",
+    hideable: true,
     header: t("traces.servicesCatalog.columns.p50Latency"),
     accessorKey: "p50_latency_ns",
     sortable: true,
@@ -646,6 +665,7 @@ const tableColumns = computed(() => [
   },
   {
     id: "p95_latency_ns",
+    hideable: true,
     header: t("traces.servicesCatalog.columns.p95Latency"),
     accessorKey: "p95_latency_ns",
     sortable: true,
@@ -655,6 +675,7 @@ const tableColumns = computed(() => [
   },
   {
     id: "p99_latency_ns",
+    hideable: true,
     header: t("traces.servicesCatalog.columns.p99Latency"),
     accessorKey: "p99_latency_ns",
     sortable: true,
@@ -664,6 +685,7 @@ const tableColumns = computed(() => [
   },
   {
     id: "avg_duration_ns",
+    hideable: true,
     header: t("traces.servicesCatalog.columns.avgDuration"),
     accessorKey: "avg_duration_ns",
     sortable: true,
@@ -673,6 +695,7 @@ const tableColumns = computed(() => [
   },
   {
     id: "max_duration_ns",
+    hideable: true,
     header: t("traces.servicesCatalog.columns.maxDuration"),
     accessorKey: "max_duration_ns",
     sortable: true,
