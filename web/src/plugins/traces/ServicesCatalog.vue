@@ -186,24 +186,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Column-visibility toggle + refresh — pinned to the right end of the
            filter bar so the catalog matches the other list pages (column
-           toggle, then refresh). -->
-      <OTableColumnToggle
-        :columns="tableColumns"
-        :column-visibility="columnVisibility"
-        @update:column-visibility="setColumnVisibility"
-        class="shrink-0"
-      />
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="refresh"
-        :loading="isLoading"
-        class="shrink-0 ml-2"
-        data-test="services-catalog-refresh-btn"
-        @click="loadServicesCatalog"
-      >
-        <OTooltip side="bottom" :content="t('common.refresh')" />
-      </OButton>
+           toggle, then refresh). Wrapped in a real element with ml-2 because
+           OTableColumnToggle's root is a reka-ui DropdownMenuRoot that renders
+           no DOM node, so a fallthrough class on it would be dropped. -->
+      <div class="flex items-center gap-2 shrink-0 ml-2">
+        <OTableColumnToggle
+          :columns="tableColumns"
+          :column-visibility="columnVisibility"
+          @update:column-visibility="setColumnVisibility"
+        />
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          icon-left="refresh"
+          :loading="isLoading"
+          data-test="services-catalog-refresh-btn"
+          @click="loadServicesCatalog"
+        >
+          <OTooltip side="bottom" :content="t('common.refresh')" />
+        </OButton>
+      </div>
     </div>
 
     <!-- Body: left rail (entity-type filter) + table — mirrors the Dashboards
