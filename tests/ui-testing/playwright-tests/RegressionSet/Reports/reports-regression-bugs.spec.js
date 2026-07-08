@@ -87,6 +87,16 @@ test.describe("Reports Regression Bug Fixes", () => {
       const TEST_START_TIME = '10:30';
       const TEST_START_HOUR = 10;
 
+      // Start Date is REQUIRED + format-checked on the Schedule Later tab
+      // (CreateReport.schema date/time rule). ODate is a Reka segmented field
+      // (no native <input>) — type day/month/year into its focused segments.
+      const startDateField = page.locator('[data-test="add-report-schedule-start-date-field-group"]');
+      await startDateField.click({ force: true });
+      await page.keyboard.type('29');
+      await page.keyboard.type('12');
+      await page.keyboard.type('2027');
+      await page.keyboard.press('Escape');
+
       // OTime wraps a hidden <input type="time"> inside the role="group" div.
       // Fill with force:true since the native input is visually hidden.
       const startTimeInput = page.locator('[data-test="add-report-schedule-start-time-field"] input[type="time"]');

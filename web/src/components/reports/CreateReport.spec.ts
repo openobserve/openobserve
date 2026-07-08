@@ -493,6 +493,37 @@ describe("CreateReport", () => {
       const payload = vi.mocked(reports.createReportV2).mock.calls[0][1] as any;
       expect(payload.destinations).toEqual([]);
     });
+
+    it("blocks submit in Schedule Later mode when date/time are empty", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      await fillValidForm(wrapper);
+      setField(wrapper, "selectedTimeTab", "scheduleLater");
+      setField(wrapper, "timezone", "UTC");
+      // Start Date + Start Time left empty → the restored rule blocks the save.
+      await flushPromises();
+
+      await submitForm(wrapper);
+
+      expect((wrapper.vm as any).form.state.isValid).toBe(false);
+      expect(reports.createReportV2).not.toHaveBeenCalled();
+    });
+
+    it("submits in Schedule Later mode with a valid date + time", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      await fillValidForm(wrapper);
+      setField(wrapper, "selectedTimeTab", "scheduleLater");
+      setField(wrapper, "timezone", "UTC");
+      setField(wrapper, "date", "2027-12-29"); // ISO YYYY-MM-DD (ODate value)
+      setField(wrapper, "time", "10:30"); // HH:MM (OTime value)
+      await flushPromises();
+
+      await submitForm(wrapper);
+
+      expect((wrapper.vm as any).form.state.isValid).toBe(true);
+      expect(reports.createReportV2).toHaveBeenCalledTimes(1);
+    });
   });
 
   // ── Step error jump ───────────────────────────────────────────────────────

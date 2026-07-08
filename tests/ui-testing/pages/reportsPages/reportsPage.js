@@ -273,22 +273,24 @@ export class ReportsPage {
   }
 
   async createReportDateTime() {
-    // ODate / OTime are Reka segmented popovers — the trigger wrapper carries
-    // the consumer's data-test (forwarded via $attrs in ODate.vue / OTime.vue)
-    // and is a <div>, not a native <input>, so `.fill()` is not supported.
-    // Focus each field and type into the active segments; Escape closes any
-    // popover that opens. The actual datetime value isn't asserted by these
-    // tests — they cover the Schedule Later flow end-to-end.
+    // Start Date + Start Time are REQUIRED + format-checked on the non-cron
+    // "Schedule Later" tab (CreateReport.schema date/time rule), so both must be
+    // entered with well-formed values or the save is blocked.
+
+    // ODate is a Reka segmented field (no native <input>) — click to focus and
+    // type digits into the day/month/year segments (emits ISO YYYY-MM-DD).
     await this.scheduleStartDateField.click({ force: true });
     await this.page.keyboard.type('29');
     await this.page.keyboard.type('12');
     await this.page.keyboard.type('2027');
     await this.page.keyboard.press('Escape');
 
+    // OTime wraps a (visually hidden) native <input type="time"> inside its field
+    // group — fill it directly with a 24h HH:MM value (matches the schema's
+    // reportTimeRegex). force:true because the native input is visually hidden.
     await this.scheduleStartTimeField.waitFor({ state: 'visible', timeout: 5000 });
-    await this.scheduleStartTimeField.click({ force: true });
-    await this.page.keyboard.press('Escape');
-    await this.scheduleStartTimeField.waitFor({ state: 'visible', timeout: 5000 });
+    const timeInput = this.scheduleStartTimeField.locator('input[type="time"]');
+    await timeInput.fill('10:30', { force: true });
   }
 
   async createReportZone() {

@@ -403,7 +403,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OFormToggleGroup>
 
                   <template v-if="frequencyType === 'cron'">
-                    <div class="flex items-center justify-start mt-3">
+                    <!-- items-start: keep the Timezone select aligned with the
+                         Cron input when the cron error text wraps below it. -->
+                    <div class="flex items-start justify-start mt-3">
                       <div
                         data-test="add-report-schedule-custom-interval-input"
                         class="o2-input mr-2"
@@ -522,10 +524,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
 
+                    <!-- items-start (not items-center): when a Date/Time
+                         validation error appears below its cell, items-center
+                         would re-center the taller cell and drop the Timezone
+                         select out of line with the date/time inputs;
+                         items-start keeps all three top-aligned. -->
                     <div
                       data-test="add-report-schedule-send-later-section"
                       v-if="selectedTimeTab === 'scheduleLater'"
-                      class="flex items-center justify-start mt-3"
+                      class="flex items-start justify-start mt-3"
                     >
                       <div
                         data-test="add-report-schedule-start-date-input"

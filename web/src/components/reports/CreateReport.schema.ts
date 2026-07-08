@@ -28,18 +28,20 @@
 // Restores the Quasar BEFORE validation baseline for CreateReport (the :rules
 // from complete-quasar-validation-inventory-BEFORE.md §5) as Zod constraints
 // (truthy -> Zod inversion); the conditional rules (custom-interval mode,
-// !cached mode, cron vs custom, scheduleLater timezone) are expressed in
-// superRefine. Exception: the date/time format rules — see the NOTE below.
+// !cached mode, cron vs custom, scheduleLater timezone/date/time) are expressed
+// in superRefine.
 //
-// NOTE on the BEFORE baseline's date/time format rules: they are deliberately
-// NOT restored. Those DD-MM-YYYY / HH:MM q-input rules targeted the old
-// free-typed inputs; the fields are now ODate/OTime segmented controls that can
-// only emit a well-formed value or "" — and the LIVE pre-migration
-// validateReportData never checked either field, so an untouched (empty)
-// Schedule Later date/time passes through to save. The reports E2E suite
-// (reportsScheduleLater.spec.js) pins that exact flow; enforcing the rules here
-// blocks saves that succeed in production. Making date/time required is a
-// deliberate behavior change for a follow-up (together with the E2E flow).
+// NOTE on the date/time format rules: the BEFORE baseline validated
+// `scheduling.date` as DD-MM-YYYY and `scheduling.time` via the built-in `time`
+// rule (both on the old free-typed q-inputs). The fields are now ODate/OTime
+// segmented controls whose emitted value is ISO YYYY-MM-DD (verified in
+// saveReport, which splits scheduling.date as [y,m,d]) / HH:MM, so the rules are
+// restored against those live formats (reportDateRegex / reportTimeRegex) — same
+// validation INTENT, corrected for the migrated controls. They apply ONLY on the
+// non-cron "Schedule Later" tab (the only mode that surfaces the inputs; cron /
+// "Schedule Now" set date/time programmatically at save), and because an empty
+// value fails the regex they also make both fields REQUIRED there. The
+// reportsScheduleLater E2E flow enters a Start Date + Start Time to match.
 //
 // Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
 // this file only describes WHAT is valid.
@@ -60,6 +62,14 @@ const RESOURCE_NAME_MESSAGE =
 // old `validateReportData` recipients rule.
 export const reportEmailRegex =
   /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/;
+
+// Live ODate / OFormDate value format (ISO YYYY-MM-DD). See the header note: the
+// BEFORE baseline regex was DD-MM-YYYY (old free-typed q-input); this is the same
+// rule for the migrated control's actual format (saveReport splits it as [y,m,d]).
+export const reportDateRegex = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+// Live OTime / OFormTime value format (HH:MM). Restores the built-in `time` rule.
+export const reportTimeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 // Per-row timerange shape (the OFormDateTimeRange value).
 export const reportTimerangeSchema = z.object({
@@ -216,8 +226,21 @@ export const makeCreateReportSchema = (
         }
       }
 
-      // (Date + time are intentionally NOT validated — see the header note on
-      // the BEFORE baseline's date/time rules.)
+      // ── Date + time: required + well-formed when scheduling for later. ────
+      // Only the non-cron "Schedule Later" tab surfaces these inputs; cron /
+      // "Schedule Now" set them programmatically at save. An empty value fails
+      // the regex, so this ALSO makes both fields required on that tab.
+      if (
+        val.selectedTimeTab === "scheduleLater" &&
+        val.frequencyType !== "cron"
+      ) {
+        if (!reportDateRegex.test(String(val.date ?? ""))) {
+          addIssue(["date"], "Date format is incorrect!");
+        }
+        if (!reportTimeRegex.test(String(val.time ?? ""))) {
+          addIssue(["time"], "Time format is incorrect!");
+        }
+      }
 
       // ── Share: title + emails required (when NOT a cached report). ────────
       if (!val.isCachedReport) {

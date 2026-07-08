@@ -3,9 +3,8 @@
 // Unit tests for the CreateReport Zod schema — restores the Quasar BEFORE
 // validation baseline (the :rules from
 // complete-quasar-validation-inventory-BEFORE.md §5) as Zod constraints, with the
-// conditional rules (cron / custom / !cached / scheduleLater) in superRefine.
-// Exception: the baseline's date/time format rules are intentionally absent —
-// the live pre-migration form never enforced them (see the schema header note).
+// conditional rules (cron / custom / !cached / scheduleLater timezone + date/time)
+// in superRefine.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
@@ -277,12 +276,11 @@ describe("CreateReport.schema", () => {
     });
   });
 
-  // ── date + time: intentionally NOT validated (pre-migration parity) ────────
-  // The live pre-migration validateReportData never checked scheduling date/
-  // time — an untouched (empty) Schedule Later date/time saves; the
-  // reportsScheduleLater E2E suite pins that flow. (ODate/OTime segmented
-  // controls can only emit a well-formed value or "".)
-  describe("date + time (scheduleLater, non-cron) — not validated", () => {
+  // ── date + time: required + well-formed in non-cron scheduleLater ──────────
+  // ODate/OTime emit ISO YYYY-MM-DD / HH:MM (or "" when empty). On the non-cron
+  // Schedule Later tab both are required + format-checked; cron / Schedule Now
+  // set them programmatically at save, so they are NOT validated there.
+  describe("date + time (scheduleLater, non-cron)", () => {
     const laterBase = () => ({
       ...base(),
       selectedTimeTab: "scheduleLater",
@@ -297,16 +295,37 @@ describe("CreateReport.schema", () => {
       expect(paths).not.toContain("time");
     });
 
-    it("accepts empty date/time for schedule-later (parity: never validated)", () => {
-      const paths = errorPaths({ ...laterBase(), date: "", time: "" });
-      expect(paths).not.toContain("date");
-      expect(paths).not.toContain("time");
+    it("rejects a malformed or empty date", () => {
+      // DD-MM-YYYY (old free-typed format) is now invalid — the live control is ISO.
+      expect(errorPaths({ ...laterBase(), date: "31-01-2025" })).toContain(
+        "date",
+      );
+      expect(errorPaths({ ...laterBase(), date: "" })).toContain("date");
+    });
+
+    it("rejects a malformed or empty time", () => {
+      expect(errorPaths({ ...laterBase(), time: "9am" })).toContain("time");
+      expect(errorPaths({ ...laterBase(), time: "" })).toContain("time");
     });
 
     it("does NOT validate date/time for schedule-now", () => {
       const paths = errorPaths({
         ...base(),
         selectedTimeTab: "scheduleNow",
+        date: "",
+        time: "",
+      });
+      expect(paths).not.toContain("date");
+      expect(paths).not.toContain("time");
+    });
+
+    it("does NOT validate date/time in cron mode (set programmatically at save)", () => {
+      const paths = errorPaths({
+        ...base(),
+        selectedTimeTab: "scheduleLater",
+        frequencyType: "cron",
+        cron: "0 0 12 * * ?",
+        timezone: "UTC",
         date: "",
         time: "",
       });
