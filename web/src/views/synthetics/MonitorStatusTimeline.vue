@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <!--
-  MonitorStatusTimelineCustom — HTML/CSS version of the Status Timeline.
+  MonitorStatusTimeline — HTML/CSS Status Timeline.
 
   Each segment = one logical run (grouped by runId) with three-color aggregate.
   Smooth scroll navigation with arrow buttons.
@@ -23,13 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
-    data-test="monitor-status-timeline-custom"
+    data-test="monitor-status-timeline"
   >
     <div
       class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
     >
       <span class="font-bold text-xs text-text-heading">
-        Status Timeline (Custom)
+        Status Timeline
       </span>
       <span class="flex-1" />
       <span
@@ -138,7 +138,7 @@ import { computed, ref } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
-defineOptions({ name: "MonitorStatusTimelineCustom" });
+defineOptions({ name: "MonitorStatusTimeline" });
 
 const MAX_VISIBLE = 30;
 

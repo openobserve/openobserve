@@ -60,14 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="mx-auto px-5 py-[0.875rem] pb-[1.75rem] flex flex-col gap-[0.875rem]"
           >
-            <!-- Status Timeline (ECharts) -->
-            <MonitorStatusTimelineCharts
-              :segments="timelineSegments"
-              :fail-count="timelineFailCount"
-              :pass-count="timelinePassCount"
-              :mixed-count="timelineMixedCount"
-            />
-            <MonitorStatusTimelineCustom
+            <!-- Status Timeline -->
+            <MonitorStatusTimeline
               :segments="timelineSegments"
               :fail-count="timelineFailCount"
               :pass-count="timelinePassCount"
@@ -784,8 +778,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import MonitorStatusTimelineCharts from "@/views/synthetics/MonitorStatusTimelineCharts.vue";
-import MonitorStatusTimelineCustom from "@/views/synthetics/MonitorStatusTimelineCustom.vue";
+import MonitorStatusTimeline from "@/views/synthetics/MonitorStatusTimeline.vue";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
 import type { SyntheticRun } from "@/composables/synthetics/syntheticResultsSchema";
