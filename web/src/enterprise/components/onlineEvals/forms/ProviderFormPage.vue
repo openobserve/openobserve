@@ -300,8 +300,10 @@ async function save(value: ProviderForm) {
       availableModels: splitCsv(value.availableModels),
       // Backend expects an authConfig object; the form only collects an
       // API key, which is the only auth secret the supported providers
-      // need today. Wrap it as { api_key: <value> }.
-      authConfig: { api_key: value.apiKey },
+      // need today. Wrap it as { api_key: <value> }. Trim to match the
+      // pre-migration `v-model.trim` (a pasted key with trailing
+      // whitespace/newline must not be sent verbatim).
+      authConfig: { api_key: value.apiKey.trim() },
       // `isDefault` is no longer surfaced in the form. Always send false;
       // backend defaults to non-default and the user manages default-ness
       // (if ever needed) outside this create/edit flow.

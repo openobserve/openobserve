@@ -131,9 +131,9 @@ describe("JobFormPage", () => {
     expect(onlineEvalsService.jobs.create).not.toHaveBeenCalled();
   });
 
-  it("saves a draft (create only) when the schema passes", async () => {
+  it("saves a draft (create only) with the EXACT payload when the schema passes", async () => {
     wrapper = createWrapper();
-    setField(wrapper, "name", "my-job");
+    setField(wrapper, "name", "  my-job  "); // padded → must be trimmed at save
     setField(wrapper, "stream", "default");
     setField(wrapper, "scorerIds", ["s1"]);
     // samplingValue defaults to "0.1" → conditional passes.
@@ -143,9 +143,30 @@ describe("JobFormPage", () => {
     expect(onlineEvalsService.jobs.create).toHaveBeenCalledTimes(1);
     const [org, payload] = (onlineEvalsService.jobs.create as any).mock.calls[0];
     expect(org).toBe("test-org");
-    expect(payload.name).toBe("my-job");
+    // EXACT key set — catches any added / dropped / renamed / leaked key.
+    expect(Object.keys(payload).sort()).toEqual([
+      "description",
+      "filterCondition",
+      "inputMapping",
+      "name",
+      "samplingMode",
+      "samplingValue",
+      "scorers",
+      "stream",
+      "streamType",
+    ]);
+    expect(payload.name).toBe("my-job"); // trimmed at save
+    expect(payload.description).toBeNull(); // blank → null
     expect(payload.stream).toBe("default");
+    expect(payload.streamType).toBe("traces");
     expect(payload.scorers).toEqual([{ id: "s1", version: null }]);
+    expect(payload.samplingMode).toBe("rate");
+    // The sampling value leaves the text input as a STRING but must reach the
+    // API as a NUMBER (JSON-parsed) — a type-drift regression guard.
+    expect(payload.samplingValue).toBe(0.1);
+    expect(typeof payload.samplingValue).toBe("number");
+    expect(payload.filterCondition).toEqual({ type: "all" }); // empty filter
+    expect(payload.inputMapping).toBeNull(); // no template vars → no mapping
     // draft path → no activation
     expect(onlineEvalsService.jobs.activate).not.toHaveBeenCalled();
     expect(wrapper.emitted("saved")).toBeTruthy();
@@ -163,5 +184,45 @@ describe("JobFormPage", () => {
 
     expect(onlineEvalsService.jobs.create).toHaveBeenCalledTimes(1);
     expect(onlineEvalsService.jobs.activate).toHaveBeenCalledWith("test-org", "job-1");
+  });
+
+  describe("edit mode", () => {
+    const editRow: any = {
+      id: "job-9",
+      name: "existing-job",
+      description: "watch prod",
+      stream: "default",
+    };
+
+    it("prefills the form from the record", () => {
+      wrapper = createWrapper({ mode: "edit", row: editRow });
+      expect(oform(wrapper).form.state.values.name).toBe("existing-job");
+      expect(oform(wrapper).form.state.values.stream).toBe("default");
+      expect(oform(wrapper).form.state.values.description).toBe("watch prod");
+    });
+
+    it("routes edit through jobs.update (NOT create) with the record id and never activates", async () => {
+      wrapper = createWrapper({ mode: "edit", row: editRow });
+      // Guarantee a valid, submittable state independent of row-parsing details:
+      // a scorer selection (guard) and a sampling mode that needs no value.
+      setField(wrapper, "scorerIds", ["s1"]);
+      setField(wrapper, "samplingMode", "all");
+      await submit(wrapper);
+
+      expect(oform(wrapper).form.state.isValid).toBe(true);
+      // The edit path must NOT create and must NOT activate.
+      expect(onlineEvalsService.jobs.create).not.toHaveBeenCalled();
+      expect(onlineEvalsService.jobs.activate).not.toHaveBeenCalled();
+      expect(onlineEvalsService.jobs.update).toHaveBeenCalledTimes(1);
+      const [org, id, payload] = (onlineEvalsService.jobs.update as any).mock.calls[0];
+      expect(org).toBe("test-org");
+      expect(id).toBe("job-9");
+      expect(payload.name).toBe("existing-job"); // name preserved (locked on edit)
+      expect(payload.stream).toBe("default");
+      expect(payload.samplingMode).toBe("all");
+      expect(payload.samplingValue).toBeNull(); // mode 'all' → no sampling value
+      expect(payload.scorers).toEqual([{ id: "s1", version: null }]);
+      expect(wrapper.emitted("saved")).toBeTruthy();
+    });
   });
 });

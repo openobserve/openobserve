@@ -102,27 +102,30 @@ describe("ProviderFormPage", () => {
     expect(onlineEvalsService.providers.create).not.toHaveBeenCalled();
   });
 
-  it("creates a provider and emits saved when the schema passes", async () => {
+  it("creates a provider with the EXACT payload and emits saved when the schema passes", async () => {
     wrapper = createWrapper();
     setField(wrapper, "name", "  Prod OpenAI  ");
     setField(wrapper, "defaultModel", "gpt-4o-mini");
     setField(wrapper, "availableModels", "gpt-4o-mini, gpt-4.1");
-    setField(wrapper, "apiKey", "sk-secret");
+    // Padded on purpose: the API key must be trimmed at save (parity with the
+    // pre-migration `v-model.trim`), exactly like name/endpoint/defaultModel.
+    setField(wrapper, "apiKey", "  sk-secret\n");
     await submit(wrapper);
 
     expect(oform(wrapper).form.state.isValid).toBe(true);
     expect(onlineEvalsService.providers.create).toHaveBeenCalledTimes(1);
-    expect(onlineEvalsService.providers.create).toHaveBeenCalledWith(
-      "test-org",
-      expect.objectContaining({
-        name: "Prod OpenAI", // trimmed at save
-        providerType: "openai",
-        defaultModel: "gpt-4o-mini",
-        availableModels: ["gpt-4o-mini", "gpt-4.1"],
-        authConfig: { api_key: "sk-secret" },
-        isDefault: false,
-      }),
-    );
+    // EXACT payload (not objectContaining): asserts keys AND value types, so a
+    // leaked schema-only `.optional()` field, a renamed/extra key, or a type
+    // drift would be caught.
+    expect(onlineEvalsService.providers.create).toHaveBeenCalledWith("test-org", {
+      name: "Prod OpenAI", // trimmed at save
+      providerType: "openai", // schema default
+      endpoint: null, // blank endpoint → `"".trim() || null`
+      defaultModel: "gpt-4o-mini",
+      availableModels: ["gpt-4o-mini", "gpt-4.1"], // split + per-item trimmed
+      authConfig: { api_key: "sk-secret" }, // trimmed
+      isDefault: false,
+    });
     expect(wrapper.emitted("saved")).toBeTruthy();
   });
 
@@ -158,20 +161,22 @@ describe("ProviderFormPage", () => {
       expect(oform(wrapper).form.state.values.apiKey).toBe("");
     });
 
-    it("saves on edit WITHOUT an API key (apiKey optional on edit)", async () => {
+    it("saves on edit WITHOUT an API key (apiKey write-only on edit) using the EXACT payload", async () => {
       wrapper = createWrapper({ mode: "edit", row });
       await submit(wrapper);
       expect(oform(wrapper).form.state.isValid).toBe(true);
       expect(onlineEvalsService.providers.update).toHaveBeenCalledTimes(1);
-      expect(onlineEvalsService.providers.update).toHaveBeenCalledWith(
-        "test-org",
-        "prov-1",
-        expect.objectContaining({
-          name: "Existing",
-          providerType: "anthropic",
-          authConfig: { api_key: "" },
-        }),
-      );
+      // EXACT payload: a blank apiKey must send `api_key: ""` (backend keeps the
+      // stored secret) — the key is present, not omitted — and no field leaks.
+      expect(onlineEvalsService.providers.update).toHaveBeenCalledWith("test-org", "prov-1", {
+        name: "Existing", // locked on edit
+        providerType: "anthropic",
+        endpoint: "https://api.anthropic.com",
+        defaultModel: "claude-3",
+        availableModels: ["claude-3", "claude-3-haiku"],
+        authConfig: { api_key: "" },
+        isDefault: false,
+      });
     });
   });
 });
