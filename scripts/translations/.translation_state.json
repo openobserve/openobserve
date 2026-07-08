@@ -1024,11 +1024,11 @@
     "newFunctionAssociationMsg": "2158bb697f7d0d8b",
     "nextRun": "2e65ffbea2465987",
     "noDestinationTypesFound": "db6c76043ee93c0a",
-    "noDestinationsMsg": "d2149b3471700f0d",
+    "noDestinationsMsg": "94111df06a2c4cc1",
     "noHistory": "bf5fdfc5bae9834c",
     "noHistoryData": "4db5cbd96e46c09e",
     "noStreamSelected": "88716132b3db4dde",
-    "noTemplatesMsg": "10530117dff34469",
+    "noTemplatesMsg": "502d623b2e86e57e",
     "notTrained": "10235b322136fba2",
     "numOfEvents": "e85d17d65d41e0a9",
     "onStream": "b8d31e852725afb1",
@@ -1485,6 +1485,7 @@
     "hr": "1b52f3a2e1514873",
     "id": "3843971dcfdee508",
     "includeSearchTerm": "e7be9bf57e81425e",
+    "invalidEmail": "958e4ccf2953d747",
     "json": "db1a21a0bc2ef8fb",
     "label": "0e66373f45dcf3dd",
     "legend": "7482e374b5bddc0a",
@@ -1500,6 +1501,7 @@
     "months": "09ca7551b3e90626",
     "move": "6ecc3df6bffdd06c",
     "name": "dcd1d5223f73b3a9",
+    "nameMaxLength": "5d8b491beb336b7a",
     "nameRequired": "604fd1b2e29c688a",
     "next": "1ff57a29d7c9d11b",
     "noMatches": "2df01a03ff43400b",
@@ -2285,12 +2287,16 @@
       "action": "da06bed30fc53669",
       "actionDesc": "41a6fea5982791f1",
       "description": "ef4662198466df11",
+      "import": "0c252e49c0582d40",
+      "importDesc": "4cc6bc50afe68594",
       "title": "a7b4b475b16b6b89"
     },
     "noAlertTemplates": {
       "action": "30d87ec4525974fb",
       "actionDesc": "351d91a71ca10a99",
       "description": "f84f4d9067b2dd0c",
+      "import": "1b275feba725ad03",
+      "importDesc": "4cc6bc50afe68594",
       "title": "2d1ae3be976e99c9"
     },
     "noAlerts": {
@@ -2354,7 +2360,7 @@
       "title": "b7155e2c082ffc7e"
     },
     "noEvalJobs": {
-      "action": "4df6a44695e5d292",
+      "action": "c27d8ac369fd6c76",
       "actionDesc": "29c7f75ad5e2cc27",
       "description": "19d6e5cebaf55a93",
       "title": "630a01b7fce3ba38"
@@ -2378,7 +2384,7 @@
       "title": "07514d065adb931e"
     },
     "noIncidents": {
-      "description": "7865f32be599cd25",
+      "description": "d68f7c0209448084",
       "title": "d3ed77d1b203829a"
     },
     "noIngestionTokens": {
@@ -2423,6 +2429,11 @@
       "description": "a7a6851bb806ae34",
       "title": "5b7a7cbdd630d761"
     },
+    "noPatterns": {
+      "description": "227a1243923b3029",
+      "logsAnalyzed": "70a6de8a20c48695",
+      "title": "3edab60ed5d526f2"
+    },
     "noPipelineDestinations": {
       "action": "da06bed30fc53669",
       "actionDesc": "ec790e4235a46dcf",
@@ -2446,8 +2457,18 @@
       "title": "5c246023abaf27ba"
     },
     "noQueryApplied": {
+      "action": "1837e00c45e8663d",
+      "actionDesc": "f4fb41b78f275787",
       "description": "2bfa5f25bd54be91",
       "title": "e6bfbea360e31f6f"
+    },
+    "noRegexPatterns": {
+      "action": "c6fbcde46fa9a9d2",
+      "actionDesc": "6d54641c6ff77e14",
+      "description": "c6739158b01fdb27",
+      "import": "e49a6359789cc0b8",
+      "importDesc": "d5f4824f5437d42f",
+      "title": "9462b19a703587e8"
     },
     "noReports": {
       "action": "16f776fa58d22446",
@@ -2466,15 +2487,19 @@
       "title": "4fbdeea751fdd8c2"
     },
     "noScoreConfigs": {
-      "action": "6942bc758e564a13",
+      "action": "d04a82b612c62f70",
       "actionDesc": "15f57b12df0441de",
       "description": "6b2fff56de37aa62",
+      "import": "f0fcf3d990c5490e",
+      "importDesc": "4cc6bc50afe68594",
       "title": "b40af0c5ea9c27f3"
     },
     "noScorers": {
-      "action": "0b5b740e5cefda74",
+      "action": "889391a98ba3ffe7",
       "actionDesc": "cdfa3214a204666e",
       "description": "7d84f11c08a57614",
+      "import": "a0be1c63be512e8c",
+      "importDesc": "4cc6bc50afe68594",
       "title": "3063c85237f211e6"
     },
     "noSearchHistory": {
@@ -2511,6 +2536,12 @@
       "description": "39ec057311912227",
       "title": "eded56e5d1469ac0"
     },
+    "noStorageConfig": {
+      "action": "85cb395a1f70f5ff",
+      "actionDesc": "336fbf07e786deaa",
+      "description": "5e09adfc87f4811f",
+      "title": "90da432000177342"
+    },
     "noStreamSelected": {
       "description": "5f6d8ae9ea3ddf7d",
       "title": "0ad1cb1aa0ed33cc"
@@ -2518,8 +2549,10 @@
     "noStreams": {
       "action": "88f92b006ef2267a",
       "actionDesc": "6f9ce9f34879bb33",
-      "description": "903a54284dbcc0e0",
-      "title": "74903f0204c81579"
+      "createAction": "f6a6800197fbfd4b",
+      "createActionDesc": "06d4efaa0d304e0f",
+      "description": "d9838f2a5da2ebfe",
+      "title": "3b6d229424d19bb3"
     },
     "noTraces": {
       "description": "e434bb5b498a6f84",
@@ -2552,10 +2585,12 @@
       "llmProviders": "437dbe28117905aa",
       "logs": "98f38f12db221a8c",
       "organizations": "f8a665a97769f1d2",
+      "patterns": "1554c4e086b184e1",
       "pipelineDestinations": "1af0500e4d2be663",
       "pipelineHistory": "79342a07eac22ddd",
       "pipelines": "8719e4b9771d340e",
       "queries": "07193df400d460d8",
+      "regexPatterns": "f2677e20964b4314",
       "reports": "7f26104f77a7ce47",
       "roleLimits": "8c5f4042c79874ad",
       "roles": "66cf5513b37462be",
@@ -2916,6 +2951,7 @@
     "rotateTokenConfirm": "fad5d7320a80e66b",
     "rum": "1207775a9d648b71",
     "rust": "d9aa89fdd15ad5c4",
+    "searchToken": "1b5465e0335742ea",
     "securityLabel": "8f6fb4eb7f42c0e2",
     "serverLabel": "b2cbd4374d111201",
     "snowflake": "1dbd59f661d68b90",
@@ -3029,6 +3065,11 @@
     "deleteIndex": "8d40fc8bb28be4e4",
     "docNum": "8d14f6e72de8f18a",
     "docsCount": "c4019e197435e840",
+    "emptyAws": "59eebdd8d1c707bb",
+    "emptyKubernetes": "a37d07fe30048d3a",
+    "emptyLinux": "4828e60247c1636f",
+    "emptyOr": "304d31e4fd1575bd",
+    "emptyWindows": "d598026a9cbc6050",
     "envQuickModeMsg": "3a9a5368b5be2736",
     "explore": "3b73900b8d29f963",
     "extendedEndDate": "e970951cfb6b60b1",
@@ -3624,6 +3665,7 @@
       "useAsDefault": "c57f9b482b23f3d7"
     },
     "quality": {
+      "agentPlaceholder": "54c32d3e2cfa1cc8",
       "detail": {
         "categoryDistributionTitle": "4a0f40cef45fc3b8",
         "compositionTitle": "f0b62ea1ea39ed81",
@@ -5157,6 +5199,7 @@
     "delete": "e2d0a54968ead24e",
     "deleteServiceAccount": "37d895d6805f30e2",
     "downloadToken": "bb6313f5d4cf0e1e",
+    "emailInvalid": "b00f7e3ae5e87365",
     "empty": {
       "cta": "3374c08920b3c8dd",
       "description": "0b6be189dd220abd",
@@ -5917,6 +5960,51 @@
     "processExitCode": "c068ec09b664f807",
     "reviewAndApplyFilters": "28a6fd8929f1ffa5",
     "searchInSpans": "dc825d0a0f577ba4",
+    "serviceGraph": {
+      "borderColor": "a42d1353ab153ecc",
+      "borderColorMetric": "cb702378f31507ef",
+      "distribution": "72a23e549d099bbd",
+      "entities": "2cc497857559ff85",
+      "fitToScreen": "32bb0d298ca1545c",
+      "kind": {
+        "database": "7b180047ed9121ac",
+        "external": "68c114ea9c8c6604",
+        "queue": "be77db1156d1f1b5",
+        "rpc": "8f7520013b0ae42e",
+        "service": "604dce445e326d95"
+      },
+      "layout": "a511909161e1b84f",
+      "mode": {
+        "auto": "0286249762f7c943",
+        "collapsed": "b322b65227bc3ec9",
+        "expanded": "e72d5d8d0b167d21"
+      },
+      "noStreamsDetected": "c717d50ad90c60e5",
+      "nodeSize": "db8358bc2ff2f6fc",
+      "nodeSizeMetric": "ada27592c9578e90",
+      "range": {
+        "critical": "8dbe368dce32dd8c",
+        "degraded": "af6245531d42e19e",
+        "healthy": "d6ba0ed10f3af1bf",
+        "warning": "344d154f9c06ebd8"
+      },
+      "searchPlaceholder": "d1f0a94f3b85accc",
+      "showTypes": "7011e98af0aeb21b",
+      "sizeHigh": "c4ebc6d4a5832cd9",
+      "sizeLow": "f793de205ead5ac3",
+      "status": {
+        "critical": "427dd2969bd140be",
+        "degraded": "a8494c12f2243903",
+        "healthy": "7f1e323b6272c620",
+        "warning": "e981ddae45d8f4ca"
+      },
+      "streamOnlyInfo": "f6da6542b640ce91",
+      "total": "c9b3c38247f744e1",
+      "types": "a5fc918683bf9602",
+      "typesFiltered": "3d6dd8df44668a42",
+      "zoomIn": "0e47f09a748fa132",
+      "zoomOut": "bc7b631a689b45ca"
+    },
     "serviceGraphTab": "b4c43a3f8ce916fb",
     "serviceMap": "d20cdb31d1fbd506",
     "servicesCatalog": {
@@ -5935,6 +6023,7 @@
       },
       "exportCsv": "91f71c14c8d6cc64",
       "filterPlaceholder": "6c403ddc8a77c64c",
+      "footerTitle": "604dce445e326d95",
       "legend": {
         "title": "bf7d539c44f17179"
       },
@@ -5950,6 +6039,15 @@
       },
       "tabLabel": "bae55a50f9710b93",
       "title": "bae55a50f9710b93",
+      "types": {
+        "all": "a52ace420f2175d0",
+        "datastore": "7b180047ed9121ac",
+        "external": "68c114ea9c8c6604",
+        "queue": "be77db1156d1f1b5",
+        "rpc": "8f7520013b0ae42e",
+        "service": "604dce445e326d95"
+      },
+      "unhealthyTooltip": "23313ad5061c1743",
       "viewTraces": "884c82142ec36670"
     },
     "sessionDetail": {
@@ -6134,6 +6232,7 @@
     "confirmDeleteHead": "4e920cc9cc7cd6e1",
     "confirmDeleteMsg": "d749b921adc2cd92",
     "createdAt": "3c21053de802636f",
+    "currentPasswordRequired": "5000b74e76ec8b67",
     "customRole": "6e8453849bf2d267",
     "delete": "e2d0a54968ead24e",
     "deleteAPIKeyMessage": "7bd099e08a8b6e89",
@@ -6143,12 +6242,14 @@
     "editUser": "6762d4a86537005c",
     "email": "969ccbd3cf6300ec",
     "externalUserCustomRoleHint": "3eb65209c2b39541",
+    "fieldRequired": "2c8afacdd93a8ec0",
     "firstName": "96ce6e6193a04726",
     "groups": "39bbb719fa2b9d22",
     "header": "c781f09df7362131",
     "id": "7967e089a7b94464",
     "inviteByEmail": "ca87b80e768f55bf",
     "inviteByEmailHint": "db07e795ebb073ab",
+    "inviteEmailInvalid": "e16dabef04db970d",
     "isExistingUser": "f72cd3aa9de5ae28",
     "lastName": "f55563b386a39dc3",
     "member": "e31ab643c44f7a0e",
@@ -6156,18 +6257,23 @@
     "memberUpdated": "285677331561a4b8",
     "name": "b82e11da3bc16786",
     "newPassword": "7c451e0f436d04a6",
+    "newPasswordRequired": "1e1a49c16c534200",
     "noCustomRolesHint": "ea04bda8ba83265a",
     "ok": "565339bc4d33d728",
     "oldPassword": "9d6a9f660079670f",
     "orgMemberId": "9f2a8072354b4f78",
     "organization": "d764d42592fc9687",
+    "otherOrgInvalid": "465942ee02c6310c",
     "otherOrganization": "4781834b6d517f95",
     "password": "e7cf3ef4f17c3999",
+    "passwordPolicyHint": "60668fcb97759fb5",
+    "passwordRequired": "4a6bfc94b5309968",
     "repassword": "4b66bf11f20f3f70",
     "revokeInvitationMsg": "223305578e10ed35",
     "revokeInvitationTitle": "5b2ff988e4228d33",
     "revoke_invite": "e9b3542ba499f523",
     "role": "14736a2eb9f4159f",
+    "roleRequired": "4bd52bf1428b0a13",
     "roles": "c25337055464f8d3",
     "save": "1509f561f2416598",
     "search": "158bb0e5675c3f2f",
