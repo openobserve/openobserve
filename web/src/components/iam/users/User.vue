@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="refresh"
               :loading="loading"
               data-test="user-list-refresh-btn"
-              @click="getOrgMembers"
+              @click="refreshUsers"
             >
               <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="iamUsersRefresh" />
             </OButton>
@@ -787,6 +787,19 @@ export default defineComponent({
       });
     };
 
+    // Refresh handler for the toolbar refresh button. getOrgMembers() only seeds
+    // default action flags on each row — the real per-row permissions are
+    // computed by updateUserActions(), so it must run after every reload (this
+    // mirrors the onBeforeMount sequence). Binding refresh straight to
+    // getOrgMembers skipped this step and blanked out all row actions.
+    const refreshUsers = async () => {
+      try {
+        await getOrgMembers();
+      } finally {
+        updateUserActions();
+      }
+    };
+
     // const shouldAllowEdit = (user: any) => {
     //   if (isEnterprise.value) {
     //     return (
@@ -1258,7 +1271,7 @@ export default defineComponent({
       },
       {
         id: "iamUsersRefresh",
-        handler: () => { if (!isInputFocused()) getOrgMembers(); },
+        handler: () => { if (!isInputFocused()) refreshUsers(); },
       },
       {
         id: "iamUsersFocusSearch",
@@ -1288,6 +1301,7 @@ export default defineComponent({
       confirmRevokeAction,
       handleInviteSent,
       getOrgMembers,
+      refreshUsers,
       updateUser,
       updateMember,
       addUser,
