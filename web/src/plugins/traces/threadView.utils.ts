@@ -55,37 +55,29 @@ export function getModel(span: any): string {
  * for a normalised list.
  */
 export function getInputRaw(span: any): unknown {
-  return span?.gen_ai_input_messages ?? span?.llm_input;
+  return span?.gen_ai_input_messages;
 }
 
 /**
  * Raw output messages payload (un-parsed). Same caveats as `getInputRaw`.
  */
 export function getOutputRaw(span: any): unknown {
-  return span?.gen_ai_output_messages ?? span?.llm_output;
+  return span?.gen_ai_output_messages;
 }
 
 /**
- * Read the call cost in USD. Falls back to legacy llm_usage_cost_total.
+ * Read the call cost in USD.
  * Returns 0 for missing / unparseable values (instead of NaN).
  */
 export function getCost(span: any): number {
-  return (
-    Number(span?.gen_ai_usage_cost) ||
-    Number(span?.llm_usage_cost_total) ||
-    0
-  );
+  return Number(span?.gen_ai_usage_cost) || 0;
 }
 
 /**
- * Read the total token count. Falls back to llm_usage_tokens_total.
+ * Read the total token count.
  */
 export function getTokens(span: any): number {
-  return (
-    Number(span?.gen_ai_usage_total_tokens) ||
-    Number(span?.llm_usage_tokens_total) ||
-    0
-  );
+  return Number(span?.gen_ai_usage_total_tokens) || 0;
 }
 
 // ---------------------------------------------------------------------------

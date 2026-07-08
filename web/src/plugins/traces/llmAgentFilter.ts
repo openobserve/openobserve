@@ -55,9 +55,9 @@ export function buildAgentTraceFilter(
 export function buildAgentSessionFilter(
   agent: GenAiAgentListItem | null | undefined,
   streamName: string,
-  sessionField = "gen_ai_conversation_id",
 ): string {
   const traceFilter = buildAgentTraceFilter(agent, streamName);
-  if (!traceFilter || !sessionField) return "";
+  if (!traceFilter) return "";
+  const sessionField = "gen_ai_conversation_id";
   return `${sessionField} IN (SELECT ${sessionField} FROM "${streamName}" WHERE ${sessionField} IS NOT NULL AND ${sessionField} != '' AND ${traceFilter} GROUP BY ${sessionField})`;
 }

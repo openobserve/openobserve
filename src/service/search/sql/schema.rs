@@ -229,23 +229,14 @@ pub fn generate_quick_mode_fields(
         && settings.is_llm_stream
     {
         use crate::handler::http::request::traces::schema_compat::{
-            GEN_AI_SENTINEL_COLUMN, OPTIONAL_GEN_AI_FIELDS, OPTIONAL_LLM_FIELDS,
-            REQUIRED_GEN_AI_FIELDS, REQUIRED_LLM_FIELDS,
+            OPTIONAL_GEN_AI_FIELDS, REQUIRED_GEN_AI_FIELDS,
         };
 
-        let field_lists: &[&[&str]] = if schema.field_with_name(GEN_AI_SENTINEL_COLUMN).is_ok() {
-            &[
-                REQUIRED_GEN_AI_FIELDS,
-                OPTIONAL_GEN_AI_FIELDS,
-                &["trace_id", "gen_ai_conversation_id", "user_id"],
-            ]
-        } else {
-            &[
-                REQUIRED_LLM_FIELDS,
-                OPTIONAL_LLM_FIELDS,
-                &["trace_id", "llm_session_id", "llm_user_id"],
-            ]
-        };
+        let field_lists: &[&[&str]] = &[
+            REQUIRED_GEN_AI_FIELDS,
+            OPTIONAL_GEN_AI_FIELDS,
+            &["trace_id", "gen_ai_conversation_id", "user_id"],
+        ];
         for list in field_lists {
             for field_name in *list {
                 if !fields_name.contains(*field_name)

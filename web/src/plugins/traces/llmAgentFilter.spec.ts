@@ -60,16 +60,9 @@ describe("llmAgentFilter", () => {
     );
   });
 
-  it("supports a custom session field for session-membership filters", () => {
-    expect(buildAgentSessionFilter(agentWithId, "default", "llm_session_id")).toBe(
-      `llm_session_id IN (SELECT llm_session_id FROM "default" WHERE llm_session_id IS NOT NULL AND llm_session_id != '' AND gen_ai_agent_id = 'agent-123' GROUP BY llm_session_id)`,
-    );
-  });
-
-  it("returns an empty session predicate when no agent / stream / session field is given", () => {
+  it("returns an empty session predicate when no agent or stream is given", () => {
     expect(buildAgentSessionFilter(null, "default")).toBe("");
     expect(buildAgentSessionFilter(agentWithId, "")).toBe("");
-    expect(buildAgentSessionFilter(agentWithId, "default", "")).toBe("");
   });
 
   it("exposes the All Agents sentinel", () => {

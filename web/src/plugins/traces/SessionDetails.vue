@@ -1331,9 +1331,7 @@ const toolHotspots = computed<ToolHotspot[]>(() => {
   for (const s of sessionSpans.value) {
     if (String(s.gen_ai_operation_name || "").toLowerCase() !== "execute_tool")
       continue;
-    const name = String(
-      s.tool_name || s.gen_ai_tool_name || s.operation_name || "tool",
-    );
+    const name = String(s.gen_ai_tool_name || s.operation_name || "tool");
     const dur = Number(s.duration) || 0;
     const tokens = Number(s.gen_ai_usage_total_tokens) || 0;
     const a =

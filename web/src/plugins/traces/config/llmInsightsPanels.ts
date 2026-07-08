@@ -136,7 +136,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     query: {
       // Cost field populated by the backend extractor from
       // gen_ai.usage.cost / Langfuse cost_details — same source the Traces
-      // tab uses. Falls back to the legacy llm_usage_cost_total column.
+      // tab uses.
       sql: `
         SELECT
           histogram(_timestamp, '{{interval}}') as ts,

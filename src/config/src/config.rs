@@ -124,8 +124,8 @@ const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 10] = [
     "body",
     "json",
     "error",
-    "llm_input",
-    "llm_output",
+    "gen_ai_input_messages",
+    "gen_ai_output_messages",
 ];
 pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let cfg = get_config();
@@ -154,8 +154,14 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-const _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS: [&str; 3] =
-    ["trace_id", "service_name", "operation_name"];
+const _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS: [&str; 6] = [
+    "trace_id",
+    "service_name",
+    "operation_name",
+    "gen_ai_conversation_id",
+    "gen_ai_agent_id",
+    "gen_ai_agent_name",
+];
 pub static SQL_SECONDARY_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let cfg = get_config();
     let default_fields: &[&str] = if cfg.common.feature_default_index_fields_enabled {

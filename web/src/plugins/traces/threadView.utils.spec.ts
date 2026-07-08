@@ -72,20 +72,9 @@ describe("getModel", () => {
 });
 
 describe("getInputRaw / getOutputRaw", () => {
-  // gen_ai field wins over legacy.
-  it("prefers gen_ai_input_messages and gen_ai_output_messages", () => {
-    expect(
-      getInputRaw({ gen_ai_input_messages: "[{...}]", llm_input: "ignored" }),
-    ).toBe("[{...}]");
-    expect(
-      getOutputRaw({ gen_ai_output_messages: "[]", llm_output: "ignored" }),
-    ).toBe("[]");
-  });
-
-  // Falls back to legacy.
-  it("falls back to llm_input / llm_output", () => {
-    expect(getInputRaw({ llm_input: "[{...}]" })).toBe("[{...}]");
-    expect(getOutputRaw({ llm_output: "[{...}]" })).toBe("[{...}]");
+  it("reads gen_ai_input_messages and gen_ai_output_messages", () => {
+    expect(getInputRaw({ gen_ai_input_messages: "[{...}]" })).toBe("[{...}]");
+    expect(getOutputRaw({ gen_ai_output_messages: "[]" })).toBe("[]");
   });
 
   // Both missing → undefined (not "" — distinguishes "no field" from
@@ -102,11 +91,6 @@ describe("getCost / getTokens", () => {
   it("reads numeric values from gen_ai_* fields", () => {
     expect(getCost({ gen_ai_usage_cost: 0.123 })).toBe(0.123);
     expect(getTokens({ gen_ai_usage_total_tokens: 1234 })).toBe(1234);
-  });
-
-  it("falls back to llm_usage_cost_total / llm_usage_tokens_total", () => {
-    expect(getCost({ llm_usage_cost_total: 0.5 })).toBe(0.5);
-    expect(getTokens({ llm_usage_tokens_total: 200 })).toBe(200);
   });
 
   // String numbers are coerced — backend may return them as strings.

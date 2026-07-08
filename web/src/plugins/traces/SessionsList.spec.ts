@@ -121,7 +121,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
             @click="$emit('row-click', row)"
           >
             <slot name="cell-sessionId" :row="row">{{ row.sessionId }}</slot>
-            <slot name="cell-firstSeenNanos" :row="row">{{ row.firstSeenNanos }}</slot>
+            <slot name="cell-firstSeenNanos" :row="row">{{ row.lastSeenNanos }}</slot>
             <slot name="cell-turns" :row="row">{{ row.turns }}</slot>
             <slot name="cell-durationNanos" :row="row">{{ row.durationNanos }}</slot>
             <span data-test="sessions-list-token-cell">

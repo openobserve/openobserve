@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Timestamp -->
         <template #cell-firstSeenNanos="{ row }">
           <span class="text-[0.75rem] tabular-nums">
-            {{ formatTimestamp(row.firstSeenNanos) }}
+            {{ formatTimestamp(row.lastSeenNanos) }}
           </span>
         </template>
 
@@ -403,9 +403,10 @@ watch(total, () => {
 // resize. All widths are user-resizable + persisted via `table-id`.
 const tableColumns = computed(() => [
   {
+    // Keep the id stable for persisted column settings; the displayed value is Last Seen.
     id: "firstSeenNanos",
     header: t('traces.sessionsList.columns.timestamp'),
-    accessorKey: "firstSeenNanos",
+    accessorKey: "lastSeenNanos",
     size: 170,
     sortable: false,
     hideable: true,
