@@ -45,9 +45,15 @@ export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
       selectedTabs: z.array(z.string()).optional().default([]),
       selectedPanels: z.array(z.string()).optional().default([]),
       type: z.string().optional().default("query_values"),
+      // NO .trim() here (matches main): a saved name must be referenceable as
+      // `$name`, and the dependency graph extracts refs with `\$([a-zA-Z0-9_-]+)`.
+      // `.trim()` would let a value like "test_form " PASS validation (trimmed)
+      // yet be SAVED with the space (TanStack does not apply the transform to the
+      // submitted value), producing a name that `$test_form` can never match —
+      // silently breaking parent↔child dependencies. Validate the RAW value so
+      // any leading/trailing/internal whitespace is rejected outright.
       name: z
         .string()
-        .trim()
         .min(1, t("dashboard.variableNameRequired"))
         .regex(VARIABLE_NAME_REGEX, t("dashboard.variableNameInvalid")),
       label: z.string().optional().default(""),
