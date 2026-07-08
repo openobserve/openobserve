@@ -68,6 +68,12 @@ describe("ListOrganizations", () => {
         selectedOrganization: {
           identifier: "test-org",
         },
+        // useIsMetaOrg compares selectedOrganization.identifier to zoConfig.meta_org.
+        // "test-org" !== "_meta" → isMetaOrg is false → getOrganizations() uses the
+        // regular list() endpoint (the non-admin path these tests exercise).
+        zoConfig: {
+          meta_org: "_meta",
+        },
         userInfo: {
           email: "test@example.com",
         },
@@ -210,9 +216,38 @@ describe("ListOrganizations", () => {
   });
 
   describe("Data Loading", () => {
-    it("should load organizations on mount", async () => {
+    it("should load organizations on mount via the regular list endpoint (non-_meta context)", async () => {
       await flushPromises();
+      // selectedOrganization is "test-org" (not _meta) → isMetaOrg is false →
+      // getOrganizations() uses the regular list() endpoint, not the admin one.
       expect(organizationsService.list).toHaveBeenCalled();
+      expect(organizationsService.get_admin_org).not.toHaveBeenCalled();
+    });
+
+    it("should use the _meta admin endpoint when the selected org is _meta", async () => {
+      organizationsService.list.mockClear();
+      organizationsService.get_admin_org.mockClear();
+      organizationsService.get_admin_org.mockResolvedValue(mockOrganizations);
+      const metaWrapper = mount(ListOrganizations, {
+        global: {
+          plugins: [i18n, router],
+          provide: {
+            store: {
+              ...mockStore,
+              state: {
+                ...mockStore.state,
+                // Selecting the _meta org flips isMetaOrg true → admin endpoint.
+                selectedOrganization: { identifier: "_meta" },
+              },
+            },
+          },
+          stubs: { OTable: true },
+        },
+      });
+      await flushPromises();
+      expect(organizationsService.get_admin_org).toHaveBeenCalledWith("_meta");
+      expect(organizationsService.list).not.toHaveBeenCalled();
+      metaWrapper.unmount();
     });
 
     it("should transform organization data correctly", async () => {
@@ -223,9 +258,9 @@ describe("ListOrganizations", () => {
 
     it("should load organizations into the local list", async () => {
       await flushPromises();
-      // getOrganizations() sources from the _meta admin endpoint and populates the
-      // component's own list; it deliberately does NOT dispatch setOrganizations
-      // (the navbar switcher keeps its own filtered list of non-deleting orgs).
+      // getOrganizations() populates the component's own list and deliberately does
+      // NOT dispatch setOrganizations (the navbar switcher keeps its own filtered
+      // list of non-deleting orgs).
       expect(wrapper.vm.organizations).toHaveLength(mockOrganizations.data.data.length);
       expect(wrapper.vm.organizations[0].identifier).toBe(
         mockOrganizations.data.data[0].identifier,

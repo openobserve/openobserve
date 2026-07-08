@@ -190,6 +190,7 @@ import { useI18n } from "vue-i18n";
 
 import organizationsService from "@/services/organizations";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import JoinOrganization from "./JoinOrganization.vue";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import OrgCleanupTasksDialog from "@/components/iam/organizations/OrgCleanupTasksDialog.vue";
@@ -230,6 +231,7 @@ export default defineComponent({
 },
   setup() {
     const store = useStore();
+    const { isMetaOrg } = useIsMetaOrg();
     const router = useRouter();
     const { t } = useI18n();
     const organizations = ref([]);
@@ -366,13 +368,20 @@ export default defineComponent({
               timeout: 0,
 });
       loading.value = true;
-      // The _meta IAM Organizations page is the admin view: it must show ALL orgs,
-      // including those being deleted (status="deleting"), so admins can track
-      // deletion progress. The dedicated _meta endpoint (all_organizations) returns
-      // them with status; the regular /api/organizations list intentionally hides
-      // deleting orgs (that one feeds the navbar switcher). We deliberately do NOT
-      // dispatch setOrganizations here, so the switcher keeps its own filtered list.
-      organizationsService.get_admin_org("_meta").then((res) => {
+      // Pick the endpoint by the selected-org CONTEXT (not by a client-side role):
+      // - In the _meta admin context, use the admin endpoint (all_organizations),
+      //   which returns ALL orgs WITH deletion status so admins can track progress.
+      //   It deliberately does NOT dispatch setOrganizations, so the navbar switcher
+      //   keeps its own filtered (non-deleting) list.
+      // - Otherwise, use the regular list — the user's own orgs (original behavior).
+      // This is a UX branch only. Access is enforced server-side: the _meta endpoint
+      // requires OFGA LIST on _meta (root bypasses), validated in the auth layer
+      // before the handler runs, so a spoofed client just gets 403 — no data leak,
+      // no IDOR (the {org} path is pinned to "_meta"; you cannot enumerate other orgs).
+      const request = isMetaOrg.value
+        ? organizationsService.get_admin_org("_meta")
+        : organizationsService.list(0, 1000000, "name", false, "");
+      request.then((res) => {
         let counter = 1;
         const billingPlans = {
           "0": "Free",
