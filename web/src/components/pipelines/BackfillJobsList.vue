@@ -60,8 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:column-visibility="setColumnVisibility"
       />
       <OButton
-        variant="ghost-muted"
+        variant="outline"
         size="icon-sm"
+        class="shrink-0"
         @click="refreshJobs"
         :disabled="loading"
         data-test="refresh-btn"
