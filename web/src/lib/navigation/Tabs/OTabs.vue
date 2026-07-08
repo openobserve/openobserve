@@ -159,9 +159,20 @@ function updateScrollState(): void {
     canScrollRight.value = false
     return
   }
-  hasOverflow.value = el.scrollWidth > el.clientWidth + 1
+  // Measure the tabs, not scrollWidth: the sliding underline's transformed
+  // bounds extend scrollWidth and would flash the arrows mid-animation.
+  let contentWidth = 0
+  const list = tablistRef.value
+  if (list) {
+    for (const tab of list.querySelectorAll<HTMLElement>('[role="tab"]')) {
+      const right = tab.offsetLeft + tab.offsetWidth
+      if (right > contentWidth) contentWidth = right
+    }
+    if (contentWidth > 0) contentWidth += 3 // tablist px-[3px] right padding
+  }
+  hasOverflow.value = contentWidth > el.clientWidth + 1
   canScrollLeft.value = el.scrollLeft > 1
-  canScrollRight.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
+  canScrollRight.value = el.scrollLeft + el.clientWidth < contentWidth - 1
   // Tab geometry can shift on resize (wrap/overflow) — keep the bar aligned.
   updateIndicator()
 }
@@ -174,6 +185,15 @@ function scrollTabs(direction: 1 | -1): void {
 
 let ro: ResizeObserver | null = null
 let mo: MutationObserver | null = null
+let scrollStateRaf = 0
+
+// Re-measure now and on the next frame: mutation callbacks can sample
+// mid-update layout, and a wrong hasOverflow would never self-correct.
+function updateScrollStateSettled(): void {
+  updateScrollState()
+  cancelAnimationFrame(scrollStateRaf)
+  scrollStateRaf = requestAnimationFrame(() => updateScrollState())
+}
 
 onMounted(() => {
   if (isVertical.value) return
@@ -183,11 +203,10 @@ onMounted(() => {
   ro = new ResizeObserver(updateScrollState)
   ro.observe(el)
   if (tablistRef.value) ro.observe(tablistRef.value)
-  // Reordering tabs changes their order without changing modelValue or the
-  // tablist size, so the ResizeObserver won't fire. Watch the child list (and
-  // the active-state attribute) so the underline re-measures after a reorder.
+  // Reorders and add/removes don't resize the stretched tablist, so the
+  // ResizeObserver misses them — watch the child list instead.
   if (tablistRef.value) {
-    mo = new MutationObserver(() => updateIndicator())
+    mo = new MutationObserver(() => updateScrollStateSettled())
     mo.observe(tablistRef.value, {
       childList: true,
       subtree: true,
@@ -206,6 +225,7 @@ onUnmounted(() => {
   scrollRef.value?.removeEventListener('scroll', updateScrollState)
   ro?.disconnect()
   mo?.disconnect()
+  cancelAnimationFrame(scrollStateRaf)
 })
 
 // Auto-scroll to reveal the active tab when modelValue changes

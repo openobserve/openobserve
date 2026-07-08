@@ -16,8 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   EmptyUsers — object-only "no users" illustration: two faint member avatars
-  beside a dashed "add member" slot with a pulsing + badge. CSS motion gated by
-  `animated` + prefers-reduced-motion.
+  beside a dashed "add member" slot with a small static outlined + mark.
+  Static by design — a filled, pulsing badge read as a clickable button and
+  was confused with the real CTA card rendered below the illustration.
 -->
 <template>
   <svg
@@ -50,11 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <circle cx="120" cy="76" r="16" fill="var(--color-surface-base)" stroke="var(--color-primary-400)" stroke-width="2" stroke-dasharray="5 5" />
       <path d="M98 126 Q98 100 120 98 Q142 100 142 126 Z" fill="var(--color-surface-base)" stroke="var(--color-primary-400)" stroke-width="2" stroke-dasharray="5 5" />
     </g>
-    <!-- + badge -->
-    <g class="es-badge">
-      <circle cx="142" cy="64" r="11" fill="var(--color-primary-600)" />
-      <line x1="142" y1="58" x2="142" y2="70" stroke="var(--color-white)" stroke-width="2.5" stroke-linecap="round" />
-      <line x1="136" y1="64" x2="148" y2="64" stroke="var(--color-white)" stroke-width="2.5" stroke-linecap="round" />
+    <!-- decorative + mark (static, outlined — reads as an ornament, not a button) -->
+    <g opacity="0.55">
+      <circle cx="142" cy="64" r="9" fill="none" stroke="var(--color-primary-400)" stroke-width="1.75" stroke-dasharray="3 3" />
+      <line x1="142" y1="60" x2="142" y2="68" stroke="var(--color-primary-400)" stroke-width="1.75" stroke-linecap="round" />
+      <line x1="138" y1="64" x2="146" y2="64" stroke="var(--color-primary-400)" stroke-width="1.75" stroke-linecap="round" />
     </g>
   </svg>
 </template>
@@ -65,28 +66,3 @@ withDefaults(
   { width: 260, animated: true },
 );
 </script>
-
-<style>
-.es-badge {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: es-pop 2.6s ease-in-out infinite;
-}
-@keyframes es-pop {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.12);
-  }
-}
-.es-static :where(.es-badge) {
-  animation: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  :where(.es-badge) {
-    animation: none;
-  }
-}
-</style>

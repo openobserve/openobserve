@@ -12,13 +12,20 @@
       "action": "Zeitbereich erweitern",
       "actionDesc": "Suche über einen längeren Zeitraum"
     },
+    "noPatterns": {
+      "title": "Keine Muster gefunden",
+      "description": "Versuchen Sie, den Zeitbereich zu vergrößern oder einen anderen Stream mit mehr Protokolldaten auszuwählen. Die Musterextraktion funktioniert am besten mit mindestens 1.000 Protokollen.",
+      "logsAnalyzed": "Nur {count} -Protokolle wurden analysiert."
+    },
     "noStreamSelected": {
       "title": "Wählen Sie einen Stream aus, um loszulegen",
       "description": "Wählen Sie einen Stream aus und führen Sie dann Ihre Abfrage aus, um seine Daten zu untersuchen. Verfeinern Sie die Ergebnisse mit Filtern und einem benutzerdefinierten Zeitraum."
     },
     "noQueryApplied": {
       "title": "Führen Sie eine Abfrage aus, um Protokolle anzuzeigen",
-      "description": "Passen Sie Ihre Filter an und klicken Sie auf „Abfrage ausführen“, um Ereignisse für diesen Stream zu laden."
+      "description": "Passen Sie Ihre Filter an und klicken Sie auf „Abfrage ausführen“, um Ereignisse für diesen Stream zu laden.",
+      "action": "Abfrage ausführen",
+      "actionDesc": "Ereignisse für die ausgewählten Filter laden"
     },
     "noDashboards": {
       "title": "Erstelle dein erstes Dashboard",
@@ -80,7 +87,9 @@
       "title": "Noch keine Ziele",
       "description": "Ziele definieren, wohin Warnmeldungen gesendet werden — Slack, E-Mail, Webhooks und mehr.",
       "action": "Neues Reiseziel",
-      "actionDesc": "Einen Benachrichtigungskanal verbinden"
+      "actionDesc": "Einen Benachrichtigungskanal verbinden",
+      "import": "Ziel importieren",
+      "importDesc": "Import aus einer JSON-Datei"
     },
     "noPipelineDestinations": {
       "title": "Noch keine Ziele",
@@ -92,7 +101,9 @@
       "title": "Noch keine Vorlagen",
       "description": "Vorlagen definieren das Format von Warnmeldungen.",
       "action": "Neue Vorlage",
-      "actionDesc": "Erstellen Sie eine Benachrichtigungsvorlage"
+      "actionDesc": "Erstellen Sie eine Benachrichtigungsvorlage",
+      "import": "Vorlage importieren",
+      "importDesc": "Import aus einer JSON-Datei"
     },
     "noEvalTemplates": {
       "title": "Noch keine Bewertungsvorlagen",
@@ -142,6 +153,20 @@
       "title": "Keine Backfill-Jobs",
       "description": "Backfill-Jobs verarbeiten historische Daten über eine Pipeline erneut. Führen Sie einen aus, um loszulegen."
     },
+    "noRegexPatterns": {
+      "title": "Noch keine Regex-Muster",
+      "description": "Erstellen Sie ein wiederverwendbares Muster, um vertrauliche Daten zu redigieren, oder importieren Sie eines aus Ihrer Bibliothek.",
+      "action": "Neues Muster",
+      "actionDesc": "Definieren Sie ein neues Regex-Muster",
+      "import": "Muster importieren",
+      "importDesc": "Wiederverwenden Sie ein Muster aus Ihrer Bibliothek"
+    },
+    "noStorageConfig": {
+      "title": "Kein Bucket konfiguriert",
+      "description": "Leiten Sie die Daten dieser Organisation an einen dedizierten Bucket weiter — unabhängig von anderen Organisationen und globalen Standardeinstellungen.",
+      "action": "Speicher konfigurieren",
+      "actionDesc": "Einen S3-, GCS- oder Azure-Bucket verbinden"
+    },
     "noPipelineHistory": {
       "title": "Noch keine Pipeline-Historie",
       "description": "Der Verlauf der Pipeline-Ausführung wird hier angezeigt, sobald Ihre Pipelines ausgeführt werden."
@@ -161,10 +186,12 @@
       "actionDesc": "Schreiben Sie eine neue VRL-Funktion"
     },
     "noStreams": {
-      "title": "Ich warte auf deine ersten Daten",
-      "description": "Es sind noch keine Daten eingetroffen. Verbinde eine Quelle und deine Streams werden hier automatisch angezeigt.",
+      "title": "Verbinde eine Quelle, um deinen ersten Stream zu erstellen",
+      "description": "Streams werden automatisch erstellt, sobald Daten eintreffen. Richten Sie die Aufnahme von Ihrer App, Ihrem Agenten oder Collector ein, um loszulegen.",
       "action": "Einnahme einrichten",
-      "actionDesc": "Eine Datenquelle verbinden"
+      "actionDesc": "Eine Datenquelle verbinden",
+      "createAction": "Neuer Stream",
+      "createActionDesc": "Manuelles Definieren eines Stream-Schemas"
     },
     "noAlerts": {
       "title": "Erstelle deinen ersten Alert",
@@ -174,7 +201,7 @@
     },
     "noIncidents": {
       "title": "Keine aktiven Vorfälle",
-      "description": "Sie sind alle beschäftigt — nichts braucht Ihre Aufmerksamkeit im Moment. Ausgelöste Vorfälle werden hier angezeigt."
+      "description": "Vorfälle entstehen, wenn eine Warnung ausgelöst wird — es wurde noch keine ausgelöst. Sobald Sie die Warnmeldungen eingerichtet haben, werden alle ausgelösten Vorfälle hier angezeigt."
     },
     "noLLMInsights": {
       "title": "Noch keine LLM-Aktivität",
@@ -191,20 +218,24 @@
     "noScorers": {
       "title": "Noch keine Torschützen",
       "description": "Scorer bewerten LLM-Antworten anhand Ihrer Score-Konfigurationen — beginnen Sie mit einem LLM-Judge oder importieren Sie einen aus der Bibliothek.",
-      "action": "Torschütze erstellen",
-      "actionDesc": "Definieren Sie einen LLM-Richter oder Remote-Scorer"
+      "action": "Neuer Torschütze",
+      "actionDesc": "Definieren Sie einen LLM-Richter oder Remote-Scorer",
+      "import": "Punktezähler importieren",
+      "importDesc": "Import aus einer JSON-Datei"
     },
     "noEvalJobs": {
       "title": "Noch keine Bewertungsjobs",
       "description": "Jobs plant Torschützen gegen einen LLM-Stream. Erstellen Sie einen, um mit der Bewertung von Konversationen in einer bestimmten Reihenfolge zu beginnen.",
-      "action": "Evaluationsjob erstellen",
+      "action": "Neuer Job",
       "actionDesc": "Wähle einen Stream + Torschützen + Trittfrequenz"
     },
     "noScoreConfigs": {
       "title": "Noch keine Score-Konfigurationen",
       "description": "Score-Konfigurationen definieren das Schema, das Scorer erzeugen — numerisch, boolesch oder kategorial. Fügen Sie eine hinzu, um mit der Bewertung zu beginnen.",
-      "action": "Score-Konfiguration erstellen",
-      "actionDesc": "Definieren Sie die Punkteform + den gesunden Bereich"
+      "action": "Neue Score-Konfiguration",
+      "actionDesc": "Definieren Sie die Punkteform + den gesunden Bereich",
+      "import": "Score-Konfiguration importieren",
+      "importDesc": "Import aus einer JSON-Datei"
     },
     "loadError": {
       "title": "Etwas ist schief gelaufen",
@@ -271,6 +302,7 @@
     },
     "nouns": {
       "logs": "aufzeichnen",
+      "patterns": "Muster",
       "dashboards": "Dashboards",
       "pipelines": "Rohrleitungen",
       "functions": "Funktionen",
@@ -305,7 +337,8 @@
       "scorers": "Scorer",
       "evalJobs": "Bewertungsaufträge",
       "scoreConfigs": "Score-Konfigurationen",
-      "pipelineHistory": "Pipeline-Verlauf"
+      "pipelineHistory": "Pipeline-Verlauf",
+      "regexPatterns": "Regex-Muster"
     }
   },
   "common": {
@@ -385,6 +418,8 @@
     "legendWidth": "Breite der Legende",
     "exceptions": "Ausnahmen",
     "nameRequired": "Name ist erforderlich",
+    "invalidEmail": "Bitte geben Sie eine gültige E-Mail-Adresse ein.",
+    "nameMaxLength": "Der Name darf aus maximal {max} Zeichen bestehen.",
     "edit": "Bearbeiten",
     "delete": "Löschen",
     "remove": "entfernen",
@@ -1322,6 +1357,14 @@
     "newPassword": "Neues Passwort",
     "organization": "Organisation",
     "otherOrganization": "Andere Organisation",
+    "roleRequired": "Rolle ist erforderlich",
+    "fieldRequired": "Feld ist erforderlich",
+    "passwordRequired": "Passwort ist erforderlich.",
+    "passwordPolicyHint": "Das Passwort muss aus 8 bis 128 Zeichen bestehen und mindestens einen Kleinbuchstaben, einen Großbuchstaben, eine Ziffer und ein Sonderzeichen enthalten.",
+    "currentPasswordRequired": "Das aktuelle Passwort ist erforderlich.",
+    "newPasswordRequired": "Ein neues Passwort ist erforderlich.",
+    "otherOrgInvalid": "Der Name der Organisation muss mit einem Buchstaben beginnen und alphanumerisch, _ oder -, sein.",
+    "inviteEmailInvalid": "Bitte geben Sie die richtige E-Mail-ID ein.",
     "isExistingUser": "Existierender Benutzer?",
     "deleteAPIKeyMessage": "Möchten Sie diesen Benutzer-API-Schlüssel wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden. Klicken Sie zur Bestätigung auf Ok.",
     "apiKeyNotFound": "Benutzer-API-Schlüssel wurde nicht gefunden.",
@@ -1362,6 +1405,7 @@
   },
   "serviceAccounts": {
     "header": "Dienstkonten",
+    "emailInvalid": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
     "headerSubtitle": "Programmatische Zugriffstoken für APIs",
     "search": "Suchdienstkonto",
     "refresh": "Service-Token aktualisieren",
@@ -1404,14 +1448,14 @@
     },
     "form": {
       "identifier": {
-        "label": "Identifier",
+        "label": "Kennung",
         "placeholder": "Geben Sie die E-Mail-Adresse ein",
         "help": "E-Mail-Adresse, die als Dienstkonto-ID verwendet wird"
       }
     },
     "list": {
       "col": {
-        "identifier": "Identifier",
+        "identifier": "Kennung",
         "description": "Beschreibung",
         "token": "Wertmarke",
         "created": "Erstellt"
@@ -1601,6 +1645,11 @@
     "subtitle": "Indexverwaltung und Stream-Konfiguration",
     "streamNameHelpText": "Verwenden Sie nur alphanumerische Zeichen, Unterstriche und Doppelpunkte.",
     "search": "Stream durchsuchen",
+    "emptyOr": "Oder:",
+    "emptyKubernetes": "Kubernetes",
+    "emptyAws": "AWS//CloudWatch",
+    "emptyLinux": "Linux",
+    "emptyWindows": "Windows",
     "name": "Name",
     "docNum": "Dokument Num",
     "storageSize": "Aufgenommene Daten",
@@ -2047,6 +2096,7 @@
     "defaultTokenBadge": "STANDARD",
     "createTokenBtn": "Neues Token erstellen",
     "createTokenTitle": "Token erstellen",
+    "searchToken": "Token suchen",
     "tokenNameLabel": "Name",
     "tokenDescriptionLabel": "Beschreibung",
     "rotateTokenBtn": "Rotieren",
@@ -3005,9 +3055,9 @@
     "searchAllFolders": "Alle Ordner",
     "streamConfig": "Stream-Konfiguration",
     "alertRules": "Regeln für Warnmeldungen",
-    "noTemplatesMsg": "Es sieht so aus, als ob Sie noch keine Vorlagen erstellt haben. Um eine Warnung zu erstellen, benötigen Sie mindestens ein Ziel und eine Vorlage",
+    "noTemplatesMsg": "Um eine Warnung zu erstellen, benötigen Sie mindestens eine Vorlage und ein Ziel. Vorlagen definieren das Format der Benachrichtigung. Erstellen Sie zunächst eine.",
     "createTemplateBtn": "Vorlage erstellen",
-    "noDestinationsMsg": "Es sieht so aus, als ob Sie noch keine Ziele erstellt haben. Um eine Warnung zu erstellen, benötigen Sie mindestens ein Ziel und eine Vorlage",
+    "noDestinationsMsg": "Um eine Warnung zu erstellen, benötigen Sie mindestens ein Ziel und eine Vorlage. Ziele definieren, wohin Benachrichtigungen gesendet werden. Erstellen Sie zunächst eine.",
     "createDestinationBtn": "Ziel erstellen",
     "add": "Warnung hinzufügen",
     "edit": "Bearbeiten",
@@ -5233,6 +5283,7 @@
     },
     "quality": {
       "scopeLabel": "Alle Qualitätsabmessungen in diesem Arbeitsbereich",
+      "agentPlaceholder": "Alle Agenten",
       "timeRange": {
         "label": "Zeitbereich",
         "last1h": "Letzte 1 Stunde",

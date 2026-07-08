@@ -3907,6 +3907,19 @@ button.date-time-button {
   font-size: 12px !important;
 }
 
+/* This "table" lays out entirely with flexbox + explicit column widths — it
+   does not use native table column layout. Rendering the table/thead/tbody as
+   block boxes makes `position: relative` (the containing block for the
+   position:absolute virtual rows), `height`, and `position: sticky` on the
+   header behave identically across browsers. Firefox does NOT honor these on
+   native table-row-group boxes, which left the Firefox results table collapsed
+   with no visible rows. */
+.logs-table,
+.logs-table > thead,
+.logs-table > tbody {
+  display: block;
+}
+
 .logs-table thead {
   font-family: var(--font-sans);
   font-size: 14px !important;

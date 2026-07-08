@@ -21,7 +21,7 @@
         </template>
         <span
           v-else
-          class="text-[1.2rem] font-semibold leading-none text-[var(--o2-text-secondary)]"
+          class="text-[0.95rem] font-medium leading-none text-[var(--o2-text-muted)]"
         >
           {{ t("onlineEvals.quality.kpis.noData") }}
         </span>

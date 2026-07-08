@@ -86,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="h-full"
               @view-traces="handleServiceGraphViewTraces"
               @request:stream-change="onChildStreamChangeRequest"
+              @jump-to-stream-data="onJumpToPanelStreamData"
             />
           </div>
 
@@ -99,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="h-full"
               @view-traces="handleServicesCatalogViewTraces"
               @request:stream-change="onChildStreamChangeRequest"
+              @jump-to-stream-data="onJumpToPanelStreamData"
             />
           </div>
 
@@ -146,6 +148,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="traces-no-streams-in-org-text"
                     @ask-ai="onAskAiSetupTracing"
                   />
+                  <!-- Stable loading state while streams load / auto-run fires,
+                       so the empties don't flash in between. -->
+                  <div
+                    v-else-if="searchObj.loadingStream"
+                    class="card-container h-full flex flex-col items-center justify-center gap-2 text-[var(--o2-text-secondary)]"
+                    data-test="traces-search-loading"
+                  >
+                    <OSpinner size="sm" />
+                    <span>{{ t("traces.fetchingTraces") }}</span>
+                  </div>
                   <div
                     v-else-if="
                       searchObj.data.errorMsg !== '' &&
@@ -247,6 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       preset="no-query-applied"
                       size="hero"
                       data-test="traces-search-not-started-text"
+                      @action="() => searchData()"
                     />
                   </div>
                   <div
@@ -363,6 +376,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import TracesNoDataState from "@/plugins/traces/TracesNoDataState.vue";
 import TracesNoStreamState from "@/plugins/traces/TracesNoStreamState.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
@@ -1802,6 +1816,17 @@ const onJumpToTracesStreamData = (fromUs: number, toUs: number) => {
   searchObj.data.datetime.endTime = toUs;
   searchObj.data.datetime.type = "absolute";
   runQueryFn();
+};
+
+// Jump handler for the service-graph / services-catalog empty states. Mirrors
+// the datetime + picker sync above, but does not run the traces query — each
+// panel reloads itself from its own watch on the shared datetime.
+const onJumpToPanelStreamData = (fromUs: number, toUs: number) => {
+  searchBarRef.value?.dateTimeRef?.setAbsoluteTime(fromUs, toUs);
+  searchObj.data.datetime.startTime = fromUs;
+  searchObj.data.datetime.endTime = toUs;
+  searchObj.data.datetime.type = "absolute";
+  searchObj.data.datetime.relativeTimePeriod = null;
 };
 
 const onSelectTracesStream = () => {
