@@ -263,6 +263,18 @@ describe("StreamSelection - schema validation (real OForm)", () => {
     expect(wrapper.emitted("save")).toBeFalsy();
   });
 
+  it("blocks submit when name has trailing whitespace (validates raw, not trimmed)", async () => {
+    // Regression: with a schema `.trim()`, "mypipe " passed validation (trim ran
+    // before the regex) but OForm SAVES the raw value → the space was persisted.
+    // The raw value must be rejected by the regex (no .trim() in the schema).
+    setField(wrapper, "stream_type", "logs");
+    setField(wrapper, "stream_name", "my-stream");
+    setField(wrapper, "name", "mypipe ");
+    await submitForm(wrapper);
+    expect(wrapper.vm.form.state.isValid).toBe(false);
+    expect(wrapper.emitted("save")).toBeFalsy();
+  });
+
   it("blocks submit when stream_type is empty", async () => {
     setField(wrapper, "name", "valid-name");
     setField(wrapper, "stream_name", "my-stream");

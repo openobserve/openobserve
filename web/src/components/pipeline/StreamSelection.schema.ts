@@ -21,7 +21,11 @@ export const makeAddPipelineSchema = (t: (_key: string) => string) =>
   z.object({
     name: z
       .string()
-      .trim()
+      // NO .trim(): OForm/TanStack validates with the schema but SAVES the raw
+      // value (emit('save', value) -> savePipeline spreads it into
+      // createPipeline), so .trim() would let "mypipe " pass validation yet
+      // persist the space. Validate the raw value — the regex below rejects
+      // spaces, so a whitespace name is correctly blocked.
       .min(1, t("common.nameRequired"))
       .regex(
         streamSelectionNameRegex,
