@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <!-- Timestamp — relative recency ("5 min ago"), full datetime on hover. -->
       <template #cell-firstSeenNanos="{ row }">
-        <OTimeCell :value="row.firstSeenNanos" unit="ns" mode="relative" empty-label="—" />
+        <OTimeCell :value="row.lastSeenNanos" unit="ns" mode="relative" empty-label="—" />
       </template>
 
       <!-- Session ID -->
@@ -378,7 +378,8 @@ const tableColumns = computed(() =>
     {
       id: "firstSeenNanos",
       header: t("traces.sessionsList.columns.timestamp"),
-      accessorKey: "firstSeenNanos",
+      // Keep the id stable for persisted column settings; display Last Seen.
+      accessorKey: "lastSeenNanos",
       size: 170,
       sortable: false,
       hideable: true,
