@@ -318,7 +318,7 @@ pub async fn ingest(
         }
 
         if !has_user_pipeline && !json_data_by_stream.contains_key(stream_name) {
-            for (mut value, metrics_type) in records.into_iter().zip(metric_types.into_iter()) {
+            for (mut value, metrics_type) in records.into_iter().zip(metric_types) {
                 let mut local_val = match value.take() {
                     json::Value::Object(val) => val,
                     _ => unreachable!(),
