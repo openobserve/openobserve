@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <EvalListShell
     data-test="scorer"
     :show-empty="showNoProvidersState"
@@ -40,13 +40,13 @@
         :persist-columns="true"
         table-id="scorer-list"
         width="100%"
-        class="tw:w-full tw:h-full"
+        class="w-full h-full"
         @row-click="(row: any) => $emit('view', row)"
       >
         <template #toolbar>
           <OSearchInput
             :model-value="search"
-            class="tw:flex-1 tw:min-w-0"
+            class="flex-1 min-w-0"
             :placeholder="t('onlineEvals.scorer.searchPlaceholder')"
             data-test="scorer-list-search-input"
             clearable
@@ -58,17 +58,21 @@
             :placeholder="t('onlineEvals.scorer.allTypes')"
             size="md"
             width="sm"
-            class="tw:shrink-0"
+            class="shrink-0"
             data-test="scorer-list-type-filter"
           />
         </template>
 
         <template #empty>
-          <div class="tw:flex tw:items-center tw:justify-center tw:py-8">
+          <div class="flex items-center justify-center py-8">
             <OEmptyState
               size="hero"
               preset="no-scorers"
               :filtered="hasFilters"
+              :actions="[
+                { id: 'create', icon: 'add', titleKey: 'emptyState.noScorers.action', descriptionKey: 'emptyState.noScorers.actionDesc' },
+                { id: 'import', icon: 'upload-file', titleKey: 'emptyState.noScorers.import', descriptionKey: 'emptyState.noScorers.importDesc' },
+              ]"
               data-test="scorer-empty-state"
               @action="onEmptyAction"
             />
@@ -76,14 +80,14 @@
         </template>
 
         <template #bottom="{ totalRows }">
-          <span class="o2-table-footer-title tw:text-primary">
+          <span class="o2-table-footer-title text-primary">
             {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scorer.listTitle") }}
           </span>
           <OButton
             v-if="selectedIds.length > 0"
             variant="outline"
             size="sm"
-            class="tw:ml-3"
+            class="ml-3"
             icon-left="download"
             data-test="scorer-bulk-export-btn"
             @click="handleBulkExport"
@@ -93,31 +97,29 @@
         </template>
 
         <template #cell-type="{ row }">
-          <OBadge :variant="scorerTypeBadgeVariant(scorerTypeOf(row))" size="sm">
-            {{ scorerTypeLabel(scorerTypeOf(row)) }}
-          </OBadge>
+          <OTag
+            type="scorerType"
+            :value="scorerTypeOf(row)"
+          />
         </template>
 
         <template #cell-produces="{ row }">
-          <span class="sr-mono-cell">{{ producesLabel(row) || "—" }}</span>
+          <span class="font-mono text-xs">{{ producesLabel(row) || "—" }}</span>
         </template>
 
         <template #cell-version="{ row }">
-          <span class="sr-mono-cell">v{{ row.version }}</span>
+          <span class="font-mono text-xs">v{{ row.version }}</span>
         </template>
 
         <template #cell-usedBy="{ row }">
-          <span class="sr-mono-cell">{{ usedByText(row) }}</span>
-        </template>
-
-        <template #cell-lastRun>
-          <span class="sr-muted-cell">—</span>
+          <span class="font-mono text-xs">{{ usedByText(row) }}</span>
         </template>
 
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:items-center actions-container">
+          <div class="flex items-center actions-container">
             <OButton
               :data-test="`scorer-list-${row.name}-edit-btn`"
+              data-row-action="edit"
               variant="ghost"
               size="icon-sm"
               :title="t('onlineEvals.actions.edit')"
@@ -134,6 +136,7 @@
             />
             <OButton
               :data-test="`scorer-list-${row.name}-delete-btn`"
+              data-row-action="delete"
               variant="ghost-destructive"
               size="icon-sm"
               :title="t('onlineEvals.actions.delete')"
@@ -165,7 +168,7 @@ import type {
 } from "@/services/online-evals.service";
 import { entityId, scorerTypeOf, valueOf } from "./utils/evalEntity";
 import EvalListShell from "./EvalListShell.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
 
 const props = defineProps<{
@@ -249,7 +252,7 @@ const columns = computed(() => [
     accessorKey: "version",
     sortable: true,
     size: COL.version,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "usedBy",
@@ -257,14 +260,7 @@ const columns = computed(() => [
     accessorFn: (row: Scorer) => usedByCount(row),
     sortable: true,
     size: COL.count,
-    meta: { align: "left" },
-  },
-  {
-    id: "lastRun",
-    header: t("onlineEvals.scorer.columns.lastRun"),
-    sortable: false,
-    size: COL.date,
-    meta: { align: "left" },
+    meta: { align: "right" },
   },
   {
     id: "actions",
@@ -313,24 +309,11 @@ const hasFilters = computed(
 
 function onEmptyAction(id?: string) {
   if (id === "create") emit("create");
+  else if (id === "import") emit("import-custom");
   else if (id === "clear-filters") {
     emit("update:search", "");
     typeFilter.value = null;
   }
-}
-
-function scorerTypeLabel(type: ScorerType) {
-  if (type === "remote") return t("onlineEvals.scorer.badgeRemote");
-  return t("onlineEvals.scorer.badgeLlm");
-}
-
-// Map a scorer type to a neutral design-system OBadge soft variant
-// (llm_judge → blue, remote → teal, code → purple). Types are just labels,
-// so use neutral palette colors rather than semantic success/warning variants.
-function scorerTypeBadgeVariant(type: ScorerType | string) {
-  if (type === "remote") return "teal-soft" as const;
-  if (type === "code") return "purple-soft" as const;
-  return "blue-soft" as const; // llm_judge
 }
 
 function producesLabel(row: Scorer) {
@@ -357,14 +340,3 @@ function usedByText(row: Scorer) {
   return t("onlineEvals.scorer.usedByJobs", { count });
 }
 </script>
-
-<style lang="scss">
-.sr-mono-cell {
-  font-size: 12px;
-}
-
-.sr-muted-cell {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 12px;
-}
-</style>

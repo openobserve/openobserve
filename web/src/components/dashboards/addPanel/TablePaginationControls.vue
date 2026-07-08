@@ -16,15 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:items-center"
+    class="flex items-center"
     data-test="dashboard-table-pagination-controls"
   >
     <!-- Records per page dropdown: only when pagination is enabled -->
     <div
       v-if="showPagination"
-      class="tw:flex tw:flex-row tw:items-center tw:gap-2"
+      class="flex flex-row items-center gap-2"
     >
-      <span class="tw:text-xs" data-test="dashboard-table-rows-per-page-label"
+      <span class="text-xs" data-test="dashboard-table-rows-per-page-label"
         >{{ t("dashboard.rowsPerPage") }}
       </span>
       <OSelect
@@ -32,12 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="(val: number) => $emit('update:rowsPerPage', val)"
         :options="formattedPaginationOptions"
         size="sm"
+        class="w-fit!"
         data-test="dashboard-table-rows-per-page-select"
       />
     </div>
 
     <!-- Count display -->
-    <span class="tw:text-xs tw:px-2" data-test="dashboard-table-row-count">
+    <span class="text-xs px-2" data-test="dashboard-table-row-count">
       {{ countDisplay }}
     </span>
 
@@ -164,54 +165,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-// Auto-size to content so "10" is narrow and "1000" is wider.
-:deep([data-test="dashboard-table-rows-per-page-select"]) {
-  width: fit-content !important;
-}
-
-// Ensure all pagination elements sit on the same baseline.
-[data-test="dashboard-table-pagination-controls"] {
-  display: flex !important;
-  align-items: center !important;
-
-  // Override q-gutter-sm margins on the container and all its children.
-  .q-gutter-sm {
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
-
-    > * {
-      margin-top: 0 !important;
-      margin-bottom: 0 !important;
-    }
-  }
-}
-
-.q-table__select {
-  min-height: auto !important;
-  height: auto !important;
-
-  :deep(.q-field__inner),
-  :deep(.q-field__control),
-  :deep(.q-field__native),
-  :deep(.q-field__append),
-  :deep(.q-field__marginal) {
-    min-height: auto !important;
-    height: auto !important;
-    padding: 0 !important;
-    line-height: 1;
-  }
-
-  // Keep a subtle border on the dropdown control.
-  :deep(.q-field__control) {
-    border: 1px solid rgba(0, 0, 0, 0.12) !important;
-    border-radius: 4px;
-    padding: 2px 4px !important;
-  }
-
-  // Shrink the dropdown arrow icon.
-  :deep(.q-select__dropdown-icon) {
-    font-size: 16px !important;
-  }
-}
-</style>

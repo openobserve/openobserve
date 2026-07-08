@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div data-test="alert-conditions-text" class="tw:font-bold">
+    <div data-test="alert-conditions-text" class="font-bold">
       Conditions * (AND operator is used by default to evaluate multiple
       conditions)
     </div>
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-conditions-add-btn"
         variant="outline"
         size="sm"
-        class="tw:mt-2"
+        class="mt-2"
         @click="addApiHeader"
         icon-left="add"
       >
@@ -36,14 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(field, index) in fields as any"
         :key="field.uuid"
-        class="tw:flex tw:justify-start tw:items-end tw:gap-2 tw:pb-2"
+        class="flex justify-start items-end gap-2 pb-2"
         :data-test="`alert-conditions-${index + 1}`"
       >
-        <div class="tw:ml-0 o2-input">
+        <div class="ml-0 o2-input">
           <OSelect
             v-model="field.column"
             :options="props.streamFields"
-            class="tw:py-2"
+            class="py-2"
             :placeholder="t('alerts.column')"
             :creatable="props.enableNewValueMode"
             :error="!!fieldErrors[`${field.uuid}-column`]"
@@ -54,11 +54,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-column`] = v ? '' : 'Field is required!'; emits('input:update', 'conditions', field); }"
           />
         </div>
-        <div class="tw:ml-0 o2-input">
+        <div class="ml-0 o2-input">
           <OSelect
             v-model="field.operator"
             :options="triggerOperators"
-            class="tw:py-2"
+            class="py-2"
             :error="!!fieldErrors[`${field.uuid}-operator`]"
             :error-message="fieldErrors[`${field.uuid}-operator`] || ''"
             style="min-width: 120px"
@@ -66,11 +66,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-operator`] = v ? '' : 'Field is required!'; emits('input:update', 'conditions', field); }"
           />
         </div>
-        <div class="tw:ml-0 tw:flex tw:items-end o2-input">
+        <div class="ml-0 flex items-end o2-input">
           <OInput
             v-model="field.value"
             :placeholder="t('common.value')"
-            class="tw:py-2"
+            class="py-2"
             :error="!!fieldErrors[`${field.uuid}-value`]"
             :error-message="fieldErrors[`${field.uuid}-value`] || ''"
             style="min-width: 150px"
@@ -79,12 +79,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div
-          class="tw:ml-0 alerts-condition-action"
+          class="ml-0 alerts-condition-action"
           style="margin-bottom: 12px"
         >
           <OButton
             data-test="alert-conditions-delete-condition-btn"
-            class="tw:ml-1"
+            class="ml-1"
             variant="ghost"
             size="icon-circle-sm"
             :title="t('alert_templates.edit')"
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             data-test="alert-conditions-add-condition-btn"
             v-if="index === fields.length - 1"
-            class="tw:ml-1"
+            class="ml-1"
             variant="ghost"
             size="icon-circle-sm"
             :title="t('alert_templates.edit')"
@@ -167,10 +167,3 @@ const addApiHeader = () => {
 
 </script>
 
-<style lang="scss">
-.add-field {
-}
-
-.alerts-condition-action {
-}
-</style>

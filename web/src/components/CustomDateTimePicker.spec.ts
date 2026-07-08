@@ -238,7 +238,7 @@ describe('CustomDateTimePicker.vue', () => {
       );
       const vm = wrapper.vm as any;
       
-      expect(vm.computedClass).toBe('dark-mode-date-time-picker');
+      expect(vm.computedClass).toBe('bg-[#2a2828]! text-white!');
     });
 
     it('computedClass returns light mode class for light theme', () => {
@@ -248,7 +248,7 @@ describe('CustomDateTimePicker.vue', () => {
       );
       const vm = wrapper.vm as any;
       
-      expect(vm.computedClass).toBe('light-mode-date-time-picker');
+      expect(vm.computedClass).toBe('bg-white!');
     });
 
     it('computedClass returns empty string when changeStyle is false', () => {

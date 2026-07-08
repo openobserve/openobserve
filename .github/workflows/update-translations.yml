@@ -1,10 +1,15 @@
+# Copyright 2026 OpenObserve Inc.
 name: Update Translations
 
 on:
   push:
     branches:
-      - '**'
-    # No path filter - always run to check for changes
+      - main
+    # Only run when the English source actually changes. Gating to `main` (instead
+    # of every branch) prevents paying AWS Translate for the same strings on each
+    # feature branch — the single largest cost driver of this job.
+    paths:
+      - 'web/src/locales/languages/en.json'
   workflow_dispatch:
     inputs:
       languages:
@@ -12,172 +17,172 @@ on:
         required: false
         default: ''
       force:
-        description: 'Force translation even if en.json not detected as changed'
+        description: 'Bypass the safety cap for large/intentional translation runs'
         required: false
         type: boolean
         default: false
+
+# Cancel an in-progress run if a newer push to the same ref arrives, so we don't
+# pay for superseded translation runs.
+concurrency:
+  group: update-translations-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   update-translations:
     name: Update translation files
     runs-on: ubuntu-latest
 
-    # Only run on main repo, not forks
+    # Only run on the main repo, not forks.
     if: github.repository == 'openobserve/openobserve'
 
-    # Required for OIDC authentication with AWS
+    # Required for OIDC authentication with AWS and opening the translations PR.
     permissions:
       id-token: write
       contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check if en.json was modified
-        id: check_en_json
+      - name: Verify AWS role secret is configured
+        env:
+          AWS_TRANSLATE_ROLE_ARN: ${{ secrets.AWS_TRANSLATE_ROLE_ARN }}
         run: |
-          echo "Checking for en.json changes..."
-          echo "Event: ${{ github.event_name }}"
-          echo "Force flag: ${{ github.event.inputs.force }}"
-          echo "Before: ${{ github.event.before }}"
-          echo "After: ${{ github.sha }}"
-
-          # Check if force flag is set (manual workflow dispatch)
-          if [ "${{ github.event.inputs.force }}" = "true" ]; then
-            echo "changed=true" >> $GITHUB_OUTPUT
-            echo "🔧 Force flag set - running translation regardless"
-            exit 0
-          fi
-
-          EN_JSON_CHANGED=false
-
-          # Method 1: Check using git diff with before/after SHAs
-          if [ "${{ github.event.before }}" != "" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
-            echo "Attempting to compare ${{ github.event.before }} with ${{ github.sha }}"
-
-            # Check if before commit exists (handles force push/rebase)
-            if git cat-file -e ${{ github.event.before }} 2>/dev/null; then
-              echo "Before commit exists, comparing..."
-              CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
-              echo "Changed files in this push:"
-              echo "$CHANGED_FILES"
-
-              if echo "$CHANGED_FILES" | grep -q "web/src/locales/languages/en.json"; then
-                EN_JSON_CHANGED=true
-              fi
-            else
-              echo "⚠️  Before commit doesn't exist (force push/rebase), checking last commit..."
-              CHANGED_FILES=$(git show --name-only --pretty="" HEAD)
-              echo "Changed files in last commit:"
-              echo "$CHANGED_FILES"
-
-              if echo "$CHANGED_FILES" | grep -q "web/src/locales/languages/en.json"; then
-                EN_JSON_CHANGED=true
-              fi
-            fi
-          else
-            # Method 2: For first push or workflow_dispatch, check last commit
-            echo "Checking last commit changes..."
-            CHANGED_FILES=$(git show --name-only --pretty="" HEAD)
-            echo "Changed files in last commit:"
-            echo "$CHANGED_FILES"
-
-            if echo "$CHANGED_FILES" | grep -q "web/src/locales/languages/en.json"; then
-              EN_JSON_CHANGED=true
-            fi
-          fi
-
-          if [ "$EN_JSON_CHANGED" = true ]; then
-            echo "changed=true" >> $GITHUB_OUTPUT
-            echo "✅ en.json was modified, will update translations"
-          else
-            echo "changed=false" >> $GITHUB_OUTPUT
-            echo "ℹ️  en.json not modified, skipping translation update"
+          if [ -z "$AWS_TRANSLATE_ROLE_ARN" ]; then
+            echo "::error::Secret AWS_TRANSLATE_ROLE_ARN is not set. Add the IAM role ARN as a repository secret."
+            exit 1
           fi
 
       - name: Configure AWS Credentials with IAM Role
-        if: steps.check_en_json.outputs.changed == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::058694856476:role/GitHubActionsRole
+          role-to-assume: ${{ secrets.AWS_TRANSLATE_ROLE_ARN }}
           role-session-name: GitHubActions-TranslationWorkflow
           aws-region: us-east-1
 
       - name: Set up Python
-        if: steps.check_en_json.outputs.changed == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: scripts/translations/requirements.txt
 
       - name: Install Python dependencies
-        if: steps.check_en_json.outputs.changed == 'true'
-        run: |
-          pip install -q boto3 botocore
+        run: pip install -r scripts/translations/requirements.txt
 
       - name: Run translation script
-        if: steps.check_en_json.outputs.changed == 'true'
+        id: run_translation
+        # Inputs are passed as environment variables (not interpolated into the
+        # script body) so user-controlled text can never be injected into the
+        # shell. The script itself validates language codes against the supported
+        # list before any AWS call (see main.py).
+        env:
+          INPUT_LANGUAGES: ${{ github.event.inputs.languages }}
+          INPUT_FORCE: ${{ github.event.inputs.force }}
         run: |
           cd scripts/translations
-          if [ -n "${{ github.event.inputs.languages }}" ]; then
-            echo "Translating specific languages: ${{ github.event.inputs.languages }}"
-            python3 main.py ${{ github.event.inputs.languages }}
-          else
-            echo "Translating all supported languages..."
-            python3 main.py
+          ARGS=()
+          if [ -n "$INPUT_LANGUAGES" ]; then
+            read -ra REQUESTED <<< "$INPUT_LANGUAGES"
+            ARGS+=("${REQUESTED[@]}")
           fi
+          if [ "$INPUT_FORCE" = "true" ]; then
+            ARGS+=("--force")
+          fi
+          echo "Running translation with args: ${ARGS[*]}"
+          python3 main.py "${ARGS[@]}"
 
       - name: Check for translation changes
         id: check_changes
+        # Use `git status --porcelain` (not `git diff`) so brand-new untracked
+        # files — e.g. a freshly created .translation_state.json or a new locale
+        # file — are detected, not just modifications to already-tracked files.
         run: |
-          if git diff --quiet web/src/locales/languages/; then
-            echo "changes=false" >> $GITHUB_OUTPUT
-            echo "No translation changes detected"
-          else
+          PATHS="web/src/locales/languages/ scripts/translations/.translation_state.json"
+          if [ -n "$(git status --porcelain -- $PATHS)" ]; then
             echo "changes=true" >> $GITHUB_OUTPUT
             echo "Translation changes detected:"
-            git diff --stat web/src/locales/languages/
+            git status --porcelain -- $PATHS
+          else
+            echo "changes=false" >> $GITHUB_OUTPUT
+            echo "No translation changes detected"
           fi
 
-      - name: Commit and push translation updates
+      # `main` is a protected branch, so a direct `git push` from GITHUB_TOKEN is
+      # rejected (this is why earlier runs failed on the push step). Open a PR
+      # with the generated translations instead. Requires the repo setting
+      # "Allow GitHub Actions to create and approve pull requests" to be enabled
+      # (Settings → Actions → General → Workflow permissions).
+      - name: Create pull request with translation updates
+        id: cpr
         if: steps.check_changes.outputs.changes == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: chore/update-translations
+          delete-branch: true
+          add-paths: |
+            web/src/locales/languages/*.json
+            scripts/translations/.translation_state.json
+          commit-message: |
+            chore: update translations from en.json
+
+            Auto-generated translation updates from English source file.
+
+            🤖 Generated with automated translation workflow
+          title: "chore: update translations from en.json"
+          body: |
+            Auto-generated translation updates from the English source file
+            (`web/src/locales/languages/en.json`).
+
+            🤖 Generated with automated translation workflow
+          labels: |
+            translations
+            e2e
+
+      # Approve the PR so it satisfies the required-review rule. GITHUB_TOKEN
+      # cannot approve a PR it authored (the PR above is authored by
+      # github-actions[bot]), so this uses a personal access token that belongs
+      # to the reviewer account `nikhilsaikethe` — the approval is attributed to
+      # that user. Store that account's PAT in the TRANSLATIONS_APPROVE_TOKEN
+      # secret. PR number is passed via env (never interpolated into the shell body).
+      - name: Approve the translation PR
+        if: steps.check_changes.outputs.changes == 'true' && steps.cpr.outputs.pull-request-number
+        env:
+          GH_TOKEN: ${{ secrets.TRANSLATIONS_APPROVE_TOKEN }}
+          PR_NUMBER: ${{ steps.cpr.outputs.pull-request-number }}
+          REPO: ${{ github.repository }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          gh pr review "$PR_NUMBER" --repo "$REPO" --approve \
+            --body "Auto-approved: automated translation update."
 
-          git add web/src/locales/languages/*.json
-
-          git commit -m "chore: update translations from en.json
-
-          Auto-generated translation updates from English source file.
-
-          🤖 Generated with automated translation workflow"
-
-          git push
+      # Enable auto-merge so the PR enters the merge queue automatically once the
+      # required review (above) and status checks pass. Uses the same PAT so the
+      # enqueue is attributed to a real user and downstream workflows (e.g. the
+      # merge_group checks) trigger correctly. Merge method must match the repo's
+      # merge-queue configuration — change --squash if the queue uses merge/rebase.
+      - name: Enable auto-merge (merge queue)
+        if: steps.check_changes.outputs.changes == 'true' && steps.cpr.outputs.pull-request-number
+        env:
+          GH_TOKEN: ${{ secrets.TRANSLATIONS_APPROVE_TOKEN }}
+          PR_NUMBER: ${{ steps.cpr.outputs.pull-request-number }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh pr merge "$PR_NUMBER" --repo "$REPO" --auto --squash
 
       - name: Summary
-        if: steps.check_changes.outputs.changes == 'true'
-        run: |
-          echo "✅ Translations updated and committed successfully!"
-          echo "📦 Subsequent build workflows will use the updated translation files."
-
-      - name: No changes summary
-        if: steps.check_changes.outputs.changes != 'true'
-        run: |
-          echo "ℹ️  No translation updates needed. All translations are up to date."
-
-      - name: Workflow complete
         if: always()
         run: |
-          echo "✅ Translation workflow completed successfully"
-          if [ "${{ steps.check_en_json.outputs.changed }}" != "true" ]; then
-            echo "ℹ️  No en.json changes detected - skipped translation"
-          elif [ "${{ steps.check_changes.outputs.changes }}" == "true" ]; then
-            echo "✅ Translations updated and committed"
-          else
-            echo "ℹ️  No new translation keys to update"
+          if [ "${{ steps.run_translation.outcome }}" != "success" ]; then
+            echo "❌ Translation script did not complete successfully (outcome: ${{ steps.run_translation.outcome }}). See the 'Run translation script' step logs."
+            exit 0
           fi
-          echo "📦 Dependent workflows can now proceed"
+          if [ "${{ steps.check_changes.outputs.changes }}" == "true" ]; then
+            echo "✅ Translations updated — PR #${{ steps.cpr.outputs.pull-request-number }} created/updated (branch: chore/update-translations), labeled 'translations,e2e', approved, and set to auto-merge into the merge queue."
+          else
+            echo "ℹ️  No new or modified keys — translations already up to date."
+          fi

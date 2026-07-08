@@ -200,16 +200,46 @@ pub async fn get_passcode(
     org_id: Option<&str>,
     user_id: &str,
 ) -> Result<IngestionPasscode, anyhow::Error> {
+    get_passcode_inner(org_id, user_id, false).await
+}
+
+/// Read a service account's own API token.
+///
+/// Unlike [`get_passcode`], this never returns the org-level "default"
+/// ingestion token (`o2oi_`-prefixed). A service account authenticates as
+/// itself and is authorized by its assigned role/group — its token is its own
+/// credential, not the org-wide ingestion token.
+pub async fn get_service_account_passcode(
+    org_id: Option<&str>,
+    user_id: &str,
+) -> Result<IngestionPasscode, anyhow::Error> {
+    get_passcode_inner(org_id, user_id, true).await
+}
+
+async fn get_passcode_inner(
+    org_id: Option<&str>,
+    user_id: &str,
+    is_service_account: bool,
+) -> Result<IngestionPasscode, anyhow::Error> {
     let lookup_org_id = org_id.unwrap_or(DEFAULT_ORG);
 
-    // Try default org ingestion token first — returns actual unmasked value
-    if let Ok(Some(token_record)) =
-        db::org_ingestion_tokens::get_by_name(lookup_org_id, "default").await
-    {
-        return Ok(IngestionPasscode {
-            user: user_id.to_string(),
-            passcode: token_record.token,
-        });
+    // The org-wide "default" ingestion token is only the right answer for the
+    // org ingestion passcode — never for a service account, which must return
+    // its own per-account token.
+    if !is_service_account {
+        let default_org_token = db::org_ingestion_tokens::get_by_name(lookup_org_id, "default")
+            .await
+            .ok()
+            .flatten();
+        // Try default org ingestion token first — returns actual unmasked value
+        if should_use_org_ingestion_token(is_service_account, default_org_token.is_some())
+            && let Some(token_record) = default_org_token
+        {
+            return Ok(IngestionPasscode {
+                user: user_id.to_string(),
+                passcode: token_record.token,
+            });
+        }
     }
 
     // Fall back to existing user token lookup
@@ -246,7 +276,7 @@ pub async fn update_rum_token(
     user_id: &str,
 ) -> Result<RumIngestionToken, anyhow::Error> {
     let is_rum_update = true;
-    match update_passcode_inner(org_id, user_id, is_rum_update).await {
+    match update_passcode_inner(org_id, user_id, is_rum_update, false).await {
         Ok(IngestionTokensContainer::RumToken(response)) => Ok(response),
         _ => Err(anyhow::Error::msg("User not found")),
     }
@@ -257,17 +287,48 @@ pub async fn update_passcode(
     user_id: &str,
 ) -> Result<IngestionPasscode, anyhow::Error> {
     let is_rum_update = false;
-    match update_passcode_inner(org_id, user_id, is_rum_update).await {
+    match update_passcode_inner(org_id, user_id, is_rum_update, false).await {
         Ok(IngestionTokensContainer::Passcode(response)) => Ok(response),
         Err(e) => Err(e),
         _ => Err(anyhow::Error::msg("User not found")),
     }
 }
 
+/// Rotate a service account's own API token.
+///
+/// Unlike [`update_passcode`], this never diverts to the org-level "default"
+/// ingestion token (the `o2oi_`-prefixed org token). A service account must
+/// always receive its own per-account token; handing back the org ingestion
+/// token would be both wrong (org-wide scope) and a security issue.
+pub async fn update_service_account_passcode(
+    org_id: Option<&str>,
+    user_id: &str,
+) -> Result<IngestionPasscode, anyhow::Error> {
+    match update_passcode_inner(org_id, user_id, false, true).await {
+        Ok(IngestionTokensContainer::Passcode(response)) => Ok(response),
+        Err(e) => Err(e),
+        _ => Err(anyhow::Error::msg("User not found")),
+    }
+}
+
+/// Whether a passcode read/rotation should use the org-wide "default" ingestion
+/// token (`o2oi_`-prefixed) instead of the caller's own token.
+///
+/// This is only correct for the org-level ingestion passcode. A service account
+/// must NEVER be handed the org ingestion token — its token is its own
+/// credential, authorized by the account's assigned role/group.
+fn should_use_org_ingestion_token(
+    is_service_account: bool,
+    default_org_token_exists: bool,
+) -> bool {
+    !is_service_account && default_org_token_exists
+}
+
 async fn update_passcode_inner(
     org_id: Option<&str>,
     user_id: &str,
     is_rum_update: bool,
+    is_service_account: bool,
 ) -> Result<IngestionTokensContainer, anyhow::Error> {
     let mut local_org_id = "";
     let Ok(db_user) = db::user::get_db_user(user_id).await else {
@@ -303,11 +364,16 @@ async fn update_passcode_inner(
     if is_rum_update {
         org_users::update_rum_token(local_org_id, user_id, &rum_token).await?;
     } else {
-        // If a "default" org ingestion token exists, rotate it instead of the user token
-        if db::org_ingestion_tokens::get_by_name(local_org_id, "default")
-            .await
-            .is_ok_and(|r| r.is_some())
-        {
+        // For a "default" org ingestion token (the org-wide passcode), rotating
+        // it here is intentional. But a service account must always rotate its
+        // OWN per-account token — never the org ingestion token, which is
+        // org-wide and `o2oi_`-prefixed. Diverting a service-account rotation to
+        // the org token is wrong (scope) and a security issue.
+        let default_org_token_exists =
+            db::org_ingestion_tokens::get_by_name(local_org_id, "default")
+                .await
+                .is_ok_and(|r| r.is_some());
+        if should_use_org_ingestion_token(is_service_account, default_org_token_exists) {
             let new_token = db::org_ingestion_tokens::rotate_token(local_org_id, "default").await?;
             return Ok(IngestionTokensContainer::Passcode(IngestionPasscode {
                 user: db_user.email,
@@ -1316,6 +1382,24 @@ mod tests {
 
         let resp = update_passcode(Some(org_id), user_id).await.unwrap();
         assert_ne!(resp.passcode, passcode);
+    }
+
+    #[test]
+    fn test_service_account_rotation_never_uses_org_ingestion_token() {
+        // The bug: rotating a service account returned the org "default"
+        // ingestion token (o2oi_…) when one existed. A service account must
+        // always rotate its own token, regardless of the org token.
+        assert!(!should_use_org_ingestion_token(true, true));
+        assert!(!should_use_org_ingestion_token(true, false));
+    }
+
+    #[test]
+    fn test_org_passcode_rotation_uses_org_ingestion_token_when_present() {
+        // Non-service-account (org-level) passcode rotation keeps the original
+        // behavior: rotate the org "default" ingestion token when it exists.
+        assert!(should_use_org_ingestion_token(false, true));
+        // …and falls back to the user token when no org token exists.
+        assert!(!should_use_org_ingestion_token(false, false));
     }
 
     #[test]

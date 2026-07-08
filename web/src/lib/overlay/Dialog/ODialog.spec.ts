@@ -157,8 +157,8 @@ describe("ODialog", () => {
         slots: { "header-right": '<button data-testid="hr-btn">Action</button>' },
       });
       const hrWrapper = wrapper.find('[data-testid="hr-btn"]').element.parentElement!;
-      expect(hrWrapper.className).toContain("tw:shrink-0");
-      expect(hrWrapper.className).not.toContain("tw:flex-1");
+      expect(hrWrapper.className).toContain("shrink-0");
+      expect(hrWrapper.className).not.toContain("flex-1");
     });
 
     it("spacer appears before header-right in DOM (keeps content right-aligned)", () => {
@@ -170,7 +170,7 @@ describe("ODialog", () => {
       const headerEl = closeBtn.element.parentElement!;
       const children = Array.from(headerEl.children) as HTMLElement[];
       const spacer = children.find(
-        (el) => el.className.includes("tw:flex-1") && !el.className.includes("tw:min-w-0"),
+        (el) => el.className.includes("flex-1") && !el.className.includes("min-w-0"),
       );
       const hrWrapper = wrapper.find('[data-testid="hr-btn"]').element.parentElement!;
       expect(spacer).toBeDefined();
@@ -186,7 +186,7 @@ describe("ODialog", () => {
       // The close button is a direct child of the header div
       const closeBtn = wrapper.find('button[aria-label="Close dialog"]');
       const headerEl = closeBtn.element.parentElement;
-      expect(headerEl?.className).toContain("tw:shrink-0");
+      expect(headerEl?.className).toContain("shrink-0");
     });
 
     it("body does NOT have flex-1 (must not push footer to bottom on short content)", () => {
@@ -196,9 +196,9 @@ describe("ODialog", () => {
       });
       const bodyContent = wrapper.find('[data-testid="body-content"]');
       const bodyEl = bodyContent.element.parentElement;
-      expect(bodyEl?.className).not.toContain("tw:flex-1");
-      expect(bodyEl?.className).toContain("tw:min-h-0");
-      expect(bodyEl?.className).toContain("tw:overflow-y-auto");
+      expect(bodyEl?.className).not.toContain("flex-1");
+      expect(bodyEl?.className).toContain("min-h-0");
+      expect(bodyEl?.className).toContain("overflow-y-auto");
     });
 
     it("footer has shrink-0 class (does not expand to fill space)", () => {
@@ -208,9 +208,9 @@ describe("ODialog", () => {
       });
       const footerBtn = wrapper.find('[data-testid="footer-btn"]');
       const footerEl = footerBtn.element.parentElement;
-      expect(footerEl?.className).toContain("tw:shrink-0");
-      expect(footerEl?.className).not.toContain("tw:flex-1");
-      expect(footerEl?.className).not.toContain("tw:mt-auto");
+      expect(footerEl?.className).toContain("shrink-0");
+      expect(footerEl?.className).not.toContain("flex-1");
+      expect(footerEl?.className).not.toContain("mt-auto");
     });
   });
 

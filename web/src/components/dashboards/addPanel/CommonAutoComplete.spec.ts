@@ -409,7 +409,7 @@ describe("CommonAutoComplete", () => {
       wrapper = createWrapper();
       const container = wrapper.find('[data-test="common-auto-complete-container"]');
       expect(container.exists()).toBeTruthy();
-      expect(container.classes()).toContain("tw:relative");
+      expect(container.classes()).toContain("relative");
     });
 
     it("should have correct container styling", () => {
@@ -425,8 +425,10 @@ describe("CommonAutoComplete", () => {
       await wrapper.vm.$nextTick();
       
       const options = wrapper.findAll('[data-test="common-auto-complete-option"]');
+      expect(options.length).toBeGreaterThan(0);
       options.forEach(option => {
-        expect(option.classes()).toContain("option");
+        expect(option.classes()).toContain("p-2");
+        expect(option.classes()).toContain("cursor-pointer");
       });
     });
   });

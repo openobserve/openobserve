@@ -50,12 +50,12 @@ describe("MetricsSummaryCard", () => {
 
     it("should render a q-card element", () => {
       wrapper = mountComponent();
-      expect(wrapper.find(".metrics-summary-card").exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-summary-card"]').exists()).toBe(true);
     });
 
     it("should render all three metric items", () => {
       wrapper = mountComponent();
-      const metricItems = wrapper.findAll(".metric-item");
+      const metricItems = wrapper.findAll('[data-test="metrics-summary-card-item"]');
       expect(metricItems).toHaveLength(3);
     });
   });
@@ -63,19 +63,19 @@ describe("MetricsSummaryCard", () => {
   describe("metrics display", () => {
     it("should display the totalTime value", () => {
       wrapper = mountComponent({ ...defaultMetrics, totalTime: "42.50ms" });
-      const values = wrapper.findAll(".metric-value");
+      const values = wrapper.findAll('[data-test="metrics-summary-card-value"]');
       expect(values.some((v) => v.text() === "42.50ms")).toBe(true);
     });
 
     it("should display the totalRows value", () => {
       wrapper = mountComponent({ ...defaultMetrics, totalRows: "5,678" });
-      const values = wrapper.findAll(".metric-value");
+      const values = wrapper.findAll('[data-test="metrics-summary-card-value"]');
       expect(values.some((v) => v.text() === "5,678")).toBe(true);
     });
 
     it("should display the peakMemory value", () => {
       wrapper = mountComponent({ ...defaultMetrics, peakMemory: "1.50MB" });
-      const values = wrapper.findAll(".metric-value");
+      const values = wrapper.findAll('[data-test="metrics-summary-card-value"]');
       expect(values.some((v) => v.text() === "1.50MB")).toBe(true);
     });
 
@@ -112,7 +112,7 @@ describe("MetricsSummaryCard", () => {
   describe("metric icons", () => {
     it("should render three metric icons", () => {
       wrapper = mountComponent();
-      const icons = wrapper.findAll(".metric-icon");
+      const icons = wrapper.findAll('[data-test="metrics-summary-card-icon"]');
       expect(icons).toHaveLength(3);
     });
   });
@@ -120,7 +120,7 @@ describe("MetricsSummaryCard", () => {
   describe("metric labels", () => {
     it("should render three metric labels", () => {
       wrapper = mountComponent();
-      const labels = wrapper.findAll(".metric-label");
+      const labels = wrapper.findAll('[data-test="metrics-summary-card-label"]');
       expect(labels).toHaveLength(3);
     });
   });

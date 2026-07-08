@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,21 +15,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
-    <div v-if="!showImportTemplate && !showTemplateEditor" class="tw:flex tw:flex-col tw:h-full">
+  <div class="rounded-md flex flex-col h-full p-0">
+    <div v-if="!showImportTemplate && !showTemplateEditor" class="flex flex-col h-full">
       <!-- Standard section header: title + actions only. Search moved to toolbar. -->
       <AppPageHeader
         :title="t('alert_templates.header')"
         icon="description"
         :subtitle="'Reusable alert message templates'"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="shrink-0 px-4 border-b border-border-default"
       >
         <template #actions>
           <OToggleGroup
             :model-value="activeTab"
             @update:model-value="(v: any) => { activeTab = v; }"
             data-test="template-list-tabs"
-            class="tw:mr-2"
+            class="mr-2"
           >
             <OToggleGroupItem value="all" size="sm" data-test="template-tab-all">
               <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </template>
       </AppPageHeader>
-      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div class="card-container flex-1 min-h-0 overflow-hidden">
       <OTable
         :frame="false"
         data-test="alert-templates-list-table"
@@ -84,8 +84,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar>
           <OSearchInput
             v-model="filterQuery"
-            class="tw:flex-1"
+            class="flex-1"
             :placeholder="t('template.search')"
+            data-test="template-list-search-input"
           />
         </template>
         <template #empty>
@@ -93,66 +94,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="hero"
             preset="no-alert-templates"
             :filtered="!!filterQuery"
-            :hide-action="!filterQuery"
-            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+            :actions="[
+              { id: 'create', icon: 'add', titleKey: 'emptyState.noAlertTemplates.action', descriptionKey: 'emptyState.noAlertTemplates.actionDesc' },
+              { id: 'import', icon: 'upload-file', titleKey: 'emptyState.noAlertTemplates.import', descriptionKey: 'emptyState.noAlertTemplates.importDesc' },
+            ]"
+            @action="(id) => id === 'clear-filters' ? (filterQuery = '') : id === 'import' ? importTemplate() : editTemplate(null)"
           />
         </template>
         <template #cell-name="{ row }">
-          <div class="tw:flex tw:items-center tw:gap-2">
+          <div class="flex items-center gap-2">
             <span>{{ row.name }}</span>
-            <span
+            <OTag
               v-if="row.isPrebuilt"
-              class="dimension-badge badge-blue"
+              type="templateOrigin"
+              value="prebuilt"
               :title="t('alert_templates.prebuiltBadgeHint')"
               data-test="alert-template-prebuilt-badge"
-            >{{ t('alert_templates.prebuiltBadge') }}</span>
-            <span
+            />
+            <OTag
               v-else
-              class="dimension-badge"
+              type="templateOrigin"
+              value="custom"
               data-test="alert-template-custom-badge"
-            >{{ t('alert_templates.customBadge') }}</span>
+            />
           </div>
         </template>
         <template #cell-actions="{ row }">
           <OButton
             title="Export Template"
-            class="tw:ml-1"
+            class="ml-1"
             variant="ghost"
             size="icon-sm"
             @click.stop="exportTemplate(row)"
             data-test="destination-export"
+            data-row-action="export"
           >
             <OIcon name="download" size="sm" />
           </OButton>
           <OButton
             :data-test="`alert-template-list-${row.name}-update-template`"
-            class="tw:ml-1"
+            class="ml-1"
             variant="ghost"
             size="icon-sm"
             :title="row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.edit')"
             :disabled="row.isPrebuilt"
             @click="editTemplate(row)"
+            data-row-action="edit"
           >
             <OIcon name="edit" size="sm" />
           </OButton>
           <OButton
             :data-test="`alert-template-list-${row.name}-clone-template`"
-            class="tw:ml-1"
+            class="ml-1"
             variant="ghost"
             size="icon-sm"
             :title="t('alert_templates.clone')"
             @click="cloneTemplate(row)"
+            data-row-action="duplicate"
           >
             <OIcon name="content-copy" size="sm" />
           </OButton>
           <OButton
             :data-test="`alert-template-list-${row.name}-delete-template`"
-            class="tw:ml-1"
+            class="ml-1"
             variant="ghost"
             size="icon-sm"
             :title="row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.delete')"
             :disabled="row.isPrebuilt"
             @click="conformDeleteDestination(row)"
+            data-row-action="delete"
           >
             <OIcon name="delete" size="sm" />
           </OButton>
@@ -161,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedTemplates.length > 0"
           #bottom
         >
-          <span class="tw:text-xs tw:text-text-primary">
+          <span class="text-xs text-text-primary">
             {{ selectedTemplates.length }} selected
           </span>
           <OButton
@@ -229,11 +239,14 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import ImportTemplate from "./ImportTemplate.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const AddTemplate = defineAsyncComponent(
@@ -590,41 +603,22 @@ const bulkDeleteTemplates = () => {
       }
     });
 };
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcuts([
+  {
+    id: "alertTemplatesAdd",
+    handler: () => { if (!isInputFocused()) editTemplate(null); },
+  },
+  {
+    id: "alertTemplatesRefresh",
+    handler: () => { if (!isInputFocused()) getTemplates(); },
+  },
+  {
+    id: "alertTemplatesFocusSearch",
+    handler: () => {
+      focusSearchInput("template-list-search-input");
+    },
+  },
+]);
+
 </script>
-<style lang="scss" scoped>
-// Badge style copied from ModelPricingList.vue so the "Prebuilt" / "Default"
-// labels match the LLM-pricing list visually.
-.dimension-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-  border: 1px solid #d1d5db;
-  color: inherit;
-}
-
-.badge-blue {
-  border: 1px solid #1d4ed8;
-}
-
-.badge-green {
-  border: 1px solid #065f46;
-}
-
-:global(body.body--dark) .dimension-badge {
-  color: #ffffff;
-  border-color: #4b5563;
-}
-
-:global(body.body--dark) .badge-blue {
-  border-color: #93c5fd;
-}
-
-:global(body.body--dark) .badge-green {
-  border-color: #6ee7b7;
-}
-</style>

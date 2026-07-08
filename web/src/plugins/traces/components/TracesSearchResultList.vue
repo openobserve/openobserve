@@ -16,15 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="traces-search-result-list tw:h-auto! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)]"
+    class="traces-search-result-list h-auto! flex flex-col bg-[var(--o2-card-bg-solid)]"
   >
     <!-- ════════════════════ Empty State ════════════════════ -->
     <TracesNoEventsState
       v-if="noResults"
+      :ai-enabled="aiEnabled"
+      :stream-doc-time-range="streamDocTimeRange"
+      :query-window-us="queryWindowUs"
       data-test="traces-search-result-not-found-text"
-      @widen-range="(p) => emit('widen-range', p)"
       @remove-filter="emit('remove-filter')"
       @jump-to-stream-data="(from, to) => emit('jump-to-stream-data', from, to)"
+      @ask-ai="emit('ask-ai')"
     />
 
     <!-- ════════════════════ Traces List Section ════════════════════ -->
@@ -32,15 +35,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       v-show="hasResults || loading"
       data-test="traces-table-wrapper"
-      class="tw:flex tw:flex-col tw:h-auto! traces-table-container"
+      class="flex flex-col h-auto! traces-table-container"
     >
       <!-- Table scroll area: no overflow here — parent handles unified scroll -->
       <div
         data-test="traces-search-result-list"
-        class="tw:w-full tw:h-auto! tw:overflow-x-auto tw:relative"
+        class="w-full h-auto! overflow-x-auto relative"
       >
         <TenstackTable
-          class="tw:h-auto!"
+          class="h-auto!"
           :columns="searchObj.data.resultGrid.columns"
           :rows="hits"
           :loading="loading"
@@ -94,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-operation_name="{ item }">
             <span
-              class="tw:text-xs tw:truncate tw:text-[var(--o2-text-1)]!"
+              class="text-xs truncate text-[var(--o2-text-1)]!"
               data-test="trace-row-operation-name"
             >
               {{ item.operation_name }}
@@ -103,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-duration="{ item }">
-            <span class="tw:text-xs" data-test="trace-row-duration">
+            <span class="text-xs" data-test="trace-row-duration">
               {{ formatTimeWithSuffix(item.duration) || "0us" }}
             </span>
           </template>
@@ -124,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <TraceStatusCell :item="item" />
           </template>
           <template #cell-input_tokens="{ item }">
-            <span class="tw:text-xs" data-test="trace-row-input-tokens">
+            <span class="text-xs" data-test="trace-row-input-tokens">
               {{
                 isLLMTrace(item)
                   ? formatTokens(extractLLMData(item)?.usage?.input ?? 0)
@@ -134,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-output_tokens="{ item }">
-            <span class="tw:text-xs" data-test="trace-row-output-tokens">
+            <span class="text-xs" data-test="trace-row-output-tokens">
               {{
                 isLLMTrace(item)
                   ? formatTokens(extractLLMData(item)?.usage?.output ?? 0)
@@ -144,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-cost="{ item }">
-            <span class="tw:text-xs" data-test="trace-row-cost">
+            <span class="text-xs" data-test="trace-row-cost">
               {{
                 isLLMTrace(item)
                   ? `$${formatCost(extractLLMData(item)?.cost?.total ?? 0)}`
@@ -221,6 +224,12 @@ interface Props {
   searchMode?: TraceSearchMode;
   /** Whether to show CellActions overlay on table cells. Default: true */
   showCellActions?: boolean;
+  /** Whether the AI copilot is enabled — gates the "Ask AI" empty-state button. */
+  aiEnabled?: boolean;
+  /** Authoritative stream doc time range (µs) for the empty-state jump card. */
+  streamDocTimeRange?: { min: number; max: number };
+  /** Resolved query window (µs) for empty-state overlap detection. */
+  queryWindowUs?: { start: number; end: number };
 }
 
 const { t } = useI18n();
@@ -238,6 +247,9 @@ const props = withDefaults(defineProps<Props>(), {
   sortOrder: undefined,
   searchMode: "traces",
   showCellActions: true,
+  aiEnabled: false,
+  streamDocTimeRange: undefined,
+  queryWindowUs: undefined,
 });
 
 const emit = defineEmits<{
@@ -247,9 +259,9 @@ const emit = defineEmits<{
   "sort-change": [sortBy: string, sortOrder: "asc" | "desc"];
   copy: [value: any];
   "send-to-ai-chat": [value: string];
-  "widen-range": [period: string];
   "remove-filter": [];
   "jump-to-stream-data": [fromUs: number, toUs: number];
+  "ask-ai": [];
 }>();
 
 const copyToClipboard = (field: string, value: any) =>
@@ -388,12 +400,8 @@ const totalPages = computed(() =>
 );
 </script>
 
-<style lang="scss" scoped>
-@import "@/styles/pagination.scss";
-
-:deep(.traces-table-container) {
-  .table-container {
-    border-radius: 0 !important;
-  }
+<style>
+.traces-table-container .table-container {
+  border-radius: 0 !important;
 }
 </style>

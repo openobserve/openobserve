@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading State -->
         <div
           v-if="loading"
-          class="tw:flex tw:flex-1 tw:items-center tw:justify-center"
+          class="flex flex-1 items-center justify-center"
         >
           <OSpinner size="lg" />
         </div>
@@ -37,64 +37,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Error State -->
         <div
           v-else-if="error"
-          class="tw:flex tw:flex-1 tw:flex-col tw:items-center tw:justify-center tw:text-center"
+          class="flex flex-1 flex-col items-center justify-center text-center"
         >
           <OIcon
             name="error-outline"
-            class="tw:mb-2" style="width: 3em; height: 3em;" />
-          <div class="tw:text-red-500">{{ error }}</div>
+            class="mb-2" style="width: 3em; height: 3em;" />
+          <div class="text-red-500">{{ error }}</div>
           <OButton
             variant="primary"
             size="sm"
-            class="tw:mt-4"
+            class="mt-4"
             @click="loadDashboards"
             >Retry</OButton
           >
         </div>
 
         <!-- Dashboard List -->
-        <div v-else class="tw:flex tw:flex-col tw:mx-2 tw:my-2">
+        <div v-else class="flex flex-col mx-2 my-2">
           <OSearchInput
             v-model="searchQuery"
             placeholder="Search dashboards..."
             clearable
-            class="tw:mb-3"
+            class="mb-3"
             data-test="add-dashboard-github-search"
           />
 
-          <div class="tw:text-xs tw:text-gray-500 tw:mb-2 tw:px-1">
+          <div class="text-xs text-gray-500 mb-2 px-1">
             {{ filteredDashboards.length }} dashboard(s) available
           </div>
 
           <ul
-            class="dashboard-list tw:my-2 tw:flex tw:flex-col tw:rounded"
-            :class="filteredDashboards.length > 0 ? 'tw:border tw:border-border' : ''"
+            class="dashboard-list flex flex-col rounded list-none p-0 m-0 max-h-[calc(100dvh-200px)] overflow-y-auto"
+            :class="filteredDashboards.length > 0 ? 'border border-border' : ''"
           >
             <li
               v-for="dashboard in filteredDashboards"
               :key="dashboard.name"
               @click="toggleDashboard(dashboard)"
-              class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1 tw:cursor-pointer tw:transition-colors tw:duration-200 tw:border-l-4"
+              class="flex items-center gap-2 px-3 py-1 cursor-pointer transition-colors duration-200 border-l-4"
               :class="[
                 isSelected(dashboard)
-                  ? 'selected-item tw:bg-primary/5 tw:border-primary'
-                  : 'tw:border-transparent hover:tw:bg-gray-50',
+                  ? 'selected-item bg-(--o2-tab-bg)! border-primary'
+                  : 'border-transparent hover:bg-gray-50',
               ]"
               data-test="add-dashboard-github-item"
             >
-              <div class="tw:shrink-0 tw:pr-2">
+              <div class="shrink-0 pr-2">
                 <OCheckbox
                   :model-value="isSelected(dashboard)"
                   @update:model-value="toggleDashboard(dashboard)"
                 />
               </div>
-              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                <span class="tw:text-sm tw:font-medium">
+              <div class="flex flex-col flex-1 min-w-0">
+                <span class="text-sm font-medium">
                   {{ dashboard.displayName }}
                 </span>
                 <span
                   v-if="dashboard.description"
-                  class="tw:block tw:text-xs tw:text-muted-foreground"
+                  class="block text-xs text-muted-foreground"
                 >
                   {{ dashboard.description }}
                 </span>
@@ -116,12 +116,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="showFolderSelection = false"
       @click:primary="confirmAdd"
     >
-      <div class="tw:flex tw:items-end tw:gap-2">
+      <div class="flex items-end gap-2">
         <OSelect
           v-model="selectedFolderObj"
           :options="folderOptions"
           label="Folder"
-          class="tw:grow"
+          class="grow"
           data-test="add-dashboard-github-folder-select"
         />
         <div style="width: 40px; margin-bottom: 2px">
@@ -575,38 +575,8 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.dashboard-list {
-  max-height: calc(100dvh - 200px);
-  overflow-y: auto;
-  list-style: none;
-  padding: 0;
-  margin: 0;
-
-  .selected-item {
-    background-color: var(--o2-tab-bg) !important;
-  }
-
-  .body--light & {
-    li:hover:not(.selected-item) {
-      background-color: var(--o2-hover-gray);
-    }
-  }
-
-  .body--dark & {
-    li:hover:not(.selected-item) {
-      background-color: var(--o2-hover-gray);
-    }
-  }
-}
-
-.folder-select {
-  :deep(.q-field__control) {
-    min-height: 56px !important;
-  }
-
-  :deep(.q-field__native) {
-    min-height: 20px !important;
-  }
+<style>
+.dashboard-list li:hover:not(.selected-item) {
+  background-color: var(--o2-hover-gray);
 }
 </style>

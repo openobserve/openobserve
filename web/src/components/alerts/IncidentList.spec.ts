@@ -471,25 +471,6 @@ describe("IncidentList.vue", () => {
     });
   });
 
-  describe("getSeverityColorClass", () => {
-    it("returns severity-p1 for P1", () => {
-      wrapper = createWrapper();
-      expect((wrapper.vm as any).getSeverityColorClass("P1")).toBe("severity-p1");
-    });
-
-    it("returns severity-p4 for P4", () => {
-      wrapper = createWrapper();
-      expect((wrapper.vm as any).getSeverityColorClass("P4")).toBe("severity-p4");
-    });
-
-    it("returns severity-default for unknown", () => {
-      wrapper = createWrapper();
-      expect((wrapper.vm as any).getSeverityColorClass("PX")).toBe(
-        "severity-default",
-      );
-    });
-  });
-
   describe("formatDimensions", () => {
     it("formats key=value pairs joined by comma", () => {
       wrapper = createWrapper();

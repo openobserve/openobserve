@@ -230,7 +230,9 @@ describe("ErrorViewer.vue", () => {
         data: { hits: [mockErrorData] },
       });
       wrapper = mountComponent();
-      expect(wrapper.find(".error-viewer-container").exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="error-viewer-container"]').exists(),
+      ).toBe(true);
     });
 
     it("should have correct styles applied", () => {
@@ -238,10 +240,10 @@ describe("ErrorViewer.vue", () => {
         data: { hits: [mockErrorData] },
       });
       wrapper = mountComponent();
-      const container = wrapper.find(".error-viewer-container");
+      const container = wrapper.find('[data-test="error-viewer-container"]');
       expect(container.exists()).toBe(true);
-      // Check that the container has the expected CSS class
-      expect(container.classes()).toContain("error-viewer-container");
+      // Check that the container has the expected layout class
+      expect(container.classes()).toContain("card-container");
     });
   });
 
@@ -294,6 +296,61 @@ describe("ErrorViewer.vue", () => {
       });
       wrapper = mountComponent({ timestamp: null });
       expect(wrapper.vm.getTimestamp).toBe(30000);
+    });
+  });
+
+  describe("Linked backend trace", () => {
+    beforeEach(() => {
+      mockSearchService.search.mockResolvedValue({ data: { hits: [] } });
+    });
+
+    // errorDetails is only populated inside onActivated (keep-alive), which
+    // never fires in a plain mount — seed the exposed ref directly.
+    const seedErrorDetails = async (details: Record<string, any>) => {
+      wrapper = mountComponent();
+      wrapper.vm.errorDetails = details;
+      await nextTick();
+    };
+
+    it("shows the trace correlation card when the error carries _oo_trace_id", async () => {
+      await seedErrorDetails({
+        error_id: "err-1",
+        _oo_trace_id: "trace-abc",
+        session_id: "session-1",
+        _timestamp: 1640995200000000,
+      });
+
+      const card = wrapper.findComponent({ name: "TraceCorrelationCard" });
+      expect(card.exists()).toBe(true);
+      expect(card.props("traceId")).toBe("trace-abc");
+      expect(card.props("timestamp")).toBe(1640995200000000);
+    });
+
+    it("shows the card when a captured xhr event carries _oo_trace_id", async () => {
+      await seedErrorDetails({
+        error_id: "err-1",
+        _timestamp: 1640995200000000,
+        events: [
+          { type: "action", action_type: "click" },
+          { type: "resource", resource_type: "xhr", _oo_trace_id: "trace-xhr" },
+        ],
+      });
+
+      const card = wrapper.findComponent({ name: "TraceCorrelationCard" });
+      expect(card.exists()).toBe(true);
+      expect(card.props("traceId")).toBe("trace-xhr");
+    });
+
+    it("hides the card when neither the error nor its events carry a trace id", async () => {
+      await seedErrorDetails({
+        error_id: "err-1",
+        _timestamp: 1640995200000000,
+        events: [{ type: "action", action_type: "click" }],
+      });
+
+      expect(
+        wrapper.findComponent({ name: "TraceCorrelationCard" }).exists(),
+      ).toBe(false);
     });
   });
 

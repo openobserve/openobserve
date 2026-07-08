@@ -17,14 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
+  <div class="rounded-md p-0 h-full flex flex-col">
     <!-- Standard page header: title + actions only. Search moved into the
          table's own toolbar (built-in global filter). -->
     <AppPageHeader
       :title="t('organization.header')"
       :subtitle="'Organizations you can access'"
       icon="corporate-fare"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     >
       <template #actions>
         <OButton
@@ -37,8 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </AppPageHeader>
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+    <div class="w-full flex-1 min-h-0 overflow-hidden">
+      <div class="card-container h-full">
       <OTable
           :frame="false"
           :data="organizations"
@@ -59,11 +59,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           table-id="iam-organizations-list"
         >
           <template #toolbar>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+            <div class="flex items-center gap-2 w-full">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('organization.search')"
-                class="tw:flex-1"
+                class="flex-1"
                 data-test="organizations-search-input"
               />
             </div>
@@ -78,6 +78,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
+
+          <template #cell-identifier="{ row }">
+            <OCodeCell :value="row.identifier" />
+          </template>
+
+          <template #cell-type="{ row }">
+            <OTag v-if="row.type" :value="row.type" />
+            <span v-else class="text-text-primary">—</span>
+          </template>
+
+          <template #cell-plan="{ row }">
+            <OTag v-if="row.plan && row.plan !== '-'" type="subscriptionPlan" :value="row.plan" />
+            <span v-else class="text-text-primary">—</span>
+          </template>
 
           <template #cell-actions="{ row }">
             <OButton
@@ -116,6 +130,8 @@ import JoinOrganization from "./JoinOrganization.vue";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -130,9 +146,11 @@ import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 export default defineComponent({
   name: "PageOrganization",
   components: {
+    OCodeCell,
     AddUpdateOrganization,
     OEmptyState,
     OButton,
+    OTag,
     AppPageHeader,
     OIcon,
     OTable,
@@ -162,7 +180,7 @@ export default defineComponent({
         size: TABLE_INDEX_COL_SIZE,
         minSize: 32,
         maxSize: 40,
-        meta: { align: "left", compactPadding: true, cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },
+        meta: { align: "left", compactPadding: true, cellClass: 'pl-4!', headerClass: 'pl-4!' },
       },
       {
         id: "name",
@@ -474,6 +492,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-</style>

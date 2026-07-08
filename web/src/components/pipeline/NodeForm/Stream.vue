@@ -33,22 +33,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       data-test="add-stream-input-stream-routing-section"
-      :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
+      :class="store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'"
     >
 
 
-    <div class="stream-routing-container tw:w-full tw:py-3">
+    <div class="stream-routing-container w-full py-3">
       <OSwitch
         v-if="selectedNodeType == 'input'"
         data-test="create-stream-toggle"
         :label="isUpdating ? 'Edit Stream' : 'Create new Stream'"
         v-model="createNewStream"
-        class="tw:px-3 tw:mb-3"
+        class="px-3 mb-3"
       />
 
       <div>
-        <div v-if="!createNewStream" class="tw:p-4 tw:flex tw:flex-col tw:gap-3">
-          <div data-test="input-node-stream-type-select" class="tw:w-full">
+        <div v-if="!createNewStream" class="p-4 flex flex-col gap-3">
+          <div data-test="input-node-stream-type-select" class="w-full">
             <OSelect
               v-model="stream_type"
               :options="(filteredStreamTypes as any)"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <div class="tw:w-full">
+          <div class="w-full">
             <OSelect
               v-model="stream_name"
               :options="indexOptions"
@@ -81,33 +81,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               v-model="appendData"
               :label="t('function.appendData')"
-              class="tw:mt-2"
+              class="mt-2"
             />
           </div>
 
           <div
             v-if="selectedNodeType == 'output'"
-            class="note-message tw:rounded-md tw:p-3 tw:flex tw:flex-col tw:gap-2"
+            class="note-message bg-[#f9f290] text-[#2d3748] w-full rounded-md p-3 flex flex-col gap-2"
           >
-            <div class="tw:text-sm tw:text-gray-800">Guidelines:</div>
-            <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-gray-800">
-              <div class="tw:flex tw:items-start tw:gap-2">
-                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+            <div class="text-sm text-gray-800">Guidelines:</div>
+            <div class="flex flex-col gap-1 text-sm text-gray-800">
+              <div class="flex items-start gap-2">
+                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
                 <span>
                   Select an existing stream from the list or enter the name to create a new one
                 </span>
               </div>
-              <div class="tw:flex tw:items-start tw:gap-2">
-                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+              <div class="flex items-start gap-2">
+                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
                 <span>
-                  <span class="highlight">Enrichment_tables</span> as destination stream is only available for scheduled pipelines
+                  <span class="highlight font-bold text-[#007bff]">Enrichment_tables</span> as destination stream is only available for scheduled pipelines
                 </span>
               </div>
-              <div class="tw:flex tw:items-start tw:gap-2">
-                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+              <div class="flex items-start gap-2">
+                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
                 <span>
-                  Use curly braces <span class="code">{}</span> to configure stream name dynamically. e.g.
-                  <span class="code">static_text_{fieldname}_postfix</span>. Static text before/after <span class="code">{}</span> is optional
+                  Use curly braces <span class="code [font-family:monospace] py-[1px] px-[4px] rounded-[3px] bg-[rgba(0,0,0,0.06)] text-[#b30059]">{}</span> to configure stream name dynamically. e.g.
+                  <span class="code [font-family:monospace] py-[1px] px-[4px] rounded-[3px] bg-[rgba(0,0,0,0.06)] text-[#b30059]">static_text_{fieldname}_postfix</span>. Static text before/after <span class="code [font-family:monospace] py-[1px] px-[4px] rounded-[3px] bg-[rgba(0,0,0,0.06)] text-[#b30059]">{}</span> is optional
                 </span>
               </div>
             </div>
@@ -455,10 +455,6 @@ defineExpose({
 </script>
 
 <style>
-.stream-routing-title {
-  font-size: 18px;
-  padding-top: 16px;
-}
 .pipeline-add-stream {
   .add-stream-header.row {
     display: none;
@@ -471,32 +467,5 @@ defineExpose({
   [role="separator"] {
     display: none !important;
   }
-}
-.q-field--labeled.showLabelOnTop.q-select
-  .q-field__control-container
-  .q-field__native
-  > :first-child {
-  text-transform: none !important;
-  font-size: 0.875rem; /* Keep the font size and weight as needed */
-  font-weight: 600;
-}
-
-.note-message {
-  background-color: #f9f290;
-  color: #2d3748;
-  width: 100%;
-}
-
-.note-message .highlight {
-  font-weight: bold;
-  color: #007bff;
-}
-
-.note-message .code {
-  font-family: monospace;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background-color: rgba(0, 0, 0, 0.06);
-  color: #b30059;
 }
 </style>

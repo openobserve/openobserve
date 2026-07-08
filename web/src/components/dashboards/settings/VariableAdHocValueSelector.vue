@@ -1,8 +1,8 @@
 <template>
-  <div class="tw:flex tw:flex-wrap tw:items-center">
-    <!-- <div class="tw:mb-2 title" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-300'" no-caps no-outline rounded>{{ variableItem?.name }}</div> -->
+  <div class="flex flex-wrap items-center">
+    <!-- <div class="mb-2 title" :class="store.state.theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'" no-caps no-outline rounded>{{ variableItem?.name }}</div> -->
     <div
-      class="tw:flex tw:flex-nowrap tw:items-center tw:mb-1 tw:gap-x-1"
+      class="flex flex-nowrap items-center mb-1 gap-x-1"
       v-for="(item, index) in adhocVariables"
       :key="index"
     >
@@ -12,7 +12,7 @@
         data-test="dashboard-variable-adhoc-name-selector"
         placeholder="Enter Name"
         @update:model-value="updateModelValueOfSelect(index, $event)"
-        class="tw:flex-1"
+        class="flex-1"
       />
       <OSelect
         v-model="adhocVariables[index].operator"
@@ -31,18 +31,18 @@
       <OButton
         variant="ghost"
         size="icon"
-        class="tw:ml-1"
+        class="ml-1"
         @click="removeField(index)"
         :data-test="`dashboard-variable-adhoc-close-${index}`"
         icon-left="close"
       >
       </OButton>
-      <!-- <div v-if="index != adhocVariables.length - 1" class="tw:ml-2 and-border" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-300'">AND</div> -->
+      <!-- <div v-if="index != adhocVariables.length - 1" class="ml-2 and-border" :class="store.state.theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'">AND</div> -->
     </div>
     <OButton
       variant="ghost"
       size="sm"
-      class="tw:ml-1 tw:mb-2 hideOnPrintMode"
+      class="ml-1 mb-2 hideOnPrintMode"
       @click="addFields"
       data-test="dashboard-variable-adhoc-add-selector"
     >
@@ -127,38 +127,8 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.and-border {
-  padding: 4px 6px;
-  border-radius: 4px;
-  // background-color: $grey-4;
-  font-size: smaller;
-}
-
-.title {
-  padding: 10px 8px;
-  border-radius: 4px;
-  // background-color: $grey-4;
-  font-size: small;
-  font-weight: bold;
-}
-
-.operator {
-  border-left: 1px solid $grey-4;
-  border-right: 1px solid $grey-4;
-}
-
-.close {
-  height: 100%;
-  // border-top: 1px solid $grey-4;
-  border-left: 1px solid $grey-4;
-  // border-bottom: 1px solid $grey-4;
-  // background-color: $grey-3;
-  border-radius: 0 !important;
-}
-.printMode {
-  .hideOnPrintMode {
-    display: none;
-  }
+<style>
+.printMode .hideOnPrintMode {
+  display: none;
 }
 </style>

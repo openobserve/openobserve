@@ -1,34 +1,34 @@
-<template>
+﻿<template>
   <!-- Page gutter is owned by the Settings shell's ConstrainedPage. -->
   <div>
     <LicensePeriod @updateLicense="showUpdateFormAndFocus"></LicensePeriod>
 
-    <div v-if="loading" class="tw:p-3 tw:flex tw:flex-col tw:items-center tw:justify-center">
+    <div v-if="loading" class="p-3 flex flex-col items-center justify-center">
       <OSpinner size="md" />
-      <div class="tw:mt-3">{{ t("about.loading_license_info") }}</div>
+      <div class="mt-3">{{ t("about.loading_license_info") }}</div>
     </div>
     <div
       v-else
-      class="tw:grid tw:grid-cols-1 lg:tw:grid-cols-2 tw:gap-4 tw:items-start tw:pb-4"
+      class="grid grid-cols-1 gap-4 items-start pb-4"
     >
-      <div class="tw:col-span-1 tw:min-h-0">
+      <div class="col-span-1 min-h-0">
         <div v-if="licenseData.license === null || !licenseData.license">
-          <OCard class="tw:mb-4 tw:border tw:border-solid tw:border-[var(--o2-border-color)]">
+          <OCard class="mb-4 border border-solid border-[var(--o2-border-color)]">
             <OCardSection role="body">
-              <div class="tw:text-xl tw:font-semibold">{{ t("about.no_license_found") }}</div>
-              <div class="tw:mt-2 tw:text-sm">
+              <div class="text-xl font-semibold">{{ t("about.no_license_found") }}</div>
+              <div class="mt-2 text-sm">
                 {{ t("about.installation_id") }}:
                 <strong>{{ licenseData.installation_id || "N/A" }}</strong>
               </div>
               <div
-                class="tw:mt-3 tw:text-sm"
+                class="mt-3 text-sm"
                 v-html="DOMPurify.sanitize(t('about.contact_admin_license'))"
               ></div>
               <OButton
                 data-test="no-license-get-license-btn"
                 variant="primary"
                 size="sm-action"
-                class="tw:ml-2 tw:mt-2"
+                class="ml-2 mt-2"
                 @click="redirectToGetLicense"
               >
                 {{ t("about.get_license") }}
@@ -36,9 +36,9 @@
             </OCardSection>
           </OCard>
 
-          <OCard class="tw:border tw:border-solid tw:border-[var(--o2-border-color)]">
+          <OCard class="border border-solid border-[var(--o2-border-color)]">
             <OCardSection role="body">
-              <div class="tw:text-base tw:font-medium tw:mb-3">
+              <div class="text-base font-medium mb-3">
                 {{ t("about.enter_license_key") }}
               </div>
               <OTextarea
@@ -48,14 +48,14 @@
                 :placeholder="t('about.paste_license_placeholder')"
                 style="min-height: 200px"
               />
-              <div v-if="isLicenseKeyAutoFilled" class="tw:mt-2 tw:mb-3">
-                <div class="modern-info-banner">
+              <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
+                <div class="flex items-center py-3 px-4 bg-[rgba(34,197,94,0.08)] border border-solid border-[rgba(34,197,94,0.2)] rounded-lg [backdrop-filter:blur(10px)] transition-all duration-200 dark:bg-[rgba(34,197,94,0.15)] dark:border-[rgba(34,197,94,0.3)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
                   <OIcon
                     name="check-circle"
-                    class="tw:text-green-600 tw:mr-2"
+                    class="text-green-600 mr-2"
                     size="md"
                   />
-                  <span class="tw:text-sm">{{
+                  <span class="text-sm">{{
                     t("about.license_auto_filled")
                   }}</span>
                 </div>
@@ -64,7 +64,7 @@
                 data-test="no-license-update-btn"
                 variant="primary"
                 size="sm-action"
-                class="tw:mt-2"
+                class="mt-2"
                 :loading="updating"
                 :disabled="!licenseKey.trim()"
                 @click="updateLicense"
@@ -76,64 +76,61 @@
         </div>
 
         <div v-else>
-          <OCard class="tw:border tw:border-solid tw:border-[var(--o2-border-color)]">
+          <OCard class="border border-solid border-[var(--o2-border-color)]">
             <OCardSection role="body">
-              <div class="tw:text-xl tw:font-semibold tw:mb-3">{{ t("about.license_info") }}</div>
-              <table class="tw:w-full tw:border-collapse tw:border tw:border-solid tw:border-[var(--o2-border-color)] compact-table">
+              <div class="text-xl font-semibold mb-3">{{ t("about.license_info") }}</div>
+              <table class="w-full border-collapse border border-solid border-[var(--o2-border-color)]">
                 <tbody>
-                  <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
+                  <tr class="border-b border-solid border-[var(--o2-border-color)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
                       {{ t("about.installation_id") }}
                     </td>
-                    <td class="tw:px-3 tw:py-2">{{ licenseData.installation_id }}</td>
+                    <td class="px-3 py-2 leading-[1.2]">{{ licenseData.installation_id }}</td>
                   </tr>
-                  <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
+                  <tr class="border-b border-solid border-[var(--o2-border-color)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
                       {{ t("about.license_id") }}
                     </td>
-                    <td class="tw:px-3 tw:py-2">{{ licenseData.license.license_id }}</td>
+                    <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.license_id }}</td>
                   </tr>
-                  <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
+                  <tr class="border-b border-solid border-[var(--o2-border-color)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
                       {{ t("about.status_lbl") }}
                     </td>
-                    <td class="tw:px-3 tw:py-2">
-                      <OBadge :variant="licenseData?.expired ? 'error' : 'success'">
-                        {{
-                          licenseData?.expired
-                            ? t("about.expired_lbl")
-                            : t("about.active_lbl")
-                        }}
-                      </OBadge>
+                    <td class="px-3 py-2 leading-[1.2]">
+                      <OTag
+                        type="licenseStatus"
+                        :value="licenseData?.expired ? 'expired' : 'active'"
+                      />
                     </td>
                   </tr>
-                  <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
+                  <tr class="border-b border-solid border-[var(--o2-border-color)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
                       {{ t("about.create_at_lbl") }}
                     </td>
-                    <td class="tw:px-3 tw:py-2">{{ formatDate(licenseData.license.created_at) }}</td>
+                    <td class="px-3 py-2 leading-[1.2]">{{ formatDate(licenseData.license.created_at) }}</td>
                   </tr>
-                  <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
+                  <tr class="border-b border-solid border-[var(--o2-border-color)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
                       {{ t("about.expires_at_lbl") }}
                     </td>
-                    <td class="tw:px-3 tw:py-2">{{ formatDate(licenseData.license.expires_at) }}</td>
+                    <td class="px-3 py-2 leading-[1.2]">{{ formatDate(licenseData.license.expires_at) }}</td>
                   </tr>
-                  <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.company") }}</td>
-                    <td class="tw:px-3 tw:py-2">{{ licenseData.license.company }}</td>
+                  <tr class="border-b border-solid border-[var(--o2-border-color)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">{{ t("about.company") }}</td>
+                    <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.company }}</td>
                   </tr>
-                  <tr v-if="licenseData.key" class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
+                  <tr v-if="licenseData.key" class="border-b border-solid border-[var(--o2-border-color)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
                       {{ t("about.license_key") }}
                     </td>
-                    <td class="tw:px-3 tw:py-2">
-                      <div class="tw:flex tw:items-center tw:gap-2">
+                    <td class="px-3 py-2 leading-[1.2]">
+                      <div class="flex items-center gap-2">
                         <span>{{ getMaskedLicenseKey() }}</span>
                         <OButton
                           variant="ghost"
                           size="icon"
-                          class="tw:ml-2"
+                          class="ml-2"
                           data-test="show-license-key-btn"
                           @click="showLicenseKeyModal = true"
                         >
@@ -142,27 +139,27 @@
                       </div>
                     </td>
                   </tr>
-                  <tr v-if="licenseData.license.contact_name" class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
+                  <tr v-if="licenseData.license.contact_name" class="border-b border-solid border-[var(--o2-border-color)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
                       {{ t("about.contact_name") }}
                     </td>
-                    <td class="tw:px-3 tw:py-2">{{ licenseData.license.contact_name }}</td>
+                    <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.contact_name }}</td>
                   </tr>
-                  <tr v-if="licenseData.license.contact_email" class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
+                  <tr v-if="licenseData.license.contact_email" class="border-b border-solid border-[var(--o2-border-color)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
                       {{ t("about.contact_email") }}
                     </td>
-                    <td class="tw:px-3 tw:py-2">{{ licenseData.license.contact_email }}</td>
+                    <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.contact_email }}</td>
                   </tr>
                   <tr v-if="licenseData.license.environment_type">
-                    <td class="tw:font-bold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
                       {{ t("about.environment_type") }}
                     </td>
-                    <td class="tw:px-3 tw:py-2">{{ licenseData.license.environment_type }}</td>
+                    <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.environment_type }}</td>
                   </tr>
                 </tbody>
               </table>
-              <div class="tw:mt-3 tw:flex tw:gap-3">
+              <div class="mt-3 flex gap-3">
                 <OButton
                   variant="primary"
                   size="sm-action"
@@ -192,9 +189,9 @@
             </OCardSection>
           </OCard>
 
-          <OCard v-show="showUpdateForm" class="tw:mt-4 tw:border tw:border-solid tw:border-[var(--o2-border-color)]">
+          <OCard v-show="showUpdateForm" class="mt-4 border border-solid border-[var(--o2-border-color)]">
             <OCardSection role="body">
-              <div class="tw:text-base tw:font-medium tw:mb-2">
+              <div class="text-base font-medium mb-2">
                 {{ t("about.update_license_key") }}
               </div>
               <OTextarea
@@ -204,19 +201,19 @@
                 :placeholder="t('about.paste_new_license_placeholder')"
                 style="min-height: 150px"
               />
-              <div v-if="isLicenseKeyAutoFilled" class="tw:mt-2 tw:mb-3">
-                <div class="modern-info-banner">
+              <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
+                <div class="flex items-center py-3 px-4 bg-[rgba(34,197,94,0.08)] border border-solid border-[rgba(34,197,94,0.2)] rounded-lg [backdrop-filter:blur(10px)] transition-all duration-200 dark:bg-[rgba(34,197,94,0.15)] dark:border-[rgba(34,197,94,0.3)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
                   <OIcon
                     name="check-circle"
-                    class="tw:text-green-600 tw:mr-2"
+                    class="text-green-600 mr-2"
                     size="md"
                   />
-                  <span class="tw:text-sm">{{
+                  <span class="text-sm">{{
                     t("about.license_auto_filled")
                   }}</span>
                 </div>
               </div>
-              <div class="tw:flex tw:gap-2">
+              <div class="flex gap-2">
                 <OButton
                   data-test="cancel-update-license-btn"
                   variant="outline"
@@ -244,23 +241,23 @@
         </div>
       </div>
 
-      <div class="tw:col-span-1 tw:self-start">
-        <OCard class="futuristic-card tw:border tw:border-solid tw:border-[var(--o2-border-color)]">
-          <OCardSection class="tw:p-3">
-            <div class="futuristic-header">
-              <div class="header-glow"></div>
-              <div class="tw:text-xl tw:font-semibold tw:relative tw:z-10">
+      <div class="col-span-1 self-start">
+        <OCard class="futuristic-card border border-solid" :class="store.state.theme === 'dark' ? 'bg-[linear-gradient(135deg,rgba(99,102,241,0.08)_0%,rgba(168,85,247,0.08)_100%)] border-[rgba(99,102,241,0.25)]' : 'border-[var(--o2-border-color)]'">
+          <OCardSection class="p-3">
+            <div>
+              <div :class="store.state.theme === 'dark' ? 'bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.15)_0%,transparent_70%)]' : ''"></div>
+              <div class="text-xl font-semibold relative z-10">
                 {{ t("about.usage_information") }}
               </div>
             </div>
 
-            <div class="tw:flex tw:flex-col tw:gap-2 tw:mt-3">
+            <div class="flex flex-col gap-2 mt-3">
               <!-- Summary Message -->
-              <div class="ingestion-summary-compact">
-                <div class="summary-text-compact tw:text-sm">
+              <div class="ingestion-summary-compact border border-solid rounded-lg py-3 px-[14px] [backdrop-filter:blur(10px)] relative overflow-hidden" :class="store.state.theme === 'dark' ? 'bg-[linear-gradient(135deg,rgba(99,102,241,0.1)_0%,rgba(168,85,247,0.1)_100%)] border-[rgba(99,102,241,0.3)]' : 'border-[rgba(99,102,241,0.2)]'">
+                <div class="summary-text-compact text-sm leading-[1.6] text-inherit text-[13px]">
                   <!-- Line 1: License Info -->
-                  <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-                    <OIcon name="info" size="sm" class="tw:flex-shrink-0" />
+                  <div class="flex items-center gap-2 mb-2">
+                    <OIcon name="info" size="sm" class="flex-shrink-0" />
                     <span v-if="isIngestionUnlimited">
                       {{ t("about.license_allows_unlimited_ingestion") }}
                     </span>
@@ -283,7 +280,7 @@
                   <!-- Line 2: Exceeded Status -->
                   <div
                     v-if="!isIngestionUnlimited"
-                    class="tw:flex tw:items-center tw:gap-2"
+                    class="flex items-center gap-2"
                   >
                     <OIcon
                       v-if="
@@ -293,7 +290,7 @@
                       "
                       name="warning"
                       size="sm"
-                      class="tw:text-red-500 tw:flex-shrink-0"
+                      class="text-red-500 flex-shrink-0"
                     />
                     <OIcon
                       v-else-if="
@@ -302,13 +299,13 @@
                       "
                       name="check-circle"
                       size="sm"
-                      class="tw:text-amber-500 tw:flex-shrink-0"
+                      class="text-amber-500 flex-shrink-0"
                     />
                     <OIcon
                       v-else
                       name="check-circle"
                       size="sm"
-                      class="tw:text-green-500 tw:flex-shrink-0"
+                      class="text-green-500 flex-shrink-0"
                     />
                     <span>
                       <span
@@ -323,8 +320,8 @@
                               t('about.limit_exceeded_days', {
                                 colorClass:
                                   licenseData?.ingestion_exceeded > 30
-                                    ? 'tw:text-red-500'
-                                    : 'tw:text-amber-500',
+                                    ? 'text-red-500'
+                                    : 'text-amber-500',
                                 days: licenseData?.ingestion_exceeded,
                                 plural:
                                   licenseData?.ingestion_exceeded > 1
@@ -339,7 +336,7 @@
                             licenseData?.ingestion_exceeded >
                             limitBreachAllowedCount
                           "
-                          class="warning-message"
+                          class="inline-flex items-center text-inherit font-semibold"
                           v-html="
                             DOMPurify.sanitize(
                               t('about.limit_exceeded_warning', {
@@ -352,7 +349,7 @@
                         ></span
                         ><span
                           v-else
-                          class="info-message"
+                          class="text-[12px] opacity-80 italic"
                           v-html="
                             DOMPurify.sanitize(
                               t('about.limit_exceeded_info', {
@@ -386,8 +383,8 @@
 
               <!-- Chart -->
               <div v-if="usageDashboardData">
-                <div class="chart-wrapper">
-                  <div class="usage-chart-container">
+                <div class="chart-wrapper relative">
+                  <div class="usage-chart-container w-full overflow-visible p-0 mx-auto">
                     <RenderDashboardCharts
                       :key="dashboardRenderKey"
                       :dashboardData="usageDashboardData"
@@ -399,7 +396,7 @@
                   </div>
                   <div
                     v-if="isIngestionUnlimited"
-                    class="tw:text-xs tw:text-gray-400 tw:mt-1 tw:text-center"
+                    class="text-xs text-gray-400 mt-1 text-center"
                     style="font-size: 10px"
                   >
                     {{ t("about.usage_shows_zero_unlimited") }}
@@ -424,7 +421,7 @@
       @click:secondary="showLicenseKeyModal = false"
       @click:primary="copyLicenseKey"
     >
-      <div class="tw:text-sm tw:mb-3">
+      <div class="text-sm mb-3">
         {{ t('about.your_complete_license_key') }}
       </div>
       <OTextarea
@@ -455,7 +452,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OCard from "@/lib/core/Card/OCard.vue";
@@ -476,7 +473,7 @@ export default defineComponent({
     ODialog,
     OSpinner,
     OIcon,
-    OBadge,
+    OTag,
     OTextarea,
     OCard,
     OCardSection,
@@ -976,220 +973,55 @@ export default defineComponent({
       generateUsageDashboard,
       limitBreachAllowedCount,
       DOMPurify,
+      store,
     };
   },
 });
 </script>
 
 <style>
-.gradient-banner {
+.usage-chart-container .grid-stack-item-content {
+  border: 0px !important;
+}
+
+.ingestion-summary-compact::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
   background: linear-gradient(
-    to right,
-    transparent 60%,
-    #f7f7ff 70%,
-    #cdf7e4 100%
+    180deg,
+    var(--o2-menu-color) 0%,
+    var(--o2-menu-color) 100%
+  );
+  opacity: 0.6;
+}
+
+.ingestion-summary-compact .summary-text-compact strong {
+  font-weight: 700;
+  background: linear-gradient(
+    135deg,
+    var(--o2-menu-color) 0%,
+    var(--o2-menu-color) 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.dark .futuristic-card::before {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(99, 102, 241, 0.7) 20%,
+    rgba(168, 85, 247, 0.7) 80%,
+    transparent 100%
   );
 }
 
-.license-expiry-container {
-  border: 1px solid #d7d7d7;
-  border-radius: 6px;
-}
-
-.o2-license-message {
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 32px;
-}
-
-.o2-license-subtitle {
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 22px;
-}
-
-.compact-table {
-  td,
-  th {
-    padding: 8px 12px !important;
-    line-height: 1.2;
-  }
-}
-
-.usage-chart-container {
-  width: 100%;
-  overflow: visible;
-  padding: 0;
-  margin: 0 auto;
-
-  .grid-stack-item-content {
-    border: 0px !important;
-  }
-}
-
-@media (max-width: 1023px) {
-  .usage-chart-container {
-    height: 320px !important;
-    min-height: 320px !important;
-  }
-}
-
-.chart-wrapper {
-  position: relative;
-
-  .chart-title {
-    color: inherit;
-    opacity: 0.9;
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-}
-
-.limit-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 12px;
-  background: rgba(249, 115, 22, 0.1);
-  border: 1px solid rgba(249, 115, 22, 0.3);
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #f97316;
-  backdrop-filter: blur(10px);
-}
-
-.ingestion-summary-compact {
-  border: 1px solid rgba(99, 102, 241, 0.2);
-  border-radius: 8px;
-  padding: 12px 14px;
-  backdrop-filter: blur(10px);
-  position: relative;
-  overflow: hidden;
-
-  &::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 3px;
-    height: 100%;
-    background: linear-gradient(
-      180deg,
-      var(--o2-menu-color) 0%,
-      var(--o2-menu-color) 100%
-    );
-    opacity: 0.6;
-  }
-
-  .summary-text-compact {
-    line-height: 1.6;
-    color: inherit;
-    font-size: 13px;
-
-    strong {
-      font-weight: 700;
-      background: linear-gradient(
-        135deg,
-        var(--o2-menu-color) 0%,
-        var(--o2-menu-color) 100%
-      );
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-  }
-
-  .warning-message {
-    display: inline-flex;
-    align-items: center;
-    color: inherit;
-    font-weight: 600;
-  }
-
-  .info-message {
-    font-size: 12px;
-    opacity: 0.8;
-    font-style: italic;
-  }
-}
-
-.modern-info-banner {
-  display: flex;
-  align-items: center;
-  padding: 12px 16px;
-  background: rgba(34, 197, 94, 0.08);
-  border: 1px solid rgba(34, 197, 94, 0.2);
-  border-radius: 8px;
-  backdrop-filter: blur(10px);
-  transition: all 0.2s ease;
-}
-
-.body--dark {
-  .gradient-banner {
-    background: linear-gradient(
-      to right,
-      transparent 60%,
-      #24262f 70%,
-      #2c3934 100%
-    );
-  }
-
-  .license-expiry-container {
-    border: 1px solid #454f5b;
-  }
-
-  .modern-info-banner {
-    background: rgba(34, 197, 94, 0.15);
-    border: 1px solid rgba(34, 197, 94, 0.3);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  }
-
-  .futuristic-card {
-    background: linear-gradient(
-      135deg,
-      rgba(99, 102, 241, 0.08) 0%,
-      rgba(168, 85, 247, 0.08) 100%
-    );
-    border: 1px solid rgba(99, 102, 241, 0.25);
-
-    &::before {
-      background: linear-gradient(
-        90deg,
-        transparent 0%,
-        rgba(99, 102, 241, 0.7) 20%,
-        rgba(168, 85, 247, 0.7) 80%,
-        transparent 100%
-      );
-    }
-  }
-
-  .futuristic-header {
-    .header-glow {
-      background: radial-gradient(
-        ellipse at center,
-        rgba(99, 102, 241, 0.15) 0%,
-        transparent 70%
-      );
-    }
-  }
-
-  .ingestion-summary-compact {
-    background: linear-gradient(
-      135deg,
-      rgba(99, 102, 241, 0.1) 0%,
-      rgba(168, 85, 247, 0.1) 100%
-    );
-    border: 1px solid rgba(99, 102, 241, 0.3);
-
-    &::before {
-      opacity: 0.8;
-    }
-  }
-
-  .limit-badge {
-    background: rgba(249, 115, 22, 0.15);
-    border: 1px solid rgba(249, 115, 22, 0.4);
-  }
+.dark .ingestion-summary-compact::before {
+  opacity: 0.8;
 }
 </style>

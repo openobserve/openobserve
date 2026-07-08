@@ -13,159 +13,29 @@ function selectPrompt(id: string) {
 </script>
 
 <template>
-  <section class="prompt-suggestions">
-    <p class="prompt-suggestions__heading">
+  <section class="flex flex-col gap-3 w-full">
+    <div class="m-0 self-center text-xs font-normal text-(--color-typography-meta) opacity-75">
       {{ t("aiAssistant.welcome.tryOneOfThese") }}
-    </p>
+    </div>
 
-    <div class="suggestions-grid">
+    <div class="suggestions-grid grid w-full gap-2 md:grid-cols-2 lg:grid-cols-3 sm:grid-cols-1">
       <button
         v-for="s in PROMPT_SUGGESTIONS"
         :key="s.id"
         type="button"
-        class="suggestion-chip"
+        class="suggestion-chip group relative inline-flex items-center gap-2 py-2 px-[0.625rem] pl-3 rounded-lg border border-(--color-border-default) bg-[linear-gradient(180deg,color-mix(in_srgb,var(--color-card-bg)_100%,transparent),color-mix(in_srgb,var(--color-card-bg)_92%,transparent))] text-(--color-text-secondary) text-xs leading-tight text-left cursor-pointer [transition:border-color_0.15s_ease,background_0.15s_ease,color_0.15s_ease,transform_0.15s_ease,box-shadow_0.15s_ease] overflow-hidden hover:border-[rgba(123,97,255,0.5)] hover:text-(--color-text-primary) hover:-translate-y-px hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_6px_16px_-8px_rgba(123,97,255,0.3)] focus-visible:outline-none focus-visible:border-[rgba(123,97,255,0.7)] focus-visible:shadow-[0_0_0_2px_rgba(123,97,255,0.4)]"
         @click="selectPrompt(s.id)"
       >
-        <span class="suggestion-chip__icon">
+        <span class="suggestion-chip__icon inline-flex items-center justify-center shrink-0 w-[22px] h-[22px] rounded-md bg-[color-mix(in_srgb,var(--color-border-default)_40%,transparent)] text-(--color-typography-meta) [transition:background_0.15s_ease,color_0.15s_ease] group-hover:bg-[rgba(123,97,255,0.15)] group-hover:text-[#7b61ff]">
           <OIcon :name="s.icon" size="sm" />
         </span>
-        <span class="suggestion-chip__label">
+        <span class="flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
           {{ t(`aiAssistant.suggestions.${s.id}`) }}
         </span>
-        <span class="suggestion-chip__arrow" aria-hidden="true">
+        <span class="suggestion-chip__arrow inline-flex items-center justify-center shrink-0 text-(--color-typography-meta) opacity-0 -translate-x-1 [transition:opacity_0.15s_ease,transform_0.15s_ease,color_0.15s_ease] group-hover:opacity-100 group-hover:translate-x-0 group-hover:text-[#7b61ff]" aria-hidden="true">
           <OIcon name="arrow-forward" size="xs" />
         </span>
       </button>
     </div>
   </section>
 </template>
-
-<style scoped lang="scss">
-.prompt-suggestions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  width: 100%;
-}
-
-.prompt-suggestions__heading {
-  margin: 0;
-  align-self: center;
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--color-typography-meta);
-  opacity: 0.75;
-}
-
-.suggestions-grid {
-  display: grid;
-  width: 100%;
-  gap: 0.5rem;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-@media (max-width: 64rem) {
-  .suggestions-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 40rem) {
-  .suggestions-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.suggestion-chip {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.625rem 0.5rem 0.75rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--color-border-default);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--color-card-bg) 100%, transparent),
-    color-mix(in srgb, var(--color-card-bg) 92%, transparent)
-  );
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  line-height: 1.25;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    color 0.15s ease,
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
-  overflow: hidden;
-}
-
-.suggestion-chip:hover {
-  border-color: rgba(123, 97, 255, 0.5);
-  color: var(--color-text-primary);
-  transform: translateY(-1px);
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.04),
-    0 6px 16px -8px rgba(123, 97, 255, 0.3);
-}
-
-.suggestion-chip:focus-visible {
-  outline: none;
-  border-color: rgba(123, 97, 255, 0.7);
-  box-shadow: 0 0 0 2px rgba(123, 97, 255, 0.4);
-}
-
-.suggestion-chip__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  border-radius: 0.375rem;
-  background: color-mix(
-    in srgb,
-    var(--color-border-default) 40%,
-    transparent
-  );
-  color: var(--color-typography-meta);
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
-}
-
-.suggestion-chip:hover .suggestion-chip__icon {
-  background: rgba(123, 97, 255, 0.15);
-  color: #7b61ff;
-}
-
-.suggestion-chip__label {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.suggestion-chip__arrow {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: var(--color-typography-meta);
-  opacity: 0;
-  transform: translateX(-4px);
-  transition:
-    opacity 0.15s ease,
-    transform 0.15s ease,
-    color 0.15s ease;
-}
-
-.suggestion-chip:hover .suggestion-chip__arrow {
-  opacity: 1;
-  transform: translateX(0);
-  color: #7b61ff;
-}
-</style>

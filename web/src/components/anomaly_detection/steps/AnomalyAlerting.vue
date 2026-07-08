@@ -16,26 +16,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-anomaly-alerting"
+    class="step-anomaly-alerting h-full"
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-    <div class="step-content tw:px-3 tw:py-4">
+    <div
+      class="step-content px-3 py-4 rounded-lg h-full overflow-y-auto border bg-[var(--color-surface-overlay)] border-[var(--color-border-default)]"
+    >
       <!-- Enable Notifications toggle -->
-      <div class="tw:flex tw:items-start alert-settings-row">
+      <div class="flex items-start mb-6!  pb-0!">
         <div
-          class="tw:font-semibold tw:flex tw:items-center"
+          class="font-semibold flex items-center"
           style="width: 190px; height: 36px"
         >
           {{ t('alerts.anomaly.notifications') }}
           <OIcon
             name="info"
             size="sm"
-            class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
+            class="ml-1 cursor-pointer text-gray-400"
           >
             <OTooltip :content="t('alerts.anomaly.notificationsTooltip')" side="right" />
           </OIcon>
         </div>
-        <div class="tw:flex tw:items-center tw:h-11">
+        <div class="flex items-center h-11">
           <OSwitch
             v-model="config.alert_enabled"
             :label="config.alert_enabled ? t('alerts.anomaly.enabled') : t('alerts.anomaly.disabled')"
@@ -47,17 +49,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Destination picker (shown when alert_enabled) -->
       <div
         v-if="config.alert_enabled"
-        class="tw:flex tw:items-start alert-settings-row"
+        class="flex items-start mb-6! pb-0!"
       >
         <div
-          class="tw:font-semibold tw:flex tw:items-center"
+          class="font-semibold flex items-center"
           style="width: 190px; height: 36px"
         >
           {{ t("alerts.destination") }}
-          <span class="tw:text-red-500 tw:ml-1">*</span>
+          <span class="text-red-500 ml-1">*</span>
         </div>
-        <div class="tw:flex tw:flex-col">
-          <div class="tw:flex tw:items-center">
+        <div class="flex flex-col">
+          <div class="flex items-center">
             <OSelect
               v-model="config.alert_destination_ids"
               :options="destinations"
@@ -65,34 +67,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               valueKey="name"
               multiple
               searchable
-              class="destination-select"
+              class="min-h-auto! h-auto!"
               style="min-width: 300px; max-width: 420px"
               data-test="anomaly-destination"
             >
               <template #selected-item="{ index, opt, removeAtIndex }">
-                <OBadge
+                <OTag
                   v-if="index < visibleChipCount"
-                  variant="default"
-                  size="sm"
+                  type="selectionChip"
                 >
                   {{ typeof opt === "object" ? opt.name : opt }}
                   <template #trailing>
                     <button
                       type="button"
                       aria-label="Remove"
-                      class="tw:inline-flex tw:items-center tw:justify-center tw:cursor-pointer tw:hover:opacity-70"
+                      class="inline-flex items-center justify-center cursor-pointer hover:opacity-70"
                       @click="removeAtIndex(index)"
                     >
                       <OIcon name="close" size="xs" />
                     </button>
                   </template>
-                </OBadge>
+                </OTag>
                 <span
                   v-if="
                     index === visibleChipCount &&
                     config.alert_destination_ids.length > visibleChipCount
                   "
-                  class="tw:text-[13px] tw:text-gray-500 tw:ml-1 tw:whitespace-nowrap"
+                  class="text-[13px] text-gray-500 ml-1 whitespace-nowrap"
                 >
                   +{{ config.alert_destination_ids.length - visibleChipCount }}
                 </span>
@@ -104,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="sm"
-              class="tw:ml-1"
+              class="ml-1"
               :title="t('alerts.alertSettings.refreshDestinations')"
               @click="$emit('refresh:destinations')"
               icon-left="refresh"
@@ -112,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="outline"
               size="sm"
-              class="tw:ml-2"
+              class="ml-2"
               @click="openAddDestination"
             >
               {{ t('alerts.anomaly.addNewDestination') }}
@@ -122,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="
               config.alert_enabled && config.alert_destination_ids.length === 0
             "
-            class="text-red-8 tw:pt-1"
+            class="text-red-8 pt-1"
             style="font-size: 11px; line-height: 12px"
             data-test="anomaly-destination-error"
           >
@@ -134,11 +135,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Info note when notifications disabled -->
       <div
         v-if="!config.alert_enabled"
-        class="tw:flex tw:items-start tw:gap-2 tw:text-xs tw:mt-2"
-        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
+        class="flex items-start gap-2 text-xs mt-2"
+        :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
       >
         <OIcon name="info" size="sm"
-class="tw:mt-px tw:flex-shrink-0" />
+class="mt-px flex-shrink-0" />
         <span>{{ t('alerts.anomaly.disabledNotificationsInfo') }}</span>
       </div>
     </div>
@@ -155,13 +156,13 @@ import OSwitch from '@/lib/forms/Switch/OSwitch.vue';
 import OSelect from '@/lib/forms/Select/OSelect.vue';
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 export default defineComponent({
   name: "AnomalyAlerting",
   components: { OButton, OSwitch, OSelect, OTooltip,
     OIcon,
-    OBadge,
+    OTag,
 },
 
   props: {
@@ -198,61 +199,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.step-anomaly-alerting {
-  height: 100%;
-
-  .step-content {
-    border-radius: 8px;
-    height: 100%;
-    overflow-y: auto;
-  }
-
-  &.dark-mode {
-    .step-content {
-      background-color: #212121;
-      border: 1px solid #343434;
-    }
-  }
-
-  &.light-mode {
-    .step-content {
-      background-color: #ffffff;
-      border: 1px solid #e6e6e6;
-    }
-  }
-}
-
-.alert-settings-row {
-  margin-bottom: 24px !important;
-  padding-bottom: 0 !important;
-}
-
-.destination-select {
-  // override the compact 28px from alert-v3-select — chips need flexible height
-  min-height: auto !important;
-  height: auto !important;
-  :deep(.q-field__inner) {
-    min-height: auto !important;
-    max-height: none !important;
-    height: auto !important;
-  }
-  :deep(.q-field__control) {
-    min-height: 1.75rem !important;
-    max-height: none !important;
-    height: auto !important;
-    flex-wrap: nowrap;
-  }
-  :deep(.q-field__control-container) {
-    flex-wrap: nowrap;
-    overflow: hidden;
-  }
-  :deep(.q-field__marginal) {
-    height: auto !important;
-  }
-  :deep(.q-field__append) {
-    height: auto !important;
-  }
-}
-</style>

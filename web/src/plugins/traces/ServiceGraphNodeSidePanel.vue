@@ -25,10 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="(v) => { if (!v) handleClose() }"
   >
     <template #header-right>
-      <div class="tw:flex tw:items-center tw:gap-2">
-        <span class="health-badge" :class="serviceHealth.status">
-          {{ serviceHealth.text }}
-        </span>
+      <div class="flex items-center gap-2">
+        <OTag type="serviceStatus" :value="serviceHealth.status" data-test="service-health-badge">{{ serviceHealth.text }}</OTag>
         <ODropdown side="bottom" align="start">
           <template #trigger>
             <OButton
@@ -55,29 +53,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Content Scrollable Area -->
-      <div class="panel-content">
+      <div class="panel-content flex-1 overflow-y-auto overflow-x-hidden bg-[#0f1419] p-2.5">
         <!-- RED Charts Section -->
         <div
           v-if="streamFilter !== 'all' && dashboardData"
-          class="panel-section red-charts-section tw:flex tw:flex-col tw:mb-0!"
+          class="panel-section red-charts-section flex flex-col p-0 mb-0!"
           data-test="service-graph-side-panel-red-charts"
         >
           <!-- DataZoom filter chips + View in Traces button -->
           <div
             v-if="filterChips.length"
-            class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-[0.3rem] tw:flex-wrap"
+            class="flex items-center gap-2 px-2 py-[0.3rem] flex-wrap"
             data-test="service-graph-side-panel-filter-chips"
           >
             <!-- Filter chip pills -->
             <div
               v-for="chip in filterChips"
               :key="chip.key"
-              class="tw:inline-flex tw:items-center tw:gap-1 tw:rounded tw:border tw:border-[var(--o2-border)] tw:px-2 tw:py-[0.325rem] tw:text-[0.7rem] tw:leading-none tw:text-[var(--o2-text-primary)]"
+              class="inline-flex items-center gap-1 rounded border border-[var(--o2-border)] px-2 py-[0.325rem] text-[0.7rem] leading-none text-[var(--o2-text-primary)]"
               :data-test="`service-graph-filter-chip-${chip.key}`"
               :class="
                 chip.type === 'duration'
-                  ? 'tw:text-[var(--o2-latency-p95)]'
-                  : 'tw:text-[var(--o2-status-error-text)]'
+                  ? 'text-[var(--o2-latency-p95)]'
+                  : 'text-[var(--o2-status-error-text)]'
               "
             >
               <!-- Duration chip icon -->
@@ -85,27 +83,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="chip.type === 'duration'"
                 name="schedule"
                 size="xs"
-                class="tw:text-[var(--o2-latency-p95)]"
+                class="text-[var(--o2-latency-p95)]"
               />
               <!-- Error chip icon -->
               <OIcon
                 v-else-if="chip.type === 'error'"
                 name="warning"
                 size="xs"
-                class="tw:text-[var(--o2-status-error-text)]"
+                class="text-[var(--o2-status-error-text)]"
               />
               <span
                 :class="
                   chip.type === 'duration'
-                    ? 'tw:text-[var(--o2-latency-p95)]'
-                    : 'tw:text-[var(--o2-status-error-text)]'
+                    ? 'text-[var(--o2-latency-p95)]'
+                    : 'text-[var(--o2-status-error-text)]'
                 "
                 >{{ chip.label }}</span
               >
               <OButton
                 variant="ghost"
                 size="icon-chip"
-                class="tw:ml-0.5"
+                class="ml-0.5"
                 :data-test="`service-graph-filter-chip-remove-${chip.key}`"
                 @click="removeLocalRangeFilter(chip.key)"
               >
@@ -114,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Spacer -->
-            <div class="tw:flex-1" />
+            <div class="flex-1" />
 
             <!-- View in Traces button -->
             <OButton
@@ -129,8 +127,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               View Traces
             </OButton>
           </div>
-          <div class="charts-wrapper tw:py-0! tw:min-h-[10.875rem] tw:w-full">
-            <div class="charts-container tw:w-full">
+          <div class="charts-wrapper py-0! min-h-[10.875rem] w-full">
+            <div class="charts-container w-full">
               <RenderDashboardCharts
                 ref="dashboardChartsRef"
                 :viewOnly="true"
@@ -145,18 +143,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <OSeparator v-if="streamFilter !== 'all' && dashboardData" class="tw:my-[1rem]!" />
+        <OSeparator v-if="streamFilter !== 'all' && dashboardData" class="my-[1rem]!" />
         <!-- Tabs: Operations / Nodes / Pods -->
         <template v-if="streamFilter !== 'all'">
           <div
-            class="tw:flex tw:items-end tw:border-b tw:border-b-[var(--o2-border-color)] tw:mx-[0.5rem] tw:mb-[0.375rem]"
+            class="flex items-end border-b border-b-[var(--o2-border-color)] mx-[0.5rem] mb-[0.375rem]"
             data-test="service-graph-node-panel-tabs-row"
           >
             <OTabs
               v-model="activeTab"
               dense
               align="left"
-              class="tw:font-bold tw:flex-1 tw:w-[calc(100%-2rem)]!"
+              class="font-bold flex-1 w-[calc(100%-2rem)]!"
               data-test="service-graph-node-panel-tabs"
             >
               <OTab
@@ -200,12 +198,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </template>
               <div
-                class="tw:min-w-[12rem]!"
+                class="min-w-[12rem]!"
                 data-test="service-graph-node-panel-workload-fields-menu"
               >
                 <template v-for="env in detectedEnvironments" :key="env.key">
                   <div
-                    class="tw:text-xs tw:px-3 tw:pb-0 tw:py-[0.375rem]! tw:uppercase tw:tracking-wide tw:text-muted-foreground"
+                    class="text-xs px-3 pb-0 py-[0.375rem]! uppercase tracking-wide text-muted-foreground"
                   >
                     {{ env.label }}
                   </div>
@@ -215,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     )"
                     :key="cfg.id"
                     :data-test="`service-graph-node-panel-workload-field-${cfg.id}`"
-                    class="tw:px-[0.325rem]! tw:h-[30px]! tw:min-h-[30px]!"
+                    class="px-[0.325rem]! h-[30px]! min-h-[30px]!"
                     @select="(e) => { e.preventDefault(); toggleWorkloadField(cfg.id); }"
                   >
                     <template #icon-left>
@@ -227,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </span>
                     </template>
-                    <span class="tw:text-xs">
+                    <span class="text-xs">
                       {{ cfg.label }}
                       <OTooltip :content="cfg.groupField" />
                     </span>
@@ -240,19 +238,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Operations Tab -->
             <OTabPanel
               name="operations"
-              class="tw:p-0! panel-section tw:mb-0!"
+              class="p-0! panel-section mb-0!"
               data-test="service-graph-side-panel-recent-operations"
             >
               <div
                 v-if="recentOperations.length === 0 && !loadingOperations"
-                class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                class="text-xs italic py-2 text-center"
                 style="color: var(--o2-text-secondary)"
               >
                 No operations found
               </div>
               <div
                   v-else-if="recentOperations.length > 0 || loadingOperations"
-                  class="tw:overflow-hidden tw:rounded"
+                  class="overflow-hidden rounded"
                   data-test="service-graph-side-panel-operations-table"
                 >
                   <TenstackTable
@@ -281,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span
                         :class="
                           item.errors > 0
-                            ? 'tw:text-[var(--q-negative)] tw:font-semibold'
+                            ? 'text-[var(--q-negative)] font-semibold'
                             : ''
                         "
                         >{{ item.errors }}</span
@@ -314,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="active"
                         variant="ghost"
                         size="icon"
-                        class="tw:ml-1 tw:absolute! tw:right-2!"
+                        class="ml-1 absolute! right-2!"
                         data-test="service-graph-side-panel-view-traces-btn"
                         @click.stop="
                           navigateToTraces({
@@ -331,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                     <template #empty>
                       <div
-                        class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                        class="text-xs italic py-2 text-center"
                         style="color: var(--o2-text-secondary)"
                       >
                         No operations found
@@ -347,19 +345,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="cfg in activeResourceTabConfigs"
               :key="cfg.id"
               :name="cfg.id"
-              class="tw:p-0! panel-section"
+              class="p-0! panel-section mb-3"
               :data-test="`service-graph-side-panel-${cfg.id}`"
             >
               <div
                 v-if="!resourceTabData[cfg.id]?.length && !resourceTabLoading[cfg.id]"
-                class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                class="text-xs italic py-2 text-center"
                 style="color: var(--o2-text-secondary)"
               >
                 No {{ cfg.label.toLowerCase() }} data found
               </div>
               <div
                 v-else-if="resourceTabData[cfg.id]?.length > 0 || resourceTabLoading[cfg.id]"
-                class="tw:overflow-hidden tw:rounded"
+                class="overflow-hidden rounded"
                 :data-test="`service-graph-side-panel-${cfg.id}-table`"
               >
                 <TenstackTable
@@ -390,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="active"
                       variant="ghost"
                       size="icon"
-                      class="tw:ml-1 tw:absolute! tw:right-2!"
+                      class="ml-1 absolute! right-2!"
                       :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
                       @click.stop="
                         navigateToTraces({
@@ -410,7 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span
                       :class="
                         item.errors > 0
-                          ? 'tw:text-[var(--q-negative)] tw:font-semibold'
+                          ? 'text-[var(--q-negative)] font-semibold'
                           : ''
                       "
                       >{{ item.errors }}</span
@@ -440,7 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <template #empty>
                     <div
-                      class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                      class="text-xs italic py-2 text-center"
                       style="color: var(--o2-text-secondary)"
                     >
                       No {{ cfg.label.toLowerCase() }} data found
@@ -454,13 +452,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTabPanel
               v-if="!isInferred"
               name="metrics"
-              class="tw:p-0! panel-section tw:mb-0! tw:h-full!"
+              class="p-0! panel-section mb-0! h-full!"
               data-test="service-graph-side-panel-metrics"
             >
               <!-- Loading state -->
               <div
                 v-if="metricsCorrelationLoading"
-                class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
+                class="flex items-center gap-2 py-3 text-sm"
                 style="color: var(--o2-text-secondary)"
                 data-test="service-graph-side-panel-metrics-loading"
               >
@@ -471,7 +469,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Error state -->
               <div
                 v-else-if="metricsCorrelationError"
-                class="tw:flex tw:flex-col tw:items-center tw:gap-3 tw:py-6 tw:text-center tw:text-sm"
+                class="flex flex-col items-center gap-3 py-6 text-center text-sm"
                 style="color: var(--o2-text-secondary)"
                 data-test="service-graph-side-panel-metrics-error"
               >
@@ -514,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Empty state -->
               <div
                 v-else-if="metricsCorrelationLoaded"
-                class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                class="text-xs italic py-2 text-center"
                 style="color: var(--o2-text-secondary)"
                 data-test="service-graph-side-panel-metrics-empty"
               >
@@ -550,6 +548,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -827,6 +826,7 @@ const envLabel = (envKey: string): string =>
 export default defineComponent({
   name: "ServiceGraphNodeSidePanel",
   components: {
+    OTag,
     OSeparator,
     OTabs,
     OTab,
@@ -2405,685 +2405,95 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.health-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1;
-
-  &::before {
-    content: "●";
-    font-size: 10px;
-  }
-
-  &.healthy {
-    background: rgba(16, 185, 129, 0.15);
-    color: #10b981;
-  }
-
-  &.degraded {
-    background: rgba(251, 191, 36, 0.15);
-    color: #fbbf24;
-  }
-
-  &.critical {
-    background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
-  }
-
-  &.warning {
-    background: rgba(249, 115, 22, 0.15);
-    color: #f97316;
-  }
+<style>
+.health-badge::before {
+  content: "●";
+  font-size: 10px;
 }
 
-.body--light .health-badge {
-  &.healthy {
-    background: rgba(16, 185, 129, 0.08);
-    color: #059669;
-  }
-
-  &.degraded {
-    background: rgba(251, 191, 36, 0.08);
-    color: #d97706;
-  }
-
-  &.critical {
-    background: rgba(239, 68, 68, 0.08);
-    color: #dc2626;
-  }
-
-  &.warning {
-    background: rgba(249, 115, 22, 0.08);
-    color: #ea580c;
-  }
+.health-badge.healthy {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
 }
 
-// Actions Section (moved to content area)
-.actions-section {
-  display: flex;
-  gap: 8px;
-  padding: 0;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-
-  .action-btn {
-    width: 35%;
-    padding: 8px 16px;
-    font-size: 13px;
-    font-weight: 500;
-    border: 1px solid #2d3548;
-    color: #e4e7eb;
-    background: #242938;
-    transition: all 0.2s;
-
-    &:hover {
-      background: #1a1f2e;
-      border-color: #3b82f6;
-      transform: translateY(-1px);
-    }
-  }
+.health-badge.degraded {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
 }
 
-.view-traces-btn {
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 16px;
+.health-badge.critical {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.health-badge.warning {
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+}
+
+.body--light .health-badge.healthy {
+  background: rgba(16, 185, 129, 0.08);
+  color: #059669;
+}
+
+.body--light .health-badge.degraded {
+  background: rgba(251, 191, 36, 0.08);
+  color: #d97706;
+}
+
+.body--light .health-badge.critical {
+  background: rgba(239, 68, 68, 0.08);
+  color: #dc2626;
+}
+
+.body--light .health-badge.warning {
+  background: rgba(249, 115, 22, 0.08);
+  color: #ea580c;
+}
+
+.panel-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.panel-content::-webkit-scrollbar-track {
+  background: #1a1f2e;
+}
+
+.panel-content::-webkit-scrollbar-thumb {
+  background: #242938;
   border-radius: 4px;
-  padding: 0px 12px;
-  min-width: 90px;
-  transition:
-    box-shadow 0.3s ease,
-    opacity 0.2s ease;
-  background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
-
-  &:hover {
-    opacity: 0.8;
-    box-shadow: 0 0 7px
-      color-mix(in srgb, var(--o2-primary-btn-bg), transparent 10%);
-  }
 }
 
-.body--light .actions-section .action-btn {
-  border-color: #e0e0e0;
-  color: #333;
-  background: #f9f9f9;
-
-  &:hover {
-    background: #ffffff;
-    border-color: #3b82f6;
-  }
-}
-
-.panel-content {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  background: #0f1419;
-  padding: 0.625rem;
-
-  &::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: #1a1f2e;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: #242938;
-    border-radius: 4px;
-
-    &:hover {
-      background: #2d3548;
-    }
-  }
+.panel-content::-webkit-scrollbar-thumb:hover {
+  background: #2d3548;
 }
 
 .body--light .panel-content {
   background: #ffffff;
-
-  &::-webkit-scrollbar-track {
-    background: #f8f9fa;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: #e0e0e0;
-
-    &:hover {
-      background: #d0d0d0;
-    }
-  }
 }
 
-.operation-row {
-  transition: background 0.15s ease;
-
-  &:hover {
-    background: rgba(99, 102, 241, 0.1);
-
-    .operation-link-icon {
-      opacity: 1 !important;
-    }
-  }
-
-  .operation-link-icon {
-    opacity: 0;
-    color: var(--o2-text-secondary);
-    transition: opacity 0.15s ease;
-  }
+.body--light .panel-content::-webkit-scrollbar-track {
+  background: #f8f9fa;
 }
 
-.body--light .operation-row:hover {
-  background: rgba(99, 102, 241, 0.07);
+.body--light .panel-content::-webkit-scrollbar-thumb {
+  background: var(--o2-border);
 }
 
-.panel-section {
-  padding: 0;
-  margin-bottom: 12px;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-
-  .section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-  }
-
-  .section-header-actions {
-    display: flex;
-    gap: 6px;
-  }
-
-  .section-title {
-    font-size: 14px;
-    font-weight: 600;
-    text-transform: none;
-    letter-spacing: 0;
-    color: #e4e7eb;
-  }
+.body--light .panel-content::-webkit-scrollbar-thumb:hover {
+  background: #d0d0d0;
 }
 
-.body--light .panel-section .section-title {
-  color: #202124;
+.panel-section:last-child {
+  margin-bottom: 0;
 }
 
-.metrics-section {
-  // Full-width card for total requests (single line)
-  .metric-card-full {
-    padding: 10px 12px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, #242938 0%, #1f2937 100%);
-    border: 1px solid #374151;
-    margin-bottom: 12px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow:
-        0 6px 12px rgba(0, 0, 0, 0.2),
-        0 0 0 1px rgba(99, 102, 241, 0.3);
-      border-color: rgba(99, 102, 241, 0.4);
-    }
-
-    .metric-single-line {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-
-      .metric-total {
-        display: flex;
-        align-items: baseline;
-        gap: 6px;
-        padding: 6px 10px;
-        border-radius: 6px;
-        background: linear-gradient(
-          135deg,
-          rgba(99, 102, 241, 0.08),
-          rgba(99, 102, 241, 0.02)
-        );
-        border: 1px solid rgba(99, 102, 241, 0.15);
-
-        .total-label {
-          font-size: 12px;
-          font-weight: 600;
-          color: #a5b4fc;
-        }
-
-        .total-value {
-          font-size: 16px;
-          font-weight: 700;
-          color: #e0e7ff;
-          letter-spacing: -0.02em;
-        }
-
-        .total-unit {
-          font-size: 10px;
-          font-weight: 500;
-          color: #a5b4fc;
-        }
-      }
-
-      .metric-divider {
-        width: 1px;
-        height: 20px;
-        background: #374151;
-      }
-
-      .metric-inline {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        padding: 4px 8px;
-        border-radius: 4px;
-        transition: all 0.2s ease;
-        flex: 1;
-
-        &.incoming {
-          color: #a5b4fc;
-          background: linear-gradient(
-            135deg,
-            rgba(99, 102, 241, 0.1),
-            rgba(99, 102, 241, 0.02)
-          );
-          border: 1px solid rgba(99, 102, 241, 0.15);
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(99, 102, 241, 0.15),
-              rgba(99, 102, 241, 0.05)
-            );
-            box-shadow: 0 0 8px rgba(99, 102, 241, 0.2);
-          }
-        }
-
-        &.outgoing {
-          color: #a5b4fc;
-          background: linear-gradient(
-            135deg,
-            rgba(99, 102, 241, 0.1),
-            rgba(99, 102, 241, 0.02)
-          );
-          border: 1px solid rgba(99, 102, 241, 0.15);
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(99, 102, 241, 0.15),
-              rgba(99, 102, 241, 0.05)
-            );
-            box-shadow: 0 0 8px rgba(99, 102, 241, 0.2);
-          }
-        }
-
-        .inline-value {
-          font-size: 14px;
-          font-weight: 700;
-          letter-spacing: -0.01em;
-        }
-      }
-    }
-
-    // Horizontal divider between top and bottom rows
-    .metric-horizontal-divider {
-      width: 100%;
-      height: 1px;
-      background: #374151;
-      margin: 10px 0 8px 0;
-    }
-
-    // Bottom row for error rate and p95 latency
-    .metric-bottom-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-
-      .metric-inline-item {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        padding: 6px 8px;
-        border-radius: 4px;
-        transition: all 0.2s ease;
-
-        // Status-based styling
-        &.status-healthy {
-          background: linear-gradient(
-            135deg,
-            rgba(16, 185, 129, 0.08),
-            rgba(16, 185, 129, 0.02)
-          );
-          border: 1px solid rgba(16, 185, 129, 0.15);
-.metric-value {
-            color: #10b981;
-          }
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(16, 185, 129, 0.12),
-              rgba(16, 185, 129, 0.04)
-            );
-            box-shadow: 0 0 6px rgba(16, 185, 129, 0.15);
-          }
-        }
-
-        &.status-warning {
-          background: linear-gradient(
-            135deg,
-            rgba(251, 191, 36, 0.08),
-            rgba(251, 191, 36, 0.02)
-          );
-          border: 1px solid rgba(251, 191, 36, 0.15);
-.metric-value {
-            color: #fbbf24;
-          }
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(251, 191, 36, 0.12),
-              rgba(251, 191, 36, 0.04)
-            );
-            box-shadow: 0 0 6px rgba(251, 191, 36, 0.15);
-          }
-        }
-
-        &.status-critical {
-          background: linear-gradient(
-            135deg,
-            rgba(239, 68, 68, 0.08),
-            rgba(239, 68, 68, 0.02)
-          );
-          border: 1px solid rgba(239, 68, 68, 0.15);
-.metric-value {
-            color: #ef4444;
-          }
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(239, 68, 68, 0.12),
-              rgba(239, 68, 68, 0.04)
-            );
-            box-shadow: 0 0 6px rgba(239, 68, 68, 0.15);
-          }
-        }
-
-        &.status-unknown {
-          background: linear-gradient(
-            135deg,
-            rgba(107, 114, 128, 0.08),
-            rgba(107, 114, 128, 0.02)
-          );
-          border: 1px solid rgba(107, 114, 128, 0.15);
-.metric-value {
-            color: #9ca3af;
-          }
-        }
-
-        .metric-label {
-          font-size: 11px;
-          font-weight: 600;
-          color: #9ca3af;
-          white-space: nowrap;
-        }
-
-        .metric-value {
-          font-size: 13px;
-          font-weight: 700;
-          letter-spacing: -0.01em;
-        }
-      }
-
-      .metric-row-divider {
-        width: 1px;
-        height: 20px;
-        background: #374151;
-      }
-    }
-  }
+.red-charts-section .card-container {
+  box-shadow: none;
 }
 
-.body--light .metrics-section {
-  .metric-card-full {
-    background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
-    border-color: #d1d5db;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-
-    &:hover {
-      box-shadow:
-        0 6px 12px rgba(0, 0, 0, 0.08),
-        0 0 0 1px rgba(99, 102, 241, 0.2);
-      border-color: rgba(99, 102, 241, 0.3);
-    }
-
-    .metric-single-line {
-      .metric-total {
-        background: linear-gradient(
-          135deg,
-          rgba(99, 102, 241, 0.08),
-          rgba(99, 102, 241, 0.03)
-        );
-        border-color: rgba(99, 102, 241, 0.2);
-
-        .total-label {
-          color: #6366f1;
-        }
-
-        .total-value {
-          color: #4338ca;
-        }
-
-        .total-unit {
-          color: #6366f1;
-        }
-      }
-
-      .metric-divider {
-        background: #d1d5db;
-      }
-
-      .metric-inline {
-        &.incoming {
-          color: #6366f1;
-          background: linear-gradient(
-            135deg,
-            rgba(99, 102, 241, 0.08),
-            rgba(99, 102, 241, 0.02)
-          );
-          border-color: rgba(99, 102, 241, 0.2);
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(99, 102, 241, 0.12),
-              rgba(99, 102, 241, 0.04)
-            );
-            box-shadow: 0 0 8px rgba(99, 102, 241, 0.15);
-          }
-        }
-
-        &.outgoing {
-          color: #6366f1;
-          background: linear-gradient(
-            135deg,
-            rgba(99, 102, 241, 0.08),
-            rgba(99, 102, 241, 0.02)
-          );
-          border-color: rgba(99, 102, 241, 0.2);
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(99, 102, 241, 0.12),
-              rgba(99, 102, 241, 0.04)
-            );
-            box-shadow: 0 0 8px rgba(99, 102, 241, 0.15);
-          }
-        }
-      }
-    }
-
-    .metric-horizontal-divider {
-      background: #d1d5db;
-    }
-
-    .metric-bottom-row {
-      .metric-inline-item {
-        &.status-healthy {
-          background: linear-gradient(
-            135deg,
-            rgba(16, 185, 129, 0.06),
-            rgba(16, 185, 129, 0.01)
-          );
-          border-color: rgba(16, 185, 129, 0.2);
-.metric-value {
-            color: #059669;
-          }
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(16, 185, 129, 0.1),
-              rgba(16, 185, 129, 0.03)
-            );
-            box-shadow: 0 0 6px rgba(16, 185, 129, 0.12);
-          }
-        }
-
-        &.status-warning {
-          background: linear-gradient(
-            135deg,
-            rgba(217, 119, 6, 0.06),
-            rgba(217, 119, 6, 0.01)
-          );
-          border-color: rgba(217, 119, 6, 0.2);
-.metric-value {
-            color: #d97706;
-          }
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(217, 119, 6, 0.1),
-              rgba(217, 119, 6, 0.03)
-            );
-            box-shadow: 0 0 6px rgba(217, 119, 6, 0.12);
-          }
-        }
-
-        &.status-critical {
-          background: linear-gradient(
-            135deg,
-            rgba(220, 38, 38, 0.06),
-            rgba(220, 38, 38, 0.01)
-          );
-          border-color: rgba(220, 38, 38, 0.2);
-.metric-value {
-            color: #dc2626;
-          }
-
-          &:hover {
-            background: linear-gradient(
-              135deg,
-              rgba(220, 38, 38, 0.1),
-              rgba(220, 38, 38, 0.03)
-            );
-            box-shadow: 0 0 6px rgba(220, 38, 38, 0.12);
-          }
-        }
-
-        &.status-unknown {
-          background: linear-gradient(
-            135deg,
-            rgba(107, 114, 128, 0.06),
-            rgba(107, 114, 128, 0.01)
-          );
-          border-color: rgba(107, 114, 128, 0.2);
-.metric-value {
-            color: #6b7280;
-          }
-        }
-
-        .metric-label {
-          color: rgba(0, 0, 0, 0.6);
-        }
-      }
-
-      .metric-row-divider {
-        background: #d1d5db;
-      }
-    }
-  }
-}
-
-// Empty/Loading/Error States
-.empty-state,
-.loading-state,
-.error-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2.5rem 1.5rem;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.875rem;
-
-  .loading-text,
-  .error-text {
-    margin-top: 0.75rem;
-    font-weight: 400;
-  }
-}
-
-.body--light {
-  .empty-state,
-  .loading-state,
-  .error-state {
-    color: rgba(0, 0, 0, 0.5);
-  }
-}
-
-.error-state {
-  color: #f44336;
-  font-weight: 500;
-}
-
-.body--light .error-state {
-  color: #c62828;
-}
-
-.error-state {
-  color: var(--q-negative);
-}
-
-.red-charts-section {
-  :deep(.card-container) {
-    box-shadow: none;
-
-    :first-child {
-      padding: 0 0.0625rem !important;
-    }
-  }
-}
-
-:deep(
-  .metrics-correlation-dashboard .q-splitter--vertical > .q-splitter__separator
-) {
-  height: 100% !important;
+.red-charts-section .card-container :first-child {
+  padding: 0 0.0625rem !important;
 }
 
 </style>

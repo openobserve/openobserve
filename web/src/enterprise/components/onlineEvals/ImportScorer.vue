@@ -18,30 +18,30 @@ the Free Software Foundation, either version 3 of the License, or
     @import="importJson"
   >
     <template #output-content>
-      <div class="tw:w-full" style="min-width: 380px">
+      <div class="w-full" style="min-width: 380px">
         <div
           v-if="errors.length"
-          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
+          class="text-center text-xl font-semibold py-2"
           data-test="scorer-import-errors-title"
         >
           {{ t("onlineEvals.scorer.import.errors.title") }}
         </div>
         <div
           v-else
-          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
+          class="text-center text-xl font-semibold py-2"
           data-test="scorer-import-output-title"
         >
           {{ t("onlineEvals.scorer.import.outputMessages") }}
         </div>
-        <OSeparator class="tw:mx-4 tw:mt-4" />
+        <OSeparator class="mx-4 mt-4" />
 
-        <div class="error-report-container">
-          <div v-if="errors.length" class="error-section">
+        <div class="overflow-auto">
+          <div v-if="errors.length" class="p-2.5 mb-2.5">
             <div class="error-list">
               <div
                 v-for="(err, errIdx) in errors"
                 :key="`${err.itemIndex}-${err.field}-${errIdx}`"
-                class="error-item"
+                class="py-1.25 px-0 text-sm"
                 :data-test="`scorer-import-error-${err.itemIndex}-${err.field}`"
               >
                 <span
@@ -50,7 +50,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="scorer-import-name-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 320px">
                     <OInput
                       :data-test="`scorer-import-name-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
@@ -66,7 +66,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="scorer-import-name-conflict-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 320px">
                     <OInput
                       :data-test="`scorer-import-rename-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
@@ -82,7 +82,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="scorer-import-type-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 320px">
                     <OSelect
                       :data-test="`scorer-import-type-select-${err.itemIndex}`"
                       v-model="typeFixers[err.itemIndex]"
@@ -99,7 +99,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="scorer-import-score-config-ref-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 320px">
                     <OSelect
                       :data-test="`scorer-import-score-config-select-${err.itemIndex}`"
                       v-model="scoreConfigFixers[err.itemIndex]"
@@ -116,7 +116,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="scorer-import-provider-ref-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 320px">
                     <OSelect
                       :data-test="`scorer-import-provider-select-${err.itemIndex}`"
                       v-model="providerFixers[err.itemIndex]"
@@ -132,8 +132,8 @@ the Free Software Foundation, either version 3 of the License, or
             </div>
           </div>
 
-          <div v-if="creators.length" class="error-section">
-            <div class="section-title text-primary" data-test="scorer-import-creation-title">
+          <div v-if="creators.length" class="p-2.5 mb-2.5">
+            <div class="section-title text-primary text-base mb-2.5 uppercase" data-test="scorer-import-creation-title">
               {{ t("onlineEvals.scorer.import.creation") }}
             </div>
             <div
@@ -144,14 +144,14 @@ the Free Software Foundation, either version 3 of the License, or
             >
               <div
                 :class="{
-                  'error-item tw:font-bold': true,
+                  'py-1.25 px-0 text-sm font-bold': true,
                   'text-green': c.status === 'success',
                   'text-red': c.status === 'error',
                   'text-secondary': c.status === 'exists',
                 }"
                 :data-test="`scorer-import-creation-${i}-message`"
               >
-                <pre class="creators-message">{{ c.message }}</pre>
+                <pre class="whitespace-pre-wrap font-[inherit] m-0">{{ c.message }}</pre>
               </div>
             </div>
           </div>
@@ -426,31 +426,3 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
   }
 }
 </script>
-
-<style scoped lang="scss">
-.error-report-container {
-  overflow: auto;
-}
-
-.error-section {
-  padding: 10px;
-  margin-bottom: 10px;
-}
-
-.section-title {
-  font-size: 16px;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-}
-
-.error-item {
-  padding: 5px 0;
-  font-size: 14px;
-}
-
-.creators-message {
-  white-space: pre-wrap;
-  font-family: inherit;
-  margin: 0;
-}
-</style>

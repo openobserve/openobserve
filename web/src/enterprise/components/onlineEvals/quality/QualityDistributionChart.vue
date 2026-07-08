@@ -1,5 +1,5 @@
 <template>
-  <div ref="chartEl" class="qdist" data-test="quality-distribution-chart" />
+  <div ref="chartEl" class="w-full h-full min-h-50" data-test="quality-distribution-chart" />
 </template>
 
 <script setup lang="ts">
@@ -133,11 +133,3 @@ onBeforeUnmount(() => {
   chart = null;
 });
 </script>
-
-<style lang="scss" scoped>
-.qdist {
-  width: 100%;
-  height: 100%;
-  min-height: 200px;
-}
-</style>

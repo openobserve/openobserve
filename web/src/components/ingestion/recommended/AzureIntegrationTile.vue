@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="azure-integration-tile">
-    <OCardSection class="tw:pb-2">
-      <div class="tw:flex tw:items-start tw:justify-between tw:mb-2">
-        <div class="tile-name tw:font-semibold tw:text-base">
+  <OCard class="h-full flex flex-col transition-all duration-200 rounded-lg hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] dark:hover:shadow-[0_4px_12px_rgba(255,255,255,0.1)]">
+    <OCardSection class="pb-2">
+      <div class="flex items-start justify-between mb-2">
+        <div class="font-semibold text-base leading-[1.4]" :class="store.state.theme === 'dark' ? 'text-[#e0e0e0]' : 'text-[#1a1a1a]'">
           {{ integration.displayName }}
         </div>
         <OButton
@@ -26,26 +26,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-circle-sm"
           @click="handleDocumentation()"
-          class="docs-btn"
+          class="opacity-70 hover:opacity-100 transition-opacity duration-200"
           :data-test="`azure-${integration.id}-docs-btn`"
         >
           <OIcon name="description" size="sm" />
           <OTooltip content="View Documentation" />
         </OButton>
       </div>
-      <div class="tile-description tw:text-sm tw:text-gray-600 tw:mb-3">
+      <div class="text-sm mb-3 leading-normal min-h-[3em]" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
         {{ integration.description }}
       </div>
     </OCardSection>
 
-    <OCardActions class="tw:pb-4">
+    <OCardActions class="pb-4">
       <!-- Deploy Button (ARM template) -->
       <OButton
         v-if="integration.armTemplate"
         variant="primary"
         size="sm"
         @click="handleDeploy()"
-        class="tw:flex-1"
+        class="flex-1"
         :data-test="`azure-${integration.id}-deploy-btn`"
         >Deploy</OButton
       >
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="primary"
         size="sm"
         @click="handleDocumentation()"
-        class="tw:flex-1"
+        class="flex-1"
         :data-test="`azure-${integration.id}-documentation-btn`"
         >Documentation</OButton
       >
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         @click="handleDashboard"
         :disabled="!integration.hasDashboard"
-        class="tw:flex-1"
+        class="flex-1"
         :data-test="`azure-${integration.id}-dashboard-btn`"
         icon-left="dashboard"
       >
@@ -226,6 +226,7 @@ export default defineComponent({
     };
 
     return {
+      store,
       handleDeploy,
       handleDashboard,
       handleDocumentation,
@@ -233,63 +234,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.azure-integration-tile {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  transition: all 0.2s ease;
-  border-radius: 8px;
-
-  &:hover {
-    transform: translateY(-2px);
-  }
-
-  .body--light & {
-    &:hover {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
-
-    .tile-name {
-      color: #1a1a1a;
-    }
-
-    .tile-description {
-      color: #666;
-    }
-  }
-
-  .body--dark & {
-    &:hover {
-      box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
-    }
-
-    .tile-name {
-      color: #e0e0e0;
-    }
-
-    .tile-description {
-      color: #b0b0b0;
-    }
-  }
-
-  .tile-name {
-    line-height: 1.4;
-  }
-
-  .tile-description {
-    line-height: 1.5;
-    min-height: 3em;
-  }
-
-  .docs-btn {
-    opacity: 0.7;
-    transition: opacity 0.2s ease;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-}
-</style>

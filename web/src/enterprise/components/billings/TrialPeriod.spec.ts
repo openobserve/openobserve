@@ -353,7 +353,7 @@ describe("TrialPeriod.vue", () => {
   describe("Template rendering", () => {
     it("should render trial period container when showTrialPeriodMsg is true", () => {
       wrapper = createWrapper({}, mockStore);
-      const container = wrapper.find('.trial-banner');
+      const container = wrapper.find('[data-test="trial-period-container"]');
       expect(container.exists()).toBe(true);
     });
 
@@ -368,7 +368,7 @@ describe("TrialPeriod.vue", () => {
         }
       };
       wrapper = createWrapper({}, testStore);
-      const container = wrapper.find('.trial-banner');
+      const container = wrapper.find('[data-test="trial-period-container"]');
       expect(container.exists()).toBe(false);
     });
 
@@ -390,14 +390,14 @@ describe("TrialPeriod.vue", () => {
     it("should display trial message in template", () => {
       vi.mocked(getDueDays).mockReturnValue(3);
       wrapper = createWrapper({}, mockStore);
-      const banner = wrapper.find('.trial-banner');
+      const banner = wrapper.find('[data-test="trial-period-container"]');
       expect(banner.exists()).toBe(true);
       expect(banner.find('strong').exists()).toBe(true);
     });
 
     it("should display trial subtitle", () => {
       wrapper = createWrapper({}, mockStore);
-      const banner = wrapper.find('.trial-banner');
+      const banner = wrapper.find('[data-test="trial-period-container"]');
       expect(banner.exists()).toBe(true);
       const subtitleSpan = banner.find('p span:last-child');
       expect(subtitleSpan.exists()).toBe(true);
@@ -563,15 +563,15 @@ describe("TrialPeriod.vue", () => {
 
     it("should render correct CSS classes", () => {
       wrapper = createWrapper({}, mockStore);
-      const container = wrapper.find('.trial-banner');
+      const container = wrapper.find('[data-test="trial-period-container"]');
       expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain('trial-banner');
-      expect(container.classes()).toContain('tw:w-full');
+      expect(container.classes()).toContain('w-full');
+      expect(container.classes()).toContain('rounded-md');
     });
 
     it("should display correct subtitle text", () => {
       wrapper = createWrapper({}, mockStore);
-      const banner = wrapper.find('.trial-banner');
+      const banner = wrapper.find('[data-test="trial-period-container"]');
       expect(banner.exists()).toBe(true);
       expect(banner.text()).toContain("Upgrade to a plan to continue enjoying the services by OpenObserve.");
     });

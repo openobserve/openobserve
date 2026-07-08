@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="promql-chart-config" data-test="dashboard-promql-chart-config">
+  <div class="flex flex-col gap-2" data-test="dashboard-promql-chart-config">
     <!-- Aggregation Function Selector -->
     <OSelect
       v-if="showAggregationConfig"
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OSelect>
 
     <!-- GeoMap Label Configuration -->
-    <div v-if="chartType === 'geomap'" class="geomap-config">
+    <div v-if="chartType === 'geomap'" class="flex flex-col gap-2">
       <OInput
         v-model="geoLatLabel"
         :label="t('dashboard.geoLatLabel')"
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Maps Label Configuration -->
-    <div v-if="chartType === 'maps'" class="maps-config">
+    <div v-if="chartType === 'maps'" class="flex flex-col gap-2">
       <OInput
         v-model="mapsNameLabel"
         :label="t('dashboard.mapsNameLabel')"
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Table Configuration -->
-    <div v-if="chartType === 'table'" class="table-config">
+    <div v-if="chartType === 'table'" class="flex flex-col gap-2">
       <!-- PromQL Table Mode -->
       <OSelect
         v-show="isConfigOptionVisible('promqlTable', 'promql-table-mode')"
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             isConfigOptionVisible('promqlTable', 'visible-columns') ||
             isConfigOptionVisible('promqlTable', 'hidden-columns')
           "
-          class="tw:mb-2 tw:text-sm tw:font-medium tw:mt-3"
+          class="mb-2 text-sm font-medium mt-3"
         >
           Column Filters
         </div>
@@ -265,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             isConfigOptionVisible('promqlTable', 'sticky-first-column') ||
             isConfigOptionVisible('promqlTable', 'sticky-columns')
           "
-          class="tw:mb-2 tw:text-sm tw:font-medium tw:mt-3"
+          class="mb-2 text-sm font-medium mt-3"
         >
           Sticky Columns
         </div>
@@ -332,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="
             isConfigOptionVisible('promqlTable', 'configure-column-order')
           "
-          style="font-weight: 600"
+          class="font-semibold"
         ></div>
         <OButton
           v-show="
@@ -728,30 +728,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.promql-chart-config {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-
-  .geomap-config,
-  .maps-config,
-  .table-config {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    padding: 0;
-  }
-
-  // Fix icon cropping in labels
-  :deep(.q-field__label) {
-    padding-top: 4px;
-    padding-bottom: 4px;
-  }
-
-  // Prevent capitalization for column filter fields
-  :deep(.q-field__native > :first-child) {
-    text-transform: none !important;
-  }
-}
-</style>

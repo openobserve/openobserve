@@ -1,17 +1,32 @@
-<template>
+﻿<template>
   <div>
     <OSeparator />
 
     <!-- Options Row: Query Type Tabs + Legend + Step Value -->
     <div>
-      <div style="display: flex; flex-direction: row; align-items: center" class="tw:pl-2">
-        <div class="layout-name">{{ t("panel.options") }}</div>
-        <span class="layout-separator">:</span>
-        <div class="axis-container">
+      <div class="flex flex-row items-center pl-2">
+        <div
+          data-test="promql-builder-options-label"
+          class="whitespace-nowrap min-w-21.5 text-sm flex items-center"
+        >{{ t("panel.options") }}</div>
+        <span class="flex items-center ml-0.5 mr-0.5">:</span>
+        <div
+          data-test="promql-builder-options-axis-container"
+          class="my-0.5 mx-1.25 flex gap-2 flex-wrap items-center"
+        >
           <!-- Legend -->
-          <div class="option-field-wrapper">
-            <span class="field-label">{{ t("dashboard.legendLabel") }}</span>
-            <div class="field-input-wrapper">
+          <div
+            data-test="promql-builder-options-field-wrapper"
+            class="flex flex-row items-center gap-2 ml-2.5"
+          >
+            <span
+              data-test="promql-builder-options-field-label"
+              class="text-[11px] font-medium whitespace-nowrap opacity-85"
+            >{{ t("dashboard.legendLabel") }}</span>
+            <div
+              data-test="promql-builder-options-field-input-wrapper"
+              class="relative inline-block"
+            >
               <OCombobox
                 v-model="
                   dashboardPanelData.data.queries[
@@ -27,7 +42,8 @@
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:cursor-pointer field-info-icon"
+                data-test="promql-builder-options-field-info-icon"
+                class="cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 z-10 opacity-60 hover:opacity-100 pointer-events-auto"
               >
                 <OTooltip side="top" max-width="250px">
                   <template #content>
@@ -42,8 +58,14 @@
           </div>
 
           <!-- Step Value -->
-          <div class="option-field-wrapper">
-            <span class="field-label">{{ t("dashboard.stepValue") }}</span>
+          <div
+            data-test="promql-builder-options-field-wrapper"
+            class="flex flex-row items-center gap-2 ml-2.5"
+          >
+            <span
+              data-test="promql-builder-options-field-label"
+              class="text-[11px] font-medium whitespace-nowrap opacity-85"
+            >{{ t("dashboard.stepValue") }}</span>
             <OInput
               v-model="
                 dashboardPanelData.data.queries[
@@ -56,7 +78,7 @@
               style="width: 140px"
             >
               <template v-slot:icon-right>
-                <OIcon name="info" size="sm" class="tw:cursor-pointer">
+                <OIcon name="info" size="sm" class="cursor-pointer">
                   <OTooltip side="top" max-width="250px">
                     <template #content>
                       ({{ t("dashboard.optional") }}) <b>Step - </b>
@@ -73,8 +95,14 @@
           </div>
 
           <!-- Query Type Select (Range/Instant) -->
-          <div class="option-field-wrapper">
-            <span class="field-label">{{ t("common.type") }}</span>
+          <div
+            data-test="promql-builder-options-field-wrapper"
+            class="flex flex-row items-center gap-2 ml-2.5"
+          >
+            <span
+              data-test="promql-builder-options-field-label"
+              class="text-[11px] font-medium whitespace-nowrap opacity-85"
+            >{{ t("common.type") }}</span>
             <OSelect
               v-model="
                 dashboardPanelData.data.queries[
@@ -88,7 +116,7 @@
               style="width: 120px"
             >
               <template v-slot:append>
-                <OIcon name="info" size="sm" class="tw:cursor-pointer">
+                <OIcon name="info" size="sm" class="cursor-pointer">
                   <OTooltip side="top" max-width="250px">
                     <template #content>
                       <b>Query Type - </b><br />
@@ -217,62 +245,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.layout-name {
-  white-space: nowrap;
-  min-width: 86px;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-}
-
-.layout-separator {
-  display: flex;
-  align-items: center;
-  margin-left: 2px;
-  margin-right: 2px;
-}
-
-.axis-container {
-  margin: 2px 5px;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.option-field-wrapper {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  margin-left: 10px;
-}
-
-.field-label {
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-  opacity: 0.85;
-}
-
-.field-input-wrapper {
-  position: relative;
-  display: inline-block;
-}
-
-.field-info-icon {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 10;
-  pointer-events: auto;
-  color: inherit;
-  opacity: 0.6;
-}
-
-.field-info-icon:hover {
-  opacity: 1;
-}
-</style>

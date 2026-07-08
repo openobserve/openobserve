@@ -16,12 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="overflow-y: auto" class="scroll tw:flex tw:flex-col tw:h-full">
+  <div style="overflow-y: auto" class="scroll flex flex-col h-full">
     <!-- Header Section -->
     <AppPageHeader
       :back="{ label: currentDashboardData.data?.title || t('dashboard.header'), onClick: goBack, dataTest: 'dashboard-back-btn' }"
       :title="editMode ? t('panel.editPanel') : t('panel.addPanel')"
-      class="tw:px-4 tw:border-b tw:border-border-default"
+      class="px-4 border-b border-border-default"
     >
           <template #tabs>
             <OInput
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="dashboardPanelData.data.title"
               :label="t('panel.name') + '*'"
               labelPosition="inside"
-              class="dynamic-input"
+              class="dynamic-input min-w-[200px] max-w-[500px] [transition:width_0.2s_ease]"
               :style="inputStyle"
               :error="!!panelNameError"
               :error-message="panelNameError"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-panel-data-view-query-inspector-btn"
               icon-left="info-outline"
             >
-              <OTooltip side="left" align="center" content="Query Inspector" />
+              <OTooltip side="left" align="center" content="Query Inspector" shortcut-id="panelEditorQueryInspector" />
             </OButton>
             <DateTimePickerDashboard
               v-if="selectedDate"
@@ -123,13 +123,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : 'primary'
                       "
                       size="icon-sm"
-                      class="tw:!h-[2.125rem]"
+                      class="h-8.5!"
                       :disabled="searchRequestTraceIds.length > 0"
                       icon-left="keyboard-arrow-down"
                     />
                   </template>
                   <ODropdownItem @select="runQuery(true)">
-                    <div class="tw:flex tw:items-center tw:gap-2">
+                    <div class="flex items-center gap-2">
                       <OIcon name="refresh" size="xs" />
                       <span>Refresh Cache &amp; Apply</span>
                     </div>
@@ -168,11 +168,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Add Variable Drawer -->
     <div
       v-if="isAddVariableOpen"
-      class="add-variable-drawer-overlay"
+      class="add-variable-drawer-overlay fixed top-0 left-0 right-0 bottom-0 z-6000 flex justify-end"
       :class="store.state.theme === 'dark' ? 'theme-dark' : 'theme-light'"
+      style="background-color: rgba(0, 0, 0, 0.5)"
       @click.self="handleCloseAddVariable"
     >
-      <div class="add-variable-drawer-panel tw:px-6 tw:pt-4">
+      <div class="add-variable-drawer-panel px-6 pt-4 w-225 h-screen shadow-[-2px_0_8px_rgba(0,0,0,0.15)] overflow-hidden rounded-none!" :class="store.state.theme === 'dark' ? 'bg-[#1a1a1a]' : 'bg-white'">
         <AddSettingVariable
           @save="handleSaveVariable"
           @close="handleCloseAddVariable"
@@ -242,6 +243,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
 
@@ -1719,6 +1722,29 @@ export default defineComponent({
       isCachedDataDifferWithCurrentTimeRange.value = data;
     };
 
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "panelEditorRun",
+        handler: () => runQuery(false),
+      },
+      {
+        id: "panelEditorSave",
+        handler: () => savePanelData.execute(),
+      },
+      {
+        id: "panelEditorBack",
+        handler: () => goBack(),
+      },
+      {
+        id: "panelEditorQueryInspector",
+        handler: () => {
+          if (isInputFocused()) return;
+          showViewPanel.value = true;
+        },
+      },
+    ]);
+
     // Breadcrumb root crumb → dashboards list (module root).
     const goToDashboardList = () => {
       return router.push({
@@ -1828,57 +1854,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-:deep(.date-time-button) {
-  height: 32px !important;
-  min-height: 32px !important;
-}
-
-.dynamic-input {
-  min-width: 200px;
-  max-width: 500px;
-  transition: width 0.2s ease;
-}
-
-.add-variable-drawer-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  z-index: 6000;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.add-variable-drawer-panel {
-  width: 900px;
-  height: 100vh;
-  background-color: white;
-  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
-  overflow: hidden;
-  border-radius: 0 !important;
-
-  :deep(.column.full-height) {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-  }
-
-  :deep(.scrollable-content) {
-    max-height: calc(100vh - 140px);
-    overflow-y: auto;
-  }
-
-  :deep(.sticky-footer) {
-    padding: 6px 6px;
-    margin-top: auto;
-  }
-}
-
-.theme-dark .add-variable-drawer-panel {
-  background-color: #1a1a1a;
-}
-</style>

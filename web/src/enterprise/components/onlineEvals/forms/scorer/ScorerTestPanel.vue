@@ -1,32 +1,41 @@
 <template>
-  <aside class="eval-form-page__side eval-form-page__side--test">
-    <section class="eval-test-panel">
-      <h3>
-        <OIcon name="play-arrow" size="xs" />
-        {{ t("onlineEvals.scorer.testPanel.title") }}
-      </h3>
-      <p>{{ t("onlineEvals.scorer.testPanel.hint") }}</p>
+  <aside class="eval-form-page__side eval-form-page__side--test p-0">
+    <section class="eval-test-panel min-h-full p-5 bg-(--o2-card-bg) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)]">
+      <!-- Header -->
+      <div class="flex flex-col gap-1">
+        <h3 class="m-0 text-(--o2-text) text-sm font-bold">{{ t("onlineEvals.scorer.testPanel.title") }}</h3>
+        <p class="m-0 text-(--o2-text-muted) text-xs leading-[1.45]">{{ t("onlineEvals.scorer.testPanel.hint") }}</p>
+      </div>
 
-      <div v-if="variables.length" class="eval-test-panel__fields">
-        <label v-for="variable in variables" :key="variable">
-          <code v-text="formatTemplateVariable(variable)" />
+      <!-- Variable inputs -->
+      <div v-if="variables.length" class="eval-test-panel__fields flex flex-col gap-3">
+        <div v-for="variable in variables" :key="variable" class="flex flex-col gap-[6px]">
+          <label class="text-(--o2-text) font-semibold text-xs [font-family:var(--o2-font-mono)]">{{ formatTemplateVariable(variable) }}</label>
           <textarea
             :value="inputs[variable]"
             :rows="variable === 'metadata' ? 2 : 3"
-            :placeholder="t('onlineEvals.scorer.testPanel.valuePlaceholder', { variable: formatTemplateVariable(variable) })"
-            @input="updateInput(variable, ($event.target as HTMLTextAreaElement).value)"
+            :placeholder="
+              t('onlineEvals.scorer.testPanel.valuePlaceholder', {
+                variable: formatTemplateVariable(variable),
+              })
+            "
+            :data-test="`scorer-test-input-${variable}`"
+            class="w-full box-border border border-(--o2-border-input) rounded bg-(--o2-card-bg-solid) text-(--o2-text) font-normal text-xs [font-family:var(--o2-font)] leading-normal py-2 px-[9px] [resize:vertical] max-h-[160px] overflow-y-auto"
+            @input="
+              updateInput(variable, ($event.target as HTMLTextAreaElement).value)
+            "
           />
-        </label>
+        </div>
       </div>
-
-      <div v-else class="eval-test-panel__empty">
+      <div v-else class="eval-test-panel__empty text-(--o2-text-muted) text-xs py-[10px] px-3 border border-(--o2-border) rounded-md bg-(--o2-card-bg-solid) [&_code]:[font-family:var(--o2-font-mono)] [&_code]:font-semibold [&_code]:text-(--o2-text)">
         {{ t("onlineEvals.scorer.testPanel.emptyPrefix") }}<code v-text="'{{ input }}'" />{{ t("onlineEvals.scorer.testPanel.emptySuffix") }}
       </div>
 
-      <div class="eval-test-panel__actions">
+      <!-- Run -->
+      <div class="eval-test-panel__actions flex flex-col items-start gap-[6px] mt-[14px]">
         <OButton
-          type="button"
-          icon-left="play-arrow"
+          variant="primary"
+          size="sm-action"
           :loading="state === 'running'"
           :disabled="state === 'running' || !canRun"
           :title="canRun ? undefined : t('onlineEvals.scorer.testPanel.disabledHint')"
@@ -35,59 +44,60 @@
         >
           {{ t("onlineEvals.scorer.testPanel.runButton") }}
         </OButton>
+        <span
+          v-if="!canRun && state !== 'running'"
+          class="text-[11px] italic text-(--o2-text-muted)"
+          data-test="scorer-test-disabled-hint"
+        >
+          {{ t("onlineEvals.scorer.testPanel.disabledHint") }}
+        </span>
       </div>
 
-      <p
-        v-if="!canRun && state !== 'running'"
-        class="eval-test-panel__disabled-hint"
-        data-test="scorer-test-disabled-hint"
+      <!-- Result — only shown once a test has run (no idle placeholder box). -->
+      <div
+        v-if="state !== 'idle'"
+        class="flex flex-col gap-2 mt-4 p-3 border border-(--o2-border) rounded-md bg-(--o2-card-bg-solid) text-(--o2-text-muted) text-xs"
+        :class="{ 'border-[color-mix(in_srgb,var(--o2-status-success-text)_35%,var(--o2-border))]': state === 'success', 'border-[color-mix(in_srgb,var(--o2-status-error-text)_35%,var(--o2-border))] text-(--o2-status-error-text)': state === 'error' }"
+        data-test="scorer-test-result"
       >
-        {{ t("onlineEvals.scorer.testPanel.disabledHint") }}
-      </p>
-
-      <div class="eval-test-panel__result" :class="`is-${state}`" data-test="scorer-test-result">
-        <template v-if="state === 'idle'">
-          {{ t("onlineEvals.scorer.testPanel.stateIdle") }}
-        </template>
-
-        <template v-else-if="state === 'running'">
-          {{ t("onlineEvals.scorer.testPanel.stateRunning") }}
+        <template v-if="state === 'running'">
+          <span class="text-(--o2-text-secondary)">{{ t("onlineEvals.scorer.testPanel.stateRunning") }}</span>
         </template>
 
         <template v-else-if="state === 'success' && result">
-          <strong>{{ t("onlineEvals.scorer.testPanel.successHeader") }}</strong>
-          <dl class="eval-test-panel__result-grid">
+          <strong class="text-(--o2-text) text-[13px] font-semibold">{{ t("onlineEvals.scorer.testPanel.successHeader") }}</strong>
+          <dl class="eval-test-panel__result-grid grid gap-x-3 gap-y-1 m-0 text-(--o2-text-secondary) text-xs" style="grid-template-columns: max-content 1fr">
             <template v-if="displayValue !== null">
-              <dt>{{ t("onlineEvals.scorer.testPanel.resultScore") }}</dt>
-              <dd class="eval-test-panel__result-score">{{ displayValue }}</dd>
+              <dt class="text-(--o2-text-muted) font-medium">{{ t("onlineEvals.scorer.testPanel.resultScore") }}</dt>
+              <dd class="eval-test-panel__result-score m-0 text-(--o2-text) font-bold text-[13px] [font-family:var(--o2-font-mono)]">{{ displayValue }}</dd>
             </template>
             <template v-if="latencyLabel">
-              <dt>{{ t("onlineEvals.scorer.testPanel.resultLatency") }}</dt>
-              <dd>{{ latencyLabel }}</dd>
+              <dt class="text-(--o2-text-muted) font-medium">{{ t("onlineEvals.scorer.testPanel.resultLatency") }}</dt>
+              <dd class="m-0 text-(--o2-text)">{{ latencyLabel }}</dd>
             </template>
             <template v-if="modelLabel">
-              <dt>{{ t("onlineEvals.scorer.testPanel.resultModel") }}</dt>
-              <dd class="eval-test-panel__result-mono">{{ modelLabel }}</dd>
+              <dt class="text-(--o2-text-muted) font-medium">{{ t("onlineEvals.scorer.testPanel.resultModel") }}</dt>
+              <dd class="eval-test-panel__result-mono m-0 text-(--o2-text) font-medium text-xs [font-family:var(--o2-font-mono)]">{{ modelLabel }}</dd>
             </template>
             <template v-if="tokensLabel">
-              <dt>{{ t("onlineEvals.scorer.testPanel.resultTokens") }}</dt>
-              <dd>{{ tokensLabel }}</dd>
+              <dt class="text-(--o2-text-muted) font-medium">{{ t("onlineEvals.scorer.testPanel.resultTokens") }}</dt>
+              <dd class="m-0 text-(--o2-text)">{{ tokensLabel }}</dd>
             </template>
           </dl>
-          <details v-if="reasoningText" class="eval-test-panel__details">
-            <summary>{{ t("onlineEvals.scorer.testPanel.resultReasoning") }}</summary>
-            <p>{{ reasoningText }}</p>
+          <details v-if="reasoningText" class="eval-test-panel__details border-t border-(--o2-border) pt-2 text-(--o2-text-secondary)">
+            <summary class="cursor-pointer text-(--o2-text) text-xs font-semibold">{{ t("onlineEvals.scorer.testPanel.resultReasoning") }}</summary>
+            <p class="m-0 mt-[6px] text-(--o2-text-secondary) font-normal text-[11.5px] [font-family:var(--o2-font-mono)] whitespace-pre-wrap break-words">{{ reasoningText }}</p>
           </details>
-          <details v-if="rawResponseText" class="eval-test-panel__details">
-            <summary>{{ t("onlineEvals.scorer.testPanel.resultRaw") }}</summary>
-            <pre>{{ rawResponseText }}</pre>
+          <details v-if="rawResponseText" class="eval-test-panel__details border-t border-(--o2-border) pt-2 text-(--o2-text-secondary)">
+            <summary class="cursor-pointer text-(--o2-text) text-xs font-semibold">{{ t("onlineEvals.scorer.testPanel.resultRaw") }}</summary>
+            <pre class="m-0 mt-[6px] text-(--o2-text-secondary) font-normal text-[11.5px] [font-family:var(--o2-font-mono)] whitespace-pre-wrap break-words">{{ rawResponseText }}</pre>
           </details>
         </template>
 
         <template v-else>
-          <strong>{{ t("onlineEvals.scorer.testPanel.errorHeader") }}</strong>
-          <p class="eval-test-panel__error-message">{{ errorText }}</p>
-          <p v-if="latencyLabel" class="eval-test-panel__error-meta">
+          <strong class="text-[13px] font-semibold">{{ t("onlineEvals.scorer.testPanel.errorHeader") }}</strong>
+          <p class="eval-test-panel__error-message m-0 text-(--o2-status-error-text) text-xs whitespace-pre-wrap break-words">{{ errorText }}</p>
+          <p v-if="latencyLabel" class="eval-test-panel__error-meta m-0 text-(--o2-text-muted) text-[11.5px]">
             {{ t("onlineEvals.scorer.testPanel.resultLatency") }}: {{ latencyLabel }}
           </p>
         </template>
@@ -100,7 +110,6 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { ScorerTestResult } from "@/services/online-evals.service";
 import { formatTemplateVariable } from "../../utils/evalFormat";
 
@@ -184,189 +193,27 @@ const tokensLabel = computed(() => {
   const parts: string[] = [];
   if (promptTokens.value != null) parts.push(`p:${promptTokens.value}`);
   if (completionTokens.value != null) parts.push(`c:${completionTokens.value}`);
-  return parts.length ? `${totalTokens.value} (${parts.join(", ")})` : String(totalTokens.value);
+  return parts.length
+    ? `${totalTokens.value} (${parts.join(", ")})`
+    : String(totalTokens.value);
 });
 
 const errorText = computed(
-  () => props.errorMessage || props.result?.error || t("onlineEvals.scorer.testPanel.errorFallback"),
+  () =>
+    props.errorMessage ||
+    props.result?.error ||
+    t("onlineEvals.scorer.testPanel.errorFallback"),
 );
 </script>
 
-<style lang="scss" scoped>
-.eval-form-page__side--test {
-  padding: 0;
-}
-
-.eval-test-panel {
-  min-height: 100%;
-  padding: 20px;
-  background-color: var(--o2-card-bg);
-  border-radius: 0.375rem;
-  box-shadow: 0 0 0.313rem 0.063rem var(--o2-hover-shadow);
-}
-
-.eval-test-panel h3 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 6px;
-  color: var(--o2-text);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.eval-test-panel p,
-.eval-test-panel__empty,
-.eval-test-panel__result {
-  color: var(--o2-text-muted);
-  font-size: 12px;
-}
-
-.eval-test-panel p {
-  margin: 0 0 16px;
-}
-
-.eval-test-panel__fields {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.eval-test-panel label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.eval-test-panel code {
-  color: var(--o2-text);
-  font: 700 12px var(--o2-font-mono);
-}
-
-.eval-test-panel textarea,
-.eval-test-panel select {
-  border: 1px solid var(--o2-border-input);
-  border-radius: 4px;
-  background: var(--o2-card-bg-solid);
-  color: var(--o2-text);
-  font: 400 12px var(--o2-font);
-}
-
-.eval-test-panel textarea {
-  padding: 8px 9px;
-  resize: vertical;
-  max-height: 160px;
-  overflow-y: auto;
-}
-
-.eval-test-panel__empty {
-  padding: 10px 12px;
-  border: 1px solid var(--o2-border);
-  border-radius: 6px;
-  background: var(--o2-card-bg-solid);
-}
-
-.eval-test-panel__actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 150px;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.eval-test-panel__disabled-hint {
-  margin: 6px 0 0;
-  font-size: 11px;
-  font-style: italic;
+<style>
+/* :focus and ::placeholder cannot be expressed inline. */
+.eval-test-panel textarea::placeholder {
   color: var(--o2-text-muted);
 }
 
-.eval-test-panel__result {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 84px;
-  margin-top: 16px;
-  padding: 12px;
-  border: 1px solid var(--o2-border);
-  border-radius: 6px;
-  background: var(--o2-card-bg-solid);
-}
-
-.eval-test-panel__result.is-success {
-  border-color: color-mix(in srgb, var(--o2-status-success-text) 35%, var(--o2-border));
-  color: var(--o2-status-success-text);
-}
-
-.eval-test-panel__result.is-error {
-  border-color: color-mix(in srgb, var(--o2-status-error-text) 35%, var(--o2-border));
-  color: var(--o2-status-error-text);
-}
-
-.eval-test-panel__result strong {
-  color: var(--o2-text);
-  font-size: 13px;
-}
-
-.eval-test-panel__result-grid {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 4px 12px;
-  margin: 0;
-  color: var(--o2-text-secondary);
-  font-size: 12px;
-}
-
-.eval-test-panel__result-grid dt {
-  color: var(--o2-text-muted);
-  font-weight: 500;
-}
-
-.eval-test-panel__result-grid dd {
-  margin: 0;
-  color: var(--o2-text);
-}
-
-.eval-test-panel__result-score {
-  font: 700 13px var(--o2-font-mono);
-}
-
-.eval-test-panel__result-mono {
-  font: 500 12px var(--o2-font-mono);
-}
-
-.eval-test-panel__details {
-  border-top: 1px solid var(--o2-border);
-  padding-top: 8px;
-  color: var(--o2-text-secondary);
-}
-
-.eval-test-panel__details summary {
-  cursor: pointer;
-  color: var(--o2-text);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.eval-test-panel__details p,
-.eval-test-panel__details pre {
-  margin: 6px 0 0;
-  color: var(--o2-text-secondary);
-  font: 400 11.5px var(--o2-font-mono);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.eval-test-panel__error-message {
-  margin: 0;
-  color: var(--o2-status-error-text);
-  font-size: 12px;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.eval-test-panel__error-meta {
-  margin: 0;
-  color: var(--o2-text-muted);
-  font-size: 11.5px;
+.eval-test-panel textarea:focus {
+  outline: none;
+  border-color: var(--color-primary-600, #3f7994);
 }
 </style>

@@ -21,12 +21,10 @@ import { PrebuiltConfig } from './types';
 export const pagerdutyTemplate = {
   name: 'prebuilt_pagerduty',
   body: JSON.stringify({
-    "routing_key": "{integration_key}",
-    "event_action": "trigger",
     "payload": {
       "summary": "OpenObserve Alert: {alert_name}",
-      "source": "openobserve",
       "severity": "{severity}",
+      "source": "{source}",
       "component": "{stream_name}",
       "group": "{stream_type}",
       "class": "alert",
@@ -37,10 +35,12 @@ export const pagerdutyTemplate = {
         "alert_count": "{alert_count}",
         "alert_operator": "{alert_operator}",
         "alert_threshold": "{alert_threshold}",
-        "alert_time": "{alert_time}",
+        "alert_time": "{alert_trigger_time_str}",
         "alert_url": "{alert_url}"
       }
     },
+    "routing_key": "{routing_key}",
+    "event_action": "trigger",
     "links": [
       {
         "href": "{alert_url}",

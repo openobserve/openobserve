@@ -32,7 +32,7 @@ use config::{
     utils::{
         file::*,
         hash::{Sum64, gxhash},
-        time::{get_ymdh_from_micros, now_micros},
+        time::{HourFormat, get_ymdh_from_micros, now_micros},
     },
 };
 use hashbrown::HashMap;
@@ -1126,7 +1126,7 @@ async fn write_tmp_file(file: &str, data: Bytes) -> Result<(String, String), any
     let tmp_path = format!(
         "{}/{}",
         get_config().common.data_tmp_dir,
-        get_ymdh_from_micros(now_micros())
+        get_ymdh_from_micros(now_micros(), HourFormat::Real)
     );
     if let Err(e) = std::fs::create_dir_all(&tmp_path) {
         return Err(anyhow::anyhow!(

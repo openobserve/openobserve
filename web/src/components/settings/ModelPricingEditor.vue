@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:rounded-md tw:p-0 tw:flex tw:flex-col"
+    class="rounded-md p-0 flex flex-col"
     style="min-height: 0; height: 100%; overflow: hidden"
   >
     <!-- Header -->
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dataTest: 'model-pricing-editor-back-btn',
       }"
       :title="headerTitle"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     >
       <template #title>
         <span data-test="model-pricing-editor-title">{{ headerTitle }}</span>
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Form Body -->
     <div
-      class="tw:px-3 tw:py-3"
+      class="px-3 py-3"
       style="
         flex: 1;
         min-height: 0;
@@ -44,29 +44,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         overflow-y: auto;
       "
     >
-      <div style="max-width: 760px" class="tw:flex tw:flex-col tw:gap-6">
+      <div style="max-width: 760px" class="flex flex-col gap-6">
         <!-- ── Model Details Card ── -->
-        <div class="form-card">
-          <div class="form-card-header">
+        <div class="border border-(--o2-border-color) rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+          <div class="flex flex-row items-center justify-between gap-3 py-[10px] px-4 bg-[rgba(0,0,0,0.025)] border-b border-(--o2-border-color) rounded-t-[10px] dark:bg-[rgba(255,255,255,0.04)]">
             <div>
-              <div class="form-card-title">
+              <div class="form-card-title text-[13px] font-semibold">
                 {{ t("modelPricing.modelDetails") }}
               </div>
-              <div class="form-card-subtitle">
+              <div class="form-card-subtitle text-[11px] opacity-60 mt-px">
                 {{ t("modelPricing.modelDetailsDesc") }}
               </div>
             </div>
           </div>
-          <div class="form-card-body tw:flex tw:flex-row tw:gap-4">
-            <div class="tw:flex-1">
-              <div class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label">
+          <div class="form-card-body flex flex-row gap-4 px-4 pt-[10px] pb-2">
+            <div class="flex-1">
+              <div class="flex items-center gap-1 mb-1 field-label text-xs font-semibold opacity-75 h-5">
                 {{ t("modelPricing.modelNameField") }}
-                <OButton variant="ghost" size="icon-xs-sq" class="tw:ml-1" data-test="model-pricing-name-info-btn">
+                <OButton variant="ghost" size="icon-xs-sq" class="ml-1" data-test="model-pricing-name-info-btn">
                   <OIcon
                     name="info"
                     size="xs"
                     :class="
-                      store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
+                      store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'
                     "
                   />
                   <OTooltip
@@ -86,20 +86,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="model-pricing-name-input"
               />
             </div>
-            <div class="tw:flex-1 tw:flex tw:items-start tw:gap-1">
-              <div class="tw:flex-1">
+            <div class="flex-1 flex items-start gap-1">
+              <div class="flex-1">
                 <div
-                  class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label"
+                  class="flex items-center gap-1 mb-1 field-label text-xs font-semibold opacity-75 h-5"
                 >
                   {{ t("modelPricing.matchPatternField") }}
-                  <OButton variant="ghost" size="icon-xs-sq" class="tw:ml-1" data-test="model-pricing-pattern-info-btn">
+                  <OButton variant="ghost" size="icon-xs-sq" class="ml-1" data-test="model-pricing-pattern-info-btn">
                     <OIcon
                       name="info"
                       size="xs"
                       :class="
                         store.state.theme === 'dark'
-                          ? 'tw:text-gray-400'
-                          : 'tw:text-gray-400'
+                          ? 'text-gray-400'
+                          : 'text-gray-400'
                       "
                     />
                     <OTooltip
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-xs-sq"
-                class="pattern-examples-btn"
+                class="opacity-50 text-(--q-primary) hover:opacity-100"
                 data-test="model-pricing-pattern-examples-btn"
                 @click="showExamples = true"
               >
@@ -146,22 +146,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('modelPricing.patternExamplesTitle')"
           :sub-title="t('modelPricing.patternExamplesDesc')"
         >
-          <div class="examples-table">
-            <div class="examples-table-head">
+          <div class="examples-table border border-(--o2-border-color) rounded-lg overflow-hidden">
+            <div class="grid grid-cols-[180px_1fr_auto] gap-3 py-[6px] px-3 bg-[rgba(0,0,0,0.03)] border-b border-(--o2-border-color) text-[10px] font-bold uppercase tracking-[0.06em] opacity-45 dark:bg-[rgba(255,255,255,0.05)]">
               <span>{{ t("modelPricing.patternExamplesModelCol") }}</span>
               <span>{{ t("modelPricing.patternExamplesPatternCol") }}</span>
             </div>
             <div
               v-for="ex in patternExamples"
               :key="ex.name"
-              class="examples-table-row"
+              class="examples-table-row grid grid-cols-[180px_1fr_auto] gap-3 items-center py-2 px-3 border-b border-(--o2-border-color) text-xs"
             >
-              <span class="examples-model-name">{{ ex.name }}</span>
-              <code class="examples-pattern">{{ ex.match_pattern }}</code>
+              <span class="examples-model-name font-medium">{{ ex.name }}</span>
+              <code class="font-mono text-[11px] bg-[rgba(0,0,0,0.04)] py-px px-[6px] rounded break-all dark:bg-[rgba(255,255,255,0.08)]">{{ ex.match_pattern }}</code>
               <OButton
                 variant="ghost"
                 size="icon-xs-sq"
-                class="examples-copy-btn"
+                class="opacity-40 hover:opacity-100"
                 :data-test="`model-pricing-example-copy-btn-${ex.name}`"
                 @click="copyPattern(ex.match_pattern)"
               >
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="xs"
                   :class="
                     copiedPattern === ex.match_pattern
-                      ? 'tw:text-green-500'
+                      ? 'text-green-500'
                       : ''
                   "
                 />
@@ -192,28 +192,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODialog>
 
         <!-- ── Pricing Tiers ── -->
-        <div class="form-card">
-          <div class="form-card-header">
+        <div class="border border-(--o2-border-color) rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+          <div class="flex flex-row items-center justify-between gap-3 py-[10px] px-4 bg-[rgba(0,0,0,0.025)] border-b border-(--o2-border-color) rounded-t-[10px] dark:bg-[rgba(255,255,255,0.04)]">
             <div>
-              <div class="form-card-title">
+              <div class="form-card-title text-[13px] font-semibold">
                 {{ t("modelPricing.pricingTiers") }}
               </div>
-              <div class="form-card-subtitle">
+              <div class="form-card-subtitle text-[11px] opacity-60 mt-px">
                 {{ t("modelPricing.pricingTiersDesc") }}
               </div>
             </div>
           </div>
 
-          <div class="form-card-body tw:flex tw:flex-col tw:gap-3">
+          <div class="form-card-body flex flex-col gap-3 px-4 pt-[10px] pb-2">
             <div
               v-for="(tier, idx) in model.tiers"
               :key="idx as number"
-              class="tier-card"
+              class="border border-(--o2-border-color) rounded-[10px] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_4px_rgba(0,0,0,0.3)]"
             >
               <!-- Tier Header -->
-              <div class="tier-header">
-                <div class="tw:flex tw:items-center tw:gap-2">
-                  <span class="tier-name-label">{{
+              <div class="flex items-center justify-between gap-2 py-2 px-4 bg-[rgba(0,0,0,0.025)] border-b border-(--o2-border-color) dark:bg-[rgba(255,255,255,0.04)]">
+                <div class="flex items-center gap-2">
+                  <span class="tier-name-label text-xs font-medium opacity-50 whitespace-nowrap shrink-0">{{
                     t("modelPricing.tierName")
                   }}</span>
                   <OInput
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`model-pricing-tier-name-input-${idx}`"
                   />
                 </div>
-                <div class="tw:flex tw:items-center tw:gap-2 tw:flex-shrink-0">
+                <div class="flex items-center gap-2 flex-shrink-0">
                   <OButton
                     v-if="model.tiers.length > 1"
                     variant="outline-destructive"
@@ -236,17 +236,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Tier Body -->
-              <div class="tier-body">
+              <div class="tier-body p-3 px-4 flex flex-col gap-3">
                 <!-- Condition row (non-default tiers only) -->
                 <div
                   v-if="(idx as number) > 0 && tier.condition"
-                  class="condition-block"
+                  class="py-3 px-[14px] rounded-lg bg-[rgba(0,0,0,0.02)] border border-(--o2-border-color) dark:bg-[rgba(255,255,255,0.03)]"
                 >
-                  <div class="sub-label tw:mb-2">
+                  <div class="sub-label mb-2 text-[11px] font-semibold tracking-[0.06em] opacity-65">
                     {{ t("modelPricing.applyTierWhen") }}
                   </div>
-                  <div class="tw:flex tw:gap-2 tw:items-end tw:flex-nowrap">
-                    <div class="tw:flex-1 tw:min-w-[130px]">
+                  <div class="flex gap-2 items-end flex-nowrap">
+                    <div class="flex-1 min-w-[130px]">
                       <OInput
                         v-model="tier.condition.usage_key"
                         :label="t('modelPricing.usageKeyCol')"
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`model-pricing-tier-condition-key-input-${idx}`"
                       />
                     </div>
-                    <div class="tw:w-[90px] tw:flex-shrink-0">
+                    <div class="w-[90px] flex-shrink-0">
                       <OSelect
                         v-model="tier.condition.operator"
                         :options="operators"
@@ -263,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`model-pricing-tier-condition-operator-select-${idx}`"
                       />
                     </div>
-                    <div class="tw:w-[140px] tw:flex-shrink-0">
+                    <div class="w-[140px] flex-shrink-0">
                       <OInput
                         v-model.number="tier.condition.value"
                         :label="t('modelPricing.threshold')"
@@ -275,8 +275,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Quick Setup -->
-                <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
-                  <span class="sub-label">{{
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="sub-label text-[11px] font-semibold tracking-[0.06em] opacity-65">{{
                     t("modelPricing.quickSetup")
                   }}</span>
                   <OButton
@@ -284,20 +284,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="tpl.name"
                     variant="pricing-chip"
                     :active="isTemplateActive(tier, tpl.keys)"
-                    class="tw:!rounded-[1.25rem] tw:!h-auto tw:!py-[0.3125rem] tw:!px-[0.875rem] tw:!text-xs tw:!font-medium tw:!gap-[0.375rem]"
+                    class="!rounded-[1.25rem] !h-auto !py-[0.3125rem] !px-[0.875rem] !text-xs !font-medium !gap-[0.375rem]"
                     :data-test="`model-pricing-tier-template-btn-${idx}-${tpl.name.toLowerCase()}`"
                     @click="applyTemplate(tier, tpl.keys)"
                   >
                     <template #icon-left>
                       <span
-                        class="pricing-chip-dot"
+                        class="pricing-chip-dot w-[7px] h-[7px] rounded-full shrink-0 inline-block"
                         :style="{ background: tpl.color }"
                       />
                     </template>
                     {{ tpl.name }}
                     <span
                       v-if="isTemplateActive(tier, tpl.keys)"
-                      class="template-chip-close"
+                      class="text-sm leading-none opacity-75 ml-0.5 hover:opacity-100"
                       @click.stop="clearTemplate(tier, tpl.keys)"
                       >×</span
                     >
@@ -306,18 +306,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Price Table -->
                 <div>
-                  <div class="price-table-label tw:mb-2">
+                  <div class="price-table-label mb-2 text-[11px] font-semibold tracking-[0.03em]">
                     {{ t("modelPricing.tokenPrices") }}
-                    <span class="price-table-label-sub">
+                    <span class="price-table-label-sub font-normal opacity-55 tracking-normal">
                       {{ t("modelPricing.tokenPricesUnit") }}</span
                     >
                   </div>
 
-                  <div class="price-table">
+                  <div class="price-table overflow-hidden">
                     <!-- Column headers (only when rows exist) -->
                     <div
                       v-if="Object.keys(tier.prices).length"
-                      class="price-table-head"
+                      class="price-table-head grid grid-cols-[1fr_160px_auto] gap-2 py-[6px] px-3 text-[11px] font-semibold tracking-[0.01em] opacity-45"
                     >
                       <span>{{ t("modelPricing.usageKeyCol") }}</span>
                       <span>{{ t("modelPricing.pricePerMillionHeader") }}</span>
@@ -329,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-for="(entry, entryIdx) in priceEntries(tier)"
                       :key="entry.stableId"
-                      class="price-row"
+                      class="price-row grid grid-cols-[1fr_160px_auto] gap-2 items-center py-0.5 px-3"
                     >
                       <OInput
                         :model-value="entry.key"
@@ -356,7 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       >
                         <template #icon-left
-                          ><span class="price-dollar">$</span></template
+                          ><span class="price-dollar text-xs pb-0.5">$</span></template
                         >
                       </OInput>
                       <OButton
@@ -372,19 +372,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Empty state -->
                     <div
                       v-if="!Object.keys(tier.prices).length"
-                      class="price-empty"
+                      class="price-empty flex flex-col items-center p-4 gap-[3px]"
                     >
-                      <div class="price-empty-title">
+                      <div class="price-empty-title text-xs font-medium">
                         {{ t("modelPricing.noPricesDefined") }}
                       </div>
-                      <div class="price-empty-sub">
+                      <div class="price-empty-sub text-[11px] opacity-55">
                         {{ t("modelPricing.noPricesDesc") }}
                       </div>
                     </div>
 
                     <!-- Add row -->
                     <div
-                      class="price-add-row"
+                      class="price-add-row grid grid-cols-[1fr_160px_auto] gap-2 items-center py-1 px-3"
                       :class="{
                         'price-add-row--no-top': !Object.keys(tier.prices)
                           .length,
@@ -404,7 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`model-pricing-add-price-value-input-${idx}`"
                       >
                         <template #icon-left
-                          ><span class="price-dollar">$</span></template
+                          ><span class="price-dollar text-xs pb-0.5">$</span></template
                         >
                       </OInput>
                       <OButton
@@ -422,34 +422,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Price Preview Table -->
                   <div
                     v-if="previewEntries(tier, idx as number).length"
-                    class="tw:mt-5 tw:border tw:rounded"
+                    class="mt-5 border rounded"
                     style="
                       background: rgba(0, 0, 0, 0.015);
                       border-color: var(--o2-border-color);
                     "
                   >
                     <div
-                      class="tw:px-4 tw:py-2 tw:text-xs tw:text-gray-500 tw:font-semibold tw:border-b"
+                      class="px-4 py-2 text-xs text-gray-500 font-semibold border-b"
                       style="border-color: var(--o2-border-color)"
                     >
                       {{ t("modelPricing.pricePreview") }}
                     </div>
                     <table
-                      class="tw:w-full tw:text-xs"
+                      class="w-full text-xs"
                       style="border-collapse: collapse"
                     >
                       <thead>
                         <tr
-                          class="tw:text-left tw:text-gray-400 tw:border-b"
+                          class="text-left text-gray-400 border-b"
                           style="border-color: var(--o2-border-color)"
                         >
-                          <th class="tw:px-4 tw:py-2 tw:font-medium">
+                          <th class="px-4 py-2 font-medium">
                             {{ t("modelPricing.usageType") }}
                           </th>
-                          <th class="tw:px-4 tw:py-2 tw:font-medium">
+                          <th class="px-4 py-2 font-medium">
                             {{ t("modelPricing.perThousand") }}
                           </th>
-                          <th class="tw:px-4 tw:py-2 tw:font-medium">
+                          <th class="px-4 py-2 font-medium">
                             {{ t("modelPricing.perMillion") }}
                           </th>
                         </tr>
@@ -458,21 +458,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <tr
                           v-for="entry in previewEntries(tier, idx as number)"
                           :key="entry.stableId"
-                          class="tw:border-b last:tw:border-none"
+                          class="border-b last:border-none"
                           :class="{
-                            'preview-row-pending': entry.stableId === -1,
+                            'preview-row-pending opacity-50 italic': entry.stableId === -1,
                           }"
                           style="border-color: var(--o2-border-color)"
                         >
                           <td
-                            class="tw:px-4 tw:py-2 tw:text-gray-600 tw:font-medium"
+                            class="px-4 py-2 text-gray-600 font-medium"
                           >
                             {{ entry.key }}
                           </td>
-                          <td class="tw:px-4 tw:py-2 tw:text-gray-600">
+                          <td class="px-4 py-2 text-gray-600">
                             ${{ formatPreviewCost(entry.value, 1000) }}
                           </td>
-                          <td class="tw:px-4 tw:py-2 tw:text-gray-600">
+                          <td class="px-4 py-2 text-gray-600">
                             ${{ formatPreviewCost(entry.value, 1000000) }}
                           </td>
                         </tr>
@@ -485,7 +485,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="outline"
               size="sm-action"
-              class="tw:self-start"
+              class="self-start"
               data-test="model-pricing-add-tier-btn"
               @click="addTier"
             >
@@ -497,7 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Footer -->
-    <div class="page-footer">
+    <div class="page-footer flex items-center justify-end gap-2 px-6 h-[50px] shrink-0 border-t border-(--o2-border-color)">
       <OButton
         variant="outline"
         size="sm-action"
@@ -583,7 +583,7 @@ const nameError = computed(() => {
 });
 
 /**
- * Strip Rust/PCRE tw:inline flag groups that JavaScript RegExp doesn't understand.
+ * Strip Rust/PCRE inline flag groups that JavaScript RegExp doesn't understand.
  * Handles: (?i), (?m), (?s), (?x), (?u), and combinations like (?ims).
  * Does NOT strip flag-scoped groups like (?i:...) — those are left as non-capturing groups.
  */
@@ -598,7 +598,7 @@ const regexError = computed(() => {
   if (!pattern || !pattern.trim()) return t("modelPricing.patternRequired");
   if (pattern.length > 512) return t("modelPricing.patternTooLong");
   try {
-    // Strip Rust-specific tw:inline flags before testing with JS RegExp.
+    // Strip Rust-specific inline flags before testing with JS RegExp.
     // The backend (Rust regex crate) is the authority; this is a best-effort client check.
     new RegExp(stripInlineFlags(pattern));
     return "";
@@ -880,7 +880,7 @@ async function save() {
     }
   }
 
-  // Name and pattern have tw:inline errors — just mark fields as touched so errors show,
+  // Name and pattern have inline errors — just mark fields as touched so errors show,
   // no duplicate snackbar needed.
   if (nameError.value || regexError.value) {
     nameTouched.value = true;
@@ -888,7 +888,7 @@ async function save() {
     return;
   }
 
-  // Require at least one price in the default tier (no tw:inline field for this)
+  // Require at least one price in the default tier (no inline field for this)
   const defaultTier = m.tiers?.[0];
   if (defaultTier) {
     const priceValues = Object.values(defaultTier.prices || {}) as number[];
@@ -993,344 +993,9 @@ onBeforeMount(async () => {
 });
 </script>
 
-<style lang="scss" scoped>
-/* ── Sticky footer ─────────────────────────────────── */
-.page-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 0 24px;
-  height: 50px;
-  flex-shrink: 0;
-  border-top: 1px solid var(--o2-border-color);
-}
-
-/* ── Form card (Model Details) ─────────────────────── */
-.form-card {
-  border: 1px solid var(--o2-border-color);
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-
-  .body--dark & {
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  }
-}
-
-.form-card-header {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 16px;
-  background: rgba(0, 0, 0, 0.025);
-  border-bottom: 1px solid var(--o2-border-color);
-  border-radius: 10px 10px 0 0;
-
-  .body--dark & {
-    background: rgba(255, 255, 255, 0.04);
-  }
-}
-
-.form-card-title {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.form-card-subtitle {
-  font-size: 11px;
-  opacity: 0.6;
-  margin-top: 1px;
-}
-
-.form-card-body {
-  padding: 10px 16px 8px;
-}
-
-.regex-hint-trigger {
-  cursor: default;
-  opacity: 0.4;
-
-  &:hover {
-    opacity: 0.75;
-  }
-}
-
-/* ── Tier card ──────────────────────────────────────── */
-.tier-card {
-  border: 1px solid var(--o2-border-color);
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-
-  .body--dark & {
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-  }
-}
-
-.tier-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 16px;
-  background: rgba(0, 0, 0, 0.025);
-  border-bottom: 1px solid var(--o2-border-color);
-
-  .body--dark & {
-    background: rgba(255, 255, 255, 0.04);
-  }
-}
-
-.tier-name-label {
-  font-size: 12px;
-  font-weight: 500;
-  opacity: 0.5;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.tier-name-input {
-  width: auto;
-  min-width: 80px;
-  max-width: 260px;
-
-  :deep(.q-field__control) {
-    padding: 0;
-    min-height: 30px;
-    height: 30px;
-    align-items: center;
-  }
-  :deep(.q-field__label) {
-    display: none;
-  }
-  :deep(.q-field__native) {
-    padding-top: 0;
-    padding-bottom: 0;
-    min-height: unset;
-    line-height: 30px;
-  }
-  :deep(input) {
-    font-weight: 600;
-    font-size: 14px;
-  }
-}
-
-.tier-body {
-  padding: 12px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-/* ── Sub labels inside tier body ───────────────────── */
-.sub-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  opacity: 0.65;
-}
-
-/* ── Condition tw:block ───────────────────────────────── */
-.condition-block {
-  padding: 12px 14px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.02);
-  border: 1px solid var(--o2-border-color);
-
-  .body--dark & {
-    background: rgba(255, 255, 255, 0.03);
-  }
-}
-
-.tier-status-badge {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: rgba(34, 197, 94, 0.1);
-  color: #16a34a;
-  border: 1px solid rgba(34, 197, 94, 0.25);
-  white-space: nowrap;
-}
-
-.pricing-chip-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  display: inline-block;
-}
-
-.template-chip-close {
-  font-size: 14px;
-  line-height: 1;
-  opacity: 0.75;
-  margin-left: 2px;
-
-  &:hover {
-    opacity: 1;
-  }
-}
-
-/* ── Price table ───────────────────────────────────── */
-.price-table {
-  overflow: hidden;
-}
-
-.price-table-head {
-  display: grid;
-  grid-template-columns: 1fr 160px auto;
-  gap: 8px;
-  padding: 6px 12px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  opacity: 0.45;
-}
-
-.price-row {
-  display: grid;
-  grid-template-columns: 1fr 160px auto;
-  gap: 8px;
-  align-items: center;
-  padding: 2px 12px;
-}
-
-.price-dollar {
-  font-size: 12px;
-  padding-bottom: 2px;
-}
-
-.price-table-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-}
-
-.price-table-label-sub {
-  font-weight: 400;
-  opacity: 0.55;
-  letter-spacing: normal;
-}
-
-.price-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 16px;
-  gap: 3px;
-}
-
-.price-empty-title {
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.price-empty-sub {
-  font-size: 11px;
-  opacity: 0.55;
-}
-
-.price-add-row {
-  display: grid;
-  grid-template-columns: 1fr 160px auto;
-  gap: 8px;
-  align-items: center;
-  padding: 4px 12px;
-}
-
-/* ── Pattern examples button & dialog ─────────────── */
-.pattern-examples-btn {
-  opacity: 0.5;
-  color: var(--q-primary);
-  &:hover {
-    opacity: 1;
-  }
-}
-
-.examples-table {
-  border: 1px solid var(--o2-border-color);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.examples-table-head {
-  display: grid;
-  grid-template-columns: 180px 1fr auto;
-  gap: 12px;
-  padding: 6px 12px;
-  background: rgba(0, 0, 0, 0.03);
-  border-bottom: 1px solid var(--o2-border-color);
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  opacity: 0.45;
-
-  .body--dark & {
-    background: rgba(255, 255, 255, 0.05);
-  }
-}
-
-.examples-table-row {
-  display: grid;
-  grid-template-columns: 180px 1fr auto;
-  gap: 12px;
-  align-items: center;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--o2-border-color);
-  font-size: 12px;
-
-  &:last-child {
-    border-bottom: none;
-  }
-}
-
-.examples-model-name {
-  font-weight: 500;
-}
-
-.examples-copy-btn {
-  opacity: 0.4;
-  &:hover {
-    opacity: 1;
-  }
-}
-
-.examples-pattern {
-  font-family: monospace;
-  font-size: 11px;
-  background: rgba(0, 0, 0, 0.04);
-  padding: 2px 6px;
-  border-radius: 4px;
-  word-break: break-all;
-
-  .body--dark & {
-    background: rgba(255, 255, 255, 0.08);
-  }
-}
-
-/* ── Pending preview row (typed but not yet committed) ── */
-.preview-row-pending {
-  opacity: 0.5;
-  font-style: italic;
-}
-
-/* ── Field label ────────────────────────────────────── */
-.field-label {
-  font-size: 12px;
-  font-weight: 600;
-  opacity: 0.75;
-  height: 20px;
-}
-
-/* ── showLabelOnTop input border override ───────────── */
-:deep(.q-field--labeled.showLabelOnTop) {
-  .q-field__control {
-    border: 1px solid var(--o2-border-color) !important;
-  }
+<style>
+/* :last-child pseudo selector — kept in <style> per project rules */
+.examples-table-row:last-child {
+  border-bottom: none;
 }
 </style>

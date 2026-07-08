@@ -183,6 +183,18 @@ describe("OverrideConfigPopup", () => {
       expect(opts).not.toContain("field1");
       expect(opts).toContain("field2");
     });
+
+    it("falls back to the alias for the label when a column has no label", async () => {
+      wrapper = await createWrapper({
+        columns: [{ label: "", alias: "kubernetes_namespace", isNumeric: false }],
+        overrideConfig: { overrideConfigs: [] },
+      });
+      const opt = wrapper.vm.availableToAdd.find(
+        (o: any) => o.value === "kubernetes_namespace",
+      );
+      expect(opt).toBeTruthy();
+      expect(opt.label).toBe("kubernetes_namespace");
+    });
   });
 
   describe("Field helpers", () => {

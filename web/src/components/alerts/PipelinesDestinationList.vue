@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
-    <div v-if="!showDestinationEditor" class="tw:flex tw:flex-col tw:h-full">
+  <div class="rounded-md flex flex-col h-full p-0">
+    <div v-if="!showDestinationEditor" class="flex flex-col h-full">
       <!-- Standard section header: title + actions only. Search moved to toolbar. -->
       <AppPageHeader
         :title="t('pipeline_destinations.header')"
         icon="person-pin-circle"
         :subtitle="'External targets for pipeline output'"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="shrink-0 px-4 border-b border-border-default"
       >
         <template #actions>
           <OButton
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </template>
       </AppPageHeader>
-      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div class="card-container flex-1 min-h-0 overflow-hidden">
       <OTable
         :frame="false"
         data-test="alert-destinations-list-table"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar>
           <OSearchInput
             v-model="filterQuery"
-            class="tw:flex-1"
+            class="flex-1"
             :placeholder="t('pipeline_destinations.search')"
           />
         </template>
@@ -68,22 +68,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="hero"
             preset="no-pipeline-destinations"
             :filtered="!!filterQuery"
-            :hide-action="!filterQuery"
-            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+            @action="(id) => id === 'clear-filters' ? (filterQuery = '') : editDestination(null)"
           />
         </template>
 
         <template #cell-destination_type="{ row }">
-          {{ row.destination_type_name || "N/A" }}
+          <OTag
+            v-if="row.destination_type_name"
+            type="fieldTag"
+            value="soft"
+          >{{ row.destination_type_name }}</OTag>
+          <span v-else class="text-text-primary">—</span>
         </template>
 
         <template #cell-output_format="{ row }">
-          {{ formatOutputFormat(row.output_format) }}
+          <OTag
+            v-if="row.output_format"
+            type="fieldTag"
+            value="soft"
+          >{{ formatOutputFormat(row.output_format) }}</OTag>
+          <span v-else class="text-text-primary">—</span>
         </template>
 
         <template #cell-actions="{ row }">
           <OButton
             :data-test="`alert-destination-list-${row.name}-update-destination`"
+            data-row-action="edit"
             variant="ghost"
             size="icon-sm"
             :title="t('alert_destinations.edit')"
@@ -93,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             :data-test="`alert-destination-list-${row.name}-delete-destination`"
+            data-row-action="delete"
             variant="ghost"
             size="icon-sm"
             :title="t('alert_destinations.delete')"
@@ -106,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedDestinations.length > 0"
           #bottom
         >
-          <span class="tw:text-xs tw:text-text-primary tw:font-medium">
+          <span class="text-xs text-text-primary font-medium">
             {{ selectedDestinations.length }} selected
           </span>
           <OButton
@@ -173,6 +184,7 @@ import type { Template } from "@/ts/interfaces/index";
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -202,6 +214,7 @@ export default defineComponent({
     ConfirmDialog,
     OButton,
     OIcon,
+    OTag,
     OSearchInput,
     OTable,
   },

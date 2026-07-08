@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div class="tw:flex tw:gap-1">
+    <div class="flex gap-1">
       <!-- Query Type: SQL / PromQL -->
       <OToggleGroup
         v-if="showQueryType"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="dashboard-sql-query-type"
         >
-          <template #icon-left><OIcon name="database" size="xs" class="tw:shrink-0" /></template>
+          <template #icon-left><OIcon name="database" size="xs" class="shrink-0" /></template>
           {{ t("panel.SQL") }}
         </OToggleGroupItem>
         <OToggleGroupItem
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="dashboard-promql-query-type"
         >
-          <template #icon-left><OIcon name="show-chart" size="xs" class="tw:shrink-0" /></template>
+          <template #icon-left><OIcon name="show-chart" size="xs" class="shrink-0" /></template>
           {{ t("panel.promQL") }}
         </OToggleGroupItem>
       </OToggleGroup>
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="dashboard-builder-query-type"
         >
-          <template #icon-left><OIcon name="build" size="xs" class="tw:shrink-0" /></template>
+          <template #icon-left><OIcon name="build" size="xs" class="shrink-0" /></template>
           {{ t("panel.builder") }}
         </OToggleGroupItem>
         <OToggleGroupItem
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="dashboard-custom-query-type"
         >
-          <template #icon-left><OIcon name="code" size="xs" class="tw:shrink-0" /></template>
+          <template #icon-left><OIcon name="code" size="xs" class="shrink-0" /></template>
           {{ t("panel.custom") }}
         </OToggleGroupItem>
       </OToggleGroup>
@@ -416,5 +416,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-</style>

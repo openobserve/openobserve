@@ -15,15 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
+  <div class="rounded-md p-0 h-full flex flex-col">
     <!-- Standard page header: title + actions only. Search moved into the
          table's own toolbar (built-in global filter). -->
     <AppPageHeader
       :title="t('iam.groups')"
-      :subtitle="'Group users together to assign roles'"
       icon="group"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     >
+      <template #subtitle>
+        <span data-test="iam-groups-subtitle">
+          {{ t('iam.groupsPage.subtitle') }}
+        </span>
+      </template>
       <template #actions>
         <OButton
           data-test="iam-groups-add-group-btn"
@@ -35,8 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </AppPageHeader>
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+    <div class="w-full flex-1 min-h-0 overflow-hidden">
+      <div class="card-container h-full">
         <OTable
           :frame="false"
           data-test="iam-groups-table-section"
@@ -58,19 +62,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+            <div class="flex items-center gap-2 w-full">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('iam.searchGroup')"
-                class="tw:flex-1"
+                class="flex-1"
                 data-test="iam-groups-search-input"
               />
             </div>
           </template>
           <template #cell-actions="{ row }">
-            <div class="tw:flex tw:items-center tw:justify-center">
+            <div class="flex items-center justify-center">
               <OButton
                 :data-test="`iam-groups-edit-${row.group_name}-role-icon`"
+                data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('common.edit')"
@@ -80,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 :data-test="`iam-groups-delete-${row.group_name}-role-icon`"
+                data-row-action="delete"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('common.delete')"
@@ -98,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #bottom>
-            <span class="o2-table-footer-title tw:text-text-primary">{{ rows.length }} {{ t('iam.groups') }}</span>
+            <span class="o2-table-footer-title text-text-primary">{{ rows.length }} {{ t('iam.groups') }}</span>
             <OButton
               v-if="selectedGroups.length > 0"
               data-test="iam-groups-bulk-delete-btn"
@@ -116,11 +122,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AddGroup
       v-model:open="showAddGroup"
       :org_identifier="store.state.selectedOrganization.identifier"
-      @added:group="setupGroups"
+      @added:group="onGroupAdded"
     />
     <ConfirmDialog
       title="Delete Group"
       :message="`Are you sure you want to delete '${deleteConformDialog?.data?.group_name as string}'?`"
+      :warning-message="deleteImpactMessage"
       @update:ok="_deleteGroup"
       @update:cancel="deleteConformDialog.show = false"
       v-model="deleteConformDialog.show"
@@ -128,6 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       title="Bulk Delete Groups"
       :message="`Are you sure you want to delete ${selectedGroups.length} group(s)?`"
+      :warning-message="bulkDeleteImpactMessage"
       @update:ok="bulkDeleteUserGroups"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -147,7 +155,7 @@ import { useI18n } from "vue-i18n";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { getGroups, deleteGroup, bulkDeleteGroups } from "@/services/iam";
+import { getGroups, deleteGroup, bulkDeleteGroups, getGroup } from "@/services/iam";
 import usePermissions from "@/composables/iam/usePermissions";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -155,6 +163,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const showAddGroup = ref(false);
@@ -244,6 +254,27 @@ const addGroup = () => {
   showAddGroup.value = true;
 };
 
+// After a group is created, route straight into EditGroup on the Roles tab so
+// the user can start assigning roles instead of being dropped back on the list
+// with an empty group.
+const onGroupAdded = (payload: { group_name: string; data?: any }) => {
+  if (!payload?.group_name) {
+    setupGroups();
+    return;
+  }
+
+  router.push({
+    name: "editGroup",
+    params: {
+      group_name: payload.group_name,
+    },
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+      tab: "roles",
+    },
+  });
+};
+
 const editGroup = (group: any) => {
   router.push({
     name: "editGroup",
@@ -298,9 +329,31 @@ const deleteUserGroup = (group: any) => {
     });
 };
 
-const showConfirmDialog = (row: any) => {
+// Blast-radius warning for the single-group delete dialog. We resolve the live
+// member count with one getGroup call on delete-click (the group detail payload
+// carries the users array; the list payload does not).
+const deleteImpactMessage = ref("");
+
+const fetchGroupMemberCount = async (groupName: string): Promise<number> => {
+  const res = await getGroup(
+    groupName,
+    store.state.selectedOrganization.identifier,
+  );
+  return Array.isArray(res.data?.users) ? res.data.users.length : 0;
+};
+
+const showConfirmDialog = async (row: any) => {
   deleteConformDialog.value.show = true;
   deleteConformDialog.value.data = row;
+  deleteImpactMessage.value = t("iam.groupsPage.delete.impact", { count: 0 });
+
+  try {
+    const count = await fetchGroupMemberCount(row.group_name);
+    deleteImpactMessage.value = t("iam.groupsPage.delete.impact", { count });
+  } catch (err) {
+    // If the count lookup fails, keep the generic warning rather than blocking.
+    console.log(err);
+  }
 };
 
 const _deleteGroup = () => {
@@ -308,8 +361,31 @@ const _deleteGroup = () => {
   deleteConformDialog.value.data = null;
 };
 
-const openBulkDeleteDialog = () => {
+// Blast-radius warning for the bulk-delete dialog. With exactly one group
+// selected we resolve its live member count, matching the per-row delete. For
+// 2+ groups we keep static copy to avoid N requests.
+const bulkDeleteImpactMessage = ref("");
+
+const openBulkDeleteDialog = async () => {
   confirmBulkDelete.value = true;
+
+  if (selectedGroups.value.length === 1) {
+    bulkDeleteImpactMessage.value = t("iam.groupsPage.delete.impact", {
+      count: 0,
+    });
+    try {
+      const count = await fetchGroupMemberCount(
+        selectedGroups.value[0].group_name,
+      );
+      bulkDeleteImpactMessage.value = t("iam.groupsPage.delete.impact", {
+        count,
+      });
+    } catch (err) {
+      console.log(err);
+    }
+  } else {
+    bulkDeleteImpactMessage.value = t("iam.groupsPage.bulkDelete.impact");
+  }
 };
 
 const bulkDeleteUserGroups = async () => {
@@ -357,20 +433,23 @@ const bulkDeleteUserGroups = async () => {
   }
 };
 
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcuts([
+  {
+    id: "iamGroupsAdd",
+    handler: () => { if (!isInputFocused()) addGroup(); },
+  },
+  {
+    id: "iamGroupsRefresh",
+    handler: () => { if (!isInputFocused()) setupGroups(); },
+  },
+  {
+    id: "iamGroupsFocusSearch",
+    handler: () => {
+      focusSearchInput("iam-groups-search-input");
+    },
+  },
+]);
+
 </script>
 
-<style scoped></style>
-<style lang="scss">
-.iam-table {
-  .thead-sticky,
-  .tfoot-sticky {
-    position: sticky;
-    top: 0;
-    opacity: 1;
-    z-index: 1;
-    background: transparent !important;
-  }
-
-}
-
-</style>

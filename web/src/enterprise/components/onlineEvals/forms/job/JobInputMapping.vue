@@ -1,48 +1,54 @@
-<template>
-  <div class="job-mapping">
-    <div class="job-mapping__head">
-      <span class="job-mapping__title">{{ t("onlineEvals.job.inputMapping.title") }}</span>
-      <span class="job-mapping__hint">{{ t("onlineEvals.job.inputMapping.hint") }}</span>
+﻿<template>
+  <div class="flex flex-col gap-[10px]">
+    <div class="flex flex-col gap-0.5">
+      <span class="text-xs font-semibold text-text-primary">{{ t("onlineEvals.job.inputMapping.title") }}</span>
+      <span class="text-[11.5px] text-text-secondary">{{ t("onlineEvals.job.inputMapping.hint") }}</span>
     </div>
-    <div v-if="selectedScorers.length === 0" class="job-mapping__empty">
+    <div
+      v-if="selectedScorers.length === 0"
+      class="py-2.5 px-3 border border-dashed border-dialog-header-border rounded-md text-text-secondary text-xs text-center"
+    >
       {{ t("onlineEvals.job.inputMapping.selectScorers") }}
     </div>
     <template v-else>
       <article
         v-for="scorer in selectedScorers"
         :key="entityId(scorer)"
-        class="job-mapping-card"
+        class="border border-dialog-header-border rounded-md bg-card-bg overflow-hidden"
       >
-        <div class="job-mapping-card__head">
-          <div class="job-mapping-card__head-text">
-            <strong class="job-mapping-card__name">{{ scorer.name }}</strong>
-            <small class="job-mapping-card__meta">{{
+        <div class="flex items-center justify-between gap-3 py-2.5 px-3 border-b border-dialog-header-border">
+          <div class="flex flex-col gap-px min-w-0">
+            <strong class="text-[13px] font-semibold text-text-primary truncate">{{ scorer.name }}</strong>
+            <small class="text-[11px] text-text-secondary">{{
               t("onlineEvals.job.scorerPicker.meta", {
                 type: scorerTypeOf(scorer).replace("_", " "),
                 version: scorer.version,
               })
             }}</small>
           </div>
-          <span class="job-mapping-card__count">
+          <span class="shrink-0 text-[11px] font-semibold text-text-secondary">
             {{ t("onlineEvals.job.inputMapping.variableCount", { count: variablesFor(scorer).length }) }}
           </span>
         </div>
-        <div v-if="variablesFor(scorer).length" class="job-mapping-card__rows">
+        <div v-if="variablesFor(scorer).length" class="grid gap-1.5 py-2.5 px-3">
           <label
             v-for="variable in variablesFor(scorer)"
             :key="`${entityId(scorer)}-${variable}`"
-            class="job-mapping-row"
+            class="grid grid-cols-[minmax(130px,0.35fr)_minmax(0,1fr)] items-center gap-2.5"
           >
-            <code class="job-mapping-row__var">{{ formatTemplateVariable(variable) }}</code>
+            <code class="overflow-hidden py-1.25 px-2 rounded bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-primary font-semibold text-[11px] font-mono truncate">{{ formatTemplateVariable(variable) }}</code>
             <input
-              class="job-mapping-row__input"
+              class="w-full h-7 py-0 px-2.5 border border-input-border rounded bg-input-bg text-input-text font-normal text-xs font-mono outline-none transition-colors duration-120 focus:border-[var(--color-primary-600,#3F7994)]"
               :value="inputMappings[entityId(scorer)]?.[variable] || ''"
               :placeholder="defaultJobMappingValue(variable)"
               @input="updateMapping(entityId(scorer), variable, ($event.target as HTMLInputElement).value)"
             />
           </label>
         </div>
-        <div v-else class="job-mapping__empty">
+        <div
+          v-else
+          class="py-2.5 px-3 border border-dashed border-dialog-header-border rounded-md text-text-secondary text-xs text-center"
+        >
           {{ t("onlineEvals.job.inputMapping.noVariables") }}
         </div>
       </article>
@@ -86,123 +92,3 @@ function updateMapping(scorerId: string, variable: string, value: string) {
 }
 </script>
 
-<style lang="scss" scoped>
-.job-mapping {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.job-mapping__head {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.job-mapping__title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-}
-
-.job-mapping__hint {
-  font-size: 11.5px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.job-mapping__empty {
-  padding: 10px 12px;
-  border: 1px dashed var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 12px;
-  text-align: center;
-}
-
-.job-mapping-card {
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-  background: var(--color-card-bg);
-  overflow: hidden;
-}
-
-.job-mapping-card__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--color-dialog-header-border, var(--o2-border));
-}
-
-.job-mapping-card__head-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.job-mapping-card__name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.job-mapping-card__meta {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.job-mapping-card__count {
-  flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.job-mapping-card__rows {
-  display: grid;
-  gap: 6px;
-  padding: 10px 12px;
-}
-
-.job-mapping-row {
-  display: grid;
-  grid-template-columns: minmax(130px, 0.35fr) minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-}
-
-.job-mapping-row__var {
-  overflow: hidden;
-  padding: 5px 8px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--color-text-secondary) 10%, transparent);
-  color: var(--color-text-primary, currentColor);
-  font-weight: 600;
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.job-mapping-row__input {
-  width: 100%;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--color-input-border, var(--o2-border-input));
-  border-radius: 4px;
-  background: var(--color-input-bg, var(--color-card-bg));
-  color: var(--color-input-text, var(--color-text-primary));
-  font-weight: 400;
-  font-size: 12px;
-  outline: none;
-  transition: border-color 0.12s;
-}
-
-.job-mapping-row__input:focus {
-  border-color: var(--color-primary-600, #3F7994);
-}
-</style>

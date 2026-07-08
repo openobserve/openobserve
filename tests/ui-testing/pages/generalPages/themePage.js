@@ -27,9 +27,12 @@ export class ThemePage {
         this.customColorPreviewLight = page.locator('[data-test="predefined-themes-custom-color-preview-light"]');
         // ODialog hosting OColor picker
         this.colorPickerDialog = page.locator('[data-test="predefined-themes-color-picker-dialog"]');
-        // Custom-color picker is an ODialog whose only footer button is the
-        // primary "Close" button (see PredefinedThemes.vue:215).
-        this.colorPickerClose = page.locator('[data-test="predefined-themes-color-picker-dialog"] [data-test="o-dialog-primary-btn"]');
+        // PredefinedThemes.vue's "Pick Custom Color" ODialog now has two footer
+        // buttons: the primary "Apply" button (confirms + applies the color) and
+        // the neutral "Cancel" button (closes without applying). ODialog forwards
+        // them as o-dialog-primary-btn / o-dialog-neutral-btn under the parent slug.
+        this.colorPickerApply = page.locator('[data-test="predefined-themes-color-picker-dialog"] [data-test="o-dialog-primary-btn"]');
+        this.colorPickerClose = page.locator('[data-test="predefined-themes-color-picker-dialog"] [data-test="o-dialog-neutral-btn"]');
 
         // General Settings - Theme Management
         this.settingsMenuItem = page.locator('[data-test="menu-link-\\/settings-item"]');
@@ -56,12 +59,16 @@ export class ThemePage {
 
     /**
      * Returns the theme card locator for a given theme name and mode.
-     * Cards expose `data-test="predefined-themes-card-{mode}-{slug}"` (added in
-     * PredefinedThemes.vue) so we no longer depend on text-based filters.
+     * The PredefinedThemes.vue redesign merged each predefined theme's card and
+     * Apply control into a single clickable `<button class="theme-row">` whose
+     * data-test is `predefined-themes-apply-btn-{mode}-{slug}` — there is no
+     * separate `predefined-themes-card-*` element for predefined themes anymore
+     * (only the Custom Color row keeps a `-card-` slug; see getCustomColorCard).
+     * So the row button IS the card.
      */
     getThemeCard(themeName, mode = 'light') {
         const slug = themeName.toLowerCase().replace(/\s+/g, '-');
-        return this.page.locator(`[data-test="predefined-themes-card-${mode}-${slug}"]`);
+        return this.page.locator(`[data-test="predefined-themes-apply-btn-${mode}-${slug}"]`);
     }
 
     getApplyButton(themeName, mode = 'light') {
@@ -79,9 +86,14 @@ export class ThemePage {
         return this.page.locator(`[data-test="predefined-themes-card-${mode}-custom-color"]`);
     }
 
-    /** Apply button on the custom-color card for the given mode. */
-    getCustomColorApplyButton(mode = 'light') {
-        return this.page.locator(`[data-test="predefined-themes-apply-btn-${mode}-custom-color"]`);
+    /**
+     * The custom-color row no longer carries its own Apply button — clicking the
+     * card opens the "Pick Custom Color" dialog, and the dialog's primary "Apply"
+     * button is what applies the color. Expose that dialog button here so callers
+     * have a single source of truth for "apply the custom color".
+     */
+    getCustomColorApplyButton() {
+        return this.colorPickerApply;
     }
 
     // ==================== Navigation ====================
@@ -155,14 +167,18 @@ export class ThemePage {
 
     async selectLightModeTab() {
         await this.lightModeTab.click();
-        // Wait for tab to become active
-        await expect(this.lightModeTab).toHaveAttribute('data-state', 'active', { timeout: 3000 });
+        // Wait for tab to become active. These tabs are an OToggleGroup (Reka UI),
+        // whose selected item exposes aria-pressed="true" / data-state="on" — not
+        // data-state="active" (that's Reka Tabs, a different primitive).
+        await expect(this.lightModeTab).toHaveAttribute('aria-pressed', 'true', { timeout: 3000 });
     }
 
     async selectDarkModeTab() {
         await this.darkModeTab.click();
-        // Wait for tab to become active
-        await expect(this.darkModeTab).toHaveAttribute('data-state', 'active', { timeout: 3000 });
+        // Wait for tab to become active. These tabs are an OToggleGroup (Reka UI),
+        // whose selected item exposes aria-pressed="true" / data-state="on" — not
+        // data-state="active" (that's Reka Tabs, a different primitive).
+        await expect(this.darkModeTab).toHaveAttribute('aria-pressed', 'true', { timeout: 3000 });
     }
 
     /**
@@ -236,10 +252,17 @@ export class ThemePage {
             await this.selectDarkModeTab();
         }
 
-        // Apply the custom-color theme via its dedicated apply button
-        const applyBtn = this.getCustomColorApplyButton(mode);
-        await expect(applyBtn).toBeVisible({ timeout: 5000 });
-        await applyBtn.click();
+        // The custom-color row no longer applies directly — clicking it opens the
+        // "Pick Custom Color" dialog, whose primary "Apply" button applies the
+        // color and shows a success toast.
+        const card = this.getCustomColorCard(mode);
+        await expect(card).toBeVisible({ timeout: 5000 });
+        await card.click();
+
+        await expect(this.colorPickerDialog).toBeVisible({ timeout: 10000 });
+
+        await expect(this.colorPickerApply).toBeVisible({ timeout: 5000 });
+        await this.colorPickerApply.click();
 
         // Wait for success toast confirming the custom color was applied
         await expect(this.successToast.first()).toBeVisible({ timeout: 5000 });

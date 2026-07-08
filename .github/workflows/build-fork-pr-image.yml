@@ -70,7 +70,7 @@ jobs:
           version: "21.12"
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Install frontend dependencies
         run: cd web && npm ci
@@ -79,6 +79,8 @@ jobs:
         run: cd web && npm run lint:ci
 
       - name: Build frontend code
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
         run: cd web && npm run build
 
       - name: Print rustc cfg

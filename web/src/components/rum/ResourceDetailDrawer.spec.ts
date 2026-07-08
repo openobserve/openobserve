@@ -259,7 +259,11 @@ describe("ResourceDetailDrawer", () => {
     it("displays session ID field when resource has a session id", () => {
       // Arrange & Assert
       expect(wrapper.text()).toContain("Session ID:");
-      expect(wrapper.find("code.session-id-text").exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="resource-detail-drawer-session-id-text"]')
+          .exists(),
+      ).toBe(true);
     });
 
     it("displays Page URL field when resource has a view url", () => {

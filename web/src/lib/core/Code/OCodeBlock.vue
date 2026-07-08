@@ -96,6 +96,7 @@ const onCopy = () => {
   <div
     class="o2-code-block"
     :class="[isDark ? 'o2-dark' : 'o2-light', chrome ? `o2-chrome-${chrome}` : '']"
+    :data-test="dataTest"
   >
     <div class="o2-code-toolbar">
       <span v-if="chrome === 'terminal'" class="o2-code-head">
@@ -107,7 +108,7 @@ const onCopy = () => {
         <span class="o2-code-file">{{ filename || lang || "text" }}</span>
       </span>
       <span v-else class="o2-code-lang">{{ lang || "text" }}</span>
-      <div class="tw:flex tw:items-center tw:gap-1">
+      <div class="flex items-center gap-1">
         <OButton
           v-if="codeMasked"
           :data-test="`${dataTest}-reveal-btn`"

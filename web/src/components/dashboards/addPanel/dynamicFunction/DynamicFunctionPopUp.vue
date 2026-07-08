@@ -3,29 +3,29 @@
     data-test="dynamic-function-popup-root"
     :class="
       !customQuery && !fields.isDerived
-        ? 'tw:flex tw:gap-2'
-        : 'tw:flex tw:flex-col tw:gap-y-2'
+        ? 'flex gap-2'
+        : 'flex flex-col gap-y-2'
     "
   >
     <div style="width: auto; flex-shrink: 0;">
-      <div class="text-label-bold tw:pb-3" data-test="dynamic-function-popup-property-label">Property</div>
+      <div class="font-semibold text-[13px] pb-3" data-test="dynamic-function-popup-property-label">Property</div>
       <div style="display: flex; flex-direction: column; gap: 14px">
         <div>
-          <div class="text-label-normal tw:text-sm" data-test="dynamic-function-popup-label-text">Label</div>
+          <div class="text-[13px] font-normal leading-[70%] pb-0.75" data-test="dynamic-function-popup-label-text">Label</div>
           <OInput
             v-model="fields.label"
             size="sm"
-            class="tw:w-full"
+            class="w-full"
             data-test="dynamic-function-popup-label-input"
           />
         </div>
         <div>
-          <div class="text-label-normal tw:text-sm">Alias</div>
+          <div class="text-[13px] font-normal leading-[70%] pb-0.75">Alias</div>
           <OInput
             v-model="fields.alias"
             size="sm"
             disabled
-            class="tw:w-full"
+            class="w-full"
             data-test="dynamic-function-popup-alias-input"
           />
         </div>
@@ -53,11 +53,13 @@
         <OTab
           name="build"
           label="Build"
+          class="flex-1"
           data-test="dynamic-function-popup-tab-build"
         />
         <OTab
           name="raw"
           label="Raw"
+          class="flex-1"
           data-test="dynamic-function-popup-tab-raw"
         />
       </OTabs>
@@ -70,8 +72,8 @@
         animated
       >
         <OTabPanel name="build">
-          <div class="tw:pt-2" style="max-height: 26.25rem; overflow: auto;">
-            <div class="text-label-bold tw:pb-3">Configuration</div>
+          <div class="pt-2" style="max-height: 26.25rem; overflow: auto;">
+            <div class="font-semibold text-[13px] pb-3">Configuration</div>
             <SelectFunction
               v-model="fields"
               data-test="dynamic-function-popup-select-function"
@@ -80,7 +82,7 @@
           </div>
         </OTabPanel>
         <OTabPanel name="raw">
-          <div class="tw:pt-2">
+          <div class="pt-2">
             <div style="display: flex; width: 100%">
               <div style="width: 100%; padding-right: 0.75rem">
                 <RawQueryBuilder
@@ -94,11 +96,11 @@
       </OTabPanels>
 
       <div
-        class="tw:pt-2 tw:pr-3"
+        class="pt-2 pr-3"
         v-if="!customQuery && !fields.isDerived && allowAggregation"
       >
-        <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-          <span class="tw:font-bold">Having</span>
+        <div class="flex items-center gap-2 mb-2">
+          <span class="font-bold">Having</span>
 
           <OButton
             variant="outline"
@@ -113,19 +115,19 @@
         </div>
 
         <div
-          class="tw:flex tw:space-x-2 tw:items-center"
+          class="flex space-x-2 items-center"
           v-if="isHavingFilterVisible()"
         >
           <OSelect
             v-model="getHavingCondition().operator"
             :options="havingOperators"
-            class="tw:w-[60px]"
+            class="w-[60px]"
             data-test="dynamic-function-popup-having-operator"
           />
 
           <OInput
             v-model.number="getHavingCondition().value"
-            class="tw:w-1/2"
+            class="w-1/2"
             type="number"
             placeholder="Value"
             data-test="dynamic-function-popup-having-value"
@@ -141,7 +143,7 @@
           </OButton>
         </div>
       </div>
-      <div v-if="chartType === 'table'" class="tw:mt-2 tw:mb-2">
+      <div v-if="chartType === 'table'" class="mt-2 mb-2">
         <div>
           <OCheckbox
             v-model="fields.treatAsNonTimestamp"
@@ -149,7 +151,7 @@
             data-test="dynamic-function-popup-treat-as-non-timestamp"
           />
         </div>
-        <div class="tw:mt-1">
+        <div class="mt-1">
           <OCheckbox
             v-model="fields.showFieldAsJson"
             label="Render Data as JSON / Array"
@@ -299,50 +301,3 @@ export default {
   },
 };
 </script>
-<style scoped>
-.tab-item {
-  flex: 0 1 auto !important;
-  padding: 10px 16px !important;
-}
-
-:deep(.o-tab) {
-  flex: 1;
-}
-
-.text-label-bold {
-  font-family: var(--font-sans);
-  font-size: 13px;
-  font-style: normal;
-  font-weight: 600;
-}
-
-.text-label-normal {
-  font-family: var(--font-sans);
-  font-size: 13px;
-  font-style: normal;
-  font-weight: 400;
-  line-height: 70%;
-  padding-bottom: 3px;
-}
-
-.edit-input {
-  flex: 1;
-  border: 1px solid #e0e0e0;
-  line-height: 0px;
-  border-radius: 4px;
-  padding: 2px;
-  outline: none;
-  min-width: 0;
-  width: 100%;
-
-  &:focus {
-    border-color: var(--q-primary);
-  }
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-    background-color: var(--o2-primary-background);
-  }
-}
-</style>

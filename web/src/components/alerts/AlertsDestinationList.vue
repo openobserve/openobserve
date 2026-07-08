@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
+  <div class="rounded-md flex flex-col h-full p-0">
 
-    <div v-if="!showDestinationEditor && !showImportDestination" class="tw:flex tw:flex-col tw:h-full">
+    <div v-if="!showDestinationEditor && !showImportDestination" class="flex flex-col h-full">
       <AppPageHeader
         :title="t('alert_destinations.header')"
         icon="location-on"
         subtitle="Where triggered alerts are delivered"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="shrink-0 px-4 border-b border-border-default"
       >
         <template #title>
           <span data-test="alert-destinations-list-title">{{
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t(`alert_destinations.add`) }}</OButton>
         </template>
       </AppPageHeader>
-      <div class="card-container tw:flex-1 tw:min-h-0">
+      <div class="card-container flex-1 min-h-0">
         <OTable
           data-test="alert-destinations-list-table"
           :data="visibleRows"
@@ -88,13 +88,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSearchInput
               v-model="filterQuery"
               data-test="destination-list-search-input"
-              class="tw:flex-1"
+              class="flex-1"
               :placeholder="t('alert_destinations.search')"
             />
           </template>
 
           <template #bottom="{ totalRows }">
-            <span class="o2-table-footer-title tw:text-primary">
+            <span class="o2-table-footer-title text-primary">
               {{ totalRows.toLocaleString() }} {{ t('alert_destinations.header') }}
             </span>
             <OButton
@@ -116,39 +116,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="hero"
               preset="no-alert-destinations"
               :filtered="!!filterQuery"
-              :hide-action="!filterQuery"
-              @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+              :actions="[
+                { id: 'create', icon: 'add', titleKey: 'emptyState.noAlertDestinations.action', descriptionKey: 'emptyState.noAlertDestinations.actionDesc' },
+                { id: 'import', icon: 'upload-file', titleKey: 'emptyState.noAlertDestinations.import', descriptionKey: 'emptyState.noAlertDestinations.importDesc' },
+              ]"
+              @action="(id) => id === 'clear-filters' ? (filterQuery = '') : id === 'import' ? importDestination() : (templates.length && editDestination(null))"
             />
           </template>
 
           <template #cell-template="{ row }">
             <div
               v-if="row.template"
-              class="tw:flex tw:items-center tw:gap-2 tw:min-w-0"
+              class="flex items-center gap-2 min-w-0"
               :data-test="`destination-template-${row.name}`"
             >
               <span
-                class="tw:truncate tw:min-w-0"
+                class="truncate min-w-0"
                 :title="row.template"
               >{{ row.template }}</span>
-              <OBadge
+              <OTag
                 v-if="isDefaultPrebuiltTemplate(row)"
                 :data-test="`destination-template-default-badge-${row.name}`"
-                variant="default"
-                class="tw:text-xs tw:flex-shrink-0"
-              >{{ t('alert_destinations.templateDefaultBadge') }}</OBadge>
+                type="templateDefaultFlag"
+                value="default"
+                class="flex-shrink-0"
+              />
             </div>
-            <span v-else class="tw:text-gray-400">—</span>
+            <span v-else class="text-text-primary">—</span>
           </template>
 
           <template #cell-type="{ row }">
-            <div class="tw:flex tw:items-center tw:gap-2">
+            <div class="flex items-center gap-2">
               <template v-if="getPrebuiltTypeName(row)">
-                <OBadge
+                <OTag
                   :data-test="`destination-type-badge-${getPrebuiltTypeName(row)?.toLowerCase()}`"
-                  variant="primary"
-                  class="tw:text-xs"
-                >{{ getPrebuiltTypeName(row) }}</OBadge>
+                  type="destinationKind"
+                  value="prebuilt"
+                >{{ getPrebuiltTypeName(row) }}</OTag>
                 <OIcon
                   name="auto-awesome"
                   size="sm"
@@ -156,11 +160,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template v-else>
-                <OBadge
+                <OTag
                   data-test="destination-type-badge-custom"
-                  variant="default"
-                  class="tw:text-xs"
-                >{{ getCustomDestinationLabel(row) }}</OBadge>
+                  type="destinationKind"
+                  value="custom"
+                >{{ getCustomDestinationLabel(row) }}</OTag>
                 <OIcon
                   name="settings"
                   size="sm"
@@ -171,9 +175,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-actions="{ row }">
-            <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
+            <div class="flex items-center gap-1 justify-center">
               <OButton
                 data-test="destination-export"
+                data-row-action="export"
                 variant="ghost"
                 size="icon-sm"
                 title="Export Destination"
@@ -183,6 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 :data-test="`alert-destination-list-${row.name}-update-destination`"
+                data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('alert_destinations.edit')"
@@ -192,6 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 :data-test="`alert-destination-list-${row.name}-delete-destination`"
+                data-row-action="delete"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('alert_destinations.delete')"
@@ -270,13 +277,15 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
-import OBadge from '@/lib/core/Badge/OBadge.vue';
+import OTag from '@/lib/core/Badge/OTag.vue';
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 interface ConformDelete {
@@ -294,7 +303,7 @@ export default defineComponent({
     OButton,
     OSearchInput,
     OCheckbox,
-    OBadge,
+    OTag,
     OTable,
     OToggleGroup,
     OToggleGroupItem,
@@ -759,10 +768,29 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
+
     watch(visibleRows, (newVisibleRows) => {
       resultTotal.value = newVisibleRows.length;
     }, { immediate: true });
 
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "alertDestinationsAdd",
+        handler: () => { if (!isInputFocused()) editDestination(null); },
+      },
+      {
+        id: "alertDestinationsRefresh",
+        handler: () => { if (!isInputFocused()) getDestinations(); },
+      },
+      {
+        id: "alertDestinationsFocusSearch",
+        handler: () => {
+          focusSearchInput("destination-list-search-input");
+        },
+      },
+    ]);
     return {
       t,
       showDestinationEditor,

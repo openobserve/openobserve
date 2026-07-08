@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="backfill-jobs-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
+    class="flex flex-col h-full min-h-0"
   >
     <!-- Filters live in the shell header (Functions.vue #o2-page-actions),
          next to the "Pipelines › Backfill Jobs" breadcrumb.
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         placeholder="Status"
         clearable
         searchable
-        class="tw:w-[150px]"
+        class="w-[150px]"
         data-test="status-filter"
       />
       <OSelect
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         placeholder="Pipeline"
         clearable
         searchable
-        class="tw:w-[250px]"
+        class="w-[250px]"
         data-test="pipeline-filter"
       />
       <OButton
@@ -67,8 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </Teleport>
 
     <!-- Jobs Table -->
-    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+    <div class="flex-1 min-h-0 overflow-hidden">
+      <div class="rounded-lg h-full">
           <OTable
             ref="qTableRef"
             :frame="false"
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filter-mode="client"
             :show-global-filter="false"
             width="100%"
-            class="tw:w-full tw:h-full"
+            class="w-full h-full"
             data-test="backfill-jobs-table"
           >
             <!-- Empty State -->
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Bottom footer -->
             <template #bottom="{ totalRows }">
               <div
-                class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4 tw:py-2"
+                class="flex items-center font-bold text-[14px] mr-4 py-2"
               >
                 {{ totalRows }} Backfill Job{{ totalRows === 1 ? "" : "s" }}
               </div>
@@ -109,14 +109,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Pipeline Name Column -->
             <template #cell-pipeline_name="{ row }">
-              <div class="tw:font-medium">
+              <div class="font-medium">
                 {{ row.pipeline_name || row.pipeline_id }}
               </div>
             </template>
 
             <!-- Time Range Column -->
             <template #cell-time_range="{ row }">
-              <div class="tw:text-xs">
+              <div class="text-xs">
                 {{
                   formatTimeRange(row.start_time, row.end_time)
                 }}
@@ -125,8 +125,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Progress Column -->
             <template #cell-progress_percent="{ row }">
-              <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
-                <div class="tw:flex-1 tw:relative">
+              <div class="flex items-center gap-2 w-full">
+                <div class="flex-1 relative">
                   <OProgressBar
                     :value="row.progress_percent / 100"
                     variant="default"
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="row.chunks_total"
-                  class="tw:text-xs tw:text-gray-400 tw:whitespace-nowrap tw:pr-8"
+                  class="text-xs text-text-primary whitespace-nowrap pr-8"
                 >
                   {{ row.chunks_completed || 0 }}/{{
                     row.chunks_total
@@ -150,21 +150,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Created At Column -->
             <template #cell-created_at="{ row }">
-              <div class="tw:text-xs">
-                {{ formatTimestamp(row.created_at) }}
-              </div>
+              <OTimeCell
+                :value="row.created_at"
+                unit="us"
+                :timezone="store.state.timezone"
+                empty-label="N/A"
+              />
             </template>
 
             <!-- Last Triggered At Column -->
             <template #cell-last_triggered_at="{ row }">
-              <div class="tw:text-xs">
-                {{ formatTimestamp(row.last_triggered_at) }}
-              </div>
+              <OTimeCell
+                :value="row.last_triggered_at"
+                unit="us"
+                mode="absolute"
+                :timezone="store.state.timezone"
+                empty-label="Never"
+              />
             </template>
 
             <!-- Actions Column -->
             <template #cell-actions="{ row }">
-              <div class="tw:flex tw:items-center tw:justify-center">
+              <div class="flex items-center justify-center">
                 <OButton
                   v-if="canPauseJob(row)"
                   variant="ghost-destructive"
@@ -177,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
                 <OButton
                   v-if="canResumeJob(row)"
-                  variant="ghost"
+                  variant="ghost-success"
                   size="icon-sm"
                   @click="confirmResumeJob(row)"
                   data-test="resume-job-btn"
@@ -259,23 +266,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <div v-if="errorDialogData">
-        <div class="tw:mb-3">
-          <div class="tw:text-xs tw:text-gray-400">Job ID</div>
-          <div class="tw:text-sm text-weight-medium">
+        <div class="mb-3">
+          <div class="text-xs text-gray-400">Job ID</div>
+          <div class="text-sm text-weight-medium">
             {{ errorDialogData.job_id }}
           </div>
         </div>
 
-        <div class="tw:mb-3">
-          <div class="tw:text-xs tw:text-gray-400">Pipeline</div>
-          <div class="tw:text-sm">
+        <div class="mb-3">
+          <div class="text-xs text-gray-400">Pipeline</div>
+          <div class="text-sm">
             {{ errorDialogData.pipeline_name || errorDialogData.pipeline_id }}
           </div>
         </div>
 
         <div>
-          <div class="tw:text-xs tw:text-gray-400 tw:mb-2">Error Message</div>
-          <div class="error-message-box">
+          <div class="text-xs text-gray-400 mb-2">Error Message</div>
+          <div class="p-3 rounded-md bg-[rgba(239,68,68,0.08)] border-l-[3px] border-l-[#ef4444] font-mono text-[13px] leading-[1.6] whitespace-pre-wrap wrap-break-word text-[#991b1b]">
             {{ errorDialogData.error }}
           </div>
         </div>
@@ -305,6 +312,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import BackfillJobDetails from "./BackfillJobDetails.vue";
@@ -350,9 +358,9 @@ const perPageOptionsList = [10, 20, 50, 100];
 const columns: OTableColumnDef[] = [
   { id: "pipeline_name", header: "Pipeline", accessorKey: "pipeline_name", sortable: true, size: COL.streamName, meta: { align: "left", autoWidth: true } },
   { id: "time_range", header: "Time Range", accessorKey: "start_time", sortable: true, size: COL.date, meta: { align: "left" } },
-  { id: "progress_percent", header: "Progress", accessorKey: "progress_percent", sortable: true, size: COL.description, meta: { align: "left" } },
+  { id: "progress_percent", header: "Progress", accessorKey: "progress_percent", sortable: true, size: 400, meta: { align: "left" } },
   { id: "created_at", header: "Created", accessorKey: "created_at", sortable: true, size: COL.createdAt, meta: { align: "left" } },
-  { id: "last_triggered_at", header: "Last Triggered", accessorKey: "last_triggered_at", sortable: true, size: COL.createdAt, meta: { align: "left" } },
+  { id: "last_triggered_at", header: "Last Triggered", accessorKey: "last_triggered_at", sortable: true, size: COL.dateAbsolute, meta: { align: "left" } },
   { id: "actions", header: "Actions", accessorKey: "actions", meta: { align: "center", actionCount: 4 }, isAction: true, size: 128 },
 ];
 
@@ -651,28 +659,3 @@ const formatTimestamp = (timestamp?: number) => {
 };
 </script>
 
-<style scoped lang="scss">
-.card-container {
-  border-radius: 8px;
-}
-
-.backfill-error-slot {
-  display: inline-block;
-  width: 32px;
-  height: 32px;
-  vertical-align: middle;
-}
-
-.error-message-box {
-  padding: 12px;
-  border-radius: 6px;
-  background: rgba(239, 68, 68, 0.08);
-  border-left: 3px solid #ef4444;
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
-  color: #991b1b;
-}
-</style>

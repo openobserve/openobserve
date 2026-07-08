@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="table-wrapper" data-test="dashboard-table-renderer-wrapper">
+  <div class="table-wrapper h-full w-full relative" data-test="dashboard-table-renderer-wrapper">
     <TenstackTable
       ref="tableRef"
       :rows="sortedRows"
@@ -46,8 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #bottom="scope">
         <slot name="bottom" v-bind="scope">
           <!-- Default: dashboard pagination controls -->
-          <div class="tw:flex tw:items-center tw:w-full tw:pr-2" data-test="dashboard-table-pagination">
-            <div class="tw:flex-1" />
+          <div class="flex items-center w-full pr-2" data-test="dashboard-table-pagination">
+            <div class="flex-1" />
             <TablePaginationControls
               :show-pagination="showPagination"
               :pagination="scope.pagination"
@@ -317,93 +317,82 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.table-wrapper {
-  height: 100%;
-  width: 100%;
-  position: relative;
-}
-
-// Remove border-radius from the shared .container class (logs uses rounded corners)
-:deep(.container) {
+<style>
+/* Remove border-radius from the shared .container class (logs uses rounded corners) */
+.table-wrapper .container {
   border-radius: 0;
 }
 
-// Dashboard table cells should not use the monospace font from tenstack-table.scss
-// (that scss is shared with logs, which intentionally uses monospace for log data)
-:deep(td) {
+/* Dashboard table cells should not use the monospace font from tenstack-table.scss */
+.table-wrapper td {
   font-family: var(--font-sans);
 }
 
-// Pivot table styles
-:deep(.pivot-total-row) {
+/* Pivot table styles */
+.table-wrapper .pivot-total-row {
   font-weight: bold;
   background-color: rgba(0, 0, 0, 0.03);
 }
 
-.body--dark :deep(.pivot-total-row) {
+.body--dark .table-wrapper .pivot-total-row {
   background-color: rgba(255, 255, 255, 0.05);
 }
 
-:deep(.pivot-group-header) {
+.table-wrapper .pivot-group-header {
   font-weight: 600;
   border-bottom: 2px solid rgba(0, 0, 0, 0.12);
 }
 
-.body--dark :deep(.pivot-group-header) {
+.body--dark .table-wrapper .pivot-group-header {
   border-bottom-color: rgba(255, 255, 255, 0.12);
 }
 
-:deep(.pivot-section-border) {
+.table-wrapper .pivot-section-border {
   border-left: 2px solid rgba(0, 0, 0, 0.12) !important;
 }
 
-.body--dark :deep(.pivot-section-border) {
+.body--dark .table-wrapper .pivot-section-border {
   border-left-color: rgba(255, 255, 255, 0.12) !important;
 }
 
-:deep(.pivot-value-header) {
+.table-wrapper .pivot-value-header {
   font-weight: 500;
   font-size: 0.85em;
 }
 
-// Sticky total row (bottom-row slot)
-:deep(.pivot-sticky-total-row) {
+/* Sticky total row */
+.table-wrapper .pivot-sticky-total-row {
   font-weight: bold;
-
-  td {
-    border-top: 2px solid rgba(0, 0, 0, 0.12);
-  }
 }
 
-// Pivot header sort icons
-:deep(.pivot-sort-icon) {
+.table-wrapper .pivot-sticky-total-row td {
+  border-top: 2px solid rgba(0, 0, 0, 0.12);
+}
+
+/* Pivot header sort icons */
+.table-wrapper .pivot-sort-icon {
   opacity: 0;
   transition: opacity 0.2s;
 }
 
-:deep(th:hover .pivot-sort-icon) {
+.table-wrapper th:hover .pivot-sort-icon {
   opacity: 0.4;
 }
 
-:deep(.pivot-sort-active) {
+.table-wrapper .pivot-sort-active {
   opacity: 1 !important;
 }
 
-// Sticky total column visual separator — inset shadow on left edge
-:deep(.pivot-total-col) {
+/* Sticky total column visual separator */
+.table-wrapper .pivot-total-col {
   box-shadow: inset 4px 0 6px -2px rgba(0, 0, 0, 0.15) !important;
 }
 
-// Middle sticky: both left-sticky and right-sticky — outward right + inset left
-:deep(.sticky-column.pivot-total-col) {
+.table-wrapper .sticky-column.pivot-total-col {
   box-shadow: 4px 0 8px rgba(0, 0, 0, 0.15), inset 4px 0 6px -2px rgba(0, 0, 0, 0.15) !important;
 }
 
 @media print {
-  // .table-wrapper is the containing block (position:relative).
-  // It clips the expanded table at the panel height; the footer is
-  // pinned to its bottom edge via absolute positioning (see below).
   .table-wrapper {
     position: relative !important;
     height: 100% !important;
@@ -412,39 +401,31 @@ export default defineComponent({
   }
 
   .my-sticky-virtscroll-table {
-    // Expand to natural content height so all rows are rendered from the top.
     height: auto !important;
     overflow: visible !important;
-
-    // Remove sticky — no scroll container in print, sticky causes quirks.
-    :deep(thead tr th) {
-      position: static !important;
-      top: auto !important;
-    }
-
-    // Let the scroll container expand to show all rows.
-    :deep(.table-container) {
-      overflow: visible !important;
-      height: auto !important;
-    }
-
-    // Pin the footer to the bottom of .table-wrapper (the nearest
-    // position:relative ancestor) so it is always visible at the
-    // bottom of the panel, regardless of how many rows the table has.
-    :deep([data-test="dashboard-table-pagination"]) {
-      position: absolute !important;
-      bottom: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
-      background-color: #fff !important;
-      z-index: 1 !important;
-    }
   }
 
-  .body--dark .my-sticky-virtscroll-table {
-    :deep([data-test="dashboard-table-pagination"]) {
-      background-color: #1a1a2e !important;
-    }
+  .my-sticky-virtscroll-table thead tr th {
+    position: static !important;
+    top: auto !important;
+  }
+
+  .my-sticky-virtscroll-table .table-container {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  .my-sticky-virtscroll-table [data-test="dashboard-table-pagination"] {
+    position: absolute !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    background-color: #fff !important;
+    z-index: 1 !important;
+  }
+
+  .body--dark .my-sticky-virtscroll-table [data-test="dashboard-table-pagination"] {
+    background-color: #1a1a2e !important;
   }
 }
 </style>

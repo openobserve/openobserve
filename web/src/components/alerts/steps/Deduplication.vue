@@ -16,22 +16,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-deduplication"
+    class="step-deduplication w-full h-full overflow-auto mx-auto"
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-    <div class="step-content card-container">
-      <div class="section-header">
-        <div class="section-header-accent" />
-        <span class="section-header-title">{{
+    <div
+      class="step-content rounded-lg min-h-full bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)]"
+    >
+      <div
+        class="section-header flex items-center gap-0 py-2.5 px-3"
+        :class="
+          store.state.theme === 'dark'
+            ? 'border-b border-[#343434]'
+            : 'border-b border-[#eeeeee]'
+        "
+      >
+        <div class="section-header-accent w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-[var(--q-primary)]" />
+        <span
+          class="section-header-title text-[13px] font-semibold text-[var(--color-text-primary)]"
+        >{{
           t("alerts.steps.deduplication")
         }}</span>
       </div>
-      <div class="tw:px-3 tw:py-2">
+      <div class="px-3 py-2">
         <!-- Fingerprint Fields -->
-        <div class="tw:mb-4">
-          <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
+        <div class="mb-4">
+          <div class="font-semibold pb-2 flex items-center">
             {{ t("alerts.deduplication.fingerprintFields") }}
-            <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer">
+            <OIcon name="info" size="sm" class="ml-1 cursor-pointer">
               <OTooltip
                 :content="t('alerts.deduplication.fingerprintFieldsTooltip')"
                 side="right"
@@ -39,23 +50,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OIcon>
           </div>
           <div
-            class="tw:text-sm tw:mb-2"
+            class="text-sm mb-2"
             :class="
               store.state.theme === 'dark'
-                ? 'tw:text-gray-400'
-                : 'tw:text-gray-600'
+                ? 'text-gray-400'
+                : 'text-gray-600'
             "
           >
             {{ t("alerts.deduplication.fingerprintFieldsHint") }}
           </div>
-          <div class="tw:relative">
+          <div class="relative">
             <OSelect
               v-model="localDeduplication.fingerprint_fields"
               :options="props.columns || []"
               multiple
               creatable
               data-test="alert-dedup-fingerprint-fields"
-              class="tw:max-w-[600px] tw:min-w-[300px]"
+              class="max-w-[600px] min-w-[300px]"
               helpText="Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition fields)"
               @update:model-value="emitUpdate"
               @create="addFingerprintField"
@@ -69,10 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Time Window -->
-        <div class="tw:mb-4">
-          <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
+        <div class="mb-4">
+          <div class="font-semibold pb-2 flex items-center">
             {{ t("alerts.deduplication.timeWindow") }}
-            <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer">
+            <OIcon name="info" size="sm" class="ml-1 cursor-pointer">
               <OTooltip
                 :content="t('alerts.deduplication.timeWindowTooltip')"
                 side="right"
@@ -80,17 +91,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OIcon>
           </div>
           <div
-            class="tw:text-sm tw:mb-2"
+            class="text-sm mb-2"
             :class="
               store.state.theme === 'dark'
-                ? 'tw:text-gray-400'
-                : 'tw:text-gray-600'
+                ? 'text-gray-400'
+                : 'text-gray-600'
             "
           >
             {{ t("alerts.deduplication.timeWindowHint") }}
           </div>
-          <div class="tw:flex tw:items-center">
-            <div class="tw:w-[210px] tw:ml-0">
+          <div class="flex items-center">
+            <div class="w-[210px] ml-0">
               <OInput
                 v-model="localDeduplication.time_window_minutes"
                 type="number"
@@ -107,15 +118,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 height: 28px;
                 font-weight: normal;
               "
-              :class="store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'"
-              class="tw:flex tw:justify-center tw:items-center"
+              :class="store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'"
+              class="flex justify-center items-center"
             >
               {{ t("alerts.minutes") }}
             </div>
           </div>
         </div>
       </div>
-      <!-- end tw:px-3 tw:py-2 -->
+      <!-- end px-3 py-2 -->
     </div>
   </div>
 </template>
@@ -212,119 +223,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.step-deduplication {
-  width: 100%;
-  height: 100%;
-  margin: 0 auto;
-  overflow: auto;
-
-  .step-content {
-    border-radius: 8px;
-    min-height: 100%;
-  }
-
-  &.dark-mode {
-    .step-content {
-      background-color: #212121;
-      border: 1px solid #343434;
-    }
-    .section-header {
-      border-bottom: 1px solid #343434;
-    }
-    .section-header-title {
-      color: #e0e0e0;
-    }
-    .section-header-accent {
-      background: var(--q-primary);
-    }
-  }
-
-  &.light-mode {
-    .step-content {
-      background-color: #ffffff;
-      border: 1px solid #e6e6e6;
-    }
-    .section-header {
-      border-bottom: 1px solid #eeeeee;
-    }
-    .section-header-title {
-      color: #374151;
-    }
-    .section-header-accent {
-      background: var(--q-primary);
-    }
-  }
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  padding: 10px 12px;
-}
-.section-header-accent {
-  width: 3px;
-  height: 16px;
-  border-radius: 2px;
-  margin-right: 8px;
-  flex-shrink: 0;
-}
-.section-header-title {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-:deep(.fingerprint-select) {
-  .q-field__control {
-    min-height: 40px;
-    display: flex;
-    align-items: center;
-  }
-
-  .q-field__control-container {
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-    padding-right: 36px; // Reserve space for dropdown arrow
-    display: flex;
-    align-items: center;
-  }
-
-  .q-field__native {
-    min-height: 32px;
-    gap: 4px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    display: flex !important;
-    flex-wrap: nowrap !important;
-    align-items: center !important; // Center align chips vertically
-    padding-top: 6px !important;
-    padding-bottom: 6px !important;
-
-    // Hide scrollbar but keep scrolling functionality
-    scrollbar-width: none; // Firefox
-    -ms-overflow-style: none; // IE/Edge
-
-    &::-webkit-scrollbar {
-      display: none; // Chrome/Safari/Opera
-    }
-  }
-
-  // Ensure the input field stays visible and accessible
-  input {
-    min-width: 100px !important;
-    flex-shrink: 0 !important;
-  }
-
-  // Ensure dropdown icon is always visible
-  .q-field__append {
-    padding-left: 8px;
-  }
-}
-
-// NOTE: Dark/light fingerprint chip styling moved to OBadge variants since the
-// `q-chip` element no longer renders post-Quasar removal. If chip-specific
-// visual tweaks are needed, use `<OBadge variant="default">` and rely on its
-// built-in light/dark token-driven background.
-</style>

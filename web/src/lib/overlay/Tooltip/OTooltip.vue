@@ -9,6 +9,7 @@ import {
   TooltipArrow,
 } from "reka-ui";
 import { ref, computed, onMounted, onUnmounted, useSlots } from "vue";
+import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 
 const props = withDefaults(defineProps<TooltipProps>(), {
   side: "top",
@@ -27,11 +28,15 @@ const hasDefaultSlot = computed(() => !!slots.default);
 
 // ΓöÇΓöÇΓöÇ Child mode (placed inside a parent like q-tooltip) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 // When no default slot is provided, OTooltip acts like q-tooltip: it finds its
-// parent element via a tw:hidden DOM anchor span and attaches hover listeners to it.
+// parent element via a hidden DOM anchor span and attaches hover listeners to it.
 const childAnchorRef = ref<HTMLSpanElement | null>(null);
 const parentEl = ref<Element | null>(null);
 const childOpen = ref(false);
 let cleanupFn: (() => void) | null = null;
+// Pending open timer for the hover delay (child mode). Wrapper mode gets its
+// delay for free from reka's `delay-duration`; child mode wires its own hover
+// listeners, so it has to honour `props.delay` here too.
+let childShowTimer: ReturnType<typeof setTimeout> | null = null;
 
 onMounted(() => {
   if (!hasDefaultSlot.value && childAnchorRef.value) {
@@ -54,8 +59,27 @@ onMounted(() => {
     }
     parentEl.value = candidate;
     if (parentEl.value) {
-      const show = () => { if (!props.disabled) childOpen.value = true; };
-      const hide = () => { childOpen.value = false; };
+      // Open after `props.delay` ms of hover (matching wrapper mode); leaving
+      // before then cancels the pending open so a quick pass-over shows nothing.
+      const show = () => {
+        if (props.disabled) return;
+        if (childShowTimer) clearTimeout(childShowTimer);
+        if (props.delay > 0) {
+          childShowTimer = setTimeout(() => {
+            childOpen.value = true;
+            childShowTimer = null;
+          }, props.delay);
+        } else {
+          childOpen.value = true;
+        }
+      };
+      const hide = () => {
+        if (childShowTimer) {
+          clearTimeout(childShowTimer);
+          childShowTimer = null;
+        }
+        childOpen.value = false;
+      };
       parentEl.value.addEventListener("mouseenter", show);
       parentEl.value.addEventListener("mouseleave", hide);
       cleanupFn = () => {
@@ -66,7 +90,10 @@ onMounted(() => {
   }
 });
 
-onUnmounted(() => cleanupFn?.());
+onUnmounted(() => {
+  if (childShowTimer) clearTimeout(childShowTimer);
+  cleanupFn?.();
+});
 
 const effectiveSideOffset = computed(() => props.sideOffset);
 
@@ -83,16 +110,16 @@ const contentStyle = computed(() => ({
 }));
 
 const contentClasses = computed(() => [
-  "tw:z-[10100] tw:px-2.5 tw:py-1.5",
-  "tw:bg-[var(--color-surface-overlay)] tw:rounded-md",
-  "tw:text-xs tw:text-[var(--color-text-primary)] tw:font-medium tw:leading-relaxed",
-  "tw:data-[state=delayed-open]:animate-in tw:data-[state=delayed-open]:fade-in-0 tw:data-[state=delayed-open]:zoom-in-95",
-  "tw:data-[state=instant-open]:animate-in tw:data-[state=instant-open]:fade-in-0",
-  "tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:zoom-out-95",
-  "tw:data-[side=top]:slide-in-from-bottom-1",
-  "tw:data-[side=bottom]:slide-in-from-top-1",
-  "tw:data-[side=left]:slide-in-from-right-1",
-  "tw:data-[side=right]:slide-in-from-left-1",
+  "z-[10100] px-2.5 py-1.5",
+  "bg-[var(--color-surface-overlay)] rounded-md",
+  "text-xs text-[var(--color-text-primary)] font-medium leading-relaxed",
+  "data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95",
+  "data-[state=instant-open]:animate-in data-[state=instant-open]:fade-in-0",
+  "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+  "data-[side=top]:slide-in-from-bottom-1",
+  "data-[side=bottom]:slide-in-from-top-1",
+  "data-[side=left]:slide-in-from-right-1",
+  "data-[side=right]:slide-in-from-left-1",
   props.contentClass,
 ]);
 </script>
@@ -118,11 +145,18 @@ const contentClasses = computed(() => [
           :style="contentStyle"
           :class="contentClasses"
         >
-          <slot name="content">{{ content }}</slot>
+          <span class="inline-flex items-center gap-1.5">
+            <slot name="content">{{ content }}</slot>
+            <OShortcut
+              v-if="shortcut || shortcutId"
+              :keys="shortcut"
+              :id="shortcutId"
+            />
+          </span>
           <TooltipArrow
             :width="10"
             :height="5"
-            :class="'tw:fill-[var(--color-surface-overlay)]'"
+            :class="'fill-[var(--color-surface-overlay)]'"
           />
         </TooltipContent>
       </TooltipPortal>
@@ -154,11 +188,18 @@ const contentClasses = computed(() => [
             :style="contentStyle"
             :class="contentClasses"
           >
-            <slot name="content">{{ content }}</slot>
+            <span class="inline-flex items-center gap-1.5">
+              <slot name="content">{{ content }}</slot>
+              <OShortcut
+              v-if="shortcut || shortcutId"
+              :keys="shortcut"
+              :id="shortcutId"
+            />
+            </span>
             <TooltipArrow
               :width="10"
               :height="5"
-              :class="'tw:fill-[var(--color-surface-overlay)]'"
+              :class="'fill-[var(--color-surface-overlay)]'"
             />
           </TooltipContent>
         </TooltipPortal>

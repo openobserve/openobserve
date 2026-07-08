@@ -14,51 +14,51 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
 <template>
-  <div class="llm-eval-settings">
+  <div class="flex flex-col h-full">
     <!-- Loading skeleton -->
     <div
       v-if="loading"
       data-test="stream-llm-eval-loading"
-      class="llm-eval-settings__loading"
+      class="flex justify-center items-center p-8"
     >
       <OSpinner size="md" />
     </div>
 
     <template v-else>
       <div
-        class="llm-eval-settings__card"
+        class="flex-1 overflow-y-auto rounded-lg border border-solid py-2 m-4"
         :class="
           store.state.theme === 'dark'
-            ? 'llm-eval-settings__card--dark'
-            : 'llm-eval-settings__card--light'
+            ? 'border-[#374151] bg-(--o2-primary-background)'
+            : 'border-[#e5e7eb] bg-white'
         "
       >
         <!-- Enable toggle row -->
         <div
-          class="llm-eval-settings__row llm-eval-settings__row--bordered"
+          class="flex items-center justify-between px-4 py-2 text-[0.8125rem] border-b border-b-solid"
           :class="
             store.state.theme === 'dark'
-              ? 'llm-eval-settings__row--bordered-dark'
-              : 'llm-eval-settings__row--bordered-light'
+              ? 'border-b-[#4b5563]'
+              : 'border-b-[#e5e7eb]'
           "
         >
-          <div class="llm-eval-settings__row-content">
+          <div class="flex flex-col gap-0.5 flex-1 pr-4">
             <span
-              class="llm-eval-settings__label"
+              class="text-[0.8125rem] font-semibold"
               :class="
                 store.state.theme === 'dark'
-                  ? 'llm-eval-settings__label--dark'
-                  : 'llm-eval-settings__label--light'
+                  ? 'text-[#e5e7eb]'
+                  : 'text-[#374151]'
               "
             >
               {{ t("pipeline.llmEvaluation") }}
             </span>
             <small
-              class="llm-eval-settings__hint"
+              class="block text-xs italic mt-1"
               :class="
                 store.state.theme === 'dark'
-                  ? 'llm-eval-settings__hint--dark'
-                  : 'llm-eval-settings__hint--light'
+                  ? 'text-[#9ca3af]'
+                  : 'text-[#6b7280]'
               "
             >
               {{ t("pipeline.llmEvaluationEnableHelp") }}
@@ -74,13 +74,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
         <!-- Config fields — visible when enabled -->
         <template v-if="enabled">
           <!-- LLM Span Identifier -->
-          <div class="setting-group llm-eval-settings__field">
+          <div class="pt-3 px-4 pb-1">
             <label
-              class="llm-eval-settings__field-label"
+              class="block text-[0.8125rem] font-semibold mb-1"
               :class="
                 store.state.theme === 'dark'
-                  ? 'llm-eval-settings__label--dark'
-                  : 'llm-eval-settings__label--light'
+                  ? 'text-[#e5e7eb]'
+                  : 'text-[#374151]'
               "
             >
               {{ t("pipeline.llmSpanIdentifier") }}
@@ -91,16 +91,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               searchable
               labelKey="label"
               valueKey="value"
-              class="llm-eval-settings__input"
+              class="w-full"
               data-test="stream-llm-eval-span-identifier"
               @update:model-value="markDirty"
             />
             <small
-              class="llm-eval-settings__hint"
+              class="block text-xs italic mt-1"
               :class="
                 store.state.theme === 'dark'
-                  ? 'llm-eval-settings__hint--dark'
-                  : 'llm-eval-settings__hint--light'
+                  ? 'text-[#9ca3af]'
+                  : 'text-[#6b7280]'
               "
             >
               {{ t("pipeline.llmSpanIdentifierFieldHelp") }}
@@ -108,24 +108,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
           </div>
 
           <!-- Evaluation Template Selection -->
-          <div class="setting-group llm-eval-settings__field">
+          <div class="pt-3 px-4 pb-1">
             <label
-              class="llm-eval-settings__field-label"
+              class="block text-[0.8125rem] font-semibold mb-1"
               :class="
                 store.state.theme === 'dark'
-                  ? 'llm-eval-settings__label--dark'
-                  : 'llm-eval-settings__label--light'
+                  ? 'text-[#e5e7eb]'
+                  : 'text-[#374151]'
               "
             >
               {{ t("pipeline.evaluationTemplate") }}
             </label>
-            <div class="tw:flex tw:items-center tw:gap-2">
+            <div class="flex items-center gap-2">
               <OSelect
                 v-model="selectedTemplate"
                 :options="availableTemplates"
                 labelKey="name"
                 valueKey="id"
-                class="llm-eval-settings__input tw:flex-1"
+                class="w-full flex-1"
                 data-test="stream-llm-eval-template-select"
                 :loading="loadingTemplates"
                 @update:model-value="markDirty"
@@ -141,11 +141,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               />
             </div>
             <small
-              class="llm-eval-settings__hint"
+              class="block text-xs italic mt-1"
               :class="
                 store.state.theme === 'dark'
-                  ? 'llm-eval-settings__hint--dark'
-                  : 'llm-eval-settings__hint--light'
+                  ? 'text-[#9ca3af]'
+                  : 'text-[#6b7280]'
               "
             >
               {{ t("pipeline.evaluationTemplateHelp") }}
@@ -154,19 +154,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
           <!-- Sampling toggle row -->
           <div
-            class="llm-eval-settings__row llm-eval-settings__row--bordered"
+            class="flex items-center justify-between px-4 py-2 text-[0.8125rem] border-b border-b-solid"
             :class="
               store.state.theme === 'dark'
-                ? 'llm-eval-settings__row--bordered-dark'
-                : 'llm-eval-settings__row--bordered-light'
+                ? 'border-b-[#4b5563]'
+                : 'border-b-[#e5e7eb]'
             "
           >
             <span
-              class="llm-eval-settings__label"
+              class="text-[0.8125rem] font-semibold"
               :class="
                 store.state.theme === 'dark'
-                  ? 'llm-eval-settings__label--dark'
-                  : 'llm-eval-settings__label--light'
+                  ? 'text-[#e5e7eb]'
+                  : 'text-[#374151]'
               "
             >
               {{ t("pipeline.samplingLabel") }}
@@ -181,15 +181,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
           <!-- Sampling rate slider -->
           <div
             v-if="enableSampling"
-            class="setting-group llm-eval-settings__field"
+            class="pt-3 px-4 pb-1"
           >
-            <div class="llm-eval-settings__sampling-header">
+            <div class="mb-1">
               <span
-                class="llm-eval-settings__sampling-label"
+                class="text-xs"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'llm-eval-settings__label--dark'
-                    : 'llm-eval-settings__label--light'
+                    ? 'text-[#e5e7eb]'
+                    : 'text-[#374151]'
                 "
               >
                 {{
@@ -208,11 +208,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               @update:model-value="markDirty"
             />
             <small
-              class="llm-eval-settings__hint"
+              class="block text-xs italic mt-1"
               :class="
                 store.state.theme === 'dark'
-                  ? 'llm-eval-settings__hint--dark'
-                  : 'llm-eval-settings__hint--light'
+                  ? 'text-[#9ca3af]'
+                  : 'text-[#6b7280]'
               "
             >
               {{ t("pipeline.llmEvaluationSamplingHelp") }}
@@ -220,29 +220,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
           </div>
 
           <!-- Output stream name -->
-          <div class="setting-group llm-eval-settings__field">
+          <div class="pt-3 px-4 pb-1">
             <label
-              class="llm-eval-settings__field-label"
+              class="block text-[0.8125rem] font-semibold mb-1"
               :class="
                 store.state.theme === 'dark'
-                  ? 'llm-eval-settings__label--dark'
-                  : 'llm-eval-settings__label--light'
+                  ? 'text-[#e5e7eb]'
+                  : 'text-[#374151]'
               "
             >
               {{ t("pipeline.llmEvaluationOutputStreamName") }}
             </label>
             <OInput
               v-model="outputStream"
-              class="llm-eval-settings__input"
+              class="w-full"
               data-test="stream-llm-eval-output-stream"
               @update:model-value="markDirty"
             />
             <small
-              class="llm-eval-settings__hint"
+              class="block text-xs italic mt-1"
               :class="
                 store.state.theme === 'dark'
-                  ? 'llm-eval-settings__hint--dark'
-                  : 'llm-eval-settings__hint--light'
+                  ? 'text-[#9ca3af]'
+                  : 'text-[#6b7280]'
               "
             >
               {{ t("pipeline.llmEvaluationOutputStreamHelp") }}
@@ -254,11 +254,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
         <div
           v-else
           data-test="stream-llm-eval-info-banner"
-          class="llm-eval-settings__info-banner"
+          class="mx-4 my-3 p-3 rounded border border-solid text-xs"
           :class="
             store.state.theme === 'dark'
-              ? 'llm-eval-settings__info-banner--dark'
-              : 'llm-eval-settings__info-banner--light'
+              ? 'text-[#fcd34d] border-[#92400e] bg-[rgba(146,64,14,0.15)]'
+              : 'text-[#92400e] border-[#fde68a] bg-[#fffbeb]'
           "
         >
           {{ t("pipeline.llmEvaluationRemoveWarning") }}
@@ -611,136 +611,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.llm-eval-settings {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-
-  &__loading {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 2rem;
-  }
-
-  &__card {
-    flex: 1;
-    overflow-y: auto;
-    border-radius: 0.5rem;
-    border-width: 0.0625rem;
-    border-style: solid;
-    padding: 0.5rem 0;
-    margin: 1rem;
-
-    &--light {
-      border-color: #e5e7eb;
-      background-color: #ffffff;
-    }
-
-    &--dark {
-      border-color: #374151;
-      background-color: #181a1b;
-    }
-  }
-
-  &__row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.5rem 1rem;
-    font-size: 0.8125rem;
-
-    &--bordered {
-      border-bottom-width: 0.0625rem;
-      border-bottom-style: solid;
-
-      &-light {
-        border-bottom-color: #e5e7eb;
-      }
-      &-dark {
-        border-bottom-color: #4b5563;
-      }
-    }
-  }
-
-  &__row-content {
-    display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
-    flex: 1;
-    padding-right: 1rem;
-  }
-
-  &__label {
-    font-size: 0.8125rem;
-    font-weight: 600;
-
-    &--light {
-      color: #374151;
-    }
-    &--dark {
-      color: #e5e7eb;
-    }
-  }
-
-  &__field {
-    padding: 0.75rem 1rem 0.25rem;
-  }
-
-  &__field-label {
-    display: block;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-  }
-
-  &__input {
-    width: 100%;
-  }
-
-  &__hint {
-    display: block;
-    font-size: 0.75rem;
-    font-style: italic;
-    margin-top: 0.25rem;
-
-    &--light {
-      color: #6b7280;
-    }
-    &--dark {
-      color: #9ca3af;
-    }
-  }
-
-  &__sampling-header {
-    margin-bottom: 0.25rem;
-  }
-
-  &__sampling-label {
-    font-size: 0.75rem;
-  }
-
-  &__info-banner {
-    margin: 0.75rem 1rem;
-    padding: 0.75rem;
-    border-radius: 0.25rem;
-    border-width: 0.0625rem;
-    border-style: solid;
-    font-size: 0.75rem;
-
-    &--light {
-      color: #92400e;
-      border-color: #fde68a;
-      background-color: #fffbeb;
-    }
-
-    &--dark {
-      color: #fcd34d;
-      border-color: #92400e;
-      background-color: rgba(146, 64, 14, 0.15);
-    }
-  }
-}
-</style>

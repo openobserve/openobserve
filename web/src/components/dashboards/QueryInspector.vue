@@ -8,7 +8,7 @@
   >
     <!-- search input: sits left of the close button via #header-right -->
     <template #header-right>
-      <div class="tw:flex">
+      <div class="flex">
         <OSearchInput
           v-model="searchQuery"
           placeholder="Search keywords..."
@@ -21,39 +21,39 @@
     <!-- Body -->
       <div
         v-if="queryData.length === 0"
-        class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-64 tw:text-[var(--o2-text-muted)]"
+        class="flex flex-col items-center justify-center h-64 text-[var(--o2-text-muted)]"
       >
         <OIcon name="info" style="width: 48px; height: 48px;" />
-        <p class="tw:mt-2">No queries executed for this panel.</p>
+        <p class="mt-2">No queries executed for this panel.</p>
       </div>
 
-      <div v-else class="tw:space-y-4">
+      <div v-else class="space-y-4">
         <div
           v-for="(query, index) in queryData"
           :key="query?.originalQuery + index"
-          class="tw:bg-[var(--o2-card-bg)] tw:rounded-xl tw:border tw:border-[var(--o2-border-color)] tw:shadow-sm tw:overflow-hidden"
+          class="bg-[var(--o2-card-bg)] rounded-xl border border-[var(--o2-border-color)] shadow-sm overflow-hidden"
         >
           <!-- Query Header -->
           <div
-            class="tw:p-2 tw:gap-3 tw:bg-[var(--o2-body-primary-bg)] tw:border-b tw:border-[var(--o2-border-color)] tw:flex tw:items-start tw:justify-start"
+            class="p-2 gap-3 bg-[var(--o2-body-primary-bg)] border-b border-[var(--o2-border-color)] flex items-start justify-start"
           >
-            <span class="tw:text-sm tw:font-bold tw:rounded-md"
+            <span class="text-sm font-bold rounded-md"
                 :data-test="`query-inspector-query-name-${index}`">
               {{ query.tabName || ('Query ' + (index + 1)) }}
             </span>
             <span
-              class="tw:bg-[var(--o2-body-primary-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-[var(--o2-text-secondary)] tw:text-[10px] tw:font-bold tw:px-2 tw:py-0.5 tw:rounded-md"
+              class="bg-[var(--o2-body-primary-bg)] border border-[var(--o2-border-color)] text-[var(--o2-text-secondary)] text-[10px] font-bold px-2 py-0.5 rounded-md"
             >
               {{ getQueryTypeDisplay(query.queryType) }}
             </span>
           </div>
 
           <!-- Query Content -->
-          <div class="tw:p-3 tw:space-y-4">
+          <div class="p-3 space-y-4">
             <!-- Original Query -->
             <div v-if="query.originalQuery">
-              <div class="tw:flex tw:items-center tw:justify-between">
-                <label class="tw:text-xs tw:font-bold tw:tracking-wider"
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-bold tracking-wider"
                   >Original Query</label
                 >
                 <OButton
@@ -65,9 +65,9 @@
                   Copy
                 </OButton>
               </div>
-              <div class="tw:relative tw:group">
+              <div class="relative group mt-1">
                 <div
-                  class="tw:p-2 tw:rounded-lg tw:bg-[var(--o2-body-primary-bg)] tw:border tw:border-[var(--o2-border-color)] tw:font-mono tw:text-sm tw:max-h-40 tw:overflow-y-auto tw:whitespace-pre-wrap tw:break-all inspector-query-editor"
+                  class="p-2 rounded-lg bg-[var(--o2-body-primary-bg)] border border-[var(--o2-border-color)] font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:rgba(128,128,128,0.2)_transparent] inspector-query-editor"
                   :data-test="`query-inspector-original-query-${index}`"
                   v-html="
                     highlightSearch(
@@ -82,8 +82,8 @@
 
             <!-- Executed Query -->
             <div>
-              <div class="tw:flex tw:items-center tw:justify-between">
-                <label class="tw:text-xs tw:font-bold tw:tracking-wider"
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-bold tracking-wider"
                   >Executed Query</label
                 >
                 <OButton
@@ -95,9 +95,9 @@
                   Copy
                 </OButton>
               </div>
-              <div class="tw:relative tw:group">
+              <div class="relative group mt-1">
                 <div
-                  class="tw:p-2 tw:rounded-lg tw:bg-[var(--o2-body-primary-bg)] tw:border tw:border-[var(--o2-border-color)] tw:font-mono tw:text-sm tw:max-h-40 tw:overflow-y-auto tw:whitespace-pre-wrap tw:break-all inspector-query-editor"
+                  class="p-2 rounded-lg bg-[var(--o2-body-primary-bg)] border border-[var(--o2-border-color)] font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:rgba(128,128,128,0.2)_transparent] inspector-query-editor"
                   :data-test="`query-inspector-executed-query-${index}`"
                   v-html="
                     highlightSearch(
@@ -111,38 +111,38 @@
 
             <!-- Time Metadata -->
             <div
-              class="tw:grid tw:grid-cols-2 tw:gap-4 tw:border-t tw:border-[var(--o2-border-color)] tw:pt-2"
+              class="grid grid-cols-2 gap-4 border-t border-[var(--o2-border-color)] pt-2"
             >
-              <div class="tw:space-y-1"
+              <div class="space-y-1"
                 :data-test="`dashboard-query-inspector-start-time-${index}`"
               >
-                <label class="tw:text-xs tw:font-bold tw:tracking-wider"
+                <label class="text-xs font-bold tracking-wider"
                   >Start Time</label
                 >
                 <div
-                  class="tw:text-xs tw:text-[var(--o2-text-secondary)] tw:font-medium tw:flex tw:items-center tw:gap-2"
+                  class="text-xs text-[var(--o2-text-secondary)] font-medium flex items-center gap-2"
                 >
                   <OIcon
                     name="login"
                     size="xs"
-                    class="tw:text-[var(--o2-text-muted)]"
+                    class="text-[var(--o2-text-muted)]"
                   />
                   {{ formatTimestamp(query.startTime) }}
                 </div>
               </div>
-              <div class="tw:space-y-1"
+              <div class="space-y-1"
                 :data-test="`dashboard-query-inspector-end-time-${index}`"
               >
-                <label class="tw:text-xs tw:font-bold tw:tracking-wider"
+                <label class="text-xs font-bold tracking-wider"
                   >End Time</label
                 >
                 <div
-                  class="tw:text-xs tw:text-[var(--o2-text-secondary)] tw:font-medium tw:flex tw:items-center tw:gap-2"
+                  class="text-xs text-[var(--o2-text-secondary)] font-medium flex items-center gap-2"
                 >
                   <OIcon
                     name="logout"
                     size="xs"
-                    class="tw:text-[var(--o2-text-muted)]"
+                    class="text-[var(--o2-text-muted)]"
                   />
                   {{ formatTimestamp(query.endTime) }}
                 </div>
@@ -151,32 +151,32 @@
 
             <!-- Variables List (Row by Row) -->
             <div
-              class="tw:space-y-3 tw:border-t tw:border-[var(--o2-border-color)]"
+              class="space-y-3 border-t border-[var(--o2-border-color)]"
             >
               <!-- Standard Variables -->
-              <div class="tw:pt-2">
-                <label class="tw:text-xs tw:font-bold tw:tracking-wider"
+              <div class="pt-2">
+                <label class="text-xs font-bold tracking-wider"
                   >Variable(s)</label
                 >
-                <div class="tw:flex tw:flex-wrap tw:gap-2">
+                <div class="flex flex-wrap gap-2 mt-1">
                   <template v-if="getVariablesByType(query, 'variable').length">
                     <div
                       v-for="v in getVariablesByType(query, 'variable')"
                       :key="v.name"
-                      class="tw:flex tw:items-center tw:gap-2 tw:p-1 tw:rounded-md tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:text-xs"
+                      class="flex items-center gap-2 p-1 rounded-md border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] text-xs"
                     >
                       <span
-                        class="tw:font-bold tw:text-[var(--o2-text-primary)]"
+                        class="font-bold text-[var(--o2-text-primary)]"
                         >{{ v.name }}</span
                       >
-                      <span class="tw:text-[var(--o2-text-muted)]">:</span>
+                      <span class="text-[var(--o2-text-muted)]">:</span>
                       <span
-                        class="tw:text-[var(--o2-text-secondary)] tw:italic"
+                        class="text-[var(--o2-text-secondary)] italic"
                         >{{ v.value }}</span
                       >
                     </div>
                   </template>
-                  <span v-else class="tw:text-xs tw:text-[var(--o2-text-muted)]"
+                  <span v-else class="text-xs text-[var(--o2-text-muted)]"
                     >-</span
                   >
                 </div>
@@ -184,28 +184,28 @@
 
               <!-- Fixed Variables -->
               <div>
-                <label class="tw:text-xs tw:font-bold tw:tracking-wider"
+                <label class="text-xs font-bold tracking-wider"
                   >Fixed Variable(s)</label
                 >
-                <div class="tw:flex tw:flex-wrap tw:gap-2">
+                <div class="flex flex-wrap gap-2 mt-1">
                   <template v-if="getVariablesByType(query, 'fixed').length">
                     <div
                       v-for="v in getVariablesByType(query, 'fixed')"
                       :key="v.name"
-                      class="tw:flex tw:items-center tw:gap-2 tw:p-1 tw:rounded-md tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:text-xs"
+                      class="flex items-center gap-2 p-1 rounded-md border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] text-xs"
                     >
                       <span
-                        class="tw:font-bold tw:text-[var(--o2-text-primary)]"
+                        class="font-bold text-[var(--o2-text-primary)]"
                         >{{ v.name }}</span
                       >
-                      <span class="tw:text-[var(--o2-text-muted)]">:</span>
+                      <span class="text-[var(--o2-text-muted)]">:</span>
                       <span
-                        class="tw:text-[var(--o2-text-secondary)] tw:italic"
+                        class="text-[var(--o2-text-secondary)] italic"
                         >{{ v.value }}</span
                       >
                     </div>
                   </template>
-                  <span v-else class="tw:text-xs tw:text-[var(--o2-text-muted)]"
+                  <span v-else class="text-xs text-[var(--o2-text-muted)]"
                     >-</span
                   >
                 </div>
@@ -213,32 +213,32 @@
 
               <!-- Dynamic Variables -->
               <div>
-                <label class="tw:text-xs tw:font-bold tw:tracking-wider"
+                <label class="text-xs font-bold tracking-wider"
                   >Dynamic Variable(s)</label
                 >
-                <div class="tw:flex tw:flex-wrap tw:gap-2">
+                <div class="flex flex-wrap gap-2 mt-1">
                   <template
                     v-if="getVariablesByType(query, 'dynamicVariable').length"
                   >
                     <div
                       v-for="v in getVariablesByType(query, 'dynamicVariable')"
                       :key="v.name"
-                      class="tw:flex tw:items-center tw:gap-2 tw:p-1 tw:rounded-md tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:text-xs"
+                      class="flex items-center gap-2 p-1 rounded-md border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] text-xs"
                     >
                       <span
-                        class="tw:font-bold tw:text-[var(--o2-text-primary)]"
+                        class="font-bold text-[var(--o2-text-primary)]"
                         >{{ v.name }}</span
                       >
-                      <span class="tw:text-[var(--o2-text-muted)]">{{
+                      <span class="text-[var(--o2-text-muted)]">{{
                         v.operator
                       }}</span>
                       <span
-                        class="tw:text-[var(--o2-text-secondary)] tw:italic"
+                        class="text-[var(--o2-text-secondary)] italic"
                         >{{ v.value }}</span
                       >
                     </div>
                   </template>
-                  <span v-else class="tw:text-xs tw:text-[var(--o2-text-muted)]"
+                  <span v-else class="text-xs text-[var(--o2-text-muted)]"
                     >-</span
                   >
                 </div>
@@ -354,7 +354,7 @@ export default defineComponent({
         return safeHtml.replace(
           regex,
           (match) =>
-            `<mark class="tw:bg-yellow-400 tw:text-black tw:rounded-sm tw:shadow-sm">${match}</mark>`,
+            `<mark class="bg-yellow-400 text-black rounded-sm shadow-sm">${match}</mark>`,
         );
       } catch (e) {
         return safeHtml;
@@ -396,33 +396,26 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.inspector-query-editor {
-  /* Custom scrollbar styling */
-  &::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(128, 128, 128, 0.2);
-    border-radius: 10px;
-
-    &:hover {
-      background: rgba(128, 128, 128, 0.4);
-    }
-  }
-
-  /* Firefox scrollbar styling */
-  scrollbar-width: thin;
-  scrollbar-color: rgba(128, 128, 128, 0.2) transparent;
+<style>
+.inspector-query-editor::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-:deep(mark) {
+.inspector-query-editor::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.inspector-query-editor::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.2);
+  border-radius: 10px;
+}
+
+.inspector-query-editor::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.4);
+}
+
+.inspector-query-editor mark {
   all: unset;
   background-color: #facc15;
   color: black;
@@ -430,8 +423,8 @@ export default defineComponent({
   padding: 0;
 }
 
-// Ensure Monaco colorized content looks good
-:deep(.mtk1) {
+/* Ensure Monaco colorized content looks good */
+.inspector-query-editor .mtk1 {
   color: inherit;
 }
 </style>

@@ -54,8 +54,10 @@ describe("HomeViewSkeleton", () => {
       },
     });
 
-    const featureCard = wrapper.find(".feature-card");
-    expect(featureCard.classes()).toContain("light-stream-container");
+    const featureCard = wrapper.find('[data-test="home-view-skeleton-streams-container"]');
+    expect(featureCard.exists()).toBe(true);
+    const firstChart = wrapper.find(".first-chart-container");
+    expect(firstChart.classes()).toContain("[--tile-bg:#ffffff]");
   });
 
   it("should render with dark theme", () => {
@@ -74,8 +76,10 @@ describe("HomeViewSkeleton", () => {
       },
     });
 
-    const featureCard = wrapper.find(".feature-card");
-    expect(featureCard.classes()).toContain("dark-stream-container");
+    const featureCard = wrapper.find('[data-test="home-view-skeleton-streams-container"]');
+    expect(featureCard.exists()).toBe(true);
+    const firstChart = wrapper.find(".first-chart-container");
+    expect(firstChart.classes()).toContain("[--tile-bg:#2b2c2d]");
   });
 
   it("should render streams header", () => {
@@ -88,7 +92,7 @@ describe("HomeViewSkeleton", () => {
       },
     });
 
-    const header = wrapper.find(".streams-header");
+    const header = wrapper.find('[data-test="home-view-skeleton-streams-header"]');
     expect(header.exists()).toBe(true);
   });
 
@@ -105,7 +109,7 @@ describe("HomeViewSkeleton", () => {
     const tilesGrid = wrapper.find(".tiles-grid");
     expect(tilesGrid.exists()).toBe(true);
 
-    const tiles = tilesGrid.findAll(".tile");
+    const tiles = tilesGrid.findAll('[data-test="home-view-skeleton-tile"]');
     expect(tiles).toHaveLength(5);
   });
 
@@ -119,7 +123,7 @@ describe("HomeViewSkeleton", () => {
       },
     });
 
-    const tiles = wrapper.findAll(".tile");
+    const tiles = wrapper.findAll('[data-test="home-view-skeleton-tile"]');
     tiles.forEach((tile) => {
       const tileContent = tile.find(".tile-content");
       expect(tileContent.exists()).toBe(true);
@@ -223,8 +227,8 @@ describe("HomeViewSkeleton", () => {
     const firstChart = wrapper.find(".first-chart-container");
     const secondChart = wrapper.find(".second-chart-container");
 
-    expect(firstChart.classes()).toContain("chart-container-light");
-    expect(secondChart.classes()).toContain("chart-container-light");
+    expect(firstChart.classes()).toContain("[--tile-bg:#ffffff]");
+    expect(secondChart.classes()).toContain("[--tile-bg:#ffffff]");
   });
 
   it("should render details container in chart sections", () => {

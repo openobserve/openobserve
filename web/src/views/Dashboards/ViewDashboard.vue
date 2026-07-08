@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div :key="store.state.selectedOrganization.identifier" class="tw:h-full">
+  <div :key="store.state.selectedOrganization.identifier" class="h-full">
     <div
       ref="fullscreenDiv"
       :class="[
@@ -25,16 +25,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           fullscreen: isFullscreen,
           'print-mode-container': store.state.printMode,
         },
-        store.state.printMode === true ? 'tw:pb-6' : '',
+        store.state.printMode === true ? 'pb-6' : '',
       ]"
-      class="tw:h-full"
+      class="h-full"
     >
       <PageLayout
         :main-panel="false"
         :header-class="
           isFullscreen || store.state.printMode === true
-            ? 'stickyHeader fullscreenHeader tw:bg-surface-panel'
-            : 'tw:shrink-0'
+            ? 'stickyHeader fullscreenHeader bg-surface-panel'
+            : 'shrink-0'
         "
       >
         <template #header>
@@ -49,12 +49,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? { label: t('dashboard.header'), onClick: goBackToDashboardList, dataTest: 'dashboard-back-btn' }
                 : undefined
             "
-            class="tw:px-4 tw:border-b tw:border-border-default"
+            class="px-4 border-b border-border-default"
           >
           <template #title>
             <span data-test="dashboard-name-title">{{ currentDashboardData.data?.title }}</span>
           </template>
           <template #actions>
+            <!-- Primary place to set this dashboard as the org-wide home
+                 dashboard: labeled so the action is discoverable (a bare
+                 pushpin icon read as cryptic). Collapses to filled-pin +
+                 "Home dashboard" once set. -->
+            <OButton
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              :variant="isHome(dashboardId) ? 'secondary' : 'outline'"
+              size="sm-toolbar"
+              :class="
+                isHome(dashboardId)
+                  ? 'text-primary border border-button-outline-border'
+                  : ''
+              "
+              @click="toggleHomeDashboard"
+              data-test="dashboard-view-set-home-btn"
+              :icon-left="isHome(dashboardId) ? 'keep' : 'keep-outline'"
+            >
+              {{
+                isHome(dashboardId)
+                  ? t("dashboard.isHomeDashboard")
+                  : t("dashboard.setAsHome")
+              }}
+            </OButton>
+            <OTooltip
+              v-if="!isFullscreen && store.state.printMode !== true"
+              :content="
+                isHome(dashboardId)
+                  ? t('dashboard.removeFromHome')
+                  : t('dashboard.setAsHomeDesc')
+              "
+            />
             <OButton
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
@@ -64,10 +96,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-panel-add"
               icon-left="add"
             >
-              <OTooltip :content="t('panel.add')" />
+              <OTooltip :content="t('panel.add')" shortcut-id="dashboardAddPanel" />
             </OButton>
             <!-- <DateTimePicker 
-            class="tw:ml-2"
+            class="ml-2"
             ref="refDateTime"
             v-model="selectedDate"
           /> -->
@@ -89,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="selectedDate"
               v-show="store.state.printMode === false"
               ref="dateTimePicker"
-              class="dashboard-icons"
+              class="dashboard-icons h-[30px] [transition:all_0.2s_ease]"
               size="sm"
               v-model="selectedDate"
               :initialTimezone="initialTimezone"
@@ -104,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state?.zoConfig?.min_auto_refresh_interval || 5
               "
               @trigger="refreshData"
-              class="dashboard-icons hideOnPrintMode"
+              class="dashboard-icons hideOnPrintMode h-[30px] [transition:all_0.2s_ease]"
               size="sm"
             />
             <OButton
@@ -129,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-refresh-btn"
               icon-left="refresh"
             >
-              <OTooltip :content="isVariablesChanged ? 'Refresh to apply latest variable changes' : 'Refresh'" />
+              <OTooltip :content="isVariablesChanged ? 'Refresh to apply latest variable changes' : 'Refresh'" shortcut-id="dashboardRefresh" />
             </OButton>
 
             <ExportDashboard
@@ -181,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     isFullscreen ? 'fullscreen-exit' : 'fullscreen'
                   " size="sm"
               /></template>
-              <OTooltip :content="isFullscreen ? t('dashboard.exitFullscreen') : t('dashboard.fullscreen')" />
+              <OTooltip :content="isFullscreen ? t('dashboard.exitFullscreen') : t('dashboard.fullscreen')" shortcut-id="dashboardFullscreen" />
             </OButton>
             <OButton
               v-if="!isFullscreen"
@@ -213,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <RenderDashboardCharts
         :frame="false"
-        :class="store.state.printMode ? 'tw:px-6' : 'tw:flex-1 tw:min-h-0'"
+        :class="store.state.printMode ? '' : 'flex-1 min-h-0'"
         :key="
           currentDashboardData.data?.dashboardId + '-' + dashboardRemountKey
         "
@@ -325,6 +357,7 @@ import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import useNotifications from "@/composables/useNotifications";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import reports from "@/services/reports";
 import destination from "@/services/alert_destination.js";
 import config from "@/aws-exports";
@@ -351,6 +384,8 @@ import {
 import { hasPanelTime } from "@/utils/dashboard/panelTimeUtils";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -428,6 +463,25 @@ export default defineComponent({
     const dashboardId = computed(() => route.query.dashboard);
 
     const folderId = computed(() => route.query.folder);
+
+    // Set/remove this dashboard as the single org-wide home dashboard, shared
+    // reactive state with the dashboard list and HomeView via the composable.
+    const { isHome, setHomeDashboard, clearHomeDashboard } =
+      useHomeDashboard();
+    const toggleHomeDashboard = () => {
+      const id = dashboardId.value as string | undefined;
+      if (!id) return;
+      const org = store.state.selectedOrganization?.identifier;
+      if (isHome(id)) {
+        clearHomeDashboard(org);
+      } else {
+        setHomeDashboard(org, {
+          dashboardId: id,
+          folderId: (folderId.value as string) ?? "default",
+          label: currentDashboardData.data?.title ?? "Dashboard",
+        });
+      }
+    };
 
     const tabId = computed(() => route.query.tab);
 
@@ -1758,15 +1812,6 @@ export default defineComponent({
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
 
-      // Reset print mode on leave. Print mode hides the global chrome
-      // (left nav sidebar). The close button resets it, but navigating away
-      // via the browser back button skips that, leaving the sidebar hidden on
-      // other pages until a manual refresh. Resetting here guarantees the
-      // chrome is restored whenever the dashboard view is destroyed.
-      if (store.state.printMode === true) {
-        setPrint(false);
-      }
-
       // Clean up AI dashboard event listener
       offDashboardEvent(handleAiDashboardEvent);
 
@@ -1840,6 +1885,47 @@ export default defineComponent({
       }
     });
 
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "dashboardRefresh",
+        handler: () => {
+          if (isInputFocused()) return;
+          refreshData();
+        },
+      },
+      {
+        id: "dashboardAddPanel",
+        handler: () => {
+          if (isInputFocused()) return;
+          addPanelData();
+        },
+      },
+      {
+        id: "dashboardSave",
+        handler: () => savePanelLayout(null),
+      },
+      {
+        id: "dashboardFullscreen",
+        handler: () => {
+          if (isInputFocused()) return;
+          toggleFullscreen();
+        },
+      },
+      {
+        id: "dashboardExport",
+        handler: () => {
+          if (isInputFocused()) return;
+          // Trigger the whole-dashboard export (ExportDashboard button).
+          (
+            document.querySelector(
+              '[data-test="export-dashboard"]',
+            ) as HTMLElement | null
+          )?.click();
+        },
+      },
+    ]);
+
     return {
       currentDashboardData,
       dashboardRemountKey,
@@ -1848,6 +1934,8 @@ export default defineComponent({
       isFullscreen,
       goBackToDashboardList,
       addPanelData,
+      toggleHomeDashboard,
+      isHome,
       t,
       getDashboard,
       store,
@@ -1913,38 +2001,14 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.printMode {
-  .hideOnPrintMode {
-    display: none;
-  }
-}
-
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
-
-.dark-mode {
-  background-color: $dark-page;
-}
-
-.bg-white {
-  background-color: $white;
-}
-
-// The header wrapper is rendered inside PageLayout (a child component), so these
-// rules must use :deep() to cross the scope boundary. Without it the scoped class
-// names passed via `header-class` never match, position:sticky is never applied,
-// and the header scrolls away in print/fullscreen mode.
-:deep(.stickyHeader) {
+<style>
+.stickyHeader {
   position: sticky;
   top: 0;
   z-index: 1001;
 }
-:deep(.stickyHeader.fullscreenHeader) {
+
+.stickyHeader.fullscreenHeader {
   top: 0px;
   z-index: 5100 !important;
 }
@@ -1958,17 +2022,17 @@ export default defineComponent({
   z-index: 5000 !important;
   margin: 0 !important;
   padding: 0 !important;
-  background-color: var(--q-color-page-background, #ffffff) !important;
+  background-color: var(--o2-primary-background, #ffffff) !important;
 }
 
 .print-mode-container {
-  // Grow to the dashboard's natural content height and let the app's outer
-  // scroll wrapper (MainLayout's .o2-content-scroll) do the scrolling — the same
-  // model the @media print block below relies on. Pinning a viewport height here
-  // (100vh or 100%) capped the subtree, and PageLayout's body (overflow-hidden)
-  // then clipped the trailing panels, so tall dashboards could never be scrolled
-  // to the bottom. `overflow: visible` keeps the sticky header pinned to the
-  // outer scroll wrapper rather than to a dead inner scroll box.
+  /* Grow to the dashboard's natural content height and let the app's outer
+     scroll wrapper (MainLayout's .o2-content-scroll) do the scrolling — the same
+     model the @media print block below relies on. Pinning a viewport height here
+     (100vh or 100%) capped the subtree, and PageLayout's body (overflow-hidden)
+     then clipped the trailing panels, so tall dashboards could never be scrolled
+     to the bottom. `overflow: visible` keeps the sticky header pinned to the
+     outer scroll wrapper rather than to a dead inner scroll box. */
   height: auto !important;
   overflow: visible !important;
 }
@@ -1977,111 +2041,20 @@ export default defineComponent({
   .print-mode-container {
     height: auto !important;
     overflow: visible !important;
-    // max-height: none !important;
   }
 
   /* Make every ancestor flex/scroll container release its viewport height
    * so the absolute → block flow conversion in RenderDashboardCharts.vue's
    * print CSS can actually grow beyond one page. Without these, the .scroll
    * / overflow-y wrappers clip the dashboard at viewport-height in print. */
-  :global(.o2-app-root),
-  :global(main),
-  :global(.o2-content-scroll),
-  :global(.scroll) {
+  .o2-app-root,
+  main,
+  .o2-content-scroll,
+  .scroll {
     height: auto !important;
     min-height: 0 !important;
     overflow: visible !important;
   }
 }
 
-.dashboard-icons {
-  height: 30px;
-  transition: all 0.2s ease;
-
-  :deep(.q-btn-dropdown) {
-    height: 30px;
-    min-height: 30px;
-    padding: 0 8px;
-
-    .q-btn__content {
-      line-height: normal;
-      align-items: center;
-    }
-  }
-}
-
-.folder-name {
-  color: var(--o2-menu-color) !important;
-}
-
-.folder-name:hover {
-  border-radius: 0.325rem;
-  background-color: var(--o2-tab-bg) !important;
-}
-
-.el-border {
-  transition: background-color 0.2s ease;
-
-  &:hover {
-    background-color: var(--o2-hover-accent) !important;
-  }
-}
-
-.el-border {
-  transition: background-color 0.2s ease;
-
-  &:hover {
-    background-color: var(--o2-hover-accent) !important;
-  }
-}
-
-/* Outline state borders */
-.refresh-btn-group .apply-btn-refresh.q-btn--outline::before {
-  border-right: none !important;
-}
-
-.refresh-btn-group .apply-btn-dropdown.q-btn--outline::before {
-  border-left: 1px solid $border-color !important;
-}
-
-/* Flat state borders (when loading/cancel) - using pseudo-elements to avoid layout shifts */
-.refresh-btn-group .apply-btn-refresh.q-btn--flat::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  border: 1px solid $border-color !important;
-  border-right: none !important;
-  border-radius: inherit;
-  pointer-events: none;
-}
-
-.refresh-btn-group .apply-btn-dropdown.q-btn--flat::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  border: 1px solid $border-color !important;
-  border-left: 1px solid $border-color !important;
-  border-radius: inherit;
-  pointer-events: none;
-}
-
-.apply-btn-refresh {
-  border-top-left-radius: 4px !important;
-  border-bottom-left-radius: 4px !important;
-  border-top-right-radius: 0 !important;
-  border-bottom-right-radius: 0 !important;
-}
-
-.apply-btn-dropdown {
-  border-top-left-radius: 0 !important;
-  border-bottom-left-radius: 0 !important;
-  border-top-right-radius: 4px !important;
-  border-bottom-right-radius: 4px !important;
-}
 </style>

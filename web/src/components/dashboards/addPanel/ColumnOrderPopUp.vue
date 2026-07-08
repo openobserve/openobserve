@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -28,19 +28,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Content -->
     <div>
-      <div class="tw:text-xs tw:text-gray-400 tw:mb-3" data-test="dashboard-column-order-description">
+      <div class="text-xs text-gray-400 mb-3" data-test="dashboard-column-order-description">
         {{ t("dashboard.columnOrderDescription") }}
       </div>
 
       <!-- Empty state -->
       <div
         v-if="!editColumnOrder || editColumnOrder.length === 0"
-        class="tw:text-center tw:p-6 tw:text-gray-400"
+        class="text-center p-6 text-gray-400"
         data-test="dashboard-column-order-empty-state"
       >
-        <OIcon name="view-column" class="tw:mb-3" style="width: 48px; height: 48px;" />
-        <div class="tw:text-base">{{ t("dashboard.noColumnsOrdered") }}</div>
-        <div class="tw:text-xs">
+        <OIcon name="view-column" class="mb-3" style="width: 48px; height: 48px;" />
+        <div class="text-base">{{ t("dashboard.noColumnsOrdered") }}</div>
+        <div class="text-xs">
           {{ t("dashboard.columnsDefaultOrder") }}
         </div>
       </div>
@@ -56,11 +56,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="(column, index) in editColumnOrder"
           :key="`column-${index}`"
-          class="column-order-row"
+          class="flex items-center px-3 py-2 mb-1 border-b border-[#cccccc70] transition-colors hover:bg-black/[0.02] last:border-b-0 dark:border-b-[rgba(255,255,255,0.12)] dark:hover:bg-[rgba(255,255,255,0.05)]"
           :data-test="`column-order-row-${index}`"
         >
           <!-- Drag handle -->
-          <div class="drag-handle" data-test="dashboard-column-order-drag-handle">
+          <div class="cursor-move px-1 mr-2 flex items-center" data-test="dashboard-column-order-drag-handle">
             <OIcon
               name="drag-indicator"
               size="md"
@@ -69,13 +69,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Column number -->
-          <div class="column-number" data-test="dashboard-column-order-column-number">{{ index + 1 }}.</div>
+          <div class="min-w-8 font-medium text-[13px] text-[#666] dark:text-[#aaa]" data-test="dashboard-column-order-column-number">{{ index + 1 }}.</div>
 
           <!-- Column name -->
-          <div class="column-name" data-test="dashboard-column-order-column-name">{{ column }}</div>
+          <div class="flex-1 font-medium overflow-hidden text-ellipsis whitespace-nowrap text-[13px]" data-test="dashboard-column-order-column-name">{{ column }}</div>
 
           <!-- Actions -->
-          <div class="column-actions" data-test="dashboard-column-order-column-actions">
+          <div class="flex gap-0.5 ml-2" data-test="dashboard-column-order-column-actions">
             <OButton
               variant="ghost"
               size="icon"
@@ -221,67 +221,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.column-order-row {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid #cccccc70;
-  transition: background-color 0.2s;
-
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.02);
-  }
-
-  &:last-child {
-    border-bottom: none;
-  }
-
-  .drag-handle {
-    cursor: move;
-    padding: 2px 4px;
-    margin-right: 8px;
-    display: flex;
-    align-items: center;
-  }
-
-  .column-number {
-    min-width: 32px;
-    color: #666;
-    font-weight: 500;
-    font-size: 13px;
-  }
-
-  .column-name {
-    flex: 1;
-    font-weight: 500;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 13px;
-  }
-
-  .column-actions {
-    display: flex;
-    gap: 2px;
-    margin-left: 8px;
-  }
-}
-
-// Dark mode support
-.body--dark {
-  .column-order-row {
-    border-bottom-color: rgba(255, 255, 255, 0.12);
-
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.05);
-    }
-
-    .column-number {
-      color: #aaa;
-    }
-  }
-}
-</style>

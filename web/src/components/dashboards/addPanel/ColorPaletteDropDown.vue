@@ -15,32 +15,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="dashboard-color-palette-root">
     <div
       data-test="dashboard-color-palette-flex-container"
-      class="color-palette-row"
+      class="flex items-center"
     >
       <!-- dropdown to select color palette type/mode -->
       <OSelect
         data-test="dashboard-color-palette-select"
         v-model="dashboardPanelData.data.config.color.mode"
         :label="t('dashboard.colorPalette')"
-        class="showLabelOnTop tw:flex-1"
+        class="showLabelOnTop flex-1"
         @update:model-value="onColorModeChange"
         :dropdownStyle="{ width: '240px' }"
       >
         <template #trigger>
-          <div class="trigger-preview">
+          <div class="flex items-center gap-1.5 min-w-0 flex-1">
             <span
               v-if="selectedOptionPalette.length"
-              class="palette-preview"
+              class="inline-flex items-center gap-[0.1875rem] flex-shrink-0"
               aria-hidden="true"
             >
               <span
                 v-for="(color, i) in selectedOptionPalette.slice(0, 3)"
                 :key="i"
-                class="palette-preview-dot"
+                class="w-2 h-2 rounded-full flex-shrink-0"
                 :style="{ background: color }"
               />
             </span>
-            <span class="trigger-label">{{ selectedOptionLabel }}</span>
+            <span
+              class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm"
+              :style="{ color: 'var(--color-text-primary)' }"
+              >{{ selectedOptionLabel }}</span
+            >
           </div>
         </template>
 
@@ -52,16 +56,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :value="opt.value"
             :label="opt.label"
           >
-            <div class="color-option-row">
-              <span v-if="opt.colorPalette?.length" class="palette-preview" aria-hidden="true">
+            <div class="flex items-center gap-1.5 w-full min-w-0">
+              <span
+                v-if="opt.colorPalette?.length"
+                class="inline-flex items-center gap-[0.1875rem] flex-shrink-0"
+                aria-hidden="true"
+              >
                 <span
                   v-for="(c, i) in opt.colorPalette.slice(0, 5)"
                   :key="i"
-                  class="palette-preview-dot"
+                  class="w-2 h-2 rounded-full flex-shrink-0"
                   :style="{ background: c }"
                 />
               </span>
-              <span class="color-option-label">{{ opt.label }}</span>
+              <span
+                class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+                >{{ opt.label }}</span
+              >
             </div>
           </OSelectItem>
 
@@ -77,14 +88,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :value="opt.value"
             :label="opt.label"
           >
-            <div class="color-option-row">
+            <div class="flex items-center gap-1.5 w-full min-w-0">
               <span
                 v-if="opt.colorPalette?.length"
-                class="gradient-preview"
+                class="block w-10 h-2 rounded-[0.1875rem] flex-shrink-0"
                 aria-hidden="true"
                 :style="{ background: `linear-gradient(to right, ${opt.colorPalette.join(', ')})` }"
               />
-              <span class="color-option-label">{{ opt.label }}</span>
+              <span
+                class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+                >{{ opt.label }}</span
+              >
             </div>
           </OSelectItem>
         </OSelectGroup>
@@ -93,12 +107,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- color picker for fixed and shades typed color mode -->
       <div
         v-if="['fixed', 'shades'].includes(dashboardPanelData.data.config.color.mode)"
-        class="color-swatch-wrapper"
+        class="inline-flex items-center flex-shrink-0 mt-[1.875rem] ml-1.5 relative"
         data-test="dashboard-color-palette-color-input-wrapper"
       >
         <button
           type="button"
-          class="color-swatch-btn"
+          class="w-8 h-8 rounded-full cursor-pointer flex-shrink-0 transition-[box-shadow,border-color] duration-200 ease border-2 border-solid [border-color:var(--color-border-default)] hover:[border-color:var(--color-button-primary)] hover:[box-shadow:0_0_0_0.125rem_var(--color-button-primary-focus-ring)] focus-visible:[outline:2px_solid_var(--color-button-primary-focus-ring)] focus-visible:outline-offset-[0.125rem]"
           :aria-label="`Panel color: ${dashboardPanelData.data.config.color.fixedColor[0]}`"
           :style="{ background: dashboardPanelData.data.config.color.fixedColor[0] }"
           data-test="dashboard-color-palette-swatch-btn"
@@ -107,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <input
           ref="colorInput"
           type="color"
-          class="color-input-hidden"
+          class="absolute w-0 h-0 opacity-0 pointer-events-none"
           v-model="dashboardPanelData.data.config.color.fixedColor[0]"
           data-test="dashboard-color-palette-color-input"
           tabindex="-1"
@@ -118,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- color by button group -->
     <div
-      class="tw:pt-3"
+      class="pt-3"
       v-if="dashboardPanelData.data.config.color.mode.startsWith('continuous')"
     >
       {{ t("dashboard.colorSeriesBy") }}
@@ -305,116 +319,8 @@ export default defineComponent({
   },
 });
 </script>
-<style lang="scss" scoped>
-:deep(.selectedLabel span) {
+<style>
+.selectedLabel span {
   text-transform: none !important;
-}
-
-.color-palette-row {
-  display: flex;
-  align-items: center;
-}
-
-.space {
-  margin-top: 10px;
-  margin-bottom: 10px;
-}
-
-.color-swatch-wrapper {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  margin-top: 1.875rem;
-  margin-left: 0.375rem;
-  position: relative;
-}
-
-.color-swatch-btn {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 50%;
-  border: 2px solid var(--color-border-default);
-  cursor: pointer;
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
-  flex-shrink: 0;
-
-  &:hover {
-    border-color: var(--color-button-primary);
-    box-shadow: 0 0 0 0.125rem var(--color-button-primary-focus-ring);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--color-button-primary-focus-ring);
-    outline-offset: 0.125rem;
-  }
-}
-
-.color-input-hidden {
-  position: absolute;
-  width: 0;
-  height: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.color-container {
-  display: flex;
-  height: 0.5rem;
-}
-
-.palette-preview {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.1875rem;
-  flex-shrink: 0;
-}
-
-.palette-preview-dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.trigger-preview {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  min-width: 0;
-  flex: 1;
-}
-
-.trigger-label {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.875rem;
-  color: var(--color-text-primary);
-}
-
-.color-option-row {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  width: 100%;
-  min-width: 0;
-}
-
-.color-option-label {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.gradient-preview {
-  display: block;
-  width: 2.5rem;
-  height: 0.5rem;
-  border-radius: 0.1875rem;
-  flex-shrink: 0;
 }
 </style>

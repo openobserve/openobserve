@@ -1,10 +1,10 @@
 <template>
   <div
-    class="skeleton-box"
+    class="skeleton-box bg-skeleton-base relative overflow-hidden rounded"
     :class="[
-      `skeleton-${variant}`,
-      rounded && 'skeleton-rounded',
-      circle && 'skeleton-circle'
+      variantClass,
+      rounded && 'rounded-lg',
+      circle && 'rounded-full aspect-square'
     ]"
     :style="{
       width: width,
@@ -22,15 +22,15 @@ interface Props {
   // Size props
   width?: string
   height?: string
-  
+
   // Variant presets
   variant?: 'text' | 'title' | 'button' | 'avatar' | 'image' | 'custom'
-  
+
   // Shape props
   rounded?: boolean
   circle?: boolean
   customRadius?: string
-  
+
   // Text-specific props (when variant is 'text')
   lines?: number
 }
@@ -45,6 +45,17 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const store = useStore()
+
+const variantClass = computed(() => {
+  switch (props.variant) {
+    case 'text':    return 'rounded-[3px]'
+    case 'title':   return 'rounded'
+    case 'button':  return 'rounded-md'
+    case 'avatar':  return 'rounded-full'
+    case 'image':   return 'rounded-lg'
+    default:        return ''
+  }
+})
 
 // Computed styles based on variant
 const computedWidth = computed(() => {
@@ -82,18 +93,11 @@ const computedHeight = computed(() => {
 })
 </script>
 
-<style scoped lang="scss">
+<style>
 /* Flat base colour + sliding ::after overlay.
    The base is always solid (no moving gradient), the shimmer is a separate
    translucent gloss that physically slides left→right via translateX.
    ease-in-out on translateX is intentional — it mimics real light reflection. */
-.skeleton-box {
-  background-color: var(--color-skeleton-base, #f5f5f5);
-  position: relative;
-  overflow: hidden;
-  border-radius: 4px;
-}
-
 .skeleton-box::after {
   content: "";
   position: absolute;
@@ -112,64 +116,5 @@ const computedHeight = computed(() => {
 @keyframes skeleton-shimmer {
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
-}
-
-/* Variant-specific styles */
-.skeleton-text {
-  border-radius: 3px;
-}
-
-.skeleton-title {
-  border-radius: 4px;
-}
-
-.skeleton-button {
-  border-radius: 6px;
-}
-
-.skeleton-avatar {
-  border-radius: 50%;
-}
-
-.skeleton-image {
-  border-radius: 8px;
-}
-
-/* Shape modifiers */
-.skeleton-rounded {
-  border-radius: 8px;
-}
-
-.skeleton-circle {
-  border-radius: 50%;
-  aspect-ratio: 1;
-}
-
-/* Multiple lines support for text variant */
-.skeleton-text.skeleton-multiline {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.skeleton-text.skeleton-multiline::before {
-  content: '';
-  display: block;
-  height: 14px;
-  background: inherit;
-  border-radius: inherit;
-  animation: inherit;
-  background-size: inherit;
-}
-
-.skeleton-text.skeleton-multiline.skeleton-lines-3::after {
-  content: '';
-  display: block;
-  height: 14px;
-  width: 60%;
-  background: inherit;
-  border-radius: inherit;
-  animation: inherit;
-  background-size: inherit;
 }
 </style>

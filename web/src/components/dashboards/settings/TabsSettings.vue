@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:h-full" data-test="dashboard-tab-settings">
+  <div class="flex flex-col h-full" data-test="dashboard-tab-settings">
     <DashboardHeader :title="t('dashboard.tabSettingsTitle')">
       <template #right>
         <OButton
@@ -30,100 +30,90 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </template>
     </DashboardHeader>
-    <div class="table-header tw:flex tw:justify-between tw:font-bold">
-      <div class="header-content">
-        <div class="spacer"></div>
-        <div class="name-column" data-test="dashboard-tab-settings-name">
-          {{ t("dashboard.name") }}
-        </div>
-        <div class="actions-column" data-test="dashboard-tab-settings-actions">
-          {{ t("dashboard.actions") }}
-        </div>
-      </div>
-    </div>
-    <div class="table-content">
-      <draggable
-        v-model="currentDashboardData.data.tabs"
-        :options="dragOptions"
-        @end.stop="handleDragEnd"
-        @mousedown.stop="() => {}"
-        data-test="dashboard-tab-settings-drag"
+    <div ref="tableWrapper" data-test="dashboard-tab-settings-drag">
+      <OTable
+        data-test="dashboard-tabs-table"
+        :data="currentDashboardData.data.tabs ?? []"
+        :columns="columns"
+        row-key="tabId"
+        :frame="false"
+        pagination="none"
+        sorting="none"
+        selection="none"
+        :default-columns="false"
+        :show-global-filter="false"
       >
-        <div
-          v-for="(tab, index) in currentDashboardData.data.tabs"
-          :key="index"
-          class="draggable-row"
-          data-test="dashboard-tab-settings-draggable-row"
-          :data-test-tab-name="tab.name"
-        >
-          <div class="draggable-handle">
-            <OIcon
-              name="drag-indicator" size="sm"
-              class="tw:mr-1"
-              data-test="dashboard-tab-settings-drag-handle"
+        <template #cell-drag>
+          <div
+            class="tab-drag-handle flex items-center justify-center cursor-move"
+            data-test="dashboard-tab-settings-drag-handle"
+          >
+            <OIcon name="drag-indicator" size="sm" />
+          </div>
+        </template>
+
+        <template #cell-name="{ row }">
+          <span
+            v-if="row.tabId !== editTabId"
+            class="block overflow-hidden text-ellipsis whitespace-nowrap"
+            data-test="dashboard-tab-settings-tab-name"
+            :data-test-tab-name="row.name"
+            >{{ row.name }}</span
+          >
+          <div v-else class="flex items-center gap-1">
+            <input
+              :class="store.state.theme === 'dark' ? 'bg-gray-800' : ''"
+              v-model="editTabObj.data.name"
+              class="flex-1 border border-(--q-primary) rounded p-1 outline-none min-w-0 focus:border-(--q-secondary)"
+              data-test="dashboard-tab-settings-tab-name-edit"
             />
-          </div>
-          <div class="draggable-content">
-            <span
-              v-if="tab.tabId !== editTabId"
-              class="tab-name"
-              data-test="dashboard-tab-settings-tab-name"
-              >{{ tab.name }}</span
+            <OButton
+              variant="ghost"
+              size="icon"
+              :title="t('dashboard.save')"
+              @click.stop="saveEdit"
+              :disabled="!editTabObj.data.name.trim()"
+              data-test="dashboard-tab-settings-tab-name-edit-save"
+              icon-left="check"
             >
-            <div v-else class="edit-container">
-              <input
-                :class="store.state.theme === 'dark' ? 'tw:bg-gray-800' : ''"
-                v-model="editTabObj.data.name"
-                class="edit-input"
-                data-test="dashboard-tab-settings-tab-name-edit"
-              />
-              <OButton
-                variant="ghost"
-                size="icon"
-                :title="t('dashboard.save')"
-                @click.stop="saveEdit"
-                :disabled="!editTabObj.data.name.trim()"
-                data-test="dashboard-tab-settings-tab-name-edit-save"
-                icon-left="check"
-              >
-              </OButton>
-              <OButton
-                variant="ghost"
-                size="icon"
-                :title="t('dashboard.cancel')"
-                @click.stop="cancelEdit"
-                data-test="dashboard-tab-settings-tab-name-edit-cancel"
-                icon-left="close"
-              >
-              </OButton>
-            </div>
-            <div class="actions">
-              <OButton
-                variant="ghost"
-                size="icon"
-                :disabled="tab.tabId === editTabId"
-                :title="t('dashboard.edit')"
-                @click.stop="editItem(tab.tabId)"
-                data-test="dashboard-tab-settings-tab-edit-btn"
-                icon-left="edit"
-              >
-              </OButton>
-              <OButton
-                v-if="currentDashboardData.data.tabs.length !== 1"
-                variant="ghost"
-                size="icon"
-                :title="t('dashboard.delete')"
-                @click.stop="deleteItem(tab.tabId)"
-                data-test="dashboard-tab-settings-tab-delete-btn"
-              >
-                <template #icon-left
-                  ><OIcon name="delete" size="sm"
-                /></template>
-              </OButton>
-            </div>
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon"
+              :title="t('dashboard.cancel')"
+              @click.stop="cancelEdit"
+              data-test="dashboard-tab-settings-tab-name-edit-cancel"
+              icon-left="close"
+            >
+            </OButton>
           </div>
-        </div>
-      </draggable>
+        </template>
+
+        <template #cell-actions="{ row }">
+          <div class="flex justify-center gap-1">
+            <OButton
+              variant="ghost"
+              size="icon"
+              :disabled="row.tabId === editTabId"
+              :title="t('dashboard.edit')"
+              @click.stop="editItem(row.tabId)"
+              data-test="dashboard-tab-settings-tab-edit-btn"
+              icon-left="edit"
+            >
+            </OButton>
+            <OButton
+              v-if="currentDashboardData.data.tabs.length !== 1"
+              variant="ghost"
+              size="icon"
+              :title="t('dashboard.delete')"
+              @click.stop="deleteItem(row.tabId)"
+              data-test="dashboard-tab-settings-tab-delete-btn"
+            >
+              <template #icon-left><OIcon name="delete" size="sm" /></template>
+            </OButton>
+          </div>
+        </template>
+      </OTable>
     </div>
 
     <AddTab
@@ -148,16 +138,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, nextTick, ref } from "vue";
-import { VueDraggableNext } from "vue-draggable-next";
+import Sortable from "sortablejs";
 import { useI18n } from "vue-i18n";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useStore } from "vuex";
-import { deleteTab, editTab, getDashboard } from "@/utils/commons";
+import {
+  deleteTab,
+  editTab,
+  getDashboard,
+  updateDashboard,
+} from "@/utils/commons";
 import { useRoute } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { reactive } from "vue";
-import { onMounted } from "vue";
+import { onMounted, onActivated, onBeforeUnmount } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import TabsDeletePopUp from "./TabsDeletePopUp.vue";
 import useNotifications from "@/composables/useNotifications";
@@ -165,12 +163,12 @@ import useNotifications from "@/composables/useNotifications";
 export default defineComponent({
   name: "TabsSettings",
   components: {
-    draggable: VueDraggableNext as any,
     DashboardHeader,
     AddTab,
     TabsDeletePopUp,
     OButton,
     OIcon,
+    OTable,
   },
   setup(props, { emit }) {
     const store = useStore();
@@ -199,14 +197,90 @@ export default defineComponent({
       showErrorNotification,
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
+    // Attach SortableJS to OTable's rendered <tbody> so rows can be dragged
+    // to reorder. Re-runnable: tears down any prior instance first.
+    const initSortable = async () => {
+      await nextTick();
+      const tbody = tableWrapper.value?.querySelector(
+        'tbody[data-test="o2-table-body"]',
+      ) as HTMLElement | null;
+      if (!tbody) return;
+
+      sortableInstance?.destroy();
+      sortableInstance = Sortable.create(tbody, {
+        animation: 200,
+        handle: ".tab-drag-handle",
+        onEnd: (evt: Sortable.SortableEvent) => {
+          const { oldIndex, newIndex } = evt;
+          if (oldIndex == null || newIndex == null || oldIndex === newIndex) {
+            return;
+          }
+
+          // Revert Sortable's DOM mutation so Vue stays the single source of
+          // truth, then reorder the reactive data and let Vue re-render.
+          const parent = evt.from;
+          if (newIndex > oldIndex) {
+            parent.insertBefore(evt.item, parent.children[oldIndex]);
+          } else {
+            parent.insertBefore(evt.item, parent.children[oldIndex + 1] ?? null);
+          }
+
+          const list = [...currentDashboardData.data.tabs];
+          const [moved] = list.splice(oldIndex, 1);
+          list.splice(newIndex, 0, moved);
+          currentDashboardData.data.tabs = list;
+
+          handleDragEnd();
+        },
+      });
+    };
+
     onMounted(async () => {
       await getDashboardData();
+      await initSortable();
+    });
+
+    onActivated(async () => {
+      await initSortable();
+    });
+
+    onBeforeUnmount(() => {
+      sortableInstance?.destroy();
+      sortableInstance = null;
     });
 
     const { t } = useI18n();
-    const dragOptions = ref({
-      animation: 200,
-    });
+
+    // Wrapper around the global OTable; used to reach its rendered <tbody>
+    // so SortableJS can provide row drag-and-drop (OTable has no native row
+    // reorder — we layer it on without modifying OTable).
+    const tableWrapper = ref<HTMLElement | null>(null);
+    let sortableInstance: Sortable | null = null;
+
+    const columns: OTableColumnDef[] = [
+      {
+        id: "drag",
+        header: "",
+        size: 32,
+        minSize: 32,
+        maxSize: 32,
+        meta: { align: "center" },
+      },
+      {
+        id: "name",
+        header: t("dashboard.name"),
+        accessorKey: "name",
+        size: COL.name,
+        meta: { align: "left", isName: true, autoWidth: true },
+      },
+      {
+        id: "actions",
+        header: t("dashboard.actions"),
+        isAction: true,
+        size: 120,
+        meta: { align: "center", actionCount: 2 },
+      },
+    ];
 
     const editTabId = ref(null);
     const editTabObj: any = reactive({
@@ -352,8 +426,9 @@ export default defineComponent({
     };
 
     return {
-      dragOptions,
       t,
+      columns,
+      tableWrapper,
       editTabId,
       editTabObj,
       editItem,
@@ -375,95 +450,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.table-header {
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--o2-border-color);
-  background-color: var(--o2-table-header-bg);
-}
-
-.header-content {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 80px;
-  width: 100%;
-  align-items: center;
-}
-
-.name-column {
-  padding-left: 8px;
-}
-
-.actions-column {
-  justify-self: flex-end;
-}
-
-.table-content {
-  .draggable-row {
-    display: grid;
-    grid-template-columns: 40px minmax(0, 1fr);
-    align-items: center;
-    border-bottom: 1px solid var(--o2-border-color);
-    min-height: 40px;
-
-    &:hover {
-      background-color: var(--o2-hover-accent);
-    }
-  }
-}
-
-.draggable-handle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  cursor: move;
-}
-
-.draggable-content {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 80px;
-  align-items: center;
-  padding-right: 8px;
-}
-
-.tab-name {
-  padding: 8px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.edit-container {
-  display: flex;
-  align-items: center;
-  padding: 4px 8px;
-  gap: 4px;
-}
-
-.edit-input {
-  flex: 1;
-  border: 1px solid var(--q-primary);
-  border-radius: 4px;
-  padding: 4px;
-  outline: none;
-  min-width: 0;
-
-  &:focus {
-    border-color: var(--q-secondary);
-  }
-}
-
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 4px;
-}
-.q-btn {
-  transition: background-color 0.2s ease;
-
-  &:hover {
-    background-color: var(--o2-hover-accent) !important;
-  }
-}
-</style>

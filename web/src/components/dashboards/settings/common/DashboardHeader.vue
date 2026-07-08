@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="dashboard-header-root">
     <div
       data-test="dashboard-header-row"
-      class="tw:flex tw:items-center tw:flex-nowrap tw:mb-2"
+      class="flex items-center flex-nowrap my-2 mx-2"
     >
       <div
         v-if="backButton"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-header-back-button"
           variant="outline"
           size="icon-xs"
-          class="tw:mr-2"
+          class="mr-2"
           @click="onBackClicked"
           icon-left="arrow-back-ios-new"
         >
@@ -37,11 +37,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         data-test="dashboard-header-title-container"
-        class="tw:flex tw:flex-col tw:flex-1"
+        class="flex flex-col flex-1"
       >
         <div
           data-test="dashboard-header-title"
-          class="tw:text-base tw:font-semibold"
+          class="text-base font-semibold"
         >
           {{ title }}
         </div>
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <slot name="right"></slot>
       </div>
     </div>
-    <OSeparator data-test="dashboard-header-separator" class="tw:mb-2" />
+    <OSeparator data-test="dashboard-header-separator"/>
   </div>
 </template>
 
@@ -85,4 +85,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss"></style>

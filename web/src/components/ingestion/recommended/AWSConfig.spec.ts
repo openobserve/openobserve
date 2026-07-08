@@ -264,22 +264,22 @@ describe("AWSConfig", () => {
 
   // Test 16: Template section heading
   it("should display AWS Integrations heading", () => {
-    const heading = wrapper.find('.page-title');
+    const heading = wrapper.find('[data-test="aws-config-page-title"]');
     expect(heading.exists()).toBe(true);
     expect(heading.text()).toBe('AWS Integrations');
   });
 
   // Test 17: Template description text
   it("should display integration description", () => {
-    const description = wrapper.find('.page-description');
+    const description = wrapper.find('[data-test="aws-config-page-description"]');
     expect(description.exists()).toBe(true);
     expect(description.text()).toContain('Set up AWS monitoring in one click');
   });
 
   // Test 18: Integration section structure
   it("should have correct integration section structure", () => {
-    expect(wrapper.find('.tw\\:mt-8').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:mb-4').exists()).toBe(true);
+    expect(wrapper.find('.mt-8').exists()).toBe(true);
+    expect(wrapper.find('.mb-4').exists()).toBe(true);
   });
 
   // Test 19: CopyContent component integration
@@ -296,8 +296,10 @@ describe("AWSConfig", () => {
 
   // Test 21: Template structure
   it("should have correct template structure", () => {
-    expect(wrapper.find('.tw\\:m-3').exists()).toBe(true);
-    expect(wrapper.find('.aws-config-page').exists()).toBe(true);
+    expect(wrapper.find('.m-3').exists()).toBe(true);
+    expect(
+      wrapper.find('[data-test="aws-config-page-title"]').exists(),
+    ).toBe(true);
   });
 
   // Test 22: getImageURL function exposure
@@ -464,7 +466,9 @@ describe("AWSConfig", () => {
     expect(quickSetupComponent.exists()).toBe(true);
 
     // Verify template structure
-    expect(wrapper.find('.tw\\:m-3').exists()).toBe(true);
-    expect(wrapper.find('h6').exists()).toBe(true);
+    expect(wrapper.find('.m-3').exists()).toBe(true);
+    expect(
+      wrapper.find('[data-test="aws-config-page-title"]').exists(),
+    ).toBe(true);
   });
 });

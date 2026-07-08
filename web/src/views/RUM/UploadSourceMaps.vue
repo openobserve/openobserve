@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,18 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="upload-source-maps-page tw:w-full tw:h-full tw:px-[0.625rem]">
+  <div class="flex flex-col w-full h-full px-2.5 bg-(--q-background)">
     <!-- Top Header Bar -->
-    <div class="header-bar card-container tw:flex tw:items-center tw:justify-between tw:py-[0.675rem] tw:h-[64px] tw:px-[0.675rem] tw:mb-[0.675rem]">
-      <div class="tw:flex tw:items-center tw:gap-3">
+    <div class="header-bar shrink-0 card-container flex items-center justify-between py-[0.675rem] h-16 px-[0.675rem] mb-[0.675rem] border-b border-[var(--o2-border-color)]">
+      <div class="flex items-center gap-3">
         <div
           data-test="add-alert-back-btn"
-          class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer"
+          class="flex justify-center items-center mr-3 cursor-pointer"
           style="
             border: 1.5px solid;
             border-radius: 50%;
             width: 22px;
-            height: 22px; 
+            height: 22px;
           "
           title="Go Back"
           @click="navigateBack()"
@@ -34,19 +34,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
         <div>
-          <div class="tw:text-xl tw:font-semibold text-weight-medium">Upload Source Maps</div>
+          <div class="text-xl font-semibold text-weight-medium">Upload Source Maps</div>
         </div>
       </div>
     </div>
 
     <!-- Form Content Area -->
-    <div class="form-content-area card-container tw:mb-[0.675rem] tw:p-6" style="height: calc(100vh - 172px); overflow: auto">
-      <div class="upload-form">
+    <div class="flex-1 overflow-y-auto card-container mb-[0.675rem] p-6" style="height: calc(100vh - 172px); overflow: auto">
+      <div class="max-w-300 mx-auto">
         <!-- Input Fields -->
-        <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-3 tw:gap-4 tw:mb-6">
+        <div class="grid grid-cols-1 gap-4 mb-6">
           <!-- Service Input -->
           <div>
-            <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Service *</div>
+            <div class="text-sm font-medium text-weight-medium mb-2">Service *</div>
             <OInput
               data-test="rum-upload-source-maps-service-input"
               v-model="formData.service"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Version Input -->
           <div>
-            <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Version *</div>
+            <div class="text-sm font-medium text-weight-medium mb-2">Version *</div>
             <OInput
               data-test="rum-upload-source-maps-version-input"
               v-model="formData.version"
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Environment Input -->
           <div>
-            <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Environment</div>
+            <div class="text-sm font-medium text-weight-medium mb-2">Environment</div>
             <OInput
               data-test="rum-upload-source-maps-environment-input"
               v-model="formData.environment"
@@ -82,12 +82,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- File Upload Area -->
-        <div class="tw:mb-6">
-          <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Source Map ZIP File *</div>
+        <div class="mb-6">
+          <div class="text-sm font-medium text-weight-medium mb-2">Source Map ZIP File *</div>
           <div
             data-test="rum-upload-source-maps-file-dropzone"
-            class="upload-area"
-            :class="{ 'drag-over': isDragging, 'has-file': formData.file }"
+            class="border-2 border-dashed border-[var(--o2-border-color)] rounded-lg p-8 text-center cursor-pointer transition-all duration-300 bg-(--q-background) hover:border-(--q-primary) dark:border-[rgba(255,255,255,0.1)] dark:hover:bg-[rgba(var(--q-primary-rgb),0.05)]"
+            :class="[
+              isDragging ? 'border-[var(--q-primary)]! bg-[rgba(var(--q-primary-rgb),0.05)]! border-solid! dark:bg-[rgba(var(--q-primary-rgb),0.1)]!' : '',
+              formData.file ? 'p-6! text-left! border-solid! border-[var(--q-positive)]! bg-[rgba(var(--q-positive-rgb),0.02)]! dark:bg-[rgba(var(--q-positive-rgb),0.05)]!' : ''
+            ]"
             @dragover.prevent="isDragging = true"
             @dragleave.prevent="isDragging = false"
             @drop.prevent="handleDrop"
@@ -102,20 +105,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @change="handleFileInput"
             />
 
-            <div v-if="!formData.file" class="upload-content">
-              <OIcon name="backup" size="xl" class="tw:mb-3" />
-              <div class="tw:text-xl tw:font-semibold tw:text-gray-500 tw:mb-2">Drop your file here</div>
-              <div class="tw:text-sm tw:text-gray-400 tw:mb-3">or click to browse</div>
-              <div class="tw:text-xs tw:text-gray-400">.zip files only</div>
+            <div v-if="!formData.file" class="flex flex-col items-center justify-center">
+              <OIcon name="backup" size="xl" class="mb-3" />
+              <div class="text-xl font-semibold text-gray-500 mb-2">Drop your file here</div>
+              <div class="text-sm text-gray-400 mb-3">or click to browse</div>
+              <div class="text-xs text-gray-400">.zip files only</div>
             </div>
 
             <div v-else class="file-info">
-              <div class="tw:flex tw:items-center tw:justify-between">
-                <div class="tw:flex tw:items-center tw:gap-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
                   <OIcon name="draft" size="lg" />
                   <div>
-                    <div class="tw:text-sm tw:font-medium text-weight-medium">{{ formData.file.name }}</div>
-                    <div class="tw:text-xs tw:text-gray-400">{{ formatFileSize(formData.file.size) }}</div>
+                    <div class="text-sm font-medium text-weight-medium">{{ formData.file.name }}</div>
+                    <div class="text-xs text-gray-400">{{ formatFileSize(formData.file.size) }}</div>
                   </div>
                 </div>
                 <OButton
@@ -132,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Bottom Action Bar -->
-    <div class="action-bar card-container tw:flex tw:items-center tw:justify-end tw:gap-3 tw:py-3 tw:pr-3"
+    <div class="action-bar shrink-0 card-container flex items-center justify-end gap-3 py-3 pr-3 border-t border-[var(--o2-border-color)]"
       style="position: sticky; z-index: 2">
       <OButton
         data-test="rum-upload-source-maps-cancel-btn"
@@ -308,87 +311,3 @@ const uploadSourceMaps = async () => {
 };
 </script>
 
-<style lang="scss" scoped>
-.upload-source-maps-page {
-  display: flex;
-  flex-direction: column;
-  background-color: var(--q-background);
-}
-
-.header-bar {
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--q-border-color, #e0e0e0);
-}
-
-.form-content-area {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.upload-form {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.action-bar {
-  flex-shrink: 0;
-  border-top: 1px solid var(--q-border-color, #e0e0e0);
-}
-
-.upload-area {
-  border: 2px dashed var(--q-border-color, #e0e0e0);
-  border-radius: 8px;
-  padding: 2rem 2rem;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  background-color: var(--q-background);
-
-  &:hover {
-    border-color: var(--q-primary);
-    background-color: rgba(var(--q-primary-rgb), 0.02);
-  }
-
-  &.drag-over {
-    border-color: var(--q-primary);
-    background-color: rgba(var(--q-primary-rgb), 0.05);
-    border-style: solid;
-  }
-
-  &.has-file {
-    padding: 1.5rem;
-    text-align: left;
-    border-style: solid;
-    border-color: var(--q-positive);
-    background-color: rgba(var(--q-positive-rgb), 0.02);
-  }
-}
-
-.upload-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.file-info {
-}
-
-:deep(.q-dark) {
-  .upload-area {
-    border-color: rgba(255, 255, 255, 0.1);
-
-    &:hover {
-      background-color: rgba(var(--q-primary-rgb), 0.05);
-    }
-
-    &.drag-over {
-      background-color: rgba(var(--q-primary-rgb), 0.1);
-    }
-
-    &.has-file {
-      background-color: rgba(var(--q-positive-rgb), 0.05);
-    }
-  }
-}
-</style>

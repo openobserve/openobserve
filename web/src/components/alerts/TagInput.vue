@@ -15,37 +15,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="tag-input-container" class="tag-input-container">
-    <div data-test="tag-input-wrapper" class="tag-input-wrapper" :class="{ 'has-content': hasContent }">
-      <label v-if="label" data-test="tag-input-label" class="tag-input-label">{{ label }}</label>
-      <div data-test="tags-and-input" class="tags-and-input">
-        <OBadge
+  <div data-test="tag-input-container" class="w-full h-full">
+    <div
+      data-test="tag-input-wrapper"
+      class="tag-input-wrapper relative flex flex-col px-[5px] py-0 border border-(--o2-border-color,rgba(0,0,0,0.12)) rounded bg-(--o2-card-bg) min-h-14 h-full w-full max-w-full cursor-text transition-colors duration-300 overflow-hidden"
+      :class="{ 'has-content': hasContent }"
+    >
+      <label
+        v-if="label"
+        data-test="tag-input-label"
+        class="tag-input-label absolute top-4 left-3 text-base text-[rgba(0,0,0,0.6)] pointer-events-none transition-all duration-300 bg-transparent px-1 -ml-1"
+        style="transition-timing-function: cubic-bezier(0.25, 0.8, 0.5, 1); transform-origin: left top;"
+      >{{ label }}</label>
+      <div data-test="tags-and-input" class="flex flex-wrap items-start gap-1 mt-[5px] w-full overflow-hidden">
+        <OTag
           v-for="(tag, index) in modelValue"
           :key="index"
           :data-test="`tag-chip-${index}`"
-          variant="default"
-          size="sm"
-          class="tag-chip"
+          type="selectionChip"
+          class="tag-chip m-0! shrink-0 grow-0 basis-auto"
+          style="background-color: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%)"
         >
           {{ tag }}
           <template #trailing>
             <button
               type="button"
               :aria-label="`Remove ${tag}`"
-              class="tw:inline-flex tw:items-center tw:justify-center tw:cursor-pointer tw:hover:opacity-70"
+              class="inline-flex items-center justify-center cursor-pointer hover:opacity-70"
               @click="removeTag(index)"
             >
               <OIcon name="close" size="xs" />
             </button>
           </template>
-        </OBadge>
+        </OTag>
         <input
           data-test="tag-input-field"
           ref="inputRef"
           v-model="inputValue"
           type="text"
           :placeholder="modelValue.length > 0 ? '' : placeholder"
-          class="tag-input"
+          class="tag-input [flex:1_1_100px] min-w-[100px] border-0 outline-none bg-transparent p-1 text-sm text-(--q-color-text-primary)"
           @keydown.enter.prevent="addTag"
           @input="handleInput"
           @keydown.delete="handleBackspace"
@@ -58,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed } from "vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface Props {
@@ -124,84 +133,21 @@ const handleBackspace = () => {
 };
 </script>
 
-<style lang="scss" scoped>
-.tag-input-container {
-  width: 100%;
-  height: 100%;
+<style>
+.tag-input-wrapper:focus-within {
+  border-color: var(--q-primary);
 }
 
-.tag-input-wrapper {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  padding: 0px 5px;
-  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.12));
-  border-radius: 4px;
-  background-color: var(--o2-card-bg);
-  min-height: 56px;
-  height: 100%;
-  width: 100%;
-  max-width: 100%;
-  cursor: text;
-  transition: border-color 0.3s;
-  overflow: hidden;
-
-  &:focus-within {
-    border-color: var(--q-primary);
-
-    .tag-input-label {
-      color: var(--q-primary);
-    }
-  }
-
-  &.has-content .tag-input-label {
-    transform: translateY(-8px) scale(0.75);
-    color: var(--q-primary);
-  }
+.tag-input-wrapper:focus-within .tag-input-label {
+  color: var(--q-primary);
 }
 
-.tag-input-label {
-  position: absolute;
-  top: 16px;
-  left: 12px;
-  font-size: 16px;
-  color: rgba(0, 0, 0, 0.6);
-  pointer-events: none;
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.5, 1);
-  transform-origin: left top;
-  background-color: transparent;
-  padding: 0 4px;
-  margin-left: -4px;
+.tag-input-wrapper.has-content .tag-input-label {
+  transform: translateY(-8px) scale(0.75);
+  color: var(--q-primary);
 }
 
-.tags-and-input {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 4px;
-  margin-top: 5px;
-  width: 100%;
-  overflow: hidden;
-}
-
-.tag-chip {
-  margin: 0 !important;
-  flex: 0 0 auto;
-  background-color: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
-}
-
-.tag-input {
-  flex: 1 1 100px;
-  min-width: 100px;
-  border: none;
-  outline: none;
-  background: transparent;
-  padding: 4px;
-  font-size: 14px;
-  color: var(--q-color-text-primary);
-
-  &::placeholder {
-    color: var(--q-color-text-hint);
-  }
+.tag-input::placeholder {
+  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 </style>

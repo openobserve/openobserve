@@ -28,6 +28,18 @@ export interface TooltipProps {
   open?: boolean;
   /** Extra CSS class applied to the tooltip bubble element */
   contentClass?: string;
+  /**
+   * Renders a keyboard-shortcut hint (OShortcut keycaps) after the content.
+   * Accepts a pre-symbolised string (`"⌘⇧A"`) or an array of keycaps
+   * (`["⌘", "⇧", "A"]`). Omit to show no hint.
+   */
+  shortcut?: string | string[];
+  /**
+   * Registry shortcut id — resolves the hint keys from `shortcutRegistry.ts`
+   * (the single source of truth) so a key change there updates this tooltip too.
+   * Prefer this over `shortcut`; `shortcut` wins if both are set.
+   */
+  shortcutId?: string;
 }
 
 export interface TooltipSlots {

@@ -1,28 +1,30 @@
+<!-- Copyright 2026 OpenObserve Inc. -->
 <!-- Unified Query Editor Component
   Supports: SQL, PromQL, VRL, JavaScript
   Features: NL Mode (AI), Language Switching, Auto-detection
 -->
 
 <template>
-  <div class="query-editor tw:w-full tw:relative" :style="rootStyle">
+  <div class="flex flex-col w-full relative outline-transparent" :style="rootStyle">
     <!-- AI Input Bar (shown in NL Mode) - Positioned at top -->
     <!-- Height locked to 1.875rem = same as icon-toolbar expand button -->
     <div
       v-if="isAIMode"
-      :class="['ai-input-bar tw:h-[2.25rem] tw:flex tw:items-center tw:gap-2 tw:px-2 tw:flex-shrink-0 tw:z-10', props.hasExpandButton && 'tw:pr-10']"
+      :data-test="`${dataTestPrefix}-ai-input-bar`"
+      :class="['bg-[linear-gradient(135deg,rgba(139,92,246,0.05)_0%,rgba(236,72,153,0.05)_100%)] border-b border-b-(--o2-border-color) h-9 flex items-center gap-2 px-2 shrink-0 z-10', props.hasExpandButton && 'pr-10']"
     >
       <!-- Show streaming status with spinner + stop button -->
       <template v-if="isGenerating">
-        <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px] tw:shrink-0" />
+        <img :src="nlpIcon" alt="AI" class="w-[20px] h-[20px] shrink-0" />
         <OSpinner variant="dots" size="xs" />
-        <span class="tw:text-sm tw:flex-1 tw:truncate">{{ streamingText || aiStatusText || t('search.analyzingQuery') }}</span>
+        <span class="text-sm flex-1 truncate">{{ streamingText || aiStatusText || t('search.analyzingQuery') }}</span>
         <OButton
           variant="ghost-destructive"
           size="icon-circle-sm"
           icon-left="stop"
           :data-test="`${dataTestPrefix}-ai-stop-btn`"
           @click="cancelGeneration"
-          class="ai-stop-button tw:shrink-0"
+          class="text-[#e74c3c]! transition-all! duration-200! hover:bg-[rgba(231,76,60,0.1)] shrink-0"
         >
           <OTooltip :content="t('common.stopGenerating')" />
         </OButton>
@@ -37,7 +39,7 @@
           @keydown.enter="handleAIInputEnter"
         >
           <template #icon-left>
-            <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
+            <img :src="nlpIcon" alt="AI" class="w-[20px] h-[20px]" />
           </template>
         </OInput>
         <!-- Send Button -->
@@ -48,7 +50,7 @@
           :disabled="!aiInputText.trim() || props.disableAi"
           :data-test="`${dataTestPrefix}-ai-send-btn`"
           @click="handleAIGenerate"
-          class="ai-send-button"
+          class="bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! text-white! transition-all! duration-200! min-w-7! min-h-7! w-7! h-7! enabled:hover:-translate-y-px enabled:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.4)]! enabled:active:translate-y-0 disabled:opacity-40! disabled:bg-[#ccc]!"
         >
           <OTooltip v-if="props.disableAi && props.disableAiReason" :content="props.disableAiReason" />
           <OTooltip v-else-if="!aiInputText.trim()" :content="props.aiTooltip || t('search.enterPrompt')" />
@@ -60,7 +62,7 @@
           icon-left="close"
           :data-test="`${dataTestPrefix}-ai-close-btn`"
           @click="dismissAIMode"
-          class="ai-close-button"
+          class="transition-colors! duration-200!"
         >
           <OTooltip :content="t('common.close')" />
         </OButton>
@@ -68,7 +70,7 @@
     </div>
 
     <!-- Code Editor with relative positioning for floating button -->
-    <div class="editor-container tw:relative tw:flex-1 tw:min-h-0">
+    <div class="overflow-hidden relative flex-1 min-h-0">
       <CodeQueryEditor
         :ref="(el) => (editorRef = el)"
         :editor-id="`${dataTestPrefix}-editor-${currentLanguage}`"
@@ -76,6 +78,7 @@
         :query="query"
         :nlp-mode="nlpMode"
         :read-only="readOnly"
+        :release-wheel-to-page="releaseWheelToPage"
         :show-auto-complete="showAutoComplete"
         :keywords="keywords"
         :suggestions="suggestions"
@@ -88,7 +91,7 @@
         @generation-start="handleGenerationStart"
         @generation-end="handleGenerationEnd"
         @generation-success="handleGenerationSuccess"
-        class="monaco-editor tw:w-full tw:h-full"
+        class="w-full h-full"
       />
 
       <!-- Floating AI Icon (top-right corner of editor) - hidden when AI bar is open -->
@@ -99,10 +102,10 @@
         size="icon-toolbar"
         :disabled="props.disableAi"
         @click="nlpMode = true"
-        class="ai-floating-button"
+        class="group absolute! top-0.75 z-100 bg-[linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]! text-white! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! w-7.5! h-7.5! min-w-7.5! min-h-7.5! rounded-md hover:bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]!"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
-        <img :src="nlpIcon" alt="AI Mode" class="tw:w-[18px] tw:h-[18px] ai-icon" />
+        <img :src="nlpIcon" alt="AI Mode" class="w-[18px] h-[18px] transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert" />
         <OTooltip :content="props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')" />
       </OButton>
     </div>
@@ -134,6 +137,7 @@ interface Props {
   query: string;
   readOnly?: boolean;
   showAutoComplete?: boolean;
+  releaseWheelToPage?: boolean; // default true: let the page scroll when editor has nothing left to scroll
 
   // Editor autocomplete (forwarded to CodeQueryEditor)
   keywords?: any[];              // Autocomplete keywords for Monaco
@@ -161,6 +165,7 @@ const props = withDefaults(defineProps<Props>(), {
   defaultLanguage: 'sql',
   readOnly: false,
   showAutoComplete: true,
+  releaseWheelToPage: true,
   keywords: () => [],
   suggestions: () => [],
   debounceTime: 500,
@@ -233,18 +238,7 @@ const nlpIcon = computed(() => {
 });
 
 // Computed: AI input field class based on theme
-const aiInputFieldClass = computed(() => {
-  return store.state.theme === 'dark'
-    ? 'ai-input-field ai-input-field--dark tw:flex-1 tw:my-px'
-    : 'ai-input-field tw:flex-1 tw:my-px';
-});
-
-// Computed: AI streaming bar class based on theme
-const aiBarStreamingClass = computed(() => {
-  return store.state.theme === 'dark'
-    ? 'ai-bar-streaming ai-bar-streaming--dark tw:flex tw:items-center tw:gap-2'
-    : 'ai-bar-streaming tw:flex tw:items-center tw:gap-2';
-});
+const aiInputFieldClass = computed(() => 'h-7! flex-1 my-px');
 
 // Computed: Is in AI mode?
 // When externally controlled (nlpMode prop passed), only show AI bar when nlpMode is explicitly ON.
@@ -312,7 +306,6 @@ const handleAIGenerate = async () => {
 
   // Check if user wants to execute the query instead of generating a new one
   if (currentQuery && currentQuery.trim() && isExecutionIntent(userInput)) {
-    console.log('[QueryEditor] Execution intent detected, running query instead of generating');
     aiInputText.value = ''; // Clear input
     emit('run-query'); // Trigger query execution
     return;
@@ -425,7 +418,6 @@ const handleGenerationEnd = () => {
 };
 
 const handleGenerationSuccess = ({ type, message }: any) => {
-  console.log('[QueryEditor] Generation success:', { type, message });
 
   // Show success message in AI status
   aiStatusText.value = '✓ ' + t('search.queryGeneratedSuccess');
@@ -462,15 +454,18 @@ watch(() => props.query, (newQuery) => {
   if (!editorRef.value?.getValue) return;
 
   const currentValue = editorRef.value.getValue();
+  // Coerce to string so a null/undefined query (e.g. switching PromQL → SQL)
+  // doesn't reach Monaco's setValue, which throws "Illegal argument"
+  const nextValue = newQuery ?? "";
 
   // Compare trimmed values to avoid cursor jumps from whitespace differences
   // This prevents setValue calls when user is typing trailing spaces
-  if (currentValue?.trim() === newQuery?.trim()) {
+  if (currentValue?.trim() === nextValue.trim()) {
     return;
   }
 
   if (editorRef.value.setValue) {
-    editorRef.value.setValue(newQuery);
+    editorRef.value.setValue(nextValue);
   }
 });
 
@@ -562,160 +557,3 @@ defineExpose({
 });
 </script>
 
-<style scoped>
-.query-editor {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  outline-color: transparent; /* Remove focus outline from root container */  
-}
-
-/* Editor container - clips Monaco but keeps floating button visible */
-.editor-container {
-  overflow: hidden;
-}
-
-/* Floating AI Button (top-right corner) - right is set dynamically via :style based on hasExpandButton */
-.ai-floating-button {
-  position: absolute;
-  top: 0.1875rem;
-  right: 0.25rem;
-  z-index: 100;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
-  color: white !important;
-  transition: background 0.3s ease, box-shadow 0.3s ease !important;
-  width: 30px !important;
-  height: 30px !important;
-  min-width: 30px !important;
-  min-height: 30px !important;
-  border-radius: 6px;
-}
-
-.ai-floating-button:hover {
-  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
-  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35) !important;
-}
-
-.ai-floating-button:hover .ai-icon {
-  filter: brightness(0) invert(1);
-}
-
-/* AI icon rotation on hover - matches MainLayout ai-icon */
-.ai-floating-button .ai-icon {
-  transition: transform 0.6s ease;
-}
-
-.ai-floating-button:hover .ai-icon {
-  transform: rotate(180deg);
-}
-
-/* AI Send Button (arrow icon inside input bar) */
-.ai-send-button {
-  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
-  color: white !important;
-  transition: all 0.2s ease !important;
-  min-width: 28px !important;
-  min-height: 28px !important;
-  width: 28px !important;
-  height: 28px !important;
-}
-
-.ai-send-button:hover:not([disabled]) {
-  transform: translateY(-1px);
-  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.4) !important;
-}
-
-.ai-send-button:active:not([disabled]) {
-  transform: translateY(0);
-}
-
-.ai-send-button[disabled] {
-  opacity: 0.4 !important;
-  background: #ccc !important;
-}
-
-/* AI Stop Button (shown during generation) */
-.ai-stop-button {
-  color: #e74c3c !important;
-  transition: all 0.2s ease !important;
-}
-
-.ai-stop-button:hover {
-  background: rgba(231, 76, 60, 0.1) !important;
-}
-
-/* AI Close Button */
-.ai-close-button {
-  transition: color 0.2s ease !important;
-}
-
-/* AI Input Bar Styling */
-.ai-input-bar {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%);
-  border-bottom: 1px solid var(--o2-border-color);
-}
-
-.ai-input-field {
-  height: 1.75rem !important; /* tw:h-7 = 28px, overrides OInput's default h-8 (32px) */
-}
-
-.ai-input-field :deep(.tw\:h-8) {
-  height: 1.75rem !important; /* h-7 = 28px, overrides OInput's default h-8 (32px) */
-}
-
-.ai-input-field :deep(.q-field__control) {
-  background: white;
-  border-radius: 6px;
-  padding: 0 8px;
-  min-height: 18px;
-  height: 18px;
-}
-
-/* Remove focus border */
-.ai-input-field :deep(.q-field__control::before),
-.ai-input-field :deep(.q-field__control::after) {
-  border: none !important;
-}
-
-.ai-input-field :deep(.q-field__prepend) {
-  padding-right: 8px;
-}
-
-/* Streaming status display */
-.ai-bar-streaming {
-  background: white;
-  border-radius: 6px;
-  padding: 6px 10px;
-  color: var(--q-primary);
-}
-
-.ai-bar-streaming span {
-  color: #666;
-}
-
-/* Dark mode styling - using store.state.theme */
-.ai-input-field--dark :deep(.q-field__control) {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.ai-input-field--dark :deep(.q-field__native),
-.ai-input-field--dark :deep(input) {
-  color: #fff !important;
-}
-
-.ai-input-field--dark :deep(.q-field__native::placeholder),
-.ai-input-field--dark :deep(input::placeholder) {
-  color: rgba(255, 255, 255, 0.5) !important;
-}
-
-/* Dark mode streaming bar - using store.state.theme */
-.ai-bar-streaming--dark {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.ai-bar-streaming--dark span {
-  color: #ccc;
-}
-</style>

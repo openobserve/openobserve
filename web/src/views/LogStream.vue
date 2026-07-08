@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="alert-list-page" class="tw:h-full">
+  <div data-test="alert-list-page" class="h-full">
     <PageLayout
-      :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+      :header-class="'shrink-0 px-4 border-b border-border-default'"
     >
       <!-- Row 1: standard header — title + actions only. The stream-type filter
            and search moved into the table's own toolbar below. -->
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </AppPageHeader>
       </template>
 
-      <div class="card-container tw:h-full">
+      <div class="card-container h-full">
       <OTable
         data-test="log-stream-table"
         :data="logStream"
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Toolbar inside the table frame: stream-type filter + search. -->
           <template #toolbar>
             <div
-              class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:w-full"
+              class="flex items-center justify-between gap-2 w-full"
             >
               <OToggleGroup
                 :model-value="streamActiveTab"
@@ -85,25 +85,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OToggleGroupItem value="logs" size="sm">
                   <template #icon-left
-                    ><OIcon name="search" size="xs" class="tw:shrink-0"
+                    ><OIcon name="search" size="xs" class="shrink-0"
                   /></template>
                   {{ t("logStream.labelLogs") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="metrics" size="sm">
                   <template #icon-left
-                    ><OIcon name="bar-chart" size="xs" class="tw:shrink-0"
+                    ><OIcon name="bar-chart" size="xs" class="shrink-0"
                   /></template>
                   {{ t("logStream.labelMetrics") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="traces" size="sm">
                   <template #icon-left
-                    ><OIcon name="account-tree" size="xs" class="tw:shrink-0"
+                    ><OIcon name="account-tree" size="xs" class="shrink-0"
                   /></template>
                   {{ t("logStream.labelTraces") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="metadata" size="sm">
                   <template #icon-left
-                    ><OIcon name="info" size="xs" class="tw:shrink-0"
+                    ><OIcon name="info" size="xs" class="shrink-0"
                   /></template>
                   {{ t("logStream.labelMetadata") }}
                 </OToggleGroupItem>
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSearchInput
                 data-test="streams-search-stream-input"
                 v-model="filterQuery"
-                class="tw:w-64 no-border o2-search-input"
+                class="w-64 no-border o2-search-input"
                 :placeholder="t('logStream.search')"
                 :debounce="300"
               />
@@ -126,14 +126,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             `dashboard-name-cell-<name>` pattern in Dashboards.vue.
           -->
           <template #cell-name="{ row }">
-            <span :data-test="`log-stream-name-cell-${row.name}`" class="tw:text-text-primary">{{ row.name }}</span>
+            <span :data-test="`log-stream-name-cell-${row.name}`" class="text-text-primary">{{ row.name }}</span>
           </template>
           <template #cell-actions="{ row }">
-             <div class="tw:flex tw:items-center actions-container">
+             <div class="flex items-center actions-container">
               <OButton
                 icon-left="search"
                 :title="t('logStream.explore')"
                 data-test="log-stream-explore-btn"
+                data-row-action="view"
                 variant="ghost"
                 size="icon-sm"
                 @click="exploreStream({ row })"
@@ -142,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="description"
                 :title="t('logStream.schemaHeader')"
                 data-test="log-stream-schema-btn"
+                data-row-action="view"
                 variant="ghost"
                 size="icon-sm"
                 @click="listSchema({ row })"
@@ -150,6 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="delete"
                 :title="t('logStream.delete')"
                 data-test="log-stream-delete-btn"
+                data-row-action="delete"
                 variant="ghost-destructive"
                 size="icon-sm"
                 @click="confirmDeleteAction({ row })"
@@ -161,18 +164,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OEmptyState
                 size="hero"
                 preset="no-streams"
+                :actions="streamsEmptyActions"
                 :filtered="!!filterQuery"
-                :hide-action="!filterQuery"
-                @action="(id) => id === 'clear-filters' && (filterQuery = '')"
-              />
+                @action="onStreamsEmptyStateAction"
+              >
+                <template v-if="!filterQuery" #extra>
+                  <div class="flex items-center justify-center gap-2 flex-wrap">
+                    <span class="text-sm font-semibold text-text-secondary mr-1">
+                      {{ t('logStream.emptyOr') }}
+                    </span>
+                    <EmptyStateIngestionChip
+                      data-test="log-stream-empty-kubernetes-btn"
+                      @click="router.push({ name: 'ingestFromKubernetes', query: { org_identifier: store.state.selectedOrganization.identifier } })"
+                    >
+                      <img :src="getImageURL('images/common/kubernetes.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+                      {{ t('logStream.emptyKubernetes') }}
+                    </EmptyStateIngestionChip>
+                    <EmptyStateIngestionChip
+                      data-test="log-stream-empty-aws-btn"
+                      @click="router.push({ name: 'AWSConfig', query: { org_identifier: store.state.selectedOrganization.identifier } })"
+                    >
+                      <img :src="getImageURL('images/ingestion/aws.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+                      {{ t('logStream.emptyAws') }}
+                    </EmptyStateIngestionChip>
+                    <EmptyStateIngestionChip
+                      data-test="log-stream-empty-linux-btn"
+                      @click="router.push({ name: 'ingestFromLinux', query: { org_identifier: store.state.selectedOrganization.identifier } })"
+                    >
+                      <img :src="getImageURL('images/common/linux.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+                      {{ t('logStream.emptyLinux') }}
+                    </EmptyStateIngestionChip>
+                    <EmptyStateIngestionChip
+                      data-test="log-stream-empty-windows-btn"
+                      @click="router.push({ name: 'ingestFromWindows', query: { org_identifier: store.state.selectedOrganization.identifier } })"
+                    >
+                      <img :src="getImageURL('images/common/windows.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+                      {{ t('logStream.emptyWindows') }}
+                    </EmptyStateIngestionChip>
+                  </div>
+                </template>
+              </OEmptyState>
             </div>
           </template>
           <template #bottom="scope">
             <div
-              class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2"
+              class="flex items-center justify-between w-full py-2"
             >
               <div
-                class="tw:flex tw:items-center tw:w-full tw:font-bold tw:text-[14px]"
+                class="flex items-center w-full font-bold text-[14px]"
               >
                 {{ scope.totalRows }} Stream(s)
                 <OButton
@@ -180,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="delete"
                   variant="outline-destructive"
                   size="sm-action"
-                  class="tw:ml-4"
+                  class="ml-4"
                   :disabled="isDeleting"
                   @click="confirmBatchDeleteAction"
                 >
@@ -212,16 +251,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmDelete = false"
       @click:primary="() => { deleteStream(); confirmDelete = false; }"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:py-1">
-        <p class="tw:text-sm">{{ t("logStream.confirmDeleteMsg") }}</p>
+      <div class="flex flex-col gap-3 py-1">
+        <p class="text-sm">{{ t("logStream.confirmDeleteMsg") }}</p>
         <div
-          class="tw:w-full tw:flex tw:items-center tw:gap-2 tw:text-sm tw:text-gray-500"
+          class="w-full flex items-center gap-2 text-sm text-gray-500"
         >
           <OCheckbox
-            class="checkbox-delete-associated-alerts-pipelines"
             v-model="deleteAssociatedAlertsPipelines"
           />
-          <span class="delete-associated-alerts-pipelines-text">
+          <span class="text-(--o2-text-secondary) text-xs font-medium">
             {{ t("logStream.deleteAssociatedAlertsPipelines") }}
           </span>
         </div>
@@ -238,16 +276,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmBatchDelete = false"
       @click:primary="() => { deleteBatchStream(); confirmBatchDelete = false; }"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:py-1">
-        <p class="tw:text-sm">{{ t("logStream.confirmBatchDeleteMsg") }}</p>
+      <div class="flex flex-col gap-3 py-1">
+        <p class="text-sm">{{ t("logStream.confirmBatchDeleteMsg") }}</p>
         <div
-          class="tw:w-full tw:flex tw:items-center tw:gap-2 tw:text-sm tw:text-gray-500"
+          class="w-full flex items-center gap-2 text-sm text-gray-500"
         >
           <OCheckbox
-            class="checkbox-delete-associated-alerts-pipelines"
             v-model="deleteAssociatedAlertsPipelines"
           />
-          <span class="delete-associated-alerts-pipelines-text">
+          <span class="text-(--o2-text-secondary) text-xs font-medium">
             Delete all Pipelines and Alerts associated with the selected streams
           </span>
         </div>
@@ -278,6 +315,7 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import streamService from "../services/stream";
 import SchemaIndex from "../components/logstream/schema.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 import segment from "../services/segment_analytics";
 import {
   getImageURL,
@@ -299,6 +337,8 @@ import { useReo } from "@/services/reodotdev_analytics";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "PageLogStream",
   components: {
@@ -306,6 +346,7 @@ export default defineComponent({
     AppPageHeader,
     SchemaIndex,
     OEmptyState,
+    EmptyStateIngestionChip,
     AddStream,
     OButton,
     ODialog,
@@ -374,15 +415,6 @@ export default defineComponent({
         meta: { align: "left", flex: true },
       },
       {
-        id: "stream_type",
-        accessorKey: "stream_type",
-        header: t("logStream.type"),
-        size: COL.streamType,
-        resizable: true,
-        hideable: true,
-        meta: { align: "left" },
-      },
-      {
         id: "doc_num",
         accessorFn: (row: any) =>
           row.doc_num?.toLocaleString?.() ?? row.doc_num,
@@ -390,7 +422,7 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        size: COL.count,
+        size: 150,
         meta: { align: "right" },
       },
       {
@@ -823,6 +855,43 @@ export default defineComponent({
       // });
     };
 
+    const streamsEmptyActions = computed(() => {
+      const actions: { id: string; icon: string; titleKey: string; descriptionKey: string }[] = [
+        {
+          id: "setup-ingestion",
+          icon: "cloud-upload",
+          titleKey: "emptyState.noStreams.action",
+          descriptionKey: "emptyState.noStreams.actionDesc",
+        },
+      ];
+      if (isSchemaUDSEnabled.value) {
+        actions.push({
+          id: "create",
+          icon: "add",
+          titleKey: "emptyState.noStreams.createAction",
+          descriptionKey: "emptyState.noStreams.createActionDesc",
+        });
+      }
+      return actions;
+    });
+
+    const onStreamsEmptyStateAction = (id?: string) => {
+      if (id === "clear-filters") {
+        filterQuery.value = "";
+        return;
+      }
+      if (id === "create") {
+        addStream();
+        return;
+      }
+      if (id === "setup-ingestion") {
+        router.push({
+          name: "ingestion",
+          query: { org_identifier: store.state.selectedOrganization.identifier },
+        });
+      }
+    };
+
     const onPaginationChange = async (params: { page: number; size: number }) => {
       currentPage.value = params.page;
       pageSize.value = params.size;
@@ -840,6 +909,26 @@ export default defineComponent({
       streamActiveTab.value = tab;
       onChangeStreamFilter(tab);
     };
+
+
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "streamsAdd",
+        handler: () => { if (!isInputFocused()) addStream(); },
+      },
+      {
+        id: "streamsRefresh",
+        handler: () => { if (!isInputFocused()) getLogStream(true); },
+      },
+      {
+        id: "streamsFocusSearch",
+        handler: () => {
+          focusSearchInput("streams-search-stream-input");
+        },
+      },
+    ]);
     return {
       t,
       router,
@@ -878,6 +967,8 @@ export default defineComponent({
       onChangeStreamFilter,
       addStreamDialog,
       addStream,
+      streamsEmptyActions,
+      onStreamsEmptyStateAction,
       loadingState,
       isDeleting,
       searchKeyword,
@@ -888,57 +979,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped></style>
-
-<style lang="scss">
-.bottom-bar {
-  display: flex;
-  width: 100%;
-  justify-content: space-between;
-  align-items: center;
-}
-.delete-btn {
-  width: 10vw;
-}
-
-.confirmBodyLogStream {
-  padding: 22px 1.375rem 0;
-  font-size: 0.875rem;
-  text-align: center;
-  font-weight: 700;
-
-  .head {
-    line-height: 2.15em;
-    margin-bottom: 4px;
-  }
-
-  .para {
-    color: $light-text;
-  }
-}
-
-.delete-associated-alerts-pipelines-text {
-  color: $light-text;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.confirmActionsLogStream {
-  justify-content: center;
-  padding: 16px 22px 22px;
-  display: flex;
-}
-.checkbox-delete-associated-alerts-pipelines {
-  .q-checkbox__inner {
-    height: 28px !important;
-    min-height: 28px !important;
-    width: 28px !important;
-    min-width: 28px !important;
-  }
-  .q-checkbox__bg {
-    height: 16px !important;
-    width: 16px !important;
-  }
-}
-</style>

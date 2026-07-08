@@ -1,11 +1,11 @@
 <template>
   <div
-    class="field_overlay tw:absolute tw:right-0 tw:top-[50%] table-cell-actions tw:translate-y-[-50%] tw:h-full! tw:flex! tw:items-center tw:justify-center tw:rounded tw:max-h-10! tw:px-2"
+    class="field_overlay absolute right-0 top-[50%] table-cell-actions translate-y-[-50%] h-full! flex! items-center justify-center rounded max-h-10! px-2"
     :class="backgroundClass"
     :title="row[column.id]"
     :data-test="`log-add-data-from-column-${row[column.id]}`"
   >
-    <span class="tw:mx-1">
+    <span class="mx-1">
       <OButton
         variant="ghost"
         size="icon-xs-circle"
@@ -15,7 +15,7 @@
         <OIcon name="content-copy" size="xs" />
       </OButton>
     </span>
-    <span v-if="isStreamField && !hideSearchTermActions" class="tw:mr-1">
+    <span v-if="isStreamField && !hideSearchTermActions" class="mr-1">
       <OButton
         variant="ghost"
         size="icon-xs-circle"
@@ -26,11 +26,11 @@
         title="Include Term"
       >
         <OIcon style="height: 8px; width: 8px">
-          <EqualIcon class="tw:size-full" />
+          <EqualIcon class="size-full" />
         </OIcon>
       </OButton>
     </span>
-    <span v-if="isStreamField && !hideSearchTermActions" class="tw:mr-1">
+    <span v-if="isStreamField && !hideSearchTermActions" class="mr-1">
       <OButton
         variant="ghost"
         size="icon-xs-circle"
@@ -41,7 +41,7 @@
         :data-test="`log-details-exclude-field-${row[column.id]}`"
       >
         <OIcon style="height: 8px; width: 8px">
-          <NotEqualIcon class="tw:size-full" />
+          <NotEqualIcon class="size-full" />
         </OIcon>
       </OButton>
     </span>
@@ -113,7 +113,7 @@ const addSearchTerm = (
 };
 
 const backgroundClass = computed(() =>
-  store.state.theme === "dark" ? "tw:bg-black" : "tw:bg-white",
+  store.state.theme === "dark" ? "bg-black" : "bg-white",
 );
 const sendToAiChat = (value: any) => {
   emit("sendToAiChat", value);

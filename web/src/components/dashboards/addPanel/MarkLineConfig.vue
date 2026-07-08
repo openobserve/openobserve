@@ -10,7 +10,7 @@
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  See the License for the specific language governing permissions and
- limitations under the License. 
+ limitations under the License.
 -->
 
 <!-- eslint-disable vue/no-unused-components -->
@@ -21,20 +21,14 @@
       :key="index"
     >
       <div
-        style="
-          display: flex;
-          justify-content: space-between;
-          padding-bottom: 12px;
-          margin-bottom: 12px;
-          border-bottom: 1px solid gray;
-        "
+        class="flex justify-between pb-3 mb-3 border-b border-gray-500"
       >
-        <div style="width: 90%" class="tw:flex tw:flex-col tw:gap-2">
+        <div style="width: 90%" class="flex flex-col gap-2">
           <OSelect
             v-model="dashboardPanelData.data.config.mark_line[index].type"
             :label="t('dashboard.markLineType')"
             :options="markLineTypeOptions"
-            class="tw:w-full"
+            class="w-full"
             :data-test="`dashboard-config-markline-type-${index}`"
           />
           <OInput
@@ -55,10 +49,9 @@
         </div>
 
         <OIcon
-          class="tw:mr-1"
+          class="mr-1 cursor-pointer"
           size="sm"
           name="close"
-          style="cursor: pointer"
           @click="removeMarkLineByIndex(index)"
           :data-test="`dashboard-addpanel-config-markline-remove-${index}`"
         />
@@ -141,5 +134,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped></style>

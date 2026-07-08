@@ -15,8 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="tw:rounded-md home-page"
-    :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view' : ''"
+    class="rounded-md overflow-hidden min-h-0 h-full flex flex-col"
     data-test="home-page"
   >
     <!-- No card-container here: the page already renders inside MainLayout's
@@ -28,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          a padded root insets the header and makes it read as a floating bar.
          Padding is reintroduced on the body wrapper below the header instead. -->
     <div
-      class="tw:h-full tw:overflow-hidden tw:flex tw:flex-col tw:min-h-0"
+      class="h-full overflow-hidden flex flex-col min-h-0"
     >
       <!-- Top-level page header: module icon + "Home" title, with the home tabs
            rendered as a full-width strip below (tabsBelow). The header owns its
@@ -41,9 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :subtitle="t('home.subtitle')"
         icon="home"
         :tabs-below="tabOrder.length > 1"
-        class="tw:shrink-0 tw:px-4"
+        class="shrink-0 px-4"
         :class="
-          tabOrder.length > 1 ? '' : 'tw:border-b tw:border-border-default'
+          tabOrder.length > 1 ? '' : 'border-b border-border-default'
         "
       >
         <template v-if="tabOrder.length > 1" #tabs>
@@ -58,18 +57,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="tab in tabOrder"
               :key="tab.id"
               :name="tab.id"
-              :label="tab.label"
               :data-test="`home-tab-${tab.id}`"
-            />
+            >
+              <span class="o-tab__label truncate">{{ tab.label }}</span>
+              <button
+                v-if="tab.id.startsWith('dash:')"
+                type="button"
+                class="home-tab-close q-ml-xs"
+                :data-test="`home-tab-close-${tab.id}`"
+                :aria-label="t('home.removeHomeDashboard')"
+                @mousedown.stop.prevent
+                @pointerdown.stop.prevent
+                @click.stop.prevent="onCloseTab(tab.id)"
+              >
+                &times;
+              </button>
+              <OTooltip
+                v-if="tab.id.startsWith('dash:')"
+                side="bottom"
+                :content="t('home.removeHomeDashboard')"
+              />
+            </OTab>
           </OTabs>
         </template>
       </AppPageHeader>
 
       <!-- Body: padded wrapper that holds the active tab panel. Padding lives
-           here (not on the root) so the header above stays full-bleed. -->
-      <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:pt-px tw:px-2.5 tw:pb-2.5">
+           here (not on the root) so the header above stays full-bleed. The
+           pinned dashboard tab opts out: its actions row draws a full-bleed
+           divider (like the header's) and the dashboard grid pads itself. -->
+      <div
+        class="flex-1 min-h-0 flex flex-col"
+        :class="activeHomeTab.startsWith('dash:') ? '' : 'pt-px px-2.5 pb-2.5'"
+      >
         <!-- O2 AI Assistant tab -->
-        <div v-if="activeHomeTab === 'ai'" class="home-tab-panel home-ai-panel">
+        <div v-if="activeHomeTab === 'ai'" class="home-ai-panel flex-1 min-h-0 flex flex-row overflow-hidden">
           <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
           <O2AIChat
             ref="homeChat"
@@ -83,14 +105,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              already provides the border; avoids a double-bordered card). -->
         <div
           v-if="activeHomeTab === 'overview'"
-          class="home-tab-panel"
+          class="flex-1 min-h-0 overflow-hidden"
         >
           <OverviewTab />
         </div>
 
         <!-- Usage tab -->
-        <div v-if="activeHomeTab === 'usage'" class="home-tab-panel home-tab-panel--usage">
+        <div v-if="activeHomeTab === 'usage'" class="flex-1 min-h-0 overflow-hidden -mr-2.5">
           <UsageTab />
+        </div>
+
+        <!-- Pinned dashboard tab -->
+        <div
+          v-else-if="activeHomeTab.startsWith('dash:')"
+          class="flex-1 min-h-0 overflow-hidden"
+        >
+          <PinnedDashboardTab
+            :key="activeHomeTab"
+            :dashboard-id="parsePinnedTabId(activeHomeTab).dashboardId"
+            :folder-id="parsePinnedTabId(activeHomeTab).folderId"
+            @update-label="(l) => onPinnedLabel(parsePinnedTabId(activeHomeTab).dashboardId, l)"
+            @unavailable="onPinnedUnavailable"
+          />
         </div>
       </div>
     </div>
@@ -115,7 +151,10 @@ import O2AIChat from "@/components/O2AIChat.vue";
 import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PinnedDashboardTab from "@/views/PinnedDashboardTab.vue";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 export default defineComponent({
   name: "PageHome",
@@ -129,8 +168,11 @@ export default defineComponent({
     const isEnterpriseOrCloud =
       config.isEnterprise === "true" || config.isCloud === "true";
 
+    const { homeDashboard, clearHomeDashboard, updateLabel } =
+      useHomeDashboard();
+
     const DEFAULT_TABS = computed(() => {
-      const tabs: { id: string; label: string }[] = [];
+      const tabs: { id: string; label: string; closable?: boolean }[] = [];
       if (isEnterpriseOrCloud && store.state.zoConfig.ai_enabled) {
         tabs.push({ id: "ai", label: t("home.tabAiAssistant") });
       }
@@ -138,8 +180,45 @@ export default defineComponent({
         tabs.push({ id: "overview", label: t("home.tabOverview") });
       }
       tabs.push({ id: "usage", label: t("home.tabUsage") });
+      // Append the org home dashboard as a single tab (if set).
+      if (homeDashboard.value) {
+        tabs.push({
+          id: `dash:${homeDashboard.value.folderId}:${homeDashboard.value.dashboardId}`,
+          label: homeDashboard.value.label,
+          closable: true,
+        });
+      }
       return tabs;
     });
+
+    // "dash:default:abc" -> { folderId: "default", dashboardId: "abc" }
+    function parsePinnedTabId(id: string) {
+      const rest = id.slice("dash:".length);
+      const sep = rest.indexOf(":");
+      return { folderId: rest.slice(0, sep), dashboardId: rest.slice(sep + 1) };
+    }
+
+    function onPinnedLabel(dashboardId: string, label: string) {
+      updateLabel(
+        store.state.selectedOrganization?.identifier,
+        dashboardId,
+        label,
+      );
+    }
+
+    function onPinnedUnavailable(_dashboardId: string) {
+      const org = store.state.selectedOrganization?.identifier;
+      clearHomeDashboard(org);
+      // Active tab no longer exists in the recomputed set → fall back to first.
+      if (!DEFAULT_TABS.value.find((tb) => tb.id === activeHomeTab.value)) {
+        activeHomeTab.value = tabOrder.value[0]?.id ?? "usage";
+      }
+    }
+
+    function onCloseTab(id: string) {
+      if (!id.startsWith("dash:")) return;
+      onPinnedUnavailable(parsePinnedTabId(id).dashboardId);
+    }
 
     function loadTabOrder() {
       try {
@@ -252,6 +331,10 @@ export default defineComponent({
       homeChat,
       onLoadChat,
       onNewChat,
+      parsePinnedTabId,
+      onPinnedLabel,
+      onPinnedUnavailable,
+      onCloseTab,
     };
   },
   components: {
@@ -261,12 +344,14 @@ export default defineComponent({
     HomeChatHistory,
     OTabs,
     OTab,
+    OTooltip,
     AppPageHeader,
+    PinnedDashboardTab,
   },
 });
 </script>
 
-<style scoped lang="scss">
+<style>
 /*
  * HomeView Styles — Tab bar and page layout only.
  * Usage-tab-specific styles live in UsageTab.vue.
@@ -274,30 +359,28 @@ export default defineComponent({
 
 /* Home tab bar now uses the shared OTabs component (see template). */
 
-.home-tab-panel {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
+.home-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  line-height: 1;
+  border: none;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0.6;
+  font-size: 14px;
 }
 
-/* Usage tab: cancel the body wrapper's right padding so the scroll container
-   reaches the content-card's right edge and its scrollbar sits flush there
-   (instead of floating ~10px inset). The wrapper is overflow:visible, so this
-   negative margin isn't clipped. The inner gap is restored by UsageTab's
-   `.usage-scroll` padding-right. */
-.home-tab-panel--usage {
-  margin-right: -0.625rem;
-}
-
-/* AI assistant tab — side-by-side layout */
-.home-ai-panel {
-  display: flex;
-  flex-direction: row;
-  overflow: hidden;
+.home-tab-close:hover {
+  opacity: 1;
+  background: rgba(128, 128, 128, 0.2);
 }
 
 /* Chat fills remaining width and height */
-.home-ai-panel :deep(.chat-container) {
+.home-ai-panel .chat-container {
   flex: 1;
   height: 100%;
   box-shadow: none;
@@ -308,8 +391,8 @@ export default defineComponent({
 
 /* Allow the input's gradient glow + shadow to spill outside the container.
    messages-container has its own overflow-y, so the page itself won't grow. */
-.home-ai-panel :deep(.chat-content-wrapper),
-.home-ai-panel :deep(.chat-content) {
+.home-ai-panel .chat-content-wrapper,
+.home-ai-panel .chat-content {
   overflow: visible;
 }
 
@@ -319,21 +402,21 @@ export default defineComponent({
    to their content height and push the input bar off the bottom. min-height:0
    lets them shrink within their flex columns so the message list scrolls and
    the input stays pinned at the bottom. */
-.home-ai-panel :deep(.chat-content),
-.home-ai-panel :deep(.messages-container) {
+.home-ai-panel .chat-content,
+.home-ai-panel .messages-container {
   min-height: 0;
 }
 
 /* Hide the entire chat header + its separator — sidebar owns this UI */
-.home-ai-panel :deep(.chat-header),
-.home-ai-panel :deep(.chat-content-wrapper > [role="separator"]) {
+.home-ai-panel .chat-header,
+.home-ai-panel .chat-content-wrapper > [role="separator"] {
   display: none;
 }
 
 /* Gradient border on the prompt input — home tab only.
    Uses the dual-background trick: bg color for padding-box, gradient for border-box.
    2px border for stronger presence + layered shadows for depth. */
-.home-ai-panel :deep(.unified-input-box) {
+.home-ai-panel .unified-input-box {
   position: relative;
   border: 2px solid transparent !important;
   background:
@@ -349,11 +432,11 @@ export default defineComponent({
     0 18px 44px -10px rgba(123, 97, 255, 0.3) !important;
 }
 
-.home-ai-panel :deep(.unified-input-box.light-mode) {
+.home-ai-panel .unified-input-box {
   --o2-ai-input-bg: #ffffff;
 }
 
-.home-ai-panel :deep(.unified-input-box.dark-mode) {
+.dark .home-ai-panel .unified-input-box {
   --o2-ai-input-bg: #191919;
   box-shadow:
     0 2px 4px rgba(0, 0, 0, 0.45),
@@ -362,7 +445,7 @@ export default defineComponent({
 }
 
 /* Soft ambient glow behind the input */
-.home-ai-panel :deep(.unified-input-box)::before {
+.home-ai-panel .unified-input-box::before {
   content: "";
   position: absolute;
   inset: -10px;
@@ -375,33 +458,22 @@ export default defineComponent({
 }
 
 /* Stronger glow + shadow on focus, no harsh ring */
-.home-ai-panel :deep(.unified-input-box:focus-within) {
+.home-ai-panel .unified-input-box:focus-within {
   box-shadow:
     0 1px 2px rgba(15, 23, 42, 0.04),
     0 6px 16px -2px rgba(15, 23, 42, 0.1),
     0 16px 40px -8px rgba(123, 97, 255, 0.32) !important;
 }
 
-.home-ai-panel :deep(.unified-input-box.dark-mode:focus-within) {
+.dark .home-ai-panel .unified-input-box:focus-within {
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.4),
     0 6px 20px -2px rgba(0, 0, 0, 0.55),
     0 18px 44px -8px rgba(123, 97, 255, 0.42) !important;
 }
 
-.home-ai-panel :deep(.unified-input-box:focus-within)::before {
+.home-ai-panel .unified-input-box:focus-within::before {
   opacity: 0.4;
 }
 
-.home-page {
-  overflow: hidden;
-  min-height: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.ai-enabled-home-view {
-  height: 100%;
-}
 </style>

@@ -19,16 +19,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="function-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
+    class="flex flex-col h-full min-h-0"
   >
-    <div v-if="!showAddJSTransformDialog" class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
+    <div v-if="!showAddJSTransformDialog" class="flex flex-col h-full min-h-0">
       <!-- Standard section header: title + actions only. Search moved to toolbar. -->
       <AppPageHeader
         :title="t('function.header')"
         icon="function"
         :subtitle="t('function.subtitle')"
         tabs-below
-        class="tw:shrink-0 tw:px-4"
+        class="shrink-0 px-4"
       >
         <template #tabs>
           <PipelineSectionTabs />
@@ -44,8 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
       </AppPageHeader>
-      <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-        <div class="card-container tw:h-full">
+      <div class="w-full flex-1 min-h-0 overflow-hidden">
+        <div class="h-full">
           <OTable
             :frame="false"
             :data="visibleRows"
@@ -60,14 +60,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-global-filter="false"
             :default-columns="false"
             width="100%"
-            class="tw:w-full tw:h-full"
+            class="w-full h-full"
           >
               <template #toolbar>
-                <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+                <div class="flex items-center gap-2 w-full">
                   <OSearchInput
                     data-test="functions-list-search-input"
                     v-model="filterQuery"
-                    class="tw:flex-1"
+                    class="flex-1"
                     :placeholder="t('function.search')"
                   />
                 </div>
@@ -82,16 +82,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #cell-name="{ row, value }">
-                <span class="tw:text-text-primary" :data-test="`function-list-name-cell-${row?.name ?? value}`">{{ value }}</span>
+                <span class="text-text-primary" :data-test="`function-list-name-cell-${row?.name ?? value}`">{{ value }}</span>
               </template>
 
               <template #cell-actions="{ row }">
-                <div class="tw:flex tw:items-center actions-container">
+                <div class="flex items-center actions-container">
                   <OButton
                     variant="ghost"
                     size="icon-sm"
                     :title="t('function.updateTitle')"
                     data-test="function-list-edit-function-btn"
+                    data-row-action="edit"
                     @click="showAddUpdateFn({ row })"
                     icon-left="edit"
                   />
@@ -100,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     :title="t('function.delete')"
                     data-test="function-list-delete-function-btn"
+                    data-row-action="delete"
                     @click="showDeleteDialogFn({ row })"
                     icon-left="delete"
                   />
@@ -108,14 +110,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     icon-left="account-tree"
                     :title="'Associated Pipelines'"
+                    data-row-action="view"
                     @click="getAssociatedPipelines({ row })"
                   />
                 </div>
               </template>
 
               <template #bottom="scope">
-                <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2">
-                  <div class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4">
+                <div class="flex items-center justify-between w-full py-2">
+                  <div class="flex items-center font-bold text-[14px] mr-4">
                     {{ resultTotal }} {{ t('function.header') }}
                   </div>
                   <OButton
@@ -134,11 +137,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
     </div>
-    <div v-else class="tw:flex-1 tw:min-h-0">
+    <div v-else class="flex-1 min-h-0">
       <AddFunction
         v-model="formData"
         :isUpdated="isUpdated"
-        class="tw:p-2"
+        class="p-2"
         @update:list="refreshList"
         @cancel:hideform="hideForm"
         @sendToAiChat="sendToAiChat"
@@ -165,22 +168,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         v-if="transformedPipelineList.length > 0"
-        class="pipeline-list-container"
+        class="max-h-50 overflow-y-auto"
       >
-        <ul class="scrollable-list tw:flex tw:flex-col">
+        <ul class="scrollable-list flex flex-col list-none p-0 m-0">
           <li
             v-for="(pipeline, index) in transformedPipelineList"
             :key="pipeline.value"
             @click="onPipelineSelect(pipeline)"
-            class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+            class="flex items-center px-3 py-2 cursor-pointer hover:bg-muted/50"
             :data-test="`function-list-pipeline-item-${pipeline.value}`"
           >
-            <span class="tw:text-sm">{{ index + 1 }}. {{ pipeline.label }}</span>
+            <span class="text-sm">{{ index + 1 }}. {{ pipeline.label }}</span>
           </li>
         </ul>
       </div>
       <div v-else>
-        <div class="tw:text-xl tw:font-semibold tw:text-center">
+        <div class="text-xl font-semibold text-center">
           No pipelines associated with this function
         </div>
       </div>
@@ -204,6 +207,7 @@ import { useI18n } from "vue-i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 import jsTransformService from "../../services/jstransform";
 import NoData from "../shared/grid/NoData.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -220,7 +224,8 @@ import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "functionList",
@@ -578,7 +583,7 @@ export default defineComponent({
       resultTotal.value = newVisibleRows.length;
     }, { immediate: true });
 
-    
+
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
@@ -666,6 +671,25 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
+
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "functionsAdd",
+        handler: () => { if (!isInputFocused()) showAddUpdateFn({}); },
+      },
+      {
+        id: "functionsRefresh",
+        handler: () => { if (!isInputFocused()) getJSTransforms(); },
+      },
+      {
+        id: "functionsFocusSearch",
+        handler: () => {
+          focusSearchInput("functions-list-search-input");
+        },
+      },
+    ]);
     return {
       t,
       store,
@@ -734,35 +758,21 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-.pipeline-list-container {
-  max-height: 200px; /* Adjust based on item height to fit 5 items */
-  overflow-y: auto;
-}
-.dialog-heading {
-  border-bottom: 1px solid $border-color;
-}
-
-.scrollable-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
+<style>
 .scrollable-list::-webkit-scrollbar {
   width: 8px;
 }
 
 .scrollable-list::-webkit-scrollbar-thumb {
-  background-color: #888; /* Desired thumb color */
+  background-color: #888;
   border-radius: 4px;
 }
 
 .scrollable-list::-webkit-scrollbar-thumb:hover {
-  background-color: blue; /* Darker shade on hover */
+  background-color: blue;
 }
 
 .scrollable-list::-webkit-scrollbar-track {
-  background-color: blue; /* Track color */
+  background-color: blue;
 }
 </style>

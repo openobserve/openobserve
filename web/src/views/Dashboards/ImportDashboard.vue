@@ -14,11 +14,11 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="tw:mx-2">
+  <div class="mx-2">
     <AppPageHeader
       :title="t('dashboard.importDashboard')"
       :back="{ label: t('dashboard.header'), onClick: goBack }"
-      class="tw:-mx-2 tw:px-4 tw:border-b tw:border-border-default"
+      class="-mx-2 px-4 border-b border-border-default"
     >
       <template #actions>
         <OButton
@@ -47,18 +47,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </template>
     </AppPageHeader>
-    <div class="tw:flex">
-      <div class="tw:flex">
+    <div class="flex w-full">
+      <div class="flex w-full min-w-0">
         <OSplitter
           v-model="splitterModel"
-          style="width: calc(100vw - 100px)"
+          class="w-full min-w-0"
         >
           <template #before>
-            <div class="tw:w-full tw:h-full">
+            <div class="w-full h-full">
               <div
-                class="card-container tw:py-[0.625rem] tw:pl-[0.625rem] tw:mb-[0.625rem]"
+                class="card-container py-[0.625rem] pl-[0.625rem] mb-[0.625rem]"
               >
-                <div class="app-tabs-container tw:h-[36px] tw:w-fit">
+                <div class="app-tabs-container h-[36px] w-fit">
                   <app-tabs
                     data-test="dashboard-import-type-tabs"
                     class="tabs-selection-container"
@@ -70,10 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="activeTab == 'import_json_url'"
-                class="editor-container-url card-container tw:py-1"
+                class="editor-container-url card-container py-1"
               >
-                <div class="tw:mx-2 my-2">
-                  <div style="width: calc(100% - 10px)" class="tw:flex tw:gap-2 tw:mt-2 tw:w-full tw:items-center">
+                <div class="mx-2 my-2">
+                  <div style="width: calc(100% - 10px)" class="flex gap-2 mt-2 w-full items-center">
                     <div
                       data-test="dashboard-import-url-input"
                       style="width: 69%"
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-import-url-editor"
                     ref="queryEditorFileRef"
                     editor-id="dashboards-query-editor-file"
-                    class="monaco-editor tw:my-4"
+                    class="my-4 h-[calc(100vh-285px)]! overflow-hidden resize-none border border-(--o2-border-color) rounded-md"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -110,10 +110,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="activeTab == 'import_json_file'"
-                class="dashboard-import-json-container card-container tw:py-1"
+                class="dashboard-import-json-container card-container py-1"
               >
-                <div class="tw:mx-2 tw:my-2">
-                  <div style="width: calc(100% - 10px)" class="tw:flex tw:gap-2 tw:w-full tw:items-center">
+                <div class="mx-2 my-2">
+                  <div style="width: calc(100% - 10px)" class="flex gap-2 w-full items-center">
                     <div
                       data-test="dashboard-import-file-input"
                       style="width: 69%"
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :activeFolderId="selectedFolder.value"
                       />
                     </div>
-                    <div v-if="filesImportResults.length" class="tw:py-2" data-test="dashboard-import-file-results">
+                    <div v-if="filesImportResults.length" class="py-2" data-test="dashboard-import-file-results">
                       <div v-for="importResult in filesImportResults">
                         <span
                           v-if="importResult.status == 'rejected'"
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-import-json-file-editor"
                     ref="queryEditorJsonRef"
                     editor-id="dashboards-query-editor-json"
-                    class="monaco-editor tw:my-4"
+                    class="my-4 h-[calc(100vh-282px)]! overflow-hidden resize-none border border-(--o2-border-color) rounded-md"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -172,12 +172,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               data-test="dashboard-import-error-container"
-              class="card-container tw:h-[calc(100vh-110px)] tw:border-l tw:border-border-default"
+              class="card-container h-[calc(100vh-110px)] border-l border-border-default"
             >
-              <div class="tw:text-center tw:text-[1.0625rem] tw:font-semibold tw:leading-[1.45] tw:tracking-[-0.02em] tw:text-text-primary tw:py-2">Error Validations</div>
-              <OSeparator class="tw:mt-4" />
+              <div class="text-center text-[1.0625rem] font-semibold leading-[1.45] tracking-[-0.02em] text-text-primary py-2">Error Validations</div>
+              <OSeparator class="mt-4" />
               <div
-                class="error-section"
+                class="error-section p-[10px] mb-[10px]"
                 v-if="dashboardErrorsToDisplay.length > 0"
               >
                 <div class="error-reporter-container">
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       errorMessage, errorIndex
                     ) in dashboardErrorsToDisplay"
                     :key="errorIndex"
-                    class="error-item"
+                    class="error-item py-[5px] text-sm"
                   >
                     <span
                       v-if="errorMessage.field == 'dashboard_title'"
@@ -864,127 +864,19 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.editor-container {
-  height: calc(80vh - 20px) !important;
-}
-.editor-container-url {
-  :deep(.monaco-editor) {
-    height: calc(100vh - 285px) !important;
-    overflow: hidden;
-    resize: none;
-  }
-}
-.dashboard-import-json-container {
-  :deep(.monaco-editor) {
-    height: calc(100vh - 282px) !important;
-    overflow: hidden;
-    resize: none;
-  }
-}
-:deep(.monaco-editor) {
-  height: calc(81vh - 14px) !important;
+<style>
+.editor-container-url .monaco-editor {
+  height: calc(100vh - 285px) !important;
   overflow: hidden;
   resize: none;
 }
-/* Border lives on the editor wrapper only (scoped, not pierced with :deep), so
-   Monaco's own internal .monaco-editor element doesn't get a second border.
-   Mirrors BaseImport.vue and removes the double-container look. */
-.monaco-editor {
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-}
-.error-report-container {
-  height: calc(100vh - 8px) !important; /* Total editor height */
-  overflow: auto; /* Allows scrolling if content overflows */
+.dashboard-import-json-container .monaco-editor {
+  height: calc(100vh - 282px) !important;
+  overflow: hidden;
   resize: none;
 }
-.error-container {
-  display: flex;
-  overflow-y: auto;
-
-  flex-direction: column;
-  border: 1px solid #ccc;
-  height: calc(100% - 100px) !important; /* Total container height */
-}
-
-.error-section {
-  padding: 10px;
-  margin-bottom: 10px;
-}
-
-.section-title {
-  font-size: 16px;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-}
-
-.error-list {
-}
-
-.error-item {
-  padding: 5px 0px;
-  font-size: 14px;
-}
-.dashboard-import-type-tabs {
-  height: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #464646;
-  }
-
-  :deep(.rum-tab) {
-    &:hover {
-      background: #464646;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
-.dashboard-import-type-tabs {
-  height: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #eaeaea;
-    height: fit-content;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  :deep(.rum-tab) {
-    width: fit-content !important;
-    padding: 4px 12px !important;
-    border: none !important;
-
-    &:hover {
-      background: #eaeaea;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
-.dashboard-folder-dropdown {
-  :deep(.q-field--labeled.showLabelOnTop) {
-    padding-top: 12px; /* Example override */
-  }
-}
-.dashboard-folder-dropdown {
-  :deep(
-      .q-field--labeled.showLabelOnTop.q-select
-        .q-field__control-container
-        .q-field__native
-    )
-    > :first-child {
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-.import-folder-dropdown-container {
+.import-folder-dropdown-container .add-folder-btn {
+  margin-bottom: 0 !important;
+  margin-top: 12px !important;
 }
 </style>

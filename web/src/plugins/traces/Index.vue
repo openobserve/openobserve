@@ -16,14 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md tracePage tw:h-full tw:min-h-full! tw:max-h-full! tw:overflow-hidden!"
+  <div class="rounded-md tracePage h-full min-h-full! max-h-full! overflow-hidden!"
     id="tracePage"
     style="min-height: auto"
   >
-    <div id="tracesSecondLevel" class="tw:h-full">
+    <div id="tracesSecondLevel" class="h-full">
       <OSplitter
         :class="[
-          'traces-horizontal-splitter tw:h-full',
+          'traces-horizontal-splitter h-full',
           activeTab === 'service-graph' || activeTab === 'services-catalog'
             ? 'hide-splitter-separator'
             : '',
@@ -38,8 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :separatorStyle="{ height: '9px', marginTop: '-5px', marginBottom: '-5px', zIndex: '10' }"
         :before-class="
           activeTab === 'service-graph' || activeTab === 'services-catalog'
-            ? 'tw:max-h-[3.125rem]!'
-            : ''
+            ? 'z-auto overflow-visible max-h-[3.125rem]!'
+            : 'z-auto overflow-visible'
         "
         @update:model-value="onSplitterUpdate"
       >
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                + 4px = 10px, aligning the bar with the 10px field-list & results
                panels below (matches the Logs page). -->
           <div
-            class="tw:w-full tw:h-full"
+            class="w-full h-full"
           >
             <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
             <search-bar
@@ -73,34 +73,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template v-slot:after>
-          <div class="tw:h-full tw:overflow-hidden">
+          <div class="h-full overflow-hidden">
           <!-- Service Graph Tab Content -->
           <div
             v-if="
               activeTab === 'service-graph' && config.isEnterprise == 'true'
             "
-            class="tw:h-full tw:overflow-hidden"
+            class="h-full overflow-hidden"
           >
             <service-graph
               ref="serviceGraphRef"
-              class="tw:h-full"
+              class="h-full"
               @view-traces="handleServiceGraphViewTraces"
               @request:stream-change="onChildStreamChangeRequest"
-              @widen-range="onWidenTracesRange"
+              @jump-to-stream-data="onJumpToPanelStreamData"
             />
           </div>
 
           <!-- Services Catalog Tab Content -->
           <div
             v-if="activeTab === 'services-catalog'"
-            class="tw:h-full tw:overflow-hidden"
+            class="h-full overflow-hidden"
           >
             <services-catalog
               ref="servicesCatalogRef"
-              class="tw:h-full"
+              class="h-full"
               @view-traces="handleServicesCatalogViewTraces"
               @request:stream-change="onChildStreamChangeRequest"
-              @widen-range="onWidenTracesRange"
+              @jump-to-stream-data="onJumpToPanelStreamData"
             />
           </div>
 
@@ -108,19 +108,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-if="activeTab === 'search'"
             id="tracesThirdLevel"
-            class="traces-search-result-container relative-position tw:h-full"
+            class="traces-search-result-container relative-position h-full"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <OSplitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
               style="width: 100%"
-              separatorClass="tw:w-px"
+              separatorClass="w-px"
               @update:model-value="onSplitterUpdate"
-              class="tw:h-full"
+              class="h-full"
             >
               <template #before>
-                <div class="tw:h-full tw:border-r tw:border-border-default tw:bg-surface-panel">
+                <div class="h-full border-r border-border-default bg-surface-panel">
                   <index-list
                     v-show="searchObj.meta.showFields"
                     ref="indexListRef"
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :active-include-field-values="activeIncludeFilterValues"
                     :active-exclude-field-values="activeExcludeFilterValues"
                     data-test="traces-search-index-list"
-                    class="card-container tw:h-full"
+                    class="card-container h-full"
                     :key="searchObj.data.stream.streamLists"
                     @update:changeStream="onChangeStream"
                     @update:selectedFields="updateFieldVisibility"
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #after>
-                <div class="tw:h-full tw:pb-[0.625rem]">
+                <div class="h-full pb-[0.625rem]">
                   <!-- No trace streams in org yet -->
                   <TracesNoDataState
                     v-if="
@@ -146,21 +146,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :ai-enabled="isAiEnabled"
                     data-test="traces-no-streams-in-org-text"
-                    @ask-ai="onAskAiTracing"
+                    @ask-ai="onAskAiSetupTracing"
                   />
+                  <!-- Stable loading state while streams load / auto-run fires,
+                       so the empties don't flash in between. -->
+                  <div
+                    v-else-if="searchObj.loadingStream"
+                    class="card-container h-full flex flex-col items-center justify-center gap-2 text-[var(--o2-text-secondary)]"
+                    data-test="traces-search-loading"
+                  >
+                    <OSpinner size="sm" />
+                    <span>{{ t("traces.fetchingTraces") }}</span>
+                  </div>
                   <div
                     v-else-if="
                       searchObj.data.errorMsg !== '' &&
                       parseInt(searchObj.data.errorCode) !== 0 &&
                       searchObj.loading == false
                     "
-                    class="card-container tw:h-full"
+                    class="card-container h-full"
                   >
-                    <div class="tw:text-center tw:pt-[2rem]">
+                    <div class="text-center pt-[2rem]">
                       <!-- Actual error case -->
                       <div
                         data-test="traces-search-error-message"
-                        class="tw:text-[1.3rem] tw:pt-4"
+                        class="text-[1.3rem] pt-4"
                       >
                         {{ t("traces.errorRetrievingTraces") }}
                         <OButton
@@ -176,17 +186,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                       </div>
                       <!-- Collapsible error detail — shown below results when toggled -->
-                      <div class="tw:text-center">
-                        <div class="tw:my-none tw:text-[1rem]! tw:px-[2rem]!">
+                      <div class="text-center">
+                        <div class="my-none text-[1rem]! px-[2rem]!">
                           <span v-if="disableMoreErrorDetails">
                             <SanitizedHtmlRenderer
                               data-test="traces-search-detail-error-message"
                               :htmlContent="searchObj?.data?.errorMsg"
-                              class="tw:pt-[1rem]"
+                              class="pt-[1rem]"
                             />
                             <div
                               v-if="searchObj?.data?.errorDetail"
-                              class="error-display__message tw:pt-[1rem]! tw:text-[var(--o2-text-2)]!"
+                              class="error-display__message pt-[1rem]! text-[var(--o2-text-2)]!"
                             >
                               {{ searchObj.data.errorDetail }}
                             </div>
@@ -210,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                         {{ t("traces.configureFullTextSearch") }}
                       </div>
-                      <span class="tw:text-sm">{{
+                      <span class="text-sm">{{
                         searchObj.data.additionalErrorMsg
                       }}</span>
                     </div>
@@ -222,12 +232,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.loading
                     "
                     data-test="traces-search-error-text"
-                    class="tw:text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
+                    class="text-center py-[40px] text-[20px] card-container h-full"
                   >
                     <SanitizedHtmlRenderer
                       data-test="traces-search-detail-error-message"
                       :htmlContent="searchObj?.data?.errorMsg"
-                      class="tw:pt-[1rem]"
+                      class="pt-[1rem]"
                     />
                   </div>
                   <div v-else-if="!isStreamSelected">
@@ -249,26 +259,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       preset="no-query-applied"
                       size="hero"
                       data-test="traces-search-not-started-text"
+                      @action="() => searchData()"
                     />
                   </div>
                   <div
                     v-else
                     data-test="logs-search-search-result"
-                    class="tw:h-full!"
+                    class="h-full!"
                   >
                     <search-result
                       ref="searchResultRef"
                       :show-error-only="showErrorOnly"
+                      :ai-enabled="isAiEnabled"
+                      :stream-doc-time-range="streamDocTimeRange"
+                      :query-window-us="queryWindowUs"
                       @update:datetime="setHistogramDate"
                       @update:scroll="getMoreData"
                       @update:sort="runQueryOnSort"
                       @shareLink="copyTracesUrl"
                       @metrics:filters-updated="onMetricsFiltersUpdated"
                       @run-query="searchData"
-                      @widen-range="onWidenTracesRange"
                       @remove-filter="onRemoveTracesFilter"
                       @jump-to-stream-data="onJumpToTracesStreamData"
                       @error-only-toggled="onErrorOnlyToggled"
+                      @ask-ai="onAskAiTracing"
+                      @send-to-ai-chat="sendToAiChat"
                     />
                   </div>
                 </div>
@@ -361,11 +376,14 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import TracesNoDataState from "@/plugins/traces/TracesNoDataState.vue";
 import TracesNoStreamState from "@/plugins/traces/TracesNoStreamState.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
@@ -387,6 +405,8 @@ const activeTab = computed(() => {
 });
 const router = useRouter();
 const { t } = useI18n();
+// Bubbles AI-chat requests up to MainLayout, which opens the O2AIChat panel.
+const emit = defineEmits(["sendToAiChat"]);
 const {
   searchObj,
   resetSearchObj,
@@ -1168,7 +1188,7 @@ async function getQueryData(
             if (customMessage) errorMsg = t(customMessage);
           }
           if (trace_id) {
-            errorMsg += ` <br><span class='tw:text-base tw:font-medium'>TraceID: ${trace_id}</span>`;
+            errorMsg += ` <br><span class='text-base font-medium'>TraceID: ${trace_id}</span>`;
           }
           searchObj.data.errorMsg = errorMsg;
           searchObj.data.errorDetail = error_detail || "";
@@ -1254,6 +1274,8 @@ const updateNewDateTime = (startTime: number, endTime: number) => {
 async function extractFields() {
   try {
     searchObj.data.stream.selectedStreamFields = [];
+    // Cleared here so a stream with no stats doesn't inherit the previous one's.
+    selectedStreamStats.value = null;
 
     if (!searchObj.data.stream?.selectedStream?.value) return;
 
@@ -1279,6 +1301,12 @@ async function extractFields() {
       if (streamResultEntry && stream?.stats) {
         streamResultEntry.stats = stream.stats;
       }
+      // Capture the authoritative stats for the selected stream so the empty
+      // state's "jump to latest data" works even if streamResults.list (from
+      // the streams name-list) is missing stats. This is the same value the
+      // query uses, fetched via getStream(force) above.
+      selectedStreamStats.value =
+        stream?.stats ?? streamResultEntry?.stats ?? null;
       searchObj.data.datetime.queryRangeRestrictionInHour = -1;
       if (
         (stream.settings.max_query_range > 0 ||
@@ -1782,19 +1810,23 @@ const onRemoveTracesFilter = () => {
   searchObj.runQuery = true;
 };
 
-const onWidenTracesRange = (period: string) => {
-  searchBarRef.value?.dateTimeRef?.setRelativeTime(period);
-  searchObj.data.datetime.relativeTimePeriod = period;
-  searchObj.data.datetime.type = "relative";
-  searchObj.runQuery = true;
-};
-
 const onJumpToTracesStreamData = (fromUs: number, toUs: number) => {
   searchBarRef.value?.dateTimeRef?.setAbsoluteTime(fromUs, toUs);
   searchObj.data.datetime.startTime = fromUs;
   searchObj.data.datetime.endTime = toUs;
   searchObj.data.datetime.type = "absolute";
   runQueryFn();
+};
+
+// Jump handler for the service-graph / services-catalog empty states. Mirrors
+// the datetime + picker sync above, but does not run the traces query — each
+// panel reloads itself from its own watch on the shared datetime.
+const onJumpToPanelStreamData = (fromUs: number, toUs: number) => {
+  searchBarRef.value?.dateTimeRef?.setAbsoluteTime(fromUs, toUs);
+  searchObj.data.datetime.startTime = fromUs;
+  searchObj.data.datetime.endTime = toUs;
+  searchObj.data.datetime.type = "absolute";
+  searchObj.data.datetime.relativeTimePeriod = null;
 };
 
 const onSelectTracesStream = () => {
@@ -1818,8 +1850,99 @@ const isAiEnabled = computed(
   () => config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
 );
 
+// Authoritative doc time range for the selected stream, captured from
+// getStream(force) in extractFields. Drives the empty-state "jump to latest
+// data" card. Held in the parent (like the logs page) so it never depends on
+// the streams name-list response carrying stats.
+const selectedStreamStats = ref<{
+  doc_time_min: number;
+  doc_time_max: number;
+} | null>(null);
+
+const streamDocTimeRange = computed<
+  { min: number; max: number } | undefined
+>(() => {
+  const selected = searchObj.data?.stream?.selectedStream?.value;
+  if (!selected) return undefined;
+
+  let min = Infinity;
+  let max = -Infinity;
+
+  const consider = (st: any) => {
+    if (!st) return;
+    // Ignore non-positive values: the schema endpoint can return a stats
+    // object with doc_time_min/max = 0, which must not mask the real stats
+    // coming from the streams name-list.
+    if (st.doc_time_min > 0 && st.doc_time_min < min) min = st.doc_time_min;
+    if (st.doc_time_max > 0 && st.doc_time_max > max) max = st.doc_time_max;
+  };
+
+  // Primary: streams name-list stats — the same source the logs page uses.
+  for (const s of searchObj.data?.streamResults?.list ?? []) {
+    if (s.name === selected) consider(s.stats);
+  }
+  // Fallback/merge: stats captured from getStream(force) in extractFields.
+  consider(selectedStreamStats.value);
+
+  if (!isFinite(min) || !isFinite(max)) return undefined;
+  return { min, max };
+});
+
+const queryWindowUs = computed<{ start: number; end: number } | undefined>(
+  () => {
+    const dt = searchObj.data.datetime;
+    if (dt?.type === "absolute" && dt.startTime && dt.endTime) {
+      return { start: Number(dt.startTime), end: Number(dt.endTime) };
+    }
+    if (dt?.type === "relative" && dt.relativeTimePeriod) {
+      const r = getConsumableRelativeTime(dt.relativeTimePeriod);
+      if (r) return { start: r.startTime, end: r.endTime };
+    }
+    return undefined;
+  },
+);
+
+// Relay AI-chat requests from row cell actions (carrying an explicit message)
+// straight up to MainLayout's O2AIChat panel.
+const sendToAiChat = (value: any, append: boolean = true) => {
+  emit("sendToAiChat", value, append);
+};
+
+// "Ask AI" from the no-events / error empty state: build a natural-language
+// prompt describing the failed traces query, then open the AI chat with it.
+// Mirrors the logs page's onAskAiFixQuery.
 const onAskAiTracing = () => {
-  router.push({ name: "ingestion", query: { org_identifier: store.state.selectedOrganization?.identifier } });
+  const filter = searchObj.data.editorValue?.trim() || "(none)";
+
+  // errorMsg may contain HTML (e.g. a <br><span>TraceID…</span>) — strip to text.
+  const el = document.createElement("div");
+  el.innerHTML = searchObj.data.errorMsg || "";
+  const errorText = (el.textContent ?? "").trim();
+  const errorContext = errorText ? ` Error: ${errorText}.` : "";
+
+  const outcome = errorContext
+    ? `The traces query produced an error.${errorContext}`
+    : `The traces query ran successfully but returned no results.`;
+
+  const mode = searchObj.meta.searchMode === "spans" ? "spans" : "traces";
+  const stream = searchObj.data.stream.selectedStream?.value || "unknown";
+  const timeRange = searchObj.data.datetime.relativeTimePeriod || "custom";
+
+  emit(
+    "sendToAiChat",
+    `${outcome} I am searching ${mode}. The filter expression is: ${filter}. This is a WHERE-clause filter — not a full SQL query. Stream: ${stream}. Time range: ${timeRange}. Can you help me adjust the filter to get results?`,
+    false,
+  );
+};
+
+// "Ask AI" from the no-streams empty state: open the AI chat asking how to
+// start sending traces, instead of navigating away to the ingestion page.
+const onAskAiSetupTracing = () => {
+  emit(
+    "sendToAiChat",
+    `I don't have any trace streams in OpenObserve yet and want to start sending traces. How do I instrument my services to send traces (e.g. via OpenTelemetry / OTLP)?`,
+    false,
+  );
 };
 
 /**
@@ -2247,61 +2370,63 @@ watch(
     router.replace({ query });
   },
 );
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcuts([
+  {
+    id: "tracesSearch",
+    handler: () => runQueryFn(),
+  },
+  {
+    id: "tracesRefresh",
+    handler: () => {
+      if (isInputFocused()) return;
+      runQueryFn();
+    },
+  },
+  {
+    id: "tracesFocusQuery",
+    handler: () => {
+      // The traces query editor is Monaco — focus its inner textarea.
+      const el = document.querySelector<HTMLElement>(
+        '[data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] textarea, [data-test="logs-search-bar"] .cm-editor',
+      );
+      el?.focus();
+    },
+  },
+  {
+    id: "tracesCopyUrl",
+    handler: () => copyTracesUrl(),
+  },
+]);
 </script>
 
-<style lang="scss" scoped></style>
-<style lang="scss">
-.tracePage {
-  .index-menu .field_list .field_overlay .field_label,
-  .q-field__native,
-  .q-field__input,
-  .q-table tbody td {
-    font-size: 12px !important;
-  }
+<style>
 
-  .o-splitter__after {
-    overflow: hidden;
-  }
+.tracePage .index-table :hover::-webkit-scrollbar,
+.tracePage #tracesSearchGridComponent:hover::-webkit-scrollbar {
+  height: 13px;
+  width: 13px;
+}
 
-  .index-table :hover::-webkit-scrollbar,
-  #tracesSearchGridComponent:hover::-webkit-scrollbar {
-    height: 13px;
-    width: 13px;
-  }
+.tracePage .index-table ::-webkit-scrollbar-track,
+.tracePage #tracesSearchGridComponent::-webkit-scrollbar-track {
+  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+}
 
-  .index-table ::-webkit-scrollbar-track,
-  #tracesSearchGridComponent::-webkit-scrollbar-track {
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-    border-radius: 10px;
-  }
+.tracePage .index-table ::-webkit-scrollbar-thumb,
+.tracePage #tracesSearchGridComponent::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
+}
 
-  .index-table ::-webkit-scrollbar-thumb,
-  #tracesSearchGridComponent::-webkit-scrollbar-thumb {
-    border-radius: 10px;
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
-  }
 
-  .q-table__top {
-    padding: 0px !important;
-  }
-
-  .q-table__control {
-    width: 100%;
-  }
-
-  .q-field__control-container {
-    padding-top: 0px !important;
-  }
-
-  .traces-horizontal-splitter .o-splitter__before {
-    z-index: auto;
-    overflow: visible;
-  }
-
-  .traces-horizontal-splitter.hide-splitter-separator
-    > .o-splitter__separator {
-    background: transparent !important;
-    border: none !important;
-  }
+.tracePage .index-menu .field_list .field_overlay .field_label {
+  font-size: 12px !important;
+}
+.tracePage .traces-horizontal-splitter.hide-splitter-separator > .o-splitter__separator {
+  background: transparent !important;
+  border: none !important;
 }
 </style>

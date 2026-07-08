@@ -15,66 +15,77 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="edition-comparison">
+  <div>
 
     <!-- ── Header ──────────────────────────────────────────────────────── -->
-    <div class="tw:flex tw:items-start tw:gap-3 tw:mb-2">
-      <div class="ec-icon-wrapper">
+    <div class="flex items-start gap-3 mb-2">
+      <div data-test="feature-comparison-table-icon-wrapper" class="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 bg-[color-mix(in_srgb,var(--o2-primary-color)_12%,var(--o2-card-bg))] text-(--o2-primary-color)">
         <OIcon name="compare-arrows" size="md" />
       </div>
       <div>
-        <p class="header-eyebrow">EDITIONS</p>
-        <h3 class="header-title">{{ t("about.feature_comparison_lbl") }}</h3>
+        <div class="text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.1em] text-(--o2-primary-color) m-0 mb-[0.125rem]">EDITIONS</div>
+        <div class="text-[length:var(--text-xl)] font-semibold text-(--color-text-heading) m-0 tracking-[-0.015em]">{{ t("about.feature_comparison_lbl") }}</div>
       </div>
     </div>
-    <p class="header-desc tw:mb-8">
+    <div class="text-sm font-normal leading-relaxed text-typography-body mt-2">
       <template v-if="buildType === 'opensource'">{{ t("about.feature_comparision_os_msg") }}</template>
       <template v-else-if="buildType === 'enterprise'">{{ t("about.feature_comparision_ent_msg") }}</template>
       <template v-else>{{ t("about.feature_comparision_subtitle") }}</template>
-    </p>
+    </div>
 
     <!-- ── Edition Cards Grid ──────────────────────────────────────────── -->
-    <div class="tw:grid tw:grid-cols-3 tw:gap-5 tw:pt-4">
+    <div class="grid grid-cols-3 gap-5 pt-4">
       <div
         v-for="ed in editionList"
         :key="ed.id"
-        class="edition-card"
-        :class="{ 'edition-card--active': buildType === ed.id }"
+        data-test="feature-comparison-table-edition-card"
+        :data-test-active="buildType === ed.id ? 'true' : undefined"
+        class="relative flex flex-col bg-(--o2-card-bg) rounded-xl p-6 max-[1024px]:p-4 border border-(--o2-border-color)"
+        :class="{ 'border-2 border-(--o2-primary-color) pt-7 max-[1024px]:pt-5': buildType === ed.id }"
       >
         <!-- Your Plan badge (floats above the card top border) -->
-        <div v-if="buildType === ed.id" class="your-plan-badge">
-          <OIcon name="arrow-upward" size="sm" class="tw:mr-1" />
+        <div v-if="buildType === ed.id" data-test="feature-comparison-table-your-plan-badge" class="absolute top-[-14px] left-1/2 -translate-x-1/2 inline-flex items-center py-1 px-[0.875rem] rounded-full text-[0.625rem] font-bold uppercase tracking-[0.08em] whitespace-nowrap bg-(--o2-primary-color) text-(--o2-primary-foreground)">
+          <OIcon name="arrow-upward" size="sm" class="mr-1" />
           Your Plan
         </div>
 
         <!-- Edition name + hosting + price ────────────────────────────── -->
-        <div class="edition-card__top">
-          <p class="edition-name">{{ ed.shortName }}</p>
-          <p class="edition-hosting">{{ ed.hosting }}</p>
-          <p class="edition-price">{{ ed.price }}</p>
-          <p class="edition-price-sub">{{ ed.priceSub }}</p>
+        <div class="mb-5">
+          <div class="text-base font-bold text-(--o2-text-heading) m-0 mb-[0.125rem]">{{ ed.shortName }}</div>
+          <div class="text-[0.8125rem] text-(--o2-text-muted) m-0 mb-[0.875rem]">{{ ed.hosting }}</div>
+          <div class="text-[1.75rem] font-bold text-(--o2-primary-color) m-0 mb-1 tracking-[-0.03em] leading-[1.1]">{{ ed.price }}</div>
+          <div class="text-[0.8125rem] text-(--o2-text-muted) m-0 leading-[1.4]">{{ ed.priceSub }}</div>
         </div>
 
         <!-- All Five Pillars chips ────────────────────────────────────── -->
-        <div class="pillars-section">
-          <p class="pillars-label">ALL FIVE PILLARS</p>
-          <div class="tw:flex tw:flex-wrap tw:gap-1.5 tw:mb-1.5">
-            <span v-for="pillarId in PILLAR_IDS" :key="pillarId" class="pillar-chip">
+        <div class="bg-[color-mix(in_srgb,var(--o2-primary-color)_5%,var(--o2-card-bg))] border border-[color-mix(in_srgb,var(--o2-primary-color)_15%,transparent)] rounded-lg p-3 mb-4">
+          <div class="text-[0.5625rem] font-bold uppercase tracking-[0.12em] text-(--o2-text-label) m-0 mb-2">ALL FIVE PILLARS</div>
+          <div class="flex flex-wrap gap-1.5 mb-1.5">
+            <span v-for="pillarId in PILLAR_IDS" :key="pillarId" data-test="feature-comparison-table-pillar-chip" class="inline-flex items-center py-[0.1875rem] px-2 rounded text-[0.6875rem] font-medium bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] text-(--o2-primary-color) border border-[color-mix(in_srgb,var(--o2-primary-color)_20%,transparent)] mr-[0.375rem] mb-[0.375rem]">
               {{ t(`about.feature_${pillarId}`) }}
             </span>
           </div>
-          <span class="pillar-chip">{{ t('about.feature_dashboards') }}</span>
+          <span class="inline-flex items-center py-[0.1875rem] px-2 rounded text-[0.6875rem] font-medium bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] text-(--o2-primary-color) border border-[color-mix(in_srgb,var(--o2-primary-color)_20%,transparent)] mr-[0.375rem] mb-[0.375rem]">{{ t('about.feature_dashboards') }}</span>
         </div>
 
         <!-- Feature list ───────────────────────────────────────────────── -->
-        <ul class="feature-list">
+        <ul class="list-none p-0 m-0 flex-1">
           <li
             v-for="feature in listFeatures"
             :key="feature.id"
-            class="feature-item"
-            :class="`feature-item--${getFeatureStatus(feature, ed.id)}`"
+            data-test="feature-comparison-table-feature-item"
+            class="flex items-start gap-2 py-[0.4375rem] text-[0.8125rem] border-b border-(--o2-border-color) last:border-b-0"
+            :class="{
+              'text-[var(--o2-text-body)]': getFeatureStatus(feature, ed.id) !== 'unavailable',
+              'text-[var(--o2-text-muted)]': getFeatureStatus(feature, ed.id) === 'unavailable',
+            }"
           >
-            <span class="feature-item__icon">
+            <span class="shrink-0 mt-[0.125rem] leading-none"
+              :class="{
+                'text-[var(--o2-positive)]': getFeatureStatus(feature, ed.id) !== 'unavailable',
+                'text-[var(--o2-text-muted)]': getFeatureStatus(feature, ed.id) === 'unavailable',
+              }"
+            >
               <OIcon
                 v-if="getFeatureStatus(feature, ed.id) !== 'unavailable'"
                 name="check-circle"
@@ -86,9 +97,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
               />
             </span>
-            <span class="feature-item__body">
-              <span class="feature-item__name">{{ t(getFeatureNameKey(feature)) }}</span>
-              <span v-if="getFeatureNote(feature, ed.id)" class="feature-item__note">
+            <span class="flex flex-col gap-[0.0625rem]">
+              <span class="leading-[1.45]">{{ t(getFeatureNameKey(feature)) }}</span>
+              <span v-if="getFeatureNote(feature, ed.id)" class="text-[0.6875rem] text-(--o2-text-muted) italic">
                 {{ getFeatureNote(feature, ed.id) }}
               </span>
             </span>
@@ -96,27 +107,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ul>
 
         <!-- Footer: license + support + CTA ──────────────────────────── -->
-        <div class="edition-card__footer">
-          <div class="footer-divider"></div>
-          <div class="footer-meta">
-            <div class="footer-row">
-              <span class="footer-key">{{ t('about.feature_license') }}</span>
-              <span class="footer-val">{{ ed.license }}</span>
+        <div class="mt-4">
+          <div class="h-px bg-(--o2-border-color) mb-3"></div>
+          <div class="mb-[0.875rem]">
+            <div data-test="feature-comparison-table-footer-row" class="flex justify-between items-baseline text-[0.8125rem] py-[0.125rem]">
+              <span class="text-(--o2-text-muted) font-medium">{{ t('about.feature_license') }}</span>
+              <span class="text-(--o2-text-body) font-semibold">{{ ed.license }}</span>
             </div>
-            <div class="footer-row">
-              <span class="footer-key">{{ t('about.feature_support') }}</span>
-              <span class="footer-val">{{ ed.support }}</span>
+            <div data-test="feature-comparison-table-footer-row" class="flex justify-between items-baseline text-[0.8125rem] py-[0.125rem]">
+              <span class="text-(--o2-text-muted) font-medium">{{ t('about.feature_support') }}</span>
+              <span class="text-(--o2-text-body) font-semibold">{{ ed.support }}</span>
             </div>
           </div>
           <a
             v-if="ed.ctaUrl"
             :href="ed.ctaUrl"
             target="_blank"
-            class="cta-btn cta-btn--action"
+            data-test="feature-comparison-table-cta-btn"
+            data-test-cta="action"
+            class="block w-full py-2 px-4 rounded-md text-sm font-semibold text-center no-underline cursor-pointer transition-all duration-200 border-[1.5px] border-solid bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] text-(--o2-primary-color) border-[color-mix(in_srgb,var(--o2-primary-color)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--o2-primary-color)_18%,var(--o2-card-bg))] hover:border-(--o2-primary-color)"
           >
             {{ ed.ctaLabel }}
           </a>
-          <button v-else class="cta-btn cta-btn--current" disabled>
+          <button v-else data-test="feature-comparison-table-cta-btn" data-test-cta="current" class="block w-full py-2 px-4 rounded-md text-sm font-semibold text-center no-underline cursor-default transition-all duration-200 border-[1.5px] border-solid bg-transparent text-(--o2-text-muted) border-(--o2-border-color)" disabled>
             {{ ed.ctaLabel }}
           </button>
         </div>
@@ -222,288 +235,3 @@ function getFeatureNote(feature: FeatureDefinition, editionId: string): string {
 }
 </script>
 
-<style lang="scss" scoped>
-.edition-comparison {
-
-  // ─── Header ──────────────────────────────────────────────────────────────
-  .ec-icon-wrapper {
-    width: 48px;
-    height: 48px;
-    border-radius: 0.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    background: color-mix(in srgb, var(--o2-primary-color) 12%, var(--o2-card-bg));
-    color: var(--o2-primary-color);
-  }
-
-  .header-eyebrow {
-    font-size: var(--text-xs);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--o2-primary-color);
-    margin: 0 0 0.125rem;
-  }
-
-  .header-title {
-    font-size: var(--text-xl);
-    font-weight: 600;
-    color: var(--color-text-heading);
-    margin: 0;
-    letter-spacing: -0.015em;
-  }
-
-  .header-desc {
-    font-size: var(--text-sm);
-    line-height: 1.65;
-    color: var(--o2-text-secondary);
-    margin: 0.5rem 0 0;
-  }
-
-  // ─── Edition Cards ───────────────────────────────────────────────────────
-  .edition-card {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    background: var(--o2-card-bg);
-    border-radius: 0.75rem;
-    padding: 1.5rem;
-    border: 1px solid var(--o2-border-color);
-
-    &--active {
-      border: 2px solid var(--o2-primary-color);
-      padding-top: 1.75rem;
-    }
-  }
-
-  // ── "Your Plan" badge ─────────────────────────────────────────────────────
-  .your-plan-badge {
-    position: absolute;
-    top: -14px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: inline-flex;
-    align-items: center;
-    padding: 0.25rem 0.875rem;
-    border-radius: 999px;
-    font-size: 0.625rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    white-space: nowrap;
-    background: var(--o2-primary-color);
-    color: var(--o2-primary-foreground);
-  }
-
-  // ── Card top ─────────────────────────────────────────────────────────────
-  .edition-card__top {
-    margin-bottom: 1.25rem;
-  }
-
-  .edition-name {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--o2-text-heading);
-    margin: 0 0 0.125rem;
-  }
-
-  .edition-hosting {
-    font-size: 0.8125rem;
-    color: var(--o2-text-muted);
-    margin: 0 0 0.875rem;
-  }
-
-  .edition-price {
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: var(--o2-primary-color);
-    margin: 0 0 0.25rem;
-    letter-spacing: -0.03em;
-    line-height: 1.1;
-  }
-
-  .edition-price-sub {
-    font-size: 0.8125rem;
-    color: var(--o2-text-muted);
-    margin: 0;
-    line-height: 1.4;
-  }
-
-  // ── Pillars section ───────────────────────────────────────────────────────
-  .pillars-section {
-    background: color-mix(in srgb, var(--o2-primary-color) 5%, var(--o2-card-bg));
-    border: 1px solid color-mix(in srgb, var(--o2-primary-color) 15%, transparent);
-    border-radius: 0.5rem;
-    padding: 0.75rem;
-    margin-bottom: 1rem;
-  }
-
-  .pillars-label {
-    font-size: 0.5625rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--o2-text-label);
-    margin: 0 0 0.5rem;
-  }
-
-  .pillar-chip {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.1875rem 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 0.6875rem;
-    font-weight: 500;
-    background: color-mix(in srgb, var(--o2-primary-color) 10%, var(--o2-card-bg));
-    color: var(--o2-primary-color);
-    border: 1px solid color-mix(in srgb, var(--o2-primary-color) 20%, transparent);
-    margin-right: 0.375rem;
-    margin-bottom: 0.375rem;
-  }
-
-  // ── Feature list ─────────────────────────────────────────────────────────
-  .feature-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    flex: 1;
-  }
-
-  .feature-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.5rem;
-    padding: 0.4375rem 0;
-    font-size: 0.8125rem;
-    border-bottom: 1px solid var(--o2-border-color);
-
-    &:last-child { border-bottom: none; }
-
-    &__icon {
-      flex-shrink: 0;
-      margin-top: 0.125rem;
-      line-height: 1;
-    }
-
-    &__body {
-      display: flex;
-      flex-direction: column;
-      gap: 0.0625rem;
-    }
-
-    &__name {
-      line-height: 1.45;
-    }
-
-    &__note {
-      font-size: 0.6875rem;
-      color: var(--o2-text-muted);
-      font-style: italic;
-    }
-
-    // Available: green icon + normal text
-    &--available {
-      color: var(--o2-text-body);
-
-      .feature-item__icon { color: var(--o2-positive); }
-    }
-
-    // Conditional (string availability, e.g. "Requires HA mode"): green icon + muted note
-    &--conditional {
-      color: var(--o2-text-body);
-
-      .feature-item__icon { color: var(--o2-positive); }
-    }
-
-    // Unavailable: gray icon + muted text
-    &--unavailable {
-      color: var(--o2-text-muted);
-
-      .feature-item__icon { color: var(--o2-text-muted); }
-    }
-  }
-
-  // ── Card footer ───────────────────────────────────────────────────────────
-  .edition-card__footer {
-    margin-top: 1rem;
-  }
-
-  .footer-divider {
-    height: 1px;
-    background: var(--o2-border-color);
-    margin-bottom: 0.75rem;
-  }
-
-  .footer-meta {
-    margin-bottom: 0.875rem;
-  }
-
-  .footer-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    font-size: 0.8125rem;
-    padding: 0.125rem 0;
-  }
-
-  .footer-key {
-    color: var(--o2-text-muted);
-    font-weight: 500;
-  }
-
-  .footer-val {
-    color: var(--o2-text-body);
-    font-weight: 600;
-  }
-
-  .cta-btn {
-    display: block;
-    width: 100%;
-    padding: 0.5rem 1rem;
-    border-radius: 0.375rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    text-align: center;
-    text-decoration: none;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: 1.5px solid;
-
-    // Non-current plan: interactive link style
-    &--action {
-      background: color-mix(in srgb, var(--o2-primary-color) 10%, var(--o2-card-bg));
-      color: var(--o2-primary-color);
-      border-color: color-mix(in srgb, var(--o2-primary-color) 30%, transparent);
-
-      &:hover {
-        background: color-mix(in srgb, var(--o2-primary-color) 18%, var(--o2-card-bg));
-        border-color: var(--o2-primary-color);
-      }
-    }
-
-    // Current plan: muted/disabled
-    &--current {
-      background: transparent;
-      color: var(--o2-text-muted);
-      border-color: var(--o2-border-color);
-      cursor: default;
-    }
-  }
-
-  // ─── Responsive ──────────────────────────────────────────────────────────
-  // Cards always stay side-by-side; just reduce padding on tighter viewports
-  @media (max-width: 1024px) {
-    .edition-card {
-      padding: 1rem;
-
-      &--active { padding-top: 1.25rem; }
-    }
-
-    .edition-price {
-      font-size: 1.375rem;
-    }
-  }
-}
-</style>

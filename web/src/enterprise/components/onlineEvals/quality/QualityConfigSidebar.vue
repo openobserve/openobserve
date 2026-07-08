@@ -1,15 +1,15 @@
-<template>
-  <aside class="qcs" data-test="quality-config-sidebar">
-    <header class="qcs__head">
-      <span class="qcs__title">{{ t("onlineEvals.quality.overview.title") }}</span>
-      <span class="qcs__count">{{ filteredRows.length }}</span>
+﻿<template>
+  <aside class="flex flex-col gap-2.5 p-3 pb-4 bg-(--o2-card-bg) border border-dialog-header-border rounded-md min-h-0 max-h-[calc(100vh-var(--navbar-height)-200px)] overflow-hidden" data-test="quality-config-sidebar">
+    <header class="flex items-baseline gap-2">
+      <span class="text-[11px] font-semibold text-text-secondary">{{ t("onlineEvals.quality.overview.title") }}</span>
+      <span class="text-[11px] text-text-secondary bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] px-1.5 py-px rounded-[4px] [font-variant-numeric:tabular-nums]">{{ filteredRows.length }}</span>
     </header>
 
     <OInput
       v-model="filter"
       :placeholder="t('onlineEvals.quality.overview.searchPlaceholder')"
       size="sm"
-      class="qcs__filter"
+      class="w-full"
       data-test="quality-sidebar-filter"
     >
       <template #icon-left>
@@ -19,7 +19,7 @@
 
     <button
       type="button"
-      class="qcs__all"
+      class="qcs__all inline-flex items-center gap-1 bg-transparent border-0 py-[2px] px-0 text-xs text-(--color-primary-600,#3F7994) cursor-pointer w-max hover:underline"
       data-test="quality-sidebar-all-configs"
       @click="$emit('clear')"
     >
@@ -27,46 +27,43 @@
       {{ t("onlineEvals.quality.sidebar.allConfigs") }}
     </button>
 
-    <div class="qcs__list">
+    <div class="flex-1 min-h-0 overflow-auto flex flex-col gap-1">
       <button
         v-for="row in filteredRows"
         :key="row.configId"
         type="button"
-        class="qcs-item"
-        :class="{ 'qcs-item--selected': String(row.config.id) === selectedId }"
+        class="qcs-item flex gap-2 py-[10px] px-[10px] pb-2 bg-transparent border border-transparent rounded-md text-left cursor-pointer w-full [font:inherit] text-inherit transition-[background,border-color] duration-[120ms] hover:bg-[color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]"
+        :class="String(row.config.id) === selectedId ? ['qcs-item--selected', 'bg-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_14%,transparent)]', 'border-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_45%,transparent)]', 'relative'] : []"
         :data-test="`quality-sidebar-item-${row.name}`"
         @click="$emit('select', row)"
       >
-        <span class="qcs-item__status" :class="`qcs-item__status--${row.status}`">
-          <template v-if="row.status === 'unhealthy'">▲</template>
-          <template v-else>●</template>
-        </span>
+        <OTag type="qualityStatus" :value="row.status" label="" :aria-label="row.status" />
 
-        <div class="qcs-item__main">
-          <div class="qcs-item__row">
-            <span class="qcs-item__name">{{ row.name }}</span>
-            <span class="qcs-item__type" :class="`qcs-item__type--${row.dataType}`">
+        <div class="qcs-item__main flex-1 min-w-0 flex flex-col gap-1">
+          <div class="flex items-center gap-[6px]">
+            <span class="qcs-item__name flex-1 min-w-0 font-semibold text-[13px] text-(--color-text-primary,currentColor) truncate font-mono">{{ row.name }}</span>
+            <span class="qcs-item__type shrink-0 px-1 rounded-[2px] font-bold text-[4px] leading-[1.4] tracking-[0.02em]" :class="{ 'bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] text-[#4f5bcf]': row.dataType === 'numeric', 'bg-[color-mix(in_srgb,#9333ea_14%,transparent)] text-[#7c3aed]': row.dataType === 'categorical', 'bg-[color-mix(in_srgb,#16a34a_14%,transparent)] text-[#15803d]': row.dataType === 'boolean' }">
               {{ shortType(row.dataType) }}
             </span>
           </div>
 
-          <div class="qcs-item__row qcs-item__row--meta">
-            <div v-if="row.hasThreshold" class="qcs-item__bar">
+          <div class="flex items-center gap-[6px] [font-variant-numeric:tabular-nums]">
+            <div v-if="row.hasThreshold" class="qcs-item__bar flex-1 h-1 bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] rounded-full overflow-hidden">
               <div
-                class="qcs-item__bar-fill"
-                :class="`qcs-item__bar-fill--${row.status}`"
+                class="qcs-item__bar-fill h-full"
+                :class="{ 'bg-[var(--o2-status-warning-text,#b25400)]': row.status === 'unhealthy' || row.status === 'warn', 'bg-[var(--o2-status-success-text,#2e7d32)]': row.status === 'healthy', 'bg-[color-mix(in_srgb,var(--color-text-secondary)_30%,transparent)]': row.status === 'noThreshold' }"
                 :style="{ width: `${Math.min(100, row.unhealthyPct ?? 0)}%` }"
               />
             </div>
-            <span v-if="row.hasThreshold" class="qcs-item__pct">{{ formatPct(row.unhealthyPct) }}</span>
-            <span v-else class="qcs-item__pct qcs-item__pct--muted">—</span>
-            <span class="qcs-item__count">{{ formatCount(row.totalScores) }}</span>
+            <span v-if="row.hasThreshold" class="qcs-item__pct shrink-0 text-[11px] font-semibold text-(--o2-status-warning-text,#b25400)">{{ formatPct(row.unhealthyPct) }}</span>
+            <span v-else class="qcs-item__pct--muted shrink-0 text-[11px] font-semibold text-(--color-text-secondary,var(--o2-text-secondary))">—</span>
+            <span class="shrink-0 text-[11px] text-(--color-text-secondary,var(--o2-text-secondary))">{{ formatCount(row.totalScores) }}</span>
           </div>
 
           <svg
             v-if="row.trendSparkline.length > 0"
-            class="qcs-item__spark"
-            :class="`qcs-item__spark--${row.status}`"
+            class="qcs-item__spark w-full h-5"
+            :class="{ 'text-[var(--o2-status-warning-text,#b25400)]': row.status === 'unhealthy' || row.status === 'warn', 'text-[var(--o2-status-success-text,#2e7d32)]': row.status === 'healthy', 'text-[color-mix(in_srgb,var(--color-text-secondary)_50%,transparent)]': row.status === 'noThreshold' }"
             viewBox="0 0 100 20"
             preserveAspectRatio="none"
             aria-hidden="true"
@@ -81,7 +78,7 @@
         </div>
       </button>
 
-      <div v-if="filteredRows.length === 0" class="qcs__empty">
+      <div v-if="filteredRows.length === 0" class="py-5 px-2 text-center text-xs text-text-secondary">
         {{ t("onlineEvals.quality.sidebar.empty") }}
       </div>
     </div>
@@ -93,6 +90,7 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type { ScoreConfigRow } from "../composables/useQualityScoreConfigs";
 
 const props = defineProps<{
@@ -153,94 +151,8 @@ function sparkPoints(series: number[]): string {
 }
 </script>
 
-<style lang="scss" scoped>
-.qcs {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px 12px 16px;
-  background: var(--o2-card-bg);
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-  min-height: 0;
-  max-height: calc(100vh - var(--navbar-height) - 200px);
-  overflow: hidden;
-}
-
-.qcs__head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.qcs__title {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.qcs__count {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-variant-numeric: tabular-nums;
-}
-
-.qcs__filter {
-  width: 100%;
-}
-
-.qcs__all {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: transparent;
-  border: 0;
-  padding: 2px 0;
-  font-size: 12px;
-  color: var(--color-primary-600, #3F7994);
-  cursor: pointer;
-  width: max-content;
-}
-
-.qcs__all:hover { text-decoration: underline; }
-
-.qcs__list {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.qcs-item {
-  display: flex;
-  gap: 8px;
-  padding: 10px 10px 8px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  text-align: left;
-  cursor: pointer;
-  width: 100%;
-  font: inherit;
-  color: inherit;
-  transition: background 0.12s, border-color 0.12s;
-}
-
-.qcs-item:hover {
-  background: color-mix(in srgb, var(--color-text-primary) 5%, transparent);
-}
-
-.qcs-item--selected {
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 14%, transparent);
-  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 45%, transparent);
-  position: relative;
-}
-
+<style>
+/* .qcs-item selected state — pseudo-element and hover cannot be expressed inline */
 .qcs-item--selected:hover {
   background: color-mix(in srgb, var(--color-primary-600, #3F7994) 18%, transparent);
 }
@@ -256,124 +168,8 @@ function sparkPoints(series: number[]): string {
   background: var(--color-primary-600, #3F7994);
 }
 
+/* descendant selector: selected item overrides name color */
 .qcs-item--selected .qcs-item__name {
   color: var(--color-primary-600, #3F7994);
-}
-
-.qcs-item__status {
-  flex: 0 0 14px;
-  display: inline-flex;
-  align-items: flex-start;
-  padding-top: 2px;
-  font-size: 13px;
-  line-height: 1;
-}
-
-.qcs-item__status--unhealthy { color: var(--o2-status-warning-text, #b25400); }
-.qcs-item__status--warn { color: var(--o2-status-warning-text, #b25400); opacity: 0.75; }
-.qcs-item__status--healthy { color: var(--o2-status-success-text, #2e7d32); }
-.qcs-item__status--noThreshold { color: var(--color-text-secondary, var(--o2-text-secondary)); }
-
-.qcs-item__main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.qcs-item__row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.qcs-item__row--meta {
-  font-variant-numeric: tabular-nums;
-}
-
-.qcs-item__name {
-  flex: 1;
-  min-width: 0;
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--color-text-primary, currentColor);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.qcs-item__type {
-  flex: 0 0 auto;
-  padding: 0 4px;
-  border-radius: 2px;
-  font: 700 4px/1.4 inherit;
-  letter-spacing: 0.02em;
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.qcs-item__type--numeric {
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.qcs-item__type--categorical {
-  background: color-mix(in srgb, #9333ea 14%, transparent);
-  color: #7c3aed;
-}
-
-.qcs-item__type--boolean {
-  background: color-mix(in srgb, #16a34a 14%, transparent);
-  color: #15803d;
-}
-
-.qcs-item__bar {
-  flex: 1;
-  height: 4px;
-  background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.qcs-item__bar-fill {
-  height: 100%;
-}
-
-.qcs-item__bar-fill--unhealthy { background: var(--o2-status-warning-text, #b25400); }
-.qcs-item__bar-fill--healthy { background: var(--o2-status-success-text, #2e7d32); }
-.qcs-item__bar-fill--warn { background: var(--o2-status-warning-text, #b25400); }
-.qcs-item__bar-fill--noThreshold { background: color-mix(in srgb, var(--color-text-secondary) 30%, transparent); }
-
-.qcs-item__pct {
-  flex: 0 0 auto;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--o2-status-warning-text, #b25400);
-}
-
-.qcs-item__pct--muted { color: var(--color-text-secondary, var(--o2-text-secondary)); }
-
-.qcs-item__count {
-  flex: 0 0 auto;
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.qcs-item__spark {
-  width: 100%;
-  height: 20px;
-  color: color-mix(in srgb, var(--color-text-secondary) 50%, transparent);
-}
-
-.qcs-item__spark--unhealthy { color: var(--o2-status-warning-text, #b25400); }
-.qcs-item__spark--healthy { color: var(--o2-status-success-text, #2e7d32); }
-.qcs-item__spark--warn { color: var(--o2-status-warning-text, #b25400); }
-
-.qcs__empty {
-  padding: 20px 8px;
-  text-align: center;
-  font-size: 12px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 </style>

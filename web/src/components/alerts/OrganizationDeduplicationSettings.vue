@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,15 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:px-2 org-dedup-settings tw:flex tw:flex-col">
+  <div class="w-full h-full px-2 bg-(--o2-card-bg) flex flex-col">
     <!-- Scrollable content area -->
-    <div class="tw:flex-1 tw:overflow-y-auto tw:pr-2">
-      <div class="tw:mb-6">
-        <GroupHeader :title="t('alerts.correlation.title')" :showIcon="false" class="tw:mb-2" />
-        <div class="tw:text-sm tw:text-gray-400">
+    <div class="flex-1 overflow-y-auto pr-2">
+      <div class="mb-6">
+        <GroupHeader :title="t('alerts.correlation.title')" :showIcon="false" class="mb-2" />
+        <div class="text-sm text-gray-400">
           {{ t('alerts.correlation.description') }}
         </div>
-        <div class="tw:text-sm tw:text-gray-400 tw:mt-2 tw:italic">
+        <div class="text-sm text-gray-400 mt-2 italic">
           {{ t('alerts.correlation.semanticFieldNote') }}
         </div>
         <OButton
@@ -34,10 +34,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t('common.refresh') }}</OButton>
       </div>
 
-      <OSeparator class="tw:mb-6" />
+      <OSeparator class="mb-6" />
 
       <!-- Enable Deduplication -->
-      <div class="tw:mb-6">
+      <div class="mb-6">
         <OCheckbox
           data-test="organization-deduplication-enable-checkbox"
           v-model="localConfig.enabled"
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Cross-Alert Deduplication -->
-      <div class="tw:mb-6" v-if="localConfig.enabled">
+      <div class="mb-6" v-if="localConfig.enabled">
         <OCheckbox
           data-test="organizationdeduplication-enable-cross-alert-checkbox"
           v-model="localConfig.alert_dedup_enabled"
@@ -61,14 +61,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Cross-Alert Fingerprint Groups -->
-      <div class="tw:mb-6" v-if="localConfig.enabled && localConfig.alert_dedup_enabled">
-        <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
-          {{ t('alerts.correlation.fingerprintGroups') }} <span class="tw:text-red-500 tw:ml-1">*</span>
+      <div class="mb-6" v-if="localConfig.enabled && localConfig.alert_dedup_enabled">
+        <div class="font-semibold pb-2 flex items-center">
+          {{ t('alerts.correlation.fingerprintGroups') }} <span class="text-red-500 ml-1">*</span>
           <OIcon
             name="info"
             size="sm"
-            class="tw:ml-1 tw:cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
+            class="ml-1 cursor-pointer"
+            :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
           >
             <OTooltip
               side="right"
@@ -77,10 +77,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OIcon>
         </div>
-        <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
+        <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
           {{ t('alerts.correlation.fingerprintGroupsHint') }}
         </div>
-        <div class="tw:flex tw:flex-col tw:gap-2">
+        <div class="flex flex-col gap-2">
           <OCheckbox
             v-for="group in localSemanticGroups"
             :data-test="'organizationdeduplication-fingerprint-' + group.id + '-checkbox'"
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <div
             v-if="!localConfig.alert_fingerprint_groups || localConfig.alert_fingerprint_groups.length === 0"
-            class="tw:text-red-500 tw:text-sm tw:mt-1"
+            class="text-red-500 text-sm mt-1"
           >
             {{ t('alerts.correlation.fingerprintGroupsRequired') }}
           </div>
@@ -99,14 +99,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Time Window -->
-      <div class="tw:mb-6">
-        <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
+      <div class="mb-6">
+        <div class="font-semibold pb-2 flex items-center">
           {{ t('alerts.correlation.defaultWindow') }}
           <OIcon
             name="info"
             size="sm"
-            class="tw:ml-1 tw:cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
+            class="ml-1 cursor-pointer"
+            :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
            />
             <OTooltip
               side="right"
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :content="t('alerts.correlation.defaultWindowTooltip')"
             />
         </div>
-        <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
+        <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
           {{ t('alerts.correlation.defaultWindowDescription') }}
         </div>
         <OInput
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Sticky footer with buttons -->
-    <div class="tw:flex tw:justify-end tw:gap-3 tw:pt-4 tw:pb-2 tw:border-t tw:border-gray-200 dark:tw:border-gray-700 tw:bg-inherit tw:sticky tw:bottom-0">
+    <div class="flex justify-end gap-3 pt-4 pb-2 border-t border-gray-200 dark:border-gray-700 bg-inherit sticky bottom-0">
       <OButton variant="outline" size="sm-action" @click="$emit('cancel')">{{ t('alerts.correlation.cancelButton') }}</OButton>
       <OButton
         variant="primary"
@@ -324,9 +324,3 @@ watch(
 );
 </script>
 
-<style scoped lang="scss">
-.org-dedup-settings {
-  // Match parent card-container background
-  background: var(--o2-card-bg);
-}
-</style>

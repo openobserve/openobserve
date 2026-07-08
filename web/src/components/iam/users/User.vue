@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,14 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
+  <div class="rounded-md p-0 h-full flex flex-col">
     <!-- Standard page header: title + actions only. The user search moved into
          the table's own toolbar (built-in global filter) per the layout system. -->
     <AppPageHeader
       :title="t('iam.basicUsers')"
       :subtitle="t('user.subtitle')"
       icon="person"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     >
       <template #actions>
         <member-invitation
@@ -44,8 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </AppPageHeader>
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+    <div class="w-full flex-1 min-h-0 overflow-hidden">
+      <div class="card-container h-full">
         <OTable
           :key="tableKey"
           :frame="false"
@@ -71,12 +71,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+            <div class="flex items-center gap-2 w-full">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('user.search')"
                 data-test="user-list-search-input"
-                class="tw:flex-1"
+                class="flex-1"
               />
             </div>
           </template>
@@ -94,31 +94,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Auth type badge (Native / SSO / LDAP) — enterprise/cloud only -->
           <template #cell-auth="{ row }">
-            <OBadge
-              v-if="row.auth_type"
-              :variant="row.auth_type === 'SSO' ? 'primary-outline' : 'default-outline'"
-              size="sm"
-              class="o2-role-chip"
-            >
-              {{ row.auth_type }}
-            </OBadge>
+            <OTag v-if="row.auth_type" type="authType" :value="row.auth_type" />
+            <span v-else class="text-text-primary">—</span>
           </template>
 
-          <!-- Roles badges — yellow outline for built-in, red outline for custom.
-               Built-in role names are displayed capitalised (Admin/Viewer/User),
-               custom role names keep their original casing (nmcdev/admin/etc.). -->
+          <!-- Roles badges — typed userRole tags for built-in roles, custom
+               roles keep their original casing via an untyped tag. -->
           <template #cell-roles="{ row }">
-            <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-1">
-              <OBadge
+            <div class="flex flex-wrap items-center gap-1">
+              <OTag
                 v-for="(roleName, idx) in (row.roles || [])"
                 :key="`${roleName}-${idx}`"
-                :variant="isBuiltinRole(roleName) ? 'warning-outline' : 'error-outline'"
-                size="md"
-                class="o2-role-chip"
-              >
-                {{ isBuiltinRole(roleName) ? toCamelCase(roleName) : roleName }}
-              </OBadge>
+                :type="isBuiltinRole(roleName) ? 'userRole' : undefined"
+                :value="roleName"
+              />
             </div>
+          </template>
+
+          <!-- Single-role column (open-source). Built-in role gets a typed
+               userRole tag; the "(Invited)" suffix becomes a pending tag. -->
+          <template #cell-role="{ row }">
+            <span class="inline-flex items-center gap-1">
+              <OTag
+                type="userRole"
+                :value="String(row.role || '').replace(/\s*\(Invited\)\s*$/i, '')"
+              />
+              <OTag
+                v-if="row.status === 'pending'"
+                type="userStatus"
+                value="invited"
+              />
+            </span>
           </template>
 
           <template #cell-actions="{ row }">
@@ -128,6 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               :data-test="`delete-basic-user-${row.email}`"
+              data-row-action="delete"
               @click="confirmDeleteAction(row)"
             >
               <OIcon name="delete" size="sm" />
@@ -138,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               :data-test="`revoke-invite-${row.email}`"
+              data-row-action="delete"
               @click="confirmRevokeAction(row)"
             >
               <OIcon name="cancel" size="sm" />
@@ -148,13 +156,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               :data-test="`edit-basic-user-${row.email}`"
+              data-row-action="edit"
               @click="addRoutePush(row)"
             >
               <OIcon name="edit" size="sm" />
             </OButton>
           </template>
           <template #bottom>
-            <span class="o2-table-footer-title tw:text-text-primary">{{ rows.length }} {{ isEnterpriseOrCloud ? (t('iam.organizationMembers') || 'Organization Members') : t('iam.basicUsers') }}</span>
+            <span class="o2-table-footer-title text-text-primary">{{ rows.length }} {{ isEnterpriseOrCloud ? (t('iam.organizationMembers') || 'Organization Members') : t('iam.basicUsers') }}</span>
             <OButton
               v-if="selectedUsers.length > 0"
               data-test="users-list-delete-users-btn"
@@ -169,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
         </div>
     </div>
-    
+
     <update-user-role
       v-if="config.isCloud == 'false'"
       v-model:open="showUpdateUserDialog"
@@ -230,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -259,6 +268,8 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { computed, nextTick } from "vue";
 import { getRoles as getCustomRolesApi, getRoleUsers } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
@@ -270,7 +281,7 @@ export default defineComponent({
     AddUser,
     MemberInvitation,
     OButton,
-    OBadge,
+    OTag,
     OIcon,
     ODialog,
     OEmptyState,
@@ -610,7 +621,7 @@ export default defineComponent({
               const invitedMembers: any = await getInvitedMembers();
               users = [...res.data.data, ...invitedMembers];
             }
-            
+
             let counter = 1;
             currentUserRole.value = "";
             usersState.users = users.map((data: any) => {
@@ -649,7 +660,17 @@ export default defineComponent({
                 rawEmail: data.email,
                 first_name: data.first_name,
                 last_name: data.last_name,
-                role: data?.status == "pending" ? toCamelCase(data.role) + " (Invited)": toCamelCase(data.role),
+                // Store the display-cased role (e.g. "Admin", "Admin (Invited)") so
+                // the edit/update payloads stay byte-identical to pre-migration, which
+                // sent the capitalized value. The role options from getRoles use the
+                // lowercase value ("admin"), so this seeded "Admin" doesn't match an
+                // option — but OSelect renders the raw value as a fallback, so the
+                // field still displays "Admin" correctly. The only cosmetic quirk is
+                // that the open dropdown won't highlight the lowercase option as active.
+                role:
+                  data?.status == "pending"
+                    ? toCamelCase(data.role) + " (Invited)"
+                    : toCamelCase(data.role),
                 roles: rolesArr,
                 auth_type: data?.auth_type
                   ? data.auth_type
@@ -834,7 +855,9 @@ export default defineComponent({
     };
 
     const updateUser = (props: any) => {
-      selectedUser.value = props.row;
+      // The row already stores the canonical role VALUE, so it seeds the role
+      // select directly (matches an option, shows its label).
+      selectedUser.value = { ...props.row };
       showUpdateUserDialog.value = true;
     };
 
@@ -844,7 +867,9 @@ export default defineComponent({
         store.state.selectedOrganization.identifier;
 
       if (props.row != undefined) {
-        selectedUser.value = props.row;
+        // The row already stores the canonical role VALUE, so AddUser's role
+        // select matches an option directly (see updateUser).
+        selectedUser.value = { ...props.row };
         segment.track("Button Click", {
           button: "Actions",
           user_org: store.state.selectedOrganization.identifier,
@@ -1205,10 +1230,29 @@ export default defineComponent({
     watch(selectedUsers, (newSelectedUsers) => {
       const onlyEnabledSelected = newSelectedUsers.filter((user: any) => user.enableDelete);
       if (onlyEnabledSelected.length !== newSelectedUsers.length) {
+
         selectedUsers.value = onlyEnabledSelected;
       }
     });
 
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "iamUsersAdd",
+        handler: () => { if (!isInputFocused()) addRoutePush({}); },
+      },
+      {
+        id: "iamUsersRefresh",
+        handler: () => { if (!isInputFocused()) getOrgMembers(); },
+      },
+      {
+        id: "iamUsersFocusSearch",
+        handler: () => {
+          focusSearchInput("user-list-search-input");
+        },
+      },
+    ]);
     return {
       t,
       router,
@@ -1276,99 +1320,12 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-
-/* Role chip — matches the incident "dimension-badge" sizing so role pills
-   read consistently across the app (2px 8px padding, 11px font, weight 600). */
+<style>
 :deep(.o2-role-chip) {
   padding: 2px 8px;
   font-size: 11px;
   font-weight: 600;
   border-radius: 6px;
   line-height: 1.4;
-}
-
-.iconHoverBtn {
-  cursor: pointer !important;
-}
-
-.confirmBody {
-  padding: 11px 1.375rem 0;
-  font-size: 0.875rem;
-  text-align: center;
-  font-weight: 700;
-
-  .head {
-    line-height: 2.125rem;
-    margin-bottom: 0.5rem;
-    color: $dark-page;
-  }
-
-  .para {
-    color: $light-text;
-  }
-}
-
-.confirmActions {
-  justify-content: center;
-  padding: 1.25rem 1.375rem 1.625rem;
-  display: flex;
-}
-
-.non-selectable {
-  cursor: default !important;
-}
-
-.invite-user {
-  background: $input-bg;
-  border-radius: 4px;
-
-  .separator {
-    width: 1px;
-  }
-}
-
-.inputHint {
-  font-size: 11px;
-  color: $light-text;
-}
-
-.role-badge {
-  display: inline-flex;
-  align-items: center;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1;
-  padding: 4px 10px;
-  border-radius: 6px;
-  background-color: transparent;
-  white-space: nowrap;
-}
-
-.role-badge-system {
-  color: #8a6a1f;
-  border: 1px solid #8a6a1f;
-}
-
-.role-badge-custom {
-  color: #a04545;
-  border: 1px solid #a04545;
-  font-weight: 700;
-}
-
-.role-badge-more {
-  color: #a04545;
-  border: 1px solid #a04545;
-  cursor: pointer;
-}
-
-.role-badge-sso {
-  color: #1f6f8b;
-  border: 1px solid #1f6f8b;
-}
-
-.role-badge-local {
-  color: #4a4a4a;
-  border: 1px solid #4a4a4a;
 }
 </style>

@@ -1,14 +1,14 @@
 <template>
   <div
-    class="group"
     data-test="dashboard-group"
-    :style="`--group-index: ${groupNestedIndex}; padding-left: ${groupNestedIndex > 0 ? '0.3125rem' : '0'}`"
+    :style="`--group-index: ${groupNestedIndex}; padding-left: ${groupNestedIndex > 0 ? '0.3125rem' : '0'}; background-color: rgba(89, 96, 178, calc(0.12 * var(--group-index)));`"
+    class="flex p-0 rounded-[5px]"
   >
-    <div class="group-conditions" data-test="dashboard-group-conditions">
+    <div class="flex flex-row flex-wrap items-center" data-test="dashboard-group-conditions">
       <div
         v-for="(condition, index) in group.conditions"
         :key="index"
-        class="condition-group"
+        class="inline-flex items-center mr-2.5 min-h-8.75 gap-2"
         data-test="dashboard-group-condition-group"
       >
         <Group
@@ -60,7 +60,7 @@
         </ODropdownItem>
       </ODropdown>
     </div>
-    <div v-if="groupNestedIndex !== 0" class="group-remove">
+    <div v-if="groupNestedIndex !== 0" class="border-l border-[#f5f5f5] flex justify-between items-center">
       <OButton
         variant="ghost"
         size="icon"
@@ -184,35 +184,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.group {
-  display: flex;
-  padding: 0px;
-  background-color: rgba(89, 96, 178, calc(0.12 * var(--group-index)));
-  border-radius: 5px;
-}
-
-.group-remove {
-  border-left: 1px solid $grey-2;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.group-conditions {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.condition-group {
-  display: inline-flex;
-  align-items: center;
-  margin-right: 10px;
-  padding: 0px 0px 0px 0px;
-  min-height: 35px;
-  gap: 8px;
-}
-</style>

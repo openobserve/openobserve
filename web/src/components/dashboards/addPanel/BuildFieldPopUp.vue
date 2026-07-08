@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div data-test="dashboard-build-field-popup-right-section">
-      <div v-if="!customQuery && !modelValue.isDerived" class="tw:mr-1 tw:mb-2">
+      <div v-if="!customQuery && !modelValue.isDerived" class="mr-1 mb-2">
         <DynamicFunctionPopUp
           :modelValue="modelValue"
           @update:modelValue="(newValue) => emit('update:modelValue', newValue)"
@@ -87,4 +87,3 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped></style>

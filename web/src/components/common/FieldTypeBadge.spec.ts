@@ -26,22 +26,22 @@ describe("FieldTypeBadge.vue", () => {
   describe("Rendering", () => {
     it("does not render when dataType is undefined", () => {
       const wrapper = createWrapper();
-      expect(wrapper.find(".field-type-badge").exists()).toBe(false);
+      expect(wrapper.find('[data-test="common-field-type-badge"]').exists()).toBe(false);
     });
 
     it("does not render when dataType is empty string", () => {
       const wrapper = createWrapper({ dataType: "" });
-      expect(wrapper.find(".field-type-badge").exists()).toBe(false);
+      expect(wrapper.find('[data-test="common-field-type-badge"]').exists()).toBe(false);
     });
 
     it("renders a badge when dataType is provided", () => {
       const wrapper = createWrapper({ dataType: "string" });
-      expect(wrapper.find(".field-type-badge").exists()).toBe(true);
+      expect(wrapper.find('[data-test="common-field-type-badge"]').exists()).toBe(true);
     });
 
     it("sets title attribute to the raw dataType value", () => {
       const wrapper = createWrapper({ dataType: "int64" });
-      expect(wrapper.find(".field-type-badge").attributes("title")).toBe("int64");
+      expect(wrapper.find('[data-test="common-field-type-badge"]').attributes("title")).toBe("int64");
     });
   });
 
@@ -50,17 +50,17 @@ describe("FieldTypeBadge.vue", () => {
   describe("Boolean type", () => {
     it("shows label 'B' for boolean", () => {
       const wrapper = createWrapper({ dataType: "boolean" });
-      expect(wrapper.find(".field-type-badge").text()).toBe("B");
+      expect(wrapper.find('[data-test="common-field-type-badge"]').text()).toBe("B");
     });
 
     it("is case-insensitive for BOOLEAN", () => {
       const wrapper = createWrapper({ dataType: "BOOLEAN" });
-      expect(wrapper.find(".field-type-badge").text()).toBe("B");
+      expect(wrapper.find('[data-test="common-field-type-badge"]').text()).toBe("B");
     });
 
     it("uses boolean CSS variable for background color", () => {
       const wrapper = createWrapper({ dataType: "boolean" });
-      const style = wrapper.find(".field-type-badge").attributes("style") ?? "";
+      const style = wrapper.find('[data-test="common-field-type-badge"]').attributes("style") ?? "";
       expect(style).toContain("o2-field-type-boolean-bg");
     });
   });
@@ -69,20 +69,20 @@ describe("FieldTypeBadge.vue", () => {
 
   describe("Float type", () => {
     it("shows label '~' for float64", () => {
-      expect(createWrapper({ dataType: "float64" }).find(".field-type-badge").text()).toBe("~");
+      expect(createWrapper({ dataType: "float64" }).find('[data-test="common-field-type-badge"]').text()).toBe("~");
     });
 
     it("shows label '~' for float32", () => {
-      expect(createWrapper({ dataType: "float32" }).find(".field-type-badge").text()).toBe("~");
+      expect(createWrapper({ dataType: "float32" }).find('[data-test="common-field-type-badge"]').text()).toBe("~");
     });
 
     it("shows label '~' for FLOAT (uppercase)", () => {
-      expect(createWrapper({ dataType: "FLOAT" }).find(".field-type-badge").text()).toBe("~");
+      expect(createWrapper({ dataType: "FLOAT" }).find('[data-test="common-field-type-badge"]').text()).toBe("~");
     });
 
     it("uses float CSS variable for background color", () => {
       const style = createWrapper({ dataType: "float64" })
-        .find(".field-type-badge")
+        .find('[data-test="common-field-type-badge"]')
         .attributes("style") ?? "";
       expect(style).toContain("o2-field-type-float-bg");
     });
@@ -95,13 +95,13 @@ describe("FieldTypeBadge.vue", () => {
 
     intTypes.forEach((t) => {
       it(`shows label '#' for ${t}`, () => {
-        expect(createWrapper({ dataType: t }).find(".field-type-badge").text()).toBe("#");
+        expect(createWrapper({ dataType: t }).find('[data-test="common-field-type-badge"]').text()).toBe("#");
       });
     });
 
     it("uses number CSS variable for background color", () => {
       const style = createWrapper({ dataType: "int32" })
-        .find(".field-type-badge")
+        .find('[data-test="common-field-type-badge"]')
         .attributes("style") ?? "";
       expect(style).toContain("o2-field-type-number-bg");
     });
@@ -114,17 +114,17 @@ describe("FieldTypeBadge.vue", () => {
 
     tsTypes.forEach((t) => {
       it(`shows label 'T' for ${t}`, () => {
-        expect(createWrapper({ dataType: t }).find(".field-type-badge").text()).toBe("T");
+        expect(createWrapper({ dataType: t }).find('[data-test="common-field-type-badge"]').text()).toBe("T");
       });
     });
 
     it("shows label 'T' for TIMESTAMP (uppercase)", () => {
-      expect(createWrapper({ dataType: "TIMESTAMP" }).find(".field-type-badge").text()).toBe("T");
+      expect(createWrapper({ dataType: "TIMESTAMP" }).find('[data-test="common-field-type-badge"]').text()).toBe("T");
     });
 
     it("uses timestamp CSS variable for background color", () => {
       const style = createWrapper({ dataType: "timestamp" })
-        .find(".field-type-badge")
+        .find('[data-test="common-field-type-badge"]')
         .attributes("style") ?? "";
       expect(style).toContain("o2-field-type-timestamp-bg");
     });
@@ -134,20 +134,20 @@ describe("FieldTypeBadge.vue", () => {
 
   describe("String type (default)", () => {
     it("shows label 'S' for string", () => {
-      expect(createWrapper({ dataType: "string" }).find(".field-type-badge").text()).toBe("S");
+      expect(createWrapper({ dataType: "string" }).find('[data-test="common-field-type-badge"]').text()).toBe("S");
     });
 
     it("shows label 'S' for utf8", () => {
-      expect(createWrapper({ dataType: "utf8" }).find(".field-type-badge").text()).toBe("S");
+      expect(createWrapper({ dataType: "utf8" }).find('[data-test="common-field-type-badge"]').text()).toBe("S");
     });
 
     it("shows label 'S' for unknown / unsupported types", () => {
-      expect(createWrapper({ dataType: "customtype" }).find(".field-type-badge").text()).toBe("S");
+      expect(createWrapper({ dataType: "customtype" }).find('[data-test="common-field-type-badge"]').text()).toBe("S");
     });
 
     it("uses string CSS variable for background color", () => {
       const style = createWrapper({ dataType: "string" })
-        .find(".field-type-badge")
+        .find('[data-test="common-field-type-badge"]')
         .attributes("style") ?? "";
       expect(style).toContain("o2-field-type-string-bg");
     });
@@ -196,7 +196,7 @@ describe("FieldTypeBadge.vue", () => {
   describe("Inline style binding", () => {
     it("applies both backgroundColor and color style properties", () => {
       const wrapper = createWrapper({ dataType: "string" });
-      const style = wrapper.find(".field-type-badge").attributes("style") ?? "";
+      const style = wrapper.find('[data-test="common-field-type-badge"]').attributes("style") ?? "";
       expect(style).toContain("background-color");
       expect(style).toContain("color");
     });

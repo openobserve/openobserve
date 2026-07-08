@@ -23,9 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     panel-data-test="data-sources-recommended-tabs"
     tab-data-test-prefix="ingestion-recommended-tab-"
   >
-    <div class="tw:w-full tw:h-full">
-      <div class="card-container tw:h-full">
-        <div class="tw:overflow-auto tw:h-full tw:pt-1.5">
+    <div class="w-full h-full">
+      <div class="card-container h-full">
+        <div class="overflow-auto h-full pt-1.5">
           <router-view
             :title="tabs"
             :currOrgIdentifier="currOrgIdentifier"
@@ -211,29 +211,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.ingestionPage {
-  padding: 1.5rem 0 0;
-  .head {
-    padding-bottom: 1rem;
-  }
-}
-</style>
-<style lang="scss">
-.ingestionPage {
-  .o-tab-panel {
-    padding: 0 !important;
-    .tab_content {
-      .o-tab__label {
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-      }
-    }
-  }
-
-  .OIcon > img {
-    height: auto !important;
-  }
-}
-</style>

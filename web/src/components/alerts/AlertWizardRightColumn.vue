@@ -16,39 +16,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Right Column: Preview & Summary (calc to account for gap) -->
-  <div class="tw:flex-[0_0_calc(32%-0.625rem)] tw:flex tw:flex-col tw:gap-2 right-column-container" style="height: calc(100vh - 302px); position: sticky; top: 0;">
+  <div class="flex-[0_0_calc(32%-0.625rem)] flex flex-col gap-2 overflow-y-auto overflow-x-clip" style="height: calc(100vh - 302px); position: sticky; top: 0;">
     <!-- Preview Section -->
     <div
-      class="collapsible-section card-container preview-section"
+      class="collapsible-section card-container preview-section flex flex-col transition-all duration-300 bg-(--o2-card-bg) rounded-md shadow-[0_0_5px_1px_var(--o2-hover-shadow)] border border-(--o2-border-color)"
       :style="previewSectionStyle"
     >
       <div
-        class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
+        class="flex items-center justify-between px-4 py-3 cursor-pointer shrink-0 border-b border-[var(--o2-border-color,rgba(0,0,0,0.08))] transition-all duration-200 rounded-t-md select-none hover:bg-black/4 active:bg-black/[0.06]"
         @click="togglePreview"
       >
-        <div class="tw:flex tw:items-center tw:gap-2">
-          <span class="tw:text-sm tw:font-semibold">{{ t('alerts.preview') }}</span>
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-semibold">{{ t('alerts.preview') }}</span>
           <!-- Status Indicator -->
           <div
             v-if="evaluationStatus && !isRealTime"
-            class="alert-status-indicator tw:flex tw:items-center tw:gap-1.5 tw:px-2 tw:py-1 tw:rounded"
+            class="alert-status-indicator group flex items-center gap-1.5 px-2 py-1 rounded border-l-[0.1875rem] border-l-solid bg-[rgba(76,175,80,0.08)] border-l-[#4caf50]"
             :class="{
-              'status-would-trigger': evaluationStatus.wouldTrigger,
-              'status-would-not-trigger': !evaluationStatus.wouldTrigger,
-              'status-indicator-light': store.state.theme !== 'dark'
+              'status-indicator-light': store.state.theme !== 'dark',
+              'bg-[rgba(158,158,158,0.08)] border-l-[#9e9e9e]': !evaluationStatus.wouldTrigger,
+              'bg-[rgba(76,175,80,0.04)]': store.state.theme !== 'dark' && evaluationStatus.wouldTrigger,
+              'bg-[rgba(158,158,158,0.04)]': store.state.theme !== 'dark' && !evaluationStatus.wouldTrigger,
             }"
             data-test="alert-status-indicator"
           >
             <OIcon
               :name="evaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" size="sm"
-              class="tw:text-xs tw:flex-shrink-0"
-              :class="evaluationStatus.wouldTrigger ? 'tw:text-green-500' : 'tw:text-gray-400'"
+              class="text-xs flex-shrink-0"
+              :class="evaluationStatus.wouldTrigger ? 'text-green-500' : 'text-gray-400'"
             />
-            <span class="tw:text-xs tw:font-semibold tw:tracking-wide tw:uppercase tw:flex-shrink-0 tw:whitespace-nowrap">
+            <span class="text-xs font-semibold tracking-wide uppercase flex-shrink-0 whitespace-nowrap">
               {{ evaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
             </span>
-            <span class="status-separator tw:text-xs tw:flex-shrink-0">•</span>
-            <span class="tw:text-xs">
+            <span class="text-xs flex-shrink-0 text-[rgba(255,255,255,0.3)] group-[.status-indicator-light]:text-[rgba(0,0,0,0.3)]">•</span>
+            <span class="text-xs text-[rgba(255,255,255,0.65)] group-[.status-indicator-light]:text-[rgba(0,0,0,0.6)]">
               {{ evaluationStatus.reason }}
             </span>
           </div>
@@ -57,12 +58,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-circle-sm"
           @click.stop="togglePreview"
-          class="expand-toggle-btn"
+          class="expand-toggle-btn opacity-50 transition-all duration-200 hover:opacity-100"
         >
           <OIcon :name="expandState.preview ? 'expand-less' : 'expand-more'" size="sm" />
         </OButton>
       </div>
-      <div v-show="expandState.preview" class="section-content">
+      <div v-show="expandState.preview" class="section-content flex-1 flex flex-col">
         <keep-alive>
           <preview-alert
             style="height: 100%;"
@@ -80,24 +81,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Summary Section -->
     <div
-      class="collapsible-section card-container"
+      class="collapsible-section card-container flex flex-col transition-all duration-300 bg-(--o2-card-bg) rounded-md shadow-[0_0_5px_1px_var(--o2-hover-shadow)] border border-(--o2-border-color)"
       :style="summarySectionStyle"
     >
       <div
-        class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
+        class="flex items-center justify-between px-4 py-3 cursor-pointer shrink-0 border-b border-[var(--o2-border-color,rgba(0,0,0,0.08))] transition-all duration-200 rounded-t-md select-none hover:bg-black/4 active:bg-black/[0.06]"
         @click="toggleSummary"
       >
-        <span class="tw:text-sm tw:font-semibold">{{ t('alerts.summary.title') }}</span>
+        <span class="text-sm font-semibold">{{ t('alerts.summary.title') }}</span>
         <OButton
           variant="ghost"
           size="icon-circle-sm"
           @click.stop="toggleSummary"
-          class="expand-toggle-btn"
+          class="expand-toggle-btn opacity-50 transition-all duration-200 hover:opacity-100"
         >
           <OIcon :name="expandState.summary ? 'expand-less' : 'expand-more'" size="sm" />
         </OButton>
       </div>
-      <div v-show="expandState.summary" class="summary-section-content">
+      <div v-show="expandState.summary" class="summary-section-content flex-1 overflow-hidden flex flex-col">
         <alert-summary
           style="height: 100%; overflow: auto;"
           :formData="formData"
@@ -326,98 +327,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.right-column-container {
-  overflow-y: auto;
-  overflow-x: clip;
-}
-
-.collapsible-section {
-  display: flex;
-  flex-direction: column;
-  transition: all 0.3s ease;
-  // Ensure card-container styles are applied
-  background-color: var(--o2-card-bg);
-  border-radius: 0.375rem;
-  box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
-  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
-  // overflow: hidden;
-
-  .section-header {
-    flex-shrink: 0;
-    border-bottom: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
-    transition: all 0.2s ease;
-    border-radius: 0.375rem 0.375rem 0 0;
-    user-select: none;
-
-    &:hover {
-      background: rgba(0, 0, 0, 0.04);
-    }
-
-    &:active {
-      background: rgba(0, 0, 0, 0.06);
-    }
-  }
-
-  .section-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-  }
-
-
-  .summary-section-content {
-    flex: 1;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-
-  .expand-toggle-btn {
-    opacity: 0.5;
-    transition: all 0.2s ease;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-}
-
-/* Status Indicator Styles */
-.alert-status-indicator {
-  border-left: 0.1875rem solid;
-  background: rgba(76, 175, 80, 0.08);
-  border-left-color: #4caf50;
-}
-
-.alert-status-indicator.status-would-not-trigger {
-  background: rgba(158, 158, 158, 0.08);
-  border-left-color: #9e9e9e;
-}
-
-.alert-status-indicator.status-indicator-light {
-  background: rgba(76, 175, 80, 0.04);
-}
-
-.alert-status-indicator.status-would-not-trigger.status-indicator-light {
-  background: rgba(158, 158, 158, 0.04);
-}
-
-.alert-status-indicator .status-separator {
-  color: rgba(255, 255, 255, 0.3);
-}
-
-.alert-status-indicator.status-indicator-light .status-separator {
-  color: rgba(0, 0, 0, 0.3);
-}
-
-.alert-status-indicator span:last-child {
-  color: rgba(255, 255, 255, 0.65);
-}
-
-.alert-status-indicator.status-indicator-light span:last-child {
-  color: rgba(0, 0, 0, 0.6);
-}
-</style>

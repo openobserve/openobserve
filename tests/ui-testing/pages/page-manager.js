@@ -24,6 +24,7 @@ import DashboardPanelTime from "./dashboardPages/dashboard-panel-time";
 import LogsVisualise from "./dashboardPages/visualise";
 import { DashboardPage } from "./dashboardPages/dashboardPage.js";
 import { AlertsPage } from "./alertsPages/alertsPage.js";
+import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
 
 // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
 import { LogsPage } from "./logsPages/logsPage.js";
@@ -46,7 +47,11 @@ import { MetricsBuilderPage } from "./metricsPages/metricsBuilderPage.js";
 import { TracesPage } from "./tracesPages/tracesPage.js";
 import { ServiceGraphPage } from "./tracesPages/serviceGraphPage.js";
 import { ServicesCatalogPage } from "./tracesPages/servicesCatalogPage.js";
-import { RumPage } from "./logsPages/rumPage.js";
+import { RumPage } from "./rumPages/rumPage.js";
+import { RumSessionsPage } from "./rumPages/rumSessionsPage.js";
+import { RumPerformancePage } from "./rumPages/rumPerformancePage.js";
+import { RumIngestionPage } from "./rumPages/rumIngestionPage.js";
+import { RumSourcemapsPage } from "./rumPages/rumSourcemapsPage.js";
 import { ReportsPage } from "./reportsPages/reportsPage.js";
 import { ReportFoldersPage } from "./reportsPages/reportFoldersPage.js";
 import { ReportsFormValidationPage } from "./reportsPages/reportsFormValidationPage.js";
@@ -135,6 +140,7 @@ class PageManager {
 
     // ===== EXISTING ALERTS PAGE OBJECT =====
     this.alertsPage = new AlertsPage(page);
+    this.alertHistoryPage = new AlertHistoryPage(page);
 
     // ===== API CLEANUP =====
     this.apiCleanup = new APICleanup(page);
@@ -214,6 +220,10 @@ class PageManager {
 
     // ===== RUM PAGE OBJECTS =====
     this.rumFormValidation = new RumFormValidationPage(page);
+    this.rumSessionsPage = new RumSessionsPage(page);
+    this.rumPerformancePage = new RumPerformancePage(page);
+    this.rumIngestionPage = new RumIngestionPage(page);
+    this.rumSourcemapsPage = new RumSourcemapsPage(page);
   }
 }
 

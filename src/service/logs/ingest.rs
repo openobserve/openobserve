@@ -292,7 +292,28 @@ pub async fn ingest(
     // batch process records through pipeline
     if !executable_pipelines.is_empty() {
         let records_count = pipeline_inputs.len();
+        let mut evaluation_tasks = tokio::task::JoinSet::new();
         for exec_pl in &executable_pipelines {
+            if exec_pl.kind == config::meta::pipeline::PipelineKind::Evaluation
+                && exec_pl.contains_llm_evaluation_node()
+            {
+                let exec_pl = exec_pl.clone();
+                let org_id = org_id.to_string();
+                let stream_name = stream_name.clone();
+                let records = pipeline_inputs.clone();
+                evaluation_tasks.spawn(async move {
+                    if let Err(e) = exec_pl
+                        .process_batch(&org_id, records, Some(stream_name.clone()))
+                        .await
+                    {
+                        log::error!(
+                            "[Pipeline] evaluation pipeline for stream {org_id}/{stream_name}: Batch execution error: {e}.",
+                        );
+                    }
+                });
+                continue;
+            }
+
             let pipeline_start = std::time::Instant::now();
             let pl_result = exec_pl
                 .process_batch(org_id, pipeline_inputs.clone(), Some(stream_name.clone()))
@@ -301,7 +322,8 @@ pub async fn ingest(
                 // Pipeline wall-time vs total ingest elapsed so far, to see the realtime
                 // pipeline's share of ingestion latency at the ingest layer.
                 log::info!(
-                    "[Pipeline:Timing] ingest org={org_id} stream={stream_name} records={records_count} pipeline_ms={} ingest_elapsed_ms={}",
+                    "[Pipeline:Timing] ingest org={org_id} stream={stream_name} pipeline={} records={records_count} pipeline_ms={} ingest_elapsed_ms={}",
+                    exec_pl.get_pipeline_name(),
                     pipeline_start.elapsed().as_millis(),
                     start.elapsed().as_millis(),
                 );
@@ -335,7 +357,8 @@ pub async fn ingest(
                         }
 
                         if !user_defined_schema_map.contains_key(&destination_stream) {
-                            // a new dynamically created stream. need to check the two maps again
+                            // a new dynamically created stream. need to check the two maps
+                            // again
                             crate::service::ingestion::get_uds_and_original_data_streams(
                                 &[stream_params],
                                 &mut user_defined_schema_map,
@@ -381,8 +404,8 @@ pub async fn ingest(
                                     crate::service::ingestion::refactor_map(local_val, fields);
                             }
 
-                            // usize::MAX used as a flag when pipeline is applied with ResultArray
-                            // vrl
+                            // usize::MAX used as a flag when pipeline is applied with
+                            // ResultArray vrl
                             //  - invalid original_data
                             // add `_original` and '_record_id` if required by StreamSettings
                             if idx != usize::MAX
@@ -440,8 +463,9 @@ pub async fn ingest(
                             ts_data.push((timestamp, local_val));
                             *fn_num = need_usage_report.then_some(function_no);
 
-                            // Since we report the size for the original stream before the pipeline
-                            // execution we need to skip reporting the actual size on disk.
+                            // Since we report the size for the original stream before the
+                            // pipeline execution we need to
+                            // skip reporting the actual size on disk.
                             if destination_stream.ne(&stream_name) {
                                 let size = size_by_stream
                                     .entry(destination_stream.clone())
@@ -456,12 +480,28 @@ pub async fn ingest(
             }
         } // for each pipeline
 
+        while let Some(result) = evaluation_tasks.join_next().await {
+            if let Err(e) = result {
+                log::error!(
+                    "[Pipeline] evaluation pipeline task for stream {org_id}/{stream_name} failed: {e}.",
+                );
+            }
+        }
+
         // When only evaluation pipelines exist for this stream (no user pipeline
         // is responsible for writing to the source stream), preserve original
         // records by writing them back to the source stream.
         let has_user_pipeline = executable_pipelines
             .iter()
             .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
+        let has_evaluation_pipeline = executable_pipelines
+            .iter()
+            .any(|p| p.kind == config::meta::pipeline::PipelineKind::Evaluation);
+        log::debug!(
+            "[LOGS] source preservation check stream={stream_name}, pipelines={}, has_user_pipeline={has_user_pipeline}, has_evaluation_pipeline={has_evaluation_pipeline}, source_buffered={}",
+            executable_pipelines.len(),
+            json_data_by_stream.contains_key(&stream_name)
+        );
         if !has_user_pipeline && !json_data_by_stream.contains_key(&stream_name) {
             for (idx, item) in pipeline_inputs.iter().enumerate() {
                 let _ = finalize_and_buffer_record(

@@ -92,6 +92,28 @@ export function cleanFilterGroup(group: any): V2Group {
   } as V2Group;
 }
 
+/**
+ * True when every condition in the group is fully specified (column + operator
+ * + a value / values). An empty group is "complete" (matches everything). Used
+ * to avoid firing the live match-count query while the user is mid-editing a
+ * condition (e.g. picked a column but hasn't typed a value yet).
+ */
+export function isJobFilterComplete(group: any): boolean {
+  for (const item of group?.conditions || []) {
+    if (item?.filterType === "group") {
+      if (!isJobFilterComplete(item)) return false;
+    } else if (item?.filterType === "condition") {
+      const hasValue =
+        (item.value !== undefined &&
+          item.value !== null &&
+          item.value !== "") ||
+        (Array.isArray(item.values) && item.values.length > 0);
+      if (!item.column || !item.operator || !hasValue) return false;
+    }
+  }
+  return true;
+}
+
 export function buildJobFilterConditionPayload(group: V2Group) {
   const conditions = cleanFilterGroup(group);
   if (!conditions.conditions.length) return { type: "all" };

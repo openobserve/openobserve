@@ -21,13 +21,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :size="warningMessage?.length ? 'md' : 'sm'"
     :title="title"
     :secondary-button-label="t('confirmDialog.cancel')"
-    :primary-button-label="t('confirmDialog.ok')"
+    :primary-button-label="okLabelComputed"
+    :primary-button-color="okColor"
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
-    <div data-test="dialog-box" class="tw:text-left">
+    <div data-test="dialog-box" class="text-left">
       <div class="para">{{ message }}</div>
-      <div v-if="warningMessage && warningMessage.length > 0" class="tw:mt-4 tw:text-left">
+      <div v-if="warningMessage && warningMessage.length > 0" class="mt-4 text-left">
         <OBanner variant="warning" icon="warning" :content="warningMessage" />
       </div>
     </div>
@@ -50,6 +51,8 @@ export default defineComponent({
     message: { type: String },
     warningMessage: { type: String },
     modelValue: { type: Boolean, default: false },
+    okLabel: { type: String, default: "" },
+    okColor: { type: String, default: "primary" },
   },
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -57,6 +60,10 @@ export default defineComponent({
     const open = computed({
       get: () => props.modelValue ?? false,
       set: (v: boolean) => emit("update:modelValue", v),
+    });
+
+    const okLabelComputed = computed(() => {
+      return props.okLabel || t("confirmDialog.ok");
     });
 
     const onCancel = () => {
@@ -72,6 +79,7 @@ export default defineComponent({
     return {
       t,
       open,
+      okLabelComputed,
       onCancel,
       onConfirm,
     };

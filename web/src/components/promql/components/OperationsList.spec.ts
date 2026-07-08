@@ -116,18 +116,22 @@ describe("OperationsList", () => {
   describe("Component Rendering", () => {
     it("should render operations list container", () => {
       wrapper = createWrapper();
-      // Outer tw:py-[0.25rem] wrapper removed in commit 3e7c9baf6a; check the inner row instead
-      expect(wrapper.find(".tw\\:pl-2").exists()).toBe(true);
+      // Outer py-[0.25rem] wrapper removed in commit 3e7c9baf6a; check the inner row instead
+      expect(wrapper.find(".pl-2").exists()).toBe(true);
     });
 
     it("should display layout name", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".layout-name").text()).toBe("Operations");
+      expect(
+        wrapper.find('[data-test="promql-operations-list-label"]').text(),
+      ).toBe("Operations");
     });
 
     it("should render operation items", () => {
       wrapper = createWrapper();
-      const operations = wrapper.findAll(".operation-item");
+      const operations = wrapper.findAll(
+        '[data-test="promql-operations-item"]',
+      );
       expect(operations.length).toBe(mockOperations.length);
     });
 

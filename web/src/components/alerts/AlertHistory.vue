@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,14 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="alert-history-page"
-    class="tw:p-0 tw:flex"
+    class="p-0 flex"
   >
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pt-[0.325rem]">
-      <div class="card-container tw:mb-[0.625rem]">
+    <div class="w-full h-full px-2.5 pt-[0.325rem]">
+      <div class="card-container mb-2.5">
         <div
-          class="tw:flex tw:justify-between tw:w-full tw:h-[68px] tw:px-2 tw:py-3"
+          class="flex justify-between w-full h-17 px-2 py-3"
         >
-          <div class="tw:flex tw:items-center">
+          <div class="flex items-center">
             <OButton
               padding="xs"
               variant="outline"
@@ -34,14 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-history-back-btn"
             />
             <div
-              class="tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:ml-2"
+              class="text-xl tracking-[0.005em] font-semibold ml-2"
               data-test="alerts-history-title"
             >
               {{ t(`alerts.history`) }}
             </div>
           </div>
-          <div class="tw:flex tw:ml-auto tw:items-center">
-            <div class="tw:mr-2">
+          <div class="flex ml-auto items-center">
+            <div class="mr-2">
               <DateTime
                 ref="dateTimeRef"
                 auto-apply
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="onAlertSelected"
               :placeholder="t(`alerts.searcHistory`) || 'Select or search alert...'"
               data-test="alert-history-search-select"
-              class="o2-search-input tw:mr-2"
+              class="o2-search-input mr-2"
               style="min-width: 250px"
               clearable
               @clear="clearSearch"
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template #empty>
-                <div class="tw:px-3 tw:py-2 tw:text-muted-foreground">
+                <div class="px-3 py-2 text-muted-foreground">
                   No alerts found
                 </div>
               </template>
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="manualSearch"
               data-test="alert-history-manual-search-btn"
               :disabled="loading"
-              class="tw:mr-2"
+              class="mr-2"
             >
               <OTooltip :content="t('common.search') || 'Search'" />
             </OButton>
@@ -110,8 +110,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem]">
-      <div class="alert-history-table card-container tw:h-[calc(100vh-130px)]">
+    <div class="w-full h-full px-2.5">
+      <div class="alert-history-table card-container h-[calc(100vh-130px)]">
         <OTable
           data-test="alert-history-table"
           :data="rows"
@@ -134,36 +134,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @sort-change="onSortChange"
         >
           <template #empty>
-            <div class="tw:h-[100vh] tw:w-full">
+            <div class="h-screen w-full">
               <no-data />
             </div>
           </template>
 
           <template #cell-timestamp="{ value }">
-            {{ formatDate(value) }}
+            <OTimeCell :value="value" unit="us" mode="absolute" :timezone="store.state.timezone" empty-label="—" />
           </template>
 
           <template #cell-start_time="{ value }">
-            {{ formatDate(value) }}
+            <OTimeCell :value="value" unit="us" mode="absolute" :timezone="store.state.timezone" empty-label="—" />
           </template>
 
           <template #cell-end_time="{ value }">
-            {{ formatDate(value) }}
+            <OTimeCell :value="value" unit="us" mode="absolute" :timezone="store.state.timezone" empty-label="—" />
           </template>
 
           <template #cell-status="{ value }">
-            <OBadge
-              :variant="getStatusVariant(value)"
-              size="sm"
-            >
-              {{ value }}
-            </OBadge>
+            <OTag type="alertState" :value="value" data-test="alert-history-status-badge" />
           </template>
 
           <template #cell-is_realtime="{ value }">
             <OIcon
               :name="value ? 'check-circle' : 'schedule'"
-              :class="value ? 'tw:text-[var(--o2-positive)]' : 'tw:text-gray-500'"
+              :class="value ? 'text-(--o2-positive)' : 'text-text-primary'"
               size="xs"
             >
               <OTooltip :content="value ? 'Real-time' : 'Scheduled'" />
@@ -173,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-is_silenced="{ value }">
             <OIcon
               :name="value ? 'volume-off' : 'volume-up'"
-              :class="value ? 'tw:text-gray-500' : 'tw:text-[var(--o2-positive)]'"
+              :class="value ? 'text-text-primary' : 'text-(--o2-positive)'"
               size="md"
             >
               <OTooltip :content="value ? 'Silenced' : 'Not Silenced'" />
@@ -185,8 +180,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-dedup="{ row }">
-            <span v-if="!row.dedup_enabled" class="tw:text-gray-400">-</span>
-            <div v-else-if="row.dedup_suppressed" class="tw:text-red-500">
+            <span v-if="!row.dedup_enabled" class="text-text-primary">-</span>
+            <div v-else-if="row.dedup_suppressed" class="text-red-500">
               <OIcon name="block" size="sm">
                 <OTooltip>
                   <template #content>
@@ -198,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
               </OIcon>
             </div>
-            <div v-else-if="row.grouped" class="text-primary tw:flex tw:items-center tw:justify-center">
+            <div v-else-if="row.grouped" class="text-primary flex items-center justify-center">
               <OIcon name="group-work" size="md">
                 <OTooltip>
                   <template #content>
@@ -207,9 +202,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OTooltip>
               </OIcon>
-              <span class="tw:text-xs tw:ml-1">×{{ row.group_size || 1 }}</span>
+              <span class="text-xs ml-1">×{{ row.group_size || 1 }}</span>
             </div>
-            <div v-else class="tw:text-green-500 tw:flex tw:items-center tw:justify-center">
+            <div v-else class="text-green-500 flex items-center justify-center">
               <OIcon name="check-circle" size="md">
                 <OTooltip>
                   <template #content>
@@ -220,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OTooltip>
               </OIcon>
-              <span v-if="row.dedup_count && row.dedup_count > 1" class="tw:text-xs tw:ml-1">
+              <span v-if="row.dedup_count && row.dedup_count > 1" class="text-xs ml-1">
                 ×{{ row.dedup_count }}
               </span>
             </div>
@@ -259,43 +254,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       primary-button-label="Close"
       @click:primary="detailsDialog = false"
     >
-      <div v-if="selectedRow" class="tw:gap-2">
+      <div v-if="selectedRow" class="gap-2">
             <!-- Basic Information -->
-            <div class="detail-section">
-              <div class="tw:flex tw:gap-3">
-                <div class="tw:w-1/2">
-                  <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Alert Name</div>
-                  <div class="tw:text-sm tw:font-medium">
+            <div class="py-1 px-0">
+              <div class="flex gap-3">
+                <div class="w-1/2">
+                  <div class="text-xs text-text-secondary mb-1">Alert Name</div>
+                  <div class="text-sm font-medium">
                     {{ selectedRow.alert_name }}
                   </div>
                 </div>
-                <div class="tw:w-1/2">
-                  <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Status</div>
-                  <OBadge
-                    :variant="getStatusVariant(selectedRow.status)"
-                    size="sm"
-                    dot
-                  >
-                    {{ selectedRow.status }}
-                  </OBadge>
+                <div class="w-1/2">
+                  <div class="text-xs text-text-secondary mb-1">Status</div>
+                  <OTag type="alertState" :value="selectedRow.status" />
                 </div>
               </div>
             </div>
 
-            <OSeparator class="tw:my-2" />
+            <OSeparator class="my-2" />
 
             <!-- Time Information -->
-            <div class="detail-section">
-              <div class="tw:flex tw:gap-3">
-                <div class="tw:w-1/2">
-                  <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Timestamp</div>
-                  <div class="tw:text-sm">
+            <div class="py-1 px-0">
+              <div class="flex gap-3">
+                <div class="w-1/2">
+                  <div class="text-xs text-text-secondary mb-1">Timestamp</div>
+                  <div class="text-sm">
                     {{ formatDate(selectedRow.timestamp) }}
                   </div>
                 </div>
-                <div class="tw:w-1/2">
-                  <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Duration</div>
-                  <div class="tw:text-sm">
+                <div class="w-1/2">
+                  <div class="text-xs text-text-secondary mb-1">Duration</div>
+                  <div class="text-sm">
                     {{
                       formatDuration(
                         selectedRow.end_time - selectedRow.start_time,
@@ -306,36 +295,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <OSeparator class="tw:my-2" />
+            <OSeparator class="my-2" />
 
             <!-- Alert Configuration -->
-            <div class="detail-section">
-              <div class="tw:flex tw:gap-3">
-                <div class="tw:w-1/2">
-                  <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Type</div>
-                  <div class="tw:text-sm">
+            <div class="py-1 px-0">
+              <div class="flex gap-3">
+                <div class="w-1/2">
+                  <div class="text-xs text-text-secondary mb-1">Type</div>
+                  <div class="text-sm">
                     <OIcon
                       :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
-                      class="tw:mr-1"
+                      class="mr-1"
                       size="xs"
                     />
                     {{ selectedRow.is_realtime ? "Real-time" : "Scheduled" }}
                   </div>
                 </div>
-                <div class="tw:w-1/2">
-                  <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Silenced</div>
-                  <div class="tw:text-sm">
+                <div class="w-1/2">
+                  <div class="text-xs text-text-secondary mb-1">Silenced</div>
+                  <div class="text-sm">
                     <OIcon
                       v-if="selectedRow.is_silenced"
                       name="volume-off"
                       size="xs"
-                      class="tw:mr-1"
+                      class="mr-1"
                     />
                     <OIcon
                       v-else
                       name="volume-up"
                       size="xs"
-                      class="tw:mr-1"
+                      class="mr-1"
                     />
                     {{ selectedRow.is_silenced ? "Yes" : "No" }}
                   </div>
@@ -351,28 +340,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 selectedRow.retries > 0
               "
             >
-              <OSeparator class="tw:my-2" />
-              <div class="detail-section">
-                <div class="tw:flex tw:gap-3">
-                  <div v-if="selectedRow.evaluation_took_in_secs" class="tw:w-1/3">
-                    <div class="tw:text-xs tw:text-text-secondary tw:mb-1">
+              <OSeparator class="my-2" />
+              <div class="py-1 px-0">
+                <div class="flex gap-3">
+                  <div v-if="selectedRow.evaluation_took_in_secs" class="w-1/3">
+                    <div class="text-xs text-text-secondary mb-1">
                       Evaluation Time
                     </div>
-                    <div class="tw:text-sm">
+                    <div class="text-sm">
                       {{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s
                     </div>
                   </div>
-                  <div v-if="selectedRow.query_took" class="tw:w-1/3">
-                    <div class="tw:text-xs tw:text-text-secondary tw:mb-1">
+                  <div v-if="selectedRow.query_took" class="w-1/3">
+                    <div class="text-xs text-text-secondary mb-1">
                       Query Time
                     </div>
-                    <div class="tw:text-sm">
+                    <div class="text-sm">
                       {{ (selectedRow.query_took / 1000).toFixed(2) }}ms
                     </div>
                   </div>
-                  <div v-if="selectedRow.retries > 0" class="tw:w-1/3">
-                    <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Retries</div>
-                    <div class="tw:text-sm">{{ selectedRow.retries }}</div>
+                  <div v-if="selectedRow.retries > 0" class="w-1/3">
+                    <div class="text-xs text-text-secondary mb-1">Retries</div>
+                    <div class="text-sm">{{ selectedRow.retries }}</div>
                   </div>
                 </div>
               </div>
@@ -380,10 +369,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Source Node (if available) -->
             <template v-if="selectedRow.source_node">
-              <OSeparator class="tw:my-2" />
-              <div class="detail-section">
-                <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Source Node</div>
-                <div class="tw:text-sm tw:font-mono">
+              <OSeparator class="my-2" />
+              <div class="py-1 px-0">
+                <div class="text-xs text-text-secondary mb-1">Source Node</div>
+                <div class="text-sm font-mono">
                   {{ selectedRow.source_node }}
                 </div>
               </div>
@@ -391,19 +380,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Error Details (if available) -->
             <template v-if="selectedRow.error">
-              <OSeparator class="tw:my-2" />
-              <div class="detail-section">
-                <div class="tw:text-xs tw:text-text-secondary tw:mb-1">
+              <OSeparator class="my-2" />
+              <div class="py-1 px-0">
+                <div class="text-xs text-text-secondary mb-1">
                   <OIcon
                     name="error"
                     size="xs"
-                    class="tw:mr-1"
+                    class="mr-1"
                   />
                   Error Details
                 </div>
-                <div class="tw:rounded tw:border tw:border-solid tw:border-negative/30 tw:p-2 tw:mt-2 tw:bg-red-500/5">
+                <div class="rounded border border-solid border-negative/30 p-2 mt-2 bg-red-500/5">
                   <pre
-                    class="tw:text-sm"
+                    class="text-sm"
                     style="
                       white-space: pre-wrap;
                       word-break: break-word;
@@ -419,19 +408,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Success Response (if available) -->
             <template v-if="selectedRow.success_response">
-              <OSeparator class="tw:my-2" />
-              <div class="detail-section">
-                <div class="tw:text-xs tw:text-text-secondary tw:mb-1">
+              <OSeparator class="my-2" />
+              <div class="py-1 px-0">
+                <div class="text-xs text-text-secondary mb-1">
                   <OIcon
                     name="check-circle"
                     size="xs"
-                    class="tw:mr-1"
+                    class="mr-1"
                   />
                   Response
                 </div>
-                <div class="tw:rounded tw:border tw:border-solid tw:border-positive/30 tw:p-2 tw:mt-2 tw:bg-green-500/5">
+                <div class="rounded border border-solid border-positive/30 p-2 mt-2 bg-green-500/5">
                   <pre
-                    class="tw:text-sm"
+                    class="text-sm"
                     style="
                       white-space: pre-wrap;
                       word-break: break-word;
@@ -456,19 +445,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="closeErrorDialog"
     >
       <template #header-left>
-        <OIcon name="error" size="sm" class="error-icon" />
+        <OIcon name="error" size="sm" class="text-red-500" />
       </template>
       <template #header-right>
-        <div class="error-timestamp tw:text-xs">
-          <span class="tw:mr-1">Last error:</span>
-          <OIcon name="schedule" size="xs" class="tw:mr-1" />
+        <div class="flex items-center text-[13px] opacity-70 ml-9 text-xs">
+          <span class="mr-1">Last error:</span>
+          <OIcon name="schedule" size="xs" class="mr-1" />
           {{ errorMessage.last_error_timestamp && new Date(errorMessage.last_error_timestamp / 1000).toLocaleString() }}
         </div>
       </template>
 
-      <div class="tw:mb-4">
-        <div class="section-label tw:mb-2">Error Summary</div>
-        <div class="error-summary-box">
+      <div class="mb-4">
+        <div class="text-sm font-semibold tracking-[0.02em] opacity-80 mb-2">Error Summary</div>
+        <div class="p-4 rounded-lg font-mono text-[13px] leading-[1.6] whitespace-pre-wrap wrap-break-word bg-[rgba(239,68,68,0.08)] border border-solid border-[rgba(239,68,68,0.2)] text-[#dc2626]">
           {{ errorMessage.error }}
         </div>
       </div>
@@ -485,11 +474,12 @@ import { useI18n } from "vue-i18n";
 import { formatDate } from "@/utils/date";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -562,7 +552,7 @@ const columns = ref<OTableColumnDef[]>([
     minSize: 37,
     maxSize: 37,
     cell: " ",
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "is_silenced",
@@ -573,15 +563,15 @@ const columns = ref<OTableColumnDef[]>([
     minSize: 37,
     maxSize: 37,
     cell: " ",
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "timestamp",
     header: t("alerts.timestamp") || "Timestamp",
     accessorKey: "timestamp",
     sortable: true,
-    size: 160,
-    maxSize: 160,
+    size: COL.dateAbsolute,
+    maxSize: COL.dateAbsolute,
     cell: " ",
     meta: { align: "left" },
   },
@@ -590,8 +580,8 @@ const columns = ref<OTableColumnDef[]>([
     header: t("alerts.startTime") || "Start Time",
     accessorKey: "start_time",
     sortable: true,
-    size: 160,
-    maxSize: 160,
+    size: COL.dateAbsolute,
+    maxSize: COL.dateAbsolute,
     cell: " ",
     meta: { align: "left" },
   },
@@ -600,8 +590,8 @@ const columns = ref<OTableColumnDef[]>([
     header: t("alerts.endTime") || "End Time",
     accessorKey: "end_time",
     sortable: true,
-    size: 160,
-    maxSize: 160,
+    size: COL.dateAbsolute,
+    maxSize: COL.dateAbsolute,
     cell: " ",
     meta: { align: "left" },
   },
@@ -632,7 +622,7 @@ const columns = ref<OTableColumnDef[]>([
     sortable: true,
     size: 64,
     maxSize: 64,
-    meta: { align: "center" },
+    meta: { align: "right" },
   },
   {
     id: "dedup",
@@ -641,7 +631,7 @@ const columns = ref<OTableColumnDef[]>([
     size: 80,
     maxSize: 80,
     cell: " ",
-    meta: { align: "center" },
+    meta: { align: "left" },
   },
   {
     id: "actions",
@@ -842,25 +832,6 @@ const formatDuration = (microseconds: number) => {
   return `${seconds}s`;
 };
 
-const getStatusVariant = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "success":
-    case "ok":
-    case "completed":
-      return "success-outline";
-    case "error":
-    case "failed":
-      return "error-outline";
-    case "warning":
-      return "warning-outline";
-    case "pending":
-    case "running":
-      return "primary-outline";
-    default:
-      return "default-outline";
-  }
-};
-
 const showDetailsDialog = (row: any) => {
   selectedRow.value = row;
   detailsDialog.value = true;
@@ -902,120 +873,12 @@ watch(
 );
 </script>
 
-<style scoped lang="scss">
-.alert-history-table {
-  :deep(table) {
-    width: 100%;
-
-    td {
-      vertical-align: middle;
-    }
-  }
+<style>
+.alert-history-table :deep(table) {
+  width: 100%;
 }
 
-.alert-details-dialog {
-  :deep(.q-dialog__inner) {
-    padding: 24px;
-  }
-
-  .detail-section {
-    padding: 4px 0;
-  }
-
-  .text-mono {
-    font-family: "Courier New", monospace;
-    font-size: 13px;
-  }
-
-  .tw:bg-red-500-1 {
-    background-color: rgba(255, 0, 0, 0.05);
-  }
-
-  .tw:bg-green-500-1 {
-    background-color: rgba(0, 128, 0, 0.05);
-  }
-
-  pre {
-    max-height: 200px;
-    overflow-y: auto;
-
-    &::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: #f1f1f1;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: #888;
-      border-radius: 3px;
-    }
-
-    &::-webkit-scrollbar-thumb:hover {
-      background: #555;
-    }
-  }
-}
-.pipeline-error-header {
-  padding: 20px 24px 16px;
-
-  .error-icon {
-    color: #ef4444;
-  }
-
-  .pipeline-name {
-    font-size: 20px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-  }
-
-  .error-timestamp {
-    display: flex;
-    align-items: center;
-    font-size: 13px;
-    opacity: 0.7;
-    margin-left: 36px;
-  }
-
-  .close-btn {
-    opacity: 0.6;
-    transition: opacity 0.2s;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-}
-
-.pipeline-error-content {
-  padding: 20px 24px;
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
-.section-label {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  opacity: 0.8;
-}
-
-.error-summary-box {
-  padding: 16px;
-  border-radius: 8px;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  color: #dc2626;
-}
-.pipeline-error-actions {
-  padding: 16px 24px;
-  justify-content: flex-end;
+.alert-history-table :deep(table) td {
+  vertical-align: middle;
 }
 </style>

@@ -339,13 +339,21 @@ describe("JsonEditor", () => {
     it("shows validation errors section when validationErrors is non-empty", async () => {
       wrapper = createWrapper({ validationErrors: ["Field 'id' is required"] });
       await nextTick();
-      expect(wrapper.find(".validation-errors").exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="common-json-editor-validation-errors"]')
+          .exists(),
+      ).toBe(true);
       expect(wrapper.text()).toContain("Field 'id' is required");
     });
 
     it("hides validation errors section when validationErrors is empty", () => {
       wrapper = createWrapper({ validationErrors: [] });
-      expect(wrapper.find(".validation-errors").exists()).toBe(false);
+      expect(
+        wrapper
+          .find('[data-test="common-json-editor-validation-errors"]')
+          .exists(),
+      ).toBe(false);
     });
 
     it("renders multiple validation errors as list items", async () => {
@@ -353,7 +361,9 @@ describe("JsonEditor", () => {
         validationErrors: ["Error one", "Error two", "Error three"],
       });
       await nextTick();
-      const errors = wrapper.findAll(".validation-errors li");
+      const errors = wrapper.findAll(
+        '[data-test="common-json-editor-validation-errors"] li',
+      );
       expect(errors.length).toBe(3);
     });
   });
@@ -478,19 +488,19 @@ describe("JsonEditor", () => {
   // ─── Theme-based CSS class ───────────────────────────────────────────────────
 
   describe("Theme-based CSS class", () => {
-    it("applies 'dark-mode' class on root q-card when theme is dark", async () => {
+    it("applies dark background class on root when theme is dark", async () => {
       store.state.theme = "dark";
       wrapper = createWrapper();
       await nextTick();
-      expect(wrapper.html()).toContain("dark-mode");
+      expect(wrapper.html()).toContain("bg-(--o2-primary-background)");
     });
 
-    it("applies 'bg-white' class on root q-card when theme is light", async () => {
+    it("does not apply dark background class on root when theme is light", async () => {
       store.state.theme = "light";
       wrapper = createWrapper();
       await nextTick();
-      // Root element no longer uses bg-white; it's classless in light mode (dark-mode only applied in dark theme)
-      expect(wrapper.html()).not.toContain("dark-mode");
+      // Dark background class is only applied in dark theme
+      expect(wrapper.html()).not.toContain("bg-(--o2-primary-background)");
     });
   });
 

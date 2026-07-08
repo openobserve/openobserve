@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:m-3 tw:mt-1 aws-config-page">
-    <div class="tw:mb-4">
-      <div class="page-title">
+  <div class="m-3 mt-1">
+    <div class="mb-4">
+      <div data-test="aws-config-page-title" class="text-2xl font-semibold leading-[1.3] m-0 mb-1.5" :class="store.state.theme === 'dark' ? 'text-[#e0e0e0]' : 'text-[#1a1a1a]'">
         AWS Integrations
       </div>
-      <div class="page-description">
+      <div data-test="aws-config-page-description" class="text-sm m-0 mb-4" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
         Set up AWS monitoring in one click or configure individual services for granular control.
       </div>
 
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
     </div>
 
-    <OSeparator class="tw:mb-6" />
+    <OSeparator class="mb-6" />
 
     <OTabPanels v-model="activeTab" animated>
       <OTabPanel name="quick-setup">
@@ -47,14 +47,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabPanel>
     </OTabPanels>
 
-    <div class="tw:mt-8">
-      <div class="tw:mb-3">
-        <h6 class="tw:text-base tw:font-semibold tw:m-0 section-title">
+    <div class="mt-8">
+      <div class="mb-3">
+        <div class="text-base font-semibold m-0" :class="store.state.theme === 'dark' ? 'text-[#e0e0e0]' : 'text-[#333]'">
           Manual Configuration
-        </h6>
-        <p class="tw:text-sm tw:m-0 section-description">
+        </div>
+        <div class="text-sm m-0" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
           Use these credentials for custom AWS integrations or manual setup.
-        </p>
+        </div>
       </div>
       <CopyContent :content="content" />
     </div>
@@ -147,43 +147,3 @@ Access Key: [BASIC_PASSCODE]`;
   },
 });
 </script>
-
-<style scoped lang="scss">
-.aws-config-page {
-  .page-title {
-    font-size: 1.5rem;
-    font-weight: 600;
-    line-height: 1.3;
-    margin: 0 0 6px 0;
-    color: #1a1a1a;
-  }
-
-  .page-description {
-    font-size: 0.875rem;
-    margin: 0 0 16px 0;
-    color: #666;
-  }
-
-  .section-title {
-    font-size: 1rem;
-    font-weight: 600;
-  }
-
-  .section-description {
-    font-size: 0.875rem;
-    color: #666;
-  }
-
-  .dark &,
-  body.body--dark & {
-    .page-title {
-      color: #e0e0e0;
-    }
-
-    .page-description,
-    .section-description {
-      color: #b0b0b0;
-    }
-  }
-}
-</style>

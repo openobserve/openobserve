@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Outer wrapper: full panel height, flex-column so pagination sits below the scroll area -->
   <div
-    class="my-sticky-virtscroll-table tw:h-full tw:flex tw:flex-col tw:rounded-none!"
+    class="my-sticky-virtscroll-table h-full flex flex-col rounded-none! overflow-hidden"
     :data-sticky-id="tableId"
     :class="{ 'pivot-sticky-totals': stickyRowTotals, 'wrap-enabled': wrap }"
     :style="store.state.printMode ? { position: 'static' } : {}"
@@ -28,10 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="[
         'container',
         'table-container',
-        'tw:flex-1',
-        'tw:min-h-0',
-        'tw:overflow-auto',
-        'tw:relative',
+        'flex-1',
+        'min-h-0',
+        'overflow-auto',
+        'relative',
         { 'virtual-scroll-active': useVirtualScroll },
       ]"
     >
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="table"
         data-test="o2-table"
         :data-test-loading="loading ? 'true' : 'false'"
-        :class="['tw:w-full', 'tw:table-auto']"
+        :class="['w-full', 'table-auto']"
         :style="{
           minWidth: '100%',
           ...columnSizeVars,
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ── Pivot multi-level headers (dashboard only) ───────────────────── -->
         <thead
           v-if="pivotHeaderLevels.length > 0"
-          class="pivot-thead tw:sticky tw:top-0 tw:z-10"
+          class="pivot-thead sticky top-0 z-10"
         >
           <tr
             v-for="(level, levelIdx) in pivotHeaderLevels as any[]"
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="col in pivotRowColumns"
               :key="'rh_' + col.name"
               :rowspan="pivotHeaderLevels.length"
-              class="pivot-group-header tw:cursor-pointer tw:px-2 tw:text-left"
+              class="cursor-pointer px-2 text-center font-semibold align-middle whitespace-nowrap py-[5px] [border-right:1px_solid_var(--o2-pivot-header-border)] [border-bottom:1px_solid_var(--o2-pivot-header-border)] bg-(--o2-sticky-col-header-bg)"
               :style="getStickyColumnStyle(col) as any"
               @click="handlePivotSort(col.name)"
             >
@@ -86,9 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   pivotSortState.descending ? 'arrow-downward' : 'arrow-upward'
                 "
                 size="xs"
-                class="tw:ml-1 pivot-sort-icon"
+                class="ml-1 pivot-sort-icon"
                 :class="{
-                  'pivot-sort-active': pivotSortState.sortBy === col.name,
+                  'pivot-sort-active text-[var(--o2-primary-color)]': pivotSortState.sortBy === col.name,
                 }"
               />
             </th>
@@ -97,19 +97,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(cell, cellIdx) in level.cells"
               :key="'c_' + levelIdx + '_' + cellIdx"
               :data-test="`o2-table-pivot-th-${levelIdx}-${cellIdx}`"
+              :data-test-pivot-type="level.isLeaf ? 'value' : 'group'"
               :colspan="cell.colspan"
               :rowspan="cell.rowspan || 1"
-              class="tw:px-2"
+              class="px-2"
               :class="[
                 level.isLeaf
-                  ? 'pivot-value-header'
-                  : 'pivot-group-header tw:text-center',
+                  ? 'text-center font-medium text-[0.85em] align-middle py-[5px] [border-right:1px_solid_var(--o2-pivot-header-border)] [border-bottom:1px_solid_var(--o2-pivot-header-border)] bg-(--o2-sticky-col-header-bg)'
+                  : 'text-center font-semibold align-middle whitespace-nowrap py-[5px] [border-right:1px_solid_var(--o2-pivot-header-border)] [border-bottom:1px_solid_var(--o2-pivot-header-border)] bg-(--o2-sticky-col-header-bg)',
                 {
                   'pivot-section-border':
                     cell.hasBorder && !(stickyColTotals && cell._isTotalHeader),
                 },
-                { 'pivot-total-col': stickyColTotals && cell._isTotalHeader },
-                { 'tw:cursor-pointer': cell._sortColumn },
+                { 'pivot-total-col font-semibold': stickyColTotals && cell._isTotalHeader },
+                { 'cursor-pointer': cell._sortColumn },
               ]"
               :style="
                 (stickyColTotals && cell._isTotalHeader
@@ -125,9 +126,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   pivotSortState.descending ? 'arrow-downward' : 'arrow-upward'
                 "
                 size="xs"
-                class="tw:ml-1 pivot-sort-icon"
+                class="ml-1 pivot-sort-icon"
                 :class="{
-                  'pivot-sort-active':
+                  'pivot-sort-active text-[var(--o2-primary-color)]':
                     pivotSortState.sortBy === cell._sortColumn,
                 }"
               />
@@ -138,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ── Standard TanStack headers (logs / non-pivot) ─────────────────── -->
         <thead
           v-else
-          class="tw:sticky tw:top-0 tw:z-10"
+          class="sticky top-0 z-10"
           style="max-height: 44px; height: 22px"
           v-for="headerGroup in table.getHeaderGroups()"
           :key="headerGroup.id"
@@ -154,9 +155,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="[
               // Flex only for virtual-scroll mode (logs/traces) for drag-reorder + alignment
               // Non-virtual (dashboard) uses table-layout:auto — no flex so browser auto-sizes columns
-              useVirtualScroll ? 'tw:flex tw:items-center' : '',
+              useVirtualScroll ? 'flex items-center' : '',
               enableColumnReorder && table.getState().columnOrder.length
-                ? 'tw:cursor-move!'
+                ? 'cursor-move!'
                 : '',
             ]"
             :style="{
@@ -177,17 +178,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="header in headerGroup.headers"
               :key="header.id"
               :id="header.id"
-              class="tw:px-2 tw:relative table-head tw:text-ellipsis!"
+              class="px-2 relative table-head text-ellipsis!"
               :class="[
                 (header.column.columnDef.meta as any)?.align === 'center'
-                  ? 'tw:text-center!'
+                  ? 'text-center!'
                   : '',
                 (header.column.columnDef.meta as any)?.align === 'right'
-                  ? 'tw:text-right!'
+                  ? 'text-right!'
                   : '',
                 (header.column.columnDef.meta as any)?.headerClass ?? '',
                 {
-                  'pivot-total-col':
+                  'pivot-total-col font-semibold':
                     stickyColTotals &&
                     (header.column.columnDef.meta as any)?._isTotalColumn,
                 },
@@ -199,13 +200,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`o2-table-th-${header.id}`"
             >
               <div
-                class="tw:h-full tw:w-full tw:flex tw:items-center"
+                class="h-full w-full flex items-center"
                 :class="[
                   (header.column.columnDef.meta as any)?.align === 'center'
-                    ? 'tw:justify-center! tw:text-center!'
+                    ? 'justify-center! text-center!'
                     : '',
                   (header.column.columnDef.meta as any)?.align === 'right'
-                    ? 'tw:justify-end! tw:text-right!'
+                    ? 'justify-end! text-right!'
                     : '',
                 ]"
               >
@@ -220,15 +221,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :class="[
                     'resizer',
-                    'tw:bg-[var(--o2-border-color)]!',
+                    'bg-[var(--o2-border-color)]!',
                     header.column.getIsResizing() ? 'isResizing' : '',
                   ]"
-                  class="tw:right-0 tw:absolute tw:w-1 tw:h-full tw:cursor-col-resize"
+                  class="right-0 absolute w-1 h-full cursor-col-resize"
                 />
                 <div
                   v-if="!header.isPlaceholder"
                   :data-test="`o2-table-th-sort-${header.id}`"
-                  :class="['tw:text-left', 'tw:cursor-pointer tw:gap-1']"
+                  :class="['text-left', 'cursor-pointer gap-1']"
                   @click="
                     handleHeaderSortClick(
                       $event,
@@ -236,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       header.column.getToggleSortingHandler(),
                     )
                   "
-                  class="tw:overflow-hidden tw:whitespace-nowrap tw:text-ellipsis! tw:tracking-[0.06rem] tw:text-[var(--o2-text-2)] tw:text-[0.85rem]"
+                  class="overflow-hidden whitespace-nowrap text-ellipsis! tracking-[0.06rem] text-[var(--o2-text-2)] text-[0.85rem]"
                 >
                   <FlexRender
                     :render="header.column.columnDef.header"
@@ -261,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test-sort-state="active"
                       :data-test-sort-direction="sortOrder"
                       size="sm"
-                      class="tw:text-[var(--o2-primary-color)]"
+                      class="text-[var(--o2-primary-color)]"
                     />
                     <OIcon
                       v-else
@@ -270,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test-sort-state="inactive"
                       data-test-sort-direction="none"
                       size="sm"
-                      class="tw:opacity-40"
+                      class="opacity-40"
                     />
                   </template>
                 </div>
@@ -290,27 +291,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         variant="ghost"
                         size="icon-xs"
                         :data-test="`o2-table-column-filter-btn-${header.column.id}`"
-                        class="tw:ml-0.5 tw:shrink-0 tw:h-5! tw:w-5! tw:min-h-0! tw:p-0!"
+                        class="ml-0.5 shrink-0 h-5! w-5! min-h-0! p-0!"
                         @click.stop
                       >
                         <OIcon
                           name="filter-list"
                           size="sm"
-                          :class="isColFiltered(header.column.id) ? 'tw:text-[var(--color-primary-600)]' : 'tw:opacity-50'"
+                          :class="isColFiltered(header.column.id) ? 'text-[var(--color-primary-600)]' : 'opacity-50'"
                         />
                       </OButton>
                     </template>
 
                     <!-- Filter panel -->
                     <div
-                      class="tw:py-1"
+                      class="py-1"
                       style="min-width: 200px; max-width: 300px"
                       :data-test="`o2-table-column-filter-panel-${header.column.id}`"
                       @click.stop
                     >
                       <!-- Search box — always visible at top -->
                       <div
-                        class="tw:px-2 tw:pb-1"
+                        class="px-2 pb-1"
                         style="border-bottom: 1px solid rgba(128, 128, 128, 0.2)"
                       >
                         <OInput
@@ -336,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <li
                           v-for="rawVal in getFilteredUniqueValues(header.column.id)"
                           :key="String(rawVal)"
-                          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer tw:rounded tw:hover:bg-[var(--color-surface-panel)] tw:transition-colors"
+                          class="flex items-center gap-2 px-3 py-1.5 cursor-pointer rounded hover:bg-[var(--color-surface-panel)] transition-colors"
                           @click.stop="toggleColFilterValue(header.column.id, rawVal)"
                         >
                           <OCheckbox
@@ -345,13 +346,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @update:model-value="toggleColFilterValue(header.column.id, rawVal)"
                             @click.stop
                           />
-                          <span class="tw:text-sm tw:select-none tw:flex-1 tw:truncate">
+                          <span class="text-sm select-none flex-1 truncate">
                             {{ getFilterDisplayValue(header.column.id, rawVal) }}
                           </span>
                         </li>
                         <li
                           v-if="getFilteredUniqueValues(header.column.id).length === 0"
-                          class="tw:px-3 tw:py-1.5 tw:text-xs tw:opacity-60"
+                          class="px-3 py-1.5 text-xs opacity-60"
                         >
                           {{ t("common.noMatches") }}
                         </li>
@@ -360,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Clear filter — always visible at bottom -->
                       <div style="border-top: 1px solid rgba(128, 128, 128, 0.2)">
                         <div
-                          class="tw:px-3 tw:py-1.5 tw:text-xs tw:cursor-pointer tw:opacity-70 tw:hover:bg-[var(--color-surface-panel)]"
+                          class="px-3 py-1.5 text-xs cursor-pointer opacity-70 hover:bg-[var(--color-surface-panel)]"
                           @click.stop="clearColFilter(header.column.id)"
                         >
                           {{ t("common.clearFilter") }}
@@ -371,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <div
                   :data-test="`o2-table-add-data-from-column-${header.column.columnDef.header}`"
-                  class="tw:invisible tw:items-center tw:absolute tw:right-2 tw:top-0 tw:px-2 column-actions tw:h-full tw:flex"
+                  class="invisible items-center absolute right-2 top-0 px-2 column-actions h-full flex"
                   :class="
                     store.state.theme === 'dark' ? 'field_overlay_dark' : ''
                   "
@@ -384,11 +385,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="(header.column.columnDef.meta as any).closable"
                     :data-test="`o2-table-th-remove-${header.column.columnDef.header}-btn`"
                     name="cancel"
-                    class="tw:m-0 close-icon tw:cursor-pointer"
+                    class="m-0 close-icon cursor-pointer"
                     :class="
                       store.state.theme === 'dark'
                         ? 'text-white'
-                        : 'tw:text-gray-400'
+                        : 'text-gray-400'
                     "
                     :title="t('common.close')"
                     size="sm"
@@ -404,11 +405,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             takes over (initial fetch). -->
           <tr
             v-if="loading && tableRows.length === 0 && $slots.loading"
-            class="tw:w-full"
+            class="w-full"
           >
             <td
               :colspan="columnOrder.length"
-              class="tw:font-bold"
+              class="font-bold"
               :style="{
                 background:
                   store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
@@ -419,19 +420,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </td>
           </tr>
           <!-- Loading banner: shown above rows while a new page is fetching -->
-          <tr v-if="loading && tableRows.length > 0 && $slots['loading-banner']" class="tw:w-full">
+          <tr v-if="loading && tableRows.length > 0 && $slots['loading-banner']" class="w-full">
             <td :colspan="columnOrder.length">
               <slot name="loading-banner" />
             </td>
           </tr>
-          <tr v-if="!loading && errMsg != ''" class="tw:w-full">
+          <tr v-if="!loading && errMsg != ''" class="w-full">
             <td
               :colspan="columnOrder.length"
-              class="tw:font-bold"
+              class="font-bold"
               style="opacity: 0.7"
             >
-              <div class="tw:text-sm tw:font-medium text-weight-bold tw:bg-amber-500">
-                <OIcon size="sm" name="warning" class="tw:mr-1" />
+              <div class="text-sm font-medium text-weight-bold bg-amber-500">
+                <OIcon size="sm" name="warning" class="mr-1" />
                 {{ errMsg }}
               </div>
             </td>
@@ -439,21 +440,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr data-test="o2-table-function-error" v-if="functionErrorMsg != ''">
             <td
               :colspan="columnOrder.length"
-              class="tw:font-bold"
+              class="font-bold"
               style="opacity: 0.6"
             >
               <div
-                class="tw:text-sm tw:font-medium text-weight-bold tw:pl-2"
+                class="text-sm font-medium text-weight-bold pl-2"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:bg-yellow-600'
-                    : 'tw:bg-amber-300'
+                    ? 'bg-yellow-600'
+                    : 'bg-amber-300'
                 "
               >
                 <OButton
                   variant="ghost"
                   size="icon-xs-sq"
-                  class="tw:mr-1"
+                  class="mr-1"
                   data-test="table-row-expand-menu"
                   @click.capture.stop="expandFunctionError"
                 >
@@ -474,11 +475,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <td
               :colspan="columnOrder.length"
               style="opacity: 0.7"
-              class="tw:px-2"
+              class="px-2"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:bg-yellow-600'
-                  : 'tw:bg-amber-300'
+                  ? 'bg-yellow-600'
+                  : 'bg-amber-300'
               "
             >
               <pre>{{ functionErrorMsg }}</pre>
@@ -495,20 +496,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           aria-busy="true"
           aria-label="Loading"
         >
-          <!-- Rows use tw:flex to align with the real virtual/data rows. -->
+          <!-- Rows use flex to align with the real virtual/data rows. -->
           <tr
             v-for="r in SKEL_ROW_COUNT"
             :key="`skel-${r}`"
-            class="o2-skel-row tw:flex tw:items-center tw:w-full"
+            class="flex items-center w-full opacity-0 border-b border-b-[var(--o2-tag-grey-1)] h-7 [animation:o2-skel-row-in_320ms_ease-out_forwards] motion-reduce:opacity-100 motion-reduce:animate-none"
             :style="{ animationDelay: `${(r - 1) * 40}ms` }"
           >
             <!-- No columns yet (first paint) — full-width shimmer bar -->
             <td
               v-if="!headers?.length"
-              class="tw:w-full tw:px-4 tw:overflow-hidden"
+              class="w-full px-4 overflow-hidden"
             >
               <span
-                class="o2-skel-pill tw:inline-block tw:h-3 tw:rounded-md"
+                class="inline-block h-3 rounded-md [background:linear-gradient(90deg,var(--color-grey-100)_0%,rgba(255,255,255,0.65)_50%,var(--color-grey-100)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] dark:[background:linear-gradient(90deg,var(--color-grey-600)_0%,rgba(255,255,255,0.03)_50%,var(--color-grey-600)_100%)] motion-reduce:animate-none"
                 :style="{ width: `${skelCellWidth(r - 1, 0)}%` }"
                 aria-hidden="true"
               />
@@ -518,12 +519,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <td
                 v-for="(header, c) in headers"
                 :key="header.id"
-                class="tw:px-2 tw:overflow-hidden"
-                :class="c === 0 ? 'tw:pl-4' : ''"
+                class="px-2 overflow-hidden"
+                :class="c === 0 ? 'pl-4' : ''"
                 :style="skelTdStyle(header, c)"
               >
                 <span
-                  class="o2-skel-pill tw:inline-block tw:h-3 tw:rounded-md"
+                  class="inline-block h-3 rounded-md [background:linear-gradient(90deg,var(--color-grey-100)_0%,rgba(255,255,255,0.65)_50%,var(--color-grey-100)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] dark:[background:linear-gradient(90deg,var(--color-grey-600)_0%,rgba(255,255,255,0.03)_50%,var(--color-grey-600)_100%)] motion-reduce:animate-none"
                   :style="{
                     width:
                       c === 0
@@ -537,13 +538,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </tr>
         </tbody>
 
-        <!-- tw:relative is only needed for virtual-scroll absolute rows (logs/traces).
+        <!-- relative is only needed for virtual-scroll absolute rows (logs/traces).
           In dashboard mode (regular DOM rows) it must be absent so that
           position:sticky on <thead> works correctly. -->
         <tbody
           data-test="o2-table-body"
           ref="tableBodyRef"
-          :class="{ 'tw:relative': useVirtualScroll && !showPagination }"
+          :class="{ 'relative': useVirtualScroll && !showPagination }"
         >
           <!-- ── Dashboard: regular DOM rows (no virtual scroll) ──────────────── -->
           <!-- Used when `data` prop is present (dashboard mode) OR pagination is
@@ -568,41 +569,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="row.id"
               :data-index="idx"
               :ref="(node: any) => measureDashboardRow(node)"
-              class="dashboard-data-row tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
-              :class="{ 'tw:border-b': !usesSeparateBorders }"
+              class="dashboard-data-row cursor-pointer hover:bg-[var(--o2-hover-gray)]"
+              :class="{ 'border-b': !usesSeparateBorders }"
               data-test="dashboard-data-row"
+              tabindex="0"
               @click="handleDataRowClick(row.original, idx as number, $event)"
+              @keydown="handleDataRowKeydown($event, row.original, idx as number)"
             >
               <td
                 v-for="(cell, cellIndex) in row.getVisibleCells()"
                 :key="cell.id"
                 data-test="dashboard-data-row-cell"
-                class="tw:py-1 tw:px-2 tw:overflow-hidden tw:relative table-cell copy-cell-td"
+                class="py-1 px-2 overflow-hidden relative table-cell group/copy"
                 :class="[
                   (cell.column.columnDef.meta as any)?.align === 'center'
-                    ? 'tw:text-center!'
+                    ? 'text-center!'
                     : '',
                   (cell.column.columnDef.meta as any)?.align === 'right'
-                    ? 'tw:text-right!'
+                    ? 'text-right!'
                     : '',
                   (cell.column.columnDef.meta as any)?.cellClass ?? '',
                   {
-                    'sticky-column': (cell.column.columnDef.meta as any)
+                    'sticky-column bg-inherit': (cell.column.columnDef.meta as any)
                       ?.sticky,
                   },
                   {
-                    'pivot-total-col':
+                    'pivot-total-col font-semibold':
                       stickyColTotals &&
                       (cell.column.columnDef.meta as any)?._isTotalColumn,
                   },
                   // In separate-border mode (pivot or sticky columns),
                   // <tr> borders don't render — apply the row border on <td>.
-                  { 'tw:border-b': usesSeparateBorders },
+                  { 'border-b': usesSeparateBorders },
                   isPivotMergeNoBorder(
                     row.original,
                     (cell.column.columnDef.meta as any)?._col,
                   )
-                    ? 'pivot-no-border'
+                    ? 'pivot-no-border border-b-0!'
                     : '',
                 ]"
                 :style="[
@@ -628,13 +631,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   <div
-                    class="tw:h-full tw:w-full tw:flex tw:items-center"
+                    class="h-full w-full flex items-center"
                     :class="[
                       (cell.column.columnDef.meta as any)?.align === 'center'
-                        ? 'tw:justify-center!'
+                        ? 'justify-center!'
                         : '',
                       (cell.column.columnDef.meta as any)?.align === 'right'
-                        ? 'tw:justify-end!'
+                        ? 'justify-end!'
                         : '',
                     ]"
                   >
@@ -646,13 +649,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'right' &&
                         shouldShowCopyButton(cell.getValue())
                       "
-                      class="copy-btn tw:mr-1"
+                      class="mr-1 opacity-0 transition-opacity duration-[150ms] inline-flex items-center leading-none group-hover/copy:opacity-100"
                       data-test="dashboard-table-cell-copy-btn"
                       :data-copied="isCellCopied(idx as number, cell.column.id) ? 'true' : undefined"
                     >
                       <OButton
                         variant="ghost"
                         size="icon-xs-sq"
+                        class="h-[16px]! w-[16px]! min-h-0!"
                         @click.stop="
                           copyCellContent(
                             getCellDisplayValue(cell),
@@ -671,7 +675,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </OButton>
                     </span>
-                    <!-- JSON field tw:inline renderer -->
+                    <!-- JSON field inline renderer -->
                     <JsonFieldRenderer
                       v-if="
                         (cell.column.columnDef.meta as any)?.showFieldAsJson
@@ -684,9 +688,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="dashboard-table-cell-value"
                       :class="[
                         !props.wrap
-                          ? 'tw:min-w-0 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap'
+                          ? 'min-w-0 overflow-hidden text-ellipsis whitespace-nowrap'
                           : '',
-                        props.wrap ? 'tw:break-words' : '',
+                        props.wrap ? 'break-words' : '',
                       ]"
                     >
                       {{ getCellDisplayValue(cell) }}
@@ -699,13 +703,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'right' &&
                         shouldShowCopyButton(cell.getValue())
                       "
-                      class="copy-btn tw:ml-1"
+                      class="ml-1 opacity-0 transition-opacity duration-[150ms] inline-flex items-center leading-none group-hover/copy:opacity-100"
                       data-test="dashboard-table-cell-copy-btn"
                       :data-copied="isCellCopied(idx as number, cell.column.id) ? 'true' : undefined"
                     >
                       <OButton
                         variant="ghost"
                         size="icon-xs-sq"
+                        class="h-[16px]! w-[16px]! min-h-0!"
                         @click.stop="
                           copyCellContent(
                             getCellDisplayValue(cell),
@@ -765,24 +770,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 formattedRows?.[virtualRow.index]?.original?.isExpandedRow
               "
               :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
-              class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b tw:border-b-[var(--o2-tag-grey-1)] tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
+              class="absolute flex w-max items-center justify-start border-b border-b-[var(--o2-tag-grey-1)] cursor-pointer hover:bg-[var(--o2-hover-gray)] transition-colors duration-150 ease-in-out"
               :class="[
                 defaultColumns &&
                 !wrap &&
                 !(formattedRows[virtualRow.index]?.original as any)
                   ?.isExpandedRow
-                  ? 'tw:table-row'
-                  : 'tw:flex',
+                  ? 'table-row'
+                  : 'flex',
                 (formattedRows[virtualRow.index]?.original as any)?.[
                   store.state.zoConfig.timestamp_column
                 ] === highlightTimestamp &&
                 !(formattedRows[virtualRow.index]?.original as any)
                   ?.isExpandedRow
                   ? store.state.theme === 'dark'
-                    ? 'tw:bg-zinc-700'
-                    : 'tw:bg-zinc-300'
+                    ? 'bg-zinc-700'
+                    : 'bg-zinc-300'
                   : '',
-                'table-row-hover',
                 !(formattedRows[virtualRow.index]?.original as any)
                   ?.isExpandedRow
                   ? rowClass?.(formattedRows[virtualRow.index]?.original as any)
@@ -805,7 +809,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   !(formattedRows[virtualRow.index]?.original as any)
                     ?.isExpandedRow
                 "
-                class="tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:z-10"
+                class="absolute left-0 inset-y-0 w-1 z-10"
                 :style="{
                   backgroundColor: getRowStatusColor(
                     formattedRows[virtualRow.index]?.original,
@@ -820,7 +824,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 :colspan="columnOrder.length"
                 :data-test="`o2-table-expanded-row-${virtualRow.index}`"
-                class="tw:w-full tw:relative"
+                class="w-full relative"
               >
                 <slot
                   name="expanded-row"
@@ -841,23 +845,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     '-' +
                     cell.column.columnDef.id
                   "
-                  class="tw:py-none tw:px-2 tw:items-center tw:justify-start tw:relative table-cell copy-cell-td"
+                  class="py-none px-2 items-center justify-start relative table-cell group/copy"
                   :class="[
                     ...tableCellClass,
-                    { 'tw:pl-2': cellIndex === 0 },
+                    { 'pl-2': cellIndex === 0 },
                     (cell.column.columnDef.meta as any)?.align === 'center'
-                      ? 'tw:justify-center! tw:text-center!'
+                      ? 'justify-center! text-center!'
                       : '',
                     (cell.column.columnDef.meta as any)?.align === 'right'
-                      ? 'tw:justify-end! tw:text-right!'
+                      ? 'justify-end! text-right!'
                       : '',
                     (cell.column.columnDef.meta as any)?.cellClass ?? '',
                     {
-                      'sticky-column': (cell.column.columnDef.meta as any)
+                      'sticky-column bg-inherit': (cell.column.columnDef.meta as any)
                         ?.sticky,
                     },
                     {
-                      'pivot-total-col':
+                      'pivot-total-col font-semibold':
                         stickyColTotals &&
                         (cell.column.columnDef.meta as any)?._isTotalColumn,
                     },
@@ -865,7 +869,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       cell.row.original,
                       (cell.column.columnDef.meta as any)?._col,
                     )
-                      ? 'pivot-no-border'
+                      ? 'pivot-no-border border-b-0!'
                       : '',
                   ]"
                   :style="[
@@ -895,13 +899,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @mouseleave="handleCellMouseLeave()"
                 >
                   <div
-                    class="tw:h-full tw:w-full tw:flex tw:items-center"
+                    class="h-full w-full flex items-center"
                     :class="[
                       (cell.column.columnDef.meta as any)?.align === 'center'
-                        ? 'tw:justify-center! tw:text-center!'
+                        ? 'justify-center! text-center!'
                         : '',
                       (cell.column.columnDef.meta as any)?.align === 'right'
-                        ? 'tw:justify-end! tw:text-right!'
+                        ? 'justify-end! text-right!'
                         : '',
                     ]"
                   >
@@ -909,7 +913,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="enableRowExpand && cellIndex == 0"
                       variant="ghost"
                       size="icon-xs-sq"
-                      class="tw:mr-1"
+                      class="mr-1"
                       data-test="table-row-expand-menu"
                       @click.capture.stop="handleExpandRow(virtualRow.index)"
                     >
@@ -937,9 +941,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :item="cell.row.original"
                       :cell="cell"
                     />
-                    <!-- Otherwise render the default cell content tw:inline -->
+                    <!-- Otherwise render the default cell content inline -->
                     <template v-else>
-                      <!-- Pivot merge: skip content for tw:hidden (merged) cells -->
+                      <!-- Pivot merge: skip content for hidden (merged) cells -->
                       <template
                         v-if="
                           !isPivotMergeHidden(
@@ -956,13 +960,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               'right' &&
                             shouldShowCopyButton(cell.getValue())
                           "
-                          class="copy-btn tw:mr-1"
+                          class="mr-1 opacity-0 transition-opacity duration-[150ms] inline-flex items-center leading-none group-hover/copy:opacity-100"
                           data-test="dashboard-table-cell-copy-btn"
                           :data-copied="isCellCopied(virtualRow.index, cell.column.id) ? 'true' : undefined"
                         >
                           <OButton
                             variant="ghost"
                             size="icon-xs-sq"
+                            class="h-[16px]! w-[16px]! min-h-0!"
                             @click.stop="
                               copyCellContent(
                                 getCellDisplayValue(cell),
@@ -981,7 +986,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </OButton>
                         </span>
-                        <!-- Dashboard: JSON field tw:inline renderer -->
+                        <!-- Dashboard: JSON field inline renderer -->
                         <JsonFieldRenderer
                           v-if="
                             (cell.column.columnDef.meta as any)?.showFieldAsJson
@@ -1017,9 +1022,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           }"
                           :class="[
                             !props.wrap
-                              ? 'tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap'
+                              ? 'overflow-hidden text-ellipsis whitespace-nowrap'
                               : '',
-                            props.wrap ? 'tw:break-words' : '',
+                            props.wrap ? 'break-words' : '',
                           ]"
                           v-else
                         >
@@ -1032,7 +1037,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             cell.column.columnDef.id ===
                               store.state.zoConfig.timestamp_column
                           "
-                          class="tw:absolute tw:right-0 tw:top-1/2 tw:transform tw:invisible tw:-translate-y-1/2 tw:-translate-x-1/2 ai-btn"
+                          class="absolute right-0 top-1/2 transform invisible -translate-y-1/2 -translate-x-1/2 ai-btn"
                           @send-to-ai-chat="
                             sendToAiChat(
                               JSON.stringify(cell.row.original),
@@ -1048,13 +1053,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               'right' &&
                             shouldShowCopyButton(cell.getValue())
                           "
-                          class="copy-btn tw:ml-1"
+                          class="ml-1 opacity-0 transition-opacity duration-[150ms] inline-flex items-center leading-none group-hover/copy:opacity-100"
                           data-test="dashboard-table-cell-copy-btn"
                           :data-copied="isCellCopied(virtualRow.index, cell.column.id) ? 'true' : undefined"
                         >
                           <OButton
                             variant="ghost"
                             size="icon-xs-sq"
+                            class="h-[16px]! w-[16px]! min-h-0!"
                             @click.stop="
                               copyCellContent(
                                 getCellDisplayValue(cell),
@@ -1081,7 +1087,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </tr>
           </template>
           <!-- Empty slot: shown when rows is empty and not loading -->
-          <tr v-if="!loading && tableRows.length === 0" class="tw:w-full">
+          <tr v-if="!loading && tableRows.length === 0" class="w-full">
             <td :colspan="columnOrder.length">
               <slot name="empty" />
             </td>
@@ -1102,15 +1108,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <td
               v-for="col in (columns as any[]) || []"
               :key="'ft_' + col.name"
-              class="tw:px-2"
+              class="px-2 bg-[#f5f5f5] sticky bottom-0"
               :class="[
                 col.align === 'right'
-                  ? 'tw:text-right'
+                  ? 'text-right'
                   : col.align === 'center'
-                    ? 'tw:text-center'
-                    : 'tw:text-left',
-                { 'sticky-column': col.sticky },
-                { 'pivot-total-col': stickyColTotals && col._isTotalColumn },
+                    ? 'text-center'
+                    : 'text-left',
+                { 'sticky-column bg-inherit': col.sticky },
+                { 'pivot-total-col font-semibold': stickyColTotals && col._isTotalColumn },
               ]"
               :style="
                 [
@@ -1313,7 +1319,7 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
-  /** Show expand chevron and tw:inline JSON row expansion. Default: true */
+  /** Show expand chevron and inline JSON row expansion. Default: true */
   enableRowExpand: {
     type: Boolean,
     default: true,
@@ -1359,7 +1365,7 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  /** Optional function to compute tw:inline style string for a cell.
+  /** Optional function to compute inline style string for a cell.
    *  Use this to add cell background coloring from the parent.
    *  Returns empty string by default (no coloring). */
   getCellStyle: {
@@ -2032,12 +2038,12 @@ watch(
   () => {
     tableCellClass.value = [
       hasDefaultSourceColumn.value && !props.wrap
-        ? "tw:table-cell"
-        : "tw:block height-stretch",
+        ? "table-cell"
+        : "block height-stretch",
       !props.wrap
-        ? "tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap"
+        ? "overflow-hidden text-ellipsis whitespace-nowrap"
         : "",
-      props.wrap ? "tw:break-all" : "",
+      props.wrap ? "break-all" : "",
     ];
   },
   {
@@ -2464,6 +2470,24 @@ const handleDataRowClick = (row: any, index: number, event?: MouseEvent) => {
   }
 };
 
+// Keyboard access for clickable data rows: Enter/Space activate, arrows move focus.
+const handleDataRowKeydown = (event: KeyboardEvent, row: any, index: number) => {
+  if (event.target !== event.currentTarget) return;
+  const current = event.currentTarget as HTMLElement;
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    handleDataRowClick(row, index);
+  } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    const next = event.key === "ArrowDown" ? "nextElementSibling" : "previousElementSibling";
+    let sibling = current[next] as HTMLElement | null;
+    while (sibling && !sibling.matches("tr[tabindex]")) {
+      sibling = sibling[next] as HTMLElement | null;
+    }
+    sibling?.focus();
+  }
+};
+
 const expandFunctionError = () => {
   isFunctionErrorOpen.value = !isFunctionErrorOpen.value;
 };
@@ -2547,140 +2571,7 @@ defineExpose({
 <style>
 @import "@/assets/styles/log-highlighting.css";
 </style>
-<style scoped lang="scss">
-
-
-// Outer wrapper for the table (used for sticky-column CSS scoping via data-sticky-id)
-.my-sticky-virtscroll-table {
-  overflow: hidden;
-}
-
-// Add explicit hover styles for log rows
-.table-row-hover {
-  transition: background-color 0.15s ease-in-out;
-
-  &:hover {
-    background-color: var(--o2-hover-gray) !important;
-  }
-}
-
-// ── Dashboard / pivot table styles ──────────────────────────────────────────
-
-// Pivot multi-level header cells - sticky with border and shadow
-.pivot-group-header {
-  text-align: center;
-  font-weight: 600;
-  vertical-align: middle;
-  white-space: nowrap;
-  padding-top: 5px;
-  padding-bottom: 5px;
-  border-right: 1px solid rgba(0, 0, 0, 0.15);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
-  background-color: #E0E0E0;
-}
-
-.pivot-value-header {
-  text-align: center;
-  font-weight: 500;
-  font-size: 0.85em;
-  vertical-align: middle;
-  padding-top: 5px;
-  padding-bottom: 5px;
-  border-right: 1px solid rgba(0, 0, 0, 0.15);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
-  background-color: #E0E0E0;
-}
-
-.body--dark .pivot-group-header {
-  background-color: #565656;
-  border-right-color: rgba(255, 255, 255, 0.12);
-  border-bottom-color: rgba(255, 255, 255, 0.12);
-}
-
-.body--dark .pivot-value-header {
-  background-color: #565656;
-  border-right-color: rgba(255, 255, 255, 0.12);
-  border-bottom-color: rgba(255, 255, 255, 0.12);
-}
-
-// Column separator between pivot sections
-.pivot-section-border {
-  border-left: 2px solid rgba(0, 0, 0, 0.2) !important;
-}
-
-// Right-sticky total column body cells
-.pivot-total-col {
-  font-weight: 600;
-}
-
-// Cells tw:hidden by pivot row merging (duplicates suppressed)
-.pivot-no-border {
-  border-bottom: none !important;
-}
-
-// Left-sticky columns
-.sticky-column {
-  background-color: inherit;
-}
-
-// Sticky total row at bottom
-.pivot-sticky-total-row {
-  font-weight: bold;
-  position: sticky;
-  bottom: 0;
-  z-index: 9;
-  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
-
-  td {
-    background-color: var(--q-color-grey-2, #f5f5f5);
-    position: sticky;
-    bottom: 0;
-  }
-}
-
-// Sort icon shown in pivot header clicks
-.pivot-sort-icon {
-  vertical-align: middle;
-  opacity: 0;
-  transition: opacity 0.2s;
-
-  &.pivot-sort-active {
-    opacity: 1 !important;
-    color: var(--q-primary);
-  }
-}
-
-// ── Loading skeleton ─────────────────────────────────────────────
-.o2-skel-row {
-  opacity: 0;
-  animation: o2-skel-row-in 320ms ease-out forwards;
-  border-bottom: 1px solid var(--o2-tag-grey-1);
-  height: 1.75rem;
-}
-
-.o2-skel-pill {
-  // Light mode — grey-100 shimmer (matches logs/histogram skeletons)
-  background: linear-gradient(
-    90deg,
-    var(--color-grey-100) 0%,
-    rgba(255, 255, 255, 0.65) 50%,
-    var(--color-grey-100) 100%
-  );
-  background-size: 200% 100%;
-  animation: o2-skel-shimmer 1.5s ease-in-out infinite;
-
-  // Dark mode — grey-600 shimmer
-  .body--dark & {
-    background: linear-gradient(
-      90deg,
-      var(--color-grey-600) 0%,
-      rgba(255, 255, 255, 0.03) 50%,
-      var(--color-grey-600) 100%
-    );
-    background-size: 200% 100%;
-  }
-}
-
+<style>
 @keyframes o2-skel-shimmer {
   0% {
     background-position: 200% 0;
@@ -2698,38 +2589,6 @@ defineExpose({
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .o2-skel-row {
-    opacity: 1;
-    animation: none;
-  }
-  .o2-skel-pill {
-    animation: none;
-  }
-}
-
-// Copy button — only visible on cell hover, sized to match text so it
-// doesn't inflate the row height.
-.copy-cell-td {
-  .copy-btn {
-    opacity: 0;
-    transition: opacity 0.15s;
-    display: inline-flex;
-    align-items: center;
-    line-height: 1;
-
-    :deep(button) {
-      height: 16px !important;
-      width: 16px !important;
-      min-height: unset !important;
-    }
-  }
-
-  &:hover .copy-btn {
-    opacity: 1;
   }
 }
 </style>

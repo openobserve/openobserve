@@ -1,24 +1,24 @@
 <template>
-  <div v-if="visible" class="confirmation-overlay">
+  <div v-if="visible" class="confirmation-overlay w-full mb-2 [animation:slideUp_0.25s_ease-out]">
     <div
-      class="confirmation-dialog"
-      :class="theme === 'dark' ? 'dark-mode' : 'light-mode'"
+      class="confirmation-dialog w-full pt-4 px-4 pb-[14px] rounded-xl flex flex-col gap-[14px] shadow-[0_4px_16px_rgba(0,0,0,0.2)]"
+      :class="theme === 'dark' ? 'dark-mode bg-[#1e1e1e] border-2 border-[#323232] shadow-[0_2px_8px_rgba(0,0,0,0.3)]' : 'light-mode bg-white border-2 border-[#e4e7ec] shadow-[0_2px_8px_rgba(0,0,0,0.1)]'"
       @keydown="handleDialogKeydown"
       @click="handleDialogClick"
     >
-      <div class="confirmation-header">
-        <OIcon name="help-outline" size="md" class="confirmation-icon" />
-        <span class="confirmation-title">{{ formattedMessage }}</span>
+      <div class="confirmation-header flex items-start gap-3">
+        <OIcon name="help-outline" size="md" class="confirmation-icon shrink-0 mt-[2px]" :class="theme === 'dark' ? 'text-[#9ca3af]' : 'text-[#6b7280]'" />
+        <span class="confirmation-title flex-1 text-[15px] font-medium leading-normal" :class="theme === 'dark' ? 'text-[#f3f4f6]' : 'text-[#1f2937]'">{{ formattedMessage }}</span>
       </div>
 
-      <div class="confirmation-buttons">
+      <div class="confirmation-buttons flex flex-col gap-[10px] w-full pt-[14px] mt-1" :class="theme === 'dark' ? 'border-t border-[#374151]' : 'border-t border-[#e5e7eb]'">
         <!-- For navigation actions, show 3 buttons -->
         <template v-if="isNavigationAction">
           <OButton
             ref="yesButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn confirm-btn"
+            class="confirmation-btn confirm-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-[var(--q-primary)] border-2 border-[#d1d5db] dark:border-[#4b5563] bg-white dark:bg-transparent hover:bg-[#eff6ff] hover:border-[var(--q-primary)] dark:hover:bg-[rgba(59,130,246,0.1)] dark:hover:border-[var(--q-primary)]"
             :class="{ 'btn-focused': isFocusedYes }"
             tabindex="0"
             @click="handleConfirm"
@@ -29,7 +29,7 @@
             ref="alwaysButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn always-btn"
+            class="confirmation-btn always-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-[#059669] dark:text-[#34d399] border-2 border-[#d1d5db] dark:border-[#4b5563] bg-white dark:bg-transparent hover:bg-[#f0fdf4] hover:border-[#34d399] dark:hover:bg-[rgba(5,150,105,0.1)] dark:hover:border-[#34d399]"
             :class="{ 'btn-focused': isFocusedAlways }"
             tabindex="1"
             @click="handleAlwaysConfirm"
@@ -40,7 +40,7 @@
             ref="noButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn cancel-btn"
+            class="confirmation-btn cancel-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-[#374151] dark:text-[#e5e7eb] border-2 border-[#d1d5db] dark:border-[#4b5563] bg-white dark:bg-transparent hover:bg-[#fef2f2] hover:border-[#fca5a5] dark:hover:bg-[rgba(239,68,68,0.1)] dark:hover:border-[#f87171]"
             :class="{ 'btn-focused': isFocusedNo }"
             tabindex="2"
             @click="handleCancel"
@@ -55,7 +55,7 @@
             ref="yesButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn confirm-btn"
+            class="confirmation-btn confirm-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-[var(--q-primary)] border-2 border-[#d1d5db] dark:border-[#4b5563] bg-white dark:bg-transparent hover:bg-[#eff6ff] hover:border-[var(--q-primary)] dark:hover:bg-[rgba(59,130,246,0.1)] dark:hover:border-[var(--q-primary)]"
             :class="{ 'btn-focused': isFocusedYes }"
             tabindex="0"
             @click="handleConfirm"
@@ -66,7 +66,7 @@
             ref="noButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn cancel-btn"
+            class="confirmation-btn cancel-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-[#374151] dark:text-[#e5e7eb] border-2 border-[#d1d5db] dark:border-[#4b5563] bg-white dark:bg-transparent hover:bg-[#fef2f2] hover:border-[#fca5a5] dark:hover:bg-[rgba(239,68,68,0.1)] dark:hover:border-[#f87171]"
             :class="{ 'btn-focused': isFocusedNo }"
             tabindex="1"
             @click="handleCancel"
@@ -402,13 +402,7 @@ onUnmounted(() => {
 });
 </script>
 
-<style scoped lang="scss">
-.confirmation-overlay {
-  width: 100%;
-  margin-bottom: 8px;
-  animation: slideUp 0.25s ease-out;
-}
-
+<style>
 @keyframes slideUp {
   from {
     opacity: 0;
@@ -420,198 +414,34 @@ onUnmounted(() => {
   }
 }
 
-.confirmation-dialog {
-  width: 100%;
-  padding: 16px 16px 14px 16px;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-
-  &.light-mode {
-    background: #ffffff;
-    border: 2px solid #e4e7ec;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  }
-  &.dark-mode {
-    background: #1e1e1e;
-    border: 2px solid #323232;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  }
+.confirmation-btn.confirm-btn.btn-focused {
+  color: #ffffff !important;
+  background-color: var(--q-primary) !important;
+  border-color: var(--q-primary) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.4) !important;
 }
 
-.confirmation-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-
-  .confirmation-icon {
-    flex-shrink: 0;
-    margin-top: 2px;
-
-    .light-mode & {
-      color: #6b7280;
-    }
-    .dark-mode & {
-      color: #9ca3af;
-    }
-  }
-
-  .confirmation-title {
-    flex: 1;
-    font-size: 15px;
-    font-weight: 500;
-    line-height: 1.5;
-
-    .light-mode & {
-      color: #1f2937;
-    }
-    .dark-mode & {
-      color: #f3f4f6;
-    }
-  }
+.dark .confirmation-btn.confirm-btn.btn-focused {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4) !important;
 }
 
-.confirmation-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-  padding-top: 14px;
-  margin-top: 4px;
-
-  .light-mode & {
-    border-top: 1px solid #e5e7eb;
-  }
-  .dark-mode & {
-    border-top: 1px solid #374151;
-  }
-
-  .confirmation-btn {
-    width: 100%;
-    font-size: 14px;
-    font-weight: 600;
-    // padding: 11px 20px;
-    border-radius: 6px;
-    text-transform: none;
-    letter-spacing: 0;
-    transition: all 0.2s ease;
-
-    &.confirm-btn {
-      .light-mode & {
-        color: var(--q-primary);
-        border: 2px solid #d1d5db;
-        background: #ffffff;
-
-        &:hover {
-          background: #eff6ff;
-          border-color: var(--q-primary);
-        }
-
-        &.btn-focused {
-          color: #ffffff !important;
-          background-color: var(--q-primary) !important;
-          border-color: var(--q-primary) !important;
-          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.4) !important;
-        }
-      }
-
-      .dark-mode & {
-        color: var(--q-primary);
-         border: 2px solid #4b5563;
-        background: transparent;
-
-        &:hover {
-          background: rgba(59, 130, 246, 0.1);
-          border-color: var(--q-primary);
-        }
-
-        &.btn-focused {
-          color: #ffffff !important;
-          background-color: var(--q-primary) !important;
-          border-color: var(--q-primary) !important;
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4) !important;
-        }
-      }
-    }
-
-    &.always-btn {
-      .light-mode & {
-        color: #059669;
-        border: 2px solid #d1d5db;
-        background: #ffffff;
-
-        &:hover {
-          background: #f0fdf4;
-          border-color: #34d399;
-        }
-
-        &.btn-focused {
-          color: #ffffff !important;
-          background-color: #059669 !important;
-          border-color: #059669 !important;
-          box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.4) !important;
-        }
-      }
-
-      .dark-mode & {
-        color: #34d399;
-        border: 2px solid #4b5563;
-        background: transparent;
-
-        &:hover {
-          background: rgba(5, 150, 105, 0.1);
-          border-color: #34d399;
-        }
-
-        &.btn-focused {
-          color: #ffffff !important;
-          background-color: #059669 !important;
-          border-color: #059669 !important;
-          box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.4) !important;
-        }
-      }
-    }
-
-    &.cancel-btn {
-      .light-mode & {
-        color: #374151;
-        border: 2px solid #d1d5db;
-        background: #ffffff;
-
-        &:hover {
-          background: #fef2f2;
-          border-color: #fca5a5;
-        }
-
-        &.btn-focused {
-          color: #ffffff !important;
-          background-color: #ef4444 !important;
-          border-color: #ef4444 !important;
-          box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.4) !important;
-        }
-      }
-
-      .dark-mode & {
-        color: #e5e7eb;
-        border: 2px solid #4b5563;
-        background: transparent;
-
-        &:hover {
-          background: rgba(239, 68, 68, 0.1);
-          border-color: #f87171;
-        }
-
-        &.btn-focused {
-          color: #ffffff !important;
-          background-color: #dc2626 !important;
-          border-color: #dc2626 !important;
-          box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.4) !important;
-        }
-      }
-    }
-  }
+.confirmation-btn.always-btn.btn-focused {
+  color: #ffffff !important;
+  background-color: #059669 !important;
+  border-color: #059669 !important;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.4) !important;
 }
 
+.confirmation-btn.cancel-btn.btn-focused {
+  color: #ffffff !important;
+  background-color: #ef4444 !important;
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.4) !important;
+}
+
+.dark .confirmation-btn.cancel-btn.btn-focused {
+  background-color: #dc2626 !important;
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.4) !important;
+}
 </style>

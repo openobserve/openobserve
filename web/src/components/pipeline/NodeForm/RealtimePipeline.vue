@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
     <div>
       <fields-input
-        class="tw:mt-3"
+        class="mt-3"
         :stream-fields="columns"
         :fields="conditions"
         @add="addField"
@@ -47,6 +47,4 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     emits("input:update", "conditions", field);
   };
   </script>
-  
-  <style lang="scss" scoped></style>
   

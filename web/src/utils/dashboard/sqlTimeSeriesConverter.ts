@@ -119,6 +119,9 @@ export const applyAutoSQLTimeSeries = (
             axis.axisLabel.rotate = 0;
             axis.axisLabel.overflow = "none";
             axis.axisLabel.width = undefined;
+            // time ticks render at fixed intervals regardless of panel
+            // width — cull colliding labels instead of letting them abut
+            axis.axisLabel.hideOverlap = true;
           }
           // Recalculate nameGap with 0 rotation for time-based axis
           if (axis.name) {
@@ -132,6 +135,9 @@ export const applyAutoSQLTimeSeries = (
           options.xAxis[0].axisLabel.rotate = 0;
           options.xAxis[0].axisLabel.overflow = "none";
           options.xAxis[0].axisLabel.width = undefined;
+          // time ticks render at fixed intervals regardless of panel
+          // width — cull colliding labels instead of letting them abut
+          options.xAxis[0].axisLabel.hideOverlap = true;
         }
         // Recalculate nameGap with 0 rotation for time-based axis
         if (options.xAxis[0].name) {
@@ -358,6 +364,9 @@ export const applyCustomSQLTimeSeries = (
             axis.axisLabel.rotate = 0;
             axis.axisLabel.overflow = "none";
             axis.axisLabel.width = undefined;
+            // time ticks render at fixed intervals regardless of panel
+            // width — cull colliding labels instead of letting them abut
+            axis.axisLabel.hideOverlap = true;
           }
           // Recalculate nameGap with 0 rotation for time-based axis
           if (axis.name) {
@@ -371,6 +380,9 @@ export const applyCustomSQLTimeSeries = (
           options.xAxis[0].axisLabel.rotate = 0;
           options.xAxis[0].axisLabel.overflow = "none";
           options.xAxis[0].axisLabel.width = undefined;
+          // time ticks render at fixed intervals regardless of panel
+          // width — cull colliding labels instead of letting them abut
+          options.xAxis[0].axisLabel.hideOverlap = true;
         }
         // Recalculate nameGap with 0 rotation for time-based axis
         if (options.xAxis[0].name) {

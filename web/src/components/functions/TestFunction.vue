@@ -1,11 +1,11 @@
 <template>
   <div
     data-test="test-function-section"
-    class="tw:flex tw:items-center tw:flex-wrap tw:pb-2"
+    class="flex items-center flex-wrap pb-2"
   >
     <div
       data-test="test-function-query-section"
-      class="test-function-query-container tw:w-[100%]"
+      class="test-function-query-container w-[100%]"
     >
       <FullViewContainer
           data-test="test-function-query-title-section"
@@ -17,7 +17,7 @@
             <OIcon
               v-if="!!sqlQueryErrorMsg"
               name="info-outline"
-              class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
+              class="text-red-600 mx-1 cursor-pointer"
               size="sm"
             >
               <OTooltip
@@ -35,26 +35,26 @@
               :disabled="!selectedStream.name || !inputQuery || loading.events"
               @click="getResults"
             >
-              <OIcon name="search" size="sm"  class="tw:mr-1" />
+              <OIcon name="search" size="sm"  class="mr-1" />
               {{ t('search.runQuery') }}
             </OButton>
           </template>
         </FullViewContainer>
         <div
-          class="tw:flex tw:items-center tw:flex-wrap tw:py-2 tw:w-[100%]"
+          class="flex items-center flex-wrap py-2 w-[100%]"
           :class="
-            store.state.theme === 'dark' ? 'tw:bg-gray-950' : ' tw:bg-white'
+            store.state.theme === 'dark' ? 'bg-gray-950' : ' bg-white'
           "
           v-show="expandState.query"
           data-test="test-function-query-editor-section"
         >
-          <div class="function-stream-select-input tw:w-[120px] tw:pr-3">
+          <div class="function-stream-select-input w-[120px] pr-3">
             <div
-              class="tw:text-[12px]"
+              class="text-[12px]"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-gray-200'
-                  : 'tw:text-gray-700'
+                  ? 'text-gray-200'
+                  : 'text-gray-700'
               "
             >
               {{ t("alerts.streamType") + " *" }}
@@ -69,13 +69,13 @@
               style="width: 100px"
             />
           </div>
-          <div class="function-stream-select-input tw:w-[300px]">
+          <div class="function-stream-select-input w-[300px]">
             <div
-              class="tw:text-[12px]"
+              class="text-[12px]"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-gray-200'
-                  : 'tw:text-gray-700'
+                  ? 'text-gray-200'
+                  : 'text-gray-700'
               "
             >
               {{ t("alerts.stream_name") + " *" }}
@@ -91,13 +91,13 @@
               @update:model-value="updateQuery"
             />
           </div>
-          <div class="functions-duration-input tw:w-[330px]">
+          <div class="functions-duration-input w-[330px]">
             <div
-              class="tw:text-[12px]"
+              class="text-[12px]"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-gray-200'
-                  : 'tw:text-gray-700'
+                  ? 'text-gray-200'
+                  : 'text-gray-700'
               "
             >
               {{ t("common.duration") + " *" }}
@@ -105,7 +105,7 @@
 
             <DateTime
               label="Start Time"
-              class="tw:py-1 tw:w-full"
+              class="py-1 w-full"
               auto-apply
               :default-type="dateTime.type"
               :default-absolute-time="{
@@ -119,23 +119,23 @@
           </div>
 
           <div
-            class="tw:text-[12px] tw:w-[100%] tw:mt-1"
+            class="text-[12px] w-[100%] mt-1"
             :class="
               store.state.theme === 'dark'
-                ? 'tw:text-gray-200'
-                : 'tw:text-gray-700'
+                ? 'text-gray-200'
+                : 'text-gray-700'
             "
           >
             {{ t("common.query") + " *" }}
           </div>
           <div
-            class="tw:border-[1px] tw:border-gray-200 tw:relative tw:w-[100%]"
+            class="border-[1px] border-gray-200 relative w-[100%]"
           >
             <query-editor
               data-test="vrl-function-test-sql-editor"
               ref="queryEditorRef"
               editor-id="test-function-query-input-editor"
-              class="monaco-editor"
+              class="w-full min-h-40"
               v-model:query="inputQuery"
               language="sql"
               :keywords="effectiveKeywords"
@@ -145,14 +145,14 @@
             />
             <div
               v-if="!inputQuery && queryEditorPlaceholderFlag"
-              class="query-editor-placeholder-overlay"
+              class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start p-[0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-1 select-none"
             >
-              <span class="query-editor-placeholder-typewriter">{{ queryEditorPlaceholder }}</span>
+              <span class="query-editor-placeholder-typewriter [font-family:monospace] text-[var(--text-base)] [line-height:1.3125rem] text-[#a0aec0] whitespace-nowrap overflow-hidden text-ellipsis" :class="store.state.theme === 'dark' ? 'text-[#718096]' : ''">{{ queryEditorPlaceholder }}</span>
             </div>
             <div
-              class="tw:text-red-500 tw:p-1 invalid-sql-error tw:min-h-[22px]"
+              class="text-red-500 p-1 invalid-sql-error min-h-[22px]"
             >
-              <span v-show="!!sqlQueryErrorMsg" class="tw:text-[13px]">
+              <span v-show="!!sqlQueryErrorMsg" class="text-[13px]">
                 Error: {{ sqlQueryErrorMsg }}</span
               >
             </div>
@@ -172,17 +172,17 @@
         <template #left>
           <div
             v-if="loading.events"
-            class="text-weight-bold tw:flex tw:items-center tw:text-gray-500 tw:ml-2 tw:text-[13px]"
+            class="text-weight-bold flex items-center text-gray-500 ml-2 text-[13px]"
           >
             <OSpinner size="xs" />
-            <div class="tw:relative tw:top-[2px]">
+            <div class="relative top-[2px]">
               {{ t("confirmDialog.loading") }}
             </div>
           </div>
           <OIcon
             v-if="!!eventsErrorMsg"
             name="info-outline"
-            class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
+            class="text-red-600 mx-1 cursor-pointer"
             size="sm"
           >
             <OTooltip
@@ -199,28 +199,28 @@
             @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
             imageHeight="24px"
             imageWidth="24px"
-            :class="'tw:px-2 tw:mr-4'"
+            :class="'px-2 mr-4'"
             style="width: 32px !important; height: 32px !important; min-width: 32px !important; min-height: 32px !important;"
            />
           </template>
       </FullViewContainer>
       <div
         v-show="expandState.events"
-        class="tw:border-[1px] tw:border-gray-200 tw:relative"
+        class="border-[1px] border-gray-200 relative"
         data-test="test-function-input-editor-section"
       >
         <query-editor
           data-test="vrl-function-test-events-editor"
           ref="eventsEditorRef"
           editor-id="test-function-events-input-editor"
-          class="monaco-editor test-function-input-editor"
+          class="test-function-input-editor w-full min-h-40"
           :style="{ height: `calc((100vh - (260px + ${heightOffset}px)) / 2)` }"
           v-model:query="inputEvents"
           language="json"
         />
       </div>
     </div>
-    <div class="tw:mt-2">
+    <div class="mt-2">
       <FullViewContainer
         name="function"
         v-model:is-expanded="expandState.output"
@@ -231,10 +231,10 @@
         <template #left>
           <div
             v-if="loading.output"
-            class="tw:text-sm tw:font-medium text-weight-bold tw:flex tw:items-center tw:text-gray-500 tw:ml-2 tw:text-[13px]"
+            class="text-sm font-medium text-weight-bold flex items-center text-gray-500 ml-2 text-[13px]"
           >
             <OSpinner size="xs" />
-            <div class="tw:relative tw:top-[2px]">
+            <div class="relative top-[2px]">
               {{ t("confirmDialog.loading") }}
             </div>
           </div>
@@ -242,7 +242,7 @@
           <OIcon
             v-if="!!outputEventsErrorMsg"
             name="info-outline"
-            class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
+            class="text-red-600 mx-1 cursor-pointer"
             size="sm"
           >
             <OTooltip
@@ -257,24 +257,24 @@
 
       <div
         v-show="expandState.output"
-        class="tw:border-[1px] tw:border-gray-200 tw:relative"
+        class="border-[1px] border-gray-200 relative"
         data-test="test-function-output-editor-section"
       >
         <div
           v-if="!outputEvents"
-          class="tw:absolute tw:z-10 tw:flex tw:flex-col tw:justify-center tw:items-center tw:w-full tw:h-full tw:opacity-90"
+          class="absolute z-10 flex flex-col justify-center items-center w-full h-full opacity-90"
         >
           <OIcon
             name="lightbulb"
             size="xl"
-            class="tw:text-orange-400"
+            class="text-orange-400"
           />
           <div
-            class="tw:text-[15px] tw:text-gray-600"
+            class="text-[15px] text-gray-600"
             :class="
               store.state.theme === 'dark'
-                ? 'tw:text-gray-200'
-                : 'tw:text-gray-600'
+                ? 'text-gray-200'
+                : 'text-gray-600'
             "
           >
             {{ outputMessage }}
@@ -284,7 +284,7 @@
           data-test="vrl-function-test-events-output-editor"
           ref="outputEventsEditorRef"
           editor-id="test-function-events-output-editor"
-          class="monaco-editor test-function-output-editor"
+          class="test-function-output-editor w-full min-h-40"
           :style="{ height: `calc((100vh - (260px + ${heightOffset}px)) / 2)` }"
           v-model:query="outputEvents"
           language="json"
@@ -841,96 +841,14 @@ defineExpose({
 });
 </script>
 
-<style lang="scss" scoped>
-.monaco-editor {
+<style>
+.test-function-query-container :deep(.test-function-run-query-btn) {
+  padding: 2px 8px !important;
+  font-size: 11px !important;
+  margin: 1px 2px !important;
+}
+
+.functions-duration-input :deep(.date-time-button) {
   width: 100%;
-  min-height: 10rem;
-}
-
-.query-editor-placeholder-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: flex-start;
-  padding: 0.1875rem 0.5rem 0 2.15rem;
-  pointer-events: none;
-  z-index: 1;
-  user-select: none;
-
-  .query-editor-placeholder-typewriter {
-    font-family: monospace;
-    font-size: var(--text-base);
-    line-height: 1.3125rem;
-    color: #a0aec0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-
-.body--dark .query-editor-placeholder-overlay {
-  .query-editor-placeholder-typewriter {
-    color: #718096;
-  }
-}
-
-// .test-function-input-editor,
-// .test-function-output-editor {
-//   height: calc((100vh - (260px + 75px)) / 2) !important;
-// }
-
-.test-function-option-tabs {
-  :deep(.rum-tab) {
-    width: auto !important;
-    font-size: 12px;
-    padding: 3px 10px;
-    border: none !important;
-  }
-
-  :deep(.active) {
-    background-color: $primary !important;
-    color: white !important;
-  }
-}
-.test-function-query-container {
-  :deep(.test-function-run-query-btn) {
-    padding: 2px 8px !important;
-    font-size: 11px !important;
-    margin: 1px 2px !important;
-}
-}
-
-.function-stream-select-input {
-  :deep(.q-field--auto-height .q-field__control) {
-    height: 32px;
-    min-height: auto;
-
-    .q-field__control-container {
-      height: 32px;
-
-      .q-field__native {
-        min-height: 32px !important;
-        height: 32px !important;
-      }
-    }
-
-    .q-field__marginal {
-      height: 32px;
-      min-height: auto;
-    }
-  }
-}
-
-.functions-duration-input {
-  :deep(.date-time-button) {
-    width: 100%;
-
-    .OIcon.on-right {
-      margin-left: auto;
-    }
-  }
 }
 </style>

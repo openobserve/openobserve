@@ -49,6 +49,13 @@ vi.mock("./colorPalette", () => ({
   ColorModeWithoutMinMax: { palette: "palette" },
   getMetricMinMaxValue: vi.fn(() => [0, 100]),
   getSeriesColor: vi.fn(() => "#FF0000"),
+  getColorPalette: vi.fn(() => ["#FF0000", "#00FF00", "#0000FF"]),
+  getSeriesHash: vi.fn(() => 0),
+  getAreaGradientColor: vi.fn(() => ({ type: "linear", colorStops: [] })),
+  getGridLineStyle: vi.fn(() => ({ type: "dashed", width: 1, color: "rgba(0,0,0,0.08)" })),
+  getAreaStyleOverride: vi.fn((_type, base) =>
+    base ? { areaStyle: { ...base, color: { type: "linear", colorStops: [] } } } : {},
+  ),
 }));
 
 vi.mock("@/utils/dashboard/getAnnotationsData", () => ({
@@ -2197,7 +2204,7 @@ describe("Convert PromQL Data Utils", () => {
       // Verify renderItem returns correct structure
       expect(renderResult.type).toBe("text");
       expect(renderResult.style.text).toBe("456.7"); // Based on our mock formatUnitValue (latest value)
-      expect(renderResult.style.fontSize).toBe(14); // Based on our mock calculateOptimalFontSize  
+      expect(renderResult.style.fontSize).toBe(14); // Based on our mock calculateOptimalFontSize
       expect(renderResult.style.fontWeight).toBe(500);
       expect(renderResult.style.align).toBe("center");
       expect(renderResult.style.verticalAlign).toBe("middle");

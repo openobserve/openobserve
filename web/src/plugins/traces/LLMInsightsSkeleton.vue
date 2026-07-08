@@ -16,17 +16,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="llm-insights-skeleton tw:flex tw:flex-col tw:gap-[0.625rem]"
+    class="pt-[0.625rem] flex flex-col gap-[0.625rem]"
     :class="
       store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
     "
   >
+    <!-- Toolbar: Stream/Agent toggle + picker. Only in the full-page skeleton
+         when the real toolbar is hidden (initial !streamsLoaded). On a mid-session
+         switch the real toolbar is already shown, so `hideToolbar` drops this to
+         avoid a duplicate toggle/picker row. The kpiOnly variant never shows it. -->
+    <div
+      v-if="!kpiOnly && !hideToolbar"
+      class="flex items-center justify-end gap-[0.5rem] py-[0.5rem]"
+    >
+      <SkeletonBox width="116px" height="32px" rounded />
+      <SkeletonBox width="14rem" height="36px" rounded />
+    </div>
+
     <!-- Row 1: 5 KPI cards -->
-    <div class="tw:grid tw:grid-cols-5 tw:gap-[0.625rem]">
+    <div class="grid grid-cols-5 gap-[0.625rem]">
       <div
         v-for="n in 5"
         :key="n"
-        class="kpi-tile"
+        class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-lg py-[0.625rem] px-[0.875rem] flex flex-col gap-2 h-[130px]"
         :class="
           store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
         "
@@ -34,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <SkeletonBox width="60%" height="12px" rounded />
         <SkeletonBox width="55%" height="22px" rounded />
         <SkeletonBox width="40%" height="10px" rounded />
-        <div class="kpi-tile__spark">
+        <div class="flex items-end gap-[0.15rem] h-8 mt-auto">
           <SkeletonBox
             v-for="bar in 16"
             :key="bar"
@@ -47,29 +59,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Row 2 & 3: 2-column trend panel grid -->
-    <div class="tw:grid tw:grid-cols-2 tw:gap-[0.625rem]">
+    <div v-if="!kpiOnly" class="grid grid-cols-2 gap-[0.625rem]">
       <div
         v-for="n in 4"
         :key="n"
-        class="panel-tile"
+        class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-lg p-4 flex flex-col gap-[0.4rem]"
         :class="
           store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
         "
       >
         <SkeletonBox width="120px" height="16px" rounded />
         <SkeletonBox width="160px" height="10px" rounded />
-        <div class="panel-tile__line">
+        <div class="relative h-[220px] mt-2 overflow-hidden">
           <svg
-            class="panel-tile__line-svg"
+            class="w-full h-full block"
             viewBox="0 0 200 80"
             preserveAspectRatio="none"
           >
             <path
-              class="panel-tile__area-fill"
+              class="panel-tile__area-fill [animation:llm-line-pulse_1.6s_ease-in-out_infinite]"
+              :class="store.state.theme === 'dark' ? 'fill-[rgba(255,255,255,0.08)]' : 'fill-[rgba(0,0,0,0.08)]'"
               d="M0,55 C20,42 35,52 55,46 C72,41 85,30 105,28 C125,26 140,42 160,38 C175,35 190,22 200,18 L200,80 L0,80 Z"
             />
             <path
-              class="panel-tile__line-stroke"
+              class="panel-tile__line-stroke [animation:llm-line-pulse_1.6s_ease-in-out_infinite]"
+              :class="store.state.theme === 'dark' ? '[stroke:rgba(255,255,255,0.22)]' : '[stroke:rgba(0,0,0,0.18)]'"
               d="M0,55 C20,42 35,52 55,46 C72,41 85,30 105,28 C125,26 140,42 160,38 C175,35 190,22 200,18"
               fill="none"
               stroke-width="2"
@@ -79,17 +93,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Row 4: tw:w-full recent errors table -->
+    <!-- Row 4: w-full recent errors table -->
     <div
-      class="panel-tile"
+      v-if="!kpiOnly"
+      class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-lg p-4 flex flex-col gap-[0.4rem]"
       :class="
         store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
       "
     >
       <SkeletonBox width="120px" height="16px" rounded />
       <SkeletonBox width="160px" height="10px" rounded />
-      <div class="panel-tile__rows">
-        <div v-for="row in 5" :key="row" class="panel-tile__row">
+      <div class="flex flex-col gap-2 mt-2">
+        <div
+          v-for="row in 5"
+          :key="row"
+          class="panel-tile__row flex items-center gap-3 py-1 border-t border-(--tile-border)"
+        >
           <SkeletonBox width="70px" height="14px" rounded />
           <SkeletonBox width="90px" height="20px" rounded />
           <SkeletonBox width="180px" height="14px" rounded />
@@ -106,22 +125,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useStore } from "vuex";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 
+// kpiOnly: render just the KPI tiles row. Used when the trend/table panels
+// render live underneath (firing their own queries) while only the KPI strip
+// is still loading — so the panels aren't blocked behind the KPI fetch.
+defineProps<{ kpiOnly?: boolean; hideToolbar?: boolean }>();
+
 const store = useStore();
 </script>
 
-<style scoped lang="scss">
-.llm-insights-skeleton {
-  padding-top: 0.625rem;
-}
-
-.kpi-tile,
-.panel-tile {
-  background: var(--tile-bg);
-  border: 1px solid var(--tile-border);
-  color: var(--text-primary);
-  border-radius: 0.5rem;
-}
-
+<style>
 .dark-tile-content {
   --tile-bg: #2b2c2d;
   --tile-border: #444444;
@@ -133,74 +145,14 @@ const store = useStore();
   --text-primary: #2e3133;
 }
 
-.kpi-tile {
-  padding: 0.625rem 0.875rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  height: 130px;
-
-  &__spark {
-    display: flex;
-    align-items: flex-end;
-    gap: 0.15rem;
-    height: 32px;
-    margin-top: auto;
-  }
-}
-
-.panel-tile {
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-
-  &__chart {
-    display: flex;
-    align-items: flex-end;
-    gap: 0.4rem;
-    height: 220px;
-    margin-top: 0.5rem;
-  }
-
-  &__line {
-    position: relative;
-    height: 220px;
-    margin-top: 0.5rem;
-    overflow: hidden;
-  }
-
-  &__line-svg {
-    width: 100%;
-    height: 100%;
-    display: block;
-  }
-
-  &__rows {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-  }
-
-  &__row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.25rem 0;
-    border-top: 1px solid var(--tile-border);
-
-    &:first-child {
-      border-top: none;
-    }
-  }
+.panel-tile__row:first-child {
+  border-top: none;
 }
 
 /* Skeleton overrides — same pattern as HomeViewSkeleton.
    The SkeletonBox component's default gradient is theme-agnostic; redefining
-   here under .dark-tile-content / .light-tile-content gives proper contrast.
-   :deep() pierces SkeletonBox's scoped style so the override applies. */
-:deep(.skeleton-box) {
+   here under .dark-tile-content / .light-tile-content gives proper contrast. */
+.skeleton-box {
   background: linear-gradient(
     90deg,
     transparent,
@@ -213,7 +165,7 @@ const store = useStore();
   overflow: hidden;
 }
 
-.dark-tile-content :deep(.skeleton-box) {
+.dark-tile-content .skeleton-box {
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0.04),
@@ -223,7 +175,7 @@ const store = useStore();
   background-size: 200% 100%;
 }
 
-.light-tile-content :deep(.skeleton-box) {
+.light-tile-content .skeleton-box {
   background: linear-gradient(
     90deg,
     rgba(0, 0, 0, 0.04),
@@ -240,22 +192,6 @@ const store = useStore();
   100% {
     background-position: 200% 0;
   }
-}
-
-.panel-tile__area-fill {
-  fill: rgba(0, 0, 0, 0.08);
-  animation: llm-line-pulse 1.6s ease-in-out infinite;
-}
-.panel-tile__line-stroke {
-  stroke: rgba(0, 0, 0, 0.18);
-  animation: llm-line-pulse 1.6s ease-in-out infinite;
-}
-
-.dark-tile-content .panel-tile__area-fill {
-  fill: rgba(255, 255, 255, 0.08);
-}
-.dark-tile-content .panel-tile__line-stroke {
-  stroke: rgba(255, 255, 255, 0.22);
 }
 
 @keyframes llm-line-pulse {

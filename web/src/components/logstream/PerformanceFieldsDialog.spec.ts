@@ -345,9 +345,9 @@ describe("PerformanceFieldsDialog", () => {
     it("should render correctly in light theme", async () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
-      // light theme adds the light scroll-area class
-      expect(wrapper.html()).toContain("bordered-scroll-area-light");
-      expect(wrapper.html()).not.toContain("bordered-scroll-area-dark");
+      // light theme applies the light surface/border classes
+      expect(wrapper.html()).toContain("bg-[#f5f5f5]");
+      expect(wrapper.html()).not.toContain("bg-[#1e1e1e]");
     });
 
     it("should render correctly in dark theme", async () => {
@@ -360,8 +360,8 @@ describe("PerformanceFieldsDialog", () => {
 
       mountDialog([mockFtsFiled], true, darkStore);
       await flushPromises();
-      expect(wrapper.html()).toContain("bordered-scroll-area-dark");
-      expect(wrapper.html()).not.toContain("bordered-scroll-area-light");
+      expect(wrapper.html()).toContain("bg-[#1e1e1e]");
+      expect(wrapper.html()).not.toContain("bg-[#f5f5f5]");
     });
   });
 });

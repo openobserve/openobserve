@@ -7,6 +7,11 @@ import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuer
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { dataTypeOf, entityId } from "../utils/evalEntity";
 import type { DateWindow } from "./useQualityData";
+import {
+  buildScoresAgentFilterWhere,
+  combineWhere,
+  type AgentFilterSelection,
+} from "../utils/agentFilterSql";
 
 export interface DetailKpi {
   id: string;
@@ -52,7 +57,11 @@ function escapeSqlString(s: string): string {
   return s.replace(/'/g, "''");
 }
 
-function valueOf<T = any>(row: any, camel: string, snake: string): T | undefined {
+function valueOf<T = any>(
+  row: any,
+  camel: string,
+  snake: string,
+): T | undefined {
   if (row == null) return undefined;
   return row[camel] ?? row[snake];
 }
@@ -84,7 +93,9 @@ function unhealthyExprFor(config: ScoreConfig): UnhealthyExpr {
     if (!Array.isArray(list) || list.length === 0) {
       return { expr: null, contextLabel: "" };
     }
-    const inList = list.map((c) => `'${escapeSqlString(String(c))}'`).join(", ");
+    const inList = list
+      .map((c) => `'${escapeSqlString(String(c))}'`)
+      .join(", ");
     return {
       expr: `value_categorical NOT IN (${inList})`,
       contextLabel: `Healthy ∈ {${list.join(", ")}}`,
@@ -106,7 +117,7 @@ function unhealthyExprFor(config: ScoreConfig): UnhealthyExpr {
   return { expr: null, contextLabel: "" };
 }
 
-function numericSql(configIdEscaped: string, unhealthy: string | null): string {
+function numericSql(where: string, unhealthy: string | null): string {
   return [
     "SELECT",
     "  COUNT(*) AS total,",
@@ -116,11 +127,11 @@ function numericSql(configIdEscaped: string, unhealthy: string | null): string {
     "  approx_percentile_cont(value_numeric, 0.95) AS p95_v,",
     `  ${unhealthy ? `COUNT(CASE WHEN ${unhealthy} THEN 1 END)` : "CAST(NULL AS INTEGER)"} AS unhealthy`,
     'FROM "_llm_scores"',
-    `WHERE CAST(score_config_id AS VARCHAR) = '${configIdEscaped}'`,
+    `WHERE ${where}`,
   ].join("\n");
 }
 
-function booleanSql(configIdEscaped: string): string {
+function booleanSql(where: string): string {
   return [
     "SELECT",
     "  COUNT(*) AS total,",
@@ -128,18 +139,17 @@ function booleanSql(configIdEscaped: string): string {
     "  COUNT(CASE WHEN value_boolean = true THEN 1 END) AS trues,",
     "  COUNT(CASE WHEN value_boolean = false THEN 1 END) AS falses",
     'FROM "_llm_scores"',
-    `WHERE CAST(score_config_id AS VARCHAR) = '${configIdEscaped}'`,
+    `WHERE ${where}`,
   ].join("\n");
 }
 
-function categoricalSql(configIdEscaped: string): string {
+function categoricalSql(where: string): string {
   return [
     "SELECT",
     "  value_categorical,",
     "  COUNT(*) AS c",
     'FROM "_llm_scores"',
-    `WHERE CAST(score_config_id AS VARCHAR) = '${configIdEscaped}'`,
-    "  AND value_categorical IS NOT NULL",
+    `WHERE ${combineWhere(where, "value_categorical IS NOT NULL")}`,
     "GROUP BY value_categorical",
     "ORDER BY c DESC",
   ].join("\n");
@@ -148,6 +158,7 @@ function categoricalSql(configIdEscaped: string): string {
 export function useQualityConfigDetail(
   selectedConfig: Ref<ScoreConfig | null>,
   dateWindow: Ref<DateWindow>,
+  agentFilter?: Ref<AgentFilterSelection | null | undefined>,
 ) {
   const { executeQuery } = useLLMStreamQuery();
   const isLoading = ref(false);
@@ -155,7 +166,12 @@ export function useQualityConfigDetail(
   const booleanAgg = ref<BooleanAggRow | null>(null);
   const categoricalRows = ref<CategoricalAggRow[]>([]);
 
-  async function runQuery<T>(sqlText: string, label: string, startUs: number, endUs: number) {
+  async function runQuery<T>(
+    sqlText: string,
+    label: string,
+    startUs: number,
+    endUs: number,
+  ) {
     try {
       const hits = await executeQuery(sqlText, startUs, endUs, "logs");
       console.debug(`[QualityDetail:${label}]`, { hitCount: hits.length });
@@ -182,12 +198,16 @@ export function useQualityConfigDetail(
       // per-version row id — join on entity_id so cross-version edits don't
       // break the detail panel.
       const configId = escapeSqlString(entityId(cfg));
+      const where = combineWhere(
+        `CAST(score_config_id AS VARCHAR) = '${configId}'`,
+        buildScoresAgentFilterWhere(agentFilter?.value ?? null),
+      )!;
       const type = dataTypeOf(cfg);
       const unhealthy = unhealthyExprFor(cfg);
 
       if (type === "numeric") {
         const hits = await runQuery<NumericAggRow>(
-          numericSql(configId, unhealthy.expr),
+          numericSql(where, unhealthy.expr),
           "numeric",
           startUs,
           endUs,
@@ -197,7 +217,7 @@ export function useQualityConfigDetail(
         categoricalRows.value = [];
       } else if (type === "boolean") {
         const hits = await runQuery<BooleanAggRow>(
-          booleanSql(configId),
+          booleanSql(where),
           "boolean",
           startUs,
           endUs,
@@ -207,7 +227,7 @@ export function useQualityConfigDetail(
         categoricalRows.value = [];
       } else if (type === "categorical") {
         const hits = await runQuery<CategoricalAggRow>(
-          categoricalSql(configId),
+          categoricalSql(where),
           "categorical",
           startUs,
           endUs,
@@ -221,20 +241,23 @@ export function useQualityConfigDetail(
     }
   }
 
-  watch(
-    [selectedConfig, dateWindow],
-    () => {
-      void refresh();
-    },
-    { immediate: true },
-  );
-
-  const dataType = computed<"numeric" | "boolean" | "categorical" | "unknown">(() => {
-    if (!selectedConfig.value) return "unknown";
-    const t = dataTypeOf(selectedConfig.value);
-    if (t === "numeric" || t === "boolean" || t === "categorical") return t;
-    return "unknown";
+  // Only opening the drawer on a row (selectedConfig change) refreshes from
+  // here. Date-window / agent-filter changes are driven by the page's
+  // refreshAll(), so watching them here would double-fire the detail query
+  // alongside the KPI/table reload. No `immediate`: the initial load is
+  // covered by refreshAll() too.
+  watch(selectedConfig, () => {
+    void refresh();
   });
+
+  const dataType = computed<"numeric" | "boolean" | "categorical" | "unknown">(
+    () => {
+      if (!selectedConfig.value) return "unknown";
+      const t = dataTypeOf(selectedConfig.value);
+      if (t === "numeric" || t === "boolean" || t === "categorical") return t;
+      return "unknown";
+    },
+  );
 
   const kpis = computed<DetailKpi[]>(() => {
     const cfg = selectedConfig.value;
@@ -251,15 +274,34 @@ export function useQualityConfigDetail(
           ? `Range ${range.min}–${range.max}`
           : "";
       const cards: DetailKpi[] = [
-        { id: "avg", titleKey: "average", value: toNumber(agg?.avg_v), context: rangeText, format: "number" },
-        { id: "p50", titleKey: "p50", value: toNumber(agg?.p50_v), context: "", format: "number" },
-        { id: "p95", titleKey: "p95", value: toNumber(agg?.p95_v), context: "", format: "number" },
+        {
+          id: "avg",
+          titleKey: "average",
+          value: toNumber(agg?.avg_v),
+          context: rangeText,
+          format: "number",
+        },
+        {
+          id: "p50",
+          titleKey: "p50",
+          value: toNumber(agg?.p50_v),
+          context: "",
+          format: "number",
+        },
+        {
+          id: "p95",
+          titleKey: "p95",
+          value: toNumber(agg?.p95_v),
+          context: "",
+          format: "number",
+        },
       ];
       if (u.expr != null) {
         cards.push({
           id: "unhealthy",
           titleKey: "unhealthy",
-          value: total > 0 && unhealthy != null ? (unhealthy / total) * 100 : null,
+          value:
+            total > 0 && unhealthy != null ? (unhealthy / total) * 100 : null,
           context: u.contextLabel,
           format: "percent",
         });
@@ -305,9 +347,13 @@ export function useQualityConfigDetail(
     }
 
     if (dataType.value === "categorical") {
-      const total = categoricalRows.value.reduce((s, r) => s + (toNumber(r.c) ?? 0), 0);
+      const total = categoricalRows.value.reduce(
+        (s, r) => s + (toNumber(r.c) ?? 0),
+        0,
+      );
       const ht = valueOf<any>(cfg, "healthyThreshold", "healthy_threshold");
-      const healthyCats: string[] = ht?.healthy_categories || ht?.healthyCategories || [];
+      const healthyCats: string[] =
+        ht?.healthy_categories || ht?.healthyCategories || [];
       let healthyCount = 0;
       let unhealthyCount = 0;
       for (const r of categoricalRows.value) {
@@ -323,7 +369,8 @@ export function useQualityConfigDetail(
           id: "healthy",
           titleKey: "healthy",
           value: total > 0 ? (healthyCount / total) * 100 : null,
-          context: healthyCats.length > 0 ? healthyCats.join(" · ") : "no threshold",
+          context:
+            healthyCats.length > 0 ? healthyCats.join(" · ") : "no threshold",
           format: "percent",
         },
         {

@@ -21,18 +21,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('storage_settings.title')"
             icon="cloud"
             :subtitle="'Per-organization storage configuration'"
-            class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+            class="shrink-0 px-4 border-b border-border-default"
           />
 
     <!-- Loading state -->
-    <div v-if="loading" class="tw:flex tw:justify-center tw:items-center" style="min-height: calc(100vh - var(--navbar-height) - 120px)">
+    <div v-if="loading" class="flex justify-center items-center" style="min-height: calc(100vh - var(--navbar-height) - 120px)">
       <OSpinner size="md" data-test="org-storage-settings-loading-indicator" />
     </div>
 
     <!-- Cloud: storage not enabled -->
     <div
       v-else-if="isCloud && !orgStorageEnabled"
-      class="tw:text-sm tw:text-gray-500 tw:py-3"
+      class="text-sm text-gray-500 py-3"
     >
       {{ t('storage_settings.notEnabled') }}
     </div>
@@ -40,26 +40,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ========== NOT CONFIGURED: cloud hero ========== -->
     <div
       v-else-if="!isConfigured && isCloud"
-      class="hero-page"
+      class="hero-page flex flex-col"
+      :style="{ minHeight: 'calc(100vh - var(--navbar-height) - 100px)' }"
       :class="store.state.theme === 'dark' ? 'hero-page--dark' : ''"
     >
-      <div class="hero-page__body">
+      <div class="hero-page__body flex items-center justify-between flex-1 py-[72px] px-[80px]" style="gap: 56px;">
         <!-- left -->
-        <div class="hero-page__left">
+        <div class="hero-page__left flex-1 max-w-[480px]">
 
-          <div class="hero-page__headline">
-            {{ t("storage_settings.heroHeadline") }} <span class="hero-page__brand-text">OpenObserve.</span>
+          <div class="hero-page__headline font-bold leading-tight mb-[18px] text-[#111827]" :class="store.state.theme === 'dark' ? 'text-[#f1f1f5]' : ''" style="font-size: 2.6rem; letter-spacing: -0.6px; line-height: 1.2;">
+            {{ t("storage_settings.heroHeadline") }} <span class="hero-page__brand-text text-(--q-primary)">OpenObserve.</span>
           </div>
 
-          <div class="hero-page__sub">
+          <div class="hero-page__sub leading-[1.7] text-[#6b7280] mb-9 max-w-[400px]" :class="store.state.theme === 'dark' ? 'text-[#9ca3af]' : ''" style="font-size: 0.97rem;">
             {{ t("storage_settings.heroSub") }}
           </div>
 
-          <div class="hero-page__actions">
+          <div class="hero-page__actions mb-7">
             <OButton
               data-test="storage-settings-configure-btn"
               variant="primary"
-              class="no-border o2-primary-button hero-cta-btn"
+              class="no-border o2-primary-button hero-cta-btn h-11 px-7 font-semibold" style="font-size: 0.95rem;"
               :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               @click="navigateToCreate"
             >
@@ -68,15 +69,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- supported infrastructure -->
-          <div class="hero-page__inline-providers">
-            <span class="hero-page__inline-label">{{ t("storage_settings.supportedProviders") }}</span>
-            <div class="hero-page__inline-logos">
+          <div class="hero-page__inline-providers flex items-center gap-3">
+            <span class="hero-page__inline-label font-medium whitespace-nowrap text-[#aaa]" :class="store.state.theme === 'dark' ? 'text-[#666]' : ''" style="font-size: 0.8rem; letter-spacing: 0px;">{{ t("storage_settings.supportedProviders") }}</span>
+            <div class="hero-page__inline-logos flex items-center" style="gap: 10px;">
               <div
                 v-for="p in availableProviders"
                 :key="p.value"
-                class="hero-page__inline-logo-wrap"
+                class="hero-page__inline-logo-wrap w-7 h-7 flex items-center justify-center shrink-0 cursor-default opacity-70 transition-opacity duration-150"
               >
-                <img :src="p.image" :alt="p.label" class="hero-page__inline-logo" />
+                <img :src="p.image" :alt="p.label" class="hero-page__inline-logo w-7 h-7 max-w-[28px] max-h-[28px] object-contain block" />
                 <OTooltip :content="p.label" />
               </div>
             </div>
@@ -84,19 +85,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- right: feature cards -->
-        <div class="hero-page__right">
+        <div class="hero-page__right w-[340px] shrink-0 flex flex-col" style="gap: 14px;">
           <div
             v-for="feature in features"
             :key="feature.title"
-            class="feature-card"
-            :class="store.state.theme === 'dark' ? 'feature-card--dark' : ''"
+            class="feature-card flex items-start rounded-[16px] border border-[rgba(0,0,0,0.07)] bg-white transition-all duration-200" style="gap: 16px; padding: 20px 22px; box-shadow: 0 2px 12px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.04);"
+            :class="store.state.theme === 'dark' ? 'feature-card--dark bg-[rgba(255,255,255,0.05)] border-[rgba(255,255,255,0.08)] [box-shadow:0_2px_12px_rgba(0,0,0,0.3)]' : ''"
           >
-            <div class="feature-card__icon-box" :class="store.state.theme === 'dark' ? 'feature-card__icon-box--dark' : ''">
-              <OIcon :name="feature.icon" size="md" class="feature-card__icon" />
+            <div class="feature-card__icon-box w-10 h-10 rounded-[10px] bg-[rgba(66,133,244,0.08)] flex items-center justify-center shrink-0" :class="store.state.theme === 'dark' ? 'feature-card__icon-box--dark bg-[rgba(66,133,244,0.15)]' : ''">
+              <OIcon :name="feature.icon" size="md" class="feature-card__icon text-(--q-primary) opacity-85" />
             </div>
-            <div class="feature-card__content">
-              <div class="feature-card__title">{{ feature.title }}</div>
-              <div class="feature-card__desc">{{ feature.desc }}</div>
+            <div class="feature-card__content pt-[2px] flex-1">
+              <div class="feature-card__title font-bold text-[#111827] mb-[5px]" :class="store.state.theme === 'dark' ? 'text-[#f3f4f6]' : ''" style="font-size: 0.92rem;">{{ feature.title }}</div>
+              <div class="feature-card__desc text-[#6b7280] leading-[1.55]" :class="store.state.theme === 'dark' ? 'text-[#9ca3af]' : ''" style="font-size: 0.8rem;">{{ feature.desc }}</div>
             </div>
           </div>
         </div>
@@ -106,91 +107,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ========== NOT CONFIGURED: enterprise empty state ========== -->
     <div
       v-else-if="!isConfigured && !isCloud"
-      class="ent-empty"
-      :class="store.state.theme === 'dark' ? 'ent-empty--dark' : ''"
+      class="w-full"
+      :style="{ minHeight: 'calc(100vh - var(--navbar-height) - 160px)' }"
     >
-      <!-- double-ring icon -->
-      <div class="ent-empty__icon-outer">
-        <div class="ent-empty__icon-inner" :class="store.state.theme === 'dark' ? 'ent-empty__icon-inner--dark' : ''">
-          <OIcon name="cloud-upload" size="lg" class="ent-empty__icon" />
-        </div>
-      </div>
-
-      <div class="ent-empty__title">{{ t("storage_settings.noStorageConfigured") }}</div>
-
-      <div class="ent-empty__desc">
-        {{ t("storage_settings.routeDataDesc") }}
-      </div>
-
-      <!-- key fact chips -->
-      <div class="ent-empty__chips">
-        <span class="ent-empty__chip" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark' : ''">
-          <OIcon name="corporate-fare" size="xs" />
-          {{ t("storage_settings.perOrgIsolation") }}
-        </span>
-        <span class="ent-empty__chip" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark' : ''">
-          <OIcon name="bolt" size="xs" />
-          {{ t("storage_settings.appliesImmediately") }}
-        </span>
-        <span class="ent-empty__chip" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark' : ''">
-          <OIcon name="lock" size="xs" />
-          {{ t("storage_settings.usesOrgCredentials") }}
-        </span>
-      </div>
-
-      <OButton
-        data-test="storage-settings-configure-btn"
-        variant="primary"
-        class="no-border o2-primary-button ent-empty__btn"
-        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-        @click="navigateToCreate"
+      <OEmptyState
+        size="hero"
+        preset="no-storage-config"
+        data-test="org-storage-settings-empty-state"
+        @action="(id) => id === 'configure' && navigateToCreate()"
       >
-        {{ t("storage_settings.configureStorage") }}
-      </OButton>
-
-      <div class="ent-empty__providers">
-        <span class="ent-empty__providers-label">{{ t("storage_settings.supportedProviders") }}</span>
-        <div class="ent-empty__providers-logos">
-          <div
-            v-for="p in providerDefinitions"
-            :key="p.value"
-            class="ent-empty__logo-wrap"
-          >
-            <img :src="p.image" :alt="p.label" class="ent-empty__logo" />
-            <OTooltip :content="p.label" />
+        <template #extra>
+          <!-- key fact chips -->
+          <div class="flex items-center gap-2 flex-wrap justify-center">
+            <span class="inline-flex items-center gap-1.5 font-medium text-xs text-text-secondary bg-surface-subtle border border-border-default rounded-full py-1 px-3">
+              <OIcon name="corporate-fare" size="xs" />
+              {{ t("storage_settings.perOrgIsolation") }}
+            </span>
+            <span class="inline-flex items-center gap-1.5 font-medium text-xs text-text-secondary bg-surface-subtle border border-border-default rounded-full py-1 px-3">
+              <OIcon name="bolt" size="xs" />
+              {{ t("storage_settings.appliesImmediately") }}
+            </span>
+            <span class="inline-flex items-center gap-1.5 font-medium text-xs text-text-secondary bg-surface-subtle border border-border-default rounded-full py-1 px-3">
+              <OIcon name="lock" size="xs" />
+              {{ t("storage_settings.usesOrgCredentials") }}
+            </span>
           </div>
-        </div>
-      </div>
+
+          <!-- supported providers -->
+          <div class="flex items-center gap-3">
+            <span class="font-medium whitespace-nowrap text-xs text-text-disabled">{{ t("storage_settings.supportedProviders") }}</span>
+            <div class="flex items-center gap-2.5">
+              <div
+                v-for="p in providerDefinitions"
+                :key="p.value"
+                class="w-7 h-7 flex items-center justify-center shrink-0 cursor-default opacity-65 hover:opacity-100 transition-opacity duration-150"
+              >
+                <img :src="p.image" :alt="p.label" class="w-7 h-7 max-w-7 max-h-7 object-contain block" />
+                <OTooltip :content="p.label" />
+              </div>
+            </div>
+          </div>
+        </template>
+      </OEmptyState>
     </div>
 
     <!-- ========== CONFIGURED ========== -->
     <div v-else>
 
-      <div class="tw:p-3">
+      <div class="p-3">
       <OCard
-        class="storage-card"
-        :class="store.state.theme === 'dark' ? 'storage-card--dark' : ''"
+        class="storage-card rounded-xl"
+        :class="store.state.theme === 'dark' ? 'storage-card--dark bg-[#1e1e1e]' : ''"
         style="max-width: 680px;"
       >
         <!-- Card header: logo + name + badge | update button -->
         <OCardSection role="header">
-          <div class="tw:flex tw:items-center tw:flex-nowrap tw:flex-1" style="gap: 14px;">
+          <div class="flex items-center flex-nowrap flex-1" style="gap: 14px;">
             <img
               :src="configuredProviderImage"
               :alt="configuredProviderLabel"
               style="width: 44px; height: 44px; object-fit: contain; flex-shrink: 0;"
             />
             <div>
-              <div class="tw:text-base tw:font-medium" style="font-weight: 700; line-height: 1.3;">
+              <div class="text-base font-medium" style="font-weight: 700; line-height: 1.3;">
                 {{ configuredProviderLabel }}
               </div>
-              <OBadge
-                variant="success"
-                style="font-size: 11px; padding: 2px 8px; margin-top: 4px;"
-              >
-                <OIcon name="check-circle" size="xs" style="margin-right: 3px;" />
-                {{ t("storage_settings.active") }}
-              </OBadge>
+              <OTag type="activeFlag" class="mt-1" />
             </div>
           </div>
           <OButton
@@ -209,30 +191,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Field grid -->
         <OCardSection role="body">
-          <div class="storage-detail-grid">
+          <div class="storage-detail-grid grid gap-x-8 gap-y-5" style="grid-template-columns: repeat(2, 1fr);">
             <div v-if="storageData.bucket_name" class="storage-field">
-              <div class="storage-field__label">{{ t("storage_settings.bucketName") }}</div>
-              <div class="storage-field__value">{{ storageData.bucket_name }}</div>
+              <div class="storage-field__label text-xs text-[#6b7280] capitalize mb-[3px] font-medium">{{ t("storage_settings.bucketName") }}</div>
+              <div class="storage-field__value text-[#6b7280] break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.bucket_name }}</div>
             </div>
             <div v-if="storageData.region" class="storage-field">
-              <div class="storage-field__label">{{ t("storage_settings.region") }}</div>
-              <div class="storage-field__value">{{ storageData.region }}</div>
+              <div class="storage-field__label text-xs text-[#6b7280] capitalize mb-[3px] font-medium">{{ t("storage_settings.region") }}</div>
+              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.region }}</div>
             </div>
             <div v-if="storageData.server_url && !isCloud" class="storage-field">
-              <div class="storage-field__label">{{ t("storage_settings.serverUrl") }}</div>
-              <div class="storage-field__value">{{ storageData.server_url }}</div>
+              <div class="storage-field__label text-xs text-[#6b7280] capitalize mb-[3px] font-medium">{{ t("storage_settings.serverUrl") }}</div>
+              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.server_url }}</div>
             </div>
             <div v-if="storageData.access_key" class="storage-field">
-              <div class="storage-field__label">{{ t("storage_settings.accessKey") }}</div>
-              <div class="storage-field__value">{{ storageData.access_key }}</div>
+              <div class="storage-field__label text-xs text-[#6b7280] capitalize mb-[3px] font-medium">{{ t("storage_settings.accessKey") }}</div>
+              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.access_key }}</div>
             </div>
             <div v-if="storageData.secret_key" class="storage-field">
-              <div class="storage-field__label">{{ t("storage_settings.secretKey") }}</div>
-              <div class="storage-field__value">{{ storageData.secret_key }}</div>
+              <div class="storage-field__label text-xs text-[#6b7280] capitalize mb-[3px] font-medium">{{ t("storage_settings.secretKey") }}</div>
+              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.secret_key }}</div>
             </div>
             <div v-if="storageData.role_arn" class="storage-field">
-              <div class="storage-field__label">{{ t("storage_settings.roleArn") }}</div>
-              <div class="storage-field__value" style="word-break: break-all;">{{ storageData.role_arn }}</div>
+              <div class="storage-field__label text-xs text-[#6b7280] capitalize mb-[3px] font-medium">{{ t("storage_settings.roleArn") }}</div>
+              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--o2-text-primary); word-break: break-all;">{{ storageData.role_arn }}</div>
             </div>
           </div>
         </OCardSection>
@@ -241,14 +223,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Timestamps -->
         <OCardSection v-if="configTimestamps">
-          <div class="tw:flex" style="gap: 40px;">
-            <div v-if="configTimestamps.created_at" class="tw:flex tw:items-center" style="gap: 6px;">
-              <span class="storage-field__label" style="margin-bottom: 0;">{{ t("storage_settings.createdAt") }}</span>
-              <span class="tw:text-sm">{{ configTimestamps.created_at }}</span>
+          <div class="flex" style="gap: 40px;">
+            <div v-if="configTimestamps.created_at" class="flex items-center" style="gap: 6px;">
+              <span class="storage-field__label text-xs text-[#6b7280] capitalize font-medium" style="margin-bottom: 0;">{{ t("storage_settings.createdAt") }}</span>
+              <span class="text-sm">{{ configTimestamps.created_at }}</span>
             </div>
-            <div v-if="configTimestamps.updated_at" class="tw:flex tw:items-center" style="gap: 6px;">
-              <span class="storage-field__label" style="margin-bottom: 0;">{{ t("storage_settings.updatedAt") }}</span>
-              <span class="tw:text-sm">{{ configTimestamps.updated_at }}</span>
+            <div v-if="configTimestamps.updated_at" class="flex items-center" style="gap: 6px;">
+              <span class="storage-field__label text-xs text-[#6b7280] capitalize font-medium" style="margin-bottom: 0;">{{ t("storage_settings.updatedAt") }}</span>
+              <span class="text-sm">{{ configTimestamps.updated_at }}</span>
             </div>
           </div>
         </OCardSection>
@@ -277,10 +259,11 @@ import orgStorageService from "@/services/org_storage";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OrgStorageEditor from "./OrgStorageEditor.vue";
 
 const store = useStore();
@@ -416,410 +399,13 @@ onMounted(() => {
 });
 </script>
 
-<style lang="scss" scoped>
-// ── Hero page ─────────────────────────────────────────────────────────────────
-.hero-page {
-  display: flex;
-  flex-direction: column;
-  min-height: calc(100vh - var(--navbar-height) - 100px);
-
-  &__body {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 56px;
-    flex: 1;
-    padding: 72px 80px;
-  }
-
-  // ── Left ────────────────────────────────────────────────────────────────
-  &__left {
-    flex: 1;
-    max-width: 480px;
-  }
-
-  &__eyebrow {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 1.2px;
-    text-transform: none;
-    color: var(--q-primary);
-    background: rgba(66, 133, 244, 0.1);
-    border: 1px solid rgba(66, 133, 244, 0.25);
-    padding: 4px 10px;
-    border-radius: 20px;
-    margin-bottom: 20px;
-  }
-
-  &__headline {
-    font-size: 2.6rem;
-    font-weight: 700;
-    line-height: 1.2;
-    letter-spacing: -0.6px;
-    color: #111827;
-    margin-bottom: 18px;
-
-    .hero-page--dark & {
-      color: #f1f1f5;
-    }
-  }
-
-  &__brand-text {
-    color: var(--q-primary);
-  }
-
-  &__brand-logo {
-    width: 28px;
-    height: 22px;
-    object-fit: contain;
-    display: inline-block;
-    vertical-align: middle;
-    position: relative;
-    top: -2px;
-  }
-
-  &__sub {
-    font-size: 0.97rem;
-    line-height: 1.7;
-    color: #6b7280;
-    margin-bottom: 36px;
-    max-width: 400px;
-
-    .hero-page--dark & {
-      color: #9ca3af;
-    }
-  }
-
-  &__actions {
-    margin-bottom: 28px;
-  }
-
-  // provider logos tw:inline beneath the CTA
-  &__inline-providers {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  &__inline-label {
-    font-size: 0.8rem;
-    font-weight: 500;
-    letter-spacing: 0px;
-    color: #aaa;
-    white-space: nowrap;
-
-    .hero-page--dark & {
-      color: #666;
-    }
-  }
-
-  &__inline-logos {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  &__inline-logo-wrap {
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    cursor: default;
-    opacity: 0.7;
-    transition: opacity 0.15s;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-
-  &__inline-logo {
-    width: 28px;
-    height: 28px;
-    max-width: 28px;
-    max-height: 28px;
-    object-fit: contain;
-    display: block;
-  }
-
-  // ── Right ────────────────────────────────────────────────────────────────
-  &__right {
-    width: 340px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
+<style>
+.hero-page__inline-logo-wrap:hover {
+  opacity: 1;
 }
 
-.hero-cta-btn {
-  height: 44px;
-  padding: 0 28px;
-  font-size: 0.95rem;
-  font-weight: 600;
-}
-
-// ── Feature cards (right side) ────────────────────────────────────────────────
-.feature-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  padding: 20px 22px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 1);
-  border: 1px solid rgba(0, 0, 0, 0.07);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.04);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
-
-  &:hover {
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
-    transform: translateY(-1px);
-  }
-
-  &--dark {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-  }
-
-  &__icon-box {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    background: rgba(66, 133, 244, 0.08);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-
-    &--dark {
-      background: rgba(66, 133, 244, 0.15);
-    }
-  }
-
-  &__icon {
-    color: var(--q-primary);
-    opacity: 0.85;
-  }
-
-  &__content {
-    padding-top: 2px;
-    flex: 1;
-  }
-
-  &__title {
-    font-size: 0.92rem;
-    font-weight: 700;
-    color: #111827;
-    margin-bottom: 5px;
-
-    .feature-card--dark & {
-      color: #f3f4f6;
-    }
-  }
-
-  &__desc {
-    font-size: 0.8rem;
-    color: #6b7280;
-    line-height: 1.55;
-
-    .feature-card--dark & {
-      color: #9ca3af;
-    }
-  }
-}
-
-// ── Enterprise empty state ────────────────────────────────────────────────────
-.ent-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: calc(100vh - var(--navbar-height) - 160px);
-  padding: 48px 24px;
-  text-align: center;
-
-  // double-ring: outer halo
-  &__icon-outer {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    border: 1px dashed rgba(66, 133, 244, 0.25);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 28px;
-
-    .ent-empty--dark & {
-      border-color: rgba(66, 133, 244, 0.3);
-    }
-  }
-
-  // inner solid ring
-  &__icon-inner {
-    width: 68px;
-    height: 68px;
-    border-radius: 50%;
-    background: rgba(66, 133, 244, 0.09);
-    border: 1.5px solid rgba(66, 133, 244, 0.22);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    &--dark {
-      background: rgba(66, 133, 244, 0.18);
-      border-color: rgba(66, 133, 244, 0.35);
-    }
-  }
-
-  &__icon {
-    color: var(--q-primary);
-    opacity: 0.85;
-  }
-
-  &__title {
-    font-size: 1.2rem;
-    font-weight: 700;
-    letter-spacing: -0.2px;
-    color: #111827;
-    margin-bottom: 10px;
-
-    .ent-empty--dark & {
-      color: #f1f1f5;
-    }
-  }
-
-  &__desc {
-    font-size: 0.88rem;
-    line-height: 1.65;
-    color: #6b7280;
-    max-width: 400px;
-    margin-bottom: 24px;
-
-    .ent-empty--dark & {
-      color: #9ca3af;
-    }
-  }
-
-  // fact chips "row"
-  &__chips {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    justify-content: center;
-    margin-bottom: 32px;
-  }
-
-  &__chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: #6b7280;
-    background: #f3f4f6;
-    border: 1px solid #e5e7eb;
-    border-radius: 20px;
-    padding: 4px 12px;
-
-    &--dark {
-      color: #9ca3af;
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(255, 255, 255, 0.1);
-    }
-  }
-
-  &__btn {
-    height: 40px;
-    padding: 0 24px;
-    font-size: 0.92rem;
-    font-weight: 600;
-    margin-bottom: 36px;
-  }
-
-  &__providers {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  &__providers-label {
-    font-size: 0.78rem;
-    font-weight: 500;
-    color: #aaa;
-    white-space: nowrap;
-
-    .ent-empty--dark & {
-      color: #666;
-    }
-  }
-
-  &__providers-logos {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  &__logo-wrap {
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    cursor: default;
-    opacity: 0.65;
-    transition: opacity 0.15s;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-
-  &__logo {
-    width: 28px;
-    height: 28px;
-    max-width: 28px;
-    max-height: 28px;
-    object-fit: contain;
-    display: block;
-  }
-}
-
-// ── Configured card ───────────────────────────────────────────────────────────
-.storage-card {
-  border-radius: 12px;
-
-  &--dark {
-    background: #1e1e1e;
-  }
-}
-
-.storage-detail-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px 32px;
-}
-
-.storage-field {
-  &__label {
-    font-size: 0.75rem;
-    color: #6b7280;
-    text-transform: capitalize;
-    margin-bottom: 3px;
-    font-weight: 500;
-  }
-
-  &__value {
-    font-size: 0.9rem;
-    color: var(--o2-text-primary);
-    word-break: break-all;
-  }
+.feature-card:hover {
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
 }
 </style>
