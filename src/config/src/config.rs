@@ -1689,6 +1689,10 @@ pub struct Limit {
     // them), so cached entries need no invalidation. 0 disables the cache.
     #[env_config(name = "ZO_METRICS_LABEL_CACHE_MAX_ENTRIES", default = 262144)]
     pub metrics_label_cache_max_entries: usize,
+    // Skip loading series labels entirely when the query provably discards
+    // them, e.g. `sum(rate(m[5m]))` without a by()/without() modifier.
+    #[env_config(name = "ZO_METRICS_SKIP_UNUSED_LABELS", default = true)]
+    pub metrics_skip_unused_labels: bool,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
