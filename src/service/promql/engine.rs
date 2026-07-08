@@ -51,7 +51,7 @@ use promql_parser::{
 use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
 use super::{
-    PromqlContext,
+    PromqlContext, label_cache,
     utils::{apply_label_selector, apply_matchers},
 };
 use crate::service::promql::{
@@ -60,13 +60,15 @@ use crate::service::promql::{
 #[cfg(feature = "enterprise")]
 use crate::service::search::SEARCH_SERVER;
 
-type TokioResult = tokio::task::JoinHandle<Result<(HashMap<u64, Vec<Sample>>, HashSet<i64>)>>;
-type TokioExemplarsResult =
-    tokio::task::JoinHandle<Result<(HashMap<u64, Vec<Arc<Exemplar>>>, HashSet<i64>)>>;
+type TokioResult = tokio::task::JoinHandle<Result<HashMap<u64, Vec<Sample>>>>;
+type TokioExemplarsResult = tokio::task::JoinHandle<Result<HashMap<u64, Vec<Arc<Exemplar>>>>>;
 
 // Constants for optimization thresholds
 const OPTIMIZATION_STEP_LOOKBACK_MULTIPLIER: i64 = 5;
 const OPTIMIZATION_MAX_STEPS: i64 = 30;
+// Upper bound on the number of series hashes put into an in-list filter when
+// narrowing the label scan to cache-missed series.
+const MAX_HASH_INLIST_FILTER: usize = 8192;
 
 pub struct Engine {
     trace_id: String,
@@ -1348,7 +1350,7 @@ async fn selector_load_data_from_datafusion(
     }
 
     // get label columns
-    let mut label_cols = df_group
+    let mut label_col_names = df_group
         .schema()
         .fields()
         .iter()
@@ -1357,18 +1359,17 @@ async fn selector_load_data_from_datafusion(
             if name == TIMESTAMP_COL_NAME || name == VALUE_LABEL || name == EXEMPLARS_LABEL {
                 None
             } else {
-                Some(name)
+                Some(name.to_string())
             }
         })
         .collect::<Vec<_>>();
     // sort labels to have a consistent order
-    label_cols.sort();
-    let label_cols = label_cols.into_iter().map(col).collect::<Vec<_>>();
+    label_col_names.sort();
 
     // get hash & timestamp
     let start1 = std::time::Instant::now();
     let hash_field_type = schema.field_with_name(HASH_LABEL).unwrap().data_type();
-    let (mut metrics, timestamp_set) = if query_ctx.query_exemplars {
+    let mut metrics = if query_ctx.query_exemplars {
         load_exemplars_from_datafusion(&query_ctx.trace_id, hash_field_type, df_group.clone())
             .await?
     } else {
@@ -1376,130 +1377,209 @@ async fn selector_load_data_from_datafusion(
     };
 
     log::info!(
-        "[trace_id: {}] load hashing and sample took: {:?}, metrics count: {}, timestamp count: {}",
+        "[trace_id: {}] load hashing and sample took: {:?}, metrics count: {}",
         query_ctx.trace_id,
         start1.elapsed(),
         metrics.len(),
-        timestamp_set.len()
     );
 
-    // get series
+    // Series labels are immutable — the series hash is derived from them at
+    // ingest time — so serve them from the process-wide cache and scan the
+    // label columns only for series that are not cached yet.
     let start2 = std::time::Instant::now();
-    let series =
-        if config::get_config().limit.metrics_inlist_filter_enabled || timestamp_set.is_empty() {
-            df_group
-                .clone()
+    let label_cache = label_cache::LABEL_CACHE.as_ref();
+    let ctx_fp = label_cache::context_fingerprint(&query_ctx.org_id, table_name, &label_col_names);
+    // hashes that already have labels; the extraction loop below skips them
+    let mut hash_label_set: HashSet<u64> = HashSet::with_capacity(metrics.len());
+    let mut missing_hashes: Vec<u64> = Vec::new();
+    if let Some(cache) = label_cache {
+        for (hash, range_val) in metrics.iter_mut() {
+            match cache.get(ctx_fp, *hash) {
+                Some(labels) => {
+                    range_val.labels = if query_ctx.query_data {
+                        let mut with_hash = Vec::with_capacity(labels.len() + 1);
+                        with_hash.push(Arc::new(Label {
+                            name: HASH_LABEL.to_string(),
+                            value: hash.to_string(),
+                        }));
+                        with_hash.extend(labels.iter().cloned());
+                        with_hash
+                    } else {
+                        labels
+                    };
+                    hash_label_set.insert(*hash);
+                }
+                None => missing_hashes.push(*hash),
+            }
+        }
+    } else {
+        missing_hashes.extend(metrics.keys().copied());
+    }
+    let cache_hits = hash_label_set.len();
+
+    if !missing_hashes.is_empty() {
+        // Each missing series has a row at its own max timestamp, so scanning
+        // those timestamps yields at least one label row per missing series.
+        let series_timestamps = missing_hashes
+            .iter()
+            .filter_map(|hash| {
+                let range_val = metrics.get(hash)?;
+                let sample_max = range_val.samples.iter().map(|s| s.timestamp).max();
+                let exemplar_max = range_val
+                    .exemplars
+                    .as_ref()
+                    .and_then(|v| v.iter().map(|e| e.timestamp).max());
+                sample_max.max(exemplar_max)
+            })
+            .collect::<Vec<_>>();
+
+        let mut df_series = df_group;
+        // narrow the scan to the missing series when the hash column allows
+        // building an in-list filter of reasonable size
+        if label_cache.is_some()
+            && hash_field_type == &DataType::UInt64
+            && missing_hashes.len() <= MAX_HASH_INLIST_FILTER
+        {
+            df_series = df_series.filter(col(HASH_LABEL).in_list(
+                missing_hashes.iter().map(|&v| lit(v)).collect::<Vec<_>>(),
+                false,
+            ))?;
+        }
+        let label_cols = label_col_names
+            .iter()
+            .map(|name| col(name.as_str()))
+            .collect::<Vec<_>>();
+        let series = if config::get_config().limit.metrics_inlist_filter_enabled
+            || series_timestamps.is_empty()
+        {
+            df_series
                 .filter(col(TIMESTAMP_COL_NAME).in_list(
-                    timestamp_set.iter().map(|&v| lit(v)).collect::<Vec<_>>(),
+                    series_timestamps.iter().map(|&v| lit(v)).collect::<Vec<_>>(),
                     false,
                 ))?
                 .select(label_cols)?
                 .collect()
                 .await?
         } else {
-            let min = timestamp_set.iter().min().unwrap();
-            let max = timestamp_set.iter().max().unwrap();
-            df_group
-                .clone()
+            let min = series_timestamps.iter().min().unwrap();
+            let max = series_timestamps.iter().max().unwrap();
+            df_series
                 .filter(col(TIMESTAMP_COL_NAME).between(lit(*min), lit(*max)))?
                 .select(label_cols)?
                 .collect()
                 .await?
         };
 
-    log::info!(
-        "[trace_id: {}] load all labels took: {:?}",
-        query_ctx.trace_id,
-        start2.elapsed()
-    );
-
-    let mut labels = Vec::new();
-    let mut hash_label_set: HashSet<u64> = HashSet::with_capacity(metrics.len());
-    for batch in series {
-        let columns = batch.columns();
-        let schema = batch.schema();
-        let fields = schema.fields();
-        let cols = fields
-            .iter()
-            .zip(columns)
-            .filter_map(|(field, col)| {
-                if field.name() == HASH_LABEL {
-                    None
-                } else {
-                    col.as_any()
-                        .downcast_ref::<StringArray>()
-                        .map(|col| (field.name(), col))
-                }
-            })
-            .collect::<Vec<(_, _)>>();
-        if hash_field_type == &DataType::UInt64 {
-            let hash_values = batch
-                .column_by_name(HASH_LABEL)
-                .unwrap()
-                .as_any()
-                .downcast_ref::<UInt64Array>()
-                .unwrap();
-            for i in 0..batch.num_rows() {
-                let hash = hash_values.value(i);
-                if hash_label_set.contains(&hash) {
-                    continue;
-                }
-                labels.clear(); // reset and reuse the same vector
-                if query_ctx.query_data {
-                    labels.push(Arc::new(Label {
-                        name: HASH_LABEL.to_string(),
-                        value: hash.to_string(),
-                    }));
-                }
-                for (name, value) in cols.iter() {
-                    if value.is_null(i) {
+        for batch in series {
+            let columns = batch.columns();
+            let schema = batch.schema();
+            let fields = schema.fields();
+            let cols = fields
+                .iter()
+                .zip(columns)
+                .filter_map(|(field, col)| {
+                    if field.name() == HASH_LABEL {
+                        None
+                    } else {
+                        col.as_any()
+                            .downcast_ref::<StringArray>()
+                            .map(|col| (field.name(), col))
+                    }
+                })
+                .collect::<Vec<(_, _)>>();
+            if hash_field_type == &DataType::UInt64 {
+                let hash_values = batch
+                    .column_by_name(HASH_LABEL)
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<UInt64Array>()
+                    .unwrap();
+                for i in 0..batch.num_rows() {
+                    let hash = hash_values.value(i);
+                    if hash_label_set.contains(&hash) {
                         continue;
                     }
-                    labels.push(Arc::new(Label {
-                        name: name.to_string(),
-                        value: value.value(i).to_string(),
-                    }));
+                    let Some(range_val) = metrics.get_mut(&hash) else {
+                        continue;
+                    };
+                    let mut labels = Vec::with_capacity(cols.len());
+                    for (name, value) in cols.iter() {
+                        if value.is_null(i) {
+                            continue;
+                        }
+                        labels.push(Arc::new(Label {
+                            name: name.to_string(),
+                            value: value.value(i).to_string(),
+                        }));
+                    }
+                    hash_label_set.insert(hash);
+                    if let Some(cache) = label_cache {
+                        cache.put(ctx_fp, hash, labels.clone());
+                    }
+                    range_val.labels = if query_ctx.query_data {
+                        let mut with_hash = Vec::with_capacity(labels.len() + 1);
+                        with_hash.push(Arc::new(Label {
+                            name: HASH_LABEL.to_string(),
+                            value: hash.to_string(),
+                        }));
+                        with_hash.extend(labels);
+                        with_hash
+                    } else {
+                        labels
+                    };
                 }
-                hash_label_set.insert(hash);
-                if let Some(range_val) = metrics.get_mut(&hash) {
-                    range_val.labels = labels.clone();
-                }
-            }
-        } else {
-            let hash_values = batch
-                .column_by_name(HASH_LABEL)
-                .unwrap()
-                .as_any()
-                .downcast_ref::<StringArray>()
-                .unwrap();
-            for i in 0..batch.num_rows() {
-                let hash: u64 = gxhash::new().sum64(hash_values.value(i));
-                if hash_label_set.contains(&hash) {
-                    continue;
-                }
-                labels.clear(); // reset and reuse the same vector
-                if query_ctx.query_data {
-                    labels.push(Arc::new(Label {
-                        name: HASH_LABEL.to_string(),
-                        value: hash.to_string(),
-                    }));
-                }
-                for (name, value) in cols.iter() {
-                    if value.is_null(i) {
+            } else {
+                let hash_values = batch
+                    .column_by_name(HASH_LABEL)
+                    .unwrap()
+                    .as_any()
+                    .downcast_ref::<StringArray>()
+                    .unwrap();
+                for i in 0..batch.num_rows() {
+                    let hash: u64 = gxhash::new().sum64(hash_values.value(i));
+                    if hash_label_set.contains(&hash) {
                         continue;
                     }
-                    labels.push(Arc::new(Label {
-                        name: name.to_string(),
-                        value: value.value(i).to_string(),
-                    }));
-                }
-                hash_label_set.insert(hash);
-                if let Some(range_val) = metrics.get_mut(&hash) {
-                    range_val.labels = labels.clone();
+                    let Some(range_val) = metrics.get_mut(&hash) else {
+                        continue;
+                    };
+                    let mut labels = Vec::with_capacity(cols.len());
+                    for (name, value) in cols.iter() {
+                        if value.is_null(i) {
+                            continue;
+                        }
+                        labels.push(Arc::new(Label {
+                            name: name.to_string(),
+                            value: value.value(i).to_string(),
+                        }));
+                    }
+                    hash_label_set.insert(hash);
+                    if let Some(cache) = label_cache {
+                        cache.put(ctx_fp, hash, labels.clone());
+                    }
+                    range_val.labels = if query_ctx.query_data {
+                        let mut with_hash = Vec::with_capacity(labels.len() + 1);
+                        with_hash.push(Arc::new(Label {
+                            name: HASH_LABEL.to_string(),
+                            value: hash.to_string(),
+                        }));
+                        with_hash.extend(labels);
+                        with_hash
+                    } else {
+                        labels
+                    };
                 }
             }
         }
     }
+
+    log::info!(
+        "[trace_id: {}] load all labels took: {:?}, label cache hits: {}, misses: {}",
+        query_ctx.trace_id,
+        start2.elapsed(),
+        cache_hits,
+        missing_hashes.len(),
+    );
 
     log::info!(
         "[trace_id: {}] load data from datafusion took: {:?}",
@@ -1514,7 +1594,7 @@ async fn load_samples_from_datafusion(
     trace_id: &str,
     hash_field_type: &DataType,
     df: DataFrame,
-) -> Result<(HashMap<u64, RangeValue>, HashSet<i64>)> {
+) -> Result<HashMap<u64, RangeValue>> {
     let ctx = Arc::new(df.task_ctx());
     let target_partitions = ctx.session_config().target_partitions();
     let plan = df
@@ -1594,25 +1674,17 @@ async fn load_samples_from_datafusion(
                     }
                 }
             }
-            let mut unique_timestamps: HashSet<i64> = HashSet::new();
-            for (_, samples) in &series {
-                if let Some(min_timestamp) = samples.iter().map(|s| s.timestamp).max() {
-                    unique_timestamps.insert(min_timestamp);
-                }
-            }
-            Ok((series, unique_timestamps))
+            Ok(series)
         });
         tasks.push(task);
     }
 
     // collect results
-    let mut all_unique_timestamps: HashSet<i64> = HashSet::new();
     let mut metrics: HashMap<u64, RangeValue> = HashMap::new();
     for task in tasks {
-        let (m, timestamps) = task
+        let m = task
             .await
             .map_err(|e| DataFusionError::Execution(e.to_string()))??;
-        all_unique_timestamps.extend(timestamps);
         for (hash, samples) in m {
             metrics.insert(
                 hash,
@@ -1626,14 +1698,14 @@ async fn load_samples_from_datafusion(
         }
     }
 
-    Ok((metrics, all_unique_timestamps))
+    Ok(metrics)
 }
 
 async fn load_exemplars_from_datafusion(
     trace_id: &str,
     hash_field_type: &DataType,
     df: DataFrame,
-) -> Result<(HashMap<u64, RangeValue>, HashSet<i64>)> {
+) -> Result<HashMap<u64, RangeValue>> {
     let ctx = Arc::new(df.task_ctx());
     let target_partitions = ctx.session_config().target_partitions();
     let plan = df
@@ -1721,25 +1793,17 @@ async fn load_exemplars_from_datafusion(
                     }
                 }
             }
-            let mut unique_timestamps: HashSet<i64> = HashSet::new();
-            for (_, samples) in &series {
-                if let Some(min_timestamp) = samples.iter().map(|s| s.timestamp).max() {
-                    unique_timestamps.insert(min_timestamp);
-                }
-            }
-            Ok((series, unique_timestamps))
+            Ok(series)
         });
         tasks.push(task);
     }
 
     // collect results
-    let mut all_unique_timestamps: HashSet<i64> = HashSet::new();
     let mut metrics: HashMap<u64, RangeValue> = HashMap::new();
     for task in tasks {
-        let (m, timestamps) = task
+        let m = task
             .await
             .map_err(|e| DataFusionError::Execution(e.to_string()))??;
-        all_unique_timestamps.extend(timestamps);
         for (hash, exemplars) in m {
             metrics.insert(
                 hash,
@@ -1753,7 +1817,7 @@ async fn load_exemplars_from_datafusion(
         }
     }
 
-    Ok((metrics, all_unique_timestamps))
+    Ok(metrics)
 }
 
 fn get_offset_modifier(offset: Option<Offset>) -> i64 {
