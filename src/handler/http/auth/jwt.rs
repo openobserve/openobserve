@@ -64,6 +64,17 @@ pub async fn process_token(
 
     let user_email = res.0.user_email.to_owned();
 
+    // System-wide blocklist — external identities are (re)provisioned here (SSO login AND the
+    // `/token` exchange). Deny early, before any create/update, so a blocked SSO principal cannot
+    // reappear on the next login. Everything provisioned in this fn is `is_external: true`.
+    if matches!(
+        o2_enterprise::enterprise::domain_management::evaluate_cached(&user_email).await,
+        o2_enterprise::enterprise::domain_management::meta::AccessDecision::Deny
+    ) {
+        log::warn!("Blocked external identity denied at token processing: {user_email}");
+        return Err(anyhow::anyhow!("User is blocked"));
+    }
+
     let name = match dec_token.claims.get("name") {
         None => res.0.user_email.to_owned(),
         Some(name) => name.as_str().unwrap().to_string(),

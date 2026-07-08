@@ -240,6 +240,20 @@ pub async fn init() -> Result<(), anyhow::Error> {
         });
     }
 
+    // Domain management (allow-list + blocklist) is enforced in the auth path —
+    // `validate_credentials`, `validate_credentials_ext` and `process_token` — which runs on
+    // ALL node roles, including single-role routers. Initialize and watch its cache BEFORE the
+    // router early-return below so a router keeps the blocklist fresh; otherwise its cache
+    // would go stale and a newly-blocked user could keep authenticating/ingesting through that
+    // router.
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::domain_management::db::cache()
+            .await
+            .expect("domain management cache failed");
+        tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
+    }
+
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
@@ -277,8 +291,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::alerts::realtime_triggers::watch());
     tokio::task::spawn(db::alerts::alert::watch());
     tokio::task::spawn(db::organization::org_settings_watch());
-    #[cfg(feature = "enterprise")]
-    tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
+    // Watch needed on queriers (UI APIs) and on whichever node role is the configured
+    // processing node (ingester or compactor) so their local cache stays in sync with
+    // coordinator events emitted by the flusher.
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(db::ai_prompts::watch());
     // Service streams watch only needed on queriers - they serve the UI APIs
@@ -334,10 +349,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::alerts::alert::cache()
         .await
         .expect("alerts cache failed");
-    #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::domain_management::db::cache()
-        .await
-        .expect("domain management cache failed");
+    // Warm the cache on queriers (UI APIs) and on whichever node role is the configured
+    // processing node so that get_coverage_deficit returns accurate data from startup
+    // rather than always returning (0, 0) until files happen to be processed.
     #[cfg(feature = "enterprise")]
     db::ai_prompts::cache()
         .await

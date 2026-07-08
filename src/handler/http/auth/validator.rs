@@ -151,6 +151,23 @@ pub async fn validate_token(token: &str, org_id: &str) -> Result<(), Error> {
     }
 }
 
+/// System-wide domain-management blocklist check.
+///
+/// Denies **external SSO identities** (users AND SSO/token service accounts) that are on the
+/// blocklist — covering UI/API session tokens, external static tokens, and passcode ingestion. The
+/// `is_external` short-circuit means native/internal principals (incl. root, which is internal)
+/// skip the cache lookup entirely. Kept as one helper so the three validator call sites stay
+/// identical.
+#[cfg(feature = "enterprise")]
+async fn blocked_external(user: &config::meta::user::User) -> bool {
+    use o2_enterprise::enterprise::domain_management::{self, meta::AccessDecision};
+    user.is_external
+        && matches!(
+            domain_management::evaluate_cached(&user.email).await,
+            AccessDecision::Deny
+        )
+}
+
 pub async fn validate_credentials(
     user_id: &str,
     user_password: &str,
@@ -243,6 +260,17 @@ pub async fn validate_credentials(
         }
     }
     let user = user.unwrap();
+
+    // System-wide blocklist — deny external SSO identities before any token/password branch, so it
+    // also covers external service-account static tokens and ingestion. Native/internal untouched.
+    #[cfg(feature = "enterprise")]
+    if blocked_external(&user).await {
+        log::warn!(
+            "Blocked external identity attempted API/ingest access: {}",
+            user.email
+        );
+        return Ok(TokenValidationResponse::default());
+    }
 
     #[cfg(feature = "enterprise")]
     {
@@ -420,6 +448,16 @@ pub async fn validate_credentials_ext(
         return Ok(TokenValidationResponse::default());
     }
     let user = user.unwrap();
+
+    // System-wide blocklist — this is the `auth_ext` / passcode-ingestion path (req #6). Deny
+    // blocked external SSO service accounts here too. This fn is already enterprise-gated.
+    if blocked_external(&user).await {
+        log::warn!(
+            "Blocked external identity attempted passcode/ingest access: {}",
+            user.email
+        );
+        return Ok(TokenValidationResponse::default());
+    }
 
     let hashed_pass = get_hash(
         &format!(
