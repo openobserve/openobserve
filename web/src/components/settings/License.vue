@@ -134,6 +134,12 @@
                 label="Add New License Key"
                 @click="showUpdateFormAndFocus"
               />
+              <q-btn
+                no-caps
+                class="o2-primary-button"
+                label="Refresh License limits"
+                @click="triggerLimitRefresh"
+              />
             </div>
           </q-card-section>
         </q-card>
@@ -348,6 +354,23 @@ export default defineComponent({
       }, 100);
     };
 
+     const triggerLimitRefresh = async ()=>{
+       try {
+        await licenseServer.refresh_license_limits();
+        $q.notify({
+          type: "positive",
+          message: "License limit refresh triggered successfully",
+        });
+      } catch (error) {
+        console.error("Error refreshing license:", error);
+        $q.notify({
+          type: "negative",
+          message: "Failed to refresh license limits :" +
+            (error?.response?.data?.message || "unexpected error"),
+        });
+      }
+    }
+
     const maskKey = (key: string) => {
       if (!key) return '';
       if (key.length <= 10) return key; // If key is too short, show as is
@@ -498,6 +521,7 @@ export default defineComponent({
       showLicenseExpiryWarning,
       getLicenseExpiryMessage,
       showUpdateFormAndFocus,
+      triggerLimitRefresh,
       maskKey,
       getMaskedLicenseKey,
       copyLicenseKey,
