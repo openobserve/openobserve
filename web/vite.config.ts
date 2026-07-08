@@ -170,7 +170,7 @@ export default defineConfig(({ mode }) => {
           (match, namespace) => {
             const isAllowed = allowedGroups.some((group) => {
               if (group.endsWith("*"))
-                return namespace.startsWith(group.replace("*", ""));
+                return namespace.startsWith(group.slice(0, -1));
               return namespace === group || namespace.startsWith(`${group}:`);
             });
             // `false &&` instead of commenting out: multi-line calls stay
