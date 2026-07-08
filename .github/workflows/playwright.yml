@@ -258,6 +258,7 @@ jobs:
               "reportsScheduleLater.spec.js",
               "reportFolders.spec.js",
               "reports-bulk-operations.spec.js",
+              "reportCsvMediaType.spec.js",
               ]
           - testfolder: "Streams"
             browser: "chrome"

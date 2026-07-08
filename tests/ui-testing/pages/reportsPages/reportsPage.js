@@ -20,6 +20,26 @@ export class ReportsPage {
     this.titleInput = page.locator("[aria-label='Title *']");
     this.recipientsInput = page.locator("[aria-label='Recipients *']");
     this.saveButton = page.locator('[data-test="add-report-save-btn"]');
+
+    // ── Report Format section (CSV media type feature) ─────────────────────
+    // v0.80.0 uses a raw Quasar q-select (not OSelect), so options are rendered
+    // as role="option" q-items and there is no data-test-selected-value/data-test-value
+    // stamping. Match the section wrapper for the trigger + text, and options by role+label.
+    this.reportFormatSection = page.locator('[data-test="add-report-format-section"]');
+    this.reportTypeSelect = page.locator('[data-test="add-report-type-select"]');
+    this.reportTypeTrigger = page.locator('[data-test="add-report-type-select"] .q-field__control');
+    this.reportTypeLabelMap = { csv: 'CSV (Data)', pdf: 'PDF (default)', png: 'PNG (Image)' };
+    this.reportTypeOption = (value) => page.getByRole('option', { name: this.reportTypeLabelMap[value] || value, exact: true });
+    this.attachmentTypeSelect = page.locator('[data-test="add-report-attachment-type-select"]');
+    this.customDimensionsSection = page.locator('[data-test="add-report-custom-dimensions-section"]');
+    this.pngNoteBanner = page.locator('[data-test="add-report-png-note"]');
+
+    // ── Report-list search + edit shims (v0.80.0-compatible) ───────────────
+    // The generated CSV spec expects `reportSearchInputField` + `editReportBtn`
+    // helpers (introduced on main). Wire them to the v0.80.0 selectors.
+    this.reportSearchInputField = page.locator('[data-test="report-list-search-input"]');
+    this.editReportBtn = (reportName) => page.locator(`[data-test="report-list-${reportName}-edit-report"]`);
+
     this.successAlert = page.getByRole('alert').nth(1);
     this.dateTimeButton = dateTimeButtonLocator;
     this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
@@ -93,8 +113,10 @@ export class ReportsPage {
     await this.dashboardInput.dblclick({ force: true });
     await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
     await this.dashboardInput.fill(dashboardName);
-    await this.page.waitForTimeout(2000);
-    await this.page.getByRole('option', { name: dashboardName }).locator('div').nth(2).click({ force: true });
+    // Wait for the option to appear before clicking (dashboard search can be slow).
+    const option = this.page.getByRole('option', { name: dashboardName });
+    await option.first().waitFor({ state: 'visible', timeout: 30000 });
+    await option.locator('div').nth(2).click({ force: true });
   }
 
   async createReportDashboardTabInput() {
@@ -191,10 +213,10 @@ export class ReportsPage {
   }
 
   async verifyReportCreated(reportName) {
-    // Wait for save success alert (reports API takes 10-11 seconds)
-    await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 15000 });
+    // Wait for save success alert (reports API takes 10-11 seconds).
+    // Filter directly on the success text so stale error alerts don't shadow it.
     const saveAlert = this.page.getByRole('alert').filter({ hasText: 'Report saved successfully.' });
-    await expect(saveAlert).toBeVisible({ timeout: 5000 });
+    await expect(saveAlert).toBeVisible({ timeout: 30000 });
 
     // Navigate to reports list to verify report exists
     await this.page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=" + process.env["ORGNAME"]);
@@ -343,8 +365,70 @@ async notAvailableReport(reportName) {
   await this.page.locator('[data-test="report-list-search-input"]').fill(reportName);
   await this.page.waitForSelector('[data-test="report-list-table"]');
   await expect(this.page.locator('[data-test="report-list-table"]')).toContainText('No data available');
- 
+
 }
+
+  // ── Report Format section helpers (CSV media type feature) ──────────────
+
+  async selectReportType(value) {
+    // v0.80.0 renders a raw Quasar q-select. Open the dropdown by clicking the
+    // .q-field__control inside the section, then click the option by role+label.
+    await this.reportTypeTrigger.waitFor({ state: 'visible', timeout: 10000 });
+    await this.reportTypeTrigger.click();
+    const opt = this.reportTypeOption(value);
+    await opt.waitFor({ state: 'visible', timeout: 10000 });
+    await opt.click();
+    await opt.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await this.page.waitForTimeout(300);
+  }
+
+  async selectDashboardDefaults(dashboardName) {
+    await this.createReportFolderInput();
+    await this.createReportDashboardInput(dashboardName);
+    await this.createReportDashboardTabInput();
+  }
+
+  async expectReportFormatSectionVisible() {
+    await expect(this.reportFormatSection).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectAttachmentTypeVisible() {
+    await expect(this.attachmentTypeSelect).toBeVisible({ timeout: 5000 });
+  }
+
+  async expectAttachmentTypeHidden() {
+    await expect(this.attachmentTypeSelect).not.toBeVisible({ timeout: 5000 });
+  }
+
+  async expectCustomDimensionsVisible() {
+    await expect(this.customDimensionsSection).toBeVisible({ timeout: 5000 });
+  }
+
+  async expectCustomDimensionsHidden() {
+    await expect(this.customDimensionsSection).not.toBeVisible({ timeout: 5000 });
+  }
+
+  async expectPngNoteVisible() {
+    await expect(this.pngNoteBanner).toBeVisible({ timeout: 5000 });
+  }
+
+  async expectPngNoteHidden() {
+    await expect(this.pngNoteBanner).not.toBeVisible({ timeout: 5000 });
+  }
+
+  async expectReportTypeOptionVisible(value) {
+    await this.reportTypeTrigger.waitFor({ state: 'visible', timeout: 10000 });
+    await this.reportTypeTrigger.click();
+    const opt = this.reportTypeOption(value);
+    await expect(opt).toBeVisible({ timeout: 5000 });
+    await this.page.keyboard.press('Escape');
+    await opt.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+  }
+
+  async expectReportTypeOptionSelected(value) {
+    const expectedLabel = this.reportTypeLabelMap[value] || value;
+    await expect(this.reportTypeSelect).toContainText(expectedLabel, { timeout: 10000 });
+  }
 
 }
 
