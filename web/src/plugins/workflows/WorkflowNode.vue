@@ -51,9 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="wf-node-title tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!">
         {{ meta ? t(meta.titleKey) : data?.node_type }}
       </div>
-      <div class="wf-node-sub tw:text-[12px]! tw:leading-[1.3]!">
-        {{ bodySummary }}
-      </div>
     </div>
 
     <!-- hover actions (delete) — trigger is fixed -->
@@ -163,47 +160,6 @@ const pluses = computed(() => {
   return [{ handle: "out", cls: "wf-plus-out", tag: "" }];
 });
 
-const complete = computed(() => {
-  const d = props.data || {};
-  switch (d.node_type) {
-    case "workflow_trigger":
-      return true;
-    case "condition":
-      return !!(d.conditions || (d.field && d.operator));
-    case "function":
-      return !!(d.name || d.vrl);
-    case "remote_stream":
-      return !!d.destination_name;
-    default:
-      return true;
-  }
-});
-
-const bodySummary = computed(() => {
-  const d = props.data || {};
-  switch (d.node_type) {
-    case "workflow_trigger": {
-      const count = Array.isArray(d.alert_ids) ? d.alert_ids.length : 0;
-      return count
-        ? t("workflow.node.triggerLinked", { count })
-        : t("workflow.node.triggerBody");
-    }
-    case "condition":
-      return complete.value
-        ? t("workflow.node.conditionBodySet")
-        : t("workflow.node.conditionBody");
-    case "function":
-      return d.name
-        ? t("workflow.node.functionBodySet", { name: d.name })
-        : t("workflow.node.functionBody");
-    case "remote_stream":
-      return d.destination_name
-        ? t("workflow.node.destinationBodySet", { name: d.destination_name })
-        : t("workflow.node.destinationBody");
-    default:
-      return "";
-  }
-});
 
 const onClick = () => editNode(props.id);
 </script>
@@ -222,10 +178,6 @@ const onClick = () => editNode(props.id);
 }
 .wf-node-title {
   text-align: left;
-  white-space: nowrap;
-}
-.wf-node-sub {
-  color: var(--o2-text-secondary, #6b7280);
   white-space: nowrap;
 }
 

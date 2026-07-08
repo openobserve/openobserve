@@ -85,11 +85,10 @@ const { addNodeAfter, closeStepPicker } = useWorkflowCanvas();
 
 const meta = (nt: string) => nodeMeta(nt);
 
-// Tint the icon square per category (trigger amber / logic blue / action green).
+// Tint the icon square to match the canvas node colours: steps (condition /
+// function) = amber, action (destination) = green.
 const iconTint = (nt: string) => {
   switch (nodeMeta(nt)?.category) {
-    case "logic":
-      return "tw:bg-[#eef1fe] tw:text-[#4f6bed]";
     case "action":
       return "tw:bg-[#e6f6ee] tw:text-[#1f9d63]";
     default:

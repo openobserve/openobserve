@@ -89,18 +89,18 @@ export const WORKFLOW_NODE_TYPES: Record<string, WorkflowNodeMeta> = {
   // NodeData::RemoteStream ({ org_id, destination_name }) that forwards records
   // to a Pipeline (remote) Destination, the same node the pipeline "External
   // Destination" uses. v1 reuses this instead of a new alert-dispatch node;
-  // backend just needs to add RemoteStream to `is_workflow_node()`. User-facing
-  // label stays "Send To Destination".
+  // backend just needs to add RemoteStream to `is_workflow_node()`.
   //
-  // `ioType: "default"` (not "output") so an action isn't a dead end — it has
-  // an output handle + hover-`+` and can chain onward.
+  // `ioType: "output"` — for v1 the destination is a terminal *leaf* (green, no
+  // output handle / hover-`+`), matching the backend's "leaves must be
+  // Stream/RemoteStream" rule.
   remote_stream: {
     category: "action",
     kindKey: "workflow.node.kindAction",
     titleKey: "workflow.node.sendToDestination",
     descKey: "workflow.node.destinationDesc",
     icon: "share",
-    ioType: "default",
+    ioType: "output",
   },
 };
 
@@ -194,6 +194,8 @@ const defaultObject = {
   // Step picker (the searchable "add next step" dialog). The hover-`+` opens it
   // with the source node + handle; picking a type calls addNodeAfter.
   stepPicker: { show: false, source: "", handle: "out" },
+  // Node type currently being dragged from the palette (drag-and-drop add).
+  draggedNodeType: "",
   currentSelectedWorkflow: <any>JSON.parse(JSON.stringify(defaultWorkflow)),
   workflowWithoutChange: <any>JSON.parse(JSON.stringify(defaultWorkflow)),
   nameError: false,
@@ -362,6 +364,97 @@ export default function useWorkflowCanvas() {
     workflowObj.stepPicker = { show: false, source: "", handle: "out" };
   }
 
+  // The node at the end of the chain (no outgoing edge) — the palette appends
+  // after it. If the graph branches (multiple leaves), pick the bottom-most.
+  function endNodeId(): string | undefined {
+    const wf = workflowObj.currentSelectedWorkflow;
+    const nodes = wf.nodes || [];
+    if (!nodes.length) return undefined;
+    const sources = new Set((wf.edges || []).map((e: any) => e.source));
+    const leaves = nodes.filter((n: any) => !sources.has(n.id));
+    const pool = leaves.length ? leaves : nodes;
+    return pool.reduce((a: any, b: any) =>
+      (b.position?.y ?? 0) > (a.position?.y ?? 0) ? b : a,
+    ).id;
+  }
+
+  // A terminal node (output io_type, e.g. Destination) can't have children — the
+  // chain ends there. Used to block appending past it from the palette / drop.
+  function isTerminal(nodeId?: string): boolean {
+    if (!nodeId) return false;
+    const node = workflowObj.currentSelectedWorkflow.nodes.find(
+      (n: any) => n.id === nodeId,
+    );
+    return nodeMeta(node?.data?.node_type)?.ioType === "output";
+  }
+
+  // Palette add: append a node after the chain's end node (stages + opens the
+  // config drawer, same as the hover-`+`).
+  function addNodeToEnd(nodeType: string) {
+    const src = endNodeId();
+    if (!src) return;
+    if (isTerminal(src)) {
+      toast({
+        message: "This branch already ends in a Destination.",
+        variant: "warning",
+      });
+      return;
+    }
+    addNodeAfter(src, "out", nodeType);
+  }
+
+  // ── Drag & drop (palette → canvas) ──────────────────────────────────────────
+  function onDragStart(event: DragEvent, nodeType: string) {
+    if (event.dataTransfer) {
+      event.dataTransfer.setData("application/vueflow", nodeType);
+      event.dataTransfer.effectAllowed = "move";
+    }
+    workflowObj.draggedNodeType = nodeType;
+  }
+  function onDragOver(event: DragEvent) {
+    if (!workflowObj.draggedNodeType) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  }
+  // Drop: stage the node at the drop point, wired to the chain's end node (so it
+  // isn't an orphan), and open its config drawer — committed on Save.
+  function onDrop(event: DragEvent) {
+    const nodeType =
+      workflowObj.draggedNodeType ||
+      event.dataTransfer?.getData("application/vueflow") ||
+      "";
+    workflowObj.draggedNodeType = "";
+    const meta = nodeMeta(nodeType);
+    if (!meta) return;
+
+    const src = endNodeId();
+    if (isTerminal(src)) {
+      toast({
+        message: "This branch already ends in a Destination.",
+        variant: "warning",
+      });
+      return;
+    }
+
+    const flow = screenToFlowCoordinate({ x: event.clientX, y: event.clientY });
+    // Roughly center the node on the cursor (half a node card).
+    const position = { x: flow.x - 120, y: flow.y - 26 };
+
+    const id = getUUID();
+    workflowObj.currentSelectedNodeData = {
+      id,
+      type: meta.ioType,
+      position,
+      data: { label: id, node_type: nodeType },
+    };
+    workflowObj.pendingEdge = src ? { source: src, sourceHandle: undefined } : null;
+    workflowObj.currentSelectedNodeID = id;
+    workflowObj.isEditNode = false;
+    workflowObj.dialog.name = nodeType;
+    workflowObj.dialog.expand = false;
+    workflowObj.dialog.show = true;
+  }
+
   // Hover-`+` add: STAGE a node below `sourceId` and open its config drawer. The
   // node is NOT added to the canvas here — it's committed (added + auto-wired)
   // only when the drawer is saved (commitNode), or discarded on cancel
@@ -487,6 +580,11 @@ export default function useWorkflowCanvas() {
     openStepPicker,
     closeStepPicker,
     addNodeAfter,
+    addNodeToEnd,
+    endNodeId,
+    onDragStart,
+    onDragOver,
+    onDrop,
     commitNode,
     cancelNodeDrawer,
     editNode,

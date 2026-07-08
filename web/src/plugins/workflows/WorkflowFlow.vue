@@ -35,6 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @nodes-change="onNodesChange"
     @edges-change="onEdgesChange"
     @connect="onConnect"
+    @drop="onDrop"
+    @dragover="onDragOver"
   >
     <Background :size="2" :gap="22" pattern-color="#BDBDBD" />
 
@@ -66,6 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <Controls :show-interactive="false" class="controls-grp" position="top-left" />
+
+    <!-- Floating node palette, anchored bottom-left inside the canvas. -->
+    <Panel position="bottom-left" class="wf-palette-panel">
+      <WorkflowNodePalette />
+    </Panel>
   </VueFlow>
 
   <div
@@ -79,12 +86,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { VueFlow, useVueFlow } from "@vue-flow/core";
+import { VueFlow, useVueFlow, Panel } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import { useI18n } from "vue-i18n";
 import WorkflowNode from "./WorkflowNode.vue";
 import WorkflowEdge from "./WorkflowEdge.vue";
+import WorkflowNodePalette from "./WorkflowNodePalette.vue";
 import useWorkflowCanvas from "./useWorkflowCanvas";
 
 import "@vue-flow/core/dist/style.css";
@@ -92,8 +100,15 @@ import "@vue-flow/core/dist/theme-default.css";
 import "@vue-flow/controls/dist/style.css";
 
 const { t } = useI18n();
-const { workflowObj, onNodeChange, onNodesChange, onEdgesChange, onConnect } =
-  useWorkflowCanvas();
+const {
+  workflowObj,
+  onNodeChange,
+  onNodesChange,
+  onEdgesChange,
+  onConnect,
+  onDrop,
+  onDragOver,
+} = useWorkflowCanvas();
 
 const { onNodesInitialized, setViewport, viewport, dimensions, findNode } =
   useVueFlow();
@@ -154,29 +169,28 @@ defineExpose({ vueFlowRef });
   transition: none !important;
 }
 
-/* trigger (input) — amber */
+/* Node colours mirror PipelineEditor exactly: input=blue, default=amber,
+   output=green (same VueFlow node types). */
 .o2vf_node .vue-flow__node-input {
+  border: 1px solid #60a5fa;
+  color: #1f2937;
+  border-radius: 12px;
+  background: rgba(239, 246, 255, 0.8);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+}
+.o2vf_node .vue-flow__node-default {
   border: 1px solid #f59e0b;
   color: #1f2937;
   border-radius: 12px;
-  background: rgba(255, 251, 235, 0.85);
-  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.1);
+  background: rgba(255, 251, 235, 0.8);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.1);
 }
-/* logic (default) — blue/indigo */
-.o2vf_node .vue-flow__node-default {
-  border: 1px solid #4f6bed;
-  color: #1f2937;
-  border-radius: 12px;
-  background: rgba(238, 241, 254, 0.85);
-  box-shadow: 0 4px 12px rgba(79, 107, 237, 0.1);
-}
-/* action (output) — green */
 .o2vf_node .vue-flow__node-output {
-  border: 1px solid #1f9d63;
+  border: 1px solid rgba(74, 222, 128, 0.6);
   color: #1f2937;
   border-radius: 12px;
-  background: rgba(230, 246, 238, 0.9);
-  box-shadow: 0 2px 8px rgba(31, 157, 99, 0.1);
+  background: rgba(240, 253, 244, 1);
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
 }
 
 .o2vf_node .vue-flow__node.selected {
@@ -196,10 +210,7 @@ defineExpose({ vueFlowRef });
 .handle_default { background: #eef1fe !important; }
 .handle_output { background: #dcfce7 !important; }
 
-/* ── Dark mode ─────────────────────────────────────────────────────────────
-   Mirrors PipelineEditor's `.dark .vue-flow__node-*` overrides, but keeps our
-   category palette (trigger=amber, logic=blue, action=green). The `.dark` class
-   sits on an app-level ancestor (same as pipeline), so these apply globally. */
+/* ── Dark mode ── mirrors PipelineEditor's `.dark .vue-flow__node-*` values. */
 .dark .o2vf_node .vue-flow__node {
   background: rgba(30, 34, 45, 0.9) !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
@@ -207,22 +218,19 @@ defineExpose({ vueFlowRef });
 .dark .o2vf_node .vue-flow__node:hover {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
-/* trigger (input) — amber */
 .dark .o2vf_node .vue-flow__node-input {
-  background: rgba(120, 53, 15, 0.28) !important;
-  border-color: rgba(245, 158, 11, 0.45) !important;
+  background: rgba(30, 58, 138, 0.2) !important;
+  border-color: rgba(96, 165, 250, 0.3) !important;
   color: rgba(255, 255, 255, 0.9) !important;
 }
-/* logic (default) — blue/indigo */
 .dark .o2vf_node .vue-flow__node-default {
-  background: rgba(30, 41, 120, 0.3) !important;
-  border-color: rgba(129, 140, 248, 0.45) !important;
+  background: rgba(120, 53, 15, 0.2) !important;
+  border-color: rgba(251, 146, 60, 0.3) !important;
   color: rgba(255, 255, 255, 0.9) !important;
 }
-/* action (output) — green */
 .dark .o2vf_node .vue-flow__node-output {
-  background: rgba(20, 83, 45, 0.3) !important;
-  border-color: rgba(52, 211, 153, 0.45) !important;
+  background: rgba(20, 83, 45, 0.2) !important;
+  border-color: rgba(74, 222, 128, 0.3) !important;
   color: rgba(255, 255, 255, 0.9) !important;
 }
 /* handle ring blends with the dark canvas instead of a bright white ring */

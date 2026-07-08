@@ -241,15 +241,15 @@ const buildPayload = () => {
   };
 };
 
-// The trigger node is NodeData::WorkflowTrigger (a unit variant), so the
-// backend drops any extra fields inside `data`. The trigger kind is persisted
-// in the node's `meta` map instead (string values only). hydrateWorkflow
-// reverses this. (Alert association is handled separately, from the alert side.)
-// Emit only the fields the backend persists: id, position, data, and (when
-// present) meta / style. Everything else on the in-memory node is VueFlow
+// Emit only the fields the backend persists: id, io_type, position, data, and
+// (when present) meta / style. Everything else on the in-memory node is VueFlow
 // runtime state (`type`, `dimensions`, `handleBounds`, `computedPosition`,
-// `selected`, `dragging`, …) or the derived `io_type` — none of it is stored.
-// Node role is inferred from `node_type` + edges, so `io_type` isn't sent.
+// `selected`, `dragging`, …) and is dropped.
+//
+// `io_type` is derived from `node_type` (trigger=input, condition/function=
+// default, destination=output) — the same value VueFlow uses for the render
+// template (`node.type`). We send it because the backend `Node` struct requires
+// it (matches the pipeline payload); it isn't a source of truth.
 const serializeNode = (node: any) => {
   const nodeType = node?.data?.node_type;
   const data = { ...(node.data || {}) };
@@ -263,6 +263,7 @@ const serializeNode = (node: any) => {
 
   const out: any = {
     id: node.id,
+    io_type: node.type || "default",
     position: {
       x: node.position?.x ?? 0,
       y: node.position?.y ?? 0,
