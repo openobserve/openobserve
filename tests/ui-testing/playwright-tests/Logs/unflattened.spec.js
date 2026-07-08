@@ -317,6 +317,12 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Replacing query with SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC');
     await pageManager.logsPage.typeQuery('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC');
 
+    // Wait for Monaco to commit the typed query to the Vue store before clicking Run.
+    // Without this the click can race the editor debounce and re-run the PREVIOUS
+    // (quick-mode fields-only) query, whose hits never contain _o2_id — dooming the
+    // row scan below and burning the whole 5-minute test budget (CI flake).
+    await pageManager.logsPage.waitForQueryEditorValue('ORDER BY _timestamp DESC');
+
     testLogger.info('Executing SELECT * query to fetch fresh data with _o2_id');
     await applyQueryButton(page);
 
