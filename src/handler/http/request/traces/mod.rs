@@ -59,7 +59,7 @@ use crate::{
 };
 
 pub mod dag;
-pub(crate) mod schema_compat;
+pub(crate) mod gen_ai_schema;
 pub mod session;
 pub mod user;
 
@@ -341,7 +341,7 @@ pub async fn get_latest_traces(
     let is_llm_stream =
         infra::schema::get_is_llm_stream(org_id.as_str(), stream_name.as_str(), StreamType::Traces)
             .await;
-    // Fetch and validate the LLM schema so SQL never references missing columns.
+    // Fetch and validate the GenAI schema so SQL never references missing columns.
     let schema = infra::schema::get_stream_schema_from_cache(
         org_id.as_str(),
         stream_name.as_str(),
@@ -350,13 +350,13 @@ pub async fn get_latest_traces(
     .await;
     let validated_schema = if is_llm_stream {
         match schema.as_ref() {
-            Some(s) => match schema_compat::validate_llm_schema(s, &stream_name) {
+            Some(s) => match gen_ai_schema::validate_gen_ai_schema(s, &stream_name) {
                 Ok(v) => Some(v),
                 Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
             },
             // Schema not yet cached: fall back with all required fields assumed
             // present and optional fields marked absent.
-            None => Some(schema_compat::ValidatedLlmSchema::fallback()),
+            None => Some(gen_ai_schema::GenAiSchema::fallback()),
         }
     } else {
         None
@@ -810,7 +810,7 @@ pub async fn get_latest_traces(
     })
 }
 
-/// Build the shared LLM trace aggregation SQL (Query 1) for table and streaming
+/// Build the shared GenAI trace aggregation SQL (Query 1) for table and streaming
 /// handlers.
 ///
 /// Produces a `SELECT trace_id … GROUP BY trace_id` query that computes per-trace
@@ -823,7 +823,7 @@ pub async fn get_latest_traces(
 /// The function is pure — callers add WHERE and ORDER BY.
 fn build_llm_trace_query(
     stream_name: &str,
-    validated: &schema_compat::ValidatedLlmSchema,
+    validated: &gen_ai_schema::GenAiSchema,
     extra_selects: &str,
 ) -> String {
     let first_msg_clause = if validated.has_input_messages {
@@ -1030,11 +1030,11 @@ pub async fn get_latest_traces_stream(
         )
         .await;
         match schema.as_ref() {
-            Some(s) => match schema_compat::validate_llm_schema(s, &stream_name) {
+            Some(s) => match gen_ai_schema::validate_gen_ai_schema(s, &stream_name) {
                 Ok(v) => Some(v),
                 Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
             },
-            None => Some(schema_compat::ValidatedLlmSchema::fallback()),
+            None => Some(gen_ai_schema::GenAiSchema::fallback()),
         }
     } else {
         None
@@ -1152,7 +1152,7 @@ async fn process_latest_traces_stream(
     timeout: i64,
     sort_order: String,
     sql_order_expr: String,
-    validated_schema: Option<schema_compat::ValidatedLlmSchema>,
+    validated_schema: Option<gen_ai_schema::GenAiSchema>,
     use_cache: bool,
     range_error: String,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,

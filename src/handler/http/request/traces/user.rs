@@ -205,7 +205,7 @@ pub async fn get_latest_users(
     // So we must: get user→trace_id mapping first, then query by trace_id
     // (which captures ALL spans) to get accurate usage totals.
     let stream_type = StreamType::Traces;
-    let user_id_col = super::schema_compat::LlmColumns::current().user_id;
+    let user_id_col = super::gen_ai_schema::GEN_AI_USER_ID_COL;
     let user_id_opt = Some(user_id.to_string());
 
     // Get paginated user list with trace_ids per user

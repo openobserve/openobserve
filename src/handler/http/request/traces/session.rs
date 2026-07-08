@@ -210,9 +210,9 @@ pub async fn get_latest_sessions(
     // So we must: get session→trace_id mapping first, then query by trace_id
     // (which captures ALL spans) to get accurate usage totals.
     //
-    // Use ValidatedLlmSchema (Tier 1) for column-name resolution and optional
-    // field detection. Session handler keeps its own SQL shape (Phase 1 groups
-    // by session_id; Phase 2 queries by trace_id; ordering is done in Rust).
+    // Validate required GenAI fields and detect optional fields. Session handler
+    // keeps its own SQL shape (Phase 1 groups by session_id; Phase 2 queries by
+    // trace_id; ordering is done in Rust).
     let stream_type = StreamType::Traces;
     let schema = infra::schema::get_stream_schema_from_cache(
         org_id.as_str(),
@@ -221,12 +221,14 @@ pub async fn get_latest_sessions(
     )
     .await;
     let validated = match schema.as_ref() {
-        Some(s) => match super::schema_compat::validate_llm_schema(s, &stream_name) {
+        Some(s) => match super::gen_ai_schema::validate_gen_ai_schema(s, &stream_name) {
             Ok(v) => {
                 // Verify a session identifier column actually exists — even if
-                // all required LLM fields pass, we cannot run a session query
+                // all required GenAI fields pass, we cannot run a session query
                 // without something to group by.
-                if s.field_with_name(v.columns.session_id).is_err() {
+                if s.field_with_name(super::gen_ai_schema::GEN_AI_SESSION_ID_COL)
+                    .is_err()
+                {
                     return MetaHttpResponse::json(PaginatedResponse {
                         took: 0,
                         total: 0,
@@ -241,7 +243,7 @@ pub async fn get_latest_sessions(
             }
             Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
         },
-        None => Some(super::schema_compat::ValidatedLlmSchema::fallback()),
+        None => Some(super::gen_ai_schema::GenAiSchema::fallback()),
     };
     let validated = match validated {
         Some(v) => v,
@@ -257,7 +259,7 @@ pub async fn get_latest_sessions(
             });
         }
     };
-    let session_id_col = validated.columns.session_id;
+    let session_id_col = super::gen_ai_schema::GEN_AI_SESSION_ID_COL;
     let user_id_opt = Some(user_id.to_string());
 
     // Phase 1: get the paginated session ids ordered by Last Seen. Keep this
@@ -440,8 +442,7 @@ pub async fn get_latest_sessions(
     }
     let trace_ids_sql = sanitized_ids.join("','");
 
-    // Build Phase 2 SQL using ValidatedLlmSchema for column names and optional
-    // field presence (the session handler keeps its own SQL shape).
+    // Build Phase 2 SQL with optional fields only when the schema contains them.
     let first_msg_clause = if validated.has_input_messages {
         "FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '')".to_string()
     } else {
@@ -452,41 +453,7 @@ pub async fn get_latest_sessions(
     } else {
         "0 as gen_ai_usage_details_total"
     };
-    let cache_read_tokens_expr = optional_sum_expr(
-        validated.has_cache_read_input_tokens,
-        "gen_ai_usage_cache_read_input_tokens",
-        "gen_ai_usage_cache_read_input_tokens",
-    );
-    let cache_creation_tokens_expr = optional_sum_expr(
-        validated.has_cache_creation_input_tokens,
-        "gen_ai_usage_cache_creation_input_tokens",
-        "gen_ai_usage_cache_creation_input_tokens",
-    );
-    let cost_cache_read_expr = optional_sum_expr(
-        validated.has_cost_cache_read_input,
-        "gen_ai_usage_cost_cache_read_input",
-        "gen_ai_usage_cost_cache_read_input",
-    );
-    let cost_cache_creation_expr = optional_sum_expr(
-        validated.has_cost_cache_creation_input,
-        "gen_ai_usage_cost_cache_creation_input",
-        "gen_ai_usage_cost_cache_creation_input",
-    );
-    let cost_estimated_without_cache_expr = optional_sum_expr(
-        validated.has_cost_estimated_without_cache,
-        "gen_ai_usage_cost_estimated_without_cache",
-        "gen_ai_usage_cost_estimated_without_cache",
-    );
-    let cost_cache_read_savings_expr = optional_sum_expr(
-        validated.has_cost_cache_read_savings,
-        "gen_ai_usage_cost_cache_read_savings",
-        "gen_ai_usage_cost_cache_read_savings",
-    );
-    let cost_net_cache_impact_expr = optional_sum_expr(
-        validated.has_cost_net_cache_impact,
-        "gen_ai_usage_cost_net_cache_impact",
-        "gen_ai_usage_cost_net_cache_impact",
-    );
+    let optional_usage_selects = gen_ai_optional_usage_selects(&validated);
     let query_sql = format!(
         "SELECT trace_id, \
         max(user_id) as user_id,
@@ -496,13 +463,7 @@ pub async fn get_latest_sessions(
         sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
         {total_tokens_expr}, \
         sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
-        {cache_read_tokens_expr}, \
-        {cache_creation_tokens_expr}, \
-        {cost_cache_read_expr}, \
-        {cost_cache_creation_expr}, \
-        {cost_estimated_without_cache_expr}, \
-        {cost_cache_read_savings_expr}, \
-        {cost_net_cache_impact_expr}, \
+        {optional_usage_selects}, \
         sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count, \
         {first_msg_clause} as gen_ai_input_messages \
         FROM \"{stream_name}\" \
@@ -797,9 +758,11 @@ pub async fn get_session_details(
     )
     .await;
     let validated = match schema.as_ref() {
-        Some(s) => match super::schema_compat::validate_llm_schema(s, &stream_name) {
+        Some(s) => match super::gen_ai_schema::validate_gen_ai_schema(s, &stream_name) {
             Ok(v) => {
-                if s.field_with_name(v.columns.session_id).is_err() {
+                if s.field_with_name(super::gen_ai_schema::GEN_AI_SESSION_ID_COL)
+                    .is_err()
+                {
                     return MetaHttpResponse::json(PaginatedResponse {
                         took: 0,
                         total: 0,
@@ -814,9 +777,9 @@ pub async fn get_session_details(
             }
             Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
         },
-        None => super::schema_compat::ValidatedLlmSchema::fallback(),
+        None => super::gen_ai_schema::GenAiSchema::fallback(),
     };
-    let session_id_col = validated.columns.session_id;
+    let session_id_col = super::gen_ai_schema::GEN_AI_SESSION_ID_COL;
     let safe_session_id = escape_sql_string(&session_id);
     let use_cache = get_use_cache_from_request(&query);
     let user_id_opt = Some(user_id.to_string());
@@ -1001,7 +964,7 @@ async fn fetch_session_trace_hits(
     stream_type: StreamType,
     user_id_opt: Option<String>,
     stream_name: &str,
-    validated: &super::schema_compat::ValidatedLlmSchema,
+    validated: &super::gen_ai_schema::GenAiSchema,
     has_ref_parent_id: bool,
     has_infer: bool,
     start_time: i64,
@@ -1123,7 +1086,7 @@ async fn fetch_session_trace_hits(
 
 fn build_session_trace_details_sql(
     stream_name: &str,
-    validated: &super::schema_compat::ValidatedLlmSchema,
+    validated: &super::gen_ai_schema::GenAiSchema,
     has_ref_parent_id: bool,
     service_key_expr: &str,
     trace_ids_sql: &str,
@@ -1157,41 +1120,7 @@ fn build_session_trace_details_sql(
     } else {
         "0 as gen_ai_usage_details_total"
     };
-    let cache_read_tokens_expr = optional_sum_expr(
-        validated.has_cache_read_input_tokens,
-        "gen_ai_usage_cache_read_input_tokens",
-        "gen_ai_usage_cache_read_input_tokens",
-    );
-    let cache_creation_tokens_expr = optional_sum_expr(
-        validated.has_cache_creation_input_tokens,
-        "gen_ai_usage_cache_creation_input_tokens",
-        "gen_ai_usage_cache_creation_input_tokens",
-    );
-    let cost_cache_read_expr = optional_sum_expr(
-        validated.has_cost_cache_read_input,
-        "gen_ai_usage_cost_cache_read_input",
-        "gen_ai_usage_cost_cache_read_input",
-    );
-    let cost_cache_creation_expr = optional_sum_expr(
-        validated.has_cost_cache_creation_input,
-        "gen_ai_usage_cost_cache_creation_input",
-        "gen_ai_usage_cost_cache_creation_input",
-    );
-    let cost_estimated_without_cache_expr = optional_sum_expr(
-        validated.has_cost_estimated_without_cache,
-        "gen_ai_usage_cost_estimated_without_cache",
-        "gen_ai_usage_cost_estimated_without_cache",
-    );
-    let cost_cache_read_savings_expr = optional_sum_expr(
-        validated.has_cost_cache_read_savings,
-        "gen_ai_usage_cost_cache_read_savings",
-        "gen_ai_usage_cost_cache_read_savings",
-    );
-    let cost_net_cache_impact_expr = optional_sum_expr(
-        validated.has_cost_net_cache_impact,
-        "gen_ai_usage_cost_net_cache_impact",
-        "gen_ai_usage_cost_net_cache_impact",
-    );
+    let optional_usage_selects = gen_ai_optional_usage_selects(validated);
     format!(
         "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
         min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
@@ -1200,13 +1129,7 @@ fn build_session_trace_details_sql(
         sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
         {total_tokens_expr}, \
         sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
-        {cache_read_tokens_expr}, \
-        {cache_creation_tokens_expr}, \
-        {cost_cache_read_expr}, \
-        {cost_cache_creation_expr}, \
-        {cost_estimated_without_cache_expr}, \
-        {cost_cache_read_savings_expr}, \
-        {cost_net_cache_impact_expr}, \
+        {optional_usage_selects}, \
         array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
         {first_msg_clause} as gen_ai_input_messages, \
         {trace_selects} \
@@ -1370,12 +1293,46 @@ fn escape_sql_string(value: &str) -> String {
     value.replace('\'', "''")
 }
 
-fn optional_sum_expr(has_field: bool, column: &str, alias: &str) -> String {
+fn optional_sum_expr(has_field: bool, field_name: &str) -> String {
     if has_field {
-        format!("sum({column}) as {alias}")
+        format!("sum({field_name}) as {field_name}")
     } else {
-        format!("0 as {alias}")
+        format!("0 as {field_name}")
     }
+}
+
+fn gen_ai_optional_usage_selects(validated: &super::gen_ai_schema::GenAiSchema) -> String {
+    [
+        optional_sum_expr(
+            validated.has_cache_read_input_tokens,
+            "gen_ai_usage_cache_read_input_tokens",
+        ),
+        optional_sum_expr(
+            validated.has_cache_creation_input_tokens,
+            "gen_ai_usage_cache_creation_input_tokens",
+        ),
+        optional_sum_expr(
+            validated.has_cost_cache_read_input,
+            "gen_ai_usage_cost_cache_read_input",
+        ),
+        optional_sum_expr(
+            validated.has_cost_cache_creation_input,
+            "gen_ai_usage_cost_cache_creation_input",
+        ),
+        optional_sum_expr(
+            validated.has_cost_estimated_without_cache,
+            "gen_ai_usage_cost_estimated_without_cache",
+        ),
+        optional_sum_expr(
+            validated.has_cost_cache_read_savings,
+            "gen_ai_usage_cost_cache_read_savings",
+        ),
+        optional_sum_expr(
+            validated.has_cost_net_cache_impact,
+            "gen_ai_usage_cost_net_cache_impact",
+        ),
+    ]
+    .join(", ")
 }
 
 #[derive(Debug, Serialize)]
@@ -1672,7 +1629,7 @@ mod tests {
 
     #[test]
     fn session_trace_details_sql_aggregates_by_trace_id() {
-        let validated = super::super::schema_compat::ValidatedLlmSchema::fallback();
+        let validated = super::super::gen_ai_schema::GenAiSchema::fallback();
         let sql = build_session_trace_details_sql(
             "default",
             &validated,
