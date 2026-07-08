@@ -279,7 +279,7 @@ pub fn publish_triggers_usage(trigger: TriggerData) {
 
             // Increment dropped triggers metric
             metrics::SELF_REPORTING_DROPPED_TRIGGERS
-                .with_label_values(&[""])
+                .with_label_values(&["usage"])
                 .inc();
         }
         Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
@@ -345,7 +345,7 @@ pub async fn publish_error(error_data: ErrorData) {
                 error_source
             );
             metrics::SELF_REPORTING_TIMEOUT_ERRORS
-                .with_label_values(&[""])
+                .with_label_values(&["error"])
                 .inc();
         }
         Err(EnqueueError::SendFailed(e)) => {
