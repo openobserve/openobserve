@@ -14,11 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
+import i18n from "@/locales";
 import {
-  addCipherKeySchema,
+  makeAddCipherKeySchema,
   addCipherKeyDefaults,
   type AddCipherKeyForm,
 } from "./AddCipherKey.schema";
+
+// Rebuild the schema with the real i18n `t` (default locale = English) so the
+// message assertions below match the app's rendered (English) text.
+const addCipherKeySchema = makeAddCipherKeySchema((k: string) => i18n.global.t(k));
 
 // Deep clone the defaults and apply a mutator so each case starts from a known
 // shape. The schema rules (incl. the conditional requireds in superRefine) are
@@ -302,6 +307,44 @@ describe("addCipherKeySchema", () => {
       v.key.store.akeyless.auth.type = "";
       v.key.store.akeyless.store.type = "";
       expect(isValid(v)).toBe(true);
+    });
+  });
+
+  describe("i18n-driven required messages (parity with pre-migration)", () => {
+    // provider-type / algorithm / secret required were `t('cipherKey.*Required')`
+    // before the migration. Build the schema with a sentinel `t` to prove those
+    // three messages still flow through i18n (not re-hardcoded to English).
+    const tagged = makeAddCipherKeySchema((k) => `i18n:${k}`);
+    const taggedMsg = (v: AddCipherKeyForm, path: string): string | undefined => {
+      const r = tagged.safeParse(v);
+      return r.success
+        ? undefined
+        : r.error.issues.find((i) => i.path.join(".") === path)?.message;
+    };
+
+    it("secret-required flows through t (key.store.local)", () => {
+      const v = validLocal();
+      v.key.store.local = "";
+      expect(taggedMsg(v, "key.store.local")).toBe(
+        "i18n:cipherKey.secretRequired",
+      );
+    });
+
+    it("provider-type-required flows through t (key.mechanism.type)", () => {
+      const v = validLocal();
+      v.key.mechanism.type = "";
+      expect(taggedMsg(v, "key.mechanism.type")).toBe(
+        "i18n:cipherKey.providerTypeRequired",
+      );
+    });
+
+    it("algorithm-required flows through t (key.mechanism.simple_algorithm)", () => {
+      const v = validLocal();
+      v.key.mechanism.type = "simple";
+      v.key.mechanism.simple_algorithm = "";
+      expect(taggedMsg(v, "key.mechanism.simple_algorithm")).toBe(
+        "i18n:cipherKey.algorithmRequired",
+      );
     });
   });
 

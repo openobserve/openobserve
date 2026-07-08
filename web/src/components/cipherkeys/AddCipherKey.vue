@@ -186,7 +186,7 @@ import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import {
-  addCipherKeySchema,
+  makeAddCipherKeySchema,
   addCipherKeyDefaults,
   type AddCipherKeyForm,
 } from "@/components/cipherkeys/AddCipherKey.schema";
@@ -227,6 +227,11 @@ const getTypeLabel = (type: string) =>
 // children inject this SAME form via <OForm :form="form">. The save is wired
 // here through useOForm (not @submit on the tag) — wrapped lazily so onFormSubmit
 // (declared below) resolves at submit time, not at setup.
+// Build the schema with useI18n's `t` so the three previously-translated
+// validation messages (provider-type / algorithm / secret required) render in
+// the active locale, exactly as they did before the migration.
+const addCipherKeySchema = makeAddCipherKeySchema(t);
+
 const form = useOForm<AddCipherKeyForm>({
   defaultValues: addCipherKeyDefaults(),
   schema: addCipherKeySchema,

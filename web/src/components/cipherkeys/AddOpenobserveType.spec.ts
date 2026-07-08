@@ -20,10 +20,13 @@ import AddOpenobserveType from "./AddOpenobserveType.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import i18n from "@/locales";
 import {
-  addCipherKeySchema,
+  makeAddCipherKeySchema,
   addCipherKeyDefaults,
   type AddCipherKeyForm,
 } from "./AddCipherKey.schema";
+
+// Rebuild the shared schema with the real i18n `t` (default locale = English).
+const addCipherKeySchema = makeAddCipherKeySchema((k: string) => i18n.global.t(k));
 
 // AddOpenobserveType is presentational: its only field (the secret) is hosted by
 // the parent schema as `key.store.local`. Mount it inside a REAL OForm so the

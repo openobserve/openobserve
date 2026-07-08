@@ -20,10 +20,13 @@ import AddAkeylessType from "./AddAkeylessType.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import i18n from "@/locales";
 import {
-  addCipherKeySchema,
+  makeAddCipherKeySchema,
   addCipherKeyDefaults,
   type AddCipherKeyForm,
 } from "./AddCipherKey.schema";
+
+// Rebuild the shared schema with the real i18n `t` (default locale = English).
+const addCipherKeySchema = makeAddCipherKeySchema((k: string) => i18n.global.t(k));
 
 // AddAkeylessType is presentational: every control is an OForm* field bound (by
 // name) to the PARENT OForm; all rules live in AddCipherKey.schema.ts. Mount it

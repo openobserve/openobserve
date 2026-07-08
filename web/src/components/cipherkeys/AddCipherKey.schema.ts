@@ -32,7 +32,12 @@ export const akeylessLdapUsernameRegex = /^[a-zA-Z0-9._-]+$/;
 // Anti-HTML guard for base_url (the old `!/<[^>]*>/.test(v)` rule).
 const HTML_TAG_REGEX = /<[^>]*>/;
 
-export const addCipherKeySchema = z
+// Built via a factory so the three messages that were i18n-driven before the
+// migration stay translated (pass useI18n's `t`). The remaining messages were
+// hardcoded English in the pre-migration code (validateName / validateAkeyless
+// Fields), so they stay English here — restoring exact parity, not redesigning.
+export const makeAddCipherKeySchema = (t: (_key: string) => string) =>
+  z
   .object({
     // Always-validated scalars (AddCipherKey's own fields).
     name: z
@@ -81,7 +86,7 @@ export const addCipherKeySchema = z
       }),
       mechanism: z.object({
         // Encryption mechanism (AddEncryptionMechanism) — type always required.
-        type: z.string().min(1, "Provider type is required"),
+        type: z.string().min(1, t("cipherKey.providerTypeRequired")),
         // Algorithm required only when type === "simple" (superRefine).
         simple_algorithm: z.string().default(""),
       }),
@@ -96,7 +101,7 @@ export const addCipherKeySchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["key", "store", "local"],
-          message: "Secret is required",
+          message: t("cipherKey.secretRequired"),
         });
       }
     }
@@ -228,12 +233,14 @@ export const addCipherKeySchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["key", "mechanism", "simple_algorithm"],
-        message: "Algorithm is required",
+        message: t("cipherKey.algorithmRequired"),
       });
     }
   });
 
-export type AddCipherKeyForm = z.infer<typeof addCipherKeySchema>;
+export type AddCipherKeyForm = z.infer<
+  ReturnType<typeof makeAddCipherKeySchema>
+>;
 
 // STATIC create defaults (typed factory — bound `:default-values` at mount).
 // Edit-mode prefill arrives async, so the component re-seeds via

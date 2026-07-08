@@ -20,10 +20,13 @@ import AddEncryptionMechanism from "./AddEncryptionMechanism.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import i18n from "@/locales";
 import {
-  addCipherKeySchema,
+  makeAddCipherKeySchema,
   addCipherKeyDefaults,
   type AddCipherKeyForm,
 } from "./AddCipherKey.schema";
+
+// Rebuild the shared schema with the real i18n `t` (default locale = English).
+const addCipherKeySchema = makeAddCipherKeySchema((k: string) => i18n.global.t(k));
 
 // AddEncryptionMechanism is now presentational: it renders OForm* selects bound
 // (by name) to the PARENT OForm. So we mount it inside a REAL OForm carrying the
