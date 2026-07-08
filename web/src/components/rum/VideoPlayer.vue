@@ -162,6 +162,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { createRecordConverter } from "@/utils/rum/sessionReplayChangeFormat";
 const props = defineProps({
   events: {
     type: Array,
@@ -331,9 +332,20 @@ const setupSession = async () => {
   session.value = [];
   if (!props.segments.length) return;
 
+  // The SDK v7 serialization emits session-replay snapshots in the compact "Change"
+  // format (FullSnapshot type 2 with format:1 and data:Change[], plus Change records of
+  // type 12). @openobserve/rrweb-player only understands the classic rrweb format, so we
+  // convert here. A single converter instance threads node-id / string-table state across
+  // all records in order (it resets itself on each full snapshot, mirroring the SDK).
+  const recordConverter = createRecordConverter();
+
   props.segments.forEach((segment: any) => {
+    const convertedRecords: any[] = [];
     segment.records.forEach((record: any) => {
-      let segCopy = cloneDeep(record);
+      convertedRecords.push(...recordConverter.convert(cloneDeep(record)));
+    });
+    convertedRecords.forEach((record: any) => {
+      let segCopy = record;
       if (segCopy.type === 8) {
         const seg = {
           ...segCopy,
