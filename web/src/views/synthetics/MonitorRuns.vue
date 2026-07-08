@@ -54,117 +54,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="tw:max-w-[85rem] tw:mx-auto tw:px-5 tw:py-[0.875rem] tw:pb-[1.75rem] tw:flex tw:flex-col tw:gap-[0.875rem]"
           >
-            <!-- Status Timeline -->
-            <div class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden">
-              <div class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]">
-                <span class="tw:font-bold tw:text-xs tw:text-text-heading">
-                  Status Timeline
-                </span>
-                <span class="tw:flex-1" />
-                <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-text-secondary">
-                  <span class="tw:w-[7px] tw:h-[7px] tw:rounded-full tw:bg-[var(--o2-status-warning-text)]" />
-                  {{ timelineMixedCount }} Mixed
-                </span>
-                <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-text-secondary">
-                  <span class="tw:w-[7px] tw:h-[7px] tw:rounded-full tw:bg-status-error-text" />
-                  {{ timelineFailCount }} Failed
-                </span>
-                <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-text-secondary">
-                  <span class="tw:w-[7px] tw:h-[7px] tw:rounded-full tw:bg-[var(--o2-status-success-text)]" />
-                  {{ timelinePassCount }} Passed
-                </span>
-              </div>
-              <div class="tw:border-t tw:border-[var(--o2-border-color)]" />
-              <div class="tw:flex tw:flex-col tw:gap-1 tw:py-2 tw:px-[0.875rem]">
-                <div class="tw:flex tw:items-center tw:gap-1">
-                  <button
-                    class="tw:shrink-0 tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded tw:bg-transparent tw:border-none tw:cursor-pointer tw:text-text-secondary tw:hover:bg-surface-subtle tw:disabled:opacity-30 tw:disabled:cursor-default tw:transition-colors"
-                    :disabled="!canScrollLeft"
-                    @click="scrollTimeline('left')"
-                    aria-label="Scroll timeline left"
-                  >
-                    <OIcon name="chevron-left" size="xs" />
-                  </button>
-                  <div
-                    ref="timelineScrollRef"
-                    class="tw:flex-1 tw:overflow-hidden tw:flex tw:rounded tw:h-[26px] tw:gap-0.5"
-                    @scroll="onTimelineScroll"
-                  >
-                    <div
-                      v-for="(seg, i) in timelineSegments"
-                      :key="seg.runId"
-                      class="tw:shrink-0 tw:h-full tw:min-w-[3px] tw:cursor-pointer tw:transition-all tw:duration-100 hover:tw:scale-y-[1.35]"
-                      :style="{ width: (100 / MAX_VISIBLE_SEGMENTS) + '%', background: seg.color }"
-                      :title="seg.title"
-                      @mouseenter="showTooltip($event, seg)"
-                      @mouseleave="hideTooltip"
-                    />
-                  </div>
-                  <button
-                    class="tw:shrink-0 tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded tw:bg-transparent tw:border-none tw:cursor-pointer tw:text-text-secondary tw:hover:bg-surface-subtle tw:disabled:opacity-30 tw:disabled:cursor-default tw:transition-colors"
-                    :disabled="!canScrollRight"
-                    @click="scrollTimeline('right')"
-                    aria-label="Scroll timeline right"
-                  >
-                    <OIcon name="chevron-right" size="xs" />
-                  </button>
-                </div>
-                <div
-                  class="tw:flex tw:justify-between tw:text-[10.5px] tw:font-mono tw:tabular-nums tw:text-text-secondary"
-                >
-                  <span>{{ timelineStartLabel }}</span>
-                  <span>{{ timelineRangeLabel }}</span>
-                  <span>{{ timelineEndLabel }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Timeline hover tooltip -->
-            <Teleport to="body">
-              <div
-                v-if="hoveredSegment"
-                class="tw:fixed tw:z-[10100] tw:rounded-md tw:shadow-lg tw:px-3 tw:py-2 tw:text-xs tw:min-w-[220px] tw:max-w-[360px]"
-                :style="{
-                  left: tooltipX + 'px',
-                  top: tooltipY + 'px',
-                  transform: 'translate(-50%, -100%)',
-                  background: 'var(--color-surface-overlay)',
-                }"
-              >
-                <div class="tw:font-semibold tw:text-text-heading tw:mb-1.5 tw:truncate">
-                  {{ hoveredSegment.title }}
-                </div>
-                <div
-                  v-for="(exec, eIdx) in hoveredSegment.executions"
-                  :key="eIdx"
-                  class="tw:flex tw:items-center tw:gap-1.5 tw:py-0.5 tw:border-b tw:border-border-default tw:last:border-b-0"
-                >
-                  <OIcon
-                    :name="exec.statusIcon"
-                    size="xs"
-                    class="tw:shrink-0"
-                    :class="exec.status === 'pass' ? 'tw:text-[var(--o2-status-success-text)]' : 'tw:text-[var(--o2-status-error-text)]'"
-                  />
-                  <span class="tw:text-text-secondary tw:truncate">
-                    <span class="tw:font-medium tw:text-text-body">{{ exec.location }}</span>
-                    <span class="tw:mx-1 tw:opacity-40">·</span>
-                    {{ exec.browserEngine }}
-                    <span class="tw:mx-1 tw:opacity-40">·</span>
-                    {{ exec.device }}
-                  </span>
-                  <span
-                    v-if="exec.errorSnippet"
-                    class="tw:text-[10px] tw:text-status-error-text tw:truncate tw:ml-auto tw:max-w-[100px]"
-                  >
-                    {{ exec.errorSnippet }}
-                  </span>
-                </div>
-                <div
-                  class="tw:absolute tw:left-1/2 tw:-bottom-[5px] tw:-translate-x-1/2"
-                  style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 6px solid var(--color-surface-overlay);"
-                />
-              </div>
-            </Teleport>
+            <!-- Status Timeline (ECharts) -->
+            <MonitorStatusTimelineCharts
+              :segments="timelineSegments"
+              :fail-count="timelineFailCount"
+              :pass-count="timelinePassCount"
+              :mixed-count="timelineMixedCount"
+            />
+            <MonitorStatusTimelineCustom
+              :segments="timelineSegments"
+              :fail-count="timelineFailCount"
+              :pass-count="timelinePassCount"
+              :mixed-count="timelineMixedCount"
+              :start-label="timelineStartLabel"
+              :end-label="timelineEndLabel"
+            />
 
             <!-- KPI Cards — LLMInsightsDashboard style -->
             <div class="tw:grid tw:grid-cols-5 tw:gap-[0.625rem]">
@@ -827,6 +731,8 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import MonitorStatusTimelineCharts from "@/views/synthetics/MonitorStatusTimelineCharts.vue";
+import MonitorStatusTimelineCustom from "@/views/synthetics/MonitorStatusTimelineCustom.vue";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
 import type { SyntheticRun } from "@/composables/synthetics/syntheticResultsSchema";
@@ -967,7 +873,9 @@ interface MockRun {
   };
 }
 
-function generateRuns(): MockRun[] {
+function generateRuns(
+  timeRange?: { startTimeMs: number; endTimeMs: number },
+): MockRun[] {
   const r = seedRand(77);
   const locations = ["us-east-1", "eu-west-1", "ap-south-1"];
   const browsers = ["Chromium", "Firefox", "WebKit"];
@@ -977,13 +885,18 @@ function generateRuns(): MockRun[] {
   const errs = errorPatterns();
   const runs: MockRun[] = [];
 
+  const timeSpan = timeRange
+    ? timeRange.endTimeMs - timeRange.startTimeMs
+    : 26 * 17 * 60 * 1000; // default ~7h span
+  const baseTime = timeRange ? timeRange.endTimeMs : Date.now();
+
   const NUM_LOGICAL_RUNS = 26;
   let idCounter = 1;
   for (let logicalRunIdx = 0; logicalRunIdx < NUM_LOGICAL_RUNS; logicalRunIdx++) {
     const runId = "run-" + String(5000 - logicalRunIdx);
     const numExecutions = 3 + Math.floor(r() * 16); // 3–18 executions per run
-    const ageMinVal = logicalRunIdx * 17 + Math.floor(r() * 6);
-    const scheduledBase = Date.now() - ageMinVal * 60 * 1000;
+    const intervalFraction = logicalRunIdx / NUM_LOGICAL_RUNS;
+    const scheduledBase = baseTime - Math.round(intervalFraction * timeSpan);
 
     for (let execIdx = 0; execIdx < numExecutions; execIdx++) {
       const isFail = r() < 0.22;
@@ -997,7 +910,7 @@ function generateRuns(): MockRun[] {
       runs.push({
         id: idCounter++,
         runId,
-        ageMin: ageMinVal,
+        ageMin: Math.round((baseTime - scheduledBase) / 60000),
         scheduledTs: scheduledBase,
         triggerType: "schedule",
         duration: dur,
@@ -1141,6 +1054,13 @@ function toMockRun(r: SyntheticRun, idx: number): MockRun {
 const allRuns = computed<MockRun[]>(() => {
   if (synthetics.hasLoadedOnce.value) {
     return synthetics.runs.value.map(toMockRun);
+  }
+  const tr = timeRangeMicros.value;
+  if (tr) {
+    return generateRuns({
+      startTimeMs: tr.startTime / 1000,
+      endTimeMs: tr.endTime / 1000,
+    });
   }
   return generateRuns();
 });
@@ -1299,6 +1219,8 @@ interface TimelineSegment {
   status: "all-pass" | "mixed" | "all-fail";
   color: string;
   title: string;
+  /** Epoch ms of the first execution in this logical run. */
+  timestampMs: number;
   executions: TimelineExecution[];
 }
 
@@ -1363,6 +1285,7 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
       status,
       color,
       title,
+      timestampMs: executions[0]?.scheduledTs || 0,
       executions: execDetails,
     };
   });
@@ -1378,73 +1301,27 @@ const timelineMixedCount = computed(() =>
   String(timelineSegments.value.filter((s) => s.status === "mixed").length),
 );
 
-// ── Timeline scroll state ────────────────────────────────────────────────
-const MAX_VISIBLE_SEGMENTS = 30;
-const timelineScrollRef = ref<HTMLElement | null>(null);
-const scrollLeft = ref(0);
-
-const timelinePage = computed(() => {
-  const el = timelineScrollRef.value;
-  if (!el) return 0;
-  return Math.round(el.scrollLeft / el.clientWidth);
-});
-
-const canScrollLeft = computed(() => scrollLeft.value > 1);
-const canScrollRight = computed(() => {
-  const el = timelineScrollRef.value;
-  if (!el) return false;
-  return el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
-});
-
-const timelineRangeLabel = computed(() => {
-  const total = timelineSegments.value.length;
-  const page = timelinePage.value;
-  const start = page * MAX_VISIBLE_SEGMENTS + 1;
-  const end = Math.min((page + 1) * MAX_VISIBLE_SEGMENTS, total);
-  return "Showing " + start + "-" + end + " of " + total + " runs";
-});
-
-function scrollTimeline(direction: "left" | "right") {
-  const el = timelineScrollRef.value;
-  if (!el) return;
-  const pageWidth = el.clientWidth;
-  const target =
-    direction === "left"
-      ? Math.max(0, el.scrollLeft - pageWidth)
-      : Math.min(el.scrollWidth - el.clientWidth, el.scrollLeft + pageWidth);
-  el.scrollTo({ left: target, behavior: "smooth" });
-}
-
-function onTimelineScroll(event: Event) {
-  scrollLeft.value = (event.target as HTMLElement).scrollLeft;
-}
-
-// ── Timeline hover tooltip state ─────────────────────────────────────────
-const hoveredSegment = ref<TimelineSegment | null>(null);
-const tooltipX = ref(0);
-const tooltipY = ref(0);
-
-function showTooltip(event: MouseEvent, seg: TimelineSegment) {
-  hoveredSegment.value = seg;
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-  tooltipX.value = rect.left + rect.width / 2;
-  tooltipY.value = rect.top - 8;
-}
-
-function hideTooltip() {
-  hoveredSegment.value = null;
+function formatTimelineDate(ms: number): string {
+  const d = new Date(ms);
+  const now = new Date();
+  const opts: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit", hourCycle: "h23" };
+  if (d.getFullYear() !== now.getFullYear()) {
+    return d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", ...opts });
+  }
+  if (d.getMonth() !== now.getMonth() || d.getDate() !== now.getDate()) {
+    return d.toLocaleString("en-US", { month: "short", day: "numeric", ...opts });
+  }
+  return d.toLocaleTimeString("en-US", opts);
 }
 
 const timelineStartLabel = computed(() => {
-  if (!timeRangeMicros.value) return windowLabel.value.replace("Last ", "") + " ago";
-  const startMs = timeRangeMicros.value.startTime / 1000;
-  const diffMin = Math.round((Date.now() - startMs) / 60000);
-  if (diffMin < 60) return diffMin + " min ago";
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return diffH + "h ago";
-  return Math.floor(diffH / 24) + "d ago";
+  if (!timeRangeMicros.value) return "";
+  return formatTimelineDate(timeRangeMicros.value.startTime / 1000);
 });
-const timelineEndLabel = "Now";
+const timelineEndLabel = computed(() => {
+  if (!timeRangeMicros.value) return "Now";
+  return formatTimelineDate(timeRangeMicros.value.endTime / 1000);
+});
 
 // ── Breakdowns ───────────────────────────────────────────────────────────
 interface BreakdownItem {
