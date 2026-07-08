@@ -22,46 +22,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden"
+    class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
     data-test="monitor-status-timeline-custom"
   >
     <div
-      class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]"
+      class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
     >
-      <span class="tw:font-bold tw:text-xs tw:text-text-heading">
+      <span class="font-bold text-xs text-text-heading">
         Status Timeline (Custom)
       </span>
-      <span class="tw:flex-1" />
+      <span class="flex-1" />
       <span
-        class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-text-secondary"
+        class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
       >
         <span
-          class="tw:w-[7px] tw:h-[7px] tw:rounded-full tw:bg-[var(--o2-status-error-text)]"
+          class="w-[7px] h-[7px] rounded-full bg-[var(--o2-status-error-text)]"
         />
         {{ failCount }} Failed
       </span>
       <span
-        class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-text-secondary"
+        class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
       >
         <span
-          class="tw:w-[7px] tw:h-[7px] tw:rounded-full tw:bg-[var(--o2-status-warning-text)]"
+          class="w-[7px] h-[7px] rounded-full bg-[var(--o2-status-warning-text)]"
         />
         {{ mixedCount }} Mixed
       </span>
       <span
-        class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-text-secondary"
+        class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
       >
         <span
-          class="tw:w-[7px] tw:h-[7px] tw:rounded-full tw:bg-[var(--o2-status-success-text)]"
+          class="w-[7px] h-[7px] rounded-full bg-[var(--o2-status-success-text)]"
         />
         {{ passCount }} Passed
       </span>
     </div>
-    <div class="tw:border-t tw:border-[var(--o2-border-color)]" />
-    <div class="tw:flex tw:flex-col tw:gap-1 tw:py-2 tw:px-[0.875rem]">
-      <div class="tw:flex tw:items-center tw:gap-1">
+    <div class="border-t border-[var(--o2-border-color)]" />
+    <div class="flex flex-col gap-1 py-2 px-[0.875rem]">
+      <div class="flex items-center gap-1">
         <button
-          class="tw:shrink-0 tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded tw:bg-transparent tw:border-none tw:cursor-pointer tw:text-text-secondary tw:hover:bg-surface-subtle tw:disabled:opacity-30 tw:disabled:cursor-default tw:transition-colors"
+          class="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded bg-transparent border-none cursor-pointer text-text-secondary hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-default transition-colors"
           :disabled="!canScrollLeft"
           @click="scrollTimeline('left')"
           aria-label="Scroll timeline left"
@@ -70,41 +70,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </button>
         <div
           ref="scrollRef"
-          class="tw:flex-1 tw:overflow-hidden tw:flex tw:rounded tw:h-[26px] tw:gap-0.5"
+          class="flex-1 overflow-hidden flex rounded h-[26px] gap-0.5"
           @scroll="onScroll"
         >
           <div
             v-for="seg in segments"
             :key="seg.runId"
-            class="tw:shrink-0 tw:h-full tw:min-w-[3px] tw:cursor-pointer tw:transition-all tw:duration-100 hover:tw:scale-y-[1.35]"
+            class="shrink-0 h-full min-w-[3px] cursor-pointer transition-all duration-100 hover:scale-y-[1.35]"
             :style="{ width: 100 / MAX_VISIBLE + '%', background: seg.color }"
           >
             <OTooltip side="top" :delay="0" :max-width="'auto'">
               <template #content>
-                <div class="tw:px-1 tw:py-0.5 tw:min-w-[200px]">
+                <div class="px-1 py-0.5 min-w-[200px]">
                   <div
-                    class="tw:font-semibold tw:text-text-heading tw:mb-1.5 tw:text-xs"
+                    class="font-semibold text-text-heading mb-1.5 text-xs"
                   >
                     {{ seg.title }}
                   </div>
                   <div
                     v-for="(exec, eIdx) in seg.executions"
                     :key="eIdx"
-                    class="tw:flex tw:items-center tw:gap-2 tw:py-0.5"
+                    class="flex items-center gap-2 py-0.5"
                   >
                     <span
-                      class="tw:w-2 tw:h-2 tw:rounded-full tw:shrink-0"
+                      class="w-2 h-2 rounded-full shrink-0"
                       :class="
                         exec.status === 'pass'
-                          ? 'tw:bg-[var(--o2-status-success-text)]'
-                          : 'tw:bg-[var(--o2-status-error-text)]'
+                          ? 'bg-[var(--o2-status-success-text)]'
+                          : 'bg-[var(--o2-status-error-text)]'
                       "
                     />
-                    <span class="tw:text-text-body">{{ exec.location }}</span>
-                    <span class="tw:text-text-secondary">{{
+                    <span class="text-text-body">{{ exec.location }}</span>
+                    <span class="text-text-secondary">{{
                       exec.browserEngine
                     }}</span>
-                    <span class="tw:text-text-secondary">{{
+                    <span class="text-text-secondary">{{
                       exec.device
                     }}</span>
                   </div>
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <button
-          class="tw:shrink-0 tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded tw:bg-transparent tw:border-none tw:cursor-pointer tw:text-text-secondary tw:hover:bg-surface-subtle tw:disabled:opacity-30 tw:disabled:cursor-default tw:transition-colors"
+          class="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded bg-transparent border-none cursor-pointer text-text-secondary hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-default transition-colors"
           :disabled="!canScrollRight"
           @click="scrollTimeline('right')"
           aria-label="Scroll timeline right"
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </button>
       </div>
       <div
-        class="tw:flex tw:justify-between tw:text-[10.5px] tw:font-mono tw:tabular-nums tw:text-text-secondary"
+        class="flex justify-between text-[10.5px] font-mono tabular-nums text-text-secondary"
       >
         <span>{{ endLabel }}</span>
         <span>{{ rangeLabel }}</span>

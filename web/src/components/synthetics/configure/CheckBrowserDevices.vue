@@ -58,27 +58,27 @@ function toggle(browserId: string, deviceId: string) {
 </script>
 
 <template>
-  <div class="tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:p-6 tw:mb-4">
-    <h3 class="tw:text-base tw:font-semibold tw:text-[var(--o2-text-heading)] tw:mb-1">
+  <div class="rounded-lg border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] p-6 mb-4">
+    <h3 class="text-base font-semibold text-[var(--o2-text-heading)] mb-1">
       Browsers &amp; Devices
     </h3>
-    <p class="tw:text-xs tw:text-[var(--o2-text-muted)] tw:mb-5">
+    <p class="text-xs text-[var(--o2-text-muted)] mb-5">
       Each selected combination runs as a separate execution per check. At least one must be selected.
     </p>
 
     <!-- Grid: rows = browsers, cols = devices -->
-    <div class="tw:overflow-x-auto">
-      <table class="device-grid tw:w-full">
+    <div class="overflow-x-auto">
+      <table class="device-grid w-full">
         <thead>
           <tr>
-            <th class="tw:w-28" />
+            <th class="w-28" />
             <th
               v-for="device in activeDevices"
               :key="device.id"
-              class="tw:text-xs tw:font-semibold tw:text-[var(--o2-text-muted)] tw:uppercase tw:tracking-wide tw:text-center tw:pb-2"
+              class="text-xs font-semibold text-[var(--o2-text-muted)] uppercase tracking-wide text-center pb-2"
             >
-              <div class="tw:flex tw:flex-col tw:items-center tw:gap-1">
-                <span class="material-symbols-outlined tw:text-base tw:text-[var(--o2-text-muted)] tw:normal-case tw:not-italic">{{ DEVICE_ICONS[device.id] ?? 'devices' }}</span>
+              <div class="flex flex-col items-center gap-1">
+                <span class="material-symbols-outlined text-base text-[var(--o2-text-muted)] normal-case not-italic">{{ DEVICE_ICONS[device.id] ?? 'devices' }}</span>
                 {{ device.label }}
               </div>
             </th>
@@ -86,13 +86,13 @@ function toggle(browserId: string, deviceId: string) {
         </thead>
         <tbody>
           <tr v-for="browser in activeBrowsers" :key="browser.id">
-            <td class="tw:py-2 tw:pr-4 tw:text-sm tw:font-medium tw:text-[var(--o2-text-primary)] tw:capitalize">
+            <td class="py-2 pr-4 text-sm font-medium text-[var(--o2-text-primary)] capitalize">
               {{ browser.label }}
             </td>
             <td
               v-for="device in activeDevices"
               :key="device.id"
-              class="tw:text-center tw:py-2"
+              class="text-center py-2"
             >
               <button
                 class="device-cell"
@@ -103,7 +103,7 @@ function toggle(browserId: string, deviceId: string) {
               >
                 <span
                   v-if="isChecked(browser.id, device.id)"
-                  class="material-symbols-outlined tw:text-sm"
+                  class="material-symbols-outlined text-sm"
                 >check</span>
               </button>
             </td>
@@ -113,11 +113,11 @@ function toggle(browserId: string, deviceId: string) {
     </div>
 
     <!-- Selected combos summary -->
-    <div class="tw:flex tw:flex-wrap tw:gap-2 tw:mt-4">
+    <div class="flex flex-wrap gap-2 mt-4">
       <span
         v-for="combo in selected"
         :key="`${combo.browser}-${combo.device}`"
-        class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-xs tw:font-medium tw:bg-[var(--o2-surface-secondary)] tw:border tw:border-[var(--o2-border-color)] tw:rounded-full tw:px-2.5 tw:py-1 tw:text-[var(--o2-text-secondary)] tw:capitalize"
+        class="inline-flex items-center gap-1.5 text-xs font-medium bg-[var(--o2-surface-secondary)] border border-[var(--o2-border-color)] rounded-full px-2.5 py-1 text-[var(--o2-text-secondary)] capitalize"
       >
         {{ combo.browser }} · {{ combo.device.replace('_', ' ') }}
       </span>

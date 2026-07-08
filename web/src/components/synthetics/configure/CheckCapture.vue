@@ -24,19 +24,19 @@ const screenshot = computed({
 </script>
 
 <template>
-  <div class="tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:p-6 tw:mb-4">
-    <h3 class="tw:text-base tw:font-semibold tw:text-[var(--o2-text-heading)] tw:pb-4">Capture</h3>
-    <div class="tw:flex tw:flex-col tw:gap-4">
+  <div class="rounded-lg border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] p-6 mb-4">
+    <h3 class="text-base font-semibold text-[var(--o2-text-heading)] pb-4">Capture</h3>
+    <div class="flex flex-col gap-4">
 
-      <div class="tw:flex tw:items-center tw:gap-4">
-        <label class="tw:text-sm tw:text-[var(--o2-text-primary)] tw:w-24 tw:shrink-0">Screenshot</label>
+      <div class="flex items-center gap-4">
+        <label class="text-sm text-[var(--o2-text-primary)] w-24 shrink-0">Screenshot</label>
         <OSelect
           v-model="screenshot"
           :options="captureOptions"
-          class="tw:w-40"
+          class="w-40"
           data-test="synthetics-check-capture-screenshot"
         />
-        <p class="tw:text-xs tw:text-[var(--o2-text-secondary)]">
+        <p class="text-xs text-[var(--o2-text-secondary)]">
           Capture a full-page screenshot at each step.
         </p>
       </div>

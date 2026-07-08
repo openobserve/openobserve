@@ -84,24 +84,24 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="tw:flex tw:flex-col tw:min-h-screen">
+  <div class="flex flex-col min-h-screen">
     <!-- Recording banner -->
-    <div class="tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-2 tw:bg-[var(--o2-status-error-subtle)] tw:border-b tw:border-[var(--o2-border-color)]">
+    <div class="flex items-center gap-3 px-4 py-2 bg-[var(--o2-status-error-subtle)] border-b border-[var(--o2-border-color)]">
       <!-- Red dot + timer -->
-      <span class="tw:flex tw:items-center tw:gap-1.5">
-        <span class="tw:w-2 tw:h-2 tw:rounded-full tw:bg-[var(--o2-status-error)] tw:animate-pulse tw:inline-block" aria-hidden="true" />
-        <span class="tw:text-sm tw:font-semibold tw:text-[var(--o2-status-error)]">Recording</span>
-        <span class="tw:font-mono tw:text-sm tw:text-[var(--o2-text-body)]">{{ formatTime(recordingSeconds) }}</span>
+      <span class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-[var(--o2-status-error)] animate-pulse inline-block" aria-hidden="true" />
+        <span class="text-sm font-semibold text-[var(--o2-status-error)]">Recording</span>
+        <span class="font-mono text-sm text-[var(--o2-text-body)]">{{ formatTime(recordingSeconds) }}</span>
       </span>
 
       <!-- Current URL -->
-      <span class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:text-[var(--o2-text-secondary)] tw:truncate tw:flex-1 tw:min-w-0">
-        <OIcon name="shield" size="sm" class="tw:shrink-0" aria-hidden="true" />
-        <span class="tw:truncate">{{ currentUrl }}</span>
+      <span class="flex items-center gap-1 text-xs text-[var(--o2-text-secondary)] truncate flex-1 min-w-0">
+        <OIcon name="shield" size="sm" class="shrink-0" aria-hidden="true" />
+        <span class="truncate">{{ currentUrl }}</span>
       </span>
 
       <!-- Actions -->
-      <div class="tw:flex tw:items-center tw:gap-2 tw:shrink-0">
+      <div class="flex items-center gap-2 shrink-0">
         <OButton variant="ghost" size="sm" @click="emit('cancel')">Cancel</OButton>
         <OButton
           variant="primary"
@@ -115,25 +115,25 @@ onUnmounted(() => {
     </div>
 
     <!-- Info banner -->
-    <div class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-2 tw:border-b tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)]">
-      <OIcon name="open-in-new" size="sm" class="tw:text-[var(--o2-text-muted)]" aria-hidden="true" />
-      <span class="tw:text-xs tw:text-[var(--o2-text-secondary)] tw:flex-1">Recording in a separate incognito window</span>
+    <div class="flex items-center gap-2 px-4 py-2 border-b border-[var(--o2-border-color)] bg-[var(--o2-card-bg)]">
+      <OIcon name="open-in-new" size="sm" class="text-[var(--o2-text-muted)]" aria-hidden="true" />
+      <span class="text-xs text-[var(--o2-text-secondary)] flex-1">Recording in a separate incognito window</span>
       <OButton variant="outline" size="sm">Show window</OButton>
     </div>
 
     <!-- Captured steps -->
-    <div class="tw:flex-1 tw:overflow-y-auto tw:p-4">
-      <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3">
-        <h3 class="tw:text-base tw:font-semibold tw:text-[var(--o2-text-heading)] tw:m-0">Journey</h3>
-        <span class="tw:text-xs tw:font-medium tw:bg-[var(--o2-status-error-subtle)] tw:text-[var(--o2-status-error)] tw:rounded-full tw:px-2 tw:py-0.5 tw:flex tw:items-center tw:gap-1">
-          <span class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-[var(--o2-status-error)] tw:animate-pulse tw:inline-block" aria-hidden="true" />
+    <div class="flex-1 overflow-y-auto p-4">
+      <div class="flex items-center gap-2 mb-3">
+        <h3 class="text-base font-semibold text-[var(--o2-text-heading)] m-0">Journey</h3>
+        <span class="text-xs font-medium bg-[var(--o2-status-error-subtle)] text-[var(--o2-status-error)] rounded-full px-2 py-0.5 flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-[var(--o2-status-error)] animate-pulse inline-block" aria-hidden="true" />
           capturing live
         </span>
-        <span class="tw:text-sm tw:text-[var(--o2-text-muted)]">({{ capturedSteps.length }} steps)</span>
+        <span class="text-sm text-[var(--o2-text-muted)]">({{ capturedSteps.length }} steps)</span>
       </div>
 
       <!-- Live step list -->
-      <div v-if="capturedSteps.length > 0" class="tw:flex tw:flex-col tw:gap-1">
+      <div v-if="capturedSteps.length > 0" class="flex flex-col gap-1">
         <BrowserJourneyStep
           v-for="(step, index) in capturedSteps"
           :key="step.id"
@@ -151,10 +151,10 @@ onUnmounted(() => {
       <!-- Waiting for first step -->
       <div
         v-else
-        class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-3 tw:py-16 tw:text-center"
+        class="flex flex-col items-center justify-center gap-3 py-16 text-center"
       >
-        <OIcon name="fiber-manual-record" size="xl" class="tw:text-[var(--o2-text-muted)] tw:animate-pulse" aria-hidden="true" />
-        <p class="tw:text-sm tw:text-[var(--o2-text-secondary)] tw:m-0">Waiting for actions in the browser…</p>
+        <OIcon name="fiber-manual-record" size="xl" class="text-[var(--o2-text-muted)] animate-pulse" aria-hidden="true" />
+        <p class="text-sm text-[var(--o2-text-secondary)] m-0">Waiting for actions in the browser…</p>
       </div>
     </div>
   </div>

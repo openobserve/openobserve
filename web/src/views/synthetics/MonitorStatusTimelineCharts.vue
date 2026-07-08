@@ -22,60 +22,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden"
+    class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
     data-test="monitor-status-timeline-charts"
   >
     <div
-      class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]"
+      class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
     >
-      <span class="tw:font-bold tw:text-xs tw:text-text-heading">
+      <span class="font-bold text-xs text-text-heading">
         Status Timeline (ECharts)
       </span>
-      <span class="tw:flex-1" />
+      <span class="flex-1" />
       <span
-        class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-text-secondary"
+        class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
       >
         <span
-          class="tw:w-[7px] tw:h-[7px] tw:rounded-full tw:bg-[var(--o2-status-error-text)]"
+          class="w-[7px] h-[7px] rounded-full bg-[var(--o2-status-error-text)]"
         />
         {{ failCount }} Failed
       </span>
       <span
-        class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-text-secondary"
+        class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
       >
         <span
-          class="tw:w-[7px] tw:h-[7px] tw:rounded-full tw:bg-[var(--o2-status-warning-text)]"
+          class="w-[7px] h-[7px] rounded-full bg-[var(--o2-status-warning-text)]"
         />
         {{ mixedCount }} Warning
       </span>
       <span
-        class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-text-secondary"
+        class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
       >
         <span
-          class="tw:w-[7px] tw:h-[7px] tw:rounded-full tw:bg-[var(--o2-status-success-text)]"
+          class="w-[7px] h-[7px] rounded-full bg-[var(--o2-status-success-text)]"
         />
         {{ passCount }} Passed
       </span>
     </div>
-    <div class="tw:border-t tw:border-[var(--o2-border-color)]" />
-    <div class="tw:flex tw:flex-col tw:gap-1 tw:py-2 tw:px-[0.875rem]">
-      <div class="tw:flex tw:items-center tw:gap-1">
+    <div class="border-t border-[var(--o2-border-color)]" />
+    <div class="flex flex-col gap-1 py-2 px-[0.875rem]">
+      <div class="flex items-center gap-1">
         <button
-          class="tw:shrink-0 tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded tw:bg-transparent tw:border-none tw:cursor-pointer tw:text-text-secondary tw:hover:bg-surface-subtle tw:disabled:opacity-30 tw:disabled:cursor-default tw:transition-colors"
+          class="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded bg-transparent border-none cursor-pointer text-text-secondary hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-default transition-colors"
           :disabled="currentPage === 0"
           @click="prevPage"
           aria-label="Scroll timeline left"
         >
           <OIcon name="chevron-left" size="xs" />
         </button>
-        <div class="tw:flex-1 tw:rounded" style="height: 60px">
+        <div class="flex-1 rounded" style="height: 60px">
           <ChartRenderer
             :data="{ options: chartOptions, notMerge: true, lazyUpdate: true }"
             height="60px"
           />
         </div>
         <button
-          class="tw:shrink-0 tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded tw:bg-transparent tw:border-none tw:cursor-pointer tw:text-text-secondary tw:hover:bg-surface-subtle tw:disabled:opacity-30 tw:disabled:cursor-default tw:transition-colors"
+          class="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded bg-transparent border-none cursor-pointer text-text-secondary hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-default transition-colors"
           :disabled="currentPage >= maxPage"
           @click="nextPage"
           aria-label="Scroll timeline right"

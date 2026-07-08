@@ -34,13 +34,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="monitor-runs tw:h-full tw:flex tw:flex-col"
+    class="monitor-runs h-full flex flex-col"
     data-test="synthetics-monitor-runs"
   >
     <!-- ── Tabs ──────────────────────────────────────────────────────── -->
     <OTabs
       v-model="activeTab"
-      class="tw:shrink-0 tw:px-5 tw:border-b tw:border-border-default"
+      class="shrink-0 px-5 border-b border-border-default"
     >
       <OTab name="overview" data-test="monitor-runs-tab-overview">
         Overview
@@ -48,17 +48,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTab name="steps" data-test="monitor-runs-tab-steps"> Steps </OTab>
     </OTabs>
 
-    <div class="tw:flex-1 tw:min-h-0">
+    <div class="flex-1 min-h-0">
       <OTabPanels
         v-model="activeTab"
         grow
         scroll="y"
-        class="tw:h-full tw:min-h-0"
+        class="h-full min-h-0"
       >
         <!-- ════════════ OVERVIEW ════════════ -->
         <OTabPanel name="overview">
           <div
-            class="tw:mx-auto tw:px-5 tw:py-[0.875rem] tw:pb-[1.75rem] tw:flex tw:flex-col tw:gap-[0.875rem]"
+            class="mx-auto px-5 py-[0.875rem] pb-[1.75rem] flex flex-col gap-[0.875rem]"
           >
             <!-- Status Timeline (ECharts) -->
             <MonitorStatusTimelineCharts
@@ -77,29 +77,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <!-- KPI Cards — LLMInsightsDashboard style -->
-            <div class="tw:grid tw:grid-cols-5 tw:gap-[0.625rem]">
+            <div class="grid grid-cols-5 gap-[0.625rem]">
               <div
                 v-for="card in kpiCards"
                 :key="card.key"
-                class="card-container tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem] tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:transition-shadow tw:duration-200 tw:hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+                class="card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
                 :data-test="`monitor-runs-kpi-${card.key}`"
               >
-                <div class="tw:flex tw:flex-col tw:gap-[0.25rem]">
+                <div class="flex flex-col gap-[0.25rem]">
                   <div
-                    class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-muted)]"
+                    class="kpi-label text-[0.7rem] font-semibold text-[var(--o2-text-muted)]"
                   >
                     {{ card.label }}
                   </div>
-                  <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
+                  <div class="flex items-baseline gap-[0.2rem]">
                     <span
-                      class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-[var(--o2-text-primary)]"
+                      class="text-[1.4rem] font-bold leading-none text-[var(--o2-text-primary)]"
                       :class="card.valueClass"
                     >
                       {{ card.value }}
                     </span>
                     <span
                       v-if="card.unit"
-                      class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-secondary)]"
+                      class="text-[0.8rem] font-semibold text-[var(--o2-text-secondary)]"
                     >
                       {{ card.unit }}
                     </span>
@@ -109,23 +109,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Charts row -->
-            <div class="tw:grid tw:grid-cols-2 tw:gap-[0.875rem]">
+            <div class="grid grid-cols-2 gap-[0.875rem]">
               <div
-                class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden"
+                class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
               >
                 <div
-                  class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]"
+                  class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
                 >
-                  <span class="tw:font-bold tw:text-sm tw:text-text-heading">
+                  <span class="font-bold text-sm text-text-heading">
                     Response Time
                   </span>
-                  <span class="tw:flex-1" />
+                  <span class="flex-1" />
                   <OBadge variant="default" size="sm">
                     p95 {{ p95Label }}
                   </OBadge>
                 </div>
-                <div class="tw:border-t tw:border-[var(--o2-border-color)]" />
-                <div class="tw:min-h-[180px] tw:p-0">
+                <div class="border-t border-[var(--o2-border-color)]" />
+                <div class="min-h-[180px] p-0">
                   <ChartRenderer
                     :data="{ options: responseChartOption }"
                     height="180px"
@@ -133,21 +133,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden"
+                class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
               >
                 <div
-                  class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]"
+                  class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
                 >
-                  <span class="tw:font-bold tw:text-sm tw:text-text-heading">
+                  <span class="font-bold text-sm text-text-heading">
                     Errors Over Time
                   </span>
-                  <span class="tw:flex-1" />
+                  <span class="flex-1" />
                   <OBadge variant="error" size="sm">
                     {{ failCount }} failed
                   </OBadge>
                 </div>
-                <div class="tw:border-t tw:border-[var(--o2-border-color)]" />
-                <div class="tw:min-h-[180px] tw:p-0">
+                <div class="border-t border-[var(--o2-border-color)]" />
+                <div class="min-h-[180px] p-0">
                   <ChartRenderer
                     :data="{ options: errorChartOption }"
                     height="180px"
@@ -157,45 +157,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Breakdown cards -->
-            <div class="tw:grid tw:grid-cols-3 tw:gap-[0.875rem]">
+            <div class="grid grid-cols-3 gap-[0.875rem]">
               <div
-                class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden"
+                class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
               >
                 <div
-                  class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]"
+                  class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
                 >
-                  <OIcon name="language" size="sm" class="tw:text-primary-700" />
-                  <span class="tw:font-bold tw:text-sm tw:text-text-heading">
+                  <OIcon name="language" size="sm" class="text-primary-700" />
+                  <span class="font-bold text-sm text-text-heading">
                     Pass Rate by Browser
                   </span>
                 </div>
-                <div class="tw:border-t tw:border-[var(--o2-border-color)]" />
-                <div class="tw:px-[0.875rem] tw:py-[0.5rem]">
+                <div class="border-t border-[var(--o2-border-color)]" />
+                <div class="px-[0.875rem] py-[0.5rem]">
                   <div
                     v-for="b in browserBreakdown"
                     :key="b.name"
-                    class="tw:flex tw:items-center tw:gap-3 tw:py-[9px] tw:border-b tw:border-border-default tw:last:border-b-0"
+                    class="flex items-center gap-3 py-[9px] border-b border-border-default last:border-b-0"
                   >
                     <OIcon
                       :name="b.icon"
                       size="sm"
-                      class="tw:text-text-secondary tw:flex-none"
+                      class="text-text-secondary flex-none"
                     />
                     <span
-                      class="tw:w-20 tw:flex-none tw:font-semibold tw:text-xs tw:text-text-heading"
+                      class="w-20 flex-none font-semibold text-xs text-text-heading"
                     >
                       {{ b.name }}
                     </span>
                     <div
-                      class="tw:flex-1 tw:h-1.5 tw:rounded-full tw:bg-text-disabled/25! tw:overflow-hidden tw:min-w-[40px]"
+                      class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-[40px]"
                     >
                       <div
-                        class="tw:h-full tw:rounded-full"
+                        class="h-full rounded-full"
                         :style="{ width: b.pct, background: b.barColor }"
                       />
                     </div>
                     <span
-                      class="tw:font-mono tw:tabular-nums tw:font-bold tw:text-xs tw:w-12 tw:text-right"
+                      class="font-mono tabular-nums font-bold text-xs w-12 text-right"
                       :style="{ color: b.textColor }"
                     >
                       {{ b.pct }}
@@ -204,44 +204,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden"
+                class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
               >
                 <div
-                  class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]"
+                  class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
                 >
                   <OIcon
-                  <OIcon name="location-on" size="sm" class="tw:text-primary-700" />
-                  <span class="tw:font-bold tw:text-sm tw:text-text-heading">
+                  <OIcon name="location-on" size="sm" class="text-primary-700" />
+                  <span class="font-bold text-sm text-text-heading">
                     Pass Rate by Location
                   </span>
                 </div>
-                <div class="tw:border-t tw:border-[var(--o2-border-color)]" />
-                <div class="tw:px-[0.875rem] tw:py-[0.5rem]">
+                <div class="border-t border-[var(--o2-border-color)]" />
+                <div class="px-[0.875rem] py-[0.5rem]">
                   <div
                     v-for="l in locationBreakdown"
                     :key="l.name"
-                    class="tw:flex tw:items-center tw:gap-3 tw:py-[9px] tw:border-b tw:border-border-default tw:last:border-b-0"
+                    class="flex items-center gap-3 py-[9px] border-b border-border-default last:border-b-0"
                   >
                     <OIcon
                       :name="l.icon"
                       size="sm"
-                      class="tw:text-text-secondary tw:flex-none"
+                      class="text-text-secondary flex-none"
                     />
                     <span
-                      class="tw:w-[110px] tw:flex-none tw:font-semibold tw:text-xs tw:text-text-heading"
+                      class="w-[110px] flex-none font-semibold text-xs text-text-heading"
                     >
                       {{ l.name }}
                     </span>
                     <div
-                      class="tw:flex-1 tw:h-1.5 tw:rounded-full tw:bg-text-disabled/25! tw:overflow-hidden tw:min-w-[40px]"
+                      class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-[40px]"
                     >
                       <div
-                        class="tw:h-full tw:rounded-full"
+                        class="h-full rounded-full"
                         :style="{ width: l.pct, background: l.barColor }"
                       />
                     </div>
                     <span
-                      class="tw:font-mono tw:tabular-nums tw:font-bold tw:text-xs tw:w-12 tw:text-right"
+                      class="font-mono tabular-nums font-bold text-xs w-12 text-right"
                       :style="{ color: l.textColor }"
                     >
                       {{ l.pct }}
@@ -250,43 +250,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="card-container tw:rounded-lg tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden"
+                class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
               >
                 <div
-                  class="tw:flex tw:items-center tw:gap-2 tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.5rem]"
+                  class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
                 >
-                  <OIcon name="devices" size="sm" class="tw:text-primary-700" />
-                  <span class="tw:font-bold tw:text-sm tw:text-text-heading">
+                  <OIcon name="devices" size="sm" class="text-primary-700" />
+                  <span class="font-bold text-sm text-text-heading">
                     Pass Rate by Device
                   </span>
                 </div>
-                <div class="tw:border-t tw:border-[var(--o2-border-color)]" />
-                <div class="tw:px-[0.875rem] tw:py-[0.5rem]">
+                <div class="border-t border-[var(--o2-border-color)]" />
+                <div class="px-[0.875rem] py-[0.5rem]">
                   <div
                     v-for="d in deviceBreakdown"
                     :key="d.name"
-                    class="tw:flex tw:items-center tw:gap-3 tw:py-[9px] tw:border-b tw:border-border-default tw:last:border-b-0"
+                    class="flex items-center gap-3 py-[9px] border-b border-border-default last:border-b-0"
                   >
                     <OIcon
                       :name="d.icon"
                       size="sm"
-                      class="tw:text-text-secondary tw:flex-none"
+                      class="text-text-secondary flex-none"
                     />
                     <span
-                      class="tw:w-20 tw:flex-none tw:font-semibold tw:text-xs tw:text-text-heading"
+                      class="w-20 flex-none font-semibold text-xs text-text-heading"
                     >
                       {{ d.name }}
                     </span>
                     <div
-                      class="tw:flex-1 tw:h-1.5 tw:rounded-full tw:bg-text-disabled/25! tw:overflow-hidden tw:min-w-[40px]"
+                      class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-[40px]"
                     >
                       <div
-                        class="tw:h-full tw:rounded-full"
+                        class="h-full rounded-full"
                         :style="{ width: d.pct, background: d.barColor }"
                       />
                     </div>
                     <span
-                      class="tw:font-mono tw:tabular-nums tw:font-bold tw:text-xs tw:w-12 tw:text-right"
+                      class="font-mono tabular-nums font-bold text-xs w-12 text-right"
                       :style="{ color: d.textColor }"
                     >
                       {{ d.pct }}
@@ -297,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Filter bar -->
-            <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+            <div class="flex items-center gap-2 flex-wrap">
               <OToggleGroup v-model="statusFilter" variant="default">
                 <OToggleGroupItem
                   v-for="so in statusOptions"
@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <template #icon-left>
                     <span
-                      class="tw:w-[7px] tw:h-[7px] tw:rounded-full"
+                      class="w-[7px] h-[7px] rounded-full"
                       :style="{ background: so.dot }"
                     />
                   </template>
@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="browserOptions"
                 icon-key="icon"
                 size="md"
-                class="tw:w-35!"
+                class="w-35!"
                 data-test="monitor-runs-filter-browser"
               />
               <OSelect
@@ -328,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="deviceOptions"
                 icon-key="icon"
                 size="md"
-                class="tw:w-35!"
+                class="w-35!"
                 data-test="monitor-runs-filter-device"
               />
               <OSelect
@@ -336,38 +336,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="locationOptions"
                 icon-key="icon"
                 size="md"
-                class="tw:w-35!"
+                class="w-35!"
                 data-test="monitor-runs-filter-location"
               />
 
               <!-- Failure-specific filters -->
               <template v-if="statusFilter === 'fail' && false">
-                <OSeparator orientation="vertical" class="tw:h-5" />
+                <OSeparator orientation="vertical" class="h-5" />
                 <OSelect
                   v-model="failedStepFilter"
                   :options="failedStepOptions"
                   size="sm"
-                  class="tw:w-[160px]"
+                  class="w-[160px]"
                   data-test="monitor-runs-filter-step"
                 />
                 <OInput
                   v-model="locatorFilter"
                   size="sm"
                   placeholder="Locator contains…"
-                  class="tw:w-[170px]"
+                  class="w-[170px]"
                   data-test="monitor-runs-filter-locator"
                 />
                 <OSelect
                   v-model="actionFilter"
                   :options="actionOptions"
                   size="sm"
-                  class="tw:w-[130px]"
+                  class="w-[130px]"
                   data-test="monitor-runs-filter-action"
                 />
               </template>
 
-              <span class="tw:flex-1" />
-              <span class="tw:text-xs tw:text-text-secondary">
+              <span class="flex-1" />
+              <span class="text-xs text-text-secondary">
                 {{ filteredRuns.length }} of {{ allRuns.length }} runs
               </span>
             </div>
@@ -375,16 +375,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Error filter indicator -->
             <div
               v-if="errorFilter"
-              class="tw:flex tw:items-center tw:gap-2"
+              class="flex items-center gap-2"
               data-test="monitor-runs-error-filter-badge"
             >
-              <span class="tw:text-xs tw:text-text-secondary"
+              <span class="text-xs text-text-secondary"
                 >Filtering by error:</span
               >
-              <OBadge variant="error" size="sm" class="tw:gap-1">
+              <OBadge variant="error" size="sm" class="gap-1">
                 {{ errorFilter }}
                 <button
-                  class="tw:inline-flex tw:items-center tw:justify-center tw:cursor-pointer tw:bg-transparent tw:border-none tw:p-0 tw:text-inherit"
+                  class="inline-flex items-center justify-center cursor-pointer bg-transparent border-none p-0 text-inherit"
                   @click="clearErrorFilter"
                 >
                   <OIcon name="close" size="xs" />
@@ -393,7 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Runs table -->
-            <OCard class="tw:p-0">
+            <OCard class="p-0">
               <OTable
                 :columns="runColumns"
                 :data="visibleRuns"
@@ -436,14 +436,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template #cell-duration="{ row }">
                   <span
-                    class="tw:font-mono tw:tabular-nums tw:text-xs"
+                    class="font-mono tabular-nums text-xs"
                     :style="{ color: (row as VisibleRun).durColor }"
                   >
                     {{ (row as VisibleRun).duration }}
                   </span>
                 </template>
                 <template #cell-location="{ row }">
-                  <span class="tw:inline-flex tw:items-center tw:gap-1 tw:text-xs tw:text-text-secondary">
+                  <span class="inline-flex items-center gap-1 text-xs text-text-secondary">
                     <OIcon
                       :name="locationIcon((row as VisibleRun).location)"
                       size="xs"
@@ -452,7 +452,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </template>
                 <template #cell-browser="{ row }">
-                  <span class="tw:inline-flex tw:items-center tw:gap-1 tw:text-xs tw:text-text-secondary">
+                  <span class="inline-flex items-center gap-1 text-xs text-text-secondary">
                     <OIcon
                       :name="browserIcon((row as VisibleRun).browser)"
                       size="xs"
@@ -461,7 +461,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </template>
                 <template #cell-device="{ row }">
-                  <span class="tw:inline-flex tw:items-center tw:gap-1 tw:text-xs tw:text-text-secondary">
+                  <span class="inline-flex items-center gap-1 text-xs text-text-secondary">
                     <OIcon
                       :name="(row as VisibleRun).device === 'Desktop' ? 'computer' : (row as VisibleRun).device === 'Tablet' ? 'tablet' : 'smartphone'"
                       size="xs"
@@ -472,7 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #cell-error="{ row }">
                   <span
                     v-if="(row as VisibleRun).errorSnippet"
-                    class="tw:cursor-pointer"
+                    class="cursor-pointer"
                     @click.stop="
                       filterByError((row as VisibleRun).errorPattern)
                     "
@@ -480,14 +480,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OBadge
                       variant="error-outline"
                       size="sm"
-                      class="tw:truncate tw:max-w-[200px]"
+                      class="truncate max-w-[200px]"
                     >
                       {{ (row as VisibleRun).errorSnippet }}
                     </OBadge>
                   </span>
                 </template>
                 <template #cell-trigger_type="{ row }">
-                  <span class="tw:text-xs tw:text-text-secondary">
+                  <span class="text-xs text-text-secondary">
                     {{ (row as VisibleRun).triggerType }}
                   </span>
                 </template>
@@ -508,17 +508,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ════════════ STEPS ════════════ -->
         <OTabPanel name="steps">
           <div
-            class="tw:mx-auto tw:px-5 tw:py-[0.875rem] tw:pb-[1.75rem] tw:flex tw:flex-col tw:gap-[0.875rem]"
+            class="mx-auto px-5 py-[0.875rem] pb-[1.75rem] flex flex-col gap-[0.875rem]"
           >
-            <div class="tw:flex tw:items-center tw:gap-2.5">
-              <span class="tw:font-bold tw:text-sm tw:text-text-heading">
+            <div class="flex items-center gap-2.5">
+              <span class="font-bold text-sm text-text-heading">
                 Cross-run step analysis
               </span>
-              <span class="tw:text-xs tw:text-text-secondary">
+              <span class="text-xs text-text-secondary">
                 Grouped over {{ windowLabel }} &middot;
                 {{ allRuns.length }} runs
               </span>
-              <span class="tw:flex-1" />
+              <span class="flex-1" />
               <OToggleGroup v-model="stepsGroupBy" variant="default">
                 <OToggleGroupItem value="step" size="sm"
                   >By Step Name</OToggleGroupItem
@@ -529,9 +529,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroup>
             </div>
 
-            <OCard class="tw:p-0">
+            <OCard class="p-0">
               <div
-                class="tw:grid tw:grid-cols-[1fr_110px_120px_110px_1fr_1fr_32px] tw:gap-2.5 tw:px-4 tw:py-2 tw:bg-surface-subtle tw:border-b tw:border-border-default tw:text-[11px] tw:font-semibold tw:text-text-secondary tw:uppercase tw:tracking-wide"
+                class="grid grid-cols-[1fr_110px_120px_110px_1fr_1fr_32px] gap-2.5 px-4 py-2 bg-surface-subtle border-b border-border-default text-[11px] font-semibold text-text-secondary uppercase tracking-wide"
               >
                 <span>{{ primaryColLabel }}</span>
                 <span>Fail Rate</span>
@@ -545,15 +545,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Group row (manual expand/collapse) -->
                 <div>
                   <div
-                    class="tw:grid tw:grid-cols-[1fr_110px_120px_110px_1fr_1fr_32px] tw:gap-2.5 tw:px-4 tw:py-2.5 tw:border-b tw:border-border-default tw:items-center tw:cursor-pointer tw:hover:bg-surface-subtle"
+                    class="grid grid-cols-[1fr_110px_120px_110px_1fr_1fr_32px] gap-2.5 px-4 py-2.5 border-b border-border-default items-center cursor-pointer hover:bg-surface-subtle"
                     @click="toggleStepGroup(g._key)"
                   >
-                    <div class="tw:min-w-0">
+                    <div class="min-w-0">
                       <div
-                        class="tw:font-semibold tw:text-xs tw:text-text-heading tw:truncate"
+                        class="font-semibold text-xs text-text-heading truncate"
                         :class="
                           stepsGroupBy === 'locator'
-                            ? 'tw:font-mono tw:tabular-nums'
+                            ? 'font-mono tabular-nums'
                             : ''
                         "
                       >
@@ -561,23 +561,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <div
                         v-if="g.sub"
-                        class="tw:text-[11px] tw:text-text-secondary"
+                        class="text-[11px] text-text-secondary"
                       >
                         {{ g.sub }}
                       </div>
                     </div>
-                    <div class="tw:flex tw:flex-col tw:gap-1">
+                    <div class="flex flex-col gap-1">
                       <span
-                        class="tw:font-mono tw:tabular-nums tw:font-bold tw:text-xs"
+                        class="font-mono tabular-nums font-bold text-xs"
                         :style="{ color: g.failColor }"
                       >
                         {{ g.failRate }}
                       </span>
                       <div
-                        class="tw:h-[5px] tw:rounded-full tw:bg-text-disabled/25! tw:overflow-hidden"
+                        class="h-[5px] rounded-full bg-text-disabled/25! overflow-hidden"
                       >
                         <div
-                          class="tw:h-full tw:rounded-full"
+                          class="h-full rounded-full"
                           :style="{
                             width: g.failRateBarPct,
                             background: g.failBarColor,
@@ -585,24 +585,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </div>
                     </div>
-                    <div class="tw:flex tw:flex-col tw:gap-1">
+                    <div class="flex flex-col gap-1">
                       <span
-                        class="tw:font-mono tw:tabular-nums tw:text-xs tw:text-text-body"
+                        class="font-mono tabular-nums text-xs text-text-body"
                       >
                         {{ g.avgDuration }}
                       </span>
                       <div
-                        class="tw:h-[5px] tw:rounded-full tw:bg-text-disabled/25! tw:overflow-hidden"
+                        class="h-[5px] rounded-full bg-text-disabled/25! overflow-hidden"
                       >
                         <div
-                          class="tw:h-full tw:rounded-full tw:bg-primary-400"
+                          class="h-full rounded-full bg-primary-400"
                           :style="{ width: g.durationBarPct }"
                         />
                       </div>
                     </div>
                     <svg
                       viewBox="0 0 90 24"
-                      class="tw:w-[90px] tw:h-6 tw:block"
+                      class="w-[90px] h-6 block"
                     >
                       <polyline
                         :points="g.trendPts"
@@ -612,7 +612,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         vector-effect="non-scaling-stroke"
                       />
                     </svg>
-                    <div class="tw:flex tw:gap-1.5 tw:flex-wrap">
+                    <div class="flex gap-1.5 flex-wrap">
                       <OBadge
                         v-for="bc in g.browserChips"
                         :key="bc.label"
@@ -622,7 +622,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ bc.label }}
                       </OBadge>
                     </div>
-                    <div class="tw:flex tw:gap-1.5 tw:flex-wrap">
+                    <div class="flex gap-1.5 flex-wrap">
                       <OBadge
                         v-for="lc in g.locationChips"
                         :key="lc.label"
@@ -635,68 +635,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       name="expand_more"
                       size="sm"
-                      class="tw:text-text-secondary tw:transition-transform tw:duration-150"
-                      :class="{ 'tw:rotate-180': g.expanded }"
+                      class="text-text-secondary transition-transform duration-150"
+                      :class="{ 'rotate-180': g.expanded }"
                     />
                   </div>
                   <div
                     v-if="g.expanded"
-                    class="tw:grid tw:grid-cols-2 tw:gap-4 tw:px-4 tw:py-3 tw:bg-surface-subtle tw:border-b tw:border-border-default"
+                    class="grid grid-cols-2 gap-4 px-4 py-3 bg-surface-subtle border-b border-border-default"
                   >
                     <div>
                       <div
-                        class="tw:text-[10px] tw:font-bold tw:text-text-secondary tw:uppercase tw:tracking-wide tw:mb-1.5"
+                        class="text-[10px] font-bold text-text-secondary uppercase tracking-wide mb-1.5"
                       >
                         Fail rate by browser
                       </div>
                       <div
                         v-for="br in g.browserRows"
                         :key="br.name"
-                        class="tw:flex tw:items-center tw:gap-2.5 tw:py-1"
+                        class="flex items-center gap-2.5 py-1"
                       >
                         <span
-                          class="tw:w-[70px] tw:text-xs tw:text-text-body"
+                          class="w-[70px] text-xs text-text-body"
                           >{{ br.name }}</span
                         >
                         <div
-                          class="tw:flex-1 tw:h-1.5 tw:rounded-full tw:bg-text-disabled/25! tw:overflow-hidden"
+                          class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden"
                         >
                           <div
-                            class="tw:h-full tw:rounded-full"
+                            class="h-full rounded-full"
                             :style="{ width: br.pct, background: br.barColor }"
                           />
                         </div>
                         <span
-                          class="tw:font-mono tw:tabular-nums tw:text-xs tw:text-text-secondary tw:w-10 tw:text-right"
+                          class="font-mono tabular-nums text-xs text-text-secondary w-10 text-right"
                           >{{ br.pct }}</span
                         >
                       </div>
                     </div>
                     <div>
                       <div
-                        class="tw:text-[10px] tw:font-bold tw:text-text-secondary tw:uppercase tw:tracking-wide tw:mb-1.5"
+                        class="text-[10px] font-bold text-text-secondary uppercase tracking-wide mb-1.5"
                       >
                         Fail rate by location
                       </div>
                       <div
                         v-for="lr in g.locationRows"
                         :key="lr.name"
-                        class="tw:flex tw:items-center tw:gap-2.5 tw:py-1"
+                        class="flex items-center gap-2.5 py-1"
                       >
                         <span
-                          class="tw:w-[90px] tw:text-xs tw:text-text-body"
+                          class="w-[90px] text-xs text-text-body"
                           >{{ lr.name }}</span
                         >
                         <div
-                          class="tw:flex-1 tw:h-1.5 tw:rounded-full tw:tw:bg-text-disabled/25! tw:overflow-hidden"
+                          class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden"
                         >
                           <div
-                            class="tw:h-full tw:rounded-full"
+                            class="h-full rounded-full"
                             :style="{ width: lr.pct, background: lr.barColor }"
                           />
                         </div>
                         <span
-                          class="tw:font-mono tw:tabular-nums tw:text-xs tw:text-text-secondary tw:w-10 tw:text-right"
+                          class="font-mono tabular-nums text-xs text-text-secondary w-10 text-right"
                           >{{ lr.pct }}</span
                         >
                       </div>
@@ -711,21 +711,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ════════════ ERRORS ════════════ -->
         <OTabPanel name="errors">
           <div
-            class="tw:mx-auto tw:px-5 tw:py-[0.875rem] tw:pb-[1.75rem] tw:flex tw:flex-col tw:gap-[0.875rem]"
+            class="mx-auto px-5 py-[0.875rem] pb-[1.75rem] flex flex-col gap-[0.875rem]"
           >
-            <div class="tw:flex tw:items-center tw:gap-2.5">
-              <span class="tw:font-bold tw:text-sm tw:text-text-heading">
+            <div class="flex items-center gap-2.5">
+              <span class="font-bold text-sm text-text-heading">
                 Error patterns
               </span>
-              <span class="tw:text-xs tw:text-text-secondary">
+              <span class="text-xs text-text-secondary">
                 Normalized across {{ windowLabel }} &middot; click a row to
                 filter runs
               </span>
             </div>
 
-            <OCard class="tw:p-0">
+            <OCard class="p-0">
               <div
-                class="tw:grid tw:grid-cols-[1fr_100px_160px_32px] tw:gap-2.5 tw:px-4 tw:py-2 tw:bg-surface-subtle tw:border-b tw:border-border-default tw:text-[11px] tw:font-semibold tw:text-text-secondary tw:uppercase tw:tracking-wide"
+                class="grid grid-cols-[1fr_100px_160px_32px] gap-2.5 px-4 py-2 bg-surface-subtle border-b border-border-default text-[11px] font-semibold text-text-secondary uppercase tracking-wide"
               >
                 <span>Error Pattern</span>
                 <span>Count</span>
@@ -735,25 +735,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="e in errorGroups"
                 :key="e.pattern"
-                class="tw:grid tw:grid-cols-[1fr_100px_160px_32px] tw:gap-2.5 tw:px-4 tw:py-[11px] tw:border-b tw:border-border-default tw:items-center tw:cursor-pointer tw:hover:bg-surface-subtle"
+                class="grid grid-cols-[1fr_100px_160px_32px] gap-2.5 px-4 py-[11px] border-b border-border-default items-center cursor-pointer hover:bg-surface-subtle"
                 data-test="monitor-runs-error-row"
                 @click="filterByErrorPattern(e.pattern)"
               >
                 <span
-                  class="tw:font-mono tw:tabular-nums tw:text-xs tw:text-text-heading tw:truncate"
+                  class="font-mono tabular-nums text-xs text-text-heading truncate"
                 >
                   {{ e.pattern }}
                 </span>
-                <span class="tw:font-bold tw:text-sm tw:text-status-error-text">
+                <span class="font-bold text-sm text-status-error-text">
                   {{ e.count }}
                 </span>
-                <span class="tw:text-xs tw:text-text-secondary">
+                <span class="text-xs text-text-secondary">
                   {{ e.lastSeen }}
                 </span>
                 <OIcon
                   name="filter_alt"
                   size="sm"
-                  class="tw:text-text-secondary"
+                  class="text-text-secondary"
                 />
               </div>
             </OCard>
@@ -1230,13 +1230,13 @@ const kpiCards = computed<KpiCard[]>(() => {
           k.totalRuns > 0
             ? ((k.retriedRuns / k.totalRuns) * 100).toFixed(1) + "%"
             : "—",
-        valueClass: k.retriedRuns > 0 ? "tw:text-text-body!" : undefined,
+        valueClass: k.retriedRuns > 0 ? "text-text-body!" : undefined,
       },
       {
         key: "failed-runs",
         label: "Failed Runs",
         value: String(k.failedRuns),
-        valueClass: k.failedRuns > 0 ? "tw:text-status-error-text!" : undefined,
+        valueClass: k.failedRuns > 0 ? "text-status-error-text!" : undefined,
       },
       {
         key: "last-run",
@@ -1252,8 +1252,8 @@ const kpiCards = computed<KpiCard[]>(() => {
           : undefined,
         valueClass:
           k.lastRunStatus === "failed"
-            ? "tw:text-status-error-text!"
-            : "tw:text-status-success-text!",
+            ? "text-status-error-text!"
+            : "text-status-success-text!",
       },
     ];
   }
@@ -1283,8 +1283,8 @@ const kpiCards = computed<KpiCard[]>(() => {
       unit: lastRun ? fmtAge(lastRun.ageMin) + " · Next in 3 min" : undefined,
       valueClass:
         lastRun?.status === "fail"
-          ? "tw:text-status-error-text!"
-          : "tw:text-status-success-text!",
+          ? "text-status-error-text!"
+          : "text-status-success-text!",
     },
   ];
 });

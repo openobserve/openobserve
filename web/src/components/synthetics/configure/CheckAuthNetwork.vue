@@ -135,37 +135,37 @@ function removeCookie(index: number) {
 </script>
 
 <template>
-  <div class="tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:p-0">
+  <div class="rounded-lg border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] p-0">
     <OCollapsible
       :default-open="true"
       data-test="synthetics-check-auth-network-collapsible"
     >
       <!-- Rich header -->
       <template #trigger="{ open }">
-        <div class="tw:flex tw:items-center tw:gap-3 tw:w-full">
-          <OIcon name="lock" size="xs" class="tw:text-[var(--o2-text-heading)] tw:shrink-0" />
-          <div class="tw:flex tw:flex-col tw:min-w-0">
-            <div class="tw:flex tw:items-center tw:gap-2">
-              <h4 class="tw:text-xs! tw:font-normal">Authentication &amp; network</h4>
+        <div class="flex items-center gap-3 w-full">
+          <OIcon name="lock" size="xs" class="text-[var(--o2-text-heading)] shrink-0" />
+          <div class="flex flex-col min-w-0">
+            <div class="flex items-center gap-2">
+              <h4 class="text-xs! font-normal">Authentication &amp; network</h4>
               <OBadge variant="default-soft" size="sm">Optional</OBadge>
             </div>
           </div>
-          <div class="tw:flex tw:items-center tw:gap-2 tw:ml-auto tw:shrink-0">
-            <span v-if="summary" class="tw:text-xs! tw:text-[var(--o2-text-muted)]">{{ summary }}</span>
+          <div class="flex items-center gap-2 ml-auto shrink-0">
+            <span v-if="summary" class="text-xs! text-[var(--o2-text-muted)]">{{ summary }}</span>
             <OIcon
               name="expand-more"
               size="md"
-              class="tw:text-[var(--o2-text-muted)] tw:transition-transform tw:duration-200"
-              :class="open ? 'tw:rotate-180' : 'tw:rotate-0'"
+              class="text-[var(--o2-text-muted)] transition-transform duration-200"
+              :class="open ? 'rotate-180' : 'rotate-0'"
             />
           </div>
         </div>
       </template>
       <OSeparator></OSeparator>
 
-      <div class="tw:flex tw:flex-col tw:gap-6 tw:py-3 tw:px-3">
+      <div class="flex flex-col gap-6 py-3 px-3">
         <!-- HTTP Basic auth -->
-        <div class="tw:flex tw:flex-col tw:gap-3">
+        <div class="flex flex-col gap-3">
           <OSwitch
             v-model="authEnabled"
             label="HTTP Basic auth"
@@ -179,9 +179,9 @@ function removeCookie(index: number) {
               data-test="synthetics-check-auth-network-username-input"
             />
             <div>
-              <label class="tw:text-sm tw:font-medium tw:text-[var(--o2-text-label)] tw:mb-1 tw:block">
+              <label class="text-sm font-medium text-[var(--o2-text-label)] mb-1 block">
                 Password
-                <OBadge variant="default-soft" size="sm" class="tw:ml-1">secret</OBadge>
+                <OBadge variant="default-soft" size="sm" class="ml-1">secret</OBadge>
               </label>
               <OInput
                 v-model="authPassword"
@@ -196,34 +196,34 @@ function removeCookie(index: number) {
         <!-- Variables -->
         <OSeparator></OSeparator>
 
-        <div class="tw:flex tw:flex-col tw:gap-3">
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <h5 class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-heading)]">Variables</h5>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-2">
+            <h5 class="text-sm font-semibold text-[var(--o2-text-heading)]">Variables</h5>
           </div>
 
           <!-- Variables -->
-          <ul v-if="variables.length" class="tw:flex tw:flex-col tw:gap-2">
+          <ul v-if="variables.length" class="flex flex-col gap-2">
             <li
               v-for="(variable, index) in variables"
               :key="variable.id ?? index"
-              class="tw:flex tw:flex-col tw:gap-2"
+              class="flex flex-col gap-2"
             >
               <!-- Main row: name = value [secure toggle] [remove] -->
-              <div class="tw:flex tw:items-center tw:gap-2">
+              <div class="flex items-center gap-2">
                 <OInput
                   :model-value="variable.name"
                   placeholder="Name"
                   :data-test="`synthetics-check-auth-network-variable-name-${index}-input`"
-                  class="tw:flex-1"
+                  class="flex-1"
                   @update:model-value="updateVariable(index, 'name', String($event))"
                 />
-                <span class="tw:text-[var(--o2-text-muted)] tw:shrink-0">=</span>
+                <span class="text-[var(--o2-text-muted)] shrink-0">=</span>
                 <OInput
                   :model-value="variable.value"
                   :type="variable.secure ? 'password' : 'text'"
                   :placeholder="variable.secure && !variable.value ? variable.example || '••••••••' : 'Value'"
                   :data-test="`synthetics-check-auth-network-variable-value-${index}-input`"
-                  class="tw:flex-1"
+                  class="flex-1"
                   @update:model-value="updateVariable(index, 'value', String($event))"
                 />
 
@@ -231,7 +231,7 @@ function removeCookie(index: number) {
                   :data-test="`synthetics-check-auth-network-variable-secure-${index}-switch`"
                   size="sm"
                   variant="outline"
-                  class="tw:gap-1.5"
+                  class="gap-1.5"
                   @click="updateVariable(index, 'secure', !variable.secure)"
                 >
                   <OSwitch
@@ -261,7 +261,7 @@ function removeCookie(index: number) {
             variant="outline"
             size="sm"
             icon-left="add"
-            class="tw:self-start"
+            class="self-start"
             data-test="synthetics-check-auth-network-add-variable-btn"
             @click="addVariable"
           >
@@ -271,37 +271,37 @@ function removeCookie(index: number) {
         </div>
 
         <!-- Custom headers -->
-        <div v-if="false" class="tw:flex tw:flex-col tw:gap-3">
-          <h5 class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-heading)]">Custom headers</h5>
-          <ul v-if="headers.length" class="tw:flex tw:flex-col tw:gap-2">
+        <div v-if="false" class="flex flex-col gap-3">
+          <h5 class="text-sm font-semibold text-[var(--o2-text-heading)]">Custom headers</h5>
+          <ul v-if="headers.length" class="flex flex-col gap-2">
             <li
               v-for="(header, index) in headers"
               :key="header.id ?? index"
-              class="tw:flex tw:items-center tw:gap-2"
+              class="flex items-center gap-2"
             >
               <OInput
                 :model-value="header.key"
                 placeholder="Header key"
                 :data-test="`synthetics-check-auth-network-header-key-${index}-input`"
-                class="tw:flex-1"
+                class="flex-1"
                 @update:model-value="updateHeader(index, 'key', String($event))"
               />
-              <span class="tw:text-[var(--o2-text-muted)] tw:shrink-0">:</span>
+              <span class="text-[var(--o2-text-muted)] shrink-0">:</span>
               <OInput
                 :model-value="header.value"
                 placeholder="Header value"
                 :data-test="`synthetics-check-auth-network-header-value-${index}-input`"
-                class="tw:flex-1"
+                class="flex-1"
                 @update:model-value="updateHeader(index, 'value', String($event))"
               />
               <button
                 type="button"
                 :aria-label="`Remove header ${index}`"
                 :data-test="`synthetics-check-auth-network-remove-header-${index}-btn`"
-                class="tw:flex tw:items-center tw:text-[var(--o2-text-muted)] tw:hover:text-[var(--o2-text-body)] tw:transition-colors tw:shrink-0"
+                class="flex items-center text-[var(--o2-text-muted)] hover:text-[var(--o2-text-body)] transition-colors shrink-0"
                 @click="removeHeader(index)"
               >
-                <OIcon name="delete-outline" size="sm" class="tw:text-[var(--o2-text-muted)]" />
+                <OIcon name="delete-outline" size="sm" class="text-[var(--o2-text-muted)]" />
               </button>
             </li>
           </ul>
@@ -309,7 +309,7 @@ function removeCookie(index: number) {
             variant="ghost"
             size="sm"
             icon-left="add"
-            class="tw:self-start"
+            class="self-start"
             data-test="synthetics-check-auth-network-add-header-btn"
             @click="addHeader"
           >
@@ -321,43 +321,43 @@ function removeCookie(index: number) {
         <template v-if="false">
         <OSeparator></OSeparator>
 
-        <div class="tw:flex tw:flex-col tw:gap-3">
-          <h5 class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-heading)]">Pre-set cookies</h5>
-          <ul v-if="cookies.length" class="tw:flex tw:flex-col tw:gap-2">
+        <div class="flex flex-col gap-3">
+          <h5 class="text-sm font-semibold text-[var(--o2-text-heading)]">Pre-set cookies</h5>
+          <ul v-if="cookies.length" class="flex flex-col gap-2">
             <li
               v-for="(cookie, index) in cookies"
               :key="cookie.id ?? index"
-              class="tw:flex tw:items-center tw:gap-2"
+              class="flex items-center gap-2"
             >
               <OInput
                 :model-value="cookie.name"
                 placeholder="Name"
                 :data-test="`synthetics-check-auth-network-cookie-name-${index}-input`"
-                class="tw:flex-1"
+                class="flex-1"
                 @update:model-value="updateCookie(index, 'name', String($event))"
               />
               <OInput
                 :model-value="cookie.value"
                 placeholder="Value"
                 :data-test="`synthetics-check-auth-network-cookie-value-${index}-input`"
-                class="tw:flex-1"
+                class="flex-1"
                 @update:model-value="updateCookie(index, 'value', String($event))"
               />
               <OInput
                 :model-value="cookie.domain"
                 placeholder="Domain"
                 :data-test="`synthetics-check-auth-network-cookie-domain-${index}-input`"
-                class="tw:flex-1"
+                class="flex-1"
                 @update:model-value="updateCookie(index, 'domain', String($event))"
               />
               <button
                 type="button"
                 :aria-label="`Remove cookie ${index}`"
                 :data-test="`synthetics-check-auth-network-remove-cookie-${index}-btn`"
-                class="tw:flex tw:items-center tw:text-[var(--o2-text-muted)] tw:hover:text-[var(--o2-text-body)] tw:transition-colors tw:shrink-0"
+                class="flex items-center text-[var(--o2-text-muted)] hover:text-[var(--o2-text-body)] transition-colors shrink-0"
                 @click="removeCookie(index)"
               >
-                <OIcon name="delete-outline" size="sm" class="tw:text-[var(--o2-text-muted)]" />
+                <OIcon name="delete-outline" size="sm" class="text-[var(--o2-text-muted)]" />
               </button>
             </li>
           </ul>
@@ -365,7 +365,7 @@ function removeCookie(index: number) {
             variant="ghost"
             size="sm"
             icon-left="add"
-            class="tw:self-start"
+            class="self-start"
             data-test="synthetics-check-auth-network-add-cookie-btn"
             @click="addCookie"
           >

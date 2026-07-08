@@ -164,18 +164,18 @@ async function saveCheck() {
 </script>
 
 <template>
-  <div class="tw:flex tw:flex-col tw:h-full tw:bg-[var(--o2-body-primary-bg)]">
+  <div class="flex flex-col h-full bg-[var(--o2-body-primary-bg)]">
     <!-- Saved banner -->
     <div
       v-if="showSavedBanner"
-      class="tw:bg-[var(--o2-status-success-subtle)] tw:border-b tw:border-[var(--o2-border-color)] tw:px-6 tw:py-2 tw:flex tw:items-center tw:gap-2"
+      class="bg-[var(--o2-status-success-subtle)] border-b border-[var(--o2-border-color)] px-6 py-2 flex items-center gap-2"
       data-test="synthetics-detail-saved-banner"
     >
       <OIcon name="check-circle" size="sm" />
-      <span class="tw:text-sm tw:text-[var(--o2-text-body)]">Browser check saved successfully!</span>
+      <span class="text-sm text-[var(--o2-text-body)]">Browser check saved successfully!</span>
       <button
         type="button"
-        class="tw:ml-auto tw:text-[var(--o2-text-secondary)] tw:hover:text-[var(--o2-text-body)] tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-lg tw:leading-none"
+        class="ml-auto text-[var(--o2-text-secondary)] hover:text-[var(--o2-text-body)] bg-transparent border-0 cursor-pointer text-lg leading-none"
         aria-label="Dismiss"
         @click="dismissBanner"
       >
@@ -184,11 +184,11 @@ async function saveCheck() {
     </div>
 
     <!-- Header row -->
-    <header class="tw:flex tw:items-center tw:gap-3 tw:px-6 tw:py-3 tw:border-b tw:border-[var(--o2-border-color)]">
-      <RouterLink :to="{ name: 'synthetic' }" class="tw:text-sm tw:text-[var(--o2-text-link)] tw:hover:text-[var(--o2-text-link-hover)] tw:flex tw:items-center tw:gap-1">
+    <header class="flex items-center gap-3 px-6 py-3 border-b border-[var(--o2-border-color)]">
+      <RouterLink :to="{ name: 'synthetic' }" class="text-sm text-[var(--o2-text-link)] hover:text-[var(--o2-text-link-hover)] flex items-center gap-1">
         ← Back to checks
       </RouterLink>
-      <h2 class="tw:text-base tw:font-semibold">{{ check.name || '…' }}</h2>
+      <h2 class="text-base font-semibold">{{ check.name || '…' }}</h2>
       <OSwitch
         v-model="enabled"
         size="sm"
@@ -197,7 +197,7 @@ async function saveCheck() {
     </header>
 
     <!-- Tab bar -->
-    <OTabs v-model="activeTab" bordered class="tw:px-6 tw:bg-[var(--o2-card-bg)]">
+    <OTabs v-model="activeTab" bordered class="px-6 bg-[var(--o2-card-bg)]">
       <OTab name="journey" label="Journey">
         <template #icon>
           <OIcon name="stacked-line-chart" size="sm" />
@@ -216,15 +216,15 @@ async function saveCheck() {
     </OTabs>
 
     <!-- Tab panels -->
-    <OTabPanels :model-value="activeTab" class="tw:flex-1 tw:overflow-y-auto tw:min-h-0">
-      <OTabPanel name="journey" class="tw:h-full">
+    <OTabPanels :model-value="activeTab" class="flex-1 overflow-y-auto min-h-0">
+      <OTabPanel name="journey" class="h-full">
         <BrowserJourney
           v-model="check.journey"
           :start-url="check.url"
           :extension-ready="true"
         />
       </OTabPanel>
-      <OTabPanel name="configure" class="tw:h-full">
+      <OTabPanel name="configure" class="h-full">
         <CheckConfigure
           v-model:check="check"
           check-type="browser"
@@ -236,13 +236,13 @@ async function saveCheck() {
           @refresh:destinations="fetchDestinations"
         />
       </OTabPanel>
-      <OTabPanel name="results" class="tw:h-full">
+      <OTabPanel name="results" class="h-full">
         <BrowserCheckResults :check-id="check.id" />
       </OTabPanel>
     </OTabPanels>
 
     <!-- Sticky footer -->
-    <div class="tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:gap-2 tw:border-t tw:border-[var(--o2-border-color)] tw:shrink-0 tw:bg-[var(--o2-body-primary-bg)]">
+    <div class="flex items-center justify-end px-3 py-2.5 gap-2 border-t border-[var(--o2-border-color)] shrink-0 bg-[var(--o2-body-primary-bg)]">
       <template v-if="activeTab === 'journey'">
         <OButton variant="outline" size="sm" data-test="synthetics-detail-replay-btn">
           <template #prefix><OIcon name="replay" size="sm" /></template>

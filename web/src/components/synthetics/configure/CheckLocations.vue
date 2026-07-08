@@ -19,8 +19,8 @@ const selectedLocations = computed({
 </script>
 
 <template>
-  <div class="tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:p-6 tw:mb-4">
-    <h3 class="tw:text-base tw:font-semibold tw:text-[var(--o2-text-heading)] tw:pb-4">
+  <div class="rounded-lg border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] p-6 mb-4">
+    <h3 class="text-base font-semibold text-[var(--o2-text-heading)] pb-4">
       {{ t('synthetics.locations.title') }}
     </h3>
 
@@ -35,13 +35,13 @@ const selectedLocations = computed({
         :value="location.id"
         :label="`${location.name} · ${location.region}`"
         :data-test="`synthetics-check-locations-option-${location.id}`"
-        class="tw:pb-2"
+        class="pb-2"
       />
     </OCheckboxGroup>
 
     <div
       v-else
-      class="tw:flex tw:items-center tw:justify-center tw:rounded-md tw:border tw:border-dashed tw:border-[var(--o2-border-color)] tw:px-3 tw:py-3 tw:text-sm tw:text-[var(--o2-text-muted)]"
+      class="flex items-center justify-center rounded-md border border-dashed border-[var(--o2-border-color)] px-3 py-3 text-sm text-[var(--o2-text-muted)]"
       data-test="synthetics-check-locations-empty"
     >
       {{ t('synthetics.locations.empty') }}

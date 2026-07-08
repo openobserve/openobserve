@@ -297,35 +297,35 @@ function onClearResults() {
 
 <template>
   <!-- ── Non-loading: shared wrapper with page header ── -->
-  <div class="tw:flex tw:flex-col tw:h-full tw:bg-[var(--o2-body-primary-bg)]">
+  <div class="flex flex-col h-full bg-[var(--o2-body-primary-bg)]">
     <AppPageHeader
       :title="headerTitle"
       :back="{ label: 'Checks', to: { name: 'synthetic' }, dataTest: 'synthetics-create-back-btn' }"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     />
 
     <main
       v-if="isLoadingEdit"
-      class="tw:min-h-full tw:flex tw:items-center tw:justify-center tw:bg-[var(--o2-body-primary-bg)]"
+      class="min-h-full flex items-center justify-center bg-[var(--o2-body-primary-bg)]"
     >
-      <div class="tw:flex tw:flex-col tw:items-center tw:gap-3">
-        <OIcon name="hourglass-empty" size="lg" class="tw:text-[var(--o2-primary-color)] tw:animate-spin" />
-        <p class="tw:text-[var(--o2-text-secondary)]">Loading check…</p>
+      <div class="flex flex-col items-center gap-3">
+        <OIcon name="hourglass-empty" size="lg" class="text-[var(--o2-primary-color)] animate-spin" />
+        <p class="text-[var(--o2-text-secondary)]">Loading check…</p>
       </div>
     </main>
     <!-- ── Gate phase: URL + name ── -->
-    <main v-else-if="phase === 'gate'" class="tw:flex-1 tw:flex tw:flex-col tw:items-center tw:justify-center">
-      <div class="tw:max-w-[48rem] tw:w-full tw:mx-auto tw:py-4 tw:px-4">
-        <div class="tw:flex tw:justify-center tw:mb-6">
+    <main v-else-if="phase === 'gate'" class="flex-1 flex flex-col items-center justify-center">
+      <div class="max-w-[48rem] w-full mx-auto py-4 px-4">
+        <div class="flex justify-center mb-6">
           <EmptyBrowserCheck :width="140" />
         </div>
-        <p class="tw:mb-8 tw:pb-4 ">
+        <p class="mb-8 pb-4 ">
           Tell us where to start — you'll record the journey next. Everything else (schedule, alerts, RUM) gets set up after.
         </p>
 
-        <div class="tw:mb-6">
-          <label for="synthetics-start-url" class="tw:mb-1 tw:block">
-            Starting URL <span class="tw:text-[var(--o2-status-error-text)]">*</span>
+        <div class="mb-6">
+          <label for="synthetics-start-url" class="mb-1 block">
+            Starting URL <span class="text-[var(--o2-status-error-text)]">*</span>
           </label>
           <OInput
             id="synthetics-start-url"
@@ -337,21 +337,21 @@ function onClearResults() {
               <OIcon name="link" size="sm" />
             </template>
           </OInput>
-          <small class="tw:mt-1 tw:block">Supports &#123;&#123;variables&#125;&#125; like &#123;&#123;baseUrl&#125;&#125;.</small>
+          <small class="mt-1 block">Supports &#123;&#123;variables&#125;&#125; like &#123;&#123;baseUrl&#125;&#125;.</small>
         </div>
 
-        <div class="tw:mb-8">
-          <label for="synthetics-check-name" class="tw:mb-1 tw:block">Name</label>
+        <div class="mb-8">
+          <label for="synthetics-check-name" class="mb-1 block">Name</label>
           <OInput
             id="synthetics-check-name"
             v-model="checkName"
             placeholder="Checkout Smoke Test"
             data-test="synthetics-create-name-input"
           />
-          <small class="tw:mt-1 tw:block">Auto-filled from the page — edit if you like.</small>
+          <small class="mt-1 block">Auto-filled from the page — edit if you like.</small>
         </div>
 
-        <div class="tw:flex tw:gap-3 tw:mb-6">
+        <div class="flex gap-3 mb-6">
           <OButton
             variant="primary"
             :disabled="!startUrl.trim()"
@@ -376,7 +376,7 @@ function onClearResults() {
           </OButton>
         </div>
 
-        <small class="tw:flex tw:items-center tw:gap-1">
+        <small class="flex items-center gap-1">
           <OIcon name="bolt" size="sm" aria-hidden="true" />
           This is all we need to start. After recording you can replay it here, then save to configure schedule, alerts and more.
         </small>
@@ -384,38 +384,38 @@ function onClearResults() {
     </main>
 
     <!-- ── Extension setup phase (only when extension not yet installed) ── -->
-    <main v-else-if="phase === 'extension-setup'" class="tw:flex-1 tw:flex tw:flex-col tw:items-center tw:justify-center">
-      <div class="tw:max-w-[48rem] tw:w-full tw:mx-auto tw:py-4 tw:px-4">
-        <div class="tw:flex tw:justify-center tw:mb-6">
-          <div class="tw:rounded-2xl tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:p-6 tw:flex tw:items-center tw:justify-center">
-            <OIcon name="open-in-browser" size="xl" class="tw:text-[var(--o2-primary-color)]" aria-hidden="true" />
+    <main v-else-if="phase === 'extension-setup'" class="flex-1 flex flex-col items-center justify-center">
+      <div class="max-w-[48rem] w-full mx-auto py-4 px-4">
+        <div class="flex justify-center mb-6">
+          <div class="rounded-2xl border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] p-6 flex items-center justify-center">
+            <OIcon name="open-in-browser" size="xl" class="text-[var(--o2-primary-color)]" aria-hidden="true" />
           </div>
         </div>
 
-        <p class="tw:mb-8 tw:text-left tw:pb-4">
+        <p class="mb-8 text-left pb-4">
           We'll open <strong>{{ check.url }}</strong> in a fresh incognito tab and capture your clicks and inputs — <strong>no code</strong>.
         </p>
 
-        <div class="tw:rounded-xl tw:border tw:border-[var(--o2-border-color)] tw:divide-y tw:divide-[var(--o2-border-color)] tw:mb-6">
+        <div class="rounded-xl border border-[var(--o2-border-color)] divide-y divide-[var(--o2-border-color)] mb-6">
           <!-- Step 1 -->
-          <div class="tw:flex tw:items-start tw:gap-4 tw:p-4">
+          <div class="flex items-start gap-4 p-4">
             <span 
-            class="tw:flex-shrink-0 tw:w-7 tw:h-7 tw:rounded-full tw:bg-[var(--o2-primary-color)] tw:text-[var(--o2-text-inverse)] tw:flex tw:items-center tw:justify-center tw:text-sm tw:font-semibold" 
-            :class="extensionInstalled ? 'tw:bg-[var(--o2-status-success-text)]!': ''"
+            class="flex-shrink-0 w-7 h-7 rounded-full bg-[var(--o2-primary-color)] text-[var(--o2-text-inverse)] flex items-center justify-center text-sm font-semibold" 
+            :class="extensionInstalled ? 'bg-[var(--o2-status-success-text)]!': ''"
             >
               1
             </span>
-            <div class="tw:flex-1 tw:min-w-0 tw:flex tw:justify-between">
-              <div class="tw:flex tw:flex-col tw:items-start">
-                <h4 class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-heading)] tw:m-0 tw:pb-1">Install the OpenObserve Recorder</h4>
-                <p class="tw:text-xs tw:text-[var(--o2-text-secondary)] tw:m-0 tw:mb-3">A lightweight Chrome extension that captures your actions.</p>
+            <div class="flex-1 min-w-0 flex justify-between">
+              <div class="flex flex-col items-start">
+                <h4 class="text-sm font-semibold text-[var(--o2-text-heading)] m-0 pb-1">Install the OpenObserve Recorder</h4>
+                <p class="text-xs text-[var(--o2-text-secondary)] m-0 mb-3">A lightweight Chrome extension that captures your actions.</p>
               </div>
-              <div class="tw:flex tw:items-center tw:gap-3 tw:px-3">
+              <div class="flex items-center gap-3 px-3">
                 <!-- <a
                   href="https://openobserve.ai/docs/synthetics/recorder/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="tw:text-sm tw:text-[var(--o2-text-link)] tw:underline"
+                  class="text-sm text-[var(--o2-text-link)] underline"
                   data-test="synthetics-setup-install-link"
                 >              
                   <OButton
@@ -443,7 +443,7 @@ function onClearResults() {
                 </OButton>
                 <span
                   v-else
-                  class="tw:text-sm tw:font-medium tw:text-[var(--o2-status-success-text)]!"
+                  class="text-sm font-medium text-[var(--o2-status-success-text)]!"
                   data-test="synthetics-setup-installed-label"
                 >Installed ✓</span>
               </div>
@@ -451,15 +451,15 @@ function onClearResults() {
           </div>
 
           <!-- Step 2 -->
-          <div class="tw:flex tw:items-start tw:gap-4 tw:p-4" :class="{ 'tw:opacity-60': !extensionInstalled }">
+          <div class="flex items-start gap-4 p-4" :class="{ 'opacity-60': !extensionInstalled }">
             <span
-              class="tw:flex-shrink-0 tw:w-7 tw:h-7 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:text-sm tw:font-semibold"
-              :class="extensionInstalled ? incognitoAllowed ? 'tw:bg-[var(--o2-status-success-text)]! tw:text-[var(--o2-text-inverse)]' : 'tw:bg-[var(--o2-primary-color)] tw:text-[var(--o2-text-inverse)]' : 'tw:bg-[var(--o2-bg-subtle)] tw:text-[var(--o2-text-muted)]'"
+              class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
+              :class="extensionInstalled ? incognitoAllowed ? 'bg-[var(--o2-status-success-text)]! text-[var(--o2-text-inverse)]' : 'bg-[var(--o2-primary-color)] text-[var(--o2-text-inverse)]' : 'bg-[var(--o2-bg-subtle)] text-[var(--o2-text-muted)]'"
             >2</span>
-            <div class="tw:flex-1 tw:min-w-0 tw:flex tw:justify-between">
-              <div class="tw:flex tw:flex-col tw:items-start">
-                <h4 class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-heading)] tw:m-0 tw:mb-1">Allow it in Incognito</h4>
-                <p class="tw:text-xs tw:text-[var(--o2-text-secondary)] tw:m-0 tw:mb-3">Open <code>chrome://extensions</code> → Details → enable Allow in Incognito.</p>
+            <div class="flex-1 min-w-0 flex justify-between">
+              <div class="flex flex-col items-start">
+                <h4 class="text-sm font-semibold text-[var(--o2-text-heading)] m-0 mb-1">Allow it in Incognito</h4>
+                <p class="text-xs text-[var(--o2-text-secondary)] m-0 mb-3">Open <code>chrome://extensions</code> → Details → enable Allow in Incognito.</p>
               </div>
               <OSwitch
                 v-model="incognitoAllowed"
@@ -474,7 +474,7 @@ function onClearResults() {
         <OButton
           variant="primary"
           size="lg"
-          class="tw:w-full tw:mb-4"
+          class="w-full mb-4"
           :disabled="!extensionInstalled || !incognitoAllowed"
           data-test="synthetics-setup-open-record-btn"
           icon-left="smart-display"
@@ -483,10 +483,10 @@ function onClearResults() {
           Open &amp; Record
         </OButton>
 
-        <div class="tw:text-center">
+        <div class="text-center">
           <button
             type="button"
-            class="tw:text-sm tw:text-[var(--o2-text-link)] tw:underline tw:bg-transparent tw:border-0 tw:cursor-pointer tw:p-0"
+            class="text-sm text-[var(--o2-text-link)] underline bg-transparent border-0 cursor-pointer p-0"
             data-test="synthetics-setup-skip-link"
             @click="onExtensionSetupSkip"
           >
@@ -501,14 +501,14 @@ function onClearResults() {
       <OStepper
         v-model="currentStep"
         :navigable="true"
-        class="tw:flex-1 tw:overflow-y-auto tw:min-h-0 tw:p-2 tw:h-full"
+        class="flex-1 overflow-y-auto min-h-0 p-2 h-full"
       >
         <OStep
           :name="1"
           title="Journey"
           icon="stacked-line-chart"
           :done="journeyStepDone"
-          class="tw:h-full!"
+          class="h-full!"
         >
           <BrowserJourney
             ref="journeyRef"
@@ -520,7 +520,7 @@ function onClearResults() {
             :step-results="stepResults"
             :active-step-id="activeStepId"
             :blocked-reason="blockedReason"
-            class="tw:h-full! tw:border-t! tw:border-border-default!"
+            class="h-full! border-t! border-border-default!"
             @need-extension-setup="onNeedExtensionSetup"
             @replay="onReplay"
             @stop-replay="onStopReplay"
@@ -543,19 +543,19 @@ function onClearResults() {
             :devices="devices"
             :destinations="destinations"
             :folders="folders"
-            class="tw:border-t! tw:border-border-default! tw:w-full!"
+            class="border-t! border-border-default! w-full!"
             @refresh:destinations="fetchDestinations"
           />
         </OStep>
       </OStepper>
 
       <!-- Sticky footer — tab-aware, always visible -->
-      <div class="tw:flex tw:items-center tw:px-3 tw:py-2.5 tw:gap-2 tw:border-t tw:border-[var(--o2-border-color)] tw:shrink-0 tw:bg-[var(--o2-body-primary-bg)]">
+      <div class="flex items-center px-3 py-2.5 gap-2 border-t border-[var(--o2-border-color)] shrink-0 bg-[var(--o2-body-primary-bg)]">
         <!-- Journey step: Cancel | Selection actions (left) | Replay status + Continue (right) -->
         <template v-if="currentStep === 1">
           <!-- Selection actions — moved from BrowserJourney, kept on the left -->
           <template v-if="journeySelectionState.count > 0 && !journeySelectionState.isRecording">
-            <span class="tw:text-sm tw:text-[var(--o2-text-secondary)] tw:whitespace-nowrap">{{ journeySelectionState.count }} selected</span>
+            <span class="text-sm text-[var(--o2-text-secondary)] whitespace-nowrap">{{ journeySelectionState.count }} selected</span>
             <OButton
               variant="outline-destructive"
               size="sm"
@@ -566,7 +566,7 @@ function onClearResults() {
               Delete
             </OButton>
           </template>
-          <span class="tw:flex-1" aria-hidden="true" />
+          <span class="flex-1" aria-hidden="true" />
 
           <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetic' })">
             Cancel
@@ -579,7 +579,7 @@ function onClearResults() {
 
         <!-- Configure step: Cancel | Back + Save -->
         <template v-else-if="currentStep === 2">
-          <span class="tw:flex-1" aria-hidden="true" />
+          <span class="flex-1" aria-hidden="true" />
           <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetic' })">
             Cancel
           </OButton>
@@ -606,7 +606,7 @@ function onClearResults() {
         @click:primary="onDeleteSelected"
         @click:secondary="showBulkDeleteDialog = false"
       >
-        <p class="tw:py-2">
+        <p class="py-2">
           Delete {{ journeySelectionState.count }} step{{ journeySelectionState.count !== 1 ? 's' : '' }}? This cannot be undone.
         </p>
       </ODialog>

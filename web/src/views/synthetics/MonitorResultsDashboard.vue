@@ -18,36 +18,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Chrome-less wrapper: the KPI tiles, chart and table each carry their own
        card-container, mirroring the LLM Insights dashboard. -->
   <div
-    class="synthetic-results-dashboard tw:h-full tw:flex tw:flex-col tw:px-[0.625rem]"
+    class="synthetic-results-dashboard h-full flex flex-col px-[0.625rem]"
     data-test="synthetic-monitor-results-dashboard"
   >
-    <div class="tw:flex-1 tw:overflow-y-auto tw:pb-[0.625rem]">
+    <div class="flex-1 overflow-y-auto pb-[0.625rem]">
       <!-- KPI Cards Row -->
       <div
-        class="tw:grid tw:grid-cols-4 tw:gap-[0.625rem] tw:mt-[0.625rem] tw:mb-[0.625rem]"
+        class="grid grid-cols-4 gap-[0.625rem] mt-[0.625rem] mb-[0.625rem]"
       >
         <div
           v-for="card in kpiCards"
           :key="card.label"
-          class="kpi-card card-container tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem]"
+          class="kpi-card card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem]"
           :data-test="`synthetic-monitor-results-kpi-${card.key}`"
         >
-          <div class="tw:flex tw:flex-col tw:gap-[0.25rem]">
+          <div class="flex flex-col gap-[0.25rem]">
             <div
-              class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-muted)]"
+              class="kpi-label text-[0.7rem] font-semibold text-[var(--o2-text-muted)]"
             >
               {{ card.label }}
             </div>
-            <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
+            <div class="flex items-baseline gap-[0.2rem]">
               <span
-                class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-[var(--o2-text-primary)]"
+                class="text-[1.4rem] font-bold leading-none text-[var(--o2-text-primary)]"
                 :class="card.valueClass"
               >
                 {{ card.value }}
               </span>
               <span
                 v-if="card.unit"
-                class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-secondary)]"
+                class="text-[0.8rem] font-semibold text-[var(--o2-text-secondary)]"
               >
                 {{ card.unit }}
               </span>
@@ -58,23 +58,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data="card.sparkData"
             :color="card.sparkColor"
             :height="32"
-            class="tw:mt-auto"
+            class="mt-auto"
           />
         </div>
       </div>
 
       <!-- Response Time chart -->
       <section
-        class="card-container tw:rounded-lg tw:px-[0.875rem] tw:py-[0.75rem] tw:mb-[0.625rem]"
+        class="card-container rounded-lg px-[0.875rem] py-[0.75rem] mb-[0.625rem]"
         data-test="synthetic-monitor-results-response-time-chart"
       >
-        <header class="tw:flex tw:items-baseline tw:gap-[0.5rem] tw:mb-[0.5rem]">
+        <header class="flex items-baseline gap-[0.5rem] mb-[0.5rem]">
           <h4
-            class="tw:text-[0.85rem] tw:font-semibold tw:text-[var(--o2-text-heading)]"
+            class="text-[0.85rem] font-semibold text-[var(--o2-text-heading)]"
           >
             {{ t("synthetics.results.responseTime") }}
           </h4>
-          <small class="tw:text-[var(--o2-text-caption)]">
+          <small class="text-[var(--o2-text-caption)]">
             {{ t("synthetics.results.responseTimeSubtitle") }}
           </small>
         </header>
@@ -83,33 +83,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Runs table (expandable) -->
       <section
-        class="card-container tw:rounded-lg tw:overflow-hidden"
+        class="card-container rounded-lg overflow-hidden"
         data-test="synthetic-monitor-results-runs-section"
       >
-        <header class="tw:flex tw:items-center tw:justify-between tw:px-[0.875rem] tw:pt-[0.75rem] tw:pb-[0.5rem]">
-          <h4 class="tw:text-[0.85rem] tw:font-semibold tw:text-[var(--o2-text-heading)]">
+        <header class="flex items-center justify-between px-[0.875rem] pt-[0.75rem] pb-[0.5rem]">
+          <h4 class="text-[0.85rem] font-semibold text-[var(--o2-text-heading)]">
             {{ t("synthetics.results.recentRuns") }}
           </h4>
-          <span v-if="runsTotal" class="tw:text-xs tw:text-[var(--o2-text-muted)]">{{ runsTotal }} runs</span>
+          <span v-if="runsTotal" class="text-xs text-[var(--o2-text-muted)]">{{ runsTotal }} runs</span>
         </header>
 
         <!-- Loading skeleton -->
-        <div v-if="runsLoading" class="tw:flex tw:flex-col tw:gap-1 tw:px-4 tw:py-3">
-          <div v-for="i in 5" :key="i" class="runs-skel tw:h-9 tw:rounded" />
+        <div v-if="runsLoading" class="flex flex-col gap-1 px-4 py-3">
+          <div v-for="i in 5" :key="i" class="runs-skel h-9 rounded" />
         </div>
 
         <!-- Empty -->
-        <div v-else-if="!runRows.length" class="tw:flex tw:items-center tw:justify-center tw:py-12 tw:text-sm tw:text-[var(--o2-text-muted)]">
+        <div v-else-if="!runRows.length" class="flex items-center justify-center py-12 text-sm text-[var(--o2-text-muted)]">
           {{ t("synthetics.results.noRuns") }}
         </div>
 
         <!-- Table -->
         <div v-else class="runs-list">
           <!-- Column headers -->
-          <div class="runs-header tw:grid tw:text-[0.65rem] tw:font-semibold tw:uppercase tw:tracking-wider tw:text-[var(--o2-text-muted)] tw:px-4 tw:py-1.5 tw:border-b tw:border-[var(--o2-border-color)]">
-            <span class="tw:pl-5">Status</span>
+          <div class="runs-header grid text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--o2-text-muted)] px-4 py-1.5 border-b border-[var(--o2-border-color)]">
+            <span class="pl-5">Status</span>
             <span>Started</span>
-            <span class="tw:text-right">Duration</span>
+            <span class="text-right">Duration</span>
             <span>Locations</span>
             <span>Trigger</span>
           </div>
@@ -118,28 +118,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="run in runRows"
             :key="run.id"
-            class="tw:border-b tw:border-[var(--o2-border-color)] last:tw:border-b-0"
+            class="border-b border-[var(--o2-border-color)] last:border-b-0"
           >
             <!-- Summary row -->
             <button
-              class="runs-row tw:w-full tw:grid tw:items-center tw:px-4 tw:py-2.5 tw:text-xs tw:text-left hover:tw:bg-[var(--o2-surface-hover)] tw:transition-colors"
-              :class="run.status === 'pending' ? 'tw:cursor-default' : 'tw:cursor-pointer'"
+              class="runs-row w-full grid items-center px-4 py-2.5 text-xs text-left hover:bg-[var(--o2-surface-hover)] transition-colors"
+              :class="run.status === 'pending' ? 'cursor-default' : 'cursor-pointer'"
               :disabled="run.status === 'pending'"
               @click="run.status !== 'pending' && toggleRunExpansion(run.id)"
             >
               <!-- Chevron + status -->
-              <span class="tw:flex tw:items-center tw:gap-1.5">
+              <span class="flex items-center gap-1.5">
                 <OIcon
                   v-if="run.status !== 'pending'"
                   :name="expandedRunIds.has(run.id) ? 'expand_more' : 'chevron_right'"
                   size="xs"
-                  class="tw:text-[var(--o2-text-muted)] tw:shrink-0"
+                  class="text-[var(--o2-text-muted)] shrink-0"
                 />
-                <span v-else class="tw:w-3.5 tw:h-3.5 tw:shrink-0 tw:flex tw:items-center tw:justify-center">
-                  <span class="run-status-spinner tw:inline-block" />
+                <span v-else class="w-3.5 h-3.5 shrink-0 flex items-center justify-center">
+                  <span class="run-status-spinner inline-block" />
                 </span>
                 <span
-                  class="run-status tw:flex tw:items-center tw:gap-1.5 tw:font-semibold"
+                  class="run-status flex items-center gap-1.5 font-semibold"
                   :class="`run-status--${run.status}`"
                 >
                   <span v-if="run.status !== 'pending'" class="run-status-dot" />
@@ -152,12 +152,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}
                 </span>
               </span>
-              <span class="tw:text-[var(--o2-text-secondary)]">{{ relativeFromNow(run.scheduledTs / 1000) }}</span>
-              <span class="tw:text-right tw:tabular-nums tw:text-[var(--o2-text-secondary)]">
+              <span class="text-[var(--o2-text-secondary)]">{{ relativeFromNow(run.scheduledTs / 1000) }}</span>
+              <span class="text-right tabular-nums text-[var(--o2-text-secondary)]">
                 {{ run.durationMs ? formatDuration(run.durationMs) : '—' }}
               </span>
-              <span class="tw:text-[var(--o2-text-muted)]">{{ run.jobsDone }}/{{ run.jobCount }}</span>
-              <span class="tw:text-[var(--o2-text-muted)] tw:capitalize">{{ run.triggerType || 'scheduled' }}</span>
+              <span class="text-[var(--o2-text-muted)]">{{ run.jobsDone }}/{{ run.jobCount }}</span>
+              <span class="text-[var(--o2-text-muted)] capitalize">{{ run.triggerType || 'scheduled' }}</span>
             </button>
 
             <!-- Inline expansion -->
@@ -259,11 +259,11 @@ const kpiCards = computed<KpiCard[]>(() => {
         : undefined,
       valueClass:
         lastStatus === "passed"
-          ? "tw:text-[#16a34a]!"
+          ? "text-[#16a34a]!"
           : lastStatus === "warning"
-            ? "tw:text-[var(--o2-status-warning-text)]!"
+            ? "text-[var(--o2-status-warning-text)]!"
             : lastStatus === "failed" || lastStatus === "error"
-              ? "tw:text-[var(--o2-status-error-text)]!"
+              ? "text-[var(--o2-status-error-text)]!"
               : undefined,
     },
   ];

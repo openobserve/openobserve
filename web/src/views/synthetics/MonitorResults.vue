@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="synthetic-monitor-results-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:overflow-hidden"
+    class="flex flex-col h-full min-h-0 overflow-hidden"
   >
     <AppPageHeader
       :title="monitorName"
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         label: t('synthetics.results.monitors'),
         to: { name: 'synthetic' },
       }"
-      class="tw:px-4"
+      class="px-4"
     >
       <template #title-trail>
         <OBadge v-if="statusBadge" :variant="statusBadge.variant" size="sm" dot>
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           :default-relative-time="timeState.relativeTimePeriod ?? ''"
           data-test="synthetic-monitor-results-date-time"
-          class="tw:h-[2rem]"
+          class="h-[2rem]"
           @on:date-change="onDateChange"
         />
         <OButton
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </AppPageHeader>
 
-    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+    <div class="flex-1 min-h-0 overflow-hidden">
       <MonitorRuns
         ref="runsRef"
         :monitor-id="monitorId"

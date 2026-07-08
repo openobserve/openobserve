@@ -289,30 +289,30 @@ function openChromeExtensions() {
 </script>
 
 <template>
-  <div class="tw:flex tw:flex-col tw:min-h-0 tw:w-full tw:p-2">
+  <div class="flex flex-col min-h-0 w-full p-2">
 
     <!-- Toolbar — no-layout-shift design: fluid search + fixed w-80 action area -->
-    <div class="tw:flex tw:items-center tw:gap-4 tw:mb-3 tw:pl-3">
+    <div class="flex items-center gap-4 mb-3 pl-3">
       <!-- Select-all — visibility:hidden during replay to preserve layout -->
       <OCheckbox
         :model-value="selectAllModel"
         size="xs"
-        :class="{ 'tw:invisible': isRecording || readonly }"
+        :class="{ 'invisible': isRecording || readonly }"
         data-test="synthetics-journey-select-all"
         @update:model-value="toggleSelectAll"
       />
-      <div class="tw:flex">
-        <h3 class="tw:text-base tw:font-semibold tw:text-[var(--o2-text-heading)] tw:mr-0">Steps</h3>
-        <OBadge variant="default" size="sm" class="tw:ml-1">{{ modelValue.length }}</OBadge>
+      <div class="flex">
+        <h3 class="text-base font-semibold text-[var(--o2-text-heading)] mr-0">Steps</h3>
+        <OBadge variant="default" size="sm" class="ml-1">{{ modelValue.length }}</OBadge>
       </div>
       <OInput
         v-model="filterQuery"
         placeholder="Filter steps..."
-        class="tw:flex-1 tw:min-w-[8rem]!"
+        class="flex-1 min-w-[8rem]!"
         data-test="synthetics-journey-filter-input"
       />
       <!-- Fixed-width action area — buttons right-aligned, widest set (Add Step + Record + Replay/Stop) fits in 320px -->
-      <div class="tw:w-100 tw:flex tw:items-center tw:gap-2 tw:justify-end">
+      <div class="w-100 flex items-center gap-2 justify-end">
         <OButton
           v-if="!isRecording && !isReplayRunning"
           variant="outline"
@@ -377,7 +377,7 @@ function openChromeExtensions() {
           data-test="synthetics-journey-stop-btn"
           @click="stopRecording"
           icon-left="stop"
-          class="tw:w-24!"
+          class="w-24!"
         >
           Stop
         </OButton>
@@ -389,7 +389,7 @@ function openChromeExtensions() {
           data-test="synthetics-journey-record-btn"
           @click="onRecordButtonClick"
           icon-left="smart-display"
-          class="tw:w-24!"
+          class="w-24!"
         >
           Record
         </OButton>
@@ -399,25 +399,25 @@ function openChromeExtensions() {
     <!-- Incognito blocked warning card (pre-flight failure) -->
     <div
       v-if="blockedReason === 'incognito'"
-      class="tw:flex tw:flex-col tw:gap-3 tw:px-3 tw:py-3 tw:mb-3 tw:rounded-lg tw:border tw:border-[var(--o2-warning-300)] tw:bg-[var(--o2-warning-50)]"
+      class="flex flex-col gap-3 px-3 py-3 mb-3 rounded-lg border border-[var(--o2-warning-300)] bg-[var(--o2-warning-50)]"
       role="alert"
       data-test="synthetics-journey-incognito-warning"
     >
-      <div class="tw:flex tw:items-center tw:gap-2">
-        <OIcon name="visibility-off" size="sm" class="tw:text-[var(--o2-warning-600)]" aria-hidden="true" />
-        <span class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-heading)]">Can't open the Incognito window</span>
+      <div class="flex items-center gap-2">
+        <OIcon name="visibility-off" size="sm" class="text-[var(--o2-warning-600)]" aria-hidden="true" />
+        <span class="text-sm font-semibold text-[var(--o2-text-heading)]">Can't open the Incognito window</span>
       </div>
-      <p class="tw:text-xs tw:text-[var(--o2-text-secondary)] tw:m-0">
+      <p class="text-xs text-[var(--o2-text-secondary)] m-0">
         Replays run in a clean Incognito session. The OpenObserve Recorder extension needs permission to run in Incognito mode.
       </p>
-      <ol class="tw:list-decimal tw:pl-4 tw:text-xs tw:text-[var(--o2-text-body)] tw:flex tw:flex-col tw:gap-1 tw:m-0">
-        <li>Open <code class="tw:font-mono tw:text-[var(--o2-text-code)]">chrome://extensions</code></li>
+      <ol class="list-decimal pl-4 text-xs text-[var(--o2-text-body)] flex flex-col gap-1 m-0">
+        <li>Open <code class="font-mono text-[var(--o2-text-code)]">chrome://extensions</code></li>
         <li>Find the <strong>OpenObserve Recorder</strong> extension</li>
         <li>Click <strong>Details</strong></li>
         <li>Enable <strong>Allow in Incognito</strong></li>
         <li>Return here and click <strong>Retry</strong></li>
       </ol>
-      <div class="tw:flex tw:items-center tw:gap-2">
+      <div class="flex items-center gap-2">
         <OButton
           variant="primary"
           size="sm"
@@ -434,7 +434,7 @@ function openChromeExtensions() {
         >
           Dismiss
         </OButton>
-        <span class="tw:flex-1" />
+        <span class="flex-1" />
         <OButton
           variant="outline"
           size="sm"
@@ -449,18 +449,18 @@ function openChromeExtensions() {
     <!-- Replay running banner -->
     <div
       v-if="replayPhase === 'running'"
-      class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--color-badge-primary-soft-bg)] tw:border tw:border-[var(--o2-border-color)]"
+      class="flex items-center gap-2 px-3 py-2 mb-3 rounded bg-[var(--color-badge-primary-soft-bg)] border border-[var(--o2-border-color)]"
       role="status"
       data-test="synthetics-journey-replay-banner"
     >
-      <OIcon name="sync" size="sm" class="tw:animate-spin tw:text-[var(--o2-primary-color)]" aria-hidden="true" />
+      <OIcon name="sync" size="sm" class="animate-spin text-[var(--o2-primary-color)]" aria-hidden="true" />
       <span
-        class="tw:text-sm tw:text-[var(--o2-text-heading)]"
+        class="text-sm text-[var(--o2-text-heading)]"
         data-test="synthetics-journey-replay-banner-text"
       >
         Replaying…
       </span>
-      <span class="tw:text-sm tw:text-[var(--o2-text-secondary)]">
+      <span class="text-sm text-[var(--o2-text-secondary)]">
         {{ stepResults?.size ?? 0 }} of {{ modelValue.length }} steps
       </span>
     </div>
@@ -468,13 +468,13 @@ function openChromeExtensions() {
     <!-- Replay passed banner -->
     <div
       v-else-if="replayPhase === 'passed'"
-      class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--color-badge-success-soft-bg)] tw:border tw:border-badge-success-ol-border/50"
+      class="flex items-center gap-2 px-3 py-2 mb-3 rounded bg-[var(--color-badge-success-soft-bg)] border border-badge-success-ol-border/50"
       role="status"
       data-test="synthetics-journey-passed-banner"
     >
-      <OIcon name="check-circle" size="sm" class="tw:text-[var(--color-timeline-dot-success)]" aria-hidden="true" />
-      <span class="tw:text-sm tw:text-badge-success-ol-text tw:font-semi-bold">Replay passed — all {{ modelValue.length }} steps completed successfully</span>
-      <span class="tw:flex-1" />
+      <OIcon name="check-circle" size="sm" class="text-[var(--color-timeline-dot-success)]" aria-hidden="true" />
+      <span class="text-sm text-badge-success-ol-text font-semi-bold">Replay passed — all {{ modelValue.length }} steps completed successfully</span>
+      <span class="flex-1" />
       <OButton variant="ghost" size="xs" data-test="synthetics-journey-clear-results-btn" @click="emit('clear-results')">
         <OIcon name="close" size="sm" />
       </OButton>
@@ -483,14 +483,14 @@ function openChromeExtensions() {
     <!-- Replay failed banner -->
     <div
       v-else-if="replayPhase === 'failed'"
-      class="tw:flex tw:items-start tw:gap-2 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--color-badge-error-soft-bg)] tw:border tw:border-badge-error-ol-border/30"
+      class="flex items-start gap-2 px-3 py-2 mb-3 rounded bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30"
       role="alert"
       data-test="synthetics-journey-failed-banner"
     >
-      <OIcon name="error" size="sm" class="tw:mt-0.5 tw:text-badge-error-ol-text" aria-hidden="true" />
-      <div class="tw:flex tw:flex-col tw:gap-0.5 tw:flex-1 tw:min-w-0">
-        <span class="tw:text-sm tw:text-badge-error-ol-text tw:font-semibold">Replay failed — stopped at step {{ firstFailedIndex + 1 }} of {{ modelValue.length }}</span>
-        <span v-if="failedStepResult?.stepName" class="tw:text-xs tw:truncate tw:text-badge-error-ol-text tw:pt-1">{{ failedStepResult.stepName }}</span>
+      <OIcon name="error" size="sm" class="mt-0.5 text-badge-error-ol-text" aria-hidden="true" />
+      <div class="flex flex-col gap-0.5 flex-1 min-w-0">
+        <span class="text-sm text-badge-error-ol-text font-semibold">Replay failed — stopped at step {{ firstFailedIndex + 1 }} of {{ modelValue.length }}</span>
+        <span v-if="failedStepResult?.stepName" class="text-xs truncate text-badge-error-ol-text pt-1">{{ failedStepResult.stepName }}</span>
       </div>
       <OButton variant="ghost" size="xs" data-test="synthetics-journey-clear-results-btn" @click="emit('clear-results')">
         <OIcon name="close" size="sm" />
@@ -500,13 +500,13 @@ function openChromeExtensions() {
     <!-- Replay stopped banner -->
     <div
       v-else-if="replayPhase === 'stopped'"
-      class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--o2-bg-subtle)] tw:border tw:border-[var(--o2-border-color)]"
+      class="flex items-center gap-2 px-3 py-2 mb-3 rounded bg-[var(--o2-bg-subtle)] border border-[var(--o2-border-color)]"
       role="status"
       data-test="synthetics-journey-stopped-banner"
     >
-      <OIcon name="stop" size="sm" class="tw:text-[var(--o2-text-secondary)]" aria-hidden="true" />
-      <span class="tw:text-sm tw:text-[var(--o2-text-heading)]">Replay stopped at step {{ stepResults?.size ?? 0 }} of {{ modelValue.length }}</span>
-      <span class="tw:flex-1" />
+      <OIcon name="stop" size="sm" class="text-[var(--o2-text-secondary)]" aria-hidden="true" />
+      <span class="text-sm text-[var(--o2-text-heading)]">Replay stopped at step {{ stepResults?.size ?? 0 }} of {{ modelValue.length }}</span>
+      <span class="flex-1" />
       <OButton variant="outline" size="xs" data-test="synthetics-journey-stopped-retry-btn" @click="emit('replay')">
         Re-run
       </OButton>
@@ -518,7 +518,7 @@ function openChromeExtensions() {
     <!-- Recorder error (extension missing / failed to start) -->
     <div
       v-if="recordingError && !isRecording"
-      class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--o2-status-error-subtle)] tw:text-[var(--o2-status-error)] tw:text-sm"
+      class="flex items-center gap-2 px-3 py-2 mb-3 rounded bg-[var(--o2-status-error-subtle)] text-[var(--o2-status-error)] text-sm"
       role="alert"
       data-test="synthetics-journey-record-error"
     >
@@ -529,21 +529,21 @@ function openChromeExtensions() {
     <!-- Live capture area (shown while recording) -->
     <template v-if="isRecording">
       <!-- Recording banner with current URL + controls -->
-      <div class="tw:flex tw:items-center tw:gap-3 tw:px-3 tw:py-2 tw:mb-3 tw:rounded tw:bg-[var(--o2-status-error-subtle)] tw:border tw:border-[var(--o2-border-color)]">
-        <span class="tw:flex tw:items-center tw:gap-1.5">
-          <span class="tw:relative tw:inline-flex tw:items-center tw:justify-center tw:w-[0.7rem] tw:h-[0.7rem]" aria-hidden="true">
-            <span class="tw:absolute tw:w-[0.7rem] tw:h-[0.7rem] tw:rounded-full tw:bg-[var(--o2-status-error-text)] tw:z-1" />
-            <span class="tw:absolute tw:w-[0.7rem] tw:h-[0.7rem] tw:rounded-full tw:bg-[var(--o2-status-error-text)] tw:opacity-0 tw:animate-[recording-pulse-expand_1.5s_ease-out_infinite]" />
+      <div class="flex items-center gap-3 px-3 py-2 mb-3 rounded bg-[var(--o2-status-error-subtle)] border border-[var(--o2-border-color)]">
+        <span class="flex items-center gap-1.5">
+          <span class="relative inline-flex items-center justify-center w-[0.7rem] h-[0.7rem]" aria-hidden="true">
+            <span class="absolute w-[0.7rem] h-[0.7rem] rounded-full bg-[var(--o2-status-error-text)] z-1" />
+            <span class="absolute w-[0.7rem] h-[0.7rem] rounded-full bg-[var(--o2-status-error-text)] opacity-0 animate-[recording-pulse-expand_1.5s_ease-out_infinite]" />
           </span>
-          <span class="tw:text-sm tw:font-semibold tw:text-[var(--o2-status-error)] tw:pl-1.5">Recording</span>
+          <span class="text-sm font-semibold text-[var(--o2-status-error)] pl-1.5">Recording</span>
         </span>
-        <span class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:text-[var(--o2-text-secondary)] tw:truncate tw:flex-1 tw:min-w-0">
-          <span class="tw:truncate">{{ currentUrl }}</span>
+        <span class="flex items-center gap-1 text-xs text-[var(--o2-text-secondary)] truncate flex-1 min-w-0">
+          <span class="truncate">{{ currentUrl }}</span>
         </span>
-        <span class="tw:text-xs tw:text-[var(--o2-text-muted)]">{{ capturedSteps.length }} steps</span>
+        <span class="text-xs text-[var(--o2-text-muted)]">{{ capturedSteps.length }} steps</span>
       </div>
 
-      <div v-if="capturedSteps.length > 0" class="tw:flex tw:flex-col tw:gap-1">
+      <div v-if="capturedSteps.length > 0" class="flex flex-col gap-1">
         <BrowserJourneyStep
           v-for="(step, index) in capturedSteps"
           :key="step.id"
@@ -559,9 +559,9 @@ function openChromeExtensions() {
       </div>
 
       <!-- Waiting for first step -->
-      <div v-else class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-3 tw:py-16 tw:text-center">
-        <OIcon name="fiber-manual-record" size="xl" class="tw:text-[var(--o2-text-muted)] tw:animate-pulse" aria-hidden="true" />
-        <p class="tw:text-sm tw:text-[var(--o2-text-secondary)] tw:m-0">Waiting for actions in the browser…</p>
+      <div v-else class="flex flex-col items-center justify-center gap-3 py-16 text-center">
+        <OIcon name="fiber-manual-record" size="xl" class="text-[var(--o2-text-muted)] animate-pulse" aria-hidden="true" />
+        <p class="text-sm text-[var(--o2-text-secondary)] m-0">Waiting for actions in the browser…</p>
       </div>
     </template>
 
@@ -569,11 +569,11 @@ function openChromeExtensions() {
     <!-- Empty state -->
     <div
       v-else-if="modelValue.length === 0"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-4 tw:py-16 tw:text-center"
+      class="flex flex-col items-center justify-center gap-4 py-16 text-center"
     >
-      <OIcon name="open-in-browser" size="xl" class="tw:text-[var(--o2-text-muted)]" aria-hidden="true" />
-      <h3 class="tw:text-base tw:font-semibold tw:text-[var(--o2-text-heading)] tw:m-0">No steps yet</h3>
-      <div class="tw:flex tw:items-center tw:gap-3">
+      <OIcon name="open-in-browser" size="xl" class="text-[var(--o2-text-muted)]" aria-hidden="true" />
+      <h3 class="text-base font-semibold text-[var(--o2-text-heading)] m-0">No steps yet</h3>
+      <div class="flex items-center gap-3">
         <OButton variant="primary" size="sm" @click="onRecordButtonClick">Record journey</OButton>
         <OButton variant="outline" size="sm" @click="addStep">Add a step manually</OButton>
       </div>
@@ -613,7 +613,7 @@ function openChromeExtensions() {
     </VueDraggableNext>
 
     <!-- Plain list when drag is disabled (filter active, etc.) -->
-    <div v-else class="tw:flex tw:flex-col tw:gap-1">
+    <div v-else class="flex flex-col gap-1">
       <BrowserJourneyStep
         v-for="{ step, originalIndex } in filteredSteps"
         :key="step.id"

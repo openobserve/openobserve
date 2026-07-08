@@ -134,20 +134,20 @@ function toggleSteps(executionId: string) {
       </OBadge>
     </template>
 
-    <div class="tw:flex tw:flex-col tw:h-full">
+    <div class="flex flex-col h-full">
 
       <!-- ── Loading skeleton ── -->
-      <div v-if="loading" class="tw:flex tw:flex-col tw:gap-3 tw:p-5">
-        <div class="tw:flex tw:gap-6 tw:mb-2">
-          <div class="skel tw:h-10 tw:w-28 tw:rounded" />
-          <div class="skel tw:h-10 tw:w-20 tw:rounded" />
-          <div class="skel tw:h-10 tw:w-40 tw:rounded" />
+      <div v-if="loading" class="flex flex-col gap-3 p-5">
+        <div class="flex gap-6 mb-2">
+          <div class="skel h-10 w-28 rounded" />
+          <div class="skel h-10 w-20 rounded" />
+          <div class="skel h-10 w-40 rounded" />
         </div>
-        <div v-for="i in 2" :key="i" class="tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden">
-          <div class="skel tw:h-11 tw:w-full" />
-          <div class="tw:p-4 tw:flex tw:flex-col tw:gap-2">
-            <div class="skel tw:h-4 tw:w-2/3 tw:rounded" />
-            <div class="skel tw:h-4 tw:w-1/2 tw:rounded" />
+        <div v-for="i in 2" :key="i" class="rounded-lg border border-[var(--o2-border-color)] overflow-hidden">
+          <div class="skel h-11 w-full" />
+          <div class="p-4 flex flex-col gap-2">
+            <div class="skel h-4 w-2/3 rounded" />
+            <div class="skel h-4 w-1/2 rounded" />
           </div>
         </div>
       </div>
@@ -155,29 +155,29 @@ function toggleSteps(executionId: string) {
       <!-- ── Query error ── -->
       <div
         v-else-if="queryError"
-        class="tw:flex tw:flex-col tw:items-center tw:gap-3 tw:py-16 tw:text-[var(--o2-text-muted)] tw:px-5"
+        class="flex flex-col items-center gap-3 py-16 text-[var(--o2-text-muted)] px-5"
       >
-        <OIcon name="error_outline" size="xl" class="tw:text-[var(--o2-status-error-text)]" />
-        <p class="tw:text-sm tw:font-medium tw:text-[var(--o2-status-error-text)]">Failed to load run data</p>
-        <p class="tw:text-xs tw:font-mono tw:text-[var(--o2-text-caption)] tw:text-center tw:max-w-sm">{{ queryError }}</p>
+        <OIcon name="error_outline" size="xl" class="text-[var(--o2-status-error-text)]" />
+        <p class="text-sm font-medium text-[var(--o2-status-error-text)]">Failed to load run data</p>
+        <p class="text-xs font-mono text-[var(--o2-text-caption)] text-center max-w-sm">{{ queryError }}</p>
       </div>
 
       <!-- ── No data ── -->
       <div
         v-else-if="!locations.length"
-        class="tw:flex tw:flex-col tw:items-center tw:gap-3 tw:py-16 tw:text-[var(--o2-text-muted)] tw:px-5"
+        class="flex flex-col items-center gap-3 py-16 text-[var(--o2-text-muted)] px-5"
       >
         <OIcon name="hourglass_empty" size="xl" />
-        <p class="tw:text-sm tw:font-medium">No execution data found</p>
-        <p class="tw:text-xs tw:text-[var(--o2-text-caption)] tw:text-center">
-          Stream data for run <code class="tw:font-mono">{{ runId }}</code> was not found in the ±5 min window around the scheduled time.
+        <p class="text-sm font-medium">No execution data found</p>
+        <p class="text-xs text-[var(--o2-text-caption)] text-center">
+          Stream data for run <code class="font-mono">{{ runId }}</code> was not found in the ±5 min window around the scheduled time.
         </p>
       </div>
 
       <!-- ── Data ── -->
       <template v-else>
         <!-- Summary strip -->
-        <div class="tw:grid tw:grid-cols-3 tw:gap-x-6 tw:px-5 tw:py-4 tw:border-b tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-surface-secondary)] tw:shrink-0">
+        <div class="grid grid-cols-3 gap-x-6 px-5 py-4 border-b border-[var(--o2-border-color)] bg-[var(--o2-surface-secondary)] shrink-0">
           <div>
             <p class="meta-label">Max Duration</p>
             <p class="meta-value">{{ fmtDuration(overallDurationMs) }}</p>
@@ -188,98 +188,98 @@ function toggleSteps(executionId: string) {
           </div>
           <div>
             <p class="meta-label">Run ID</p>
-            <p class="tw:text-xs tw:font-mono tw:text-[var(--o2-text-secondary)] tw:truncate tw:mt-0.5" :title="runId">{{ runId }}</p>
+            <p class="text-xs font-mono text-[var(--o2-text-secondary)] truncate mt-0.5" :title="runId">{{ runId }}</p>
           </div>
         </div>
 
         <!-- Per-location cards -->
-        <div class="tw:flex-1 tw:overflow-y-auto tw:p-5 tw:flex tw:flex-col tw:gap-4">
+        <div class="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
           <div
             v-for="loc in locations"
             :key="loc.executionId"
-            class="location-card tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden"
+            class="location-card rounded-lg border border-[var(--o2-border-color)] overflow-hidden"
           >
             <!-- Card header -->
             <div
-              class="tw:flex tw:items-center tw:gap-2.5 tw:px-4 tw:py-3 tw:bg-[var(--o2-surface-secondary)] tw:border-b tw:border-[var(--o2-border-color)]"
+              class="flex items-center gap-2.5 px-4 py-3 bg-[var(--o2-surface-secondary)] border-b border-[var(--o2-border-color)]"
             >
               <OBadge :variant="statusVariant(loc.status)" size="sm">{{ statusLabel(loc.status) }}</OBadge>
-              <span class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-heading)] tw:truncate">{{ loc.location || '—' }}</span>
-              <div class="tw:ml-auto tw:flex tw:items-center tw:gap-3 tw:shrink-0">
-                <span class="tw:text-xs tw:text-[var(--o2-text-muted)]">{{ [loc.browserEngine, loc.device].filter(Boolean).join(' · ') }}</span>
-                <span class="tw:text-sm tw:font-medium tw:tabular-nums tw:text-[var(--o2-text-primary)]">{{ fmtDuration(loc.durationMs) }}</span>
+              <span class="text-sm font-semibold text-[var(--o2-text-heading)] truncate">{{ loc.location || '—' }}</span>
+              <div class="ml-auto flex items-center gap-3 shrink-0">
+                <span class="text-xs text-[var(--o2-text-muted)]">{{ [loc.browserEngine, loc.device].filter(Boolean).join(' · ') }}</span>
+                <span class="text-sm font-medium tabular-nums text-[var(--o2-text-primary)]">{{ fmtDuration(loc.durationMs) }}</span>
               </div>
             </div>
 
-            <div class="tw:divide-y tw:divide-[var(--o2-border-color)]">
+            <div class="divide-y divide-[var(--o2-border-color)]">
 
               <!-- Error -->
               <div
                 v-if="loc.error"
-                class="tw:px-4 tw:py-3"
+                class="px-4 py-3"
               >
-                <p class="tw:text-xs tw:font-semibold tw:text-[var(--o2-status-error-text)] tw:flex tw:items-center tw:gap-1.5 tw:mb-1.5">
+                <p class="text-xs font-semibold text-[var(--o2-status-error-text)] flex items-center gap-1.5 mb-1.5">
                   <OIcon name="cancel" size="xs" />
                   Error
                 </p>
-                <pre class="tw:whitespace-pre-wrap tw:font-mono tw:text-xs tw:text-[var(--o2-text-secondary)] tw:leading-relaxed tw:bg-[var(--o2-status-error-subtle)] tw:rounded tw:px-3 tw:py-2 tw:border tw:border-[var(--o2-status-error-border)]">{{ loc.error }}</pre>
+                <pre class="whitespace-pre-wrap font-mono text-xs text-[var(--o2-text-secondary)] leading-relaxed bg-[var(--o2-status-error-subtle)] rounded px-3 py-2 border border-[var(--o2-status-error-border)]">{{ loc.error }}</pre>
               </div>
 
               <!-- Steps -->
-              <div v-if="loc.steps.length" class="tw:px-4 tw:py-3">
+              <div v-if="loc.steps.length" class="px-4 py-3">
                 <button
-                  class="tw:flex tw:items-center tw:gap-1.5 tw:text-xs tw:font-semibold tw:text-[var(--o2-text-heading)] tw:mb-2 tw:cursor-pointer hover:tw:text-[var(--o2-text-primary)] tw:transition-colors"
+                  class="flex items-center gap-1.5 text-xs font-semibold text-[var(--o2-text-heading)] mb-2 cursor-pointer hover:text-[var(--o2-text-primary)] transition-colors"
                   @click="toggleSteps(loc.executionId)"
                 >
                   <OIcon :name="expandedSteps.has(loc.executionId) ? 'expand_less' : 'expand_more'" size="sm" />
                   Steps ({{ loc.steps.length }})
-                  <span v-if="loc.steps.some(s => s.status === 'fail')" class="tw:ml-1 tw:text-[var(--o2-status-error-text)]">
+                  <span v-if="loc.steps.some(s => s.status === 'fail')" class="ml-1 text-[var(--o2-status-error-text)]">
                     · {{ loc.steps.filter(s => s.status === 'fail').length }} failed
                   </span>
                 </button>
 
-                <div v-if="expandedSteps.has(loc.executionId)" class="tw:flex tw:flex-col tw:gap-1">
+                <div v-if="expandedSteps.has(loc.executionId)" class="flex flex-col gap-1">
                   <div
                     v-for="(step, idx) in loc.steps"
                     :key="step.stepId"
-                    class="tw:flex tw:items-start tw:gap-2.5 tw:py-1.5 tw:text-xs"
+                    class="flex items-start gap-2.5 py-1.5 text-xs"
                   >
                     <span
-                      class="tw:shrink-0 tw:w-4 tw:h-4 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:text-white tw:text-[0.6rem] tw:font-bold tw:mt-px"
-                      :class="step.status === 'ok' ? 'tw:bg-green-600' : 'tw:bg-red-500'"
+                      class="shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-white text-[0.6rem] font-bold mt-px"
+                      :class="step.status === 'ok' ? 'bg-green-600' : 'bg-red-500'"
                     >{{ idx + 1 }}</span>
-                    <div class="tw:flex-1 tw:min-w-0">
-                      <div class="tw:flex tw:items-center tw:gap-2">
-                        <span class="tw:font-mono tw:text-[var(--o2-text-secondary)] tw:truncate">{{ step.stepId }}</span>
-                        <span class="tw:ml-auto tw:tabular-nums tw:text-[var(--o2-text-muted)] tw:shrink-0">{{ fmtDuration(step.durationMs) }}</span>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2">
+                        <span class="font-mono text-[var(--o2-text-secondary)] truncate">{{ step.stepId }}</span>
+                        <span class="ml-auto tabular-nums text-[var(--o2-text-muted)] shrink-0">{{ fmtDuration(step.durationMs) }}</span>
                       </div>
-                      <p v-if="step.error" class="tw:text-[var(--o2-status-error-text)] tw:truncate tw:mt-0.5" :title="step.error">{{ step.error }}</p>
+                      <p v-if="step.error" class="text-[var(--o2-status-error-text)] truncate mt-0.5" :title="step.error">{{ step.error }}</p>
                     </div>
                   </div>
                 </div>
               </div>
 
               <!-- Screenshots -->
-              <div v-if="loc.steps.some(s => s.screenshotKey)" class="tw:px-4 tw:py-3">
-                <p class="tw:text-xs tw:font-semibold tw:text-[var(--o2-text-heading)] tw:mb-2">Screenshots</p>
-                <div class="tw:grid tw:grid-cols-2 tw:gap-2">
+              <div v-if="loc.steps.some(s => s.screenshotKey)" class="px-4 py-3">
+                <p class="text-xs font-semibold text-[var(--o2-text-heading)] mb-2">Screenshots</p>
+                <div class="grid grid-cols-2 gap-2">
                   <div
                     v-for="step in loc.steps.filter(s => s.screenshotKey)"
                     :key="step.stepId"
-                    class="tw:rounded tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden tw:bg-[var(--o2-surface-secondary)]"
+                    class="rounded border border-[var(--o2-border-color)] overflow-hidden bg-[var(--o2-surface-secondary)]"
                   >
-                    <div class="tw:flex tw:items-center tw:gap-1.5 tw:px-2 tw:py-1 tw:border-b tw:border-[var(--o2-border-color)]">
+                    <div class="flex items-center gap-1.5 px-2 py-1 border-b border-[var(--o2-border-color)]">
                       <span
-                        class="tw:w-2 tw:h-2 tw:rounded-full tw:shrink-0"
-                        :class="step.status === 'ok' ? 'tw:bg-green-500' : 'tw:bg-red-500'"
+                        class="w-2 h-2 rounded-full shrink-0"
+                        :class="step.status === 'ok' ? 'bg-green-500' : 'bg-red-500'"
                       />
-                      <span class="tw:text-[0.65rem] tw:font-mono tw:text-[var(--o2-text-muted)] tw:truncate">{{ step.stepId }}</span>
+                      <span class="text-[0.65rem] font-mono text-[var(--o2-text-muted)] truncate">{{ step.stepId }}</span>
                     </div>
                     <a :href="artifactUrl(step.screenshotKey!)" target="_blank">
                       <img
                         :src="artifactUrl(step.screenshotKey!)"
                         :alt="`Screenshot ${step.stepId}`"
-                        class="tw:w-full tw:block tw:object-contain tw:max-h-48 hover:tw:opacity-90 tw:transition-opacity"
+                        class="w-full block object-contain max-h-48 hover:opacity-90 transition-opacity"
                         loading="lazy"
                       />
                     </a>
@@ -288,11 +288,11 @@ function toggleSteps(executionId: string) {
               </div>
 
               <!-- Trace -->
-              <div v-if="loc.traceKey" class="tw:px-4 tw:py-3">
+              <div v-if="loc.traceKey" class="px-4 py-3">
                 <a
                   :href="artifactUrl(loc.traceKey)"
                   target="_blank"
-                  class="tw:inline-flex tw:items-center tw:gap-2 tw:text-xs tw:font-medium tw:text-[var(--o2-text-link)] hover:tw:text-[var(--o2-text-link-hover)] tw:bg-[var(--o2-surface-secondary)] tw:border tw:border-[var(--o2-border-color)] tw:rounded tw:px-3 tw:py-1.5 tw:transition-colors"
+                  class="inline-flex items-center gap-2 text-xs font-medium text-[var(--o2-text-link)] hover:text-[var(--o2-text-link-hover)] bg-[var(--o2-surface-secondary)] border border-[var(--o2-border-color)] rounded px-3 py-1.5 transition-colors"
                 >
                   <OIcon name="download" size="xs" />
                   Download trace.zip

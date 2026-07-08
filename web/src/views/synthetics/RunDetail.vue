@@ -27,12 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="run-detail tw:flex tw:flex-col tw:h-full tw:min-h-0"
+    class="run-detail flex flex-col h-full min-h-0"
     data-test="synthetics-run-detail"
   >
     <!-- ════════ HEADER ════════ -->
     <AppPageHeader
-      class="tw:px-4"
+      class="px-4"
       :back="{
         label: t('synthetics.results.monitors'),
         to: { name: 'synthetic-monitor-results', params: { id: monitorId } },
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ statusLabel }}
         </OBadge>
-        <div class="tw:flex tw:ml-1">
+        <div class="flex ml-1">
           <OButton
             variant="ghost"
             size="icon-xs"
@@ -93,61 +93,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ════════ SUB TABS ════════ -->
     <OTabs
       v-model="activeTab"
-      class="tw:shrink-0 tw:px-5 tw:border-b tw:border-border-default"
+      class="shrink-0 px-5 border-b border-border-default"
     >
       <OTab name="summary" data-test="synthetics-run-detail-tab-summary">
-        <span class="tw:flex tw:items-center tw:gap-1.5">
+        <span class="flex items-center gap-1.5">
           <OIcon name="summarize" size="sm" />
           Summary
         </span>
       </OTab>
       <OTab name="logs" data-test="synthetics-run-detail-tab-logs">
-        <span class="tw:flex tw:items-center tw:gap-1.5">
+        <span class="flex items-center gap-1.5">
           <OIcon name="search" size="sm" />
           Logs
         </span>
       </OTab>
       <OTab name="traces" data-test="synthetics-run-detail-tab-traces">
-        <span class="tw:flex tw:items-center tw:gap-1.5">
+        <span class="flex items-center gap-1.5">
           <OIcon name="account_tree" size="sm" />
           Traces
         </span>
       </OTab>
       <OTab name="rum" data-test="synthetics-run-detail-tab-rum">
-        <span class="tw:flex tw:items-center tw:gap-1.5">
+        <span class="flex items-center gap-1.5">
           <OIcon name="devices" size="sm" />
           RUM
         </span>
       </OTab>
     </OTabs>
 
-    <div class="tw:flex-1 tw:min-h-0">
+    <div class="flex-1 min-h-0">
       <OTabPanels
         v-model="activeTab"
         grow
         scroll="y"
-        class="tw:h-full tw:min-h-0"
+        class="h-full min-h-0"
       >
         <!-- ════════════ SUMMARY ════════════ -->
         <OTabPanel name="summary" data-test="synthetics-run-detail-summary-tab">
           <div
-            class="tw:mx-auto tw:px-5 tw:py-[0.875rem] tw:pb-[1.75rem] tw:flex tw:flex-col tw:gap-[0.875rem]"
+            class="mx-auto px-5 py-[0.875rem] pb-[1.75rem] flex flex-col gap-[0.875rem]"
           >
             <!-- Error callout -->
             <div
               v-if="isFailed"
-              class="tw:border tw:border-[var(--o2-status-error-border)] tw:bg-[var(--o2-status-error-subtle)] tw:rounded-lg tw:overflow-hidden"
+              class="border border-[var(--o2-status-error-border)] bg-[var(--o2-status-error-subtle)] rounded-lg overflow-hidden"
               data-test="synthetics-run-detail-error-callout"
             >
-              <div class="tw:flex tw:items-start tw:gap-3 tw:p-[0.875rem]">
+              <div class="flex items-start gap-3 p-[0.875rem]">
                 <OIcon
                   name="error"
-                  class="tw:text-[var(--o2-status-error-text)] tw:shrink-0 tw:text-[22px]"
+                  class="text-[var(--o2-status-error-text)] shrink-0 text-[22px]"
                 />
-                <div class="tw:flex-1 tw:min-w-0">
-                  <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
                     <span
-                      class="tw:text-[13.5px] tw:font-bold tw:text-[var(--o2-status-error-text)]"
+                      class="text-[13.5px] font-bold text-[var(--o2-status-error-text)]"
                     >
                       {{ errorType }}
                     </span>
@@ -156,26 +156,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OBadge>
                   </div>
                   <p
-                    class="tw:text-[12.5px] tw:leading-[1.6] tw:text-text-body tw:mt-1.5 tw:mb-0"
+                    class="text-[12.5px] leading-[1.6] text-text-body mt-1.5 mb-0"
                   >
                     {{ errorReason }}
                   </p>
                   <button
                     type="button"
-                    class="tw:flex tw:items-center tw:gap-1 tw:bg-transparent tw:border-0 tw:p-0 tw:mt-2 tw:cursor-pointer tw:font-inherit tw:text-[11.5px] tw:font-semibold tw:text-[var(--o2-status-error-text)]"
+                    class="flex items-center gap-1 bg-transparent border-0 p-0 mt-2 cursor-pointer font-inherit text-[11.5px] font-semibold text-[var(--o2-status-error-text)]"
                     @click="toggleStack"
                   >
                     <OIcon
                       name="expand_more"
                       size="xs"
-                      class="tw:transition-transform tw:duration-150"
-                      :class="{ 'tw:rotate-180': stackOpen }"
+                      class="transition-transform duration-150"
+                      :class="{ 'rotate-180': stackOpen }"
                     />
                     View full error &amp; stack trace
                   </button>
                   <pre
                     v-if="stackOpen"
-                    class="tw:mt-2 tw:text-[11px] tw:leading-[1.6] tw:text-text-body tw:bg-[var(--o2-code-bg)] tw:rounded-md tw:p-[10px_12px] tw:overflow-auto tw:whitespace-pre-wrap tw:font-mono"
+                    class="mt-2 text-[11px] leading-[1.6] text-text-body bg-[var(--o2-code-bg)] rounded-md p-[10px_12px] overflow-auto whitespace-pre-wrap font-mono"
                     data-test="synthetics-run-detail-error-stack"
                     >{{ errorStack }}</pre
                   >
@@ -185,27 +185,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Info bar -->
             <div
-              class="tw:grid tw:grid-cols-5 tw:border tw:border-border-default tw:rounded-lg tw:bg-surface-subtle tw:overflow-hidden"
+              class="grid grid-cols-5 border border-border-default rounded-lg bg-surface-subtle overflow-hidden"
               data-test="synthetics-run-detail-info-bar"
             >
               <div
                 v-for="chip in infoChips"
                 :key="chip.label"
-                class="tw:flex tw:flex-col tw:gap-0.5 tw:px-4 tw:py-[0.625rem] tw:border-r tw:border-border-default tw:last:border-r-0"
+                class="flex flex-col gap-0.5 px-4 py-[0.625rem] border-r border-border-default last:border-r-0"
               >
                 <span
-                  class="tw:text-xs tw:pb-1 tw:font-semibold tw:text-text-secondary tw:capitalize tw:tracking-wide"
+                  class="text-xs pb-1 font-semibold text-text-secondary capitalize tracking-wide"
                 >
                   {{ chip.label }}
                 </span>
                 <span
-                  class="tw:flex tw:items-center tw:gap-1 tw:font-mono tw:tabular-nums tw:text-[13px] tw:font-bold tw:text-text-heading"
+                  class="flex items-center gap-1 font-mono tabular-nums text-[13px] font-bold text-text-heading"
                 >
                   <OIcon
                     v-if="chip.icon"
                     :name="chip.icon"
                     size="sm"
-                    class="tw:shrink-0"
+                    class="shrink-0"
                   />
                   {{ chip.value }}
                 </span>
@@ -213,32 +213,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- ══ Split: Replay Player (left) + Steps Timeline (right) ══ -->
-            <div class="tw:flex tw:gap-[0.875rem] tw:items-start">
+            <div class="flex gap-[0.875rem] items-start">
               <!-- ── Left: Session Replay Player ── -->
               <OCard
                 v-if="currentRun.hasReplay"
-                class="tw:p-0 tw:gap-0 tw:w-[30%] tw:min-w-[30rem]"
+                class="p-0 gap-0 w-[30%] min-w-[30rem]"
               >
-                <OCardSection role="header" class="tw:gap-2">
+                <OCardSection role="header" class="gap-2">
                   <OIcon
                     name="smart_display"
                     size="sm"
-                    class="tw:text-primary-700"
+                    class="text-primary-700"
                   />
-                  <span class="tw:font-bold tw:text-sm tw:text-text-heading"
+                  <span class="font-bold text-sm text-text-heading"
                     >Session Replay</span
                   >
-                  <span class="tw:flex-1" />
+                  <span class="flex-1" />
                   <span
-                    class="tw:font-mono tw:text-[11px] tw:text-text-secondary"
+                    class="font-mono text-[11px] text-text-secondary"
                   >
                     Step {{ selectedStep.id }} of {{ steps.length }}
                   </span>
                 </OCardSection>
                 <OSeparator />
 
-                <div class="tw:h-[380px] tw:flex tw:flex-col">
-                  <div class="tw:flex-1 tw:min-h-0">
+                <div class="h-[380px] flex flex-col">
+                  <div class="flex-1 min-h-0">
                     <VideoPlayer
                       :events="[]"
                       :segments="[]"
@@ -249,15 +249,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OCard>
 
               <!-- ── Right: Execution Timeline ── -->
-              <OCard class="tw:p-0 tw:gap-0 tw:flex-1 tw:min-w-0">
-                <OCardSection role="header" class="tw:gap-2">
-                  <span class="tw:font-bold tw:text-sm tw:text-text-heading"
+              <OCard class="p-0 gap-0 flex-1 min-w-0">
+                <OCardSection role="header" class="gap-2">
+                  <span class="font-bold text-sm text-text-heading"
                     >Steps</span
                   >
                   <OBadge variant="default" size="sm">{{
                     steps.length
                   }}</OBadge>
-                  <span class="tw:flex-1" />
+                  <span class="flex-1" />
                   <OBadge
                     v-if="isFailed"
                     variant="error"
@@ -272,26 +272,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OCardSection
                   role="body"
                   scrollable
-                  class="tw:max-h-[35rem] tw:p-2 tw:overflow-auto"
+                  class="max-h-[35rem] p-2 overflow-auto"
                 >
                   <!-- Steps pass/fail banner -->
                   <div
                     v-if="isFailed"
-                    class="tw:flex tw:items-start tw:gap-2 tw:px-3 tw:py-2 tw:mb-2 tw:rounded tw:bg-[var(--color-badge-error-soft-bg)] tw:border tw:border-badge-error-ol-border/30"
+                    class="flex items-start gap-2 px-3 py-2 mb-2 rounded bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30"
                     role="alert"
                     data-test="synthetics-run-detail-steps-failed-banner"
                   >
                     <OIcon
                       name="error"
                       size="sm"
-                      class="tw:mt-0.5 tw:text-status-error-text"
+                      class="mt-0.5 text-status-error-text"
                       aria-hidden="true"
                     />
                     <div
-                      class="tw:flex tw:flex-col tw:gap-0.5 tw:flex-1 tw:min-w-0"
+                      class="flex flex-col gap-0.5 flex-1 min-w-0"
                     >
                       <span
-                        class="tw:text-sm tw:text-status-error-text tw:font-semibold"
+                        class="text-sm text-status-error-text font-semibold"
                       >
                         Run failed — {{ failedStepLabel || "execution error" }}
                       </span>
@@ -299,18 +299,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     v-else-if="steps.length > 0"
-                    class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:mb-2 tw:rounded tw:bg-[var(--color-badge-success-soft-bg)] tw:border tw:border-badge-success-ol-border/50"
+                    class="flex items-center gap-2 px-3 py-2 mb-2 rounded bg-[var(--color-badge-success-soft-bg)] border border-badge-success-ol-border/50"
                     role="status"
                     data-test="synthetics-run-detail-steps-passed-banner"
                   >
                     <OIcon
                       name="check-circle"
                       size="sm"
-                      class="tw:text-[var(--color-timeline-dot-success)]"
+                      class="text-[var(--color-timeline-dot-success)]"
                       aria-hidden="true"
                     />
                     <span
-                      class="tw:text-sm tw:text-badge-success-ol-text tw:font-semibold"
+                      class="text-sm text-badge-success-ol-text font-semibold"
                     >
                       Run passed — {{ steps.length }}/{{ steps.length }} steps
                       completed successfully
@@ -319,32 +319,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="st in steps"
                     :key="st.id"
-                    class="tw:rounded tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:mb-1"
+                    class="rounded border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] mb-1"
                     :data-test="`synthetics-run-detail-step-row-${st.id}`"
                   >
                     <!-- Compact row -->
                     <div
-                      class="tw:flex tw:items-center tw:gap-1.5 tw:px-2 tw:h-16 tw:min-h-16 tw:rounded"
+                      class="flex items-center gap-1.5 px-2 h-16 min-h-16 rounded"
                       :class="{
-                        'tw:border-b tw:border-[var(--o2-border-color)]':
+                        'border-b border-[var(--o2-border-color)]':
                           isExpanded(st.id),
                       }"
                     >
                       <!-- Screenshot thumbnail 60×40 -->
                       <div
-                        class="tw:w-18 tw:h-12 tw:shrink-0 tw:rounded tw:border tw:border-[var(--o2-border-color)] tw:bg-surface-subtle tw:flex tw:items-center tw:justify-center tw:overflow-hidden"
+                        class="w-18 h-12 shrink-0 rounded border border-[var(--o2-border-color)] bg-surface-subtle flex items-center justify-center overflow-hidden"
                       >
                         <img
                           v-if="st.screenshotKey"
                           :src="screenshotUrl(st.screenshotKey)"
                           alt="Step screenshot"
-                          class="tw:w-full tw:h-full tw:object-cover"
+                          class="w-full h-full object-cover"
                         />
                         <OIcon
                           v-else
                           name="image"
                           size="xs"
-                          class="tw:text-text-caption"
+                          class="text-text-caption"
                         />
                       </div>
 
@@ -352,8 +352,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span
                         :class="[
                           st.status === 'fail'
-                            ? 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-badge-error-soft-bg)] tw:text-[var(--color-badge-error-soft-text)] tw:border tw:border-[var(--color-badge-error-soft-text)] tw:text-xs tw:font-semibold'
-                            : 'tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[var(--color-badge-success-soft-bg)] tw:text-[var(--color-badge-success-soft-text)] tw:border tw:border-[var(--color-badge-success-soft-text)] tw:text-xs tw:font-semibold',
+                            ? 'w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-error-soft-bg)] text-[var(--color-badge-error-soft-text)] border border-[var(--color-badge-error-soft-text)] text-xs font-semibold'
+                            : 'w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-success-soft-bg)] text-[var(--color-badge-success-soft-text)] border border-[var(--color-badge-success-soft-text)] text-xs font-semibold',
                         ]"
                       >
                         {{ st.id }}
@@ -361,12 +361,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Action icon -->
                       <span
-                        class="tw:bg-[var(--o2-primary-50)] tw:rounded tw:p-1 tw:flex tw:items-center tw:shrink-0"
+                        class="bg-[var(--o2-primary-50)] rounded p-1 flex items-center shrink-0"
                       >
                         <OIcon
                           :name="st.icon"
                           size="sm"
-                          class="tw:text-[var(--o2-primary-color)]"
+                          class="text-[var(--o2-primary-color)]"
                         />
                       </span>
 
@@ -377,14 +377,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Step name -->
                       <span
-                        class="tw:text-sm tw:text-[var(--o2-text-body)] tw:flex-1 tw:truncate tw:min-w-0"
+                        class="text-sm text-[var(--o2-text-body)] flex-1 truncate min-w-0"
                       >
                         {{ st.name }}
                       </span>
 
                       <!-- Duration -->
                       <span
-                        class="tw:text-xs tw:text-[var(--o2-text-secondary)] tw:shrink-0 tw:font-mono tw:tabular-nums"
+                        class="text-xs text-[var(--o2-text-secondary)] shrink-0 font-mono tabular-nums"
                       >
                         {{ st.durStr }}
                       </span>
@@ -393,7 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         variant="ghost"
                         size="xs"
-                        class="tw:shrink-0"
+                        class="shrink-0"
                         :data-test="`synthetics-run-detail-step-expand-${st.id}`"
                         @click="toggleExpand(st.id)"
                       >
@@ -409,30 +409,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Inline error card for failed steps -->
                     <div
                       v-if="st.status === 'fail' && st.error"
-                      class="tw:mx-6 tw:mb-2 tw:border tw:border-badge-error-ol-border/30 tw:rounded-lg tw:overflow-hidden"
+                      class="mx-6 mb-2 border border-badge-error-ol-border/30 rounded-lg overflow-hidden"
                       :data-test="`synthetics-run-detail-step-error-card-${st.id}`"
                     >
                       <div
-                        class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:bg-[var(--color-badge-error-soft-bg)]"
+                        class="flex items-center gap-2 px-3 py-2 bg-[var(--color-badge-error-soft-bg)]"
                       >
                         <OIcon
                           name="error"
                           size="sm"
-                          class="tw:text-[var(--o2-status-error)]"
+                          class="text-[var(--o2-status-error)]"
                           aria-hidden="true"
                         />
                         <span
-                          class="tw:text-xs tw:font-semibold tw:text-[var(--o2-text-heading)] tw:flex-1"
+                          class="text-xs font-semibold text-[var(--o2-text-heading)] flex-1"
                           >Error</span
                         >
                         <span
-                          class="tw:text-xs tw:font-mono tw:text-[var(--o2-text-secondary)]"
+                          class="text-xs font-mono text-[var(--o2-text-secondary)]"
                           >exit · {{ st.durStr }}</span
                         >
                       </div>
-                      <div class="tw:px-3 tw:py-3">
+                      <div class="px-3 py-3">
                         <p
-                          class="tw:text-[12.5px] tw:text-[var(--o2-text-body)] tw:m-0"
+                          class="text-[12.5px] text-[var(--o2-text-body)] m-0"
                         >
                           {{ st.error }}
                         </p>
@@ -442,43 +442,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Expanded content -->
                     <div
                       v-if="isExpanded(st.id)"
-                      class="tw:flex tw:gap-4 tw:p-3"
+                      class="flex gap-4 p-3"
                     >
                       <!-- Screenshot preview 280px -->
-                      <div class="tw:w-[280px] tw:shrink-0">
+                      <div class="w-[280px] shrink-0">
                         <div
-                          class="tw:rounded tw:border tw:border-[var(--o2-border-color)] tw:overflow-hidden"
+                          class="rounded border border-[var(--o2-border-color)] overflow-hidden"
                         >
                           <div
-                            class="tw:flex tw:items-center tw:gap-1 tw:px-[8px] tw:py-1 tw:bg-surface-subtle tw:border-b tw:border-[var(--o2-border-color)]"
+                            class="flex items-center gap-1 px-[8px] py-1 bg-surface-subtle border-b border-[var(--o2-border-color)]"
                           >
                             <span
-                              class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-[var(--o2-grey-300)]"
+                              class="w-1.5 h-1.5 rounded-full bg-[var(--o2-grey-300)]"
                             />
                             <span
-                              class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-[var(--o2-grey-300)]"
+                              class="w-1.5 h-1.5 rounded-full bg-[var(--o2-grey-300)]"
                             />
                             <span
-                              class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-[var(--o2-grey-300)]"
+                              class="w-1.5 h-1.5 rounded-full bg-[var(--o2-grey-300)]"
                             />
                             <span
-                              class="tw:font-mono tw:text-[10px] tw:text-text-secondary tw:ml-1 tw:truncate"
+                              class="font-mono text-[10px] text-text-secondary ml-1 truncate"
                               >{{ st.detail }}</span
                             >
                           </div>
                           <div
-                            class="tw:aspect-[16/10] tw:flex tw:items-center tw:justify-center tw:overflow-hidden"
+                            class="aspect-[16/10] flex items-center justify-center overflow-hidden"
                             :class="
                               st.status === 'fail'
-                                ? 'tw:bg-[var(--o2-status-error-subtle)]'
-                                : 'tw:bg-surface-subtle'
+                                ? 'bg-[var(--o2-status-error-subtle)]'
+                                : 'bg-surface-subtle'
                             "
                           >
                             <img
                               v-if="st.screenshotKey"
                               :src="screenshotUrl(st.screenshotKey)"
                               alt="Step screenshot"
-                              class="tw:w-full tw:h-full tw:object-contain"
+                              class="w-full h-full object-contain"
                             />
                             <template v-else>
                               <OIcon
@@ -489,17 +489,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 "
                                 :class="
                                   st.status === 'fail'
-                                    ? 'tw:text-status-error-text'
-                                    : 'tw:text-text-caption'
+                                    ? 'text-status-error-text'
+                                    : 'text-text-caption'
                                 "
                                 size="lg"
                               />
                               <span
-                                class="tw:text-xs tw:font-semibold"
+                                class="text-xs font-semibold"
                                 :class="
                                   st.status === 'fail'
-                                    ? 'tw:text-status-error-text'
-                                    : 'tw:text-text-caption'
+                                    ? 'text-status-error-text'
+                                    : 'text-text-caption'
                                 "
                               >
                                 {{
@@ -514,42 +514,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
 
                       <!-- KV metadata + actions -->
-                      <div class="tw:flex-1 tw:flex tw:flex-col tw:gap-2">
+                      <div class="flex-1 flex flex-col gap-2">
                         <dl
-                          class="tw:grid tw:grid-cols-[auto_1fr] tw:gap-x-3 tw:gap-y-1.5 tw:text-xs"
+                          class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs"
                         >
                           <dt
-                            class="tw:text-[10px] tw:font-semibold tw:text-text-secondary tw:uppercase tw:tracking-wide"
+                            class="text-[10px] font-semibold text-text-secondary uppercase tracking-wide"
                           >
                             Action
                           </dt>
-                          <dd class="tw:text-text-body">{{ st.action }}</dd>
+                          <dd class="text-text-body">{{ st.action }}</dd>
                           <dt
-                            class="tw:text-[10px] tw:font-semibold tw:text-text-secondary tw:uppercase tw:tracking-wide"
+                            class="text-[10px] font-semibold text-text-secondary uppercase tracking-wide"
                           >
                             Selector
                           </dt>
-                          <dd class="tw:font-mono tw:text-text-body">
+                          <dd class="font-mono text-text-body">
                             {{ st.detail }}
                           </dd>
                           <dt
-                            class="tw:text-[10px] tw:font-semibold tw:text-text-secondary tw:uppercase tw:tracking-wide"
+                            class="text-[10px] font-semibold text-text-secondary uppercase tracking-wide"
                           >
                             URL
                           </dt>
                           <dd
-                            class="tw:font-mono tw:truncate tw:text-text-body"
+                            class="font-mono truncate text-text-body"
                           >
                             {{ st.detail }}
                           </dd>
                           <dt
-                            class="tw:text-[10px] tw:font-semibold tw:text-text-secondary tw:uppercase tw:tracking-wide"
+                            class="text-[10px] font-semibold text-text-secondary uppercase tracking-wide"
                           >
                             Duration
                           </dt>
-                          <dd class="tw:text-text-heading">{{ st.durStr }}</dd>
+                          <dd class="text-text-heading">{{ st.durStr }}</dd>
                         </dl>
-                        <div class="tw:flex tw:gap-2 tw:mt-auto">
+                        <div class="flex gap-2 mt-auto">
                           <OButton
                             variant="ghost"
                             size="sm"
@@ -570,7 +570,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- ════════════ LOGS (placeholder) ════════════ -->
         <OTabPanel name="logs">
-          <div class="tw:h-full tw:flex tw:items-center tw:justify-center">
+          <div class="h-full flex items-center justify-center">
             <OEmptyState
               preset="no-results"
               size="block"
@@ -591,7 +591,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- ════════════ TRACES (placeholder) ════════════ -->
         <OTabPanel name="traces">
-          <div class="tw:h-full tw:flex tw:items-center tw:justify-center">
+          <div class="h-full flex items-center justify-center">
             <OEmptyState
               preset="no-results"
               size="block"
@@ -612,7 +612,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- ════════════ RUM (placeholder) ════════════ -->
         <OTabPanel name="rum">
-          <div class="tw:h-full tw:flex tw:items-center tw:justify-center">
+          <div class="h-full flex items-center justify-center">
             <OEmptyState
               preset="no-results"
               size="block"

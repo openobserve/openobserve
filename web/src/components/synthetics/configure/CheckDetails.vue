@@ -75,9 +75,9 @@ function handleTagKeydown(event: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:p-6 tw:mb-4">
-    <h3 class="tw:text-base tw:font-semibold tw:text-[var(--o2-text-heading)] tw:mb-4">Check Details</h3>
-    <div class="tw:flex tw:flex-col tw:gap-4">
+  <div class="rounded-lg border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] p-6 mb-4">
+    <h3 class="text-base font-semibold text-[var(--o2-text-heading)] mb-4">Check Details</h3>
+    <div class="flex flex-col gap-4">
       <OInput
         v-model="name"
         label="Name"
@@ -124,13 +124,13 @@ function handleTagKeydown(event: KeyboardEvent) {
       />
 
       <div>
-        <label class="tw:text-sm tw:font-medium tw:text-[var(--o2-text-label)] tw:mb-1 tw:block">Tags</label>
-        <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
+        <label class="text-sm font-medium text-[var(--o2-text-label)] mb-1 block">Tags</label>
+        <div class="flex items-center gap-2 mb-2">
           <OInput
             v-model="tagInput"
             placeholder="Add a tag and press Enter"
             data-test="synthetics-check-details-tag-input"
-            class="tw:flex-1"
+            class="flex-1"
             @keydown="handleTagKeydown"
           />
           <OButton
@@ -142,18 +142,18 @@ function handleTagKeydown(event: KeyboardEvent) {
             Add
           </OButton>
         </div>
-        <ul v-if="check.tags.length > 0" class="tw:flex tw:flex-wrap tw:gap-2">
+        <ul v-if="check.tags.length > 0" class="flex flex-wrap gap-2">
           <li
             v-for="(tag, index) in check.tags"
             :key="tag"
-            class="tw:inline-flex tw:items-center tw:gap-1 tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-[var(--o2-text-body)]"
+            class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] text-[var(--o2-text-body)]"
           >
             <span>{{ tag }}</span>
             <button
               type="button"
               :aria-label="`Remove tag ${tag}`"
               :data-test="`synthetics-check-details-remove-tag-${index}-btn`"
-              class="tw:flex tw:items-center tw:text-[var(--o2-text-muted)] tw:hover:text-[var(--o2-text-body)] tw:transition-colors"
+              class="flex items-center text-[var(--o2-text-muted)] hover:text-[var(--o2-text-body)] transition-colors"
               @click="removeTag(index)"
             >
               <OIcon name="close" size="xs" />

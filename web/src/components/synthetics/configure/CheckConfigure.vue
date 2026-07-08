@@ -28,8 +28,8 @@ function handleUpdate(value: BrowserCheck) {
 </script>
 
 <template>
-  <div class="tw:w-full tw:px-6 tw:py-4">
-    <div class="tw:max-w-[53.75rem]">
+  <div class="w-full px-6 py-4">
+    <div class="max-w-[53.75rem]">
       <CheckDetails
         :check="check"
         :folders="folders ?? []"

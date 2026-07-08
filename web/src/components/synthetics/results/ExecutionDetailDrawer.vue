@@ -12,10 +12,10 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>()
 
 const STATUS_COLOR: Record<string, string> = {
-  passed:  'tw:text-green-600',
-  warning: 'tw:text-yellow-500',
-  failed:  'tw:text-red-500',
-  error:   'tw:text-orange-500',
+  passed:  'text-green-600',
+  warning: 'text-yellow-500',
+  failed:  'text-red-500',
+  error:   'text-orange-500',
 }
 
 const DEVICE_ICON: Record<string, string> = {
@@ -59,41 +59,41 @@ function fmtDuration(ms: number) {
     <Transition name="drawer">
       <div
         v-if="execution"
-        class="tw:fixed tw:inset-0 tw:z-50 tw:flex tw:justify-end"
+        class="fixed inset-0 z-50 flex justify-end"
         @click.self="emit('close')"
       >
         <!-- Backdrop -->
-        <div class="tw:absolute tw:inset-0 tw:bg-black/40" @click="emit('close')" />
+        <div class="absolute inset-0 bg-black/40" @click="emit('close')" />
 
         <!-- Drawer panel -->
-        <div class="tw:relative tw:z-10 tw:w-full tw:max-w-2xl tw:h-full tw:border-l tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:overflow-hidden tw:shadow-2xl" style="background: var(--o2-body-primary-bg, #18181b)">
+        <div class="relative z-10 w-full max-w-2xl h-full border-l border-[var(--o2-border-color)] flex flex-col overflow-hidden shadow-2xl" style="background: var(--o2-body-primary-bg, #18181b)">
 
           <!-- Header -->
-          <div class="tw:flex tw:items-center tw:gap-3 tw:px-5 tw:py-4 tw:border-b tw:border-[var(--o2-border-color)] tw:shrink-0">
-            <div class="tw:flex tw:items-center tw:gap-2 tw:flex-1 tw:min-w-0">
-              <span class="material-symbols-outlined tw:text-[var(--o2-text-muted)] tw:text-base tw:normal-case tw:not-italic">
+          <div class="flex items-center gap-3 px-5 py-4 border-b border-[var(--o2-border-color)] shrink-0">
+            <div class="flex items-center gap-2 flex-1 min-w-0">
+              <span class="material-symbols-outlined text-[var(--o2-text-muted)] text-base normal-case not-italic">
                 {{ DEVICE_ICON[execution.device] ?? 'devices' }}
               </span>
-              <span class="tw:font-semibold tw:text-[var(--o2-text-heading)] tw:capitalize">
+              <span class="font-semibold text-[var(--o2-text-heading)] capitalize">
                 {{ execution.browserEngine }} · {{ execution.device.replace(/_/g, ' ') }}
               </span>
-              <span class="tw:text-sm" :class="STATUS_COLOR[execution.status]">
+              <span class="text-sm" :class="STATUS_COLOR[execution.status]">
                 {{ execution.status.charAt(0).toUpperCase() + execution.status.slice(1) }}
               </span>
-              <span class="tw:text-xs tw:text-[var(--o2-text-muted)]">{{ fmtDuration(execution.durationMs) }}</span>
+              <span class="text-xs text-[var(--o2-text-muted)]">{{ fmtDuration(execution.durationMs) }}</span>
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:shrink-0">
+            <div class="flex items-center gap-2 shrink-0">
               <a
                 v-if="execution.traceKey"
                 :href="artifactUrlFn(execution.traceKey)"
                 target="_blank"
-                class="tw:inline-flex tw:items-center tw:gap-1 tw:text-xs tw:font-medium tw:text-[var(--o2-text-link)] tw:border tw:border-current tw:rounded tw:px-2 tw:py-1 hover:tw:opacity-80"
+                class="inline-flex items-center gap-1 text-xs font-medium text-[var(--o2-text-link)] border border-current rounded px-2 py-1 hover:opacity-80"
               >
                 <OIcon name="download" size="xs" />
                 trace.zip
               </a>
               <button
-                class="tw:p-1 tw:rounded hover:tw:bg-[var(--o2-surface-hover)] tw:text-[var(--o2-text-muted)]"
+                class="p-1 rounded hover:bg-[var(--o2-surface-hover)] text-[var(--o2-text-muted)]"
                 @click="emit('close')"
               >
                 <OIcon name="close" size="sm" />
@@ -104,43 +104,43 @@ function fmtDuration(ms: number) {
           <!-- Error banner (probe crash) -->
           <div
             v-if="execution.error && !execution.steps.length"
-            class="tw:mx-5 tw:mt-4 tw:rounded tw:border tw:border-orange-500/30 tw:bg-orange-500/10 tw:px-4 tw:py-3 tw:shrink-0"
+            class="mx-5 mt-4 rounded border border-orange-500/30 bg-orange-500/10 px-4 py-3 shrink-0"
           >
-            <p class="tw:text-xs tw:font-semibold tw:text-orange-600 tw:mb-1">Probe error</p>
-            <p class="tw:text-xs tw:text-orange-600 tw:font-mono tw:whitespace-pre-wrap tw:leading-relaxed">{{ execution.error }}</p>
+            <p class="text-xs font-semibold text-orange-600 mb-1">Probe error</p>
+            <p class="text-xs text-orange-600 font-mono whitespace-pre-wrap leading-relaxed">{{ execution.error }}</p>
           </div>
 
           <!-- Steps -->
-          <div class="tw:flex-1 tw:overflow-y-auto tw:px-5 tw:py-4">
-            <p v-if="!mergedSteps.length" class="tw:text-xs tw:text-[var(--o2-text-muted)] tw:italic">
+          <div class="flex-1 overflow-y-auto px-5 py-4">
+            <p v-if="!mergedSteps.length" class="text-xs text-[var(--o2-text-muted)] italic">
               No step data available.
             </p>
 
-            <div v-else class="tw:flex tw:flex-col tw:gap-3">
+            <div v-else class="flex flex-col gap-3">
               <div
                 v-for="(step, i) in mergedSteps"
                 :key="step.stepId"
-                class="tw:rounded-lg tw:border tw:overflow-hidden"
-                :class="step.status === 'fail' ? 'tw:border-red-500/40' : 'tw:border-[var(--o2-border-color)]'"
+                class="rounded-lg border overflow-hidden"
+                :class="step.status === 'fail' ? 'border-red-500/40' : 'border-[var(--o2-border-color)]'"
               >
                 <!-- Step header -->
                 <div
-                  class="tw:flex tw:items-start tw:gap-3 tw:px-3 tw:py-2.5"
-                  :class="step.status === 'fail' ? 'tw:bg-red-500/10' : 'tw:bg-[var(--o2-surface-secondary)]'"
+                  class="flex items-start gap-3 px-3 py-2.5"
+                  :class="step.status === 'fail' ? 'bg-red-500/10' : 'bg-[var(--o2-surface-secondary)]'"
                 >
                   <span
-                    class="tw:shrink-0 tw:w-5 tw:h-5 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:text-white tw:text-[0.6rem] tw:font-bold tw:mt-0.5"
-                    :class="step.status === 'fail' ? 'tw:bg-red-500' : 'tw:bg-green-600'"
+                    class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-white text-[0.6rem] font-bold mt-0.5"
+                    :class="step.status === 'fail' ? 'bg-red-500' : 'bg-green-600'"
                   >{{ i + 1 }}</span>
-                  <div class="tw:flex-1 tw:min-w-0">
-                    <p class="tw:text-sm tw:font-medium tw:text-[var(--o2-text-heading)] tw:truncate" :title="step.name">
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-[var(--o2-text-heading)] truncate" :title="step.name">
                       {{ step.name || step.stepId }}
                     </p>
-                    <p class="tw:text-[0.65rem] tw:text-[var(--o2-text-muted)] tw:font-mono tw:mt-0.5 tw:truncate" :title="step.stepId">
+                    <p class="text-[0.65rem] text-[var(--o2-text-muted)] font-mono mt-0.5 truncate" :title="step.stepId">
                       {{ step.stepId }}
                     </p>
                   </div>
-                  <span class="tw:shrink-0 tw:text-xs tw:tabular-nums tw:text-[var(--o2-text-muted)] tw:mt-0.5">
+                  <span class="shrink-0 text-xs tabular-nums text-[var(--o2-text-muted)] mt-0.5">
                     {{ fmtDuration(step.durationMs) }}
                   </span>
                 </div>
@@ -148,18 +148,18 @@ function fmtDuration(ms: number) {
                 <!-- Step error -->
                 <div
                   v-if="step.error"
-                  class="tw:px-3 tw:py-2 tw:border-t tw:border-red-500/20 tw:bg-red-500/5"
+                  class="px-3 py-2 border-t border-red-500/20 bg-red-500/5"
                 >
-                  <p class="tw:text-xs tw:text-red-600 tw:font-mono tw:whitespace-pre-wrap tw:leading-relaxed">{{ step.error }}</p>
+                  <p class="text-xs text-red-600 font-mono whitespace-pre-wrap leading-relaxed">{{ step.error }}</p>
                 </div>
 
                 <!-- Screenshot -->
-                <div v-if="step.screenshotKey" class="tw:border-t tw:border-[var(--o2-border-color)]">
-                  <a :href="artifactUrlFn(step.screenshotKey)" target="_blank" class="tw:block">
+                <div v-if="step.screenshotKey" class="border-t border-[var(--o2-border-color)]">
+                  <a :href="artifactUrlFn(step.screenshotKey)" target="_blank" class="block">
                     <img
                       :src="artifactUrlFn(step.screenshotKey)"
                       :alt="`Step ${i + 1} screenshot`"
-                      class="tw:w-full tw:object-contain tw:max-h-64"
+                      class="w-full object-contain max-h-64"
                       loading="lazy"
                     />
                   </a>
