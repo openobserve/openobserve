@@ -12,13 +12,20 @@
       "action": "Élargir la plage horaire",
       "actionDesc": "Recherche sur une période plus longue"
     },
+    "noPatterns": {
+      "title": "Aucun motif n'a été trouvé",
+      "description": "Essayez d'augmenter la plage de temps ou de sélectionner un autre flux contenant davantage de données de journal. L'extraction de motifs fonctionne mieux avec au moins 1 000 journaux.",
+      "logsAnalyzed": "Seuls les journaux {count} ont été analysés."
+    },
     "noStreamSelected": {
       "title": "Sélectionnez un stream pour commencer",
       "description": "Choisissez un flux, puis exécutez votre requête pour explorer ses données. Affinez les résultats à l'aide de filtres et d'une plage de temps personnalisée."
     },
     "noQueryApplied": {
       "title": "Exécutez une requête pour voir les journaux",
-      "description": "Ajustez vos filtres et cliquez sur « Exécuter la requête » pour charger les événements pour ce flux."
+      "description": "Ajustez vos filtres et cliquez sur « Exécuter la requête » pour charger les événements pour ce flux.",
+      "action": "Exécuter une requête",
+      "actionDesc": "Charger des événements pour les filtres sélectionnés"
     },
     "noDashboards": {
       "title": "Créez votre premier tableau de bord",
@@ -80,7 +87,9 @@
       "title": "Aucune destination pour le moment",
       "description": "Les destinations définissent l'endroit où les notifications d'alerte sont envoyées : Slack, e-mail, webhooks, etc.",
       "action": "Nouvelle destination",
-      "actionDesc": "Connecter un canal de notification"
+      "actionDesc": "Connecter un canal de notification",
+      "import": "Destination d'importation",
+      "importDesc": "Importer depuis un fichier JSON"
     },
     "noPipelineDestinations": {
       "title": "Aucune destination pour le moment",
@@ -92,7 +101,9 @@
       "title": "Pas encore de modèles",
       "description": "Les modèles définissent le format des messages de notification d'alerte.",
       "action": "Nouveau modèle",
-      "actionDesc": "Création d'un modèle de notification"
+      "actionDesc": "Création d'un modèle de notification",
+      "import": "Modèle d'importation",
+      "importDesc": "Importer depuis un fichier JSON"
     },
     "noEvalTemplates": {
       "title": "Aucun modèle d'évaluation pour le moment",
@@ -142,6 +153,20 @@
       "title": "Aucun travail de remblayage",
       "description": "Les tâches de remblayage retraitent les données historiques via un pipeline. Exécutez-en un pour commencer."
     },
+    "noRegexPatterns": {
+      "title": "Pas encore de modèles regex",
+      "description": "Créez un modèle réutilisable pour supprimer les données sensibles ou importez-en un depuis votre bibliothèque.",
+      "action": "Nouveau motif",
+      "actionDesc": "Définir un nouveau modèle de regex",
+      "import": "Modèle d'importation",
+      "importDesc": "Réutilisez un modèle de votre bibliothèque"
+    },
+    "noStorageConfig": {
+      "title": "Aucun compartiment n'est configuré",
+      "description": "Acheminez les données de cette organisation vers un compartiment dédié, indépendamment des autres organisations et des valeurs par défaut globales.",
+      "action": "Configuration du stockage",
+      "actionDesc": "Connectez un compartiment S3, GCS ou Azure"
+    },
     "noPipelineHistory": {
       "title": "Pas encore d'historique du pipeline",
       "description": "L'historique d'exécution des pipelines apparaîtra ici une fois que vos pipelines seront exécutés."
@@ -161,10 +186,12 @@
       "actionDesc": "Écrire une nouvelle fonction VRL"
     },
     "noStreams": {
-      "title": "En attente de vos premières données",
-      "description": "Aucune donnée n'est encore arrivée. Connectez une source et vos flux s'afficheront automatiquement ici.",
+      "title": "Connectez une source pour créer votre premier flux",
+      "description": "Les flux sont créés automatiquement au moment où les données arrivent. Configurez l'ingestion depuis votre application, votre agent ou votre collecteur pour commencer.",
       "action": "Configurer l'ingestion",
-      "actionDesc": "Connecter une source de données"
+      "actionDesc": "Connecter une source de données",
+      "createAction": "Nouveau stream",
+      "createActionDesc": "Définir manuellement un schéma de flux"
     },
     "noAlerts": {
       "title": "Créez votre première alerte",
@@ -174,7 +201,7 @@
     },
     "noIncidents": {
       "title": "Aucun incident actif",
-      "description": "Vous êtes tous rattrapés, rien n'a besoin de votre attention pour le moment. Les incidents déclenchés apparaîtront ici."
+      "description": "Les incidents sont créés lorsqu'une alerte se déclenche ; aucun ne s'est déclenché pour le moment. Une fois que vous avez mis en place des alertes, tous les incidents déclenchés apparaîtront ici."
     },
     "noLLMInsights": {
       "title": "Aucune activité LLM pour le moment",
@@ -191,20 +218,24 @@
     "noScorers": {
       "title": "Aucun buteur pour l'instant",
       "description": "Les évaluateurs évaluent les réponses LLM en fonction de vos configurations de score : commencez par un juge LLM ou importez-en un depuis la bibliothèque.",
-      "action": "Créer un buteur",
-      "actionDesc": "Définissez un juge LLM ou un marqueur à distance"
+      "action": "Nouveau buteur",
+      "actionDesc": "Définissez un juge LLM ou un marqueur à distance",
+      "import": "Marqueur d'importation",
+      "importDesc": "Importer depuis un fichier JSON"
     },
     "noEvalJobs": {
       "title": "Aucun poste d'évaluation pour le moment",
       "description": "Les jobs planifient les buteurs par rapport à un stream LLM. Créez-en un pour commencer à évaluer les conversations selon une cadence.",
-      "action": "Créer une tâche d'évaluation",
+      "action": "Nouvel emploi",
       "actionDesc": "Choisissez un stream + des buteurs + une cadence"
     },
     "noScoreConfigs": {
       "title": "Aucune configuration de score pour le moment",
       "description": "Les configurations de score définissent le schéma produit par les évaluateurs : numérique, booléen ou catégorique. Ajoutez-en un pour commencer à marquer.",
-      "action": "Créer une configuration de score",
-      "actionDesc": "Définissez la forme du score + la plage saine"
+      "action": "Nouvelle configuration de score",
+      "actionDesc": "Définissez la forme du score + la plage saine",
+      "import": "Importer la configuration du score",
+      "importDesc": "Importer depuis un fichier JSON"
     },
     "loadError": {
       "title": "Quelque chose s'est mal passé",
@@ -271,6 +302,7 @@
     },
     "nouns": {
       "logs": "journaux",
+      "patterns": "modèles",
       "dashboards": "tableaux de bord",
       "pipelines": "pipelines",
       "functions": "fonctions",
@@ -305,7 +337,8 @@
       "scorers": "évaluateurs",
       "evalJobs": "tâches d'évaluation",
       "scoreConfigs": "configurations de score",
-      "pipelineHistory": "historique du pipeline"
+      "pipelineHistory": "historique du pipeline",
+      "regexPatterns": "modèles regex"
     }
   },
   "common": {
@@ -385,6 +418,8 @@
     "legendWidth": "Largeur de la légende",
     "exceptions": "Exceptions",
     "nameRequired": "Le nom est obligatoire",
+    "invalidEmail": "Veuillez saisir une adresse e-mail valide.",
+    "nameMaxLength": "Le nom doit comporter au maximum {max} caractères.",
     "edit": "Modifier",
     "delete": "Supprimer",
     "remove": "Supprimer",
@@ -1322,6 +1357,14 @@
     "newPassword": "Nouveau mot de passe",
     "organization": "Organisation",
     "otherOrganization": "Autre organisation",
+    "roleRequired": "Le rôle est obligatoire",
+    "fieldRequired": "Ce champ est obligatoire",
+    "passwordRequired": "Le mot de passe est obligatoire.",
+    "passwordPolicyHint": "Le mot de passe doit être composé de 8 à 128 caractères et contenir au moins une lettre minuscule, une lettre majuscule, un chiffre et un caractère spécial.",
+    "currentPasswordRequired": "Le mot de passe actuel est requis.",
+    "newPasswordRequired": "Un nouveau mot de passe est requis.",
+    "otherOrgInvalid": "Le nom de l'organisation doit commencer par une lettre et être alphanumérique, _ ou -.",
+    "inviteEmailInvalid": "Veuillez saisir l'adresse e-mail correcte.",
     "isExistingUser": "Utilisateur existant ?",
     "deleteAPIKeyMessage": "Êtes-vous sûr de vouloir supprimer cette clé API utilisateur ? Cette action ne peut pas être annulée. Cliquez sur OK pour confirmer.",
     "apiKeyNotFound": "Clé API utilisateur introuvable.",
@@ -1362,6 +1405,7 @@
   },
   "serviceAccounts": {
     "header": "Comptes de service",
+    "emailInvalid": "Veuillez saisir une adresse e-mail valide",
     "headerSubtitle": "Jetons d'accès programmatiques pour les API",
     "search": "Compte de service de recherche",
     "refresh": "Actualiser le jeton de service",
@@ -1601,6 +1645,11 @@
     "subtitle": "Gestion des index et configuration des flux",
     "streamNameHelpText": "Utilisez uniquement des caractères alphanumériques, un trait de soulignement et deux points.",
     "search": "Stream de recherche",
+    "emptyOr": "Ou :",
+    "emptyKubernetes": "Kubernetes",
+    "emptyAws": "AWS/CloudWatch",
+    "emptyLinux": "Linux",
+    "emptyWindows": "Fenêtres",
     "name": "Nom",
     "docNum": "Docteur Num",
     "storageSize": "Données ingérées",
@@ -2047,6 +2096,7 @@
     "defaultTokenBadge": "PAR DÉFAUT",
     "createTokenBtn": "Créer un nouveau jeton",
     "createTokenTitle": "Créer un jeton",
+    "searchToken": "Rechercher des jetons",
     "tokenNameLabel": "Nom",
     "tokenDescriptionLabel": "Descriptif",
     "rotateTokenBtn": "Faire pivoter",
@@ -3005,9 +3055,9 @@
     "searchAllFolders": "Tous les dossiers",
     "streamConfig": "Configuration du flux",
     "alertRules": "Règles d'alerte",
-    "noTemplatesMsg": "Il semble que vous n'ayez pas encore créé de modèles. Pour créer une alerte, vous devez disposer d'au moins une destination et d'un modèle",
+    "noTemplatesMsg": "Pour créer une alerte, vous avez besoin d'au moins un modèle et d'une destination. Les modèles définissent le format du message de notification. Commencez par en créer un.",
     "createTemplateBtn": "Créer un modèle",
-    "noDestinationsMsg": "Il semblerait que vous n'ayez encore créé aucune destination. Pour créer une alerte, vous devez disposer d'au moins une destination et d'un modèle",
+    "noDestinationsMsg": "Pour créer une alerte, vous avez besoin d'au moins une destination et d'un modèle. Les destinations définissent l'endroit où les notifications sont envoyées. Commencez par en créer une.",
     "createDestinationBtn": "Créer une destination",
     "add": "Ajouter une alerte",
     "edit": "Modifier",
@@ -5233,6 +5283,7 @@
     },
     "quality": {
       "scopeLabel": "Toutes les dimensions de qualité dans cet espace de travail",
+      "agentPlaceholder": "Tous les agents",
       "timeRange": {
         "label": "Plage de temps",
         "last1h": "Au cours de la dernière heure",

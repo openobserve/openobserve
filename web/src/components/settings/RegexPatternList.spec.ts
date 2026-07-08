@@ -1171,7 +1171,6 @@ describe('RegexPatternList.vue - ODrawer Migration', () => {
           AddRegexPattern: AddRegexPatternStub,
           ImportRegexPattern: true,
           ConfirmDialog: true,
-          NoRegexPatterns: true,
           NoData: true,
           QTablePagination: true,
           OButton: true,

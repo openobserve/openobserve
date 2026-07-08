@@ -198,7 +198,7 @@ describe("PatternList", () => {
         "Try increasing the time range or selecting a different stream",
       );
       expect(emptyText).toContain(
-        "Pattern extraction works best with at least 1000+ logs",
+        "Pattern extraction works best with at least 1,000 logs",
       );
     });
 

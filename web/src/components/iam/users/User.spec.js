@@ -402,4 +402,28 @@ describe("User Component", () => {
       expect(addButton.exists()).toBe(false); // Add button should not exist in cloud mode
     });
   });
+
+  // Pre-migration behavior (restored): the row stores the DISPLAY-cased role
+  // (toCamelCase → "Admin" / "User"), which is what pre-migration sent on the
+  // wire for edit/update_member_role. Accepted trade-off: this value doesn't
+  // match the lowercase role-select options, so the edit dropdown comes up
+  // blank until the role is re-picked (same as pre-migration).
+  describe("Edit dialog role prefill (row stores the display-cased role)", () => {
+    it("builds rows with the camel-cased display role", async () => {
+      await flushPromises();
+      // mockUsers roles are "admin" / "user" → stored as "Admin" / "User".
+      expect(wrapper.vm.usersState.users[0].role).toBe("Admin");
+      expect(wrapper.vm.usersState.users[1].role).toBe("User");
+    });
+
+    it("seeds AddUser with the row's role value", () => {
+      wrapper.vm.addUser({ row: { email: "u@x.com", role: "viewer" } }, true);
+      expect(wrapper.vm.selectedUser.role).toBe("viewer");
+    });
+
+    it("seeds UpdateRole with the row's role value", () => {
+      wrapper.vm.updateUser({ row: { email: "u@x.com", role: "admin" } });
+      expect(wrapper.vm.selectedUser.role).toBe("admin");
+    });
+  });
 });

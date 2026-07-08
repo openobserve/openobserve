@@ -60,3 +60,60 @@ export async function getTableCellText(page, rowIndex, colIndex) {
     { ri: rowIndex, ci: colIndex }
   );
 }
+
+/**
+ * Column filtering helpers (TenstackTable.vue, gated by enableColumnFilter prop
+ * <- config.table_filtering). Filter button/panel data-test attrs are keyed by
+ * `header.column.id`, which is dynamic per stream, so these target by column
+ * index (nth) rather than by name.
+ */
+
+/** Locator for the filter icon button of the nth column header (0-based). */
+export function getColumnFilterBtn(page, nth = 0) {
+  return page.locator('[data-test^="o2-table-column-filter-btn-"]').nth(nth);
+}
+
+/** Opens the filter dropdown for the nth column header and waits for the panel. */
+export async function openColumnFilter(page, nth = 0) {
+  const btn = getColumnFilterBtn(page, nth);
+  await btn.waitFor({ state: "visible", timeout: 10000 });
+  await btn.click();
+  const panel = page.locator('[data-test^="o2-table-column-filter-panel-"]').first();
+  await panel.waitFor({ state: "visible", timeout: 5000 });
+  return panel;
+}
+
+/** Returns the value <li> items (including the "no matches" placeholder, if shown) in an open filter panel. */
+function getFilterValueItems(panel) {
+  return panel.locator('ul[role="listbox"] li');
+}
+
+/** Checks the value at itemIdx (0-based) in an open filter panel. */
+async function selectFilterValueByIndex(panel, itemIdx = 0) {
+  const item = getFilterValueItems(panel).nth(itemIdx);
+  await item.waitFor({ state: "visible", timeout: 5000 });
+  await item.click();
+}
+
+/** Types into the filter panel's search box to narrow the value list. */
+async function searchInFilterPanel(panel, text) {
+  const searchInput = panel.locator("input").first();
+  await searchInput.fill(text);
+}
+
+/** Clicks "Clear filter" in an open filter panel. */
+async function clearColumnFilter(panel) {
+  await panel.getByText("Clear filter", { exact: false }).click();
+}
+
+/**
+ * Panel-scoped column filter actions — take the `panel` locator returned by
+ * openColumnFilter() rather than `page`. (getColumnFilterBtn/openColumnFilter are
+ * exported standalone above since they're page-scoped, not part of this namespace.)
+ */
+export const columnFilter = {
+  valueItems: getFilterValueItems,
+  selectValueByIndex: selectFilterValueByIndex,
+  search: searchInFilterPanel,
+  clear: clearColumnFilter,
+};
