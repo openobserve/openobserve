@@ -1504,7 +1504,7 @@ GROUP BY stream;
     }
 
     async fn org_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)> {
-        let sql = r#"SELECT 
+        let sql = r#"SELECT
 SUM(original_size) AS original_size,
 SUM(index_size) AS index_size
 FROM file_list
@@ -1516,6 +1516,16 @@ WHERE org = $1 AND account = $2;"#;
             .fetch_optional(&pool)
             .await?;
         Ok(ret.unwrap_or_default())
+    }
+
+    async fn delete_by_org(&self, org_id: &str) -> Result<()> {
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        sqlx::query("DELETE FROM file_list WHERE org = $1;")
+            .bind(org_id)
+            .execute(&*client)
+            .await?;
+        Ok(())
     }
 }
 

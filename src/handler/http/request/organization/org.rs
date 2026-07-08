@@ -122,6 +122,14 @@ pub async fn organizations(
     };
 
     for org in all_orgs {
+        // Hide blocked orgs (pending_deletion or deleting) from the regular org
+        // list (switcher) so a soft-deleted org feels gone. _meta admins inspect
+        // them via the dedicated all_organizations endpoint instead. This matches
+        // the blocked_orgs middleware, which also gates on is_blocked.
+        #[cfg(feature = "cloud")]
+        if crate::service::db::org_status::is_blocked(&org.identifier) {
+            continue;
+        }
         id += 1;
         #[cfg(feature = "cloud")]
         let org_subscription: i32 = all_subscriptions
@@ -239,6 +247,13 @@ pub async fn all_organizations(
                 .map(|(_, _, provider)| provider.clone())
                 .unwrap_or_default(),
             org_storage_enabled: settings.org_storage_enabled,
+            status: org.status.clone(),
+            deleted_at: org.deleted_at,
+            grace_period_days: if org.status == "pending_deletion" {
+                Some(crate::service::org_cleanup::grace_period_days())
+            } else {
+                None
+            },
         };
         if !org_names.contains(&org.identifier) {
             org_names.insert(org.identifier.clone());
@@ -1261,6 +1276,77 @@ pub async fn cluster_info(
 
     // Return the response
     MetaHttpResponse::json(cluster_info_response)
+}
+
+/// InitiateOrgDeletion
+#[cfg(feature = "cloud")]
+pub async fn initiate_org_deletion(
+    Headers(user_email): Headers<UserEmail>,
+    Path(org_id): Path<String>,
+) -> Response {
+    use config::meta::user::UserRole;
+
+    // Cloud authorization for self-service org deletion is intentionally NOT
+    // routed through OpenFGA: cloud orgs are frequently created without per-org
+    // `admin` membership tuples (org creation bypasses the OFGA POST check), so
+    // an OFGA `organizations:DELETE` check would 403 legitimate org admins.
+    // Instead, gate on the DB-resolved membership role for this org: allow root
+    // users (members of no org) and users whose role in *this* org is Admin.
+    let allowed = is_root_user(&user_email.user_id)
+        || matches!(
+            crate::service::users::get_user(Some(&org_id), &user_email.user_id).await,
+            Some(user) if user.role == UserRole::Admin
+        );
+    if !allowed {
+        return MetaHttpResponse::forbidden("Not allowed");
+    }
+
+    match crate::service::org_cleanup::initiate_deletion(&org_id, &user_email.user_id).await {
+        Ok(()) => MetaHttpResponse::ok("Organization deletion initiated"),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}
+
+/// ResurrectOrg — _meta admin action to cancel a pending deletion.
+#[cfg(feature = "cloud")]
+pub async fn resurrect_org_deletion(
+    Headers(user_email): Headers<UserEmail>,
+    Path((meta_org, target_org_id)): Path<(String, String)>,
+) -> Response {
+    if meta_org != "_meta" {
+        return MetaHttpResponse::forbidden("Not allowed");
+    }
+    if !is_root_user(user_email.user_id.as_str()) {
+        return MetaHttpResponse::forbidden("Not allowed");
+    }
+    match crate::service::org_cleanup::resurrect_org(&target_org_id, &user_email.user_id).await {
+        Ok(()) => MetaHttpResponse::ok("Organization resurrected"),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}
+
+#[cfg(not(feature = "cloud"))]
+pub async fn resurrect_org_deletion(
+    Path((_meta_org, _target_org_id)): Path<(String, String)>,
+) -> Response {
+    MetaHttpResponse::forbidden("Enterprise feature")
+}
+
+/// ListOrgCleanupTasks - admin endpoint to inspect cleanup task state for an org
+pub async fn list_org_cleanup_tasks(
+    Headers(user_email): Headers<UserEmail>,
+    Path((meta_org, target_org_id)): Path<(String, String)>,
+) -> Response {
+    if meta_org != "_meta" {
+        return MetaHttpResponse::forbidden("Not allowed");
+    }
+    if !is_root_user(user_email.user_id.as_str()) {
+        return MetaHttpResponse::forbidden("Not allowed");
+    }
+    match infra::table::org_cleanup_tasks::list_by_org_status(&target_org_id, None).await {
+        Ok(tasks) => MetaHttpResponse::json(tasks),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
 }
 
 /// Helper function to collect nodes from the local cluster

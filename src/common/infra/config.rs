@@ -115,6 +115,18 @@ pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
 /// Presence means the token is valid and enabled. Absence means cache miss (check DB).
 pub static ORG_INGESTION_TOKENS: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
 
+/// Status of an organization — used to gate ingestion and query while deletion is in progress.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OrgStatus {
+    Active,
+    PendingDeletion,
+    Deleting,
+}
+
+/// Cache of org_id → OrgStatus for O(1) synchronous checks during request handling.
+pub static ORG_STATUS_CACHE: Lazy<Arc<RwHashMap<String, OrgStatus>>> =
+    Lazy::new(|| Arc::new(dashmap::DashMap::default()));
+
 /// System settings cache
 /// Key format: "{scope}:{org_id}:{user_id}:{setting_key}" where org_id/user_id can be "_" if not
 /// applicable

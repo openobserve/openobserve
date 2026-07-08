@@ -1600,6 +1600,7 @@
   },
   "organization": {
     "header": "Organizations",
+    "orgBeingDeletedSwitching": "This organization is being deleted. Switching you to another organization.",
     "orgName": "Organization Name",
     "createOrganization": "New organization",
     "updateOrganization": "Update organization",
@@ -1634,7 +1635,10 @@
     "subscription_type": "Plan Type",
     "proceed_subscription": "Proceed to Subscription",
     "subscription_plan": "Subscription Plan",
-    "manage": "Manage"
+    "manage": "Manage",
+    "pendingDeletion": "Pending deletion",
+    "daysLeft": "{n} days left",
+    "resurrect": "Resurrect organization"
   },
   "template": {
     "header": "Templates",
@@ -4012,6 +4016,14 @@
     "pickCustomColor": "Pick Custom Color",
     "close": "Close",
     "organizationSettingsUpdated": "Organization settings updated",
+    "dangerZone": "Danger Zone",
+    "deleteOrganization": "Delete organization",
+    "deleteOrganizationDescription": "Permanently delete this organization and all of its data. This action cannot be undone.",
+    "deleteOrganizationConfirm": "This will permanently delete \"{name}\" and all of its streams, dashboards, alerts, pipelines, users, and settings.",
+    "deleteOrganizationWarning": "This action cannot be undone. Deletion runs in the background and the organization will be unavailable immediately.",
+    "deleteOrganizationRecoverable": "You can recover this organization during the grace period before its data is permanently deleted.",
+    "deleteOrganizationTypeToConfirm": "To confirm, type {name} below:",
+    "deleteOrganizationInitiated": "Organization deletion initiated.",
     "somethingWentWrong": "Something went wrong",
     "logoUpdatedSuccessfully": "{mode} logo updated successfully.",
     "errorUploadingImage": "Error while uploading image.",

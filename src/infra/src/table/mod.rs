@@ -43,6 +43,7 @@ mod migration;
 pub mod model_pricing;
 pub mod online_eval_jobs;
 pub mod org_ai_toolsets;
+pub mod org_cleanup_tasks;
 pub mod org_ingestion_tokens;
 pub mod org_storage_providers;
 pub mod org_users;
@@ -116,6 +117,7 @@ pub async fn create_user_tables() -> Result<(), anyhow::Error> {
     organizations::create_table().await?;
     users::create_table().await?;
     org_users::create_table().await?;
+    org_cleanup_tasks::create_table().await?;
 
     Ok(())
 }

@@ -372,6 +372,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
       </div>
     </div>
+
+    <!-- Danger Zone: delete this organization (owner/admin only).
+         Backend gate is the per-org RBAC check on DELETE /api/{org_id}/organizations;
+         this UI gate just hides the action for non-admins of the current org. -->
+    <div
+      id="dangerZone"
+      v-if="canDeleteOrg"
+      data-test="general-settings-danger-zone"
+      class="tw:mt-8"
+    >
+      <!-- Red-accented header signals this section is destructive. -->
+      <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
+        <OIcon name="warning" size="sm" class="tw:text-error" />
+        <span class="tw:text-base tw:font-bold tw:leading-6 tw:text-error">
+          {{ t("settings.dangerZone") }}
+        </span>
+      </div>
+
+      <!-- Bordered, tinted card. Title + description share one row (same layout as
+           the settings rows above), then the destructive action on the next line,
+           left-aligned to match the Save button. -->
+      <div
+        class="tw:rounded-lg tw:border tw:border-error/50 tw:bg-error/[0.06] tw:px-5 tw:py-4"
+      >
+        <div class="tw:grid tw:grid-cols-3 tw:gap-4 tw:items-start">
+          <span class="individual-setting-title tw:text-sm tw:font-medium tw:leading-5 tw:col-span-1">
+            {{ t("settings.deleteOrganization") }}
+          </span>
+          <span class="individual-setting-description tw:text-[13px] tw:opacity-70 tw:col-span-2">
+            {{ t("settings.deleteOrganizationDescription") }}
+          </span>
+        </div>
+        <OButton
+          data-test="general-settings-delete-org-btn"
+          variant="destructive"
+          size="sm-action"
+          class="tw:mt-4"
+          :loading="deleting"
+          @click="confirmDeleteOrg = true"
+        >
+          {{ t("settings.deleteOrganization") }}
+        </OButton>
+      </div>
+    </div>
   </div>
   <OSpinner
     v-if="loadingState"
@@ -401,6 +445,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OColor v-model="tempColor" @update:model-value="updateCustomColor" />
   </ODialog>
+
+  <ODialog
+    data-test="general-delete-org-dialog"
+    v-model:open="confirmDeleteOrg"
+    size="sm"
+    :title="t('settings.deleteOrganization')"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('settings.deleteOrganization')"
+    primary-button-variant="destructive"
+    :primary-button-disabled="!deleteConfirmMatches"
+    @update:open="(v) => !v && (deleteConfirmInput = '')"
+    @click:secondary="confirmDeleteOrg = false"
+    @click:primary="deleteOrg"
+  >
+    <div class="tw:space-y-3">
+      <!-- What will happen -->
+      <p class="tw:text-sm tw:text-text-primary">
+        {{
+          t("settings.deleteOrganizationConfirm", {
+            name: deleteOrgName,
+          })
+        }}
+      </p>
+
+      <!-- Irreversible-action warning callout -->
+      <div
+        class="tw:flex tw:items-start tw:gap-2 tw:rounded tw:border tw:border-error tw:bg-surface-secondary tw:px-3 tw:py-2"
+      >
+        <OIcon name="warning" size="sm" class="tw:text-error tw:mt-0.5 tw:shrink-0" />
+        <div class="tw:space-y-1">
+          <p class="tw:text-xs tw:text-text-secondary">
+            {{ t("settings.deleteOrganizationWarning") }}
+          </p>
+          <p class="tw:text-xs tw:text-text-secondary">
+            {{ t("settings.deleteOrganizationRecoverable") }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Type-to-confirm gate -->
+      <div class="tw:space-y-1">
+        <label class="tw:text-xs tw:text-text-secondary tw:block">
+          <!-- eslint-disable-next-line @intlify/vue-i18n/no-raw-text -->
+          <i18n-t keypath="settings.deleteOrganizationTypeToConfirm" tag="span">
+            <template #name>
+              <span class="tw:font-semibold tw:text-text-primary">{{ deleteOrgName }}</span>
+            </template>
+          </i18n-t>
+        </label>
+        <OInput
+          data-test="general-delete-org-confirm-input"
+          v-model="deleteConfirmInput"
+          :placeholder="deleteOrgName"
+          size="sm"
+          autocomplete="off"
+          @keyup.enter="deleteConfirmMatches && deleteOrg()"
+        />
+      </div>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -410,6 +514,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import organizations from "@/services/organizations";
+import usersService from "@/services/users";
 import settingsService from "@/services/settings";
 import config from "@/aws-exports";
 import configService from "@/services/config";
@@ -565,9 +670,86 @@ export default defineComponent({
       }
     };
 
+    // ===== Delete organization (Danger Zone) =====
+    // The current user's role in the *currently selected* org. Sourced the same
+    // way IAM Users page does it: match our email in the org members list.
+    const currentUserRole = ref("");
+    const confirmDeleteOrg = ref(false);
+    const deleting = ref(false);
+
+    // Type-to-confirm gate: the destructive action is only enabled once the user
+    // types the exact org name. Guards against accidental clicks on an irreversible
+    // action (same pattern GitHub/Stripe use for delete-repo/close-account).
+    const deleteConfirmInput = ref("");
+    const deleteOrgName = computed(
+      () =>
+        store.state.selectedOrganization?.label ||
+        store.state.selectedOrganization?.identifier ||
+        "",
+    );
+    const deleteConfirmMatches = computed(
+      () => deleteConfirmInput.value.trim() === deleteOrgName.value,
+    );
+
+    // Only cloud builds expose self-service org deletion. Backend enforces the
+    // real per-org RBAC check; this only governs visibility.
+    const canDeleteOrg = computed(() => {
+      if (config.isCloud !== "true") return false;
+      const role = currentUserRole.value?.toLowerCase();
+      return role === "root" || role === "admin";
+    });
+
+    const fetchCurrentUserRole = async () => {
+      const orgId = store.state.selectedOrganization?.identifier;
+      if (!orgId || config.isCloud !== "true") return;
+      try {
+        const res = await usersService.orgUsers(orgId);
+        const me = store.state.userInfo?.email?.toLowerCase();
+        const members = res.data?.data || [];
+        const mine = members.find(
+          (m: any) => m.email?.toLowerCase() === me,
+        );
+        currentUserRole.value = mine?.role?.toLowerCase() || "";
+      } catch {
+        // On error, leave role empty -> button stays hidden.
+        currentUserRole.value = "";
+      }
+    };
+
+    const deleteOrg = async () => {
+      const org = store.state.selectedOrganization;
+      const orgId = org?.identifier;
+      if (!orgId) return;
+      deleting.value = true;
+      try {
+        await organizations.delete_org(orgId);
+        confirmDeleteOrg.value = false;
+        deleteConfirmInput.value = "";
+        toast({
+          variant: "success",
+          message: t("settings.deleteOrganizationInitiated"),
+        });
+      } catch (e: any) {
+        toast({
+          variant: "error",
+          message:
+            e?.response?.data?.message ||
+            e?.message ||
+            t("settings.somethingWentWrong"),
+        });
+      } finally {
+        deleting.value = false;
+      }
+    };
+
+    onMounted(() => {
+      fetchCurrentUserRole();
+    });
+
     onActivated(() => {
       // Initialize from store on mount
       updateFromStore();
+      fetchCurrentUserRole();
     });
 
     // Watch for changes in organization settings (backend config)
@@ -1055,6 +1237,14 @@ export default defineComponent({
       updateCustomColor,
       resetThemeColors,
       currentPickerMode,
+      // Delete organization (Danger Zone)
+      canDeleteOrg,
+      confirmDeleteOrg,
+      deleting,
+      deleteOrg,
+      deleteConfirmInput,
+      deleteOrgName,
+      deleteConfirmMatches,
     };
   },
 });

@@ -554,8 +554,8 @@ async fn handle_alert_triggers(
             if let Err(e) = set_without_updating_trigger(&trigger.org, alert).await {
                 log::error!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] Failed to pause alert due to trial expiry: {}/{} : {e}",
-                    &trigger.org,
-                    &trigger.module_key
+                    trigger.org,
+                    trigger.module_key
                 );
             }
 
@@ -568,8 +568,8 @@ async fn handle_alert_triggers(
             {
                 log::error!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] Failed to remove alert from scheduled_jobs due to trial expiry: {}/{} : {e}",
-                    &trigger.org,
-                    &trigger.module_key
+                    trigger.org,
+                    trigger.module_key
                 );
             }
 
@@ -1455,7 +1455,7 @@ async fn handle_report_triggers(
             {
                 log::error!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] Failed to pause report due to trial expiry: {}/{} : {e}",
-                    &trigger.org,
+                    trigger.org,
                     report_name
                 );
             }
@@ -1469,7 +1469,7 @@ async fn handle_report_triggers(
             {
                 log::error!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] Failed to remove report from scheduled_jobs due to trial expiry: {}/{} : {e}",
-                    &trigger.org,
+                    trigger.org,
                     report_name
                 );
             }
@@ -1801,7 +1801,7 @@ async fn handle_derived_stream_triggers(
             {
                 log::error!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] Failed to pause pipeline due to trial expiry: {}/{} : {e}",
-                    &trigger.org,
+                    trigger.org,
                     pipeline.name
                 );
             }
@@ -1815,7 +1815,7 @@ async fn handle_derived_stream_triggers(
             {
                 log::error!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] Failed to remove pipeline from scheduled_jobs due to trial expiry: {}/{} : {e}",
-                    &trigger.org,
+                    trigger.org,
                     pipeline.name
                 );
             }

@@ -165,8 +165,10 @@ pub async fn save_org_tuples(_org_id: &str) {}
 pub async fn delete_org_tuples(org_id: &str) {
     use o2_openfga::config::get_config as get_openfga_config;
 
-    if get_openfga_config().enabled {
-        o2_openfga::authorizer::authz::delete_org_tuples(org_id).await
+    if get_openfga_config().enabled
+        && let Err(e) = o2_openfga::authorizer::authz::delete_org_tuples(org_id).await
+    {
+        log::error!("[auth] failed to delete org tuples for {org_id}: {e}");
     }
 }
 

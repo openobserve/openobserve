@@ -14,43 +14,44 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{extract::Request, middleware::Next, response::Response};
-#[cfg(feature = "cloud")]
-use {
-    crate::service::organization, axum::http::StatusCode, axum::response::IntoResponse,
-    config::cluster::LOCAL_NODE,
-};
 
 pub async fn blocked_orgs_middleware(request: Request, next: Next) -> Response {
-    #[cfg(not(feature = "cloud"))]
+    let path = request
+        .uri()
+        .path()
+        .strip_prefix("/")
+        .unwrap_or("")
+        .split('?')
+        .next()
+        .unwrap_or("");
+
+    // Extract org_id as first path segment.
+    // Skip the check for known non-org top-level path prefixes that share this router.
+    const SYSTEM_PREFIXES: &[&str] = &["organizations", "invites", "proxy"];
+    let org_id = path.split('/').next().unwrap_or("");
+
+    if !org_id.is_empty()
+        && !SYSTEM_PREFIXES.contains(&org_id)
+        && crate::service::db::org_status::is_blocked(org_id)
     {
-        next.run(request).await
+        use axum::{http::StatusCode, response::IntoResponse};
+        return (StatusCode::FORBIDDEN, "Organization is being deleted").into_response();
     }
 
     #[cfg(feature = "cloud")]
     {
-        let path = request
-            .uri()
-            .path()
-            .strip_prefix("/")
-            .unwrap_or("")
-            .split('?')
-            .next()
-            .unwrap_or("");
+        use axum::{http::StatusCode, response::IntoResponse};
+        use config::cluster::LOCAL_NODE;
 
-        // in middleware, we only want to block ingestion request
-        // so for non ingester node, we can allow pass.
+        use crate::service::organization;
+
         if LOCAL_NODE.is_ingester()
             && config::router::INGESTER_ROUTES
                 .iter()
                 .any(|r| path.ends_with(r))
         {
-            // for all ingester routes, the first part of path is org_id
-            let org_id = path.split('/').next().unwrap_or("");
-            // the function can return error if there were any db errors or such
-            // in that case, we allow the request to proceed
             match organization::is_org_in_free_trial_period(org_id).await {
                 Ok(ongoing) => {
-                    // if the trial period is not ongoing, we will block the org here itself
                     if !ongoing {
                         log::info!("{org_id} blocked in middleware");
                         return (
@@ -65,6 +66,30 @@ pub async fn blocked_orgs_middleware(request: Request, next: Next) -> Response {
                 }
             }
         }
-        next.run(request).await
+    }
+
+    next.run(request).await
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_org_id_extracted_from_path() {
+        let path = "myorg/api/logs";
+        let org_id = path.split('/').next().unwrap_or("");
+        assert_eq!(org_id, "myorg");
+    }
+
+    #[test]
+    fn test_empty_path_gives_empty_org_id() {
+        let path = "";
+        let org_id = path.split('/').next().unwrap_or("");
+        assert_eq!(org_id, "");
+    }
+
+    #[test]
+    fn test_non_blocked_org_is_allowed_by_cache() {
+        // ORG_STATUS_CACHE starts empty; is_blocked for an unknown org returns false
+        assert!(!crate::service::db::org_status::is_blocked("someorg"));
     }
 }

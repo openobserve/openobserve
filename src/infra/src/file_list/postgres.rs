@@ -1908,6 +1908,18 @@ WHERE org = $1 AND account = $2;"#;
         let (storage, index) = ret.unwrap_or_default();
         Ok((storage.unwrap_or_default(), index.unwrap_or_default()))
     }
+
+    async fn delete_by_org(&self, org_id: &str) -> Result<()> {
+        let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["delete", "file_list"])
+            .inc();
+        sqlx::query("DELETE FROM file_list WHERE org = $1;")
+            .bind(org_id)
+            .execute(&pool)
+            .await?;
+        Ok(())
+    }
 }
 
 impl PostgresFileList {
