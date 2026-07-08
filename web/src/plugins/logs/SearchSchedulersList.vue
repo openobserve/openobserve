@@ -8,12 +8,17 @@
         class="shrink-0 px-4 border-b border-border-default"
       >
         <template #actions>
-          <div>
+          <div class="flex items-center gap-1">
+            <OTableColumnToggle
+              :columns="columnsToBeRendered"
+              :column-visibility="columnVisibility"
+              @update:column-visibility="setColumnVisibility"
+            />
             <OButton
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              class="ml-3"
+              class=""
               :loading="isLoading"
               data-test="search-scheduler-get-jobs-btn"
               @click="fetchSearchHistory"
@@ -29,6 +34,7 @@
             data-test="search-scheduler-table"
             :data="dataToBeLoaded"
             :columns="columnsToBeRendered"
+            :column-visibility="columnVisibility"
             row-key="trace_id"
             :loading="isLoading"
             pagination="client"
@@ -262,6 +268,8 @@ import { useI18n } from "vue-i18n";
 import { formatDate } from "@/utils/date";
 import type { Ref } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -288,6 +296,7 @@ export default defineComponent({
     DateTime,
     OEmptyState,
     OTable,
+    OTableColumnToggle,
     OTimeCell,
     OUserCell,
     OTag,
@@ -334,6 +343,9 @@ export default defineComponent({
       endTime: 0,
     });
     const columnsToBeRendered = ref<OTableColumnDef[]>([]);
+    const { columnVisibility, setColumnVisibility } = useExternalColumnToggle(
+      "logs-search-schedulers-list",
+    );
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
     const isDateTimeChanged = ref(false);
@@ -368,11 +380,11 @@ export default defineComponent({
       if (data && data.length === 0) return [];
 
       return [
-        { id: "user_id", header: t('search_scheduler_job.user_id'), accessorKey: "user_id", sortable: true, size: COL.owner, meta: { align: "left", autoWidth: true } },
-        { id: "created_at", header: t('search_scheduler_job.created_at'), accessorKey: "created_at", sortable: true, size: COL.createdAt, meta: { align: "left" } },
-        { id: "start_time", header: t('search_scheduler_job.start_time'), accessorKey: "start_time", sortable: true, size: COL.date, meta: { align: "left" } },
-        { id: "duration", header: t('search_scheduler_job.duration'), accessorKey: "duration", sortable: false, size: COL.duration, meta: { align: "left" } },
-        { id: "status", header: t('search_scheduler_job.status'), accessorKey: "status", cell: " ", sortable: false, size: COL.status, meta: { align: "left" } },
+        { id: "user_id", header: t('search_scheduler_job.user_id'), accessorKey: "user_id", sortable: true, hideable: true, size: COL.owner, meta: { align: "left", autoWidth: true } },
+        { id: "created_at", header: t('search_scheduler_job.created_at'), accessorKey: "created_at", sortable: true, hideable: true, size: COL.createdAt, meta: { align: "left" } },
+        { id: "start_time", header: t('search_scheduler_job.start_time'), accessorKey: "start_time", sortable: true, hideable: true, size: COL.date, meta: { align: "left" } },
+        { id: "duration", header: t('search_scheduler_job.duration'), accessorKey: "duration", sortable: false, hideable: true, size: COL.duration, meta: { align: "left" } },
+        { id: "status", header: t('search_scheduler_job.status'), accessorKey: "status", cell: " ", sortable: false, hideable: true, size: COL.status, meta: { align: "left" } },
         { id: "actions", header: t('search_scheduler_job.actions'), isAction: true, size: 120, meta: { align: "center", cellClass: "actions-column", actionCount: 4 } },
       ];
     };
@@ -785,6 +797,8 @@ export default defineComponent({
       fetchSearchHistory,
       dataToBeLoaded,
       columnsToBeRendered,
+      columnVisibility,
+      setColumnVisibility,
       config,
       t,
       route,

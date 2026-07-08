@@ -82,6 +82,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ t("metrics.runQuery") }}
               </OButton>
+              <OTableColumnToggle
+                :columns="tableColumns"
+                :column-visibility="columnVisibility"
+                @update:column-visibility="setColumnVisibility"
+              />
               <!-- Refresh button -->
               <OButton
                 variant="outline"
@@ -267,6 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTable
                   :data="tableRows"
                   :columns="tableColumns"
+                  :column-visibility="columnVisibility"
                   :loading="isLoading.length > 0"
                   row-key="session_id"
                   pagination="none"
@@ -415,6 +421,8 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -634,6 +642,9 @@ const userDataSet = new Set([
   "resource_url",
 ]);
 
+const { columnVisibility, setColumnVisibility } =
+  useExternalColumnToggle("rum-sessions-list");
+
 const tableColumns = [
   {
     id: "action_play",
@@ -648,6 +659,7 @@ const tableColumns = [
     header: t("rum.userSession"),
     accessorFn: (row: any) => row["user_email"] || "Unknown",
     sortable: true,
+    hideable: true,
     meta: { align: "left", autoWidth: true },
   },
   {
@@ -655,6 +667,7 @@ const tableColumns = [
     header: t("rum.activity"),
     accessorFn: (row: any) => row["events"] || 0,
     sortable: true,
+    hideable: true,
     size: 220,
     meta: { align: "left" },
   },
@@ -665,6 +678,7 @@ const tableColumns = [
     accessorFn: (row: any) =>
       (row["error_count"] || 0) * 1000 + (row["frustration_count"] || 0),
     sortable: true,
+    hideable: true,
     size: 160,
     meta: { align: "left" },
   },
@@ -673,6 +687,7 @@ const tableColumns = [
     header: t("rum.location"),
     accessorFn: (row: any) => row["country"] || "",
     sortable: true,
+    hideable: true,
     size: 360,
     meta: { align: "left" },
   },
@@ -681,6 +696,7 @@ const tableColumns = [
     header: t("rum.duration"),
     accessorFn: (row: any) => row["time_spent"] || 0,
     sortable: true,
+    hideable: true,
     size: COL.duration,
     meta: { align: "right" },
   },
