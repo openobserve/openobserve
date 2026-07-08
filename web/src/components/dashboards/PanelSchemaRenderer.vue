@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         size="inline"
         icon="bar-chart"
-        :title="noData"
+        :title="t('panel.noData')"
         :backdrop="false"
         data-test="no-data"
         class="noData absolute! inset-0 w-full h-full !min-h-0 !p-2 [container-type:size]"
@@ -304,6 +304,7 @@ import {
   onUnmounted,
 } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import { getDataValue } from "@/utils/dashboard/aliasUtils";
@@ -515,6 +516,7 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const store = useStore();
+    const { t } = useI18n();
     const route = useRoute();
     const router = useRouter();
 
@@ -1617,6 +1619,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       store,
       chartPanelRef,
       chartRendererRef,

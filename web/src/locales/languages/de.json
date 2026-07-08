@@ -2639,7 +2639,8 @@
     "configSectionDrilldown": "Drilldown",
     "configSectionComparison": "Vergleich",
     "configSectionMarkLines": "Linien markieren",
-    "configSectionBackground": "Hintergrund"
+    "configSectionBackground": "Hintergrund",
+    "editTab": "Tab bearbeiten"
   },
   "panel": {
     "header": "Panel",
@@ -2718,7 +2719,7 @@
     "enterCustomSql": "Geben Sie Ihre benutzerdefinierte SQL-Abfrage ein...",
     "back": "<< Zurück",
     "sqlBuilder": "SQL-Generator",
-    "promQL": "proMQL",
+    "promQL": "PromQL",
     "latitude": "Breitengrad",
     "longitude": "Längengrad",
     "weight": "Gewichtung",
@@ -2726,7 +2727,12 @@
     "mapvalue": "Wert",
     "source": "Quelle",
     "target": "Ziel",
-    "value": "Wert"
+    "value": "Wert",
+    "xAxisShort": "X-Achse",
+    "yAxisShort": "Y-Achse",
+    "rowFields": "Zeilenfelder",
+    "valueFields": "Wertfelder",
+    "noData": "Keine Daten"
   },
   "home": {
     "streams": "Streams",

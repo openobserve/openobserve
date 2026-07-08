@@ -2639,7 +2639,8 @@
     "configSectionDrilldown": "Inzoomen",
     "configSectionComparison": "Vergelijking",
     "configSectionMarkLines": "Lijnen markeren",
-    "configSectionBackground": "Achtergrond"
+    "configSectionBackground": "Achtergrond",
+    "editTab": "Tabblad bewerken"
   },
   "panel": {
     "header": "Paneel",
@@ -2718,7 +2719,7 @@
     "enterCustomSql": "Voer uw aangepaste SQL-query in...",
     "back": "<< Terug",
     "sqlBuilder": "SQL Builder",
-    "promQL": "ProMQL",
+    "promQL": "PromQL",
     "latitude": "Breedtegraad",
     "longitude": "Lengtegraad",
     "weight": "Gewicht",
@@ -2726,7 +2727,12 @@
     "mapvalue": "Waarde",
     "source": "Bron",
     "target": "Doelwit",
-    "value": "Waarde"
+    "value": "Waarde",
+    "xAxisShort": "X-as",
+    "yAxisShort": "Y-as",
+    "rowFields": "Rijvelden",
+    "valueFields": "Waardevelden",
+    "noData": "Geen gegevens"
   },
   "home": {
     "streams": "Streams",

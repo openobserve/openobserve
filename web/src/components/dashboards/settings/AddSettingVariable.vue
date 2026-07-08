@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
+  <div class="h-full">
     <div class="flex flex-col h-full">
       <DashboardHeader :title="title" backButton @back="close">
       </DashboardHeader>
 
       <div
-        class="overflow-y-auto px-[3px] max-h-[calc(100vh-170px)] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded"
+        class="overflow-y-auto px-[3px] pb-4 flex-1 min-h-0 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded"
         :class="store.state.theme === 'dark' ? '[scrollbar-color:#4b5563_transparent] [&::-webkit-scrollbar-thumb]:bg-[#4b5563]' : '[scrollbar-color:#d1d5db_transparent] [&::-webkit-scrollbar-thumb]:bg-[#d1d5db]'"
       >
         <OForm
@@ -513,7 +513,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OForm>
       </div>
       <div
-        class="sticky bottom-0 left-0 w-full pt-3 pb-2 px-0 flex justify-center gap-4 z-10 border-t"
+        class="sticky bottom-0 left-0 w-full py-3 px-4 flex justify-end gap-3 z-10 border-t"
         :class="store.state.theme === 'dark' ? 'border-t-[#333] [box-shadow:rgb(20,20,20)_0px_-4px_7px_0px]' : 'border-t-[#eee] [box-shadow:rgb(240,240,240)_0px_-4px_7px_0px]'"
       >
         <OButton

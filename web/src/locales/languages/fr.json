@@ -2639,7 +2639,8 @@
     "configSectionDrilldown": "Drill down",
     "configSectionComparison": "Comparaison",
     "configSectionMarkLines": "Marquer les lignes",
-    "configSectionBackground": "Contexte"
+    "configSectionBackground": "Contexte",
+    "editTab": "Modifier l'onglet"
   },
   "panel": {
     "header": "Panneau",
@@ -2718,7 +2719,7 @@
     "enterCustomSql": "Entrez votre requête SQL personnalisée...",
     "back": "<< Retour",
     "sqlBuilder": "Générateur SQL",
-    "promQL": "ProMQL",
+    "promQL": "PromQL",
     "latitude": "Latitude",
     "longitude": "Longitude",
     "weight": "Poids",
@@ -2726,7 +2727,12 @@
     "mapvalue": "Valeur",
     "source": "Source",
     "target": "Cible",
-    "value": "Valeur"
+    "value": "Valeur",
+    "xAxisShort": "Axe X",
+    "yAxisShort": "Axe Y",
+    "rowFields": "Champs de ligne",
+    "valueFields": "Champs de valeur",
+    "noData": "Aucune donnée"
   },
   "home": {
     "streams": "Ruisseaux",

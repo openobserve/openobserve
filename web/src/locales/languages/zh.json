@@ -2639,7 +2639,8 @@
     "configSectionDrilldown": "向下钻取",
     "configSectionComparison": "对比",
     "configSectionMarkLines": "Mark Lines",
-    "configSectionBackground": "背景"
+    "configSectionBackground": "背景",
+    "editTab": "编辑选项卡"
   },
   "panel": {
     "header": "面板",
@@ -2726,7 +2727,12 @@
     "mapvalue": "值",
     "source": "来源",
     "target": "目标",
-    "value": "值"
+    "value": "值",
+    "xAxisShort": "X轴",
+    "yAxisShort": "Y轴",
+    "rowFields": "行字段",
+    "valueFields": "值字段",
+    "noData": "无数据"
   },
   "home": {
     "streams": "数据流",

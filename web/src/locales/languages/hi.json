@@ -1412,7 +1412,7 @@
     "fullscreen": "Go Fullscreen",
     "exitFullscreen": "Exit Fullscreen",
     "tabSettings": "Tabs",
-    "newTab": "Add Tab",
+    "newTab": "टैब जोड़ें",
     "tabSettingsTitle": "Tabs Settings",
     "adhoclabelOfVariable": "Label",
     "multiSelect": "Allow multiple selection",
@@ -1789,7 +1789,8 @@
     "configSectionDrilldown": "ड्रिलडाउन",
     "configSectionComparison": "तुलना",
     "configSectionMarkLines": "मार्क लाइनें",
-    "configSectionBackground": "बैकग्राउंड"
+    "configSectionBackground": "बैकग्राउंड",
+    "editTab": "टैब संपादित करें"
   },
   "panel": {
     "header": "पैनल",
@@ -1852,7 +1853,7 @@
     "labelFilters": "Label Filters",
     "operations": "Operations",
     "promQLBuilder": "PromQL Builder",
-    "joins": "Joins",
+    "joins": "जॉइन",
     "addJoin": "Add Join",
     "removeJoin": "Remove Join",
     "leftJoin": "Left Join",
@@ -1876,7 +1877,12 @@
     "addToPivot": "पिवट फ़ील्ड में जोड़ें",
     "customSql": "कस्टम SQL",
     "generatedSql": "जनरेट किया गया SQL",
-    "enterCustomSql": "अपनी कस्टम SQL क्वेरी दर्ज करें..."
+    "enterCustomSql": "अपनी कस्टम SQL क्वेरी दर्ज करें...",
+    "xAxisShort": "X-अक्ष",
+    "yAxisShort": "Y-अक्ष",
+    "rowFields": "पंक्ति फ़ील्ड",
+    "valueFields": "मान फ़ील्ड",
+    "noData": "कोई डेटा नहीं"
   },
   "home": {
     "streams": "स्ट्रीम",

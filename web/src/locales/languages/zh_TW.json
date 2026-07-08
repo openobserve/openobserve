@@ -2194,7 +2194,8 @@
     "variableScopeHelp": "若選擇全域，變數將套用至所有分頁與面板。",
     "selectFile": "選擇檔案",
     "allFolders": "所有資料夾",
-    "showDynamicFilters": "顯示動態篩選條件"
+    "showDynamicFilters": "顯示動態篩選條件",
+    "editTab": "編輯分頁"
   },
   "panel": {
     "header": "面板",
@@ -2250,7 +2251,7 @@
     "labelFilters": "標籤篩選",
     "operations": "運算",
     "promQLBuilder": "PromQL 建構器",
-    "joins": "Joins",
+    "joins": "連接",
     "addJoin": "新增 Join",
     "removeJoin": "移除 Join",
     "leftJoin": "Left Join",
@@ -2281,7 +2282,12 @@
     "mapvalue": "值",
     "source": "來源",
     "target": "目標",
-    "value": "值"
+    "value": "值",
+    "xAxisShort": "X 軸",
+    "yAxisShort": "Y 軸",
+    "rowFields": "列欄位",
+    "valueFields": "值欄位",
+    "noData": "無資料"
   },
   "home": {
     "streams": "串流",

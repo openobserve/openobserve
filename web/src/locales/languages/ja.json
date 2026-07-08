@@ -2639,7 +2639,8 @@
     "configSectionDrilldown": "ドリルダウン",
     "configSectionComparison": "比較",
     "configSectionMarkLines": "マークライン",
-    "configSectionBackground": "バックグラウンド"
+    "configSectionBackground": "バックグラウンド",
+    "editTab": "タブを編集"
   },
   "panel": {
     "header": "パネル",
@@ -2726,7 +2727,12 @@
     "mapvalue": "値",
     "source": "ソース",
     "target": "ターゲット",
-    "value": "値"
+    "value": "値",
+    "xAxisShort": "X軸",
+    "yAxisShort": "Y軸",
+    "rowFields": "行フィールド",
+    "valueFields": "値フィールド",
+    "noData": "データなし"
   },
   "home": {
     "streams": "ストリーム",

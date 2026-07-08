@@ -2639,7 +2639,8 @@
     "configSectionDrilldown": "Detaya inme",
     "configSectionComparison": "Karşılaştırma",
     "configSectionMarkLines": "Çizgileri İşaretle",
-    "configSectionBackground": "Arkaplan"
+    "configSectionBackground": "Arkaplan",
+    "editTab": "Sekmeyi Düzenle"
   },
   "panel": {
     "header": "Panel",
@@ -2726,7 +2727,12 @@
     "mapvalue": "Değer",
     "source": "Kaynak",
     "target": "Hedef",
-    "value": "Değer"
+    "value": "Değer",
+    "xAxisShort": "X Ekseni",
+    "yAxisShort": "Y Ekseni",
+    "rowFields": "Satır Alanları",
+    "valueFields": "Değer Alanları",
+    "noData": "Veri Yok"
   },
   "home": {
     "streams": "Akışlar",

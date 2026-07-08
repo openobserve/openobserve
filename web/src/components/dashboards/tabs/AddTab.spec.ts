@@ -47,6 +47,9 @@ const mockI18n = {
       "dashboard.nameRequired": "Name is required",
       "dashboard.cancel": "Cancel",
       "dashboard.save": "Save",
+      "dashboard.name": "Name",
+      "dashboard.newTab": "Add Tab",
+      "dashboard.editTab": "Edit Tab",
     };
     return translations[key] || key;
   },

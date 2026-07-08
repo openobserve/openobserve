@@ -2639,7 +2639,8 @@
     "configSectionDrilldown": "Desglose",
     "configSectionComparison": "Comparación",
     "configSectionMarkLines": "Marcar líneas",
-    "configSectionBackground": "Antecedentes"
+    "configSectionBackground": "Antecedentes",
+    "editTab": "Editar pestaña"
   },
   "panel": {
     "header": "Panel",
@@ -2726,7 +2727,12 @@
     "mapvalue": "Valor",
     "source": "Fuente",
     "target": "Objetivo",
-    "value": "Valor"
+    "value": "Valor",
+    "xAxisShort": "Eje X",
+    "yAxisShort": "Eje Y",
+    "rowFields": "Campos de fila",
+    "valueFields": "Campos de valor",
+    "noData": "Sin datos"
   },
   "home": {
     "streams": "Transmisiones",
