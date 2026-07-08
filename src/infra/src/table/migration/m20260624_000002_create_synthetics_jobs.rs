@@ -140,6 +140,12 @@ fn create_synthetics_jobs_table() -> TableCreateStatement {
                 .default(""),
         )
         .col(ColumnDef::new(SyntheticsJobs::BrowserDevices).text().null())
+        .col(
+            ColumnDef::new(SyntheticsJobs::Metadata)
+                .text()
+                .not_null()
+                .default("{}"),
+        )
         .col(ColumnDef::new(SyntheticsJobs::Result).text().null())
         .col(
             ColumnDef::new(SyntheticsJobs::StartedAt)
@@ -232,6 +238,7 @@ enum SyntheticsJobs {
     Attempts,
     RunId,
     BrowserDevices,
+    Metadata,
     Result,
     StartedAt,
     CompletedAt,
@@ -270,6 +277,7 @@ mod tests {
                 "attempts" integer NOT NULL DEFAULT 0,
                 "run_id" varchar(27) NOT NULL DEFAULT '',
                 "browser_devices" text,
+                "metadata" text NOT NULL DEFAULT '{}',
                 "result" text,
                 "started_at" bigint,
                 "completed_at" bigint,
@@ -319,6 +327,7 @@ mod tests {
                 "attempts" integer NOT NULL DEFAULT 0,
                 "run_id" varchar(27) NOT NULL DEFAULT '',
                 "browser_devices" text,
+                "metadata" text NOT NULL DEFAULT '{}',
                 "result" text,
                 "started_at" bigint,
                 "completed_at" bigint,

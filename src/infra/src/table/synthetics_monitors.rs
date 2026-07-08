@@ -289,6 +289,7 @@ pub struct DueMonitor {
     pub tz_offset: i32,
     /// Populated only for browser monitors (parsed from config.browser_devices).
     pub browser_devices: Vec<config::meta::synthetics::BrowserDevice>,
+    pub tags: Vec<String>,
 }
 
 /// Returns up to `limit` enabled monitors whose `next_run_at` is at or before `now_us`.
@@ -336,6 +337,8 @@ pub async fn fetch_due<C: ConnectionTrait>(
                 vec![]
             };
 
+            let tags: Vec<String> = serde_json::from_value(m.tags).unwrap_or_default();
+
             Ok(DueMonitor {
                 id: m.id,
                 name: m.name,
@@ -345,6 +348,7 @@ pub async fn fetch_due<C: ConnectionTrait>(
                 frequency,
                 tz_offset: m.tz_offset,
                 browser_devices,
+                tags,
             })
         })
         .collect()

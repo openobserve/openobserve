@@ -45,6 +45,16 @@ pub struct EnqueueParams<'a> {
     /// JSON array of `{execution_id, engine, device}` — browser monitors only. `None` for
     /// protocol monitors.
     pub browser_devices: Option<&'a str>,
+    /// Serialized `JobMetadata` — monitor-level context copied at enqueue time.
+    pub metadata: &'a str,
+}
+
+/// Monitor-level metadata copied into the job row at enqueue time.
+/// Stored as a JSON blob so new fields can be added without schema migrations.
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+pub struct JobMetadata {
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -61,6 +71,7 @@ pub struct LeasedRow {
     pub attempts: i32,
     pub run_id: String,
     pub browser_devices: Option<String>,
+    pub metadata: String,
 }
 
 /// Returned by `dead_letter_expired` for each job that exhausted all retries.
@@ -73,6 +84,7 @@ pub struct DeadLetteredRow {
     pub location: String,
     pub attempts: i32,
     pub run_id: String,
+    pub metadata: String,
 }
 
 // ── Scheduler: enqueue ────────────────────────────────────────────────────────
@@ -87,8 +99,8 @@ pub async fn enqueue<C: ConnectionTrait>(
     let sql = r#"
         INSERT INTO synthetics_jobs
             (id, synthetics_id, synthetics_name, org_id, location, pool,
-             scheduled_ts, valid_until, status, attempts, run_id, browser_devices)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, 0, $9, $10)
+             scheduled_ts, valid_until, status, attempts, run_id, browser_devices, metadata)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, 0, $9, $10, $11)
         ON CONFLICT (synthetics_id, location, scheduled_ts) DO NOTHING
     "#;
 
@@ -108,6 +120,7 @@ pub async fn enqueue<C: ConnectionTrait>(
             p.browser_devices
                 .map(Value::from)
                 .unwrap_or(Value::from(None::<String>)),
+            Value::from(p.metadata),
         ],
     ))
     .await?;
@@ -122,7 +135,7 @@ pub async fn get_by_id<C: ConnectionTrait>(
 ) -> Result<Option<LeasedRow>, errors::Error> {
     let sql = r#"
         SELECT id, synthetics_id, synthetics_name, org_id, location, pool,
-               scheduled_ts, valid_until, attempts, run_id, browser_devices
+               scheduled_ts, valid_until, attempts, run_id, browser_devices, metadata
         FROM synthetics_jobs
         WHERE id = $1
     "#;
@@ -149,6 +162,7 @@ pub async fn get_by_id<C: ConnectionTrait>(
                 attempts: row.try_get("", "attempts")?,
                 run_id: row.try_get("", "run_id")?,
                 browser_devices: row.try_get("", "browser_devices")?,
+                metadata: row.try_get("", "metadata").unwrap_or_default(),
             })
         })
         .transpose()
@@ -235,6 +249,7 @@ pub async fn lease_batch<C: ConnectionTrait>(
             attempts: m.attempts,
             run_id: m.run_id,
             browser_devices: m.browser_devices,
+            metadata: m.metadata,
         })
         .collect())
 }
@@ -321,7 +336,7 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
 ) -> Result<Vec<DeadLetteredRow>, errors::Error> {
     // Step 1: find candidates before marking them dead.
     let select_sql = r#"
-        SELECT id, synthetics_id, synthetics_name, org_id, location, attempts, run_id
+        SELECT id, synthetics_id, synthetics_name, org_id, location, attempts, run_id, metadata
         FROM synthetics_jobs
         WHERE status = 1
           AND lease_expires_at < $1
@@ -350,6 +365,7 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
                 location: row.try_get("", "location").ok()?,
                 attempts: row.try_get("", "attempts").ok()?,
                 run_id: row.try_get("", "run_id").ok()?,
+                metadata: row.try_get("", "metadata").unwrap_or_default(),
             })
         })
         .collect();
@@ -410,6 +426,7 @@ mod tests {
             browser_devices: Some(
                 r#"[{"execution_id":"3Fze001XX","engine":"chromium","device":"laptop_large"}]"#,
             ),
+            metadata: r#"{"tags":["prod","checkout"]}"#,
         };
         assert_eq!(p.synthetics_id, "mon-1");
         assert_eq!(p.synthetics_name, "Login Flow");
@@ -431,6 +448,7 @@ mod tests {
             attempts: 1,
             run_id: "3Fzn001XXXXXXXXXXXXXXXX".to_string(),
             browser_devices: None,
+            metadata: "{}".to_string(),
         };
         assert_eq!(row.id, "2MNfNTxePfZ1pnY5gKVLkwsVRXv");
         assert_eq!(row.synthetics_id, "mon-1");

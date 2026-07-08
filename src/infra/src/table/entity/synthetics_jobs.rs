@@ -24,6 +24,8 @@ pub struct Model {
     pub run_id: String,
     /// JSON array of BrowserDevice {execution_id, engine, device} — browser monitors only.
     pub browser_devices: Option<String>,
+    /// JSON blob of monitor metadata copied at enqueue time e.g. {"tags": ["prod"]}.
+    pub metadata: String,
     /// JSON execution summaries written at ack time (no full step data — that's in the stream).
     pub result: Option<String>,
     /// UTC µs: when Lambda first resolved this job.
@@ -62,6 +64,7 @@ mod tests {
                 r#"[{"execution_id":"3Fze001XX","engine":"chromium","device":"laptop_large"}]"#
                     .to_string(),
             ),
+            metadata: "{}".to_string(),
             result: None,
             started_at: None,
             completed_at: None,
