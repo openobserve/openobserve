@@ -4268,6 +4268,51 @@
     "querySource": "Quelle abfragen"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "Dienste suchen",
+      "noStreamsDetected": "Keine Streams erkannt. Stellen Sie sicher, dass die Service-Graph-Metriken stream_name-Labels enthalten.",
+      "streamOnlyInfo": "Service Graph verwendet eine reine Stream-Architektur ohne In-Memory-Status",
+      "borderColor": "Farbe des Randes",
+      "borderColorMetric": "Fehler",
+      "nodeSize": "Knotengröße",
+      "nodeSizeMetric": "Anfragen",
+      "sizeLow": "Niedrig",
+      "sizeHigh": "Hoch",
+      "status": {
+        "healthy": "Gesund",
+        "degraded": "Degradiert",
+        "warning": "Warnung",
+        "critical": "Kritisch"
+      },
+      "range": {
+        "healthy": "< 1%",
+        "degraded": "1—5%",
+        "warning": "5 — 10%",
+        "critical": "> 10%"
+      },
+      "entities": "Entitäten",
+      "distribution": "Vertrieb",
+      "total": "Insgesamt",
+      "showTypes": "Typen anzeigen",
+      "typesFiltered": "Einige Typen sind versteckt. Öffnen, um zu ändern, was angezeigt wird.",
+      "zoomIn": "Hineinzoomen",
+      "zoomOut": "Verkleinern",
+      "fitToScreen": "An den Bildschirm anpassen",
+      "layout": "Raumaufteilung",
+      "types": "Typen",
+      "mode": {
+        "auto": "Automatisch",
+        "expanded": "Erweitert",
+        "collapsed": "Zusammengebrochen"
+      },
+      "kind": {
+        "service": "Dienstleistungen",
+        "database": "Datenspeicher",
+        "queue": "Warteschlangen",
+        "external": "Extern",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "In Vollansicht öffnen",
     "viewLogs": "Protokolle anzeigen",
     "viewRelated": "Verwandtes anzeigen",
@@ -4546,6 +4591,7 @@
     "servicesCatalog": {
       "tabLabel": "Servicekatalog",
       "title": "Servicekatalog",
+      "footerTitle": "Dienstleistungen",
       "filterPlaceholder": "Nach Dienstnamen filtern...",
       "noServicesFound": "Im ausgewählten Zeitraum wurden keine Dienste gefunden.",
       "loading": "Dienste werden geladen...",
@@ -4572,6 +4618,15 @@
       "servicesLabel": "Dienste",
       "viewTraces": "Spuren ansehen",
       "exportCsv": "CSV exportieren",
+      "types": {
+        "all": "Alle",
+        "service": "Dienstleistungen",
+        "datastore": "Datenspeicher",
+        "queue": "Warteschlangen",
+        "external": "Extern",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{Anzahl} {Status}",
       "legend": {
         "title": "Fehlerrate"
       }

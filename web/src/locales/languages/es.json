@@ -4268,6 +4268,51 @@
     "querySource": "Fuente de consulta"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "Servicios de búsqueda",
+      "noStreamsDetected": "No se detectaron transmisiones. Asegúrese de que las métricas del gráfico de servicio incluyan etiquetas stream_name.",
+      "streamOnlyInfo": "Service Graph utiliza una arquitectura de solo flujo sin ningún estado en memoria",
+      "borderColor": "Color del borde",
+      "borderColorMetric": "Errores",
+      "nodeSize": "Tamaño del nodo",
+      "nodeSizeMetric": "Solicitudes",
+      "sizeLow": "Bajo",
+      "sizeHigh": "Alto",
+      "status": {
+        "healthy": "Saludable",
+        "degraded": "Degradado",
+        "warning": "Advertencia",
+        "critical": "Crítico"
+      },
+      "range": {
+        "healthy": "< 1%",
+        "degraded": "1 — 5%",
+        "warning": "5 — 10%",
+        "critical": "> 10%"
+      },
+      "entities": "entidades",
+      "distribution": "Distribución",
+      "total": "Total",
+      "showTypes": "Mostrar tipos",
+      "typesFiltered": "Algunos tipos están ocultos. Ábrelo para cambiar lo que se muestra.",
+      "zoomIn": "Ampliar",
+      "zoomOut": "Alejar",
+      "fitToScreen": "Ajustar a la pantalla",
+      "layout": "Disposición",
+      "types": "Tipos",
+      "mode": {
+        "auto": "Auto",
+        "expanded": "Expandido",
+        "collapsed": "Colapsado"
+      },
+      "kind": {
+        "service": "Servicios",
+        "database": "Almacenes de datos",
+        "queue": "Colas",
+        "external": "Externo",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "Abrir a la vista",
     "viewLogs": "Ver registros",
     "viewRelated": "Ver relacionado",
@@ -4546,6 +4591,7 @@
     "servicesCatalog": {
       "tabLabel": "Catálogo de servicios",
       "title": "Catálogo de servicios",
+      "footerTitle": "Servicios",
       "filterPlaceholder": "Filtrar por nombre de servicio...",
       "noServicesFound": "No se ha encontrado ningún servicio en el intervalo de tiempo seleccionado.",
       "loading": "Cargando servicios...",
@@ -4572,6 +4618,15 @@
       "servicesLabel": "servicios",
       "viewTraces": "Ver trazas",
       "exportCsv": "Exportar CSV",
+      "types": {
+        "all": "Todas",
+        "service": "Servicios",
+        "datastore": "Almacenes de datos",
+        "queue": "Colas",
+        "external": "Externo",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{contar} {estado}",
       "legend": {
         "title": "Tasa de errores"
       }

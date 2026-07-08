@@ -4268,6 +4268,51 @@
     "querySource": "Fonte da consulta"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "Serviços de pesquisa",
+      "noStreamsDetected": "Nenhum fluxo detectado. Certifique-se de que as métricas do gráfico de serviço incluam rótulos stream_name.",
+      "streamOnlyInfo": "O gráfico de serviços usa arquitetura somente de stream com estado zero na memória",
+      "borderColor": "Cor da borda",
+      "borderColorMetric": "Erros",
+      "nodeSize": "Tamanho do nó",
+      "nodeSizeMetric": "Solicitações",
+      "sizeLow": "Baixo",
+      "sizeHigh": "Alto",
+      "status": {
+        "healthy": "Saudável",
+        "degraded": "Degradado",
+        "warning": "Aviso",
+        "critical": "Crítico"
+      },
+      "range": {
+        "healthy": "< 1%",
+        "degraded": "1 — 5%",
+        "warning": "5 — 10%",
+        "critical": "> 10%"
+      },
+      "entities": "entidades",
+      "distribution": "Distribuição",
+      "total": "Total",
+      "showTypes": "Mostrar tipos",
+      "typesFiltered": "Alguns tipos estão ocultos. Abra para alterar o que é mostrado.",
+      "zoomIn": "Ampliar",
+      "zoomOut": "Reduzir o zoom",
+      "fitToScreen": "Ajustar à tela",
+      "layout": "Layout",
+      "types": "Tipos",
+      "mode": {
+        "auto": "Automático",
+        "expanded": "Expandido",
+        "collapsed": "Desmoronou"
+      },
+      "kind": {
+        "service": "Serviços",
+        "database": "Armazenamentos de dados",
+        "queue": "Filas",
+        "external": "Externo",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "Abrir à vista completa",
     "viewLogs": "Exibir registros",
     "viewRelated": "Exibir relacionado",
@@ -4546,6 +4591,7 @@
     "servicesCatalog": {
       "tabLabel": "Catálogo de serviços",
       "title": "Catálogo de serviços",
+      "footerTitle": "Serviços",
       "filterPlaceholder": "Filtrar por nome do serviço...",
       "noServicesFound": "Nenhum serviço foi encontrado no intervalo de tempo selecionado.",
       "loading": "Carregando serviços...",
@@ -4572,6 +4618,15 @@
       "servicesLabel": "serviços",
       "viewTraces": "Exibir traços",
       "exportCsv": "Exportar CSV",
+      "types": {
+        "all": "Todos",
+        "service": "Serviços",
+        "datastore": "Armazenamentos de dados",
+        "queue": "Filas",
+        "external": "Externo",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{contagem} {status}",
       "legend": {
         "title": "Taxa de Erros"
       }

@@ -2142,6 +2142,13 @@
     "header": "Dashboards",
     "subtitle": "Create, organize, and share dashboards across folders",
     "add": "New dashboard",
+    "setAsHome": "Pin to home page",
+    "removeFromHome": "Unpin from home page",
+    "isHomeDashboard": "Home dashboard",
+    "openHomeDashboard": "View pinned dashboard",
+    "pinnedOnHome": "Pinned dashboard on home page",
+    "setAsHomeDesc": "Show this dashboard on the home page for everyone in the org",
+    "moreActions": "More actions",
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete Dashboard",
@@ -2811,6 +2818,7 @@
     "tabAiAssistant": "O2 Assistant",
     "tabOverview": "Overview",
     "tabUsage": "Usage",
+    "removeHomeDashboard": "Remove home dashboard",
     "subtitle": "Your observability workspace at a glance"
   },
   "overview": {

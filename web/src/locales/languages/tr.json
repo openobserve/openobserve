@@ -4268,6 +4268,51 @@
     "querySource": "Sorgu Kaynağı"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "Arama Hizmetleri",
+      "noStreamsDetected": "Akış algılanmadı. Hizmet grafiği metriklerinin akış_adı etiketleri içerdiğinden emin olun.",
+      "streamOnlyInfo": "Hizmet grafiği, sıfır bellek içi durumla yalnızca akış mimarisini kullanır",
+      "borderColor": "Kenarlık Rengi",
+      "borderColorMetric": "Hatalar",
+      "nodeSize": "Düğüm Boyutu",
+      "nodeSizeMetric": "İstekler",
+      "sizeLow": "Düşük",
+      "sizeHigh": "Yüksek",
+      "status": {
+        "healthy": "Sağlıklı",
+        "degraded": "Bozulmuş",
+        "warning": "Uyarı",
+        "critical": "Kritik"
+      },
+      "range": {
+        "healthy": "< 1%",
+        "degraded": "1 — %5",
+        "warning": "%5 — %10",
+        "critical": ">% 10"
+      },
+      "entities": "işletmeler",
+      "distribution": "Dağıtım",
+      "total": "Toplam",
+      "showTypes": "Türleri göster",
+      "typesFiltered": "Bazı türler gizlidir. Gösterilen şeyi değiştirmek için açın.",
+      "zoomIn": "Yakınlaştır",
+      "zoomOut": "Uzaklaştır",
+      "fitToScreen": "Ekrana sığdır",
+      "layout": "Düzen",
+      "types": "Türleri",
+      "mode": {
+        "auto": "Oto",
+        "expanded": "Genişletilmiş",
+        "collapsed": "Daraltılmış"
+      },
+      "kind": {
+        "service": "HİZMETLER",
+        "database": "Veri depoları",
+        "queue": "Kuyruklar",
+        "external": "Harici",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "Tam görünümde aç",
     "viewLogs": "Günlükleri Görüntüle",
     "viewRelated": "İlgili Görüntüle",
@@ -4546,6 +4591,7 @@
     "servicesCatalog": {
       "tabLabel": "Hizmet Kataloğu",
       "title": "Hizmet Kataloğu",
+      "footerTitle": "HİZMETLER",
       "filterPlaceholder": "Hizmet adına göre filtrele...",
       "noServicesFound": "Seçilen zaman aralığında hiçbir hizmet bulunamadı.",
       "loading": "Hizmetler yükleniyor...",
@@ -4572,6 +4618,15 @@
       "servicesLabel": "servisler",
       "viewTraces": "İzleri Görüntüle",
       "exportCsv": "CSV'yi dışa aktarma",
+      "types": {
+        "all": "Hepsi",
+        "service": "HİZMETLER",
+        "datastore": "Veri depoları",
+        "queue": "Kuyruklar",
+        "external": "Harici",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{count} {durum}",
       "legend": {
         "title": "Hata Oranı"
       }

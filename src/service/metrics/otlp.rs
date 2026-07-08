@@ -833,23 +833,26 @@ fn process_hist_data_point(
     count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(count_rec);
 
-    // add sum record
-    let mut sum_rec = rec.clone();
-    sum_rec[VALUE_LABEL] = data_point.sum.into();
-    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
-    bucket_recs.push(sum_rec);
+    if let Some(sum) = data_point.sum {
+        let mut sum_rec = rec.clone();
+        sum_rec[VALUE_LABEL] = sum.into();
+        sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
+        bucket_recs.push(sum_rec);
+    }
 
-    // add min record
-    let mut min_rec = rec.clone();
-    min_rec[VALUE_LABEL] = data_point.min.into();
-    min_rec[NAME_LABEL] = format!("{}_min", min_rec[NAME_LABEL].as_str().unwrap()).into();
-    bucket_recs.push(min_rec);
+    if let Some(min) = data_point.min {
+        let mut min_rec = rec.clone();
+        min_rec[VALUE_LABEL] = min.into();
+        min_rec[NAME_LABEL] = format!("{}_min", min_rec[NAME_LABEL].as_str().unwrap()).into();
+        bucket_recs.push(min_rec);
+    }
 
-    // add max record
-    let mut max_rec = rec.clone();
-    max_rec[VALUE_LABEL] = data_point.max.into();
-    max_rec[NAME_LABEL] = format!("{}_max", max_rec[NAME_LABEL].as_str().unwrap()).into();
-    bucket_recs.push(max_rec);
+    if let Some(max) = data_point.max {
+        let mut max_rec = rec.clone();
+        max_rec[VALUE_LABEL] = max.into();
+        max_rec[NAME_LABEL] = format!("{}_max", max_rec[NAME_LABEL].as_str().unwrap()).into();
+        bucket_recs.push(max_rec);
+    }
 
     // add bucket records
     let len = data_point.bucket_counts.len();
@@ -1429,6 +1432,40 @@ mod tests {
         let sum_rec = &result[1];
         assert!(sum_rec["__name__"].as_str().unwrap().ends_with("_sum"));
         assert_eq!(sum_rec["value"], json!(100.0));
+    }
+
+    #[test]
+    fn test_process_hist_data_point_skips_missing_optional_stats() {
+        let mut rec = json!({
+            "__name__": "test_histogram",
+            "__type__": "histogram"
+        });
+        let data_point = HistogramDataPoint {
+            attributes: vec![],
+            start_time_unix_nano: 0,
+            time_unix_nano: 1640995200000000000,
+            exemplars: vec![],
+            flags: 0,
+            count: 100,
+            sum: None,
+            bucket_counts: vec![10, 20],
+            explicit_bounds: vec![10.0],
+            min: None,
+            max: None,
+        };
+
+        let result = process_hist_data_point(&mut rec, &data_point);
+        let metric_names: Vec<&str> = result
+            .iter()
+            .map(|r| r[NAME_LABEL].as_str().unwrap_or(""))
+            .collect();
+
+        assert!(metric_names.contains(&"test_histogram_count"));
+        assert!(metric_names.contains(&"test_histogram_bucket"));
+        assert!(!metric_names.contains(&"test_histogram_sum"));
+        assert!(!metric_names.contains(&"test_histogram_min"));
+        assert!(!metric_names.contains(&"test_histogram_max"));
+        assert!(result.iter().all(|r| r.get(VALUE_LABEL).is_some()));
     }
 
     #[test]

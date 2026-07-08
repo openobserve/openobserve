@@ -4268,6 +4268,51 @@
     "querySource": "Fonte della query"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "Servizi di ricerca",
+      "noStreamsDetected": "Non sono stati rilevati stream. Assicurati che le metriche del grafico del servizio includano le etichette stream_name.",
+      "streamOnlyInfo": "Service Graph utilizza un'architettura di solo streaming con zero stati in memoria",
+      "borderColor": "Colore del bordo",
+      "borderColorMetric": "Errori",
+      "nodeSize": "Dimensione del nodo",
+      "nodeSizeMetric": "Richieste",
+      "sizeLow": "Basso",
+      "sizeHigh": "Alto",
+      "status": {
+        "healthy": "Salutare",
+        "degraded": "Degradato",
+        "warning": "Avvertenza",
+        "critical": "Critico"
+      },
+      "range": {
+        "healthy": "< 1%",
+        "degraded": "1-5%",
+        "warning": "5-10%",
+        "critical": "> 10%"
+      },
+      "entities": "entità",
+      "distribution": "Distribuzione",
+      "total": "Totale",
+      "showTypes": "Mostra tipi",
+      "typesFiltered": "Alcuni tipi sono nascosti. Apri per modificare ciò che viene mostrato.",
+      "zoomIn": "Ingrandisci",
+      "zoomOut": "Rimpicciolisci",
+      "fitToScreen": "Adatta allo schermo",
+      "layout": "Layout",
+      "types": "Tipi",
+      "mode": {
+        "auto": "Auto",
+        "expanded": "Espanso",
+        "collapsed": "Crollato"
+      },
+      "kind": {
+        "service": "Servizi",
+        "database": "Datastore",
+        "queue": "Code",
+        "external": "Esterno",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "Apri a piena vista",
     "viewLogs": "Visualizza i log",
     "viewRelated": "Visualizza correlati",
@@ -4546,6 +4591,7 @@
     "servicesCatalog": {
       "tabLabel": "Catalogo dei servizi",
       "title": "Catalogo dei servizi",
+      "footerTitle": "Servizi",
       "filterPlaceholder": "Filtra per nome del servizio...",
       "noServicesFound": "Nessun servizio trovato nell'intervallo di tempo selezionato.",
       "loading": "Caricamento dei servizi...",
@@ -4572,6 +4618,15 @@
       "servicesLabel": "servizi",
       "viewTraces": "Visualizza tracce",
       "exportCsv": "Esporta CSV",
+      "types": {
+        "all": "Tutti",
+        "service": "Servizi",
+        "datastore": "Datastore",
+        "queue": "Code",
+        "external": "Esterno",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{count} {status}",
       "legend": {
         "title": "Tasso di errore"
       }

@@ -4268,6 +4268,51 @@
     "querySource": "Bron van de zoekopdracht"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "Diensten voor het zoeken",
+      "noStreamsDetected": "Er zijn geen streams gedetecteerd. Zorg ervoor dat de statistieken van servicegrafieken stream_name-labels bevatten.",
+      "streamOnlyInfo": "Service Graph maakt gebruik van stream-only architectuur zonder in-memory status",
+      "borderColor": "Kleur van de rand",
+      "borderColorMetric": "Fouten",
+      "nodeSize": "Knooppuntgrootte",
+      "nodeSizeMetric": "Verzoeken",
+      "sizeLow": "Laag",
+      "sizeHigh": "Hoog",
+      "status": {
+        "healthy": "Gezond",
+        "degraded": "Gedegradeerd",
+        "warning": "Waarschuwing",
+        "critical": "Kritiek"
+      },
+      "range": {
+        "healthy": "< 1%",
+        "degraded": "1 — 5%",
+        "warning": "5 — 10%",
+        "critical": "> 10%"
+      },
+      "entities": "entiteiten",
+      "distribution": "Distributie",
+      "total": "Totaal",
+      "showTypes": "Typen weergeven",
+      "typesFiltered": "Sommige soorten zijn verborgen. Open om te wijzigen wat er wordt weergegeven.",
+      "zoomIn": "Inzoomen",
+      "zoomOut": "Uitzoomen",
+      "fitToScreen": "Aanpassen aan het scherm",
+      "layout": "Indeling",
+      "types": "Typen",
+      "mode": {
+        "auto": "Auto",
+        "expanded": "Uitgebreid",
+        "collapsed": "Ingestort"
+      },
+      "kind": {
+        "service": "Diensten",
+        "database": "Datastores",
+        "queue": "Wachtrijen",
+        "external": "Extern",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "In volledige weergave openen",
     "viewLogs": "Logboeken bekijken",
     "viewRelated": "Gerelateerd bekijken",
@@ -4546,6 +4591,7 @@
     "servicesCatalog": {
       "tabLabel": "Servicecatalogus",
       "title": "Servicecatalogus",
+      "footerTitle": "Diensten",
       "filterPlaceholder": "Filteren op servicenaam...",
       "noServicesFound": "Er zijn geen services gevonden in de geselecteerde periode.",
       "loading": "Diensten aan het laden...",
@@ -4572,6 +4618,15 @@
       "servicesLabel": "services",
       "viewTraces": "Bekijk de sporen",
       "exportCsv": "CSV exporteren",
+      "types": {
+        "all": "Alles",
+        "service": "Diensten",
+        "datastore": "Datastores",
+        "queue": "Wachtrijen",
+        "external": "Extern",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{aantal} {status}",
       "legend": {
         "title": "Foutpercentage"
       }
