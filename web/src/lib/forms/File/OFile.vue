@@ -94,6 +94,11 @@ function emitFiles(fileList: FileList | File[] | null) {
 function handleChange(event: Event) {
   const target = event.target as HTMLInputElement;
   emitFiles(target.files);
+  // Reset the native input so picking the *same* file again still fires
+  // `change`. Browsers suppress the event when the selected path is unchanged;
+  // the component's state lives entirely in `modelValue`, so clearing the raw
+  // input here is safe and keeps re-selection working after an external clear.
+  target.value = "";
 }
 
 function handleClear(event?: Event) {
