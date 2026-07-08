@@ -1,4 +1,5 @@
 import { toZonedTime } from "date-fns-tz";
+import { computeTreeLayout } from "./computeTreeLayout";
 export const convertTraceData = (props: any, timezone: string) => {
   const options: any = {
     backgroundColor: "transparent",
@@ -212,7 +213,7 @@ export const convertTraceServiceMapData = (
         data: treeData,
         symbolSize: 30,
         initialTreeDepth: treeDepth,
-        roam: true,
+        roam: "move",
         expandAndCollapse: false,
         ...layoutConfig, // Apply layout config for multiple roots
         label: {
@@ -238,6 +239,7 @@ export const convertServiceGraphToTree = (
   graphData: { nodes: any[]; edges: any[] },
   layoutType: string = "horizontal",
   isDarkMode: boolean = true,
+  canvasHeight: number = 700,
 ) => {
   // Build adjacency map for edges
   const edgesMap = new Map<string, any[]>();
@@ -263,6 +265,59 @@ export const convertServiceGraphToTree = (
     (n: any) => !nodesWithIncoming.has(n.id),
   );
 
+  // Adaptive layout: compute explicit x/y per node so we can use ECharts
+  // `layout: 'none'`. Columns are sized by label width (no horizontal bleed) and
+  // rows by node count at a minimum height (no vertical crowding), so labels stay
+  // attached to their nodes and never overlap regardless of density.
+  const layoutPos = computeTreeLayout(
+    { nodes: graphData.nodes, edges: graphData.edges },
+    layoutType,
+  );
+
+  // ── Auto-shrink to fit ────────────────────────────────────────────────────
+  // ECharts `layout:'none'` fits the whole coordinate bounding box into the
+  // panel, so a tall tree (many leaf rows) gets compressed until labels collide.
+  // We can't stop the compression, so we scale the label font + node symbol
+  // DOWN to match it: the compressed vertical pitch is (panel height ÷ rows),
+  // and a label needs a bit less than that pitch to clear its neighbour.
+  // Number of leaf ROWS drives the height — count nodes with no children in the
+  // spanning tree (parents stack between their kids, so they don't add rows).
+  const parentIds = new Set(
+    graphData.edges.map((e: any) => e.from).filter((f: any) => f != null),
+  );
+  const leafRows = Math.max(
+    1,
+    graphData.nodes.filter((n: any) => !parentIds.has(n.id)).length,
+  );
+  // Usable vertical pixels: panel minus the top/bottom series insets (~4% each).
+  const usableH = Math.max(120, canvasHeight * 0.92);
+  // Pixels each leaf row gets after ECharts compresses the tree to fit the panel.
+  const pitch = usableH / leafRows;
+  // A row's visual height is the LARGER of its node symbol and its TWO-LINE label
+  // (a bold name line + a smaller "N req" line). Both must fit inside the pitch
+  // (with a breathing gap) or rows collide. The two-line label is the real
+  // driver here — budgeting a single line (as before) let the "req" line overlap
+  // the next node. So size everything against the pitch as a whole.
+  const ROW_GAP = 6; // min clear space between adjacent rows
+  const avail = Math.max(10, pitch - ROW_GAP);
+  // Two-line label total height ≈ nameFont*1.35 + reqFont*1.35, with req ≈ 0.83×
+  // name. So total ≈ nameFont * 1.35 * 1.83 ≈ nameFont * 2.47. Invert to get the
+  // name font that fits `avail`, capped at the comfortable 12px, floored at 7px.
+  const labelFontSize = Math.max(7, Math.min(12, Math.floor(avail / 2.47)));
+  const reqFontSize = Math.max(6, Math.round(labelFontSize * 0.83));
+  const nameLineHeight = Math.round(labelFontSize * 1.35);
+  const reqLineHeight = Math.round(reqFontSize * 1.35);
+  // When even the shrunk two-line label can't fit the pitch (extreme density),
+  // drop the secondary "N req" line and keep just the name — a single line still
+  // fits, so the essential label stays readable instead of overlapping. The
+  // dropped metric is still available on hover / in the side panel.
+  const showReqLine = nameLineHeight + reqLineHeight <= avail;
+  // Node symbol fits the pitch too (a 30px dot overlaps a 24px pitch regardless
+  // of font). Comfortable 30px, shrunk toward 8px as rows tighten.
+  const nodeSymbolSize = Math.max(8, Math.min(30, Math.round(avail)));
+  // Tighten the label offset from the node as things shrink.
+  const labelDistance = Math.max(3, Math.round(labelFontSize / 2));
+
   const green = isDarkMode ? "#10b981" : "#52c41a";
 
   // Node color: same absolute thresholds as Graph View so color matches tooltip error rate
@@ -283,7 +338,12 @@ export const convertServiceGraphToTree = (
     visited = new Set<string>(),
     incomingEdge: any = null,
   ): any => {
-    if (visited.has(nodeId)) return null; // Prevent cycles
+    if (visited.has(nodeId)) return null; // Prevent cycles within this path
+    // The service graph is a DAG, not a tree: a node shared by multiple parents
+    // (e.g. `cart` called from many services) would otherwise be re-expanded
+    // under each parent, exploding the tree. Render each node exactly once at
+    // its first-encountered position (DAG → spanning tree).
+    if (globalVisited.has(nodeId)) return null;
     visited.add(nodeId);
     globalVisited.add(nodeId);
 
@@ -324,13 +384,18 @@ export const convertServiceGraphToTree = (
     const edgeColor = isDarkMode ? "#4a5568" : "#b0b7c3";
 
     // Reuse the same SVG icon as graph view (circle + service-type icon)
-    const iconDataUrl = getServiceIconSvg(node.id, isDarkMode, borderColor);
+    const iconDataUrl = getServiceIconSvg(
+      node.id,
+      isDarkMode,
+      borderColor,
+      node.service_type,
+    );
 
     return {
       name: node.label || node.id,
       value: totalRequests,
       symbol: iconDataUrl,
-      symbolSize: 30, // Fixed size so ECharts tree layout spaces nodes consistently
+      symbolSize: nodeSymbolSize, // Auto-shrunk to fit (see sizing block); uniform so ECharts spaces nodes consistently
       lineStyle: {
         color: edgeColor,
         width: 2,
@@ -376,26 +441,40 @@ export const convertServiceGraphToTree = (
       label: {
         show: true,
         position: layoutType === "vertical" ? "bottom" : "right",
-        distance: 6,
+        distance: labelDistance,
         formatter: (params: any) => {
-          return `{name|${params.name}}\n{requests|${formatNumber(totalRequests)} req}`;
+          // Drop the "N req" line at extreme density (see showReqLine) so the
+          // name line alone stays readable rather than the two lines colliding.
+          return showReqLine
+            ? `{name|${params.name}}\n{requests|${formatNumber(totalRequests)} req}`
+            : `{name|${params.name}}`;
         },
         rich: {
+          // Both lines auto-shrink with the row pitch so the two-line label
+          // never overruns into the next node (see the sizing block above).
           name: {
-            fontSize: 12,
+            fontSize: labelFontSize,
             fontWeight: "600",
             color: isDarkMode ? "#e4e7eb" : "#1f2937",
-            lineHeight: 16,
+            lineHeight: nameLineHeight,
           },
           requests: {
-            fontSize: 10,
+            fontSize: reqFontSize,
             fontWeight: "normal",
             color: isDarkMode ? "#9ca3af" : "#6b7280",
-            lineHeight: 14,
+            lineHeight: reqLineHeight,
           },
         },
       },
       children: children.length > 0 ? children : undefined,
+      // Explicit position from the adaptive layout (used with layout:'none').
+      x: layoutPos.get(node.id)?.x,
+      y: layoutPos.get(node.id)?.y,
+      // Carry identity so click handlers can detect collapsed boundary nodes
+      // (name is the display label, not the id).
+      id: node.id,
+      is_group: node.is_group,
+      service_type: node.service_type,
     };
   };
 
@@ -446,7 +525,8 @@ export const convertServiceGraphToTree = (
           orient: layoutType === "vertical" ? "TB" : "LR",
           initialTreeDepth: -1,
           symbolSize: 50,
-          roam: true, // Enable panning and zooming
+          roam: true, // Pan + bounded wheel-zoom
+          scaleLimit: { min: 0.4, max: 4 },
           selectedMode: "single", // Enable single node selection
           label: {
             position: "inside",
@@ -480,28 +560,36 @@ export const convertServiceGraphToTree = (
       {
         type: "tree",
         data: finalTreeData,
-        layout: "orthogonal",
+        // Adaptive layout: we compute explicit x/y per node (see
+        // computeTreeLayout) so labels never overlap. layout:'none' makes ECharts
+        // honor those positions; orthogonal would recompute and ignore them.
+        layout: "none",
         orient: layoutType === "vertical" ? "TB" : "LR",
-        // Maximize layout space so siblings spread further apart
         left: layoutType === "vertical" ? "2%" : "3%",
         right: layoutType === "vertical" ? "2%" : "20%",
         top: layoutType === "vertical" ? "8%" : "2%",
         bottom: layoutType === "vertical" ? "8%" : "2%",
         initialTreeDepth: -1,
-        symbolSize: 30,
+        // Auto-shrunk to the fit-to-view compression so labels never overlap,
+        // however many leaf rows there are (see the sizing block above).
+        symbolSize: nodeSymbolSize,
+        // Pan + wheel-zoom, but bounded: scaleLimit keeps the wheel from zooming
+        // to extremes (the "erratic" feel), and wheel zoom centers on the cursor
+        // so you can focus an area. The +/- buttons drive the same zoom.
         roam: true,
+        scaleLimit: { min: 0.4, max: 4 },
         selectedMode: "single",
         label: {
           position: layoutType === "vertical" ? "bottom" : "right",
-          distance: 6,
-          fontSize: 12,
+          distance: labelDistance,
+          fontSize: labelFontSize,
           rotate: 0,
         },
         leaves: {
           label: {
             position: layoutType === "vertical" ? "bottom" : "right",
-            distance: 6,
-            fontSize: 12,
+            distance: labelDistance,
+            fontSize: labelFontSize,
             rotate: 0,
           },
         },
@@ -566,10 +654,15 @@ const computeForceLayout = (
     });
   });
 
-  // Deduplicate edges (undirected for layout purposes)
+  // Deduplicate edges (undirected for layout purposes). Only keep edges whose
+  // BOTH endpoints have a position — a dangling endpoint (e.g. an edge left
+  // pointing at a node removed by collapse/filtering) would otherwise crash the
+  // force loops below at `pos.get(endpoint).x`. Filtering here fixes it once for
+  // every loop (repulsion, edge-repulsion, attraction).
   const seen = new Set<string>();
   const layoutEdges: { u: string; v: string }[] = [];
   edges.forEach((e: any) => {
+    if (!pos.has(e.from) || !pos.has(e.to)) return;
     const key = [e.from, e.to].sort().join("→");
     if (!seen.has(key)) {
       seen.add(key);
@@ -704,9 +797,47 @@ const computeForceLayout = (
 // ── Service-type icon helper ──────────────────────────────────────────────────
 
 /**
+ * Authoritative kind → icon. Driven by the backend's service_type /
+ * connection_type (database/queue/rpc/external) rather than guessing from the
+ * node name. Returns null when there is no inferred type (a real instrumented
+ * service), so the caller falls back to the name-regex SERVICE_ICON_RULES.
+ *
+ * The SVG paths mirror the corresponding entries in SERVICE_ICON_RULES so the
+ * visual language stays consistent, but selection here is by explicit type,
+ * not name matching.
+ */
+const KIND_ICON_SVG: Record<string, string> = {
+  database:
+    `<ellipse cx="12" cy="5" rx="9" ry="3"/>` +
+    `<path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>` +
+    `<path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>`,
+  queue:
+    `<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>` +
+    `<line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>` +
+    `<line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>`,
+  rpc: `<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.86 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.77 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>`,
+  external:
+    `<circle cx="12" cy="12" r="10"/>` +
+    `<line x1="2" y1="12" x2="22" y2="12"/>` +
+    `<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>`,
+};
+
+/**
+ * Return the raw SVG for a node's authoritative kind, or null when the node has
+ * no inferred type (a real service) so the name-regex fallback runs.
+ */
+export function iconSvgForType(
+  serviceType: string | undefined | null,
+): string | null {
+  if (!serviceType) return null;
+  return KIND_ICON_SVG[serviceType] ?? null;
+}
+
+/**
  * Returns an ECharts image:// data URL containing a full SVG node:
  *   outer circle (health-based border) + monochrome Feather-style icon.
- * The icon type is inferred from the service name via keyword matching.
+ * The icon is chosen from the authoritative service_type when present, else
+ * inferred from the service name via keyword matching.
  */
 // Ordered icon rules: first match wins. Priority: infra → data → domain → UI → default.
 // Each SVG path is a 24×24 Feather-style stroke icon (no fill).
@@ -953,6 +1084,7 @@ export function getServiceIconDataUrl(
   name: string,
   isDark: boolean,
   borderColor: string,
+  serviceType?: string | null,
 ): string {
   const iconColor = isDark ? "#e4e7eb" : "#374151";
   const bgColor = isDark ? "#1a1f2e" : "#ffffff";
@@ -961,8 +1093,11 @@ export function getServiceIconDataUrl(
   // "load-generator" and "load_generator" both match /load/ or /generator/.
   const n = (name || "").toLowerCase().replace(/[-_]/g, " ");
 
+  // Authoritative kind (from backend service_type) wins; else fall back to
+  // name-regex matching.
+  const authoritative = iconSvgForType(serviceType);
   const matched = SERVICE_ICON_RULES.find(({ regex }) => regex.test(n));
-  const icon = matched ? matched.svg : SERVER_ICON_SVG;
+  const icon = authoritative ?? (matched ? matched.svg : SERVER_ICON_SVG);
 
   // 56×56 viewBox: circle r=24 centered at (28,28); icon 24×24 translated to (16,16)
   const svg =
@@ -979,8 +1114,9 @@ function getServiceIconSvg(
   name: string,
   isDark: boolean,
   borderColor: string,
+  serviceType?: string | null,
 ): string {
-  return `image://${getServiceIconDataUrl(name, isDark, borderColor)}`;
+  return `image://${getServiceIconDataUrl(name, isDark, borderColor, serviceType)}`;
 }
 
 /**
@@ -1022,11 +1158,12 @@ export const convertServiceGraphToNetwork = (
   canvasWidth: number = 1200,
   canvasHeight: number = 700,
 ) => {
-  // Graph view only supports force-directed layout
-  // Tree layouts ('horizontal', 'vertical') should use convertServiceGraphToTree instead
-  const normalizedLayoutType = "force";
+  // Graph view supports 'force' (organic) and 'layered' (directed left→right,
+  // dependencies pinned as terminal leaves). Tree layouts ('horizontal',
+  // 'vertical') use convertServiceGraphToTree instead.
+  const normalizedLayoutType = layoutType === "layered" ? "layered" : "force";
 
-  if (layoutType !== normalizedLayoutType) {
+  if (layoutType !== "force" && layoutType !== "layered") {
     console.warn(
       `[convertServiceGraphToNetwork] Invalid layout '${layoutType}' for graph view, defaulting to 'force'`,
     );
@@ -1072,6 +1209,50 @@ export const convertServiceGraphToNetwork = (
     return true;
   });
 
+  // Layered ranks: rank 0 = no inbound edge; rank = 1 + max(pred ranks).
+  // Inferred deps (service_type present) are pinned to the max rank so they are
+  // always terminal downstream leaves. The `seen` guard breaks cycles.
+  const rank = new Map<string, number>();
+  if (normalizedLayoutType === "layered") {
+    const preds = new Map<string, string[]>();
+    validNodes.forEach((n: any) => preds.set(n.id, []));
+    graphData.edges.forEach((e: any) => {
+      if (preds.has(e.to)) preds.get(e.to)!.push(e.from);
+    });
+    const visit = (id: string, seen: Set<string>): number => {
+      if (rank.has(id)) return rank.get(id)!;
+      if (seen.has(id)) return 0; // cycle guard
+      seen.add(id);
+      const ps = preds.get(id) || [];
+      const r = ps.length ? 1 + Math.max(...ps.map((p) => visit(p, seen))) : 0;
+      rank.set(id, r);
+      return r;
+    };
+    validNodes.forEach((n: any) => visit(n.id, new Set()));
+    const maxRank = Math.max(0, ...Array.from(rank.values()));
+    validNodes.forEach((n: any) => {
+      if (n.service_type) rank.set(n.id, maxRank); // deps are terminal leaves
+    });
+  }
+
+  // Vertical slot per node within its rank column, so same-rank nodes don't
+  // stack. rankMembers[rank] = ordered node ids; ySlot maps id → index.
+  const ySlot = new Map<string, number>();
+  const rankSize = new Map<number, number>();
+  if (normalizedLayoutType === "layered") {
+    const counter = new Map<number, number>();
+    validNodes.forEach((n: any) => {
+      const r = rank.get(n.id) ?? 0;
+      rankSize.set(r, (rankSize.get(r) ?? 0) + 1);
+    });
+    validNodes.forEach((n: any) => {
+      const r = rank.get(n.id) ?? 0;
+      const idx = counter.get(r) ?? 0;
+      ySlot.set(n.id, idx);
+      counter.set(r, idx + 1);
+    });
+  }
+
   const nodes = validNodes.map((node: any) => {
     const metrics = nodeMetrics.get(node.id) || {
       requests: 0,
@@ -1108,13 +1289,21 @@ export const convertServiceGraphToNetwork = (
     );
 
     // SVG symbol: circle with health-colored border + service-type icon
-    const iconDataUrl = getServiceIconSvg(node.id, isDarkMode, borderColor);
+    const iconDataUrl = getServiceIconSvg(
+      node.id,
+      isDarkMode,
+      borderColor,
+      node.service_type,
+    );
 
     // Use cached position if available
     const cachedPos = cachedPositions?.get(node.id);
     const nodeData: any = {
       id: node.id,
       name: node.label || node.id,
+      // Carry group identity so the click handler can detect collapsed nodes.
+      is_group: node.is_group,
+      service_type: node.service_type,
       value: metrics.requests,
       errors: metrics.errors,
       symbol: iconDataUrl,
@@ -1151,6 +1340,17 @@ export const convertServiceGraphToNetwork = (
     if (cachedPos) {
       nodeData.x = cachedPos.x;
       nodeData.y = cachedPos.y;
+      nodeData.fixed = true;
+    } else if (normalizedLayoutType === "layered") {
+      // Layered: x from rank column (left→right); dependencies pinned right.
+      // y spreads same-rank nodes evenly down the column.
+      const r = rank.get(node.id) ?? 0;
+      const maxRank = Math.max(1, ...Array.from(rank.values()));
+      const colGap = canvasWidth / (maxRank + 1);
+      nodeData.x = colGap * (r + 0.5);
+      const count = rankSize.get(r) ?? 1;
+      const rowGap = canvasHeight / (count + 1);
+      nodeData.y = rowGap * ((ySlot.get(node.id) ?? 0) + 1);
       nodeData.fixed = true;
     } else {
       nodeData.fixed = false;
@@ -1360,6 +1560,7 @@ export const convertServiceGraphToNetwork = (
         layout: layoutMode,
         data: nodes,
         links: edges,
+        // Pan + bounded wheel-zoom (scaleLimit below tames the extremes).
         roam: true,
         draggable: false,
         focusNodeAdjacency: true,
