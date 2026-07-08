@@ -7,8 +7,11 @@
 // modelled here.
 //
 // Restored from the Quasar BEFORE baseline (complete-quasar-validation-inventory):
-//   • name              → `!!v.trim() || 'Field is required!'` (required + TRIM)
-//                         plus the live `/^[a-zA-Z0-9_:]+$/` character rule.
+//   • name              → `!!v.trim() || 'Field is required!'` (required) plus the
+//                         live `/^[a-zA-Z0-9_:]+$/` character rule. Encoded WITHOUT
+//                         a schema `.trim()` (see the field note below): the regex
+//                         rejects any whitespace on the RAW value, matching `main`,
+//                         which rejected — never silently stripped — dirty names.
 //   • stream_type       → `!!v || 'Field is required!'` (required).
 //   • dataRetentionDays → `v > 0 || 'Field is required!'` (numeric > 0), but
 //                         ONLY when the retention field is actually shown
@@ -39,9 +42,14 @@ export const streamNameHelpText =
 export const makeAddStreamSchema = (retentionEnabled: boolean) =>
   z
     .object({
+      // NO schema `.trim()`: OForm/TanStack uses the schema to VALIDATE but saves
+      // the RAW form value (the transformed output is discarded). A `.trim()`
+      // would let "mystream " pass (regex judges the trimmed copy) yet persist the
+      // space — breaking stream lookups and diverging from the backend
+      // `format_stream_name` rule. Validating the raw value means `streamNameRegex`
+      // rejects ANY whitespace (leading/trailing/only), exactly as `main` did.
       name: z
         .string()
-        .trim()
         .min(1, "Field is required!")
         .regex(streamNameRegex, streamNameHelpText),
       stream_type: z.string().min(1, "Field is required!"),

@@ -391,12 +391,31 @@ describe("AddStream", () => {
       expect(mockCreateStream).not.toHaveBeenCalled();
     });
 
-    it("rejects a whitespace-only name (required + trim restored)", async () => {
+    it("rejects a whitespace-only name (regex rejects raw whitespace)", async () => {
       const wrapper = mountComp();
       await flushPromises();
 
       const form = getForm(wrapper);
       form.setFieldValue("name", "   ");
+      form.setFieldValue("stream_type", "logs");
+      await nextTick();
+
+      await submit(wrapper);
+
+      expect(form.state.isValid).toBe(false);
+      expect(mockCreateStream).not.toHaveBeenCalled();
+    });
+
+    // Regression: a schema `.trim()` would let a trailing/leading space PASS
+    // validation (the regex judges the trimmed copy) while OForm/TanStack SAVES
+    // the raw value — persisting the space. The schema validates the RAW value
+    // (no `.trim()`), so surrounding whitespace is rejected and never saved.
+    it("rejects a name with a trailing space and never saves the raw space", async () => {
+      const wrapper = mountComp();
+      await flushPromises();
+
+      const form = getForm(wrapper);
+      form.setFieldValue("name", "mystream ");
       form.setFieldValue("stream_type", "logs");
       await nextTick();
 
