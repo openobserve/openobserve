@@ -23,6 +23,10 @@ export const scriptMethodNameRegex = /^[A-Z_][A-Z0-9_]*$/i;
 export const scriptToolbarSchema = z.object({
   name: z
     .string()
+    // Pre-migration used `v-model.trim`, so surrounding whitespace was stripped
+    // before the required + method-name checks ran. `.trim()` restores that
+    // parity — " abc " validates as "abc" instead of being rejected by the regex.
+    .trim()
     .min(1, "Field is required!")
     .regex(
       scriptMethodNameRegex,

@@ -322,6 +322,88 @@ describe("EditScript", () => {
     });
   });
 
+  describe("Payload parity (exact object handed to actions.create)", () => {
+    it("builds the exact FormData payload — keys + value types — on create", async () => {
+      vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+      const file = new File(["code"], "script.zip");
+      setField(wrapper, "name", "valid_action");
+      setField(wrapper, "description", "my description");
+      setField(wrapper, "service_account", "service1@example.com");
+      setField(wrapper, "codeZip", file);
+      await nextTick();
+
+      await submit(wrapper);
+
+      expect(actions.create).toHaveBeenCalledTimes(1);
+      const [org, actionId, payload] = (actions.create as any).mock.calls[0];
+      expect(org).toBe("default");
+      expect(actionId).toBe(""); // no route id on create
+      expect(payload).toBeInstanceOf(FormData);
+
+      // EXACT set of keys — none added (no schema-helper leak), none dropped/renamed.
+      expect([...payload.keys()].sort()).toEqual(
+        [
+          "description",
+          "environment_variables",
+          "execution_details",
+          "file",
+          "filename",
+          "name",
+          "owner",
+          "service_account",
+        ].sort(),
+      );
+
+      // Values + types.
+      expect(payload.get("name")).toBe("valid_action");
+      expect(typeof payload.get("name")).toBe("string");
+      expect(payload.get("description")).toBe("my description");
+      expect(payload.get("execution_details")).toBe("once"); // scheduled + once
+      expect(payload.get("service_account")).toBe("service1@example.com");
+      expect(payload.get("environment_variables")).toBe("{}"); // empty map → "{}"
+      expect(payload.get("owner")).toBe("example@gmail.com");
+      expect(payload.get("filename")).toBe("script.zip");
+      expect(payload.get("file")).toBeInstanceOf(File); // codeZip is a File, not a string
+
+      // Conditional key absent on a non-repeat schedule.
+      expect(payload.has("cron_expr")).toBe(false);
+      // No edit-only `id` key on create.
+      expect(payload.has("id")).toBe(false);
+    });
+
+    it("adds cron_expr (string) only when scheduled + repeat", async () => {
+      vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+      wrapper.vm.frequency.type = "repeat";
+      await nextTick();
+
+      setField(wrapper, "name", "valid_action");
+      setField(wrapper, "service_account", "service1@example.com");
+      setField(wrapper, "codeZip", new File(["code"], "script.zip"));
+      setField(wrapper, "cron", "0 0 * * *");
+      await nextTick();
+
+      await submit(wrapper);
+
+      const payload = (actions.create as any).mock.calls[0][2];
+      expect(payload.get("execution_details")).toBe("repeat");
+      expect(payload.get("cron_expr")).toBe("0 0 * * *");
+      expect(typeof payload.get("cron_expr")).toBe("string");
+    });
+
+    it("trims surrounding whitespace from the saved name (v-model.trim parity)", async () => {
+      vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+      setField(wrapper, "name", "  valid_action  ");
+      setField(wrapper, "service_account", "service1@example.com");
+      setField(wrapper, "codeZip", new File(["code"], "script.zip"));
+      await nextTick();
+
+      await submit(wrapper);
+
+      const payload = (actions.create as any).mock.calls[0][2];
+      expect(payload.get("name")).toBe("valid_action");
+    });
+  });
+
   describe("Step navigation", () => {
     it("displays the first step", () => {
       expect(
@@ -512,6 +594,17 @@ describe("EditScript", () => {
     it("shows the discard dialog when there are changes", () => {
       wrapper.vm.originalActionScriptData = JSON.stringify({ name: "Original" });
       wrapper.vm.formData.name = "Changed";
+      wrapper.vm.openCancelDialog();
+      expect(wrapper.vm.dialog.show).toBe(true);
+      expect(wrapper.vm.dialog.title).toBe("Discard Changes");
+    });
+
+    it("shows the discard dialog after a real form-field edit (regression guard)", async () => {
+      // Editing a form-owned field is what a user actually does — it updates the
+      // TanStack form, NOT `formData`. The dirty-check must still detect it and
+      // warn before discarding (previously it silently navigated away).
+      wrapper.vm.form.setFieldValue("name", "user_typed_this");
+      await nextTick();
       wrapper.vm.openCancelDialog();
       expect(wrapper.vm.dialog.show).toBe(true);
       expect(wrapper.vm.dialog.title).toBe("Discard Changes");

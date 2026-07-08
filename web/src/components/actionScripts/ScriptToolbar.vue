@@ -127,7 +127,12 @@ const form = useOForm<ScriptToolbarForm>({
 // prevents an emit/prop echo loop with the reverse watch below.
 const formName = form.useStore((s: any) => s.values.name);
 watch(formName, (v) => {
-  if ((v ?? "") !== (props.name ?? "")) emit("update:name", (v ?? "") as string);
+  // Emit the TRIMMED value — parity with the pre-migration `v-model.trim`, which
+  // stripped surrounding whitespace before handing the name to the parent (the
+  // canonical value owner). Schema `.trim()` only affects validation, not the
+  // stored form value, so trim at the emit too.
+  const next = ((v ?? "") as string).trim();
+  if (next !== (props.name ?? "")) emit("update:name", next);
 });
 
 // Keep the form in sync when the parent changes `name` externally (e.g. async

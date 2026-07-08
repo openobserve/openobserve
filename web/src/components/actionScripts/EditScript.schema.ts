@@ -47,6 +47,11 @@ export const makeEditScriptSchema = (opts: EditScriptSchemaOptions) =>
       // ── Genuinely user-typed / form-owned scalar fields ──────────────────
       name: z
         .string()
+        // Pre-migration used `v-model.trim`, so surrounding whitespace was
+        // stripped before the required + isValidResourceName checks ran. `.trim()`
+        // restores that parity — " abc " validates (and saves) as "abc" instead of
+        // failing isValidResourceName on the leading/trailing space.
+        .trim()
         .min(1, opts.t("common.nameRequired"))
         .refine((v) => isValidResourceName(String(v)), {
           message: RESOURCE_NAME_MESSAGE,

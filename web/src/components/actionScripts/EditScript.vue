@@ -794,7 +794,10 @@ const saveActionScript = async (value: EditScriptForm) => {
   form = useFormData ? new FormData() : {};
 
   const commonFields: Record<string, any> = {
-    name: value.name,
+    // Trim the name in the payload — parity with the pre-migration `v-model.trim`,
+    // which saved the trimmed name. Schema `.trim()` only validates the trimmed
+    // value; it is not written back into `value`, so trim it here.
+    name: (value.name ?? "").trim(),
     description: value.description,
     // Use the validated form value (frequencyType), not the component-owned
     // frequency.value.type — the schema's cron rule branches on frequencyType,
@@ -938,7 +941,17 @@ const setupEditingActionScript = async (report: any) => {
 };
 
 const openCancelDialog = () => {
-  if (originalActionScriptData.value === JSON.stringify(formData.value)) {
+  // Dirty-check across BOTH sources of truth. The <OForm> now owns the scalar
+  // fields (name/description/type/service_account/timezone/codeZip/cron), so
+  // editing them updates TanStack state — NOT `formData`. A `formData`-only
+  // compare therefore misses real edits and skips this confirmation (silent
+  // discard). `form.state.isDirty` catches any edited form field; the `formData`
+  // snapshot still catches the file-name display + env-var deletes, which remain
+  // component-owned. Show the confirm if EITHER changed.
+  const formEdited = form.state.isDirty;
+  const formDataEdited =
+    originalActionScriptData.value !== JSON.stringify(formData.value);
+  if (!formEdited && !formDataEdited) {
     goToActionScripts();
     return;
   }

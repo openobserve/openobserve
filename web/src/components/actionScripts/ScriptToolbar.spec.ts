@@ -184,6 +184,24 @@ describe('ScriptToolbar.vue', () => {
       expect(events).toBeTruthy();
       expect(events?.[events.length - 1]).toEqual(['new_name']);
     });
+
+    it('trims surrounding whitespace (parity with the old v-model.trim)', async () => {
+      wrapper = createWrapper({ name: '' });
+      await flushPromises();
+
+      (wrapper.vm as any).form.setFieldValue('name', '  valid_action  ');
+      await flushPromises();
+
+      // Parent (value owner) receives the TRIMMED name, as before the migration.
+      const events = wrapper.emitted('update:name') as any[];
+      expect(events[events.length - 1]).toEqual(['valid_action']);
+
+      // A whitespace-padded valid name still passes (schema .trim() → was rejected
+      // by the method-name regex before the fix).
+      await submit(wrapper);
+      expect((wrapper.vm as any).form.state.isValid).toBe(true);
+      expect(wrapper.emitted('save')).toBeTruthy();
+    });
   });
 
   describe('Event wiring', () => {
