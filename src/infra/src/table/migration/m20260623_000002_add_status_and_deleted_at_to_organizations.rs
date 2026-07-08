@@ -25,6 +25,8 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // NOTE: one column per alter_table statement — SQLite does not support
+        // multiple ALTER operations in a single ALTER TABLE (sea-query panics).
         manager
             .alter_table(
                 Table::alter()
@@ -35,8 +37,17 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default("active"),
                     )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Organizations::Table)
                     .add_column_if_not_exists(
-                        ColumnDef::new(Organizations::DeletedAt).big_integer().null(),
+                        ColumnDef::new(Organizations::DeletedAt)
+                            .big_integer()
+                            .null(),
                     )
                     .to_owned(),
             )
@@ -49,6 +60,13 @@ impl MigrationTrait for Migration {
                 Table::alter()
                     .table(Organizations::Table)
                     .drop_column(Organizations::Status)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Organizations::Table)
                     .drop_column(Organizations::DeletedAt)
                     .to_owned(),
             )

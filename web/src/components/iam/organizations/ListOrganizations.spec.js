@@ -11,6 +11,11 @@ import OTable from "@/lib/core/Table/OTable.vue";
 vi.mock("@/services/organizations", () => ({
   default: {
     list: vi.fn(),
+    // getOrganizations() sources the list from the _meta admin endpoint (so it can
+    // surface status / deleted_at); resurrect_org + delete_org are used by row actions.
+    get_admin_org: vi.fn(),
+    resurrect_org: vi.fn(),
+    delete_org: vi.fn(),
   },
 }));
 
@@ -93,6 +98,14 @@ describe("ListOrganizations", () => {
 
     // Mock the organizations service list method
     organizationsService.list.mockResolvedValue(mockOrganizations);
+    // getOrganizations() now reads from the _meta admin endpoint. Delegate it to
+    // whatever `list` is currently mocked to return (incl. per-test mockResolvedValueOnce),
+    // so existing test data setups keep driving the component unchanged.
+    organizationsService.get_admin_org.mockImplementation((...args) =>
+      organizationsService.list(...args),
+    );
+    organizationsService.resurrect_org.mockResolvedValue({});
+    organizationsService.delete_org.mockResolvedValue({});
 
     wrapper = mount(ListOrganizations, {
       global: {
@@ -157,10 +170,11 @@ describe("ListOrganizations", () => {
 
     it("should setup columns correctly for non-cloud mode", () => {
       const columns = wrapper.vm.columns;
-      // #, name, identifier, type, actions = 5 columns when isCloud is false
-      expect(columns).toHaveLength(5);
+      // #, name, identifier, type, status, actions = 6 columns when isCloud is false
+      expect(columns).toHaveLength(6);
       expect(columns.map(c => c.id)).toContain("name");
       expect(columns.map(c => c.id)).toContain("identifier");
+      expect(columns.map(c => c.id)).toContain("status");
     });
 
     it("should add plan column when isCloud is true", async () => {
@@ -187,8 +201,8 @@ describe("ListOrganizations", () => {
       });
 
       await flushPromises();
-      // #, name, identifier, type, plan, actions = 6 columns when isCloud is true
-      expect(wrapperWithCloud.vm.columns).toHaveLength(6);
+      // #, name, identifier, type, status, plan, actions = 7 columns when isCloud is true
+      expect(wrapperWithCloud.vm.columns).toHaveLength(7);
       wrapperWithCloud.unmount();
 
       config.isCloud = "false";
@@ -207,9 +221,15 @@ describe("ListOrganizations", () => {
       expect(wrapper.vm.organizations[1].type).toBe("Team");
     });
 
-    it("should update store with organizations", async () => {
+    it("should load organizations into the local list", async () => {
       await flushPromises();
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setOrganizations", mockOrganizations.data.data);
+      // getOrganizations() sources from the _meta admin endpoint and populates the
+      // component's own list; it deliberately does NOT dispatch setOrganizations
+      // (the navbar switcher keeps its own filtered list of non-deleting orgs).
+      expect(wrapper.vm.organizations).toHaveLength(mockOrganizations.data.data.length);
+      expect(wrapper.vm.organizations[0].identifier).toBe(
+        mockOrganizations.data.data[0].identifier,
+      );
     });
 
     it("should handle loading state correctly", async () => {
