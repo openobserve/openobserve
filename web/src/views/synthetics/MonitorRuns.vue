@@ -312,6 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSelect
                 v-model="browserFilter"
                 :options="browserOptions"
+                icon-key="icon"
                 size="md"
                 class="tw:w-35!"
                 data-test="monitor-runs-filter-browser"
@@ -319,6 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSelect
                 v-model="deviceFilter"
                 :options="deviceOptions"
+                icon-key="icon"
                 size="md"
                 class="tw:w-35!"
                 data-test="monitor-runs-filter-device"
@@ -326,6 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSelect
                 v-model="locationFilter"
                 :options="locationOptions"
+                icon-key="icon"
                 size="md"
                 class="tw:w-35!"
                 data-test="monitor-runs-filter-location"
@@ -402,17 +405,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OBadge
                     :variant="(row as VisibleRun).statusBadgeVariant"
                     size="sm"
-                    :icon="(row as VisibleRun).statusIcon"
+                    dot
                   >
                     {{ (row as VisibleRun).statusLabel }}
                   </OBadge>
                 </template>
                 <template #cell-scheduled_at="{ row }">
-                  <span
-                    class="tw:text-xs tw:text-text-secondary tw:font-mono tw:tabular-nums"
-                  >
-                    {{ (row as VisibleRun).scheduledAt }}
-                  </span>
+                  <OTimeCell
+                    :value="(row as VisibleRun).scheduledTs"
+                    unit="ms"
+                    mode="absolute"
+                    empty-label="—"
+                  />
+                </template>
+                <template #cell-last_run_at="{ row }">
+                  <OTimeCell
+                    :value="(row as VisibleRun).lastRunTs"
+                    unit="ms"
+                    mode="absolute"
+                    empty-label="—"
+                  />
                 </template>
                 <template #cell-duration="{ row }">
                   <span
@@ -423,17 +435,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </template>
                 <template #cell-location="{ row }">
-                  <span class="tw:text-xs tw:text-text-secondary">
+                  <span class="tw:inline-flex tw:items-center tw:gap-1 tw:text-xs tw:text-text-secondary">
+                    <OIcon
+                      :name="locationIcon((row as VisibleRun).location)"
+                      size="xs"
+                    />
                     {{ (row as VisibleRun).location }}
                   </span>
                 </template>
                 <template #cell-browser="{ row }">
-                  <span class="tw:text-xs tw:text-text-secondary">
+                  <span class="tw:inline-flex tw:items-center tw:gap-1 tw:text-xs tw:text-text-secondary">
+                    <OIcon
+                      :name="browserIcon((row as VisibleRun).browser)"
+                      size="xs"
+                    />
                     {{ (row as VisibleRun).browser }}
                   </span>
                 </template>
                 <template #cell-device="{ row }">
-                  <span class="tw:text-xs tw:text-text-secondary">
+                  <span class="tw:inline-flex tw:items-center tw:gap-1 tw:text-xs tw:text-text-secondary">
+                    <OIcon
+                      :name="(row as VisibleRun).device === 'Desktop' ? 'computer' : (row as VisibleRun).device === 'Tablet' ? 'tablet' : 'smartphone'"
+                      size="xs"
+                    />
                     {{ (row as VisibleRun).device }}
                   </span>
                 </template>
@@ -743,6 +767,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -880,6 +905,7 @@ interface MockRun {
   runId: string;
   ageMin: number;
   scheduledTs: number;
+  timestamp: number;
   duration: number;
   status: "pass" | "fail";
   location: string;
@@ -905,7 +931,7 @@ function generateRuns(timeRange?: {
   const r = seedRand(77);
   const locations = ["us-east-1", "eu-west-1", "ap-south-1"];
   const browsers = ["Chromium", "Firefox", "WebKit"];
-  const devices = ["Desktop", "Mobile"];
+  const devices = ["Desktop", "Tablet", "Mobile"];
   const steps = stepNames();
   const meta = stepMeta();
   const errs = errorPatterns();
@@ -942,12 +968,13 @@ function generateRuns(timeRange?: {
         runId,
         ageMin: Math.round((baseTime - scheduledBase) / 60000),
         scheduledTs: scheduledBase,
+        timestamp: scheduledBase + Math.round(r() * 30000),
         triggerType: "schedule",
         duration: dur,
         status: isFail ? ("fail" as const) : ("pass" as const),
         location: locations[Math.floor(r() * locations.length)],
         browser: browsers[Math.floor(r() * browsers.length)],
-        device: devices[r() < 0.85 ? 0 : 1],
+        device: devices[r() < 0.7 ? 0 : r() < 0.85 ? 1 : 2],
         failedStep,
         locator,
         action: failedStep
@@ -980,9 +1007,22 @@ function fmtAge(min: number): string {
   if (h < 24) return h + "h ago";
   return Math.floor(h / 24) + "d ago";
 }
-function fmtScheduledTs(ms: number): string {
-  if (!ms) return "—";
-  return new Date(ms).toLocaleString();
+
+function browserIcon(name: string): string {
+  switch (name) {
+    case "Chromium": return "img:" + chromiumSvgUrl;
+    case "Firefox": return "img:" + firefoxSvgUrl;
+    case "WebKit": return "img:" + webkitSvgUrl;
+    default: return "open-in-browser";
+  }
+}
+function locationIcon(region: string): string {
+  const prefix = region.split("-")[0].toLowerCase();
+  if (prefix === "aws") return "img:" + awsSvgUrl;
+  if (prefix === "gcp") return "img:" + gcpSvgUrl;
+  if (/^[a-z]{2}-[a-z]+-\d+$/.test(region)) return "img:" + awsSvgUrl;
+  if (/^[a-z]+-[a-z]+\d*$/.test(region)) return "img:" + gcpSvgUrl;
+  return "location-on";
 }
 
 function sparkPts(seed: number, n: number, base: number, vol: number): string {
@@ -1041,16 +1081,16 @@ function uniqueValues(key: "browser" | "device" | "location"): string[] {
   return Array.from(vals).sort();
 }
 const browserOptions = computed<SelectOption[]>(() => [
-  { label: "All browsers", value: "all" },
-  ...uniqueValues("browser").map((v) => ({ label: v, value: v })),
+  { label: "All browsers", value: "all", icon: "language" },
+  ...uniqueValues("browser").map((v) => ({ label: v, value: v, icon: browserIcon(v) })),
 ]);
 const deviceOptions = computed<SelectOption[]>(() => [
-  { label: "All devices", value: "all" },
-  ...uniqueValues("device").map((v) => ({ label: v, value: v })),
+  { label: "All devices", value: "all", icon: "devices" },
+  ...uniqueValues("device").map((v) => ({ label: v, value: v, icon: v === "Desktop" ? "computer" : v === "Tablet" ? "tablet" : "smartphone" })),
 ]);
 const locationOptions = computed<SelectOption[]>(() => [
-  { label: "All locations", value: "all" },
-  ...uniqueValues("location").map((v) => ({ label: v, value: v })),
+  { label: "All locations", value: "all", icon: "location-on" },
+  ...uniqueValues("location").map((v) => ({ label: v, value: v, icon: locationIcon(v) })),
 ]);
 const durationOptions: SelectOption[] = [
   { label: "Any duration", value: "all" },
@@ -1073,6 +1113,7 @@ function toMockRun(r: SyntheticRun, idx: number): MockRun {
     runId: r.runId || "unknown-" + idx,
     ageMin: Math.round((Date.now() / 1000 - r.timestamp) / 60),
     scheduledTs: r.scheduledTs,
+    timestamp: r.timestamp * 1000,
     triggerType: r.triggerType,
     duration: r.durationMs,
     status: r.status === "passed" ? ("pass" as const) : ("fail" as const),
@@ -1458,8 +1499,9 @@ const deviceBreakdown = computed<BreakdownItem[]>(() => {
     groups.set(key, g);
   }
   const iconMap: Record<string, string> = {
-    Desktop: "window",
-    Mobile: "touch-app",
+    Desktop: "computer",
+    Tablet: "tablet",
+    Mobile: "smartphone",
   };
   return Array.from(groups.entries()).map(([name, g]) => {
     const pct = g.total > 0 ? Math.round((g.pass / g.total) * 100) : 100;
@@ -1495,7 +1537,8 @@ interface VisibleRun {
   statusBadgeVariant: string;
   statusIcon: string;
   statusLabel: string;
-  scheduledAt: string;
+  scheduledTs: number;
+  lastRunTs: number;
   triggerType: string;
   duration: string;
   durColor: string;
@@ -1511,10 +1554,11 @@ const visibleRuns = computed<VisibleRun[]>(() => {
     const isFail = run.status === "fail";
     return {
       id: run.id,
-      statusBadgeVariant: isFail ? "error-outline" : "success-outline",
+      statusBadgeVariant: isFail ? "error-soft" : "success-soft",
       statusIcon: isFail ? "cancel" : "check_circle",
       statusLabel: isFail ? "Failed" : "Passed",
-      scheduledAt: fmtScheduledTs(run.scheduledTs),
+      scheduledTs: run.scheduledTs,
+      lastRunTs: run.timestamp,
       triggerType: run.triggerType === "manual" ? "Manual" : "Schedule",
       duration: fmtDur(run.duration),
       durColor: isFail ? "var(--o2-status-error-text)" : "var(--o2-text-body)",
@@ -1531,19 +1575,24 @@ const visibleRuns = computed<VisibleRun[]>(() => {
 });
 
 const runColumns: OTableColumnDef[] = [
-  { id: "status", header: "Status", accessorKey: "status", size: 110 },
+  { id: "status", header: "Status", accessorKey: "status", size: 60 },
   {
     id: "scheduled_at",
     header: "Scheduled At",
-    accessorKey: "scheduledAt",
-    size: 160,
+    accessorKey: "scheduledTs",
+    size: 100,
+  },
+  {
+    id: "last_run_at",
+    header: "Last Run At",
+    accessorKey: "lastRunTs",
+    size: 100,
   },
   {
     id: "duration",
     header: "Duration",
     accessorKey: "duration",
-    size: 90,
-    meta: { align: "right" },
+    size: 50,
   },
   { id: "location", header: "Location", accessorKey: "location", size: 110 },
   { id: "browser", header: "Browser", accessorKey: "browser", size: 100 },

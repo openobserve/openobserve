@@ -317,6 +317,9 @@ import Favorite from "~icons/material-symbols/favorite";
 import FavoriteBorder from "~icons/material-symbols/favorite-outline";
 import RadioButtonUnchecked from "~icons/material-symbols/radio-button-unchecked";
 import RadioButtonChecked from "~icons/material-symbols/radio-button-checked";
+import ComputerIcon from "~icons/material-symbols/computer-outline";
+import TabletIcon from "~icons/material-symbols/tablet-outline";
+import SmartphoneIcon from "~icons/material-symbols/smartphone-outline";
 import TouchApp from "~icons/material-symbols/touch-app";
 import NetworkCheck from "~icons/material-symbols/network-check";
 import CloudDownload from "~icons/material-symbols/cloud-download";
@@ -639,6 +642,9 @@ export const iconRegistry = {
   "wrap-text": WrapTextIcon,
   "radio-button-unchecked": RadioButtonUnchecked,
   "radio-button-checked": RadioButtonChecked,
+  "computer": ComputerIcon,
+  "tablet": TabletIcon,
+  "smartphone": SmartphoneIcon,
   "touch-app": TouchApp,
   "network-check": NetworkCheck,
   "cloud-download": CloudDownload,
