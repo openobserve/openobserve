@@ -966,11 +966,12 @@ async fn process_llm_evaluation_node(
                             response: None,
                         },
                     );
-                if let Err(e) = o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::enqueue_evaluator_traces(
-                    metadata.org_id.clone(),
-                    vec![skipped_trace],
-                    metadata.node_idx,
-                ) {
+                let observation = o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::UnsampledObservation {
+                    org_id: metadata.org_id.clone(),
+                    evaluator_traces: vec![skipped_trace],
+                    node_idx: metadata.node_idx,
+                };
+                if let Err(e) = o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::enqueue_unsampled_observation(observation) {
                     o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::log_enqueue_error(
                         &metadata.pipeline_name,
                         metadata.node_idx,
@@ -981,13 +982,13 @@ async fn process_llm_evaluation_node(
                 continue;
             }
 
-            let observation = o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::EvalObservation {
+            let observation = o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::SpanObservation {
                 pipeline_name: metadata.pipeline_name.clone(),
                 node_idx: metadata.node_idx,
                 ctx,
                 scorer_refs: scorer_refs.clone(),
             };
-            if let Err(e) = o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::enqueue_observation(observation) {
+            if let Err(e) = o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::enqueue_span_observation(observation) {
                 o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::log_enqueue_error(
                     &metadata.pipeline_name,
                     metadata.node_idx,
