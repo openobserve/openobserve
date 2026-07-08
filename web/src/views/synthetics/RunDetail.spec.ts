@@ -23,7 +23,7 @@ vi.mock("vue-router", () => ({
     currentRoute: { value: { query: {} } },
   }),
   useRoute: () => ({
-    params: { id: "mon-1", runId: "4821" },
+    params: { id: "mon-1", runId: "4821", executionId: "exec-1" },
   }),
   RouterLink: {
     name: "RouterLinkStub",
@@ -35,6 +35,45 @@ vi.mock("vue-i18n", () => ({
   useI18n: vi.fn(() => ({
     t: (key: string) => key,
   })),
+}));
+
+const mockRunDetail = {
+  timestamp: Date.now() / 1000,
+  scheduledTs: Date.now() / 1000,
+  status: "passed",
+  durationMs: 3240,
+  location: "us-west-1",
+  device: "laptop_large",
+  browserEngine: "chromium",
+  triggerType: "schedule",
+  error: "",
+  jobId: "job-1",
+  runId: "4821",
+  executionId: "exec-1",
+  monitorName: "Test Monitor",
+  attempts: 1,
+  failedStep: null,
+  recordedSteps: [],
+  lastAttemptSteps: [],
+  retryHistory: [],
+  network: null,
+  webVitals: null,
+  traceKey: null,
+};
+
+vi.mock("@/composables/useSyntheticResults", () => ({
+  default: () => ({
+    kpi: { value: { uptimePct: 0, p95Ms: 0, failedRuns: 0, totalRuns: 0, retriedRuns: 0, lastRunStatus: null, lastRunAt: null } },
+    buckets: { value: [] },
+    runs: { value: [] },
+    runDetail: { value: { ...mockRunDetail } },
+    loading: { value: false },
+    error: { value: null },
+    hasLoadedOnce: { value: true },
+    fetchAll: vi.fn(),
+    fetchRun: vi.fn(),
+    cancelAll: vi.fn(),
+  }),
 }));
 
 describe("RunDetail", () => {

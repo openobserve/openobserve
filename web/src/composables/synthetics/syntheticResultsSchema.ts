@@ -38,6 +38,7 @@ export const SYNTHETIC_FIELDS = {
   device: "device",
   engine: "engine",
   error: "error",
+  executionId: "execution_id",
 } as const;
 
 export const STATUS_VALUES = { passed: "passed", warning: "warning", failed: "failed", error: "error" } as const;
@@ -71,6 +72,7 @@ export interface SyntheticRun {
   error: string;
   jobId: string;
   runId: string;
+  executionId: string;
 }
 
 export interface SyntheticRunDetail extends SyntheticRun {
@@ -100,13 +102,13 @@ export interface RecordedStep {
 }
 
 export interface StepExecution {
-  stepId: string;
+  step_id: string;
   status: "ok" | "fail" | "skipped";
-  durationMs: number;
+  duration_ms: number;
   error: string | null;
-  startTime: number;
-  endTime: number;
-  screenshotKey: string | null;
+  start_time: number;
+  end_time: number;
+  screenshot_key: string | null;
 }
 
 export interface RetryAttempt {
@@ -290,7 +292,7 @@ ORDER BY ts`;
 /** Most-recent runs for the Runs table. */
 export function buildRunsSql(monitorId: string, limit: number): string {
   const id = escapeSqlLiteral(monitorId);
-  return `SELECT ${F.timestamp} as ts, scheduled_ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, trigger_type, ${F.error} as error, job_id, run_id
+  return `SELECT ${F.timestamp} as ts, scheduled_ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, trigger_type, ${F.error} as error, job_id, run_id, execution_id
 FROM ${TABLE}
 WHERE ${F.monitorId} = '${id}'
 ORDER BY ${F.timestamp} DESC
@@ -298,12 +300,13 @@ LIMIT ${limit}`;
 }
 
 /** Per-execution results for a single run — one row per engine×device combo. */
-export function buildRunDetailSql(monitorId: string, runId: string): string {
+export function buildRunDetailSql(monitorId: string, runId: string, executionId: string): string {
   const id = escapeSqlLiteral(monitorId);
   const rid = escapeSqlLiteral(runId);
+  const eid = escapeSqlLiteral(executionId);
   return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, ${F.error} as error, job_id, execution_id, trace_key, last_attempt_steps, recorded_steps
 FROM ${TABLE}
-WHERE ${F.monitorId} = '${id}' AND run_id = '${rid}'
+WHERE ${F.monitorId} = '${id}' AND run_id = '${rid}' AND execution_id = '${eid}'
 ORDER BY ${F.location} ASC`;
 }
 
@@ -342,6 +345,7 @@ export function mapRun(rawHit: Record<string, unknown>): SyntheticRun {
     error: str(rawHit.error),
     jobId: str(rawHit.job_id),
     runId: str(rawHit.run_id),
+    executionId: str(rawHit.execution_id),
   };
 }
 
@@ -350,15 +354,16 @@ export function mapRunDetail(
 ): SyntheticRunDetail | null {
   if (!rawHit) return null;
   const base = mapRun({
-    ts: rawHit._timestamp,
+    ts: rawHit.ts ?? rawHit._timestamp,
     status: rawHit.status,
-    duration: rawHit.duration_ms,
+    duration: rawHit.duration ?? rawHit.response_time_ms,
     location: rawHit.location,
     device: rawHit.device,
     engine: rawHit.engine,
     error: rawHit.error,
     job_id: rawHit.job_id,
     run_id: rawHit.run_id,
+    execution_id: rawHit.execution_id,
   });
 
   const rawSteps = parseJson(rawHit.last_attempt_steps);

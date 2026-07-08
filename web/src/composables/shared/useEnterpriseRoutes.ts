@@ -145,7 +145,7 @@ const useEnterpriseRoutes = () => {
         },
       },
       {
-        path: "synthetic/:id/results/run/:runId",
+        path: "synthetic/:id/results/run/:runId/:executionId",
         name: "synthetic-run-detail",
         component: () => import("@/views/synthetics/RunDetail.vue"),
         meta: { title: "Run Detail" },

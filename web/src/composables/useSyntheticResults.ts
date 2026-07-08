@@ -91,16 +91,17 @@ export function useSyntheticResults() {
   async function fetchRun(
     monitorId: string,
     runId: string,
+    executionId: string,
     startTime: number,
     endTime: number,
   ): Promise<void> {
-    if (!monitorId || !runId) return;
+    if (!monitorId || !runId || !executionId) return;
     loading.value = true;
     error.value = null;
     runDetail.value = null;
     try {
       const rows = await executeQuery(
-        buildRunDetailSql(monitorId, runId),
+        buildRunDetailSql(monitorId, runId, executionId),
         startTime,
         endTime,
         "logs",

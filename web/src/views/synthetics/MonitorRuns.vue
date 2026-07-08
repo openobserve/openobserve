@@ -16,10 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   MonitorRuns — Chrome-less tabbed content for the Monitor Runs page.
 
-  Three tabs (OTabs):
+  Two tabs (OTabs):
     - Overview: KPI cards, charts, breakdown cards, filter bar, runs table
     - Steps: Cross-run step analysis with expandable rows
     - Errors: Error pattern grouping
+
+  Runs table features:
+    - Column resize (drag header edges) and column reorder (drag headers)
+    - OTimeCell for date columns (Scheduled At, Last Run At)
+    - Icons in cells (browser logos, location cloud icons, device icons)
+    - Icons in filter dropdowns (browser, device, location selects)
 
   This component is chrome-less — it does NOT render AppPageHeader.
   The parent (MonitorResults.vue) owns the header. This component is the
@@ -52,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ════════════ OVERVIEW ════════════ -->
         <OTabPanel name="overview">
           <div
-            class="tw:max-w-[85rem] tw:mx-auto tw:px-5 tw:py-[0.875rem] tw:pb-[1.75rem] tw:flex tw:flex-col tw:gap-[0.875rem]"
+            class="tw:mx-auto tw:px-5 tw:py-[0.875rem] tw:pb-[1.75rem] tw:flex tw:flex-col tw:gap-[0.875rem]"
           >
             <!-- Status Timeline (ECharts) -->
             <MonitorStatusTimelineCharts
@@ -397,6 +403,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :page-size-options="[10, 20, 25, 50]"
                 row-key="id"
                 :show-global-filter="false"
+                :enable-column-resize="true"
+                :enable-column-reorder="true"
                 :empty-message="'No runs match'"
                 data-test="monitor-runs-runs-table"
                 @row-click="openRun"
@@ -500,7 +508,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ════════════ STEPS ════════════ -->
         <OTabPanel name="steps">
           <div
-            class="tw:max-w-[85rem] tw:mx-auto tw:px-5 tw:py-[0.875rem] tw:pb-[1.75rem] tw:flex tw:flex-col tw:gap-[0.875rem]"
+            class="tw:mx-auto tw:px-5 tw:py-[0.875rem] tw:pb-[1.75rem] tw:flex tw:flex-col tw:gap-[0.875rem]"
           >
             <div class="tw:flex tw:items-center tw:gap-2.5">
               <span class="tw:font-bold tw:text-sm tw:text-text-heading">
@@ -703,7 +711,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ════════════ ERRORS ════════════ -->
         <OTabPanel name="errors">
           <div
-            class="tw:max-w-[85rem] tw:mx-auto tw:px-5 tw:py-[0.875rem] tw:pb-[1.75rem] tw:flex tw:flex-col tw:gap-[0.875rem]"
+            class="tw:mx-auto tw:px-5 tw:py-[0.875rem] tw:pb-[1.75rem] tw:flex tw:flex-col tw:gap-[0.875rem]"
           >
             <div class="tw:flex tw:items-center tw:gap-2.5">
               <span class="tw:font-bold tw:text-sm tw:text-text-heading">
@@ -791,7 +799,7 @@ defineOptions({ name: "SyntheticMonitorRuns" });
 
 const emit = defineEmits<{
   (e: "edit"): void;
-  (e: "open-run", runId: string): void;
+  (e: "open-run", runId: string, executionId: string): void;
 }>();
 
 // ── Props ────────────────────────────────────────────────────────────────
@@ -1940,12 +1948,12 @@ function openRun(row: { id: number }) {
   const idx = allRuns.value.findIndex((r) => r.id === row.id);
   if (idx >= 0 && synthetics.hasLoadedOnce.value) {
     const realRun = synthetics.runs.value[idx];
-    if (realRun?.runId) {
-      emit("open-run", realRun.runId);
+    if (realRun?.runId && realRun?.executionId) {
+      emit("open-run", realRun.runId, realRun.executionId);
       return;
     }
   }
-  emit("open-run", String(row.id));
+  emit("open-run", String(row.id), "");
 }
 
 function toggleStepGroup(key: string) {

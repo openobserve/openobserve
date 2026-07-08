@@ -245,11 +245,11 @@ function editMonitor() {
   router.push({ name: "synthetic-new", query: { edit: monitorId.value } });
 }
 
-function openRunDetail(runId: string) {
-  if (!runId) return;
+function openRunDetail(runId: string, executionId: string) {
+  if (!runId || !executionId) return;
   router.push({
     name: "synthetic-run-detail",
-    params: { id: monitorId.value, runId },
+    params: { id: monitorId.value, runId, executionId },
   });
 }
 
