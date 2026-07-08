@@ -12,13 +12,20 @@
       "action": "Amplie o intervalo de tempo",
       "actionDesc": "Pesquise em um período mais longo"
     },
+    "noPatterns": {
+      "title": "Nenhum padrão encontrado",
+      "description": "Tente aumentar o intervalo de tempo ou selecionar um fluxo diferente com mais dados de registro. A extração de padrões funciona melhor com pelo menos 1.000 registros.",
+      "logsAnalyzed": "Somente os registros {count} foram analisados."
+    },
     "noStreamSelected": {
       "title": "Selecione um stream para começar",
       "description": "Escolha um stream e execute sua consulta para explorar seus dados. Refine os resultados com filtros e um intervalo de tempo personalizado."
     },
     "noQueryApplied": {
       "title": "Execute uma consulta para ver os registros",
-      "description": "Ajuste seus filtros e clique em “Executar consulta” para carregar eventos para esse stream."
+      "description": "Ajuste seus filtros e clique em “Executar consulta” para carregar eventos para esse stream.",
+      "action": "Executar consulta",
+      "actionDesc": "Carregar eventos para os filtros selecionados"
     },
     "noDashboards": {
       "title": "Crie seu primeiro painel",
@@ -80,7 +87,9 @@
       "title": "Ainda não há destinos",
       "description": "Os destinos definem para onde as notificações de alerta são enviadas: Slack, e-mail, webhooks e muito mais.",
       "action": "Novo destino",
-      "actionDesc": "Conectar um canal de notificação"
+      "actionDesc": "Conectar um canal de notificação",
+      "import": "Destino de importação",
+      "importDesc": "Importar de um arquivo JSON"
     },
     "noPipelineDestinations": {
       "title": "Ainda não há destinos",
@@ -92,7 +101,9 @@
       "title": "Ainda não há modelos",
       "description": "Os modelos definem o formato das mensagens de notificação de alerta.",
       "action": "Novo modelo",
-      "actionDesc": "Crie um modelo de notificação"
+      "actionDesc": "Crie um modelo de notificação",
+      "import": "Importar modelo",
+      "importDesc": "Importar de um arquivo JSON"
     },
     "noEvalTemplates": {
       "title": "Ainda não há modelos de avaliação",
@@ -142,6 +153,20 @@
       "title": "Sem trabalhos de preenchimento",
       "description": "Os trabalhos de preenchimento reprocessam dados históricos por meio de um pipeline. Execute um para começar."
     },
+    "noRegexPatterns": {
+      "title": "Ainda não há padrões de regex",
+      "description": "Crie um padrão reutilizável para editar dados confidenciais ou importe um da sua biblioteca.",
+      "action": "Novo padrão",
+      "actionDesc": "Definir um novo padrão de regex",
+      "import": "Padrão de importação",
+      "importDesc": "Reutilize um padrão da sua biblioteca"
+    },
+    "noStorageConfig": {
+      "title": "Nenhum bucket configurado",
+      "description": "Encaminhe os dados dessa organização para um bucket dedicado, independentemente de outras organizações e dos padrões globais.",
+      "action": "Configurar o armazenamento",
+      "actionDesc": "Conecte um bucket do S3, GCS ou Azure"
+    },
     "noPipelineHistory": {
       "title": "Ainda não há histórico de oleodutos",
       "description": "O histórico de execução do pipeline aparecerá aqui quando seus pipelines forem executados."
@@ -161,10 +186,12 @@
       "actionDesc": "Escreva uma nova função VRL"
     },
     "noStreams": {
-      "title": "Aguardando seus primeiros dados",
-      "description": "Nenhum dado chegou ainda. Conecte uma fonte e seus streams aparecerão aqui automaticamente.",
+      "title": "Conecte uma fonte para criar seu primeiro stream",
+      "description": "Os fluxos são criados automaticamente no momento em que os dados chegam. Configure a ingestão do seu aplicativo, agente ou coletor para começar.",
       "action": "Configurar a ingestão",
-      "actionDesc": "Conectar uma fonte de dados"
+      "actionDesc": "Conectar uma fonte de dados",
+      "createAction": "Novo stream",
+      "createActionDesc": "Definir manualmente um esquema de fluxo"
     },
     "noAlerts": {
       "title": "Crie seu primeiro alerta",
@@ -174,7 +201,7 @@
     },
     "noIncidents": {
       "title": "Sem incidentes ativos",
-      "description": "Você está ocupado — nada precisa de sua atenção no momento. Os incidentes desencadeados aparecerão aqui."
+      "description": "Os incidentes são criados quando um alerta é acionado — nenhum foi disparado ainda. Depois de ativar os alertas, todos os incidentes acionados aparecerão aqui."
     },
     "noLLMInsights": {
       "title": "Ainda não há atividade de LLM",
@@ -191,20 +218,24 @@
     "noScorers": {
       "title": "Ainda não há marcadores",
       "description": "Os pontuadores classificam as respostas do LLM de acordo com suas configurações de pontuação — comece com um juiz do LLM ou importe uma da biblioteca.",
-      "action": "Criar marcador",
-      "actionDesc": "Defina um juiz de LLM ou pontuador remoto"
+      "action": "Novo goleador",
+      "actionDesc": "Defina um juiz de LLM ou pontuador remoto",
+      "import": "Importar marcador",
+      "importDesc": "Importar de um arquivo JSON"
     },
     "noEvalJobs": {
       "title": "Ainda não há trabalhos de avaliação",
       "description": "Pontuadores do cronograma de trabalhos em relação a um stream do LLM. Crie um para começar a avaliar as conversas em uma cadência.",
-      "action": "Crie um trabalho de avaliação",
+      "action": "Novo emprego",
       "actionDesc": "Escolha uma transmissão, marcadores e cadência"
     },
     "noScoreConfigs": {
       "title": "Ainda não há configurações de pontuação",
       "description": "As configurações de pontuação definem o esquema que os pontuadores produzem — numérico, booleano ou categórico. Adicione um para começar a pontuar.",
-      "action": "Criar configuração de pontuação",
-      "actionDesc": "Defina a forma da pontuação+faixa saudável"
+      "action": "Nova configuração de pontuação",
+      "actionDesc": "Defina a forma da pontuação+faixa saudável",
+      "import": "Importar configuração de pontuação",
+      "importDesc": "Importar de um arquivo JSON"
     },
     "loadError": {
       "title": "Algo deu errado",
@@ -271,6 +302,7 @@
     },
     "nouns": {
       "logs": "troncos",
+      "patterns": "padrões",
       "dashboards": "painéis",
       "pipelines": "oleodutos",
       "functions": "funções",
@@ -305,7 +337,8 @@
       "scorers": "avaliadores",
       "evalJobs": "trabalhos de avaliação",
       "scoreConfigs": "configurações de pontuação",
-      "pipelineHistory": "histórico de pipeline"
+      "pipelineHistory": "histórico de pipeline",
+      "regexPatterns": "padrões regex"
     }
   },
   "common": {
@@ -1612,6 +1645,11 @@
     "subtitle": "Gerenciamento de índices e configuração de streams",
     "streamNameHelpText": "Use somente caracteres alfanuméricos, sublinhado e dois pontos.",
     "search": "Fluxo de pesquisa",
+    "emptyOr": "Ou:",
+    "emptyKubernetes": "Kubernetes",
+    "emptyAws": "AWS/CloudWatch",
+    "emptyLinux": "Linux",
+    "emptyWindows": "Janela",
     "name": "Nome",
     "docNum": "Doutor Num",
     "storageSize": "Dados ingeridos",
@@ -3043,9 +3081,9 @@
     "searchAllFolders": "Todas as pastas",
     "streamConfig": "Configuração de transmissão",
     "alertRules": "Regras de alerta",
-    "noTemplatesMsg": "Parece que você ainda não criou nenhum modelo. Para criar um alerta, você precisará ter pelo menos um destino e um modelo em vigor",
+    "noTemplatesMsg": "Para criar um alerta, você precisa de pelo menos um modelo e um destino. Os modelos definem o formato da mensagem de notificação — comece criando uma.",
     "createTemplateBtn": "Criar modelo",
-    "noDestinationsMsg": "Parece que você ainda não criou nenhum destino. Para criar um alerta, você precisará ter pelo menos um destino e um modelo em vigor",
+    "noDestinationsMsg": "Para criar um alerta, você precisa de pelo menos um destino e um modelo. Os destinos definem para onde as notificações são enviadas — comece criando uma.",
     "createDestinationBtn": "Criar destino",
     "add": "Adicionar alerta",
     "edit": "Editar",
@@ -5271,6 +5309,7 @@
     },
     "quality": {
       "scopeLabel": "Todas as dimensões de qualidade neste espaço de trabalho",
+      "agentPlaceholder": "Todos os agentes",
       "timeRange": {
         "label": "Intervalo de tempo",
         "last1h": "Última 1 hora",

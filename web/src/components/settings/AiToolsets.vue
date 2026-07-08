@@ -65,8 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="hero"
             preset="no-ai-toolsets"
             :filtered="!!filterQuery"
-            :hide-action="!filterQuery"
-            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+            @action="(id) => id === 'clear-filters' ? (filterQuery = '') : addToolset()"
           />
         </template>
 

@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #description>{{ t('overview.allClearDesc') }}</template>
       <template #actions>
         <!-- View alerts -->
-        <button type="button" class="ov-action-card group relative flex items-center gap-3 w-64 max-w-full min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-(--color-border-default) bg-(--color-surface-base) shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-(--color-primary-400) hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-alerts-card" @click="goToAlertList">
+        <button v-if="showAlertsCard" type="button" class="ov-action-card group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-(--color-border-default) bg-(--color-surface-base) shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-(--color-primary-400) hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-alerts-card" @click="goToAlertList">
           <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-(--o2-status-warning-bg) text-(--o2-status-warning-text) group-hover:bg-(--o2-primary-color) group-hover:text-(--o2-primary-foreground)">
             <OIcon name="notifications" size="md" />
           </span>
@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="chevron-right" size="sm" class="shrink-0 text-(--color-text-disabled) transition-[transform,color] duration-150 group-hover:translate-x-[0.125rem] group-hover:text-(--color-primary-600)" />
         </button>
         <!-- Explore logs -->
-        <button type="button" class="ov-action-card group relative flex items-center gap-3 w-64 max-w-full min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-(--color-border-default) bg-(--color-surface-base) shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-(--color-primary-400) hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-logs-card" @click="goToLogs">
+        <button v-if="showLogsCard" type="button" class="ov-action-card group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-(--color-border-default) bg-(--color-surface-base) shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-(--color-primary-400) hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-logs-card" @click="goToLogs">
           <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-(--o2-status-info-bg) text-(--o2-status-info-text) group-hover:bg-(--o2-primary-color) group-hover:text-(--o2-primary-foreground)">
             <OIcon name="search" size="md" />
           </span>
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="chevron-right" size="sm" class="shrink-0 text-(--color-text-disabled) transition-[transform,color] duration-150 group-hover:translate-x-[0.125rem] group-hover:text-(--color-primary-600)" />
         </button>
         <!-- Explore traces -->
-        <button type="button" class="ov-action-card group relative flex items-center gap-3 w-64 max-w-full min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-(--color-border-default) bg-(--color-surface-base) shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-(--color-primary-400) hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-traces-card" @click="goToTraces">
+        <button v-if="showTracesCard" type="button" class="ov-action-card group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-(--color-border-default) bg-(--color-surface-base) shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-(--color-primary-400) hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-traces-card" @click="goToTraces">
           <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-(--o2-status-info-bg) text-(--o2-status-info-text) group-hover:bg-(--o2-primary-color) group-hover:text-(--o2-primary-foreground)">
             <OIcon name="account-tree" size="md" />
           </span>
@@ -834,6 +834,14 @@ const goToIncident = (inc: any) => {
     query: { org_identifier: orgId.value },
   });
 };
+
+// Reuses the same signal the left-nav flyout uses to decide whether a section
+// is reachable at all (navGroups.ts) — a route only exists on the router when
+// its feature/RBAC gate allows it, so `hasRoute` keeps this empty state from
+// ever offering a card the user has no way to actually land on.
+const showAlertsCard = computed(() => router.hasRoute("alertList"));
+const showLogsCard = computed(() => router.hasRoute("logs"));
+const showTracesCard = computed(() => router.hasRoute("traces"));
 
 const goToAlertList = () => {
   router.push({ name: "alertList", query: { org_identifier: orgId.value } });

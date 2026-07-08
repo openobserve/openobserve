@@ -12,13 +12,20 @@
       "action": "Ampliar el rango de tiempo",
       "actionDesc": "Búsqueda durante un período más largo"
     },
+    "noPatterns": {
+      "title": "No se ha encontrado ningún patrón",
+      "description": "Intente aumentar el intervalo de tiempo o seleccionar una transmisión diferente con más datos de registro. La extracción de patrones funciona mejor con al menos 1000 registros.",
+      "logsAnalyzed": "Solo se analizaron los registros de {count}."
+    },
     "noStreamSelected": {
       "title": "Selecciona una transmisión para empezar",
       "description": "Elige una transmisión y, a continuación, ejecuta la consulta para explorar sus datos. Refina los resultados con filtros y un intervalo de tiempo personalizado."
     },
     "noQueryApplied": {
       "title": "Ejecute una consulta para ver los registros",
-      "description": "Ajusta los filtros y haz clic en «Ejecutar consulta» para cargar los eventos de esta transmisión."
+      "description": "Ajusta los filtros y haz clic en «Ejecutar consulta» para cargar los eventos de esta transmisión.",
+      "action": "Ejecutar consulta",
+      "actionDesc": "Cargar eventos para los filtros seleccionados"
     },
     "noDashboards": {
       "title": "Crea tu primer panel",
@@ -80,7 +87,9 @@
       "title": "Aún no hay destinos",
       "description": "Los destinos definen dónde se envían las notificaciones de alerta: Slack, correo electrónico, webhooks y más.",
       "action": "Nuevo destino",
-      "actionDesc": "Conectar un canal de notificaciones"
+      "actionDesc": "Conectar un canal de notificaciones",
+      "import": "Destino de importación",
+      "importDesc": "Importar desde un archivo JSON"
     },
     "noPipelineDestinations": {
       "title": "Aún no hay destinos",
@@ -92,7 +101,9 @@
       "title": "Aún no hay plantillas",
       "description": "Las plantillas definen el formato de los mensajes de notificación de alerta.",
       "action": "Nueva plantilla",
-      "actionDesc": "Crear una plantilla de notificación"
+      "actionDesc": "Crear una plantilla de notificación",
+      "import": "Importar plantilla",
+      "importDesc": "Importar desde un archivo JSON"
     },
     "noEvalTemplates": {
       "title": "Aún no hay plantillas de evaluación",
@@ -142,6 +153,20 @@
       "title": "Sin trabajos de relleno",
       "description": "Los trabajos de relleno reprocesan los datos históricos a través de una canalización. Ejecute uno para empezar."
     },
+    "noRegexPatterns": {
+      "title": "Aún no hay patrones de expresiones regulares",
+      "description": "Crea un patrón reutilizable para redactar datos confidenciales o importa uno de tu biblioteca.",
+      "action": "Nuevo patrón",
+      "actionDesc": "Definir un nuevo patrón de expresiones regulares",
+      "import": "Patrón de importación",
+      "importDesc": "Reutiliza un patrón de tu biblioteca"
+    },
+    "noStorageConfig": {
+      "title": "No hay ningún depósito configurado",
+      "description": "Dirija los datos de esta organización a un depósito dedicado, independientemente de los valores predeterminados globales y de otras organizaciones.",
+      "action": "Configurar el almacenamiento",
+      "actionDesc": "Conectar un bucket de S3, GCS o Azure"
+    },
     "noPipelineHistory": {
       "title": "Aún no hay historial de oleoductos",
       "description": "El historial de ejecución de las canalizaciones aparecerá aquí una vez que las canalizaciones estén en funcionamiento."
@@ -161,10 +186,12 @@
       "actionDesc": "Escribir una nueva función VRL"
     },
     "noStreams": {
-      "title": "Esperando tus primeros datos",
-      "description": "Aún no ha llegado ningún dato. Conecta una fuente y tus transmisiones se mostrarán aquí automáticamente.",
+      "title": "Conecta una fuente para crear tu primera transmisión",
+      "description": "Las transmisiones se crean automáticamente en el momento en que llegan los datos. Configura la ingesta desde tu aplicación, agente o recopilador para empezar.",
       "action": "Configurar la ingestión",
-      "actionDesc": "Conectar una fuente de datos"
+      "actionDesc": "Conectar una fuente de datos",
+      "createAction": "Nueva transmisión",
+      "createActionDesc": "Definir manualmente un esquema de transmisión"
     },
     "noAlerts": {
       "title": "Crea tu primera alerta",
@@ -174,7 +201,7 @@
     },
     "noIncidents": {
       "title": "No hay incidentes activos",
-      "description": "Estás atrapado, nada necesita tu atención en este momento. Los incidentes desencadenados aparecerán aquí."
+      "description": "Los incidentes se crean cuando se activa una alerta; aún no se ha activado ninguno. Una vez que haya creado las alertas, los incidentes que se hayan activado aparecerán aquí."
     },
     "noLLMInsights": {
       "title": "Aún no hay actividad de LLM",
@@ -191,20 +218,24 @@
     "noScorers": {
       "title": "Aún no hay goleadores",
       "description": "Los evaluadores califican las respuestas del LLM en función de sus configuraciones de puntuación: comience con un juez de LLM o importe uno de la biblioteca.",
-      "action": "Crear anotador",
-      "actionDesc": "Defina un juez de LLM o un anotador remoto"
+      "action": "Nuevo goleador",
+      "actionDesc": "Defina un juez de LLM o un anotador remoto",
+      "import": "Importar marcador",
+      "importDesc": "Importar desde un archivo JSON"
     },
     "noEvalJobs": {
       "title": "Aún no hay trabajos de evaluación",
       "description": "Los puntajes del calendario de trabajos se comparan con un flujo de LLM. Crea uno para empezar a calificar las conversaciones siguiendo una cadencia.",
-      "action": "Crear un trabajo de evaluación",
+      "action": "Nuevo trabajo",
       "actionDesc": "Elige una transmisión + goleadores + cadencia"
     },
     "noScoreConfigs": {
       "title": "Aún no hay configuraciones de puntuación",
       "description": "Las configuraciones de puntuación definen el esquema que producen los puntuadores: numérico, booleano o categórico. Agregue uno para empezar a puntuar.",
-      "action": "Crear configuración de puntuación",
-      "actionDesc": "Defina la forma de la puntuación + el rango saludable"
+      "action": "Nueva configuración de puntuación",
+      "actionDesc": "Defina la forma de la puntuación + el rango saludable",
+      "import": "Importar configuración de puntuación",
+      "importDesc": "Importar desde un archivo JSON"
     },
     "loadError": {
       "title": "Algo salió mal",
@@ -271,6 +302,7 @@
     },
     "nouns": {
       "logs": "registros",
+      "patterns": "patrones",
       "dashboards": "tableros",
       "pipelines": "tuberías",
       "functions": "funciones",
@@ -305,7 +337,8 @@
       "scorers": "evaluadores",
       "evalJobs": "trabajos de evaluación",
       "scoreConfigs": "configuraciones de puntuación",
-      "pipelineHistory": "historial de pipelines"
+      "pipelineHistory": "historial de pipelines",
+      "regexPatterns": "patrones de expresiones regulares"
     }
   },
   "common": {
@@ -1612,6 +1645,11 @@
     "subtitle": "Administración de índices y configuración de flujos",
     "streamNameHelpText": "Utilice únicamente caracteres alfanuméricos, guiones bajos y dos puntos.",
     "search": "Buscar transmisión",
+    "emptyOr": "O:",
+    "emptyKubernetes": "Kubernetes",
+    "emptyAws": "AWS/CloudWatch",
+    "emptyLinux": "Linux",
+    "emptyWindows": "escaparates",
     "name": "Nombre",
     "docNum": "Número de documento",
     "storageSize": "Datos ingeridos",
@@ -3043,9 +3081,9 @@
     "searchAllFolders": "Todas las carpetas",
     "streamConfig": "Configuración de transmisión",
     "alertRules": "Reglas de alerta",
-    "noTemplatesMsg": "Parece que aún no has creado ninguna plantilla. Para crear una alerta, necesitarás tener al menos un destino y una plantilla",
+    "noTemplatesMsg": "Para crear una alerta, necesita al menos una plantilla y un destino. Las plantillas definen el formato del mensaje de notificación; comience por crear una.",
     "createTemplateBtn": "Crear plantilla",
-    "noDestinationsMsg": "Parece que aún no has creado ningún destino. Para crear una alerta, necesitarás tener al menos un destino y una plantilla",
+    "noDestinationsMsg": "Para crear una alerta, necesita al menos un destino y una plantilla. Los destinos definen dónde se envían las notificaciones; comience por crear una.",
     "createDestinationBtn": "Crear destino",
     "add": "Agregar alerta",
     "edit": "Editar",
@@ -5271,6 +5309,7 @@
     },
     "quality": {
       "scopeLabel": "Todas las dimensiones de calidad en este espacio de trabajo",
+      "agentPlaceholder": "Todos los agentes",
       "timeRange": {
         "label": "Intervalo de tiempo",
         "last1h": "Última hora",

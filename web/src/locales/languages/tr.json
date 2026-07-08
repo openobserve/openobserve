@@ -12,13 +12,20 @@
       "action": "Zaman aralığını genişletin",
       "actionDesc": "Daha uzun bir süre boyunca arama yapın"
     },
+    "noPatterns": {
+      "title": "Desen bulunamadı",
+      "description": "Zaman aralığını artırmayı veya daha fazla günlük verisi içeren farklı bir akış seçmeyi deneyin. Desen çıkarma en az 1.000 kütükle en iyi sonucu verir.",
+      "logsAnalyzed": "Yalnızca {count} günlükleri analiz edildi."
+    },
     "noStreamSelected": {
       "title": "Başlamak için bir yayın seçin",
       "description": "Bir akış seçin, ardından verilerini keşfetmek için sorgunuzu çalıştırın. Filtreler ve özel bir zaman aralığı ile sonuçları hassaslaştırın."
     },
     "noQueryApplied": {
       "title": "Günlükleri görmek için bir sorgu çalıştırın",
-      "description": "Filtrelerinizi ayarlayın ve bu akış için olayları yüklemek için “Sorgu çalıştır\"ı tıklayın."
+      "description": "Filtrelerinizi ayarlayın ve bu akış için olayları yüklemek için “Sorgu çalıştır\"ı tıklayın.",
+      "action": "Sorgu çalıştır",
+      "actionDesc": "Seçilen filtreler için olayları yükle"
     },
     "noDashboards": {
       "title": "İlk panonuzu oluşturun",
@@ -80,7 +87,9 @@
       "title": "Henüz destinasyon yok",
       "description": "Hedefler, uyarı bildirimlerinin nereye gönderileceğini tanımlar - Slack, e-posta, web kancaları ve daha fazlası.",
       "action": "Yeni hedef",
-      "actionDesc": "Bir bildirim kanalı bağlayın"
+      "actionDesc": "Bir bildirim kanalı bağlayın",
+      "import": "İçe aktarma hedefi",
+      "importDesc": "JSON dosyasından içe aktarma"
     },
     "noPipelineDestinations": {
       "title": "Henüz destinasyon yok",
@@ -92,7 +101,9 @@
       "title": "Henüz şablon yok",
       "description": "Şablonlar, uyarı bildirim mesajlarının biçimini tanımlar.",
       "action": "Yeni şablon",
-      "actionDesc": "Bildirim şablonu oluşturma"
+      "actionDesc": "Bildirim şablonu oluşturma",
+      "import": "Şablonu içe aktarma",
+      "importDesc": "JSON dosyasından içe aktarma"
     },
     "noEvalTemplates": {
       "title": "Henüz değerlendirme şablonu yok",
@@ -142,6 +153,20 @@
       "title": "Dolgu işi yok",
       "description": "Doldurma işleri, geçmiş verileri bir boru hattı aracılığıyla yeniden işler. Başlamak için birini çalıştırın."
     },
+    "noRegexPatterns": {
+      "title": "Henüz regex kalıpları yok",
+      "description": "Hassas verileri düzenlemek için yeniden kullanılabilir bir desen oluşturun veya kitaplığınızdan bir tane içe aktarın.",
+      "action": "Yeni desen",
+      "actionDesc": "Yeni bir normal ifade kalıbı tanımlayın",
+      "import": "İçe aktarma deseni",
+      "importDesc": "Kitaplığınızdaki bir deseni yeniden kullanma"
+    },
+    "noStorageConfig": {
+      "title": "Yapılandırılmış kova yok",
+      "description": "Bu kuruluşun verilerini, diğer organizasyonlardan ve global varsayılanlardan bağımsız olarak özel bir depoya yönlendirin.",
+      "action": "Depolamayı yapılandırın",
+      "actionDesc": "S3, GCS veya Azure klasörünü bağlama"
+    },
     "noPipelineHistory": {
       "title": "Henüz boru hattı geçmişi yok",
       "description": "Boru hatlarınız çalıştıktan sonra boru hattı yürütme geçmişi burada görünecektir."
@@ -161,10 +186,12 @@
       "actionDesc": "Yeni bir VRL işlevi yazın"
     },
     "noStreams": {
-      "title": "İlk verilerinizi bekliyorum",
-      "description": "Henüz veri gelmedi. Bir kaynak bağladığınızda yayınlarınız burada otomatik olarak görünecektir.",
+      "title": "İlk akışınızı oluşturmak için bir kaynak bağlayın",
+      "description": "Akışlar, veriler geldiği anda otomatik olarak oluşturulur. Başlamak için uygulamanızdan, aracınızdan veya toplayıcınızdan alımı ayarlayın.",
       "action": "Yutmayı ayarlayın",
-      "actionDesc": "Veri kaynağını bağlama"
+      "actionDesc": "Veri kaynağını bağlama",
+      "createAction": "Yeni yayın",
+      "createActionDesc": "Bir akış şemasını manuel olarak tanımlayın"
     },
     "noAlerts": {
       "title": "İlk uyarınızı oluşturun",
@@ -174,7 +201,7 @@
     },
     "noIncidents": {
       "title": "Aktif olay yok",
-      "description": "Hepiniz yakalandınız - şu anda hiçbir şeyin dikkatinize ihtiyacı yok. Tetiklenen olaylar burada görünecektir."
+      "description": "Olaylar, bir uyarı tetiklendiğinde oluşturulur - henüz hiçbiri ateşlenmedi. Uyarılarınız olduğunda, tetiklenen olaylar burada görünecektir."
     },
     "noLLMInsights": {
       "title": "Henüz LLM etkinliği yok",
@@ -191,20 +218,24 @@
     "noScorers": {
       "title": "Henüz golcü yok",
       "description": "Puanlar, LLM yanıtlarını puan yapılandırmalarınıza göre derecelendirir - bir LLM jüri ile başlayın veya kütüphaneden bir tane içe aktarın.",
-      "action": "Golcü oluştur",
-      "actionDesc": "Bir LLM hakimi veya uzaktan golcü tanımlayın"
+      "action": "Yeni golcü",
+      "actionDesc": "Bir LLM hakimi veya uzaktan golcü tanımlayın",
+      "import": "İthalat puanı",
+      "importDesc": "JSON dosyasından içe aktarma"
     },
     "noEvalJobs": {
       "title": "Henüz değerlendirme işi yok",
       "description": "Bir LLM akışına karşı işler skorları programlar. Bir kadans üzerinde konuşmalara not vermeye başlamak için bir tane oluşturun.",
-      "action": "Eval işi oluştur",
+      "action": "Yeni iş",
       "actionDesc": "Bir akış seçin + puanlar + kadans"
     },
     "noScoreConfigs": {
       "title": "Henüz puan yapılandırması yok",
       "description": "Puan yapılandırmaları, şema puanlarının ürettiklerini tanımlar - sayısal, boole veya kategorik. Puanlamaya başlamak için bir tane ekleyin.",
-      "action": "Puan yapılandırması oluştur",
-      "actionDesc": "Skor şeklini+sağlıklı aralığı tanımlayın"
+      "action": "Yeni puan yapılandırması",
+      "actionDesc": "Skor şeklini+sağlıklı aralığı tanımlayın",
+      "import": "Puan yapılandırmasını içe aktarma",
+      "importDesc": "JSON dosyasından içe aktarma"
     },
     "loadError": {
       "title": "Bir şeyler ters gitti",
@@ -271,6 +302,7 @@
     },
     "nouns": {
       "logs": "günlükler",
+      "patterns": "desenler",
       "dashboards": "gösterge tabloları",
       "pipelines": "boru hatları",
       "functions": "işlevleri",
@@ -305,7 +337,8 @@
       "scorers": "puanlayıcılar",
       "evalJobs": "değerlendirme işleri",
       "scoreConfigs": "puan yapılandırmaları",
-      "pipelineHistory": "pipeline geçmişi"
+      "pipelineHistory": "pipeline geçmişi",
+      "regexPatterns": "regex desenleri"
     }
   },
   "common": {
@@ -1612,6 +1645,11 @@
     "subtitle": "Dizin yönetimi ve akış yapılandırması",
     "streamNameHelpText": "Yalnızca alfanümerik karakterler, alt çizgi ve iki nokta üst üste nokta kullanın.",
     "search": "Arama Akışı",
+    "emptyOr": "Veya:",
+    "emptyKubernetes": "Kubernetes",
+    "emptyAws": "AWS/CloudWatch",
+    "emptyLinux": "Linux",
+    "emptyWindows": "Windows",
     "name": "İsim",
     "docNum": "Doktor Numarası",
     "storageSize": "Alınan Veriler",
@@ -3043,9 +3081,9 @@
     "searchAllFolders": "Tüm klasörler",
     "streamConfig": "Akış Yapılandırması",
     "alertRules": "Uyarı Kuralları",
-    "noTemplatesMsg": "Henüz herhangi bir Şablon oluşturmadınız gibi görünüyor. Uyarı oluşturmak için en az bir Hedef ve bir Şablon bulundurmanız gerekir",
+    "noTemplatesMsg": "Bir uyarı oluşturmak için en az bir şablona ve bir hedefe ihtiyacınız vardır. Şablonlar bildirim mesajının biçimini tanımlar - bir tane oluşturarak başlayın.",
     "createTemplateBtn": "Şablon Oluştur",
-    "noDestinationsMsg": "Görünüşe göre henüz herhangi bir Hedef oluşturmadınız. Uyarı oluşturmak için en az bir Hedef ve bir Şablon bulundurmanız gerekir",
+    "noDestinationsMsg": "Bir uyarı oluşturmak için en az bir hedef ve bir şablona ihtiyacınız vardır. Hedefler bildirimlerin nereye gönderileceğini tanımlar - bir tane oluşturarak başlayın.",
     "createDestinationBtn": "Hedef Oluştur",
     "add": "Uyarı ekle",
     "edit": "Düzenle",
@@ -5271,6 +5309,7 @@
     },
     "quality": {
       "scopeLabel": "Bu çalışma alanındaki tüm kalite boyutları",
+      "agentPlaceholder": "Tüm acenteler",
       "timeRange": {
         "label": "Zaman aralığı",
         "last1h": "Son 1 saat",

@@ -12,13 +12,20 @@
       "action": "Amplia l'intervallo di tempo",
       "actionDesc": "Ricerca su un periodo più lungo"
     },
+    "noPatterns": {
+      "title": "Nessun modello trovato",
+      "description": "Prova ad aumentare l'intervallo di tempo o a selezionare un flusso diverso con più dati di registro. L'estrazione dei pattern funziona meglio con almeno 1.000 log.",
+      "logsAnalyzed": "Sono stati analizzati solo {count} log."
+    },
     "noStreamSelected": {
       "title": "Seleziona uno stream per iniziare",
       "description": "Scegli uno stream, quindi esegui la query per esplorarne i dati. Perfeziona i risultati con filtri e un intervallo di tempo personalizzato."
     },
     "noQueryApplied": {
       "title": "Esegui una query per visualizzare i log",
-      "description": "Modifica i filtri e fai clic su «Esegui query» per caricare gli eventi per questo stream."
+      "description": "Modifica i filtri e fai clic su «Esegui query» per caricare gli eventi per questo stream.",
+      "action": "Esegui interrogazione",
+      "actionDesc": "Carica eventi per i filtri selezionati"
     },
     "noDashboards": {
       "title": "Crea la tua prima dashboard",
@@ -80,7 +87,9 @@
       "title": "Ancora nessuna destinazione",
       "description": "Le destinazioni definiscono dove vengono inviate le notifiche di avviso: Slack, email, webhook e altro ancora.",
       "action": "Nuova destinazione",
-      "actionDesc": "Connetti un canale di notifica"
+      "actionDesc": "Connetti un canale di notifica",
+      "import": "Destinazione dell'importazione",
+      "importDesc": "Importazione da un file JSON"
     },
     "noPipelineDestinations": {
       "title": "Ancora nessuna destinazione",
@@ -92,7 +101,9 @@
       "title": "Non ci sono ancora template",
       "description": "I template definiscono il formato dei messaggi di notifica degli avvisi.",
       "action": "Nuovo template",
-      "actionDesc": "Creare un template di notifica"
+      "actionDesc": "Creare un template di notifica",
+      "import": "Modello di importazione",
+      "importDesc": "Importazione da un file JSON"
     },
     "noEvalTemplates": {
       "title": "Non sono ancora disponibili template di valutazione",
@@ -142,6 +153,20 @@
       "title": "Nessun lavoro di backfill",
       "description": "I lavori di backfill rielaborano i dati storici tramite una pipeline. Eseguine uno per iniziare."
     },
+    "noRegexPatterns": {
+      "title": "Non ci sono ancora modelli regex",
+      "description": "Crea un pattern riutilizzabile per oscurare i dati sensibili o importane uno dalla tua libreria.",
+      "action": "Nuovo modello",
+      "actionDesc": "Definire un nuovo modello regex",
+      "import": "Modello di importazione",
+      "importDesc": "Riutilizza un pattern dalla tua libreria"
+    },
+    "noStorageConfig": {
+      "title": "Nessun bucket configurato",
+      "description": "Indirizza i dati di questa organizzazione a un bucket dedicato, indipendentemente dalle altre organizzazioni e dalle impostazioni predefinite globali.",
+      "action": "Configurazione dello storage",
+      "actionDesc": "Connetti un bucket S3, GCS o Azure"
+    },
     "noPipelineHistory": {
       "title": "Ancora nessuna cronologia delle pipeline",
       "description": "La cronologia delle esecuzioni delle pipeline verrà visualizzata qui una volta eseguite le pipeline."
@@ -161,10 +186,12 @@
       "actionDesc": "Scrivere una nuova funzione VRL"
     },
     "noStreams": {
-      "title": "Aspettando i tuoi primi dati",
-      "description": "Non sono ancora arrivati dati. Collega una fonte e i tuoi stream verranno visualizzati qui automaticamente.",
+      "title": "Collega una fonte per creare il tuo primo stream",
+      "description": "Gli stream vengono creati automaticamente nel momento in cui arrivano i dati. Configura l'inserimento dalla tua app, agente o raccoglitore per iniziare.",
       "action": "Configurare l'ingestione",
-      "actionDesc": "Connetti una fonte di dati"
+      "actionDesc": "Connetti una fonte di dati",
+      "createAction": "Nuovo stream",
+      "createActionDesc": "Definire manualmente uno schema di flusso"
     },
     "noAlerts": {
       "title": "Crea il tuo primo avviso",
@@ -174,7 +201,7 @@
     },
     "noIncidents": {
       "title": "Nessun incidente attivo",
-      "description": "Siete tutti presi, niente ha bisogno della vostra attenzione in questo momento. Gli incidenti attivati verranno visualizzati qui."
+      "description": "Gli incidenti vengono creati quando si attiva un avviso: nessuno è ancora stato attivato. Una volta inseriti gli avvisi, tutti gli incidenti attivati verranno visualizzati qui."
     },
     "noLLMInsights": {
       "title": "Nessuna attività LLM ancora",
@@ -191,20 +218,24 @@
     "noScorers": {
       "title": "Ancora nessun marcatore",
       "description": "I valutatori valutano le risposte LLM in base alle tue configurazioni di punteggio: inizia con un giudice LLM o importane uno dalla libreria.",
-      "action": "Crea segnapunti",
-      "actionDesc": "Definire un giudice LLM o un marcatore remoto"
+      "action": "Nuovo marcatore",
+      "actionDesc": "Definire un giudice LLM o un marcatore remoto",
+      "import": "Importa segnapunti",
+      "importDesc": "Importazione da un file JSON"
     },
     "noEvalJobs": {
       "title": "Non ci sono ancora lavori di valutazione",
       "description": "I punteggi dei job pianificano i punteggi in base a uno stream LLM. Creane uno per iniziare a valutare le conversazioni in base a una cadenza.",
-      "action": "Crea un job di valutazione",
+      "action": "Nuovo lavoro",
       "actionDesc": "Scegli uno stream + marcatori + cadenza"
     },
     "noScoreConfigs": {
       "title": "Nessuna configurazione del punteggio ancora",
       "description": "Le configurazioni dei punteggi definiscono lo schema prodotto dai puntatori: numerico, booleano o categorico. Aggiungine uno per iniziare a segnare.",
-      "action": "Crea configurazione della partitura",
-      "actionDesc": "Definisci la forma del punteggio + un intervallo sano"
+      "action": "Nuova configurazione della partitura",
+      "actionDesc": "Definisci la forma del punteggio + un intervallo sano",
+      "import": "Configurazione del punteggio di importazione",
+      "importDesc": "Importazione da un file JSON"
     },
     "loadError": {
       "title": "Qualcosa è andato storto",
@@ -271,6 +302,7 @@
     },
     "nouns": {
       "logs": "log",
+      "patterns": "modelli",
       "dashboards": "dashboard",
       "pipelines": "pipeline",
       "functions": "funzioni",
@@ -305,7 +337,8 @@
       "scorers": "scorer",
       "evalJobs": "processi di valutazione",
       "scoreConfigs": "configurazioni di punteggio",
-      "pipelineHistory": "cronologia della pipeline"
+      "pipelineHistory": "cronologia della pipeline",
+      "regexPatterns": "modelli regex"
     }
   },
   "common": {
@@ -1612,6 +1645,11 @@
     "subtitle": "Gestione degli indici e configurazione dello stream",
     "streamNameHelpText": "Usa solo caratteri alfanumerici, trattini bassi e due punti.",
     "search": "Stream di ricerca",
+    "emptyOr": "Oppure:",
+    "emptyKubernetes": "Kubernetes",
+    "emptyAws": "AWS/CloudWatch",
+    "emptyLinux": "Linux",
+    "emptyWindows": "finestre",
     "name": "Nome",
     "docNum": "Doctor Num",
     "storageSize": "Dati ingeriti",
@@ -3043,9 +3081,9 @@
     "searchAllFolders": "Tutte le cartelle",
     "streamConfig": "Configurazione dello streaming",
     "alertRules": "Regole di avviso",
-    "noTemplatesMsg": "Sembra che tu non abbia ancora creato alcun template. Per creare un avviso, devi disporre di almeno una destinazione e un template",
+    "noTemplatesMsg": "Per creare un avviso sono necessari almeno un modello e una destinazione. I modelli definiscono il formato del messaggio di notifica: inizia con la creazione di uno.",
     "createTemplateBtn": "Crea template",
-    "noDestinationsMsg": "Sembra che tu non abbia ancora creato alcuna destinazione. Per creare un avviso, devi disporre di almeno una destinazione e un template",
+    "noDestinationsMsg": "Per creare un avviso sono necessari almeno una destinazione e un modello. Le destinazioni definiscono dove vengono inviate le notifiche: inizia con la creazione di una.",
     "createDestinationBtn": "Crea destinazione",
     "add": "Aggiungi avviso",
     "edit": "Modifica",
@@ -5271,6 +5309,7 @@
     },
     "quality": {
       "scopeLabel": "Tutte le dimensioni di qualità in questo spazio di lavoro",
+      "agentPlaceholder": "Tutti gli agenti",
       "timeRange": {
         "label": "Intervallo di tempo",
         "last1h": "Ultima 1 ora",
