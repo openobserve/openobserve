@@ -35,7 +35,11 @@ pub async fn blocked_orgs_middleware(request: Request, next: Next) -> Response {
         && crate::service::db::org_status::is_blocked(org_id)
     {
         use axum::{http::StatusCode, response::IntoResponse};
-        return (StatusCode::FORBIDDEN, "Organization is being deleted").into_response();
+        // "deleted", not "being deleted": this gate also covers the soft-delete
+        // (pending_deletion) grace window, during which the org is invisible and
+        // inaccessible to the end user — to them it is simply deleted, even though
+        // we retain the data for the recovery window.
+        return (StatusCode::FORBIDDEN, "Organization is deleted").into_response();
     }
 
     #[cfg(feature = "cloud")]

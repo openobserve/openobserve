@@ -1313,10 +1313,11 @@ pub async fn resurrect_org_deletion(
     Headers(user_email): Headers<UserEmail>,
     Path((meta_org, target_org_id)): Path<(String, String)>,
 ) -> Response {
+    // Access is enforced by the route middleware: this endpoint requires the
+    // `organizations:CREATE` permission in `_meta` (see route_permissions.rs), so a
+    // delegated _meta admin can resurrect without being root. We keep the `_meta`
+    // context check as defense-in-depth (this action only makes sense from _meta).
     if meta_org != "_meta" {
-        return MetaHttpResponse::forbidden("Not allowed");
-    }
-    if !is_root_user(user_email.user_id.as_str()) {
         return MetaHttpResponse::forbidden("Not allowed");
     }
     match crate::service::org_cleanup::resurrect_org(&target_org_id, &user_email.user_id).await {
@@ -1334,13 +1335,13 @@ pub async fn resurrect_org_deletion(
 
 /// ListOrgCleanupTasks - admin endpoint to inspect cleanup task state for an org
 pub async fn list_org_cleanup_tasks(
-    Headers(user_email): Headers<UserEmail>,
     Path((meta_org, target_org_id)): Path<(String, String)>,
 ) -> Response {
+    // Access is enforced by the route middleware: this endpoint requires the
+    // `organizations:LIST` permission in `_meta` (see route_permissions.rs), so a
+    // delegated _meta admin can inspect deletion progress without being root. We keep
+    // the `_meta` context check as defense-in-depth.
     if meta_org != "_meta" {
-        return MetaHttpResponse::forbidden("Not allowed");
-    }
-    if !is_root_user(user_email.user_id.as_str()) {
         return MetaHttpResponse::forbidden("Not allowed");
     }
     match infra::table::org_cleanup_tasks::list_by_org_status(&target_org_id, None).await {

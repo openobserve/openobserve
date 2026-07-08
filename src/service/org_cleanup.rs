@@ -18,7 +18,11 @@ use infra::{dist_lock, table::org_cleanup_tasks};
 
 const LOCK_KEY: &str = "/org_cleanup/worker_lock";
 const MAX_ATTEMPTS: i32 = 10;
-const POLL_INTERVAL_SECS: u64 = 30;
+/// How often the cleanup worker wakes to drain pending tasks, and how often the
+/// promotion scheduler checks for soft-deleted orgs whose grace window elapsed.
+/// One hour: org deletion is not latency-sensitive, and a shorter cadence just
+/// adds DB polling churn across every compactor node.
+const POLL_INTERVAL_SECS: u64 = 3600;
 
 const ORDER_DELETE_STREAMS: i32 = 100;
 const ORDER_DELETE_STREAM_ITEM: i32 = 150;
@@ -26,8 +30,7 @@ const ORDER_DELETE_FILE_LIST: i32 = 200;
 const ORDER_DELETE_DB_RESOURCES: i32 = 300;
 const ORDER_DELETE_SCHEDULER_TRIGGERS: i32 = 400;
 const ORDER_DELETE_USERS: i32 = 600;
-const ORDER_DELETE_OFGA: i32 = 700;
-const ORDER_DELETE_CLOUD_BILLING: i32 = 800;
+// Final step: remove the org record + OFGA tuples via the canonical delete path.
 const ORDER_DELETE_ORG_RECORD: i32 = 900;
 
 /// Grace-period length in days. Enterprise config; OSS builds have no grace period
@@ -46,14 +49,17 @@ pub fn grace_period_days() -> i64 {
 }
 
 pub fn fixed_steps(org_id: &str, org_name: &str) -> Vec<org_cleanup_tasks::NewCleanupTask> {
+    // NOTE: OFGA tuples + the org record are removed together in the final
+    // `delete_org_record` step, which calls the same `remove_org` service fn the
+    // delete API uses — so both paths stay in lockstep (OFGA cleanup, super-cluster
+    // propagation, cloud OrgDeleted event). Billing is NOT a cleanup step: deletion
+    // is refused up-front unless the org is already billing-free (see initiate_deletion).
     vec![
         ("delete_streams", ORDER_DELETE_STREAMS),
         ("delete_file_list", ORDER_DELETE_FILE_LIST),
         ("delete_db_resources", ORDER_DELETE_DB_RESOURCES),
         ("delete_scheduler_triggers", ORDER_DELETE_SCHEDULER_TRIGGERS),
         ("delete_users", ORDER_DELETE_USERS),
-        ("delete_ofga", ORDER_DELETE_OFGA),
-        ("delete_cloud_billing", ORDER_DELETE_CLOUD_BILLING),
         ("delete_org_record", ORDER_DELETE_ORG_RECORD),
     ]
     .into_iter()
@@ -234,10 +240,6 @@ async fn execute_step(org_id: &str, org_name: &str, step: &str) -> Result<(), an
         step_delete_scheduler_triggers(org_id).await
     } else if step == "delete_users" {
         step_delete_users(org_id).await
-    } else if step == "delete_ofga" {
-        step_delete_ofga(org_id).await
-    } else if step == "delete_cloud_billing" {
-        step_delete_cloud_billing(org_id).await
     } else if step == "delete_org_record" {
         step_delete_org_record(org_id).await
     } else {
@@ -310,9 +312,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     use infra::table::{
         action_scripts, alert_incidents, alerts, backfill_jobs, cipher, compactor_manual_jobs,
         dashboards, destinations, distinct_values, enrichment_table_urls, enrichment_tables,
-        folders, incident_events, kv_store, org_storage_providers, re_pattern,
-        re_pattern_stream_map, reports, search_queue, service_streams, short_urls, system_settings,
-        templates, timed_annotations, trial_quota_usage,
+        folders, incident_events, kv_store, org_ingestion_tokens, org_storage_providers,
+        re_pattern, re_pattern_stream_map, reports, search_queue, service_streams, short_urls,
+        system_settings, templates, timed_annotations, trial_quota_usage,
     };
 
     // FK-constrained children must be deleted before their parents.
@@ -388,6 +390,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     trial_quota_usage::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/trial_quota_usage: {e}"))?;
+    org_ingestion_tokens::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_ingestion_tokens: {e}"))?;
     service_streams::delete_all(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams: {e}"))?;
@@ -502,46 +507,6 @@ async fn step_delete_users(org_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn step_delete_ofga(org_id: &str) -> Result<(), anyhow::Error> {
-    #[cfg(feature = "enterprise")]
-    {
-        o2_openfga::authorizer::authz::delete_org_tuples(org_id)
-            .await
-            .map_err(|e| anyhow::anyhow!("delete_org_tuples failed: {e}"))?;
-    }
-    #[cfg(not(feature = "enterprise"))]
-    let _ = org_id;
-    Ok(())
-}
-
-async fn step_delete_cloud_billing(org_id: &str) -> Result<(), anyhow::Error> {
-    #[cfg(feature = "cloud")]
-    {
-        use o2_enterprise::enterprise::cloud::{
-            billing_group, billing_invites, billings::cancel_org_subscription, customer_billings,
-            org_invites,
-        };
-
-        // 1. Cancel Stripe subscription
-        cancel_org_subscription(org_id).await?;
-
-        // 2. Delete customer billing records
-        customer_billings::delete_by_org_id(org_id).await?;
-
-        // 3. Remove billing group memberships (payer and member sides)
-        billing_group::delete_org_billing_group_memberships(org_id).await?;
-
-        // 4. Delete billing group invites (sent and received)
-        billing_invites::delete_org_billing_group_invites(org_id).await?;
-
-        // 5. Delete pending org user invites
-        org_invites::delete_all_org_invites(org_id).await?;
-    }
-    #[cfg(not(feature = "cloud"))]
-    let _ = org_id;
-    Ok(())
-}
-
 /// Emit an audit entry to the _meta org for an org status transition.
 /// Fire-and-forget; never blocks the transition. Enterprise-only.
 async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
@@ -574,10 +539,36 @@ async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
 pub async fn initiate_deletion(org_id: &str, initiated_by: &str) -> Result<(), anyhow::Error> {
     use crate::service::db::org_status;
 
+    // The `default` and `_meta` orgs are system orgs and must never be deleted.
+    // Guard here, at the single entry point, BEFORE any status mutation — otherwise
+    // the org would be flipped to deleting/pending, blocked+hidden, and then the
+    // terminal `remove_org` step would permanently fail on its own `default` guard,
+    // leaving the org stuck in `deleting` forever.
+    if org_id == crate::common::meta::organization::DEFAULT_ORG || org_id == config::META_ORG_ID {
+        return Err(anyhow::anyhow!("Cannot delete this organization"));
+    }
+
     // Look up org — also gives us org_name for the cleanup tasks.
     let org = infra::table::organizations::get(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("org not found: {e}"))?;
+
+    // Refuse deletion while billing is still active. The user must unsubscribe
+    // first (and have that reflected in O2) — we do NOT self-cancel, because AWS
+    // and Azure marketplace subscriptions can only be cancelled by the customer,
+    // and super-org payer relationships must be unwound by the user. This makes
+    // "org is billing-free" a visible precondition instead of a silent side effect.
+    #[cfg(feature = "cloud")]
+    {
+        if o2_enterprise::enterprise::cloud::billings::org_has_active_billing(org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("failed to check billing status: {e}"))?
+        {
+            return Err(anyhow::anyhow!(
+                "Organization has an active subscription. Please cancel your subscription before deleting this organization."
+            ));
+        }
+    }
 
     let grace_days = grace_period_days();
 
@@ -627,9 +618,11 @@ pub async fn initiate_deletion(org_id: &str, initiated_by: &str) -> Result<(), a
 }
 
 async fn step_delete_org_record(org_id: &str) -> Result<(), anyhow::Error> {
-    infra::table::organizations::remove(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    // Reuse the canonical org-delete service fn — the SAME one the delete API
+    // calls — so OFGA tuple cleanup, super-cluster propagation, and the cloud
+    // OrgDeleted event all happen exactly as they do for a direct delete. If the
+    // delete handler ever grows a new side effect, this path inherits it for free.
+    crate::service::organization::remove_org(org_id).await?;
     let _ = infra::table::org_cleanup_tasks::delete_by_org(org_id).await;
     crate::service::db::org_status::evict(org_id).await?;
     emit_status_audit(org_id, "system", "deleting", "gone").await;
@@ -728,7 +721,7 @@ pub async fn promote_expired() -> Result<usize, anyhow::Error> {
     Ok(promoted)
 }
 
-/// Background job: every 5 min, promote expired pending_deletion orgs.
+/// Background job: hourly, promote expired pending_deletion orgs to `deleting`.
 pub async fn run_promotion_scheduler() -> Result<(), anyhow::Error> {
     spawn_pausable_job!("org_deletion_promotion", POLL_INTERVAL_SECS, {
         match promote_expired().await {
@@ -752,7 +745,7 @@ mod tests {
     #[test]
     fn test_fixed_steps_count() {
         let steps = fixed_steps("myorg", "My Org");
-        assert_eq!(steps.len(), 8);
+        assert_eq!(steps.len(), 6);
     }
 
     #[test]
@@ -792,12 +785,32 @@ mod tests {
             "delete_db_resources",
             "delete_scheduler_triggers",
             "delete_users",
-            "delete_ofga",
-            "delete_cloud_billing",
             "delete_org_record",
         ] {
             assert!(names.contains(expected), "missing step: {expected}");
         }
+    }
+
+    #[test]
+    fn test_fixed_steps_excludes_billing_and_standalone_ofga() {
+        // Billing is a pre-deletion precondition (initiate_deletion refuses if
+        // billing is active), NOT a cleanup step. OFGA tuple removal is folded into
+        // the final delete_org_record step (via remove_org), not a separate step.
+        let steps = fixed_steps("org", "Org");
+        let names: Vec<&str> = steps.iter().map(|s| s.step.as_str()).collect();
+        assert!(!names.contains(&"delete_cloud_billing"));
+        assert!(!names.contains(&"delete_ofga"));
+    }
+
+    #[test]
+    fn test_fixed_steps_terminal_is_org_record() {
+        // The org record (which also removes OFGA tuples) must be the LAST step.
+        let steps = fixed_steps("org", "Org");
+        let last = steps
+            .iter()
+            .max_by_key(|s| s.step_order)
+            .expect("non-empty");
+        assert_eq!(last.step, "delete_org_record");
     }
 
     #[test]
@@ -807,9 +820,8 @@ mod tests {
         assert!(ORDER_DELETE_FILE_LIST < ORDER_DELETE_DB_RESOURCES);
         assert!(ORDER_DELETE_DB_RESOURCES < ORDER_DELETE_SCHEDULER_TRIGGERS);
         assert!(ORDER_DELETE_SCHEDULER_TRIGGERS < ORDER_DELETE_USERS);
-        assert!(ORDER_DELETE_USERS < ORDER_DELETE_OFGA);
-        assert!(ORDER_DELETE_OFGA < ORDER_DELETE_CLOUD_BILLING);
-        assert!(ORDER_DELETE_CLOUD_BILLING < ORDER_DELETE_ORG_RECORD);
+        // delete_org_record (OFGA + org record + billing-free precondition) runs last.
+        assert!(ORDER_DELETE_USERS < ORDER_DELETE_ORG_RECORD);
     }
 
     #[cfg(feature = "enterprise")]
@@ -869,6 +881,23 @@ mod tests {
         }
         let r = promote_expired().await;
         assert!(r.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_initiate_deletion_refuses_system_orgs() {
+        // `default` and `_meta` must never be deletable — the guard rejects before
+        // any status mutation, so this holds even without a DB.
+        for sys_org in [
+            crate::common::meta::organization::DEFAULT_ORG,
+            config::META_ORG_ID,
+        ] {
+            let r = initiate_deletion(sys_org, "test@example.com").await;
+            assert!(r.is_err(), "{sys_org} must not be deletable");
+            assert!(
+                r.unwrap_err().to_string().contains("Cannot delete"),
+                "{sys_org} rejection should be the system-org guard"
+            );
+        }
     }
 
     #[tokio::test]

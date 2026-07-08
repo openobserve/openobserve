@@ -15,31 +15,38 @@
 
 use crate::errors::Error;
 
-pub const ORG_DELETING_KEY_PREFIX: &str = "/organization/status/deleting/";
-pub const ORG_PENDING_KEY_PREFIX: &str = "/organization/status/pending/";
-pub const ORG_EVICT_KEY_PREFIX: &str = "/organization/status/evict/";
+/// Single watched prefix for all org status changes. The new status is carried in
+/// the event VALUE ("deleting" / "pending_deletion"); a Delete event on this key
+/// means "evict" (org is active/gone). Watchers switch on the value rather than
+/// having to subscribe to a separate prefix per status.
+pub const ORG_STATUS_KEY_PREFIX: &str = "/organization/status/";
+
+/// Status values carried in the coordinator event value.
+pub const STATUS_DELETING: &str = "deleting";
+pub const STATUS_PENDING_DELETION: &str = "pending_deletion";
 
 /// Sends a coordinator event indicating that an org has been marked for deletion.
 pub async fn emit_deleting_event(org_id: &str) -> Result<(), Error> {
-    let coordinator = super::get_coordinator().await;
-    let key = format!("{ORG_DELETING_KEY_PREFIX}{org_id}");
-    coordinator
-        .put(&key, bytes::Bytes::from(""), true, None)
-        .await
+    emit_status_event(org_id, STATUS_DELETING).await
 }
 
 /// Sends a coordinator event indicating that an org has entered pending_deletion (soft delete).
 pub async fn emit_pending_event(org_id: &str) -> Result<(), Error> {
+    emit_status_event(org_id, STATUS_PENDING_DELETION).await
+}
+
+async fn emit_status_event(org_id: &str, status: &str) -> Result<(), Error> {
     let coordinator = super::get_coordinator().await;
-    let key = format!("{ORG_PENDING_KEY_PREFIX}{org_id}");
+    let key = format!("{ORG_STATUS_KEY_PREFIX}{org_id}");
     coordinator
-        .put(&key, bytes::Bytes::from(""), true, None)
+        .put(&key, bytes::Bytes::from(status.to_string()), true, None)
         .await
 }
 
 /// Sends a coordinator event to evict an org from the status cache on all nodes.
+/// Modeled as a Delete on the org's status key (no status = not blocked).
 pub async fn emit_evict_event(org_id: &str) -> Result<(), Error> {
     let coordinator = super::get_coordinator().await;
-    let key = format!("{ORG_EVICT_KEY_PREFIX}{org_id}");
+    let key = format!("{ORG_STATUS_KEY_PREFIX}{org_id}");
     coordinator.delete(&key, false, true, None).await
 }

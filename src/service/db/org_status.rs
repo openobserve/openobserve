@@ -93,67 +93,64 @@ pub async fn load_from_db() -> Result<(), anyhow::Error> {
 }
 
 /// Watch coordinator events for org status changes and keep the local cache in sync.
+///
+/// A single watched prefix carries every status transition: a `Put` on
+/// `/organization/status/{org}` with value "deleting" / "pending_deletion"
+/// updates the cache; a `Delete` on that key evicts the org (active/gone).
 pub async fn watch() -> Result<(), anyhow::Error> {
     use infra::coordinator::org_status::{
-        ORG_DELETING_KEY_PREFIX, ORG_EVICT_KEY_PREFIX, ORG_PENDING_KEY_PREFIX,
+        ORG_STATUS_KEY_PREFIX, STATUS_DELETING, STATUS_PENDING_DELETION,
     };
 
     let cluster_coordinator = db::get_coordinator().await;
-    let mut deleting_events = cluster_coordinator.watch(ORG_DELETING_KEY_PREFIX).await?;
-    let mut pending_events = cluster_coordinator.watch(ORG_PENDING_KEY_PREFIX).await?;
-    let mut evict_events = cluster_coordinator.watch(ORG_EVICT_KEY_PREFIX).await?;
-
-    let deleting_events = Arc::get_mut(&mut deleting_events).unwrap();
-    let pending_events = Arc::get_mut(&mut pending_events).unwrap();
-    let evict_events = Arc::get_mut(&mut evict_events).unwrap();
+    let mut events = cluster_coordinator.watch(ORG_STATUS_KEY_PREFIX).await?;
+    let events = Arc::get_mut(&mut events).unwrap();
 
     log::info!("Start watching org status events");
     loop {
-        tokio::select! {
-            ev = deleting_events.recv() => {
-                match ev {
-                    Some(db::Event::Put(ev)) => {
-                        if let Some(org_id) = ev.key.strip_prefix(ORG_DELETING_KEY_PREFIX) {
-                            ORG_STATUS_CACHE.insert(org_id.to_string(), OrgStatus::Deleting);
-                            log::info!("[org_status] org {org_id} marked deleting in cache");
+        match events.recv().await {
+            Some(db::Event::Put(ev)) => {
+                let Some(org_id) = ev.key.strip_prefix(ORG_STATUS_KEY_PREFIX) else {
+                    continue;
+                };
+                // Prefer the inline event value; fall back to the DB (source of
+                // truth) if a coordinator backend delivers no value inline.
+                let status = match ev.value.as_ref() {
+                    Some(v) => String::from_utf8_lossy(v).to_string(),
+                    None => match organizations::get(org_id).await {
+                        Ok(org) => org.status,
+                        Err(e) => {
+                            log::error!("[org_status] cannot resolve status for {org_id}: {e}");
+                            continue;
                         }
+                    },
+                };
+                match status.as_str() {
+                    STATUS_DELETING => {
+                        ORG_STATUS_CACHE.insert(org_id.to_string(), OrgStatus::Deleting);
+                        log::info!("[org_status] org {org_id} marked deleting in cache");
                     }
-                    None => {
-                        log::error!("watch_org_status: deleting event channel closed");
-                        return Ok(());
+                    STATUS_PENDING_DELETION => {
+                        ORG_STATUS_CACHE.insert(org_id.to_string(), OrgStatus::PendingDeletion);
+                        log::info!("[org_status] org {org_id} marked pending_deletion in cache");
                     }
-                    _ => {}
+                    other => {
+                        // Any other status (e.g. "active") means no longer blocked.
+                        ORG_STATUS_CACHE.remove(org_id);
+                        log::info!("[org_status] org {org_id} status={other}, cleared from cache");
+                    }
                 }
             }
-            ev = pending_events.recv() => {
-                match ev {
-                    Some(db::Event::Put(ev)) => {
-                        if let Some(org_id) = ev.key.strip_prefix(ORG_PENDING_KEY_PREFIX) {
-                            ORG_STATUS_CACHE.insert(org_id.to_string(), OrgStatus::PendingDeletion);
-                            log::info!("[org_status] org {org_id} marked pending_deletion in cache");
-                        }
-                    }
-                    None => {
-                        log::error!("watch_org_status: pending event channel closed");
-                        return Ok(());
-                    }
-                    _ => {}
+            Some(db::Event::Delete(ev)) => {
+                if let Some(org_id) = ev.key.strip_prefix(ORG_STATUS_KEY_PREFIX) {
+                    ORG_STATUS_CACHE.remove(org_id);
+                    log::info!("[org_status] org {org_id} evicted from cache");
                 }
             }
-            ev = evict_events.recv() => {
-                match ev {
-                    Some(db::Event::Delete(ev)) => {
-                        if let Some(org_id) = ev.key.strip_prefix(ORG_EVICT_KEY_PREFIX) {
-                            ORG_STATUS_CACHE.remove(org_id);
-                            log::info!("[org_status] org {org_id} evicted from cache");
-                        }
-                    }
-                    None => {
-                        log::error!("watch_org_status: evict event channel closed");
-                        return Ok(());
-                    }
-                    _ => {}
-                }
+            Some(db::Event::Empty) => {}
+            None => {
+                log::error!("watch_org_status: event channel closed");
+                return Ok(());
             }
         }
     }
