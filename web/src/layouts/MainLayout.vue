@@ -205,6 +205,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useShortcut } from "@/lib/vue-shortcut-manager";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -953,6 +954,12 @@ export default defineComponent({
             orgSettings?.data?.data?.org_storage_enabled ??
             defaultSettings.org_storage_enabled,
         });
+
+        // Load the org's home dashboard (settings/v2 KV) alongside the legacy org
+        // settings so it's available on boot and every org switch.
+        await useHomeDashboard().load(
+          store.state?.selectedOrganization?.identifier,
+        );
 
         if (
           orgSettings?.data?.data?.free_trial_expiry != null &&

@@ -57,9 +57,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="tab in tabOrder"
               :key="tab.id"
               :name="tab.id"
-              :label="tab.label"
               :data-test="`home-tab-${tab.id}`"
-            />
+            >
+              <span class="o-tab__label truncate">{{ tab.label }}</span>
+              <button
+                v-if="tab.id.startsWith('dash:')"
+                type="button"
+                class="home-tab-close q-ml-xs"
+                :data-test="`home-tab-close-${tab.id}`"
+                :aria-label="t('home.removeHomeDashboard')"
+                :title="t('home.removeHomeDashboard')"
+                @mousedown.stop.prevent
+                @pointerdown.stop.prevent
+                @click.stop.prevent="onCloseTab(tab.id)"
+              >
+                &times;
+              </button>
+            </OTab>
           </OTabs>
         </template>
       </AppPageHeader>
@@ -91,6 +105,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="activeHomeTab === 'usage'" class="flex-1 min-h-0 overflow-hidden -mr-2.5">
           <UsageTab />
         </div>
+
+        <!-- Pinned dashboard tab -->
+        <div
+          v-else-if="activeHomeTab.startsWith('dash:')"
+          class="flex-1 min-h-0 overflow-hidden"
+        >
+          <PinnedDashboardTab
+            :key="activeHomeTab"
+            :dashboard-id="parsePinnedTabId(activeHomeTab).dashboardId"
+            :folder-id="parsePinnedTabId(activeHomeTab).folderId"
+            @update-label="(l) => onPinnedLabel(parsePinnedTabId(activeHomeTab).dashboardId, l)"
+            @unavailable="onPinnedUnavailable"
+          />
+        </div>
       </div>
     </div>
   </div>
@@ -115,6 +143,8 @@ import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PinnedDashboardTab from "@/views/PinnedDashboardTab.vue";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 export default defineComponent({
   name: "PageHome",
@@ -128,8 +158,11 @@ export default defineComponent({
     const isEnterpriseOrCloud =
       config.isEnterprise === "true" || config.isCloud === "true";
 
+    const { homeDashboard, clearHomeDashboard, updateLabel } =
+      useHomeDashboard();
+
     const DEFAULT_TABS = computed(() => {
-      const tabs: { id: string; label: string }[] = [];
+      const tabs: { id: string; label: string; closable?: boolean }[] = [];
       if (isEnterpriseOrCloud && store.state.zoConfig.ai_enabled) {
         tabs.push({ id: "ai", label: t("home.tabAiAssistant") });
       }
@@ -137,8 +170,45 @@ export default defineComponent({
         tabs.push({ id: "overview", label: t("home.tabOverview") });
       }
       tabs.push({ id: "usage", label: t("home.tabUsage") });
+      // Append the org home dashboard as a single tab (if set).
+      if (homeDashboard.value) {
+        tabs.push({
+          id: `dash:${homeDashboard.value.folderId}:${homeDashboard.value.dashboardId}`,
+          label: homeDashboard.value.label,
+          closable: true,
+        });
+      }
       return tabs;
     });
+
+    // "dash:default:abc" -> { folderId: "default", dashboardId: "abc" }
+    function parsePinnedTabId(id: string) {
+      const rest = id.slice("dash:".length);
+      const sep = rest.indexOf(":");
+      return { folderId: rest.slice(0, sep), dashboardId: rest.slice(sep + 1) };
+    }
+
+    function onPinnedLabel(dashboardId: string, label: string) {
+      updateLabel(
+        store.state.selectedOrganization?.identifier,
+        dashboardId,
+        label,
+      );
+    }
+
+    function onPinnedUnavailable(_dashboardId: string) {
+      const org = store.state.selectedOrganization?.identifier;
+      clearHomeDashboard(org);
+      // Active tab no longer exists in the recomputed set → fall back to first.
+      if (!DEFAULT_TABS.value.find((tb) => tb.id === activeHomeTab.value)) {
+        activeHomeTab.value = tabOrder.value[0]?.id ?? "usage";
+      }
+    }
+
+    function onCloseTab(id: string) {
+      if (!id.startsWith("dash:")) return;
+      onPinnedUnavailable(parsePinnedTabId(id).dashboardId);
+    }
 
     function loadTabOrder() {
       try {
@@ -251,6 +321,10 @@ export default defineComponent({
       homeChat,
       onLoadChat,
       onNewChat,
+      parsePinnedTabId,
+      onPinnedLabel,
+      onPinnedUnavailable,
+      onCloseTab,
     };
   },
   components: {
@@ -261,6 +335,7 @@ export default defineComponent({
     OTabs,
     OTab,
     AppPageHeader,
+    PinnedDashboardTab,
   },
 });
 </script>
@@ -272,6 +347,26 @@ export default defineComponent({
  */
 
 /* Home tab bar now uses the shared OTabs component (see template). */
+
+.home-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  line-height: 1;
+  border: none;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0.6;
+  font-size: 14px;
+}
+
+.home-tab-close:hover {
+  opacity: 1;
+  background: rgba(128, 128, 128, 0.2);
+}
 
 /* Chat fills remaining width and height */
 .home-ai-panel .chat-container {
