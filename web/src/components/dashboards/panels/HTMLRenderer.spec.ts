@@ -368,10 +368,89 @@ describe("HTMLRenderer", () => {
       expect(sanitizeSpy).toHaveBeenCalledWith(
         "<iframe src=\"https://example.com\" allowfullscreen></iframe>",
         expect.objectContaining({
-          ADD_TAGS: ["iframe"],
+          ADD_TAGS: ["iframe", "style"],
           ADD_ATTR: ["allow", "allowfullscreen", "frameborder", "loading", "csp"],
+          FORCE_BODY: true,
         })
       );
+    });
+
+    it("should preserve top-level <style> blocks so authors can style content", () => {
+      wrapper = createWrapper({
+        htmlContent:
+          '<style>.big { color: red; }</style><div class="big">styled</div>',
+      });
+
+      const html = wrapper.find('[data-test="html-renderer"]').element.innerHTML;
+      expect(html).toContain(".big { color: red; }");
+      expect(html).toContain('<div class="big">styled</div>');
+    });
+
+    it("should prefix author selectors with the panel id so CSS cannot leak outside", () => {
+      wrapper = createWrapper({
+        panelId: "p1",
+        htmlContent:
+          '<style>.big { color: red; }</style><div class="big">styled</div>',
+      });
+
+      const rendererElement = wrapper.find('[data-test="html-renderer"]');
+      expect(rendererElement.attributes("id")).toBe("o2-html-panel-p1");
+
+      const style = rendererElement.element.querySelector("style");
+      expect(style?.textContent).toContain("#o2-html-panel-p1 .big");
+    });
+
+    it("should remap body/html/:root selectors onto the panel container", () => {
+      wrapper = createWrapper({
+        panelId: "p1",
+        htmlContent:
+          "<style>body { background: black; } html { font-size: 14px; }</style><p>content</p>",
+      });
+
+      const style = wrapper
+        .find('[data-test="html-renderer"]')
+        .element.querySelector("style");
+      expect(style?.textContent).toContain(
+        "#o2-html-panel-p1 { background: black; }",
+      );
+      expect(style?.textContent).toContain(
+        "#o2-html-panel-p1 { font-size: 14px; }",
+      );
+      expect(style?.textContent).not.toMatch(/(^|\s)body\s*\{/);
+    });
+
+    it("should prefix selectors inside @media and leave @keyframes untouched", () => {
+      wrapper = createWrapper({
+        panelId: "p1",
+        htmlContent:
+          "<style>@media (min-width: 100px) { .a { color: blue; } } @keyframes spin { from { opacity: 0; } to { opacity: 1; } }</style><p>content</p>",
+      });
+
+      const style = wrapper
+        .find('[data-test="html-renderer"]')
+        .element.querySelector("style");
+      expect(style?.textContent).toContain("#o2-html-panel-p1 .a");
+      expect(style?.textContent).toContain("from { opacity: 0; }");
+      expect(style?.textContent).not.toContain("#o2-html-panel-p1 from");
+    });
+
+    it("should still strip script tags when style tags are allowed", () => {
+      wrapper = createWrapper({
+        htmlContent:
+          "<style>.a{}</style><script>alert(1)</scr" + "ipt><p>safe</p>",
+      });
+
+      const html = wrapper.find('[data-test="html-renderer"]').element.innerHTML;
+      expect(html).not.toContain("script");
+      expect(html).toContain("<p>safe</p>");
+    });
+
+    it("should give the content wrapper min-height 100% so it fills the panel yet grows with content", () => {
+      wrapper = createWrapper();
+
+      expect(
+        wrapper.find('[data-test="html-renderer"]').attributes("style"),
+      ).toContain("min-height: 100%");
     });
 
     it("should enforce iframe hook restrictions", () => {

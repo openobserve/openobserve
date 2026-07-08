@@ -121,7 +121,7 @@ describe("legendConfiguration", () => {
       const result = calculateBottomLegendHeight(1, 800, seriesData);
 
       expect(result).toBeGreaterThan(0);
-      expect(result).toBeGreaterThanOrEqual(50); // Minimum height of 3.125rem = 50px
+      expect(result).toBeGreaterThanOrEqual(30); // Minimum height of 1.875rem = 30px
     });
 
     it("should calculate height for multiple legend items", () => {

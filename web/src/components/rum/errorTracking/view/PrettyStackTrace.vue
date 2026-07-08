@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Loading state -->
     <div
       v-if="isLoadingTranslation"
+      data-test="rum-pretty-stack-trace-loading"
       class="loading-container p-6 text-center min-h-[200px] flex flex-col items-center justify-center rounded-md"
       :style="{ 'background-color': backgroundColor, 'border': `1px solid ${borderColor}` }"
     >
@@ -34,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- No source maps available message -->
     <div
       v-else-if="allSourceInfoNull"
+      data-test="rum-pretty-stack-trace-unavailable"
       class="no-source-maps-container p-3 text-center flex flex-col items-center justify-center rounded-md py-5 px-6"
       :style="{ 'background-color': backgroundColor, 'border': `1px solid ${borderColor}` }"
     >
@@ -74,7 +76,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Pretty formatted view -->
-    <div v-else-if="translatedStackTrace.length > 0" class="pretty-stack-container">
+    <div
+      v-else-if="translatedStackTrace.length > 0"
+      data-test="rum-pretty-stack-trace-container"
+      class="pretty-stack-container"
+    >
       <template v-for="(stackTrace, traceIndex) in translatedStackTrace" :key="traceIndex">
         <!-- Error message -->
         <div
@@ -115,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div
                 v-if="stackTrace.stack[0].line"
+                data-test="rum-pretty-stack-trace-frame-line"
                 class="stack-line-header [font-family:'SF_Mono','Monaco','Inconsolata','Fira_Code','Droid_Sans_Mono',monospace] text-[12.5px] font-medium break-all flex-1 [line-height:1.5]"
                 :style="{ color: textColor }"
               >
@@ -126,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Expandable source code context -->
           <div
             v-if="isFrameExpanded(traceIndex, 0) && stackTrace.stack[0].source_info"
+            data-test="rum-pretty-stack-trace-source-context"
             class="source-context !px-4 !pb-4 !pt-0"
             :style="{ 'background-color': isDarkMode ? '#0d0d0d' : '#f8f9fa' }"
           >
@@ -202,6 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-if="frame.line"
+                    data-test="rum-pretty-stack-trace-frame-line"
                     class="stack-line-collapsed [font-family:'SF_Mono','Monaco','Inconsolata','Fira_Code','Droid_Sans_Mono',monospace] text-[11.5px] [line-height:1.5] break-all flex-1 opacity-85"
                     :style="{ color: mutedTextColor }"
                   >
@@ -241,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Error state -->
-    <div v-else class="p-3 text-center text-gray-400">
+    <div v-else data-test="rum-pretty-stack-trace-error" class="p-3 text-center text-gray-400">
       <div v-if="translationError" class="text-red-500">
         {{ translationError }}
       </div>

@@ -12,13 +12,20 @@
       "action": "Widen time range",
       "actionDesc": "Search across a longer period"
     },
+    "noPatterns": {
+      "title": "No patterns found",
+      "description": "Try increasing the time range or selecting a different stream with more log data. Pattern extraction works best with at least 1,000 logs.",
+      "logsAnalyzed": "Only {count} logs were analyzed."
+    },
     "noStreamSelected": {
       "title": "Select a stream to get started",
       "description": "Pick a stream, then run your query to explore its data. Refine results with filters and a custom time range."
     },
     "noQueryApplied": {
       "title": "Run a query to see results",
-      "description": "Adjust your filters and click 'Run query' to load events for this stream."
+      "description": "Adjust your filters and click 'Run query' to load events for this stream.",
+      "action": "Run query",
+      "actionDesc": "Load events for the selected filters"
     },
 
     "noDashboards": {
@@ -81,7 +88,9 @@
       "title": "No destinations yet",
       "description": "Destinations define where alert notifications are sent — Slack, email, webhooks, and more.",
       "action": "New destination",
-      "actionDesc": "Connect a notification channel"
+      "actionDesc": "Connect a notification channel",
+      "import": "Import destination",
+      "importDesc": "Import from a JSON file"
     },
     "noPipelineDestinations": {
       "title": "No destinations yet",
@@ -93,7 +102,9 @@
       "title": "No templates yet",
       "description": "Templates define the format of alert notification messages.",
       "action": "New template",
-      "actionDesc": "Create a notification template"
+      "actionDesc": "Create a notification template",
+      "import": "Import template",
+      "importDesc": "Import from a JSON file"
     },
     "noEvalTemplates": {
       "title": "No evaluation templates yet",
@@ -143,6 +154,20 @@
       "title": "No backfill jobs",
       "description": "Backfill jobs reprocess historical data through a pipeline. Run one to get started."
     },
+    "noRegexPatterns": {
+      "title": "No regex patterns yet",
+      "description": "Create a reusable pattern to redact sensitive data, or import one from your library.",
+      "action": "New pattern",
+      "actionDesc": "Define a new regex pattern",
+      "import": "Import pattern",
+      "importDesc": "Reuse a pattern from your library"
+    },
+    "noStorageConfig": {
+      "title": "No bucket configured",
+      "description": "Route this org's data to a dedicated bucket — independently of other orgs and global defaults.",
+      "action": "Configure storage",
+      "actionDesc": "Connect an S3, GCS, or Azure bucket"
+    },
     "noPipelineHistory": {
       "title": "No pipeline history yet",
       "description": "Pipeline execution history will appear here once your pipelines run."
@@ -162,10 +187,12 @@
       "actionDesc": "Write a new VRL function"
     },
     "noStreams": {
-      "title": "Waiting for your first data",
-      "description": "No data has arrived yet. Connect a source and your streams will show up here automatically.",
+      "title": "Connect a source to create your first stream",
+      "description": "Streams are created automatically the moment data arrives. Set up ingestion from your app, agent, or collector to get started.",
       "action": "Set up ingestion",
-      "actionDesc": "Connect a data source"
+      "actionDesc": "Connect a data source",
+      "createAction": "New stream",
+      "createActionDesc": "Manually define a stream schema"
     },
     "noAlerts": {
       "title": "Create your first alert",
@@ -175,7 +202,7 @@
     },
     "noIncidents": {
       "title": "No active incidents",
-      "description": "You're all caught up — nothing needs your attention right now. Triggered incidents will appear here."
+      "description": "Incidents are created when an alert triggers — none have fired yet. Once you have alerts in place, any triggered incidents will appear here."
     },
     "noLLMInsights": {
       "title": "No LLM activity yet",
@@ -192,20 +219,24 @@
     "noScorers": {
       "title": "No scorers yet",
       "description": "Scorers grade LLM responses against your score configs — start with an LLM judge or import one from the library.",
-      "action": "Create scorer",
-      "actionDesc": "Define an LLM judge or remote scorer"
+      "action": "New scorer",
+      "actionDesc": "Define an LLM judge or remote scorer",
+      "import": "Import scorer",
+      "importDesc": "Import from a JSON file"
     },
     "noEvalJobs": {
       "title": "No evaluation jobs yet",
       "description": "Jobs schedule scorers against an LLM stream. Create one to start grading conversations on a cadence.",
-      "action": "Create eval job",
+      "action": "New job",
       "actionDesc": "Pick a stream + scorers + cadence"
     },
     "noScoreConfigs": {
       "title": "No score configs yet",
       "description": "Score configs define the schema scorers produce — numeric, boolean, or categorical. Add one to start scoring.",
-      "action": "Create score config",
-      "actionDesc": "Define the score shape + healthy range"
+      "action": "New score config",
+      "actionDesc": "Define the score shape + healthy range",
+      "import": "Import score config",
+      "importDesc": "Import from a JSON file"
     },
     "loadError": {
       "title": "Something went wrong",
@@ -272,6 +303,7 @@
     },
     "nouns": {
       "logs": "logs",
+      "patterns": "patterns",
       "dashboards": "dashboards",
       "pipelines": "pipelines",
       "functions": "functions",
@@ -306,7 +338,8 @@
       "scorers": "scorers",
       "evalJobs": "evaluation jobs",
       "scoreConfigs": "score configs",
-      "pipelineHistory": "pipeline history"
+      "pipelineHistory": "pipeline history",
+      "regexPatterns": "regex patterns"
     }
   },
   "common": {
@@ -386,6 +419,8 @@
     "legendWidth": "Legend Width",
     "exceptions": "Exceptions",
     "nameRequired": "Name is required",
+    "invalidEmail": "Please enter a valid email address.",
+    "nameMaxLength": "Name must be at most {max} characters.",
     "edit": "Edit",
     "delete": "Delete",
     "remove": "Remove",
@@ -1323,6 +1358,14 @@
     "newPassword": "New Password",
     "organization": "Organization",
     "otherOrganization": "Other Organization",
+    "roleRequired": "Role is required",
+    "fieldRequired": "Field is required",
+    "passwordRequired": "Password is required.",
+    "passwordPolicyHint": "Password must be 8-128 characters and contain at least one lowercase letter, one uppercase letter, one digit, and one special character.",
+    "currentPasswordRequired": "Current password is required.",
+    "newPasswordRequired": "New password is required.",
+    "otherOrgInvalid": "Organization name must start with a letter and be alphanumeric, _ or -.",
+    "inviteEmailInvalid": "Please enter correct email id.",
     "isExistingUser": "Existing User?",
     "deleteAPIKeyMessage": "Are you sure you want to delete this User API Key? This action cannot be undone. Click OK to confirm.",
     "apiKeyNotFound": "User API Key Not Found.",
@@ -1363,6 +1406,7 @@
   },
   "serviceAccounts": {
     "header": "Service Accounts",
+    "emailInvalid": "Please enter a valid email address",
     "headerSubtitle": "Programmatic access tokens for APIs",
     "search": "Search Service Account",
     "refresh": "Refresh Service Token",
@@ -1602,6 +1646,11 @@
     "subtitle": "Index management and stream configuration",
     "streamNameHelpText": "Use alphanumeric characters, underscore and colon only.",
     "search": "Search Stream",
+    "emptyOr": "Or:",
+    "emptyKubernetes": "Kubernetes",
+    "emptyAws": "AWS / CloudWatch",
+    "emptyLinux": "Linux",
+    "emptyWindows": "Windows",
     "name": "Name",
     "docNum": "Events",
     "storageSize": "Ingested Data",
@@ -2048,6 +2097,7 @@
     "defaultTokenBadge": "DEFAULT",
     "createTokenBtn": "Create New Token",
     "createTokenTitle": "Create Token",
+    "searchToken": "Search tokens",
     "tokenNameLabel": "Name",
     "tokenDescriptionLabel": "Description",
     "rotateTokenBtn": "Rotate",
@@ -2092,6 +2142,13 @@
     "header": "Dashboards",
     "subtitle": "Create, organize, and share dashboards across folders",
     "add": "New dashboard",
+    "setAsHome": "Pin to home page",
+    "removeFromHome": "Unpin from home page",
+    "isHomeDashboard": "Home dashboard",
+    "openHomeDashboard": "View pinned dashboard",
+    "pinnedOnHome": "Pinned dashboard on home page",
+    "setAsHomeDesc": "Show this dashboard on the home page for everyone in the org",
+    "moreActions": "More actions",
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete Dashboard",
@@ -2735,6 +2792,7 @@
     "tabAiAssistant": "O2 Assistant",
     "tabOverview": "Overview",
     "tabUsage": "Usage",
+    "removeHomeDashboard": "Remove home dashboard",
     "subtitle": "Your observability workspace at a glance"
   },
   "overview": {
@@ -3001,9 +3059,9 @@
     "searchAllFolders": "All folders",
     "streamConfig": "Stream Config",
     "alertRules": "Alert Rules",
-    "noTemplatesMsg": "It looks like you haven't created any Templates yet. To create an Alert, you'll need to have at least one Destination and one Template in place",
+    "noTemplatesMsg": "To create an alert you need at least one template and one destination. Templates define the format of the notification message — start by creating one.",
     "createTemplateBtn": "Create Template",
-    "noDestinationsMsg": "It looks like you haven't created any Destinations yet. To create an Alert, you'll need to have at least one Destination and one Template in place",
+    "noDestinationsMsg": "To create an alert you need at least one destination and one template. Destinations define where notifications are sent — start by creating one.",
     "createDestinationBtn": "Create Destination",
     "add": "New alert",
     "edit": "Edit",
@@ -4191,6 +4249,51 @@
     "querySource": "Query Source"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "Search Services",
+      "noStreamsDetected": "No streams detected. Ensure service graph metrics include stream_name labels.",
+      "streamOnlyInfo": "Service graph uses stream-only architecture with zero in-memory state",
+      "borderColor": "Border Color",
+      "borderColorMetric": "Errors",
+      "nodeSize": "Node Size",
+      "nodeSizeMetric": "Requests",
+      "sizeLow": "Low",
+      "sizeHigh": "High",
+      "status": {
+        "healthy": "Healthy",
+        "degraded": "Degraded",
+        "warning": "Warning",
+        "critical": "Critical"
+      },
+      "range": {
+        "healthy": "< 1%",
+        "degraded": "1 – 5%",
+        "warning": "5 – 10%",
+        "critical": "> 10%"
+      },
+      "entities": "entities",
+      "distribution": "Distribution",
+      "total": "Total",
+      "showTypes": "Show types",
+      "typesFiltered": "Some types are hidden. Open to change what's shown.",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fitToScreen": "Fit to screen",
+      "layout": "Layout",
+      "types": "Types",
+      "mode": {
+        "auto": "Auto",
+        "expanded": "Expanded",
+        "collapsed": "Collapsed"
+      },
+      "kind": {
+        "service": "Services",
+        "database": "Datastores",
+        "queue": "Queues",
+        "external": "External",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "Open in full view",
     "viewLogs": "View Logs",
     "viewRelated": "View Related",
@@ -4469,6 +4572,7 @@
     "servicesCatalog": {
       "tabLabel": "Service Catalog",
       "title": "Service Catalog",
+      "footerTitle": "Services",
       "filterPlaceholder": "Filter by service name...",
       "noServicesFound": "No services found in the selected time range.",
       "loading": "Loading services...",
@@ -4495,6 +4599,15 @@
       "servicesLabel": "services",
       "viewTraces": "View Traces",
       "exportCsv": "Export CSV",
+      "types": {
+        "all": "All",
+        "service": "Services",
+        "datastore": "Datastores",
+        "queue": "Queues",
+        "external": "External",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{count} {status}",
       "legend": {
         "title": "Error Rate"
       }
@@ -5205,6 +5318,7 @@
     },
     "quality": {
       "scopeLabel": "All quality dimensions in this workspace",
+      "agentPlaceholder": "All agents",
       "timeRange": {
         "label": "Time range",
         "last1h": "Past 1 hour",

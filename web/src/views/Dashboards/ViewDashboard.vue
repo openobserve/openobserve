@@ -55,6 +55,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span data-test="dashboard-name-title">{{ currentDashboardData.data?.title }}</span>
           </template>
           <template #actions>
+            <!-- Primary place to set this dashboard as the org-wide home
+                 dashboard: labeled so the action is discoverable (a bare
+                 pushpin icon read as cryptic). Collapses to filled-pin +
+                 "Home dashboard" once set. -->
+            <OButton
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              :variant="isHome(dashboardId) ? 'secondary' : 'outline'"
+              size="sm-toolbar"
+              :class="
+                isHome(dashboardId)
+                  ? 'text-primary border border-button-outline-border'
+                  : ''
+              "
+              @click="toggleHomeDashboard"
+              data-test="dashboard-view-set-home-btn"
+              :icon-left="isHome(dashboardId) ? 'keep' : 'keep-outline'"
+            >
+              {{
+                isHome(dashboardId)
+                  ? t("dashboard.isHomeDashboard")
+                  : t("dashboard.setAsHome")
+              }}
+            </OButton>
+            <OTooltip
+              v-if="!isFullscreen && store.state.printMode !== true"
+              :content="
+                isHome(dashboardId)
+                  ? t('dashboard.removeFromHome')
+                  : t('dashboard.setAsHomeDesc')
+              "
+            />
             <OButton
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
@@ -325,6 +357,7 @@ import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import useNotifications from "@/composables/useNotifications";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import reports from "@/services/reports";
 import destination from "@/services/alert_destination.js";
 import config from "@/aws-exports";
@@ -430,6 +463,25 @@ export default defineComponent({
     const dashboardId = computed(() => route.query.dashboard);
 
     const folderId = computed(() => route.query.folder);
+
+    // Set/remove this dashboard as the single org-wide home dashboard, shared
+    // reactive state with the dashboard list and HomeView via the composable.
+    const { isHome, setHomeDashboard, clearHomeDashboard } =
+      useHomeDashboard();
+    const toggleHomeDashboard = () => {
+      const id = dashboardId.value as string | undefined;
+      if (!id) return;
+      const org = store.state.selectedOrganization?.identifier;
+      if (isHome(id)) {
+        clearHomeDashboard(org);
+      } else {
+        setHomeDashboard(org, {
+          dashboardId: id,
+          folderId: (folderId.value as string) ?? "default",
+          label: currentDashboardData.data?.title ?? "Dashboard",
+        });
+      }
+    };
 
     const tabId = computed(() => route.query.tab);
 
@@ -1882,6 +1934,8 @@ export default defineComponent({
       isFullscreen,
       goBackToDashboardList,
       addPanelData,
+      toggleHomeDashboard,
+      isHome,
       t,
       getDashboard,
       store,
