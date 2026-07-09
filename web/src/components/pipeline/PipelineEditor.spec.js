@@ -378,6 +378,21 @@ describe("PipelineEditor", () => {
       // onSubmitPipeline delegates to the pipeline service
       expect(pipelineService.createPipeline).toHaveBeenCalled();
     });
+
+    it("resetBasicDialog only closes the basic dialog and stays on the editor (no navigation)", async () => {
+      const routerPushSpy = vi
+        .spyOn(router, "push")
+        .mockImplementation(() => Promise.resolve());
+      wrapper.vm.confirmDialogBasicPipeline = true;
+
+      wrapper.vm.resetBasicDialog();
+      await flushPromises();
+
+      expect(wrapper.vm.confirmDialogBasicPipeline).toBe(false);
+      // Cancelling must NOT redirect to the pipelines listing.
+      expect(routerPushSpy).not.toHaveBeenCalled();
+      routerPushSpy.mockRestore();
+    });
   });
 
   // ─────────────────────────────────────────────────────────────────────────────

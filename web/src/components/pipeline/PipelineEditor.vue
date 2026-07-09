@@ -973,13 +973,10 @@ const resetConfirmDialog = () => {
 };
 
 const resetBasicDialog = () => {
+  // Cancelling the "save anyway?" prompt should only dismiss the dialog and keep
+  // the user on the editor (matching the close/X button) — NOT navigate away to
+  // the pipelines listing.
   confirmDialogBasicPipeline.value = false;
-  router.push({
-    name: "pipelines",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
 };
 
 const findMissingEdges = () => {
