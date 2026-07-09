@@ -71,6 +71,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="iam-groups-refresh-btn"
+              @click="setupGroups"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="iamGroupsRefresh" />
+            </OButton>
+          </template>
           <template #cell-actions="{ row }">
             <div class="flex items-center justify-center">
               <OButton
@@ -147,6 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onBeforeMount, computed } from "vue";
 import AddGroup from "./AddGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";

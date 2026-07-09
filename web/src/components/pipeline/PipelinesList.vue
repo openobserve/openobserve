@@ -81,6 +81,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </template>
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="pipeline-list-refresh-btn"
+            @click="getPipelines"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="pipelinesRefresh" />
+          </OButton>
+        </template>
 
         <template #cell-type="{ row }">
           <OTag type="pipelineType" :value="row.type" />

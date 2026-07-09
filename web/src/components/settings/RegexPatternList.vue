@@ -68,6 +68,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :placeholder="t('regex_patterns.search')"
         />
       </template>
+      <template #toolbar-trailing>
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          icon-left="refresh"
+          :loading="listLoading"
+          data-test="regex-pattern-list-refresh-btn"
+          @click="getRegexPatterns"
+        >
+          <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="regexPatternsRefresh" />
+        </OButton>
+      </template>
       <template #empty>
         <OEmptyState
           v-if="!listLoading"
@@ -183,6 +195,7 @@ import ImportRegexPattern from "./ImportRegexPattern.vue";
 import config from "@/aws-exports";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
@@ -191,6 +204,8 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "RegexPatternList",
@@ -201,6 +216,7 @@ export default defineComponent({
     ImportRegexPattern,
     OEmptyState,
     OButton,
+    OTooltip,
     OSearchInput,
     OTable,
     OCodeCell,
@@ -513,6 +529,10 @@ export default defineComponent({
         }
       }
     };
+
+    useShortcuts([
+      { id: "regexPatternsRefresh", handler: () => { if (!isInputFocused()) getRegexPatterns(); } },
+    ]);
 
     return {
       t,
