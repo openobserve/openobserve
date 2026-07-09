@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import OSelect from "./OSelect.vue";
 
@@ -111,6 +111,35 @@ describe("OSelect", () => {
     await wrapper.find('button[aria-label="Clear selection"]').trigger("click");
     expect(wrapper.emitted("clear")).toBeTruthy();
     expect(wrapper.emitted("update:modelValue")![0][0]).toEqual([]);
+  });
+
+  it("lets pointerdown inside the open popover propagate to document", async () => {
+    wrapper = mount(OSelect, {
+      attachTo: document.body,
+      props: {
+        multiple: true,
+        searchable: true,
+        options: [
+          { label: "Option A", value: "a" },
+          { label: "Option B", value: "b" },
+        ],
+      },
+    });
+    await wrapper.find("button").trigger("click");
+    await flushPromises();
+
+    const input = document.body.querySelector(
+      'input[placeholder="Search..."]',
+    ) as HTMLInputElement | null;
+    expect(input).not.toBeNull();
+
+    const docSpy = vi.fn();
+    document.addEventListener("pointerdown", docSpy);
+    input!.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    document.removeEventListener("pointerdown", docSpy);
+
+    // With @pointerdown.stop present this would be 0 (stopped at the content).
+    expect(docSpy).toHaveBeenCalled();
   });
 
   it("does not emit create on Enter when creatable is false", async () => {
