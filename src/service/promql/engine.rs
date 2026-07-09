@@ -1381,7 +1381,7 @@ async fn selector_load_data_from_datafusion(
 
     // get hash & timestamp
     let start1 = std::time::Instant::now();
-    let hash_field_type = schema.field_with_name(HASH_LABEL).unwrap().data_type();
+    let hash_field_type = schema.field_with_name(HASH_LABEL)?.data_type();
     let mut metrics = if query_ctx.query_exemplars {
         load_exemplars_from_datafusion(&query_ctx.trace_id, hash_field_type, df_group.clone())
             .await?
@@ -1445,6 +1445,12 @@ async fn selector_load_data_from_datafusion(
         metrics.keys().copied().collect()
     };
     let cache_hits = metrics.len() - missing_hashes.len();
+    config::metrics::QUERY_METRICS_LABEL_CACHE_HIT_COUNT
+        .with_label_values(&[&query_ctx.org_id])
+        .inc_by(cache_hits as u64);
+    config::metrics::QUERY_METRICS_LABEL_CACHE_MISS_COUNT
+        .with_label_values(&[&query_ctx.org_id])
+        .inc_by(missing_hashes.len() as u64);
 
     if !missing_hashes.is_empty() {
         // membership test for the extraction loop below: only rows of
@@ -1489,10 +1495,15 @@ async fn selector_load_data_from_datafusion(
         let series = if config::get_config().limit.metrics_inlist_filter_enabled
             || series_timestamps.is_empty()
         {
+            // many series share the same max timestamp; dedup to keep the
+            // in-list filter small
+            let mut in_list_timestamps = series_timestamps;
+            in_list_timestamps.sort_unstable();
+            in_list_timestamps.dedup();
             df_series
                 .filter(
                     col(TIMESTAMP_COL_NAME).in_list(
-                        series_timestamps
+                        in_list_timestamps
                             .iter()
                             .map(|&v| lit(v))
                             .collect::<Vec<_>>(),
