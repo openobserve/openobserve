@@ -627,7 +627,11 @@ const columns = ref([
     accessorKey: "status",
     sortable: true,
     hideable: true,
-    size: 150,
+    // Wide enough for the longest status chip ("Condition Not Satisfied");
+    // minSize stops the column shrinking and clipping the pill on narrow
+    // viewports (the cell clips non-wrapped content by design).
+    size: 200,
+    minSize: 200,
     meta: { align: "left" as const },
   },
   {
