@@ -34,7 +34,11 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
     // Ingest data using page object method
     const streamNames = ["e2e_automate", "e2e_automate1", "e2e_automate2", "e2e_automate3"];
     await pageManager.pipelinesPage.bulkIngestToStreams(streamNames, logsdata);
-    await pageManager.apiCleanup.cleanupPipelines(streamNames).catch(() => {});
+    // NOTE: no pool-wide pipeline cleanup here. Deleting pipelines across all four shared
+    // source streams on every test setup races with sibling tests (in this file and in
+    // pipeline-core / pipeline-dynamic, which share these stream names) and deletes their
+    // in-flight pipelines. Only the toggle test below persists a pipeline; it frees just
+    // its own source stream at its start.
 
     // Navigate to logs page and select stream
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
@@ -469,6 +473,10 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
   }) => {
     const pipelinePage = pageManager.pipelinesPage;
     testLogger.info('Test: Pipeline enable/disable toggle');
+
+    // Free only this test's own source stream (see note in beforeEach) so its
+    // persisted pipeline can't be deleted by a sibling test's setup.
+    await pageManager.apiCleanup.cleanupPipelines(["e2e_automate"]).catch(() => {});
 
     // First create a pipeline to test toggle
     await pipelinePage.openPipelineMenu();

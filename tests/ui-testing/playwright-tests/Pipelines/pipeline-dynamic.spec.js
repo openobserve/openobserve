@@ -40,9 +40,10 @@ test.describe('Pipeline Dynamic Stream Names', { tag: ['@all', '@pipelines', '@p
       const response = await sendRequest(page, url, logsdata, headers);
       testLogger.debug('API response received', { response });
     }
-    await pageManager.apiCleanup.cleanupPipelines(streamNames).catch((err) => {
-      testLogger.warn('Pipeline cleanup before test failed (continuing)', { error: err?.message });
-    });
+    // NOTE: no pool-wide pipeline cleanup here. Deleting pipelines across all four shared
+    // source streams on every setup races with sibling tests in pipeline-core / pipelines
+    // (which share these stream names) and deletes their in-flight pipelines. Each test
+    // below frees only its OWN source stream at its start.
   });
 
   test.afterEach(async () => {
@@ -60,6 +61,8 @@ test.describe('Pipeline Dynamic Stream Names', { tag: ['@all', '@pipelines', '@p
   });
 
   test('Verify pipeline with dynamic destination name using kubernetes_container_name', async () => {
+    // Free only this test's own source stream (see note in beforeEach).
+    await pageManager.apiCleanup.cleanupPipelines(["e2e_automate1"]).catch(() => {});
     // Navigate to stream and pipeline
     await pageManager.pipelinesPage.exploreStreamAndNavigateToPipeline('e2e_automate1');
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -81,6 +84,8 @@ test.describe('Pipeline Dynamic Stream Names', { tag: ['@all', '@pipelines', '@p
   });
 
   test('Verify pipeline with dynamic destination name using kubernetes_container_name with underscores', async () => {
+    // Free only this test's own source stream (see note in beforeEach).
+    await pageManager.apiCleanup.cleanupPipelines(["e2e_automate2"]).catch(() => {});
     await pageManager.pipelinesPage.exploreStreamAndNavigateToPipeline('e2e_automate2');
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pageManager.pipelinesPage.setupPipelineWithSourceStream('e2e_automate2');
@@ -93,6 +98,8 @@ test.describe('Pipeline Dynamic Stream Names', { tag: ['@all', '@pipelines', '@p
   });
 
   test('Verify pipeline with dynamic destination name using kubernetes_container_name directly', async () => {
+    // Free only this test's own source stream (see note in beforeEach).
+    await pageManager.apiCleanup.cleanupPipelines(["e2e_automate3"]).catch(() => {});
     await pageManager.pipelinesPage.exploreStreamAndNavigateToPipeline('e2e_automate3');
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pageManager.pipelinesPage.setupPipelineWithSourceStream('e2e_automate3');

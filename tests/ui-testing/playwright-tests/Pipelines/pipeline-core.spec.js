@@ -28,7 +28,11 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
     // Ingest data using page object method
     const streamNames = ["e2e_automate", "e2e_automate1", "e2e_automate2", "e2e_automate3"];
     await pageManager.pipelinesPage.bulkIngestToStreams(streamNames, logsdata);
-    await pageManager.apiCleanup.cleanupPipelines(streamNames).catch(() => {});
+    // NOTE: pipeline cleanup is intentionally NOT done pool-wide here. A cleanup that
+    // deletes pipelines across all four shared source streams races with sibling tests
+    // under parallel execution and deletes their in-flight pipelines, which makes
+    // deletePipelineByName poll-timeout (the flaky failure). Each test instead frees
+    // only its OWN source stream at its start via cleanupPipelines([sourceStream]).
 
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
@@ -38,6 +42,9 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
   });
 
   test("should add source & destination node and then delete the pipeline", async ({ page }) => {
+    // Free only this test's own source stream so a sibling test's setup can never
+    // delete this test's in-flight pipeline (was pool-wide cleanup in beforeEach).
+    await pageManager.apiCleanup.cleanupPipelines(["e2e_automate3"]).catch(() => {});
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
@@ -74,6 +81,8 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
   });
 
   test.skip("should add source, function, destination and then delete pipeline", async ({ page }) => {
+    // Free only this test's own source stream (see note in beforeEach).
+    await pageManager.apiCleanup.cleanupPipelines(["e2e_automate1"]).catch(() => {});
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
@@ -132,6 +141,8 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
   test("should add pipeline with function node using VRL transform @P1 @function @vrl @regression", async ({ page }) => {
     testLogger.info('Test: Add pipeline with function node (VRL transform)');
 
+    // Free only this test's own source stream (see note in beforeEach).
+    await pageManager.apiCleanup.cleanupPipelines(["e2e_automate"]).catch(() => {});
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
@@ -205,6 +216,8 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
   });
 
   test("should add source, condition & destination node and then delete the pipeline", async ({ page }) => {
+    // Free only this test's own source stream (see note in beforeEach).
+    await pageManager.apiCleanup.cleanupPipelines(["e2e_automate2"]).catch(() => {});
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
