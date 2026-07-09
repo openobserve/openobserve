@@ -1,5 +1,5 @@
 ﻿<template>
-  <form class="flex flex-col flex-1 min-h-0 bg-card-bg border border-dialog-header-border rounded-md" @submit.prevent="save">
+  <form class="flex flex-col flex-1 min-h-0 bg-card-bg" @submit.prevent="save">
     <AppPageHeader
       :subtitle="t('onlineEvals.provider.subtitle')"
       :back="{
