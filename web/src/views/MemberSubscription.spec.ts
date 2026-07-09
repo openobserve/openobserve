@@ -134,7 +134,7 @@ describe('MemberSubscription.vue', () => {
       wrapper = createWrapper('#token=test-token-123', true); // Prevent auto processing
       await wrapper.vm.$nextTick();
       
-      expect(wrapper.find('.tw\\:rounded-md').exists()).toBe(true);
+      expect(wrapper.find('.rounded-md').exists()).toBe(true);
       expect(wrapper.text()).toContain('Member Subscription');
     });
 

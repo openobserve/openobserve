@@ -17,20 +17,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Single stable root so the IntersectionObserver has one element to watch
        across all display states. -->
-  <div ref="rootEl" class="tw:min-h-4">
+  <div ref="rootEl" class="min-h-4">
   <small
     v-if="isBounce"
-    class="tw:italic tw:text-[var(--o2-text-muted)]"
+    class="italic text-[var(--o2-text-muted)]"
     data-test="rum-session-activity-bounced"
   >{{ t("rum.noActivityBounced") }}</small>
 
   <div
     v-else-if="activity"
-    class="tw:flex tw:flex-col tw:gap-0.5"
+    class="flex flex-col gap-0.5"
     data-test="rum-session-activity-sparkline"
   >
     <div
-      class="tw:flex tw:items-end tw:gap-[0.0938rem] tw:h-7"
+      class="flex items-end gap-[0.0938rem] h-7"
       role="img"
       :aria-label="ariaLabel"
       :title="ariaLabel"
@@ -38,25 +38,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="bucket in activity.buckets"
         :key="bucket.index"
-        class="tw:flex tw:flex-col tw:items-center tw:justify-end tw:h-full tw:w-1.5"
+        class="flex flex-col items-center justify-end h-full w-1.5"
       >
         <span
           v-if="bucket.errors > 0 || bucket.frustrations > 0"
-          class="spark-dot tw:mb-[0.0938rem]"
+          class="spark-dot mb-[0.0938rem]"
           :class="
             bucket.errors > 0 ? 'spark-dot--error' : 'spark-dot--frustration'
           "
           :data-test="`rum-session-activity-dot-${bucket.index}`"
         />
         <span
-          class="spark-bar tw:w-full"
+          class="spark-bar w-full"
           :class="bucket.events > 0 ? 'spark-bar--filled' : 'spark-bar--empty'"
           :style="{ height: barHeight(bucket.events) }"
         />
       </div>
     </div>
     <small
-      class="tw:text-[var(--o2-text-caption)]"
+      class="text-[var(--o2-text-caption)]"
       data-test="rum-session-activity-events-text"
     >{{ t("rum.eventsCount", { count: activity.totalEvents }) }}</small>
   </div>
@@ -65,21 +65,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        "no data" for rows that simply haven't been fetched yet. -->
   <div
     v-else-if="loading || !started"
-    class="tw:flex tw:items-end tw:gap-[0.0938rem] tw:h-7 tw:animate-pulse"
+    class="flex items-end gap-[0.0938rem] h-7 animate-pulse"
     data-test="rum-session-activity-loading"
     :aria-label="t('rum.loadingMsg')"
   >
     <span
       v-for="index in 24"
       :key="index"
-      class="spark-bar spark-bar--empty tw:w-1.5"
+      class="spark-bar spark-bar--empty w-1.5"
       :style="{ height: `${20 + ((index * 7) % 60)}%` }"
     />
   </div>
 
   <span
     v-else
-    class="tw:text-[var(--o2-text-muted)]"
+    class="text-[var(--o2-text-muted)]"
     data-test="rum-session-activity-empty"
   >—</span>
   </div>

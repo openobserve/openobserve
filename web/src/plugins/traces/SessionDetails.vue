@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="session-details-page tw:h-[calc(100vh-2.6rem)]"
+    class="session-details-page h-[calc(100vh-2.6rem)]"
   >
   <div
-    class="session-details card-container tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:bg-[var(--o2-card-bg-solid)]"
+    class="session-details card-container h-full flex flex-col overflow-hidden bg-[var(--o2-card-bg-solid)]"
   >
     <!-- Header — fixed top bar (back button + title + session identity +
          status/turns badges, trace-explorer action pinned right). Sits above the
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the header pads its own content. -->
     <AppPageHeader
       data-test="session-detail-header"
-      class="tw:px-4 tw:border-b tw:border-border-default"
+      class="px-4 border-b border-border-default"
       :title="t('traces.sessionDetail.pageTitle')"
       :back="{
         label: t('rum.sessions'),
@@ -40,15 +40,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #title-trail>
         <span
           v-if="detail"
-          class="tw:font-semibold tw:px-2 tw:py-1 tw:rounded-md tw:inline-flex tw:items-center tw:gap-1.5 tw:flex-shrink-0"
-          :class="store.state.theme === 'dark' ? 'tw:text-blue-400 tw:bg-blue-900/50' : 'tw:text-blue-600 tw:bg-blue-50'"
+          class="font-semibold px-2 py-1 rounded-md inline-flex items-center gap-1.5 flex-shrink-0"
+          :class="store.state.theme === 'dark' ? 'text-blue-400 bg-blue-900/50' : 'text-blue-600 bg-blue-50'"
           data-test="session-detail-title"
         >
-          <span class="tw:font-mono tw:text-sm">{{ detail.sessionId }}</span>
+          <span class="font-mono text-sm">{{ detail.sessionId }}</span>
           <OIcon
             name="content-copy"
             size="xs"
-            class="tw:cursor-pointer tw:opacity-70 hover:tw:opacity-100 tw:flex-shrink-0"
+            class="cursor-pointer opacity-70 hover:opacity-100 flex-shrink-0"
             @click="copySessionId"
           />
         </span>
@@ -58,61 +58,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Scrollable body — owns its own scroll so the header above stays fixed.
          Pads itself horizontally (the card has no px) so focus rings on edge
          controls aren't clipped by the scroll container's overflow. -->
-    <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:overflow-y-auto tw:px-[0.625rem] tw:pt-[0.625rem]">
+    <div class="flex-1 flex flex-col min-h-0 overflow-y-auto px-[0.625rem] pt-[0.625rem]">
     <!-- Loading — full-page skeleton mirroring the real layout (standard O2 wave
          shimmer) so nothing jumps when data lands. -->
     <div
       v-if="loading"
-      class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden"
+      class="flex flex-col flex-1 min-h-0 overflow-hidden"
       data-test="session-detail-skeleton"
     >
       <!-- Shape row: KPI tiles + ribbon -->
-      <div class="tw:grid tw:grid-cols-2 tw:gap-[0.625rem] tw:mb-[0.625rem] tw:flex-shrink-0">
-        <div class="tw:grid tw:grid-cols-3 tw:gap-[0.625rem]">
+      <div class="grid grid-cols-2 gap-[0.625rem] mb-[0.625rem] flex-shrink-0">
+        <div class="grid grid-cols-3 gap-[0.625rem]">
           <div v-for="n in 6" :key="n" :class="kpiCardClass()">
-            <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[3rem] tw:h-[0.7rem]" />
-            <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[4.5rem] tw:h-[1.3rem] tw:mt-[0.3rem]" />
-            <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[6.5rem] tw:h-[0.6rem] tw:mt-[0.4rem]" />
+            <OSkeleton type="rect" animation="wave" class="rounded w-[3rem] h-[0.7rem]" />
+            <OSkeleton type="rect" animation="wave" class="rounded w-[4.5rem] h-[1.3rem] mt-[0.3rem]" />
+            <OSkeleton type="rect" animation="wave" class="rounded w-[6.5rem] h-[0.6rem] mt-[0.4rem]" />
           </div>
         </div>
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:pt-[1rem] tw:px-[1rem] tw:pb-[0.625rem] tw:flex tw:flex-col">
-          <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[8rem] tw:h-[0.85rem] tw:flex-shrink-0" />
+        <div class="card-container rounded-lg border border-[var(--o2-border-color)] pt-[1rem] px-[1rem] pb-[0.625rem] flex flex-col">
+          <OSkeleton type="rect" animation="wave" class="rounded w-[8rem] h-[0.85rem] flex-shrink-0" />
           <!-- Fill the panel height (it stretches to the 6-tile block on the left)
                so the skeleton matches the real ribbon and leaves no gap below. -->
-          <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-full tw:flex-1 tw:min-h-0 tw:mt-[0.75rem]" />
+          <OSkeleton type="rect" animation="wave" class="rounded w-full flex-1 min-h-0 mt-[0.75rem]" />
         </div>
       </div>
 
       <!-- Lower: conversation (left) + rail (right) -->
-      <div class="tw:grid tw:grid-cols-[minmax(0,1fr)_340px] tw:gap-[0.625rem] tw:flex-1 tw:min-h-0">
+      <div class="grid grid-cols-[minmax(0,1fr)_340px] gap-[0.625rem] flex-1 min-h-0">
         <!-- Conversation column: toolbar + panel -->
-        <div class="tw:flex tw:flex-col tw:min-w-0 tw:min-h-0">
-          <div class="tw:flex tw:items-center tw:gap-[0.5rem] tw:mb-[0.625rem] tw:flex-shrink-0">
-            <OSkeleton type="rect" animation="wave" class="tw:rounded tw:flex-1 tw:h-[36px]" />
-            <OSkeleton v-for="n in 3" :key="n" type="rect" animation="wave" class="tw:rounded tw:w-[8rem] tw:h-[36px]" />
+        <div class="flex flex-col min-w-0 min-h-0">
+          <div class="flex items-center gap-[0.5rem] mb-[0.625rem] flex-shrink-0">
+            <OSkeleton type="rect" animation="wave" class="rounded flex-1 h-[36px]" />
+            <OSkeleton v-for="n in 3" :key="n" type="rect" animation="wave" class="rounded w-[8rem] h-[36px]" />
           </div>
-          <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-            <div class="tw:flex tw:items-center tw:gap-[0.625rem] tw:px-[1rem] tw:py-[0.75rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0">
-              <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[7rem] tw:h-[1rem]" />
+          <div class="card-container rounded-lg border border-[var(--o2-border-color)] flex flex-col flex-1 min-h-0 overflow-hidden">
+            <div class="flex items-center gap-[0.625rem] px-[1rem] py-[0.75rem] border-b border-[var(--o2-border-color)] flex-shrink-0">
+              <OSkeleton type="rect" animation="wave" class="rounded w-[7rem] h-[1rem]" />
             </div>
-            <div class="tw:flex tw:flex-col tw:gap-[0.5rem] tw:p-[0.5rem] tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-              <OSkeleton v-for="n in 14" :key="n" type="rect" animation="wave" class="tw:rounded tw:w-full tw:h-[3rem] tw:flex-shrink-0" />
+            <div class="flex flex-col gap-[0.5rem] p-[0.5rem] flex-1 min-h-0 overflow-hidden">
+              <OSkeleton v-for="n in 14" :key="n" type="rect" animation="wave" class="rounded w-full h-[3rem] flex-shrink-0" />
             </div>
           </div>
         </div>
 
         <!-- Rail: 3 hotspot card skeletons (share the rail height) -->
-        <div class="tw:flex tw:flex-col tw:gap-[0.625rem] tw:min-h-0">
+        <div class="flex flex-col gap-[0.625rem] min-h-0">
           <div
             v-for="c in 3"
             :key="c"
-            class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden"
+            class="card-container rounded-lg border border-[var(--o2-border-color)] flex flex-col flex-1 min-h-0 overflow-hidden"
           >
-            <div class="tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0">
-              <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[6rem] tw:h-[0.8rem]" />
+            <div class="px-[0.75rem] py-[0.5rem] border-b border-[var(--o2-border-color)] flex-shrink-0">
+              <OSkeleton type="rect" animation="wave" class="rounded w-[6rem] h-[0.8rem]" />
             </div>
-            <div class="tw:flex tw:flex-col tw:gap-[0.4rem] tw:p-[0.5rem] tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-              <OSkeleton v-for="r in 8" :key="r" type="rect" animation="wave" class="tw:rounded tw:w-full tw:h-[1.25rem] tw:flex-shrink-0" />
+            <div class="flex flex-col gap-[0.4rem] p-[0.5rem] flex-1 min-h-0 overflow-hidden">
+              <OSkeleton v-for="r in 8" :key="r" type="rect" animation="wave" class="rounded w-full h-[1.25rem] flex-shrink-0" />
             </div>
           </div>
         </div>
@@ -122,18 +122,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Error -->
     <div
       v-else-if="error"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-center"
+      class="flex flex-col items-center justify-center flex-1 text-center"
     >
       <OIcon
         name="error-outline"
         size="xl"
-        class="tw:mb-3 tw:text-[var(--o2-status-error-text)]"
+        class="mb-3 text-[var(--o2-status-error-text)]"
       />
-      <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
+      <div class="text-base text-[var(--o2-text-primary)] mb-2">
         {{ t('traces.sessionDetail.failedToLoad') }}
       </div>
       <div
-        class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:mb-3 tw:max-w-[30rem]"
+        class="text-sm text-[var(--o2-text-muted)] mb-3 max-w-[30rem]"
       >
         {{ error }}
       </div>
@@ -143,17 +143,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Not found -->
     <div
       v-else-if="!detail"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-center"
+      class="flex flex-col items-center justify-center flex-1 text-center"
     >
       <OIcon
         name="search-off"
         size="xl"
-        class="tw:mb-3 tw:text-[var(--o2-text-muted)]"
+        class="mb-3 text-[var(--o2-text-muted)]"
       />
-      <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
+      <div class="text-base text-[var(--o2-text-primary)] mb-2">
         {{ t('traces.sessionDetail.sessionNotFound') }}
       </div>
-      <div class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:max-w-[30rem]">
+      <div class="text-sm text-[var(--o2-text-muted)] max-w-[30rem]">
         {{ t('traces.sessionDetail.noSpansFound', { id: sessionId }) }}
       </div>
     </div>
@@ -163,13 +163,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Shape row: KPI tiles (left) + session ribbon (right), always two
            equal columns side by side (matches the mockup's 1fr 1fr). -->
       <div
-        class="tw:grid tw:grid-cols-2 tw:gap-[0.625rem] tw:mb-[0.625rem] tw:flex-shrink-0"
+        class="grid grid-cols-2 gap-[0.625rem] mb-[0.625rem] flex-shrink-0"
       >
       <!-- KPI strip — six session-level metric tiles. Card chrome + danger
            variant are Tailwind utilities (see kpiCardClass / kpiAccentClass),
            matching the LLM Insights dashboard so the AI module stays consistent. -->
       <div
-        class="tw:grid tw:grid-cols-3 tw:grid-rows-2 tw:h-full tw:gap-[0.625rem]"
+        class="grid grid-cols-3 grid-rows-2 h-full gap-[0.625rem]"
         data-test="session-detail-kpis"
       >
         <div
@@ -181,18 +181,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Title uses the default primary text colour for every tile — same as
                the LLM Insights KPI label (which sets no colour, so it inherits the
                primary text). No red/orange on the Errors/Latency labels. -->
-          <div class="tw:text-[0.7rem] tw:leading-normal tw:font-semibold tw:text-[var(--o2-text-primary)]">
+          <div class="text-[0.7rem] leading-normal font-semibold text-[var(--o2-text-primary)]">
             {{ card.label }}
           </div>
-          <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
+          <div class="flex items-baseline gap-[0.2rem]">
             <span
-              :class="['tw:text-[1.4rem] tw:font-bold tw:leading-none tw:tabular-nums', kpiAccentClass(card.variant) || 'tw:text-[var(--o2-text-primary)]']"
+              :class="['text-[1.4rem] font-bold leading-none tabular-nums', kpiAccentClass(card.variant) || 'text-[var(--o2-text-primary)]']"
             >
               {{ card.value }}
             </span>
             <span
               v-if="card.unit"
-              class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-secondary)]"
+              class="text-[0.8rem] font-semibold text-[var(--o2-text-secondary)]"
             >
               {{ card.unit }}
             </span>
@@ -200,25 +200,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="xs"
-                class="tw:ml-[0.15rem] tw:cursor-default tw:text-[var(--o2-text-muted)]"
+                class="ml-[0.15rem] cursor-default text-[var(--o2-text-muted)]"
               />
               <OTooltip max-width="280px">
                 <template #content>
-                  <div class="tw:flex tw:flex-col tw:gap-2 tw:min-w-[230px]">
-                    <div class="tw:text-xs tw:font-semibold tw:text-[var(--o2-text-primary)]">
+                  <div class="flex flex-col gap-2 min-w-[230px]">
+                    <div class="text-xs font-semibold text-[var(--o2-text-primary)]">
                       {{ t('traces.sessionDetail.kpiSub.cacheImpactTooltipTitle') }}
                     </div>
-                    <div class="tw:flex tw:flex-col tw:gap-1">
+                    <div class="flex flex-col gap-1">
                       <div
                         v-for="row in card.tooltipRows || []"
                         :key="row.label"
-                        class="tw:flex tw:items-center tw:justify-between tw:gap-3 tw:text-[11px]"
+                        class="flex items-center justify-between gap-3 text-[11px]"
                       >
-                        <span class="tw:text-[var(--o2-text-muted)]">{{ row.label }}</span>
-                        <span class="tw:font-semibold tw:tabular-nums tw:text-[var(--o2-text-primary)]">{{ row.value }}</span>
+                        <span class="text-[var(--o2-text-muted)]">{{ row.label }}</span>
+                        <span class="font-semibold tabular-nums text-[var(--o2-text-primary)]">{{ row.value }}</span>
                       </div>
                     </div>
-                    <div class="tw:text-[10.5px] tw:leading-snug tw:text-[var(--o2-text-secondary)]">
+                    <div class="text-[10.5px] leading-snug text-[var(--o2-text-secondary)]">
                       {{ t('traces.sessionDetail.kpiSub.cacheEstimate') }}
                     </div>
                   </div>
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </div>
           <div
-            class="tw:flex tw:items-center tw:flex-wrap tw:gap-1 tw:text-[0.65rem] tw:leading-normal tw:font-medium tw:text-[var(--o2-text-secondary)]"
+            class="flex items-center flex-wrap gap-1 text-[0.65rem] leading-normal font-medium text-[var(--o2-text-secondary)]"
           >
             <span v-if="card.subLead">{{ card.subLead }}</span>
             <template v-for="chip in card.subTurns" :key="chip.n">
@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :cache-pct="cacheRatio"
               >
                 <span
-                  class="tw:inline-flex tw:items-center tw:justify-center tw:min-w-[1rem] tw:h-[1.05rem] tw:px-[0.3rem] tw:rounded-[0.3rem] tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:text-[var(--o2-text-primary)] tw:text-[0.68rem] tw:font-bold tw:leading-none tw:cursor-pointer tw:transition-colors hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,var(--o2-card-bg))] hover:tw:border-[color-mix(in_srgb,var(--o2-text-primary)_25%,var(--o2-border-color))]"
+                  class="inline-flex items-center justify-center min-w-[1rem] h-[1.05rem] px-[0.3rem] rounded-[0.3rem] border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] text-[var(--o2-text-primary)] text-[0.68rem] font-bold leading-none cursor-pointer transition-colors hover:bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,var(--o2-card-bg))] hover:border-[color-mix(in_srgb,var(--o2-text-primary)_25%,var(--o2-border-color))]"
                   @click="jumpToTurn(chip.n)"
                 >{{ chip.label }}</span>
               </TurnPreviewCard>
@@ -274,23 +274,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            scroll — the column grows with content; the rail sticks (items-start so
            it doesn't stretch to the tall conversation's height). -->
       <div
-        class="tw:grid tw:grid-cols-[minmax(0,1fr)_340px] tw:gap-[0.625rem] tw:items-start"
+        class="grid grid-cols-[minmax(0,1fr)_340px] gap-[0.625rem] items-start"
       >
       <!-- Conversation column: toolbar + panel -->
-      <div class="tw:flex tw:flex-col tw:min-w-0 tw:min-h-0">
+      <div class="flex flex-col min-w-0 min-h-0">
 
       <!-- Conversation toolbar: search (fills width) + status + model filters.
            Sorting lives on the Collapsed view's metric column headers. -->
-      <div class="tw:flex tw:items-center tw:gap-[0.5rem] tw:mb-[0.625rem] tw:flex-shrink-0">
+      <div class="flex items-center gap-[0.5rem] mb-[0.625rem] flex-shrink-0">
         <OSearchInput
           v-model="searchText"
           :placeholder="t('traces.sessionDetail.searchPlaceholder')"
           clearable
           :debounce="200"
           size="xs"
-          class="no-border tw:flex-1! tw:h-[36px]"
+          class="no-border flex-1! h-[36px]"
         />
-        <div class="tw:w-[9rem] tw:flex-shrink-0">
+        <div class="w-[9rem] flex-shrink-0">
           <OSelect
             v-model="statusFilter"
             :label="t('traces.sessionDetail.filters.status')"
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="statusOptions"
           />
         </div>
-        <div class="tw:w-[12rem] tw:flex-shrink-0">
+        <div class="w-[12rem] flex-shrink-0">
           <OSelect
             v-model="modelFilter"
             :label="t('traces.sessionDetail.filters.model')"
@@ -310,14 +310,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Conversation panel -->
       <div
-        class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:mb-[0.625rem] tw:flex tw:flex-col tw:overflow-hidden"
+        class="card-container rounded-lg border border-[var(--o2-border-color)] mb-[0.625rem] flex flex-col overflow-hidden"
         data-test="session-conversation-panel"
       >
         <!-- panel header: title + count chip + jump buttons -->
         <div
-          class="tw:flex tw:items-center tw:gap-[0.625rem] tw:px-[1rem] tw:py-[0.75rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0"
+          class="flex items-center gap-[0.625rem] px-[1rem] py-[0.75rem] border-b border-[var(--o2-border-color)] flex-shrink-0"
         >
-          <span class="tw:text-[0.95rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
+          <span class="text-[0.95rem] font-semibold text-[var(--o2-text-primary)]">
             {{ t('traces.sessionDetail.conversation') }}
           </span>
           <OTag type="countChip" value="neutral">
@@ -342,14 +342,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- turn list (Collapsed view) -->
         <div
           v-show="viewMode === 'collapsed'"
-          class="tw:flex tw:flex-col tw:gap-[0.5rem] tw:p-[0.5rem]"
+          class="flex flex-col gap-[0.5rem] p-[0.5rem]"
         >
           <!-- column headers — clickable sort controls for the three metric bars
                (OTable-style arrows). Aligned to the same grid template as each
                turn row, sticky so they persist on scroll. -->
           <div
             v-if="filteredTraces.length"
-            class="tw:sticky tw:top-0 tw:z-[5] tw:grid tw:grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] tw:items-center tw:gap-[0.75rem] tw:px-[0.75rem] tw:py-[0.4rem] tw:bg-[var(--o2-card-bg-solid)] tw:border-b tw:border-[var(--o2-border-color)] tw:text-[0.72rem] tw:font-medium tw:text-[var(--o2-text-primary)]"
+            class="sticky top-0 z-[5] grid grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] items-center gap-[0.75rem] px-[0.75rem] py-[0.4rem] bg-[var(--o2-card-bg-solid)] border-b border-[var(--o2-border-color)] text-[0.72rem] font-medium text-[var(--o2-text-primary)]"
             data-test="session-turn-columns"
           >
             <span></span>
@@ -359,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="col in sortableColumns"
               :key="col.key"
               type="button"
-              class="tw:flex tw:items-center tw:justify-end tw:gap-[0.15rem] tw:cursor-pointer tw:select-none hover:tw:text-[var(--o2-text-primary)]"
+              class="flex items-center justify-end gap-[0.15rem] cursor-pointer select-none hover:text-[var(--o2-text-primary)]"
               :data-test="`session-turn-sort-${col.key}`"
               @click="toggleSort(col.key)"
             >
@@ -367,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 :name="sortIconName(col.key)"
                 size="xs"
-                :class="sortIcon(col.key) === 'none' ? 'tw:opacity-40' : 'tw:text-[var(--color-table-sort-icon-active)]'"
+                :class="sortIcon(col.key) === 'none' ? 'opacity-40' : 'text-[var(--color-table-sort-icon-active)]'"
               />
             </button>
           </div>
@@ -380,36 +380,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- collapsed header (click to expand) -->
             <div
-              class="tw:grid tw:grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] tw:items-center tw:gap-[0.75rem] tw:px-[0.75rem] tw:py-[0.6rem] tw:cursor-pointer hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_3%,var(--o2-card-bg))]"
+              class="grid grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] items-center gap-[0.75rem] px-[0.75rem] py-[0.6rem] cursor-pointer hover:bg-[color-mix(in_srgb,var(--o2-text-primary)_3%,var(--o2-card-bg))]"
               :data-test="`session-turn-header-${trace.traceId}`"
               @click="toggleTurn(trace.traceId)"
             >
               <OIcon
                 :name="isExpanded(trace.traceId) ? 'expand-more' : 'chevron-right'"
                 size="sm"
-                class="tw:text-[var(--o2-text-muted)] tw:flex-shrink-0"
+                class="text-[var(--o2-text-muted)] flex-shrink-0"
               />
               <span
-                class="tw:inline-flex tw:items-center tw:justify-center tw:w-[1.5rem] tw:h-[1.5rem] tw:rounded-full tw:text-[0.7rem] tw:font-bold tw:tabular-nums tw:flex-shrink-0"
+                class="inline-flex items-center justify-center w-[1.5rem] h-[1.5rem] rounded-full text-[0.7rem] font-bold tabular-nums flex-shrink-0"
                 :class="trace.status === 'error'
-                  ? 'tw:bg-[color-mix(in_srgb,var(--o2-service-health-critical)_15%,transparent)] tw:text-[var(--o2-service-health-critical)]'
-                  : 'tw:bg-[color-mix(in_srgb,var(--o2-service-health-healthy)_15%,transparent)] tw:text-[var(--o2-service-health-healthy)]'"
+                  ? 'bg-[color-mix(in_srgb,var(--o2-service-health-critical)_15%,transparent)] text-[var(--o2-service-health-critical)]'
+                  : 'bg-[color-mix(in_srgb,var(--o2-service-health-healthy)_15%,transparent)] text-[var(--o2-service-health-healthy)]'"
               >
                 {{ originalTurnIndex(trace.traceId) + 1 }}
               </span>
-              <div class="tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.15rem]">
-                <div class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-primary)] tw:truncate">
+              <div class="min-w-0 flex flex-col gap-[0.15rem]">
+                <div class="text-[0.8rem] font-semibold text-[var(--o2-text-primary)] truncate">
                   {{ trace.turnUserMessage || '—' }}
                 </div>
                 <div
-                  class="tw:text-[0.72rem] tw:truncate"
-                  :class="trace.status === 'error' ? 'tw:text-[var(--o2-service-health-critical)]' : 'tw:text-[var(--o2-text-secondary)]'"
+                  class="text-[0.72rem] truncate"
+                  :class="trace.status === 'error' ? 'text-[var(--o2-service-health-critical)]' : 'text-[var(--o2-text-secondary)]'"
                 >
                   {{ secondaryLine(trace) }}
                 </div>
               </div>
-              <div class="tw:flex tw:flex-col tw:gap-[0.2rem] tw:min-w-0">
-                <span class="tw:text-[0.72rem] tw:font-semibold tw:tabular-nums tw:text-right tw:text-[var(--o2-text-secondary)]">
+              <div class="flex flex-col gap-[0.2rem] min-w-0">
+                <span class="text-[0.72rem] font-semibold tabular-nums text-right text-[var(--o2-text-secondary)]">
                   {{ formatDuration(trace.durationNanos) }}
                 </span>
                 <OProgressBar
@@ -418,14 +418,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="xs"
                 />
               </div>
-              <div class="tw:flex tw:flex-col tw:gap-[0.2rem] tw:min-w-0">
-                <span class="tw:text-[0.72rem] tw:font-semibold tw:tabular-nums tw:text-right tw:text-[var(--o2-text-secondary)]">
+              <div class="flex flex-col gap-[0.2rem] min-w-0">
+                <span class="text-[0.72rem] font-semibold tabular-nums text-right text-[var(--o2-text-secondary)]">
                   ${{ trace.cost.toFixed(4) }}
                 </span>
                 <OProgressBar :value="ratio(trace.cost, maxTurnCost)" size="xs" />
               </div>
-              <div class="tw:flex tw:flex-col tw:gap-[0.2rem] tw:min-w-0">
-                <span class="tw:text-[0.72rem] tw:font-semibold tw:tabular-nums tw:text-right tw:text-[var(--o2-text-secondary)]">
+              <div class="flex flex-col gap-[0.2rem] min-w-0">
+                <span class="text-[0.72rem] font-semibold tabular-nums text-right text-[var(--o2-text-secondary)]">
                   {{ formatTokens(trace.tokens) }}
                 </span>
                 <OProgressBar :value="ratio(trace.tokens, maxTurnTokens)" size="xs" />
@@ -435,33 +435,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- expanded body (basic messages + stats; full Ledger is S6) -->
             <div
               v-if="isExpanded(trace.traceId)"
-              class="tw:border-t tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg-solid)] tw:p-[0.75rem]"
+              class="border-t border-[var(--o2-border-color)] bg-[var(--o2-card-bg-solid)] p-[0.75rem]"
               :data-test="`session-turn-body-${trace.traceId}`"
             >
               <!-- loading skeleton -->
-              <div v-if="sessionSpansLoading" class="tw:flex tw:flex-col tw:gap-[0.4rem]">
-                <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[40%] tw:h-[0.7rem]" />
-                <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[90%] tw:h-[0.65rem]" />
-                <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[80%] tw:h-[0.65rem]" />
-                <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[60%] tw:h-[0.65rem]" />
+              <div v-if="sessionSpansLoading" class="flex flex-col gap-[0.4rem]">
+                <OSkeleton type="rect" animation="wave" class="rounded w-[40%] h-[0.7rem]" />
+                <OSkeleton type="rect" animation="wave" class="rounded w-[90%] h-[0.65rem]" />
+                <OSkeleton type="rect" animation="wave" class="rounded w-[80%] h-[0.65rem]" />
+                <OSkeleton type="rect" animation="wave" class="rounded w-[60%] h-[0.65rem]" />
               </div>
 
-              <div v-else class="tw:flex tw:flex-col tw:gap-[0.625rem]">
+              <div v-else class="flex flex-col gap-[0.625rem]">
                 <!-- user block -->
-                <div class="tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:overflow-hidden">
-                  <div class="tw:flex tw:items-center tw:justify-between tw:px-[0.625rem] tw:py-[0.375rem] tw:border-b tw:border-[var(--o2-border-color)]">
-                    <span class="tw:text-[0.75rem] tw:font-bold tw:text-[var(--o2-text-primary)]">
+                <div class="rounded-lg border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] overflow-hidden">
+                  <div class="flex items-center justify-between px-[0.625rem] py-[0.375rem] border-b border-[var(--o2-border-color)]">
+                    <span class="text-[0.75rem] font-bold text-[var(--o2-text-primary)]">
                       {{ t('traces.sessionDetail.roles.user') }}
                     </span>
                     <OIcon
                       v-if="turnDetail(trace.traceId)?.userMessage"
                       name="content-copy"
                       size="xs"
-                      class="tw:cursor-pointer tw:text-[var(--o2-text-muted)] hover:tw:text-[var(--o2-text-primary)]"
+                      class="cursor-pointer text-[var(--o2-text-muted)] hover:text-[var(--o2-text-primary)]"
                       @click="copyText(turnDetail(trace.traceId)?.userMessage?.content)"
                     />
                   </div>
-                  <div class="tw:px-[0.75rem] tw:py-[0.625rem] tw:text-[0.8rem] tw:leading-relaxed tw:text-[var(--o2-text-primary)] tw:whitespace-pre-wrap tw:break-words tw:max-h-[12rem] tw:overflow-y-auto">
+                  <div class="px-[0.75rem] py-[0.625rem] text-[0.8rem] leading-relaxed text-[var(--o2-text-primary)] whitespace-pre-wrap break-words max-h-[12rem] overflow-y-auto">
                     {{ turnDetail(trace.traceId)?.userMessage?.content || t('traces.sessionDetail.noUserMessage') }}
                   </div>
                 </div>
@@ -474,9 +474,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
 
                 <!-- assistant block -->
-                <div class="tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:overflow-hidden">
-                  <div class="tw:flex tw:items-center tw:justify-between tw:px-[0.625rem] tw:py-[0.375rem] tw:border-b tw:border-[var(--o2-border-color)]">
-                    <span class="tw:flex tw:items-center tw:gap-[0.375rem] tw:text-[0.75rem] tw:font-bold tw:text-[var(--o2-text-primary)]">
+                <div class="rounded-lg border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] overflow-hidden">
+                  <div class="flex items-center justify-between px-[0.625rem] py-[0.375rem] border-b border-[var(--o2-border-color)]">
+                    <span class="flex items-center gap-[0.375rem] text-[0.75rem] font-bold text-[var(--o2-text-primary)]">
                       {{ t('traces.sessionDetail.roles.assistant') }}
                       <OTag v-if="turnDetail(trace.traceId)?.model" variant="purple-soft" size="sm">
                         {{ turnDetail(trace.traceId)?.model }}
@@ -486,7 +486,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="turnDetail(trace.traceId)?.assistantMessage"
                       name="content-copy"
                       size="xs"
-                      class="tw:cursor-pointer tw:text-[var(--o2-text-muted)] hover:tw:text-[var(--o2-text-primary)]"
+                      class="cursor-pointer text-[var(--o2-text-muted)] hover:text-[var(--o2-text-primary)]"
                       @click="copyText(turnDetail(trace.traceId)?.assistantMessage?.content)"
                     />
                   </div>
@@ -494,19 +494,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        code, bold). v-html is sanitized in renderMarkdown(). -->
                   <div
                     v-if="turnDetail(trace.traceId)?.assistantMessage?.content"
-                    class="markdown-body tw:px-[0.75rem] tw:py-[0.625rem] tw:text-[0.8rem] tw:text-[var(--o2-text-primary)] tw:break-words tw:max-h-[16rem] tw:overflow-auto"
+                    class="markdown-body px-[0.75rem] py-[0.625rem] text-[0.8rem] text-[var(--o2-text-primary)] break-words max-h-[16rem] overflow-auto"
                     v-html="renderMarkdown(turnDetail(trace.traceId)?.assistantMessage?.content)"
                   />
                   <div
                     v-else
-                    class="tw:px-[0.75rem] tw:py-[0.625rem] tw:text-[0.8rem] tw:text-[var(--o2-text-muted)]"
+                    class="px-[0.75rem] py-[0.625rem] text-[0.8rem] text-[var(--o2-text-muted)]"
                   >
                     {{ t('traces.sessionDetail.noAssistantMessage') }}
                   </div>
                 </div>
 
                 <!-- compact stats footer -->
-                <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-x-[0.75rem] tw:gap-y-[0.25rem] tw:text-[0.7rem] tw:text-[var(--o2-text-secondary)] tw:tabular-nums">
+                <div class="flex flex-wrap items-center gap-x-[0.75rem] gap-y-[0.25rem] text-[0.7rem] text-[var(--o2-text-secondary)] tabular-nums">
                   <span>{{ formatTime(trace.startTimeMicros) }}</span>
                   <span>· {{ formatDuration(trace.durationNanos) }}</span>
                   <span>· ${{ trace.cost.toFixed(4) }}</span>
@@ -515,9 +515,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     · {{ turnDetail(trace.traceId)!.llmCalls }} {{ t('traces.sessionDetail.stats.llmCalls') }}
                     · {{ turnDetail(trace.traceId)!.toolCalls }} {{ t('traces.sessionDetail.stats.toolCalls') }}
                   </span>
-                  <div class="tw:flex-1"></div>
+                  <div class="flex-1"></div>
                   <OButton variant="outline" size="sm" @click="openTrace(trace.traceId)">
-                    <OIcon name="open-in-new" size="xs" class="tw:mr-[0.25rem]" />
+                    <OIcon name="open-in-new" size="xs" class="mr-[0.25rem]" />
                     {{ t('traces.sessionDetail.openInTraceExplorer') }}
                   </OButton>
                 </div>
@@ -528,10 +528,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- empty state -->
           <div
             v-if="filteredTraces.length === 0"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-[0.5rem] tw:py-[3rem] tw:text-[var(--o2-text-muted)]"
+            class="flex flex-col items-center justify-center gap-[0.5rem] py-[3rem] text-[var(--o2-text-muted)]"
           >
             <OIcon name="search-off" size="lg" />
-            <span class="tw:text-[0.8rem]">{{ t('traces.sessionDetail.noTurnsMatch') }}</span>
+            <span class="text-[0.8rem]">{{ t('traces.sessionDetail.noTurnsMatch') }}</span>
           </div>
         </div>
 
@@ -541,12 +541,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="viewMode === 'pretty'">
           <div
             v-if="sessionSpansLoading"
-            class="tw:flex tw:flex-col tw:gap-[0.5rem] tw:p-[0.75rem]"
+            class="flex flex-col gap-[0.5rem] p-[0.75rem]"
             data-test="session-pretty-skeleton"
           >
-            <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[30%] tw:h-[1.5rem]" />
-            <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[70%] tw:h-[3rem] tw:mt-[0.5rem]" />
-            <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[85%] tw:h-[4rem]" />
+            <OSkeleton type="rect" animation="wave" class="rounded w-[30%] h-[1.5rem]" />
+            <OSkeleton type="rect" animation="wave" class="rounded w-[70%] h-[3rem] mt-[0.5rem]" />
+            <OSkeleton type="rect" animation="wave" class="rounded w-[85%] h-[4rem]" />
           </div>
           <ThreadView
             v-else
@@ -566,70 +566,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            if its rows exceed its third. A card with fewer rows just shows them in
            its third. Definite height so the thirds distribute. -->
       <aside
-        class="tw:sticky tw:top-0 tw:self-start tw:flex tw:flex-col tw:gap-[0.625rem] tw:h-[calc(100vh-2.6rem-68px-1.25rem)] tw:overflow-hidden tw:pb-[0.625rem]"
+        class="sticky top-0 self-start flex flex-col gap-[0.625rem] h-[calc(100vh-2.6rem-68px-1.25rem)] overflow-hidden pb-[0.625rem]"
         data-test="session-rail"
       >
         <!-- Tool Hotspots (by time + calls; cost pending backend attribution) -->
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-          <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0">
-            <OIcon name="build" size="xs" class="tw:text-[var(--o2-text-muted)]" />
-            <span class="tw:text-[0.78rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
+        <div class="card-container rounded-lg border border-[var(--o2-border-color)] flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div class="flex items-center gap-[0.4rem] px-[0.75rem] py-[0.5rem] border-b border-[var(--o2-border-color)] flex-shrink-0">
+            <OIcon name="build" size="xs" class="text-[var(--o2-text-muted)]" />
+            <span class="text-[0.78rem] font-semibold text-[var(--o2-text-primary)]">
               {{ t('traces.sessionDetail.rail.toolHotspots') }}
             </span>
           </div>
           <div
             v-if="sessionSpansLoading"
-            class="tw:flex tw:flex-col tw:gap-[0.4rem] tw:p-[0.625rem]"
+            class="flex flex-col gap-[0.4rem] p-[0.625rem]"
           >
-            <OSkeleton v-for="n in 3" :key="n" type="rect" animation="wave" class="tw:rounded tw:w-full tw:h-[1.1rem]" />
+            <OSkeleton v-for="n in 3" :key="n" type="rect" animation="wave" class="rounded w-full h-[1.1rem]" />
           </div>
           <div
             v-else-if="toolHotspots.length"
-            class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]"
+            class="flex-1 min-h-0 overflow-y-auto p-[0.375rem] flex flex-col gap-[0.1rem]"
           >
             <span
               v-for="(row, i) in toolHotspots"
               :key="row.name"
-              class="tw:contents"
+              class="contents"
             >
               <button
-                class="tw:flex tw:items-center tw:gap-[0.5rem] tw:w-full tw:px-[0.4rem] tw:py-[0.35rem] tw:rounded-md tw:text-left tw:cursor-pointer hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_4%,transparent)]"
+                class="flex items-center gap-[0.5rem] w-full px-[0.4rem] py-[0.35rem] rounded-md text-left cursor-pointer hover:bg-[color-mix(in_srgb,var(--o2-text-primary)_4%,transparent)]"
                 @click="jumpToTurn(originalTurnIndex(row.topTraceId) + 1)"
               >
-                <span class="tw:w-[1.25rem] tw:h-[1.25rem] tw:rounded-md tw:grid tw:place-items-center tw:text-[0.62rem] tw:font-bold tw:tabular-nums tw:flex-shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,transparent)] tw:text-[var(--o2-text-secondary)]">
+                <span class="w-[1.25rem] h-[1.25rem] rounded-md grid place-items-center text-[0.62rem] font-bold tabular-nums flex-shrink-0 bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,transparent)] text-[var(--o2-text-secondary)]">
                   {{ i + 1 }}
                 </span>
-                <span class="tw:text-[0.72rem] tw:font-semibold tw:text-[var(--o2-text-primary)] tw:flex-1 tw:min-w-0 tw:truncate" :title="row.name">
+                <span class="text-[0.72rem] font-semibold text-[var(--o2-text-primary)] flex-1 min-w-0 truncate" :title="row.name">
                   {{ row.name }}
                 </span>
-                <span class="tw:flex tw:items-center tw:gap-[0.3rem] tw:text-[0.7rem] tw:tabular-nums tw:flex-shrink-0">
-                  <span class="tw:font-semibold tw:text-[var(--o2-text-secondary)]">
+                <span class="flex items-center gap-[0.3rem] text-[0.7rem] tabular-nums flex-shrink-0">
+                  <span class="font-semibold text-[var(--o2-text-secondary)]">
                     {{ formatDuration(row.duration) }}
                   </span>
-                  <span class="tw:text-[var(--o2-text-muted)]">
+                  <span class="text-[var(--o2-text-muted)]">
                     · {{ t(row.calls === 1 ? 'traces.sessionDetail.rail.call' : 'traces.sessionDetail.rail.calls', { n: row.calls }) }}
                   </span>
                 </span>
-                <OIcon name="chevron-right" size="xs" class="tw:text-[var(--o2-text-muted)] tw:flex-shrink-0" />
+                <OIcon name="chevron-right" size="xs" class="text-[var(--o2-text-muted)] flex-shrink-0" />
               </button>
               <!-- Hover: which turns this (deduped) tool actually ran in. side="left"
                    (like the Cost/Slowest hovers) so it opens to the side instead of
                    covering the rows above it. -->
-              <OTooltip side="left" :delay="120" max-width="220px" content-class="tw:p-0!">
+              <OTooltip side="left" :delay="120" max-width="220px" content-class="p-0!">
                 <template #content>
-                  <div class="tw:w-[200px] tw:py-[9px] tw:px-3 tw:text-xs tw:text-[var(--o2-text-primary)]">
-                    <div class="tw:font-bold tw:mb-[2px] tw:break-words">{{ row.name }}</div>
-                    <div class="tw:text-[10px] tw:text-[var(--o2-text-muted)] tw:mb-[7px]">
+                  <div class="w-[200px] py-[9px] px-3 text-xs text-[var(--o2-text-primary)]">
+                    <div class="font-bold mb-[2px] break-words">{{ row.name }}</div>
+                    <div class="text-[10px] text-[var(--o2-text-muted)] mb-[7px]">
                       {{ t(row.calls === 1 ? 'traces.sessionDetail.rail.call' : 'traces.sessionDetail.rail.calls', { n: row.calls }) }}
                     </div>
-                    <div class="tw:text-[9.5px] tw:font-bold tw:tracking-[0.05em] tw:text-[var(--o2-text-muted)] tw:mb-1">
+                    <div class="text-[9.5px] font-bold tracking-[0.05em] text-[var(--o2-text-muted)] mb-1">
                       {{ t('traces.sessionDetail.rail.usedIn') }}
                     </div>
-                    <div class="tw:flex tw:flex-wrap tw:gap-1">
+                    <div class="flex flex-wrap gap-1">
                       <span
                         v-for="tn in row.turns"
                         :key="tn"
-                        class="tw:inline-flex tw:items-center tw:px-[0.35rem] tw:h-[1.05rem] tw:rounded-[0.3rem] tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:text-[10px] tw:font-semibold tw:tabular-nums"
+                        class="inline-flex items-center px-[0.35rem] h-[1.05rem] rounded-[0.3rem] border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] text-[10px] font-semibold tabular-nums"
                       >{{ t('traces.sessionDetail.turnLabel') }} {{ tn }}</span>
                     </div>
                   </div>
@@ -637,20 +637,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTooltip>
             </span>
           </div>
-          <div v-else class="tw:px-[0.75rem] tw:py-[1.25rem] tw:text-center tw:text-[0.72rem] tw:text-[var(--o2-text-muted)]">
+          <div v-else class="px-[0.75rem] py-[1.25rem] text-center text-[0.72rem] text-[var(--o2-text-muted)]">
             {{ t('traces.sessionDetail.rail.noTools') }}
           </div>
         </div>
 
         <!-- Cost Hotspots -->
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-          <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0">
-            <OIcon name="trending-up" size="xs" class="tw:text-[var(--o2-text-muted)]" />
-            <span class="tw:text-[0.78rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
+        <div class="card-container rounded-lg border border-[var(--o2-border-color)] flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div class="flex items-center gap-[0.4rem] px-[0.75rem] py-[0.5rem] border-b border-[var(--o2-border-color)] flex-shrink-0">
+            <OIcon name="trending-up" size="xs" class="text-[var(--o2-text-muted)]" />
+            <span class="text-[0.78rem] font-semibold text-[var(--o2-text-primary)]">
               {{ t('traces.sessionDetail.rail.costHotspots') }}
             </span>
           </div>
-          <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
+          <div class="flex-1 min-h-0 overflow-y-auto p-[0.375rem] flex flex-col gap-[0.1rem]">
             <TurnPreviewCard
               v-for="(row, i) in costHotspots"
               :key="row.n"
@@ -660,41 +660,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               side="right"
             >
               <button
-                class="tw:flex tw:items-center tw:gap-[0.5rem] tw:w-full tw:px-[0.4rem] tw:py-[0.35rem] tw:rounded-md tw:text-left tw:cursor-pointer hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_4%,transparent)]"
+                class="flex items-center gap-[0.5rem] w-full px-[0.4rem] py-[0.35rem] rounded-md text-left cursor-pointer hover:bg-[color-mix(in_srgb,var(--o2-text-primary)_4%,transparent)]"
                 @click="jumpToTurn(row.n)"
               >
-                <span class="tw:w-[1.25rem] tw:h-[1.25rem] tw:rounded-md tw:grid tw:place-items-center tw:text-[0.62rem] tw:font-bold tw:tabular-nums tw:flex-shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,transparent)] tw:text-[var(--o2-text-secondary)]">
+                <span class="w-[1.25rem] h-[1.25rem] rounded-md grid place-items-center text-[0.62rem] font-bold tabular-nums flex-shrink-0 bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,transparent)] text-[var(--o2-text-secondary)]">
                   {{ i + 1 }}
                 </span>
-                <span class="tw:text-[0.72rem] tw:font-semibold tw:text-[var(--o2-text-primary)] tw:w-[2.75rem] tw:flex-shrink-0">
+                <span class="text-[0.72rem] font-semibold text-[var(--o2-text-primary)] w-[2.75rem] flex-shrink-0">
                   {{ t('traces.sessionDetail.turnLabel') }} {{ row.n }}
                 </span>
-                <span class="tw:flex-1 tw:min-w-0">
+                <span class="flex-1 min-w-0">
                   <OProgressBar :value="ratio(row.cost, maxTurnCost)" size="xs" />
                 </span>
-                <span class="tw:flex tw:flex-col tw:items-end tw:min-w-[3.25rem]">
-                  <span class="tw:text-[0.7rem] tw:font-semibold tw:tabular-nums tw:text-[var(--o2-text-secondary)]">
+                <span class="flex flex-col items-end min-w-[3.25rem]">
+                  <span class="text-[0.7rem] font-semibold tabular-nums text-[var(--o2-text-secondary)]">
                     ${{ row.cost.toFixed(4) }}
                   </span>
-                  <span v-if="detail && detail.cost > 0" class="tw:text-[0.6rem] tw:tabular-nums tw:text-[var(--o2-text-muted)]">
+                  <span v-if="detail && detail.cost > 0" class="text-[0.6rem] tabular-nums text-[var(--o2-text-muted)]">
                     {{ ((row.cost / detail.cost) * 100).toFixed(1) }}%
                   </span>
                 </span>
-                <OIcon name="chevron-right" size="xs" class="tw:text-[var(--o2-text-muted)] tw:flex-shrink-0" />
+                <OIcon name="chevron-right" size="xs" class="text-[var(--o2-text-muted)] flex-shrink-0" />
               </button>
             </TurnPreviewCard>
           </div>
         </div>
 
         <!-- Slowest Turns -->
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-          <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0">
-            <OIcon name="schedule" size="xs" class="tw:text-[var(--o2-text-muted)]" />
-            <span class="tw:text-[0.78rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
+        <div class="card-container rounded-lg border border-[var(--o2-border-color)] flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div class="flex items-center gap-[0.4rem] px-[0.75rem] py-[0.5rem] border-b border-[var(--o2-border-color)] flex-shrink-0">
+            <OIcon name="schedule" size="xs" class="text-[var(--o2-text-muted)]" />
+            <span class="text-[0.78rem] font-semibold text-[var(--o2-text-primary)]">
               {{ t('traces.sessionDetail.rail.slowestTurns') }}
             </span>
           </div>
-          <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
+          <div class="flex-1 min-h-0 overflow-y-auto p-[0.375rem] flex flex-col gap-[0.1rem]">
             <TurnPreviewCard
               v-for="(row, i) in slowestTurns"
               :key="row.n"
@@ -704,22 +704,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               side="right"
             >
               <button
-                class="tw:flex tw:items-center tw:gap-[0.5rem] tw:w-full tw:px-[0.4rem] tw:py-[0.35rem] tw:rounded-md tw:text-left tw:cursor-pointer hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_4%,transparent)]"
+                class="flex items-center gap-[0.5rem] w-full px-[0.4rem] py-[0.35rem] rounded-md text-left cursor-pointer hover:bg-[color-mix(in_srgb,var(--o2-text-primary)_4%,transparent)]"
                 @click="jumpToTurn(row.n)"
               >
-                <span class="tw:w-[1.25rem] tw:h-[1.25rem] tw:rounded-md tw:grid tw:place-items-center tw:text-[0.62rem] tw:font-bold tw:tabular-nums tw:flex-shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,transparent)] tw:text-[var(--o2-text-secondary)]">
+                <span class="w-[1.25rem] h-[1.25rem] rounded-md grid place-items-center text-[0.62rem] font-bold tabular-nums flex-shrink-0 bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,transparent)] text-[var(--o2-text-secondary)]">
                   {{ i + 1 }}
                 </span>
-                <span class="tw:text-[0.72rem] tw:font-semibold tw:text-[var(--o2-text-primary)] tw:w-[2.75rem] tw:flex-shrink-0">
+                <span class="text-[0.72rem] font-semibold text-[var(--o2-text-primary)] w-[2.75rem] flex-shrink-0">
                   {{ t('traces.sessionDetail.turnLabel') }} {{ row.n }}
                 </span>
-                <span class="tw:flex-1 tw:min-w-0">
+                <span class="flex-1 min-w-0">
                   <OProgressBar :value="ratio(row.lat, maxTurnLat)" :variant="row.status === 'error' ? 'danger' : 'warning'" size="xs" />
                 </span>
-                <span class="tw:text-[0.7rem] tw:font-semibold tw:tabular-nums tw:text-[var(--o2-text-secondary)] tw:min-w-[2.75rem] tw:text-right">
+                <span class="text-[0.7rem] font-semibold tabular-nums text-[var(--o2-text-secondary)] min-w-[2.75rem] text-right">
                   {{ formatDuration(row.lat) }}
                 </span>
-                <OIcon name="chevron-right" size="xs" class="tw:text-[var(--o2-text-muted)] tw:flex-shrink-0" />
+                <OIcon name="chevron-right" size="xs" class="text-[var(--o2-text-muted)] flex-shrink-0" />
               </button>
             </TurnPreviewCard>
           </div>
@@ -868,15 +868,15 @@ function cacheInputDenominator(d: SessionDetail): number {
 // Errors uses a variant (red when > 50% error rate); every other tile is neutral.
 function kpiCardClass(variant?: "danger"): string {
   const base =
-    "tw:flex tw:flex-col tw:justify-center tw:gap-1 tw:px-3.5 tw:py-2.5 tw:rounded-lg tw:border tw:transition-shadow hover:tw:shadow-[0_1px_6px_rgba(0,0,0,0.08)]";
+    "flex flex-col justify-center gap-1 px-3.5 py-2.5 rounded-lg border transition-shadow hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]";
   if (variant === "danger")
-    return `${base} tw:bg-[color-mix(in_srgb,var(--o2-service-health-critical)_5%,var(--o2-card-bg))] tw:border-[color-mix(in_srgb,var(--o2-service-health-critical)_35%,var(--o2-border-color))]`;
-  return `${base} tw:bg-[var(--o2-card-bg)] tw:border-[var(--o2-border-color)]`;
+    return `${base} bg-[color-mix(in_srgb,var(--o2-service-health-critical)_5%,var(--o2-card-bg))] border-[color-mix(in_srgb,var(--o2-service-health-critical)_35%,var(--o2-border-color))]`;
+  return `${base} bg-[var(--o2-card-bg)] border-[var(--o2-border-color)]`;
 }
 
 // Accent text colour for a variant's value; "" → use the neutral default.
 function kpiAccentClass(variant?: "danger"): string {
-  if (variant === "danger") return "tw:text-[var(--o2-service-health-critical)]";
+  if (variant === "danger") return "text-[var(--o2-service-health-critical)]";
   return "";
 }
 
@@ -1468,11 +1468,11 @@ function turnRowClass(trace: SessionTraceRow): string {
   // coloured left border — keeps the row chrome flat, matching the KPI tiles.
   const surface =
     trace.status === "error"
-      ? "tw:bg-[color-mix(in_srgb,var(--o2-service-health-critical)_5%,var(--o2-card-bg))]"
-      : "tw:bg-[var(--o2-card-bg)]";
+      ? "bg-[color-mix(in_srgb,var(--o2-service-health-critical)_5%,var(--o2-card-bg))]"
+      : "bg-[var(--o2-card-bg)]";
   const flash =
-    flashTurn.value === n ? " tw:ring-2 tw:ring-[#3b82f6]" : "";
-  return `tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] ${surface} tw:overflow-hidden${flash}`;
+    flashTurn.value === n ? " ring-2 ring-[#3b82f6]" : "";
+  return `rounded-lg border border-[var(--o2-border-color)] ${surface} overflow-hidden${flash}`;
 }
 
 async function load() {

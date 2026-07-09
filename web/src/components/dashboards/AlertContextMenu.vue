@@ -19,26 +19,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="visible"
       ref="menuRef"
-      class="tw:fixed tw:z-9999 tw:bg-white tw:dark:bg-[#2c2c2c] tw:border tw:border-(--o2-border) tw:dark:border-[#404040] tw:rounded tw:shadow-[0_2px_8px_rgba(0,0,0,0.15)] tw:dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)] tw:min-w-70 tw:py-1 tw:px-0"
+      class="fixed z-9999 bg-white dark:bg-[#2c2c2c] border border-(--o2-border) dark:border-[#404040] rounded shadow-[0_2px_8px_rgba(0,0,0,0.15)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)] min-w-70 py-1 px-0"
       :style="menuStyle"
       @click.stop
       data-test="alert-context-menu"
     >
       <div
-        class="tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm tw:text-[#333] tw:hover:bg-[#f5f5f5] tw:active:bg-[var(--o2-border)] tw:dark:text-[var(--o2-border)] tw:dark:hover:bg-[#383838] tw:dark:active:bg-[#404040]"
+        class="flex items-center py-2 px-4 cursor-pointer [transition:background-color_0.2s] text-sm text-[#333] hover:bg-[#f5f5f5] active:bg-[var(--o2-border)] dark:text-[var(--o2-border)] dark:hover:bg-[#383838] dark:active:bg-[#404040]"
         @click="handleMenuItemClick('above')"
         data-test="alert-context-menu-above"
       >
-        <OIcon name="arrow-upward" size="sm" class="tw:mr-2" />
-        <span class="tw:select-none">Create Alert with threshold above {{ formattedValue }}</span>
+        <OIcon name="arrow-upward" size="sm" class="mr-2" />
+        <span class="select-none">Create Alert with threshold above {{ formattedValue }}</span>
       </div>
       <div
-        class="tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm tw:text-[#333] tw:hover:bg-[#f5f5f5] tw:active:bg-[var(--o2-border)] tw:dark:text-[var(--o2-border)] tw:dark:hover:bg-[#383838] tw:dark:active:bg-[#404040]"
+        class="flex items-center py-2 px-4 cursor-pointer [transition:background-color_0.2s] text-sm text-[#333] hover:bg-[#f5f5f5] active:bg-[var(--o2-border)] dark:text-[var(--o2-border)] dark:hover:bg-[#383838] dark:active:bg-[#404040]"
         @click="handleMenuItemClick('below')"
         data-test="alert-context-menu-below"
       >
-        <OIcon name="arrow-downward" size="sm" class="tw:mr-2" />
-        <span class="tw:select-none">Create Alert with threshold below {{ formattedValue }}</span>
+        <OIcon name="arrow-downward" size="sm" class="mr-2" />
+        <span class="select-none">Create Alert with threshold below {{ formattedValue }}</span>
       </div>
     </div>
   </teleport>

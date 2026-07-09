@@ -115,6 +115,7 @@ const mockUseDashboardPanelData = {
   isAddYAxisNotAllowed: { value: false },
   isAddZAxisNotAllowed: { value: false },
   isAddBreakdownNotAllowed: { value: false },
+  isPivotMode: { value: false },
   cleanupDraggingFields: vi.fn(),
   selectedStreamFieldsBasedOnUserDefinedSchema: {
     value: [
@@ -206,6 +207,10 @@ const i18n = createI18n({
         yAxis: "Y Axis",
         xAxis: "X Axis",
         zAxis: "Z Axis",
+        xAxisShort: "X-Axis",
+        yAxisShort: "Y-Axis",
+        rowFields: "Row Fields",
+        valueFields: "Value Fields",
         breakdown: "Breakdown",
         joins: "Joins",
         addJoin: "Add Join",
@@ -858,7 +863,7 @@ describe("DashboardQueryBuilder", () => {
       });
 
       const xAxis = wrapper.find('[data-test="dashboard-x-layout"]');
-      expect(xAxis.classes()).toContain("tw:[border-style:dotted]");
+      expect(xAxis.classes()).toContain("[border-style:dotted]");
     });
 
     it("should apply drop entered styling", () => {
@@ -868,7 +873,7 @@ describe("DashboardQueryBuilder", () => {
       });
 
       const xAxis = wrapper.find('[data-test="dashboard-x-layout"]');
-      expect(xAxis.classes()).toContain("tw:transition-all");
+      expect(xAxis.classes()).toContain("transition-all");
     });
   });
 

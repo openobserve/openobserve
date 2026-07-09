@@ -19,16 +19,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="function-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
+    class="flex flex-col h-full min-h-0"
   >
-    <div v-if="!showAddJSTransformDialog" class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
+    <div v-if="!showAddJSTransformDialog" class="flex flex-col h-full min-h-0">
       <!-- Standard section header: title + actions only. Search moved to toolbar. -->
       <AppPageHeader
         :title="t('function.header')"
         icon="function"
         :subtitle="t('function.subtitle')"
         tabs-below
-        class="tw:shrink-0 tw:px-4"
+        class="shrink-0 px-4"
       >
         <template #tabs>
           <PipelineSectionTabs />
@@ -44,8 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
       </AppPageHeader>
-      <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-        <div class="tw:h-full">
+      <div class="w-full flex-1 min-h-0 overflow-hidden">
+        <div class="h-full">
           <OTable
             :frame="false"
             :data="visibleRows"
@@ -60,17 +60,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-global-filter="false"
             :default-columns="false"
             width="100%"
-            class="tw:w-full tw:h-full"
+            class="w-full h-full"
           >
               <template #toolbar>
-                <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+                <div class="flex items-center gap-2 w-full">
                   <OSearchInput
                     data-test="functions-list-search-input"
                     v-model="filterQuery"
-                    class="tw:flex-1"
+                    class="flex-1"
                     :placeholder="t('function.search')"
                   />
                 </div>
+              </template>
+              <template #toolbar-trailing>
+                <OButton
+                  variant="outline"
+                  size="icon-sm"
+                  icon-left="refresh"
+                  :loading="loading"
+                  data-test="functions-list-refresh-btn"
+                  @click="getJSTransforms"
+                >
+                  <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="functionsRefresh" />
+                </OButton>
               </template>
               <template #empty>
                 <OEmptyState
@@ -82,11 +94,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #cell-name="{ row, value }">
-                <span class="tw:text-text-primary" :data-test="`function-list-name-cell-${row?.name ?? value}`">{{ value }}</span>
+                <span class="text-text-primary" :data-test="`function-list-name-cell-${row?.name ?? value}`">{{ value }}</span>
               </template>
 
               <template #cell-actions="{ row }">
-                <div class="tw:flex tw:items-center actions-container">
+                <div class="flex items-center actions-container">
                   <OButton
                     variant="ghost"
                     size="icon-sm"
@@ -117,8 +129,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #bottom="scope">
-                <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2">
-                  <div class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4">
+                <div class="flex items-center justify-between w-full py-2">
+                  <div class="flex items-center o2-table-footer-title mr-4">
                     {{ resultTotal }} {{ t('function.header') }}
                   </div>
                   <OButton
@@ -137,11 +149,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
     </div>
-    <div v-else class="tw:flex-1 tw:min-h-0">
+    <div v-else class="flex-1 min-h-0">
       <AddFunction
         v-model="formData"
         :isUpdated="isUpdated"
-        class="tw:p-2"
+        class="p-2"
         @update:list="refreshList"
         @cancel:hideform="hideForm"
         @sendToAiChat="sendToAiChat"
@@ -168,22 +180,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         v-if="transformedPipelineList.length > 0"
-        class="tw:max-h-50 tw:overflow-y-auto"
+        class="max-h-50 overflow-y-auto"
       >
-        <ul class="scrollable-list tw:flex tw:flex-col tw:list-none tw:p-0 tw:m-0">
+        <ul class="scrollable-list flex flex-col list-none p-0 m-0">
           <li
             v-for="(pipeline, index) in transformedPipelineList"
             :key="pipeline.value"
             @click="onPipelineSelect(pipeline)"
-            class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-muted/50"
+            class="flex items-center px-3 py-2 cursor-pointer hover:bg-muted/50"
             :data-test="`function-list-pipeline-item-${pipeline.value}`"
           >
-            <span class="tw:text-sm">{{ index + 1 }}. {{ pipeline.label }}</span>
+            <span class="text-sm">{{ index + 1 }}. {{ pipeline.label }}</span>
           </li>
         </ul>
       </div>
       <div v-else>
-        <div class="tw:text-xl tw:font-semibold tw:text-center">
+        <div class="text-xl font-semibold text-center">
           No pipelines associated with this function
         </div>
       </div>

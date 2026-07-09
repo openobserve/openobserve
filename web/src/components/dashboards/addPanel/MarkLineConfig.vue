@@ -21,14 +21,14 @@
       :key="index"
     >
       <div
-        class="tw:flex tw:justify-between tw:pb-3 tw:mb-3 tw:border-b tw:border-gray-500"
+        class="flex justify-between pb-3 mb-3 border-b border-gray-500"
       >
-        <div style="width: 90%" class="tw:flex tw:flex-col tw:gap-2">
+        <div style="width: 90%" class="flex flex-col gap-2">
           <OSelect
             v-model="dashboardPanelData.data.config.mark_line[index].type"
             :label="t('dashboard.markLineType')"
             :options="markLineTypeOptions"
-            class="tw:w-full"
+            class="w-full"
             :data-test="`dashboard-config-markline-type-${index}`"
           />
           <OInput
@@ -49,7 +49,7 @@
         </div>
 
         <OIcon
-          class="tw:mr-1 tw:cursor-pointer"
+          class="mr-1 cursor-pointer"
           size="sm"
           name="close"
           @click="removeMarkLineByIndex(index)"

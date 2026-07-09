@@ -2204,7 +2204,7 @@ describe("Convert PromQL Data Utils", () => {
       // Verify renderItem returns correct structure
       expect(renderResult.type).toBe("text");
       expect(renderResult.style.text).toBe("456.7"); // Based on our mock formatUnitValue (latest value)
-      expect(renderResult.style.fontSize).toBe(14); // Based on our mock calculateOptimalFontSize  
+      expect(renderResult.style.fontSize).toBe(14); // Based on our mock calculateOptimalFontSize
       expect(renderResult.style.fontWeight).toBe(500);
       expect(renderResult.style.align).toBe("center");
       expect(renderResult.style.verticalAlign).toBe("middle");

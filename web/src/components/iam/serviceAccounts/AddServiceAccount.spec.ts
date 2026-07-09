@@ -12,14 +12,18 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
+// AddServiceAccount is migrated to OForm + Zod (AddServiceAccount.schema.ts).
+// It is an Options-API form, so the schema (a create/update variant computed)
+// and the defaults computed are returned from setup(). These tests mount the
+// REAL <OForm> (only ODialog is stubbed) so the conditional email schema
+// actually gates the submit — behavior is asserted, not the removed emailError.
 
 import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-// --- vi.mock() at the top — hoisted by Vitest ---
 
 vi.mock("@/services/service_accounts", () => ({
   default: {
@@ -32,80 +36,50 @@ vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: vi.fn() }),
 }));
 
-// Mock toast so no real timeout side-effects bleed into tests.
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: vi.fn().mockReturnValue(vi.fn()),
+}));
+
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
-  toast: vi.fn().mockReturnValue(vi.fn()), // returns a dismiss fn
+  toast: mockToast,
 }));
 
 import AddServiceAccount from "./AddServiceAccount.vue";
 import service_accounts from "@/services/service_accounts";
 
-// ---------------------------------------------------------------------------
-// Stubs
-// ---------------------------------------------------------------------------
-
-// ODialog: renders its default slot content so all inner elements are queryable.
+// ODialog stub: renders the default slot so the REAL OForm mounts, and exposes
+// the footer primary/secondary buttons. Save submits via `form-id` in the app;
+// tests drive the form's own submit so the schema runs deterministically.
 const ODialogStub = {
   name: "ODialog",
   props: [
     "open",
-    "width",
-    "title",
     "size",
+    "title",
     "primaryButtonLabel",
     "secondaryButtonLabel",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
+    "formId",
   ],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `
-    <div
-      data-test-stub="o-drawer"
-      :data-open="String(open)"
-      :data-title="title"
-    >
+    <div data-test-stub="o-dialog" :data-open="String(open)" :data-title="title" :data-form-id="formId">
       <slot />
       <button
         v-if="secondaryButtonLabel"
         data-test="o-dialog-secondary-btn"
-        :disabled="secondaryButtonDisabled"
         @click="$emit('click:secondary')"
       >{{ secondaryButtonLabel }}</button>
       <button
         v-if="primaryButtonLabel"
         data-test="o-dialog-primary-btn"
-        :disabled="primaryButtonDisabled"
         @click="$emit('click:primary')"
       >{{ primaryButtonLabel }}</button>
     </div>
   `,
-};
-
-// OInput: renders a real <input> so setValue() works and emits update:modelValue.
-const OInputStub = {
-  name: "OInput",
-  props: ["modelValue", "label", "placeholder", "helpText", "error", "errorMessage", "disabled"],
-  emits: ["update:modelValue"],
   inheritAttrs: false,
-  template: `
-    <div v-bind="$attrs">
-      <label v-if="label" data-test="o-input-label">{{ label }}</label>
-      <input
-        :value="modelValue"
-        :placeholder="placeholder"
-        @input="$emit('update:modelValue', $event.target.value)"
-      />
-      <span v-if="helpText" data-test="o-input-help">{{ helpText }}</span>
-      <span v-if="error && errorMessage" role="alert">{{ errorMessage }}</span>
-    </div>
-  `,
 };
 
-// ---------------------------------------------------------------------------
-// Mount factory
-// ---------------------------------------------------------------------------
-
-function mountComp(props: Record<string, unknown> = {}): VueWrapper {
+function mountComp(props: Record<string, unknown> = {}): VueWrapper<any> {
   return mount(AddServiceAccount, {
     props: {
       open: true,
@@ -121,88 +95,50 @@ function mountComp(props: Record<string, unknown> = {}): VueWrapper {
     },
     global: {
       plugins: [store, i18n],
-      stubs: {
-        ODialog: ODialogStub,
-        OInput: OInputStub,
-      },
+      stubs: { ODialog: ODialogStub },
     },
   });
 }
 
-// ---------------------------------------------------------------------------
-// Helper: Save/Cancel are now ODialog's built-in primary/secondary footer
-// buttons (see ODialogStub), addressed by their canonical data-test slugs.
-// ---------------------------------------------------------------------------
+const getForm = (wrapper: VueWrapper<any>) =>
+  wrapper.findComponent({ name: "OForm" });
+const getEmailInput = (wrapper: VueWrapper<any>) =>
+  wrapper.find('[data-test="iam-add-service-account-identifier-input"] input');
+const getDescriptionInput = (wrapper: VueWrapper<any>) =>
+  wrapper.find('[data-test="iam-add-service-account-description-input"] input');
 
-function getSaveButton(wrapper: VueWrapper) {
-  return wrapper.find('[data-test="o-dialog-primary-btn"]');
-}
-
-function getCancelButton(wrapper: VueWrapper) {
-  return wrapper.find('[data-test="o-dialog-secondary-btn"]');
-}
-
-function getIdentifierInput(wrapper: VueWrapper) {
-  return wrapper.find('[data-test="iam-add-service-account-identifier-input"] input');
-}
-
-function getDescriptionInput(wrapper: VueWrapper) {
-  return wrapper.find(
-    '[data-test="iam-add-service-account-description-input"] input',
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+const submitForm = async (wrapper: VueWrapper<any>) => {
+  await getForm(wrapper).vm.form.handleSubmit();
+  await flushPromises();
+};
 
 describe("AddServiceAccount", () => {
-  let wrapper: VueWrapper;
+  let wrapper: VueWrapper<any>;
 
   beforeEach(() => {
-    vi.mocked(service_accounts.create).mockReset();
-    vi.mocked(service_accounts.update).mockReset();
-
+    vi.clearAllMocks();
     wrapper = mountComp();
   });
 
   afterEach(() => {
     wrapper?.unmount();
-    vi.clearAllMocks();
   });
 
-  // ── Rendering ─────────────────────────────────────────────────────────────
-
   describe("rendering", () => {
-    it("renders successfully", () => {
-      expect(wrapper.exists()).toBe(true);
+    it("renders the dialog with the add title in create mode", () => {
+      const dialog = wrapper.find('[data-test-stub="o-dialog"]');
+      expect(dialog.exists()).toBe(true);
+      expect(dialog.attributes("data-title")).toBe("New service account");
+      expect(dialog.attributes("data-form-id")).toBe("add-service-account-form");
     });
 
-    it("renders the ODrawer wrapper", () => {
-      expect(wrapper.find('[data-test-stub="o-drawer"]').exists()).toBe(true);
-    });
-
-    it("passes the add title to ODrawer when not updating", () => {
-      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-
-      expect(drawer.attributes("data-title")).toBe("New service account");
-    });
-
-    it("passes open prop to ODrawer as true when open=true", () => {
-      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-
-      expect(drawer.attributes("data-open")).toBe("true");
-    });
-
-    it("shows both email and description inputs in add mode", () => {
-      // Email input is only shown when not beingUpdated
-      expect(getIdentifierInput(wrapper).exists()).toBe(true);
+    it("shows both email and description inputs in create mode", () => {
+      expect(getEmailInput(wrapper).exists()).toBe(true);
       expect(getDescriptionInput(wrapper).exists()).toBe(true);
     });
 
-    it("hides email input when updating an existing service account", async () => {
-      // Arrange
-      const updateWrapper = mountComp({
+    it("hides the email input and shows the update title in update mode", async () => {
+      const w = mountComp({
         isUpdated: true,
         modelValue: {
           email: "existing@example.com",
@@ -212,120 +148,65 @@ describe("AddServiceAccount", () => {
       });
       await nextTick();
 
-      // Assert
       expect(
-        updateWrapper.find(
-          '[data-test="iam-add-service-account-identifier-input"]',
-        ).exists(),
+        w.find('[data-test="iam-add-service-account-identifier-input"]').exists(),
       ).toBe(false);
-      expect(getDescriptionInput(updateWrapper).exists()).toBe(true);
-
-      updateWrapper.unmount();
+      expect(getDescriptionInput(w).exists()).toBe(true);
+      expect(
+        w.find('[data-test-stub="o-dialog"]').attributes("data-title"),
+      ).toBe("Update Service Account");
+      w.unmount();
     });
 
-    it("shows update title when beingUpdated", async () => {
-      // Arrange
-      const updateWrapper = mountComp({
+    it("prefills the description from modelValue in update mode", () => {
+      const w = mountComp({
         isUpdated: true,
         modelValue: {
           email: "existing@example.com",
-          first_name: "Desc",
+          first_name: "My Description",
           organization: "default",
         },
       });
-      await nextTick();
-
-      // Assert
-      const drawer = updateWrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-title")).toBe("Update Service Account");
-
-      updateWrapper.unmount();
-    });
-
-    it("renders a save button", () => {
-      expect(getSaveButton(wrapper).exists()).toBe(true);
-    });
-
-    it("renders a cancel button", () => {
-      expect(getCancelButton(wrapper).exists()).toBe(true);
+      expect(getForm(w).props("defaultValues")).toEqual({
+        email: "",
+        first_name: "My Description",
+      });
+      w.unmount();
     });
   });
 
-  // ── Form validation ────────────────────────────────────────────────────────
+  describe("schema validation (real OForm, create mode)", () => {
+    it("blocks submit and does NOT call create when email is empty", async () => {
+      await submitForm(wrapper);
 
-  describe("form validation", () => {
-    it("does not call create when email is empty and save is clicked", async () => {
-      // Act
-      await getSaveButton(wrapper).trigger("click");
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
+      expect(service_accounts.create).not.toHaveBeenCalled();
+      expect(wrapper.text()).toContain("Please enter a valid email address");
+    });
 
-      // Assert
+    it("blocks submit when the email format is invalid", async () => {
+      await getEmailInput(wrapper).setValue("not-an-email");
+      await submitForm(wrapper);
+
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
       expect(service_accounts.create).not.toHaveBeenCalled();
     });
 
-    it("shows an error message when email is empty and save is clicked", async () => {
-      // Act
-      await getSaveButton(wrapper).trigger("click");
-      await nextTick();
+    it("treats an email with surrounding whitespace as invalid", async () => {
+      await getEmailInput(wrapper).setValue("   invalid   ");
+      await submitForm(wrapper);
 
-      // Assert — the OInputStub renders a role="alert" when error+errorMessage are set
-      expect(wrapper.find('[role="alert"]').exists()).toBe(true);
-      expect(wrapper.find('[role="alert"]').text()).toContain(
-        "valid email address",
-      );
-    });
-
-    it("does not call create when email format is invalid", async () => {
-      // Arrange
-      await getIdentifierInput(wrapper).setValue("not-an-email");
-
-      // Act
-      await getSaveButton(wrapper).trigger("click");
-
-      // Assert
       expect(service_accounts.create).not.toHaveBeenCalled();
     });
 
-    it("shows an error message when email format is invalid", async () => {
-      // Arrange
-      await getIdentifierInput(wrapper).setValue("bad-format");
-
-      // Act
-      await getSaveButton(wrapper).trigger("click");
-      await nextTick();
-
-      // Assert
-      expect(wrapper.find('[role="alert"]').exists()).toBe(true);
-    });
-
-    it("clears the email error when the user starts typing again", async () => {
-      // Arrange — trigger an error first
-      await getSaveButton(wrapper).trigger("click");
-      await nextTick();
-      expect(wrapper.find('[role="alert"]').exists()).toBe(true);
-
-      // Act — user corrects the input
-      await getIdentifierInput(wrapper).setValue("fix@example.com");
-      await nextTick();
-
-      // Assert — error is cleared
-      expect(wrapper.find('[role="alert"]').exists()).toBe(false);
-    });
-  });
-
-  // ── Service account creation ───────────────────────────────────────────────
-
-  describe("service account creation", () => {
-    it("calls create with correct payload on valid submit", async () => {
-      // Arrange
-      vi.mocked(service_accounts.create).mockResolvedValue({ data: {} });
-      await getIdentifierInput(wrapper).setValue("new@example.com");
+    it("submits and calls create with the payload on a valid email", async () => {
+      vi.mocked(service_accounts.create).mockResolvedValue({ data: {} } as any);
+      await getEmailInput(wrapper).setValue("new@example.com");
       await getDescriptionInput(wrapper).setValue("My Service Account");
+      await submitForm(wrapper);
 
-      // Act
-      await getSaveButton(wrapper).trigger("click");
-      await flushPromises();
-
-      // Assert
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(true);
+      expect(service_accounts.create).toHaveBeenCalledTimes(1);
       expect(service_accounts.create).toHaveBeenCalledWith(
         expect.objectContaining({
           email: "new@example.com",
@@ -336,60 +217,52 @@ describe("AddServiceAccount", () => {
       );
     });
 
-    it("emits 'updated' and 'update:open' false after successful creation", async () => {
-      // Arrange
-      vi.mocked(service_accounts.create).mockResolvedValue({ data: {} });
-      await getIdentifierInput(wrapper).setValue("new@example.com");
-
-      // Act
-      await getSaveButton(wrapper).trigger("click");
-      await flushPromises();
-
-      // Assert
-      expect(wrapper.emitted("updated")).toBeTruthy();
-      expect(wrapper.emitted("update:open")).toBeTruthy();
-      expect(wrapper.emitted("update:open")![0]).toEqual([false]);
-    });
-
-    it("does not emit 'update:open' when create returns a 500 error", async () => {
-      // Arrange
-      vi.mocked(service_accounts.create).mockRejectedValue({
-        response: { status: 500, data: { message: "Server error" } },
-      });
-      await getIdentifierInput(wrapper).setValue("fail@example.com");
-
-      // Act
-      await getSaveButton(wrapper).trigger("click");
-      await flushPromises();
-
-      // Assert — drawer must remain open on failure
-      expect(wrapper.emitted("update:open")).toBeFalsy();
-      expect(wrapper.emitted("updated")).toBeFalsy();
-    });
-
-    it("does not throw on 403 error during create", async () => {
-      // Arrange
-      vi.mocked(service_accounts.create).mockRejectedValue({
-        response: { status: 403 },
-      });
-      await getIdentifierInput(wrapper).setValue("forbidden@example.com");
-
-      // Act & Assert — must not throw
-      await expect(
-        (async () => {
-          await getSaveButton(wrapper).trigger("click");
-          await flushPromises();
-        })(),
-      ).resolves.not.toThrow();
+    it("accepts a valid email with subdomains", async () => {
+      vi.mocked(service_accounts.create).mockResolvedValue({ data: {} } as any);
+      await getEmailInput(wrapper).setValue("user@sub.example.com");
+      await submitForm(wrapper);
 
       expect(service_accounts.create).toHaveBeenCalled();
     });
   });
 
-  // ── Service account update ─────────────────────────────────────────────────
+  describe("creation behavior", () => {
+    it("emits updated + update:open(false) after a successful create", async () => {
+      vi.mocked(service_accounts.create).mockResolvedValue({ data: {} } as any);
+      await getEmailInput(wrapper).setValue("new@example.com");
+      await submitForm(wrapper);
 
-  describe("service account update", () => {
-    let updateWrapper: VueWrapper;
+      expect(wrapper.emitted("updated")).toBeTruthy();
+      expect(wrapper.emitted("update:open")![0]).toEqual([false]);
+    });
+
+    it("keeps the dialog open and shows an error toast on a 500 failure", async () => {
+      vi.mocked(service_accounts.create).mockRejectedValue({
+        response: { status: 500, data: { message: "Server error" } },
+      });
+      await getEmailInput(wrapper).setValue("fail@example.com");
+      await submitForm(wrapper);
+
+      expect(wrapper.emitted("update:open")).toBeFalsy();
+      expect(wrapper.emitted("updated")).toBeFalsy();
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error" }),
+      );
+    });
+
+    it("does not throw on a 403 failure during create", async () => {
+      vi.mocked(service_accounts.create).mockRejectedValue({
+        response: { status: 403 },
+      });
+      await getEmailInput(wrapper).setValue("forbidden@example.com");
+
+      await expect(submitForm(wrapper)).resolves.not.toThrow();
+      expect(service_accounts.create).toHaveBeenCalled();
+    });
+  });
+
+  describe("update behavior", () => {
+    let updateWrapper: VueWrapper<any>;
 
     beforeEach(async () => {
       updateWrapper = mountComp({
@@ -407,16 +280,12 @@ describe("AddServiceAccount", () => {
       updateWrapper?.unmount();
     });
 
-    it("calls update with correct payload on save", async () => {
-      // Arrange
-      vi.mocked(service_accounts.update).mockResolvedValue({ data: {} });
+    it("submits without an email field and calls update with the payload", async () => {
+      vi.mocked(service_accounts.update).mockResolvedValue({ data: {} } as any);
       await getDescriptionInput(updateWrapper).setValue("Updated Description");
+      await submitForm(updateWrapper);
 
-      // Act
-      await getSaveButton(updateWrapper).trigger("click");
-      await flushPromises();
-
-      // Assert
+      expect(getForm(updateWrapper).vm.form.state.isValid).toBe(true);
       expect(service_accounts.update).toHaveBeenCalledWith(
         expect.objectContaining({
           first_name: "Updated Description",
@@ -427,260 +296,24 @@ describe("AddServiceAccount", () => {
       );
     });
 
-    it("emits 'updated' and 'update:open' false after successful update", async () => {
-      // Arrange
-      vi.mocked(service_accounts.update).mockResolvedValue({ data: {} });
+    it("emits updated + update:open(false) after a successful update", async () => {
+      vi.mocked(service_accounts.update).mockResolvedValue({ data: {} } as any);
+      await submitForm(updateWrapper);
 
-      // Act
-      await getSaveButton(updateWrapper).trigger("click");
-      await flushPromises();
-
-      // Assert
       expect(updateWrapper.emitted("updated")).toBeTruthy();
-      expect(updateWrapper.emitted("update:open")).toBeTruthy();
       expect(updateWrapper.emitted("update:open")![0]).toEqual([false]);
     });
-
-    it("does not emit 'update:open' when update returns a 500 error", async () => {
-      // Arrange
-      vi.mocked(service_accounts.update).mockRejectedValue({
-        response: { status: 500, data: { message: "Update failed" } },
-      });
-
-      // Act
-      await getSaveButton(updateWrapper).trigger("click");
-      await flushPromises();
-
-      // Assert — drawer must stay open on failure
-      expect(updateWrapper.emitted("update:open")).toBeFalsy();
-      expect(updateWrapper.emitted("updated")).toBeFalsy();
-    });
-
-    it("does not throw on 403 error during update", async () => {
-      // Arrange
-      vi.mocked(service_accounts.update).mockRejectedValue({
-        response: { status: 403 },
-      });
-
-      // Act & Assert
-      await expect(
-        (async () => {
-          await getSaveButton(updateWrapper).trigger("click");
-          await flushPromises();
-        })(),
-      ).resolves.not.toThrow();
-
-      expect(service_accounts.update).toHaveBeenCalled();
-    });
   });
 
-  // ── UI interactions ────────────────────────────────────────────────────────
-
-  describe("UI interactions", () => {
-    it("emits 'update:open' false when cancel button is clicked", async () => {
-      // Act
-      await getCancelButton(wrapper).trigger("click");
-
-      // Assert
-      expect(wrapper.emitted("update:open")).toBeTruthy();
+  describe("dialog interactions", () => {
+    it("emits update:open(false) when cancel is clicked", async () => {
+      await wrapper.find('[data-test="o-dialog-secondary-btn"]').trigger("click");
       expect(wrapper.emitted("update:open")![0]).toEqual([false]);
     });
 
-    it("emits 'update:open' when ODrawer emits update:open", async () => {
-      // Act
-      await wrapper
-        .findComponent({ name: "ODialog" })
-        .vm.$emit("update:open", false);
-
-      // Assert
-      expect(wrapper.emitted("update:open")).toBeTruthy();
+    it("forwards update:open from the dialog", async () => {
+      await wrapper.findComponent(ODialogStub).vm.$emit("update:open", false);
       expect(wrapper.emitted("update:open")![0]).toEqual([false]);
-    });
-  });
-
-  // ── Props reactivity ───────────────────────────────────────────────────────
-
-  describe("props reactivity", () => {
-    it("switches to update mode when modelValue with email is set", async () => {
-      // Arrange — start in add mode, email field visible
-      expect(getIdentifierInput(wrapper).exists()).toBe(true);
-
-      // Act — simulate parent providing an existing user
-      await wrapper.setProps({
-        modelValue: {
-          email: "existing@example.com",
-          first_name: "Desc",
-          organization: "default",
-        },
-      });
-      await nextTick();
-
-      // Assert — email field hidden in update mode
-      expect(
-        wrapper.find('[data-test="iam-add-service-account-identifier-input"]').exists(),
-      ).toBe(false);
-    });
-
-    it("switches back to add mode when modelValue is reset to empty and isUpdated is false", async () => {
-      // Arrange — start in update mode
-      const updateWrapper = mountComp({
-        isUpdated: true,
-        modelValue: {
-          email: "existing@example.com",
-          first_name: "Desc",
-          organization: "default",
-        },
-      });
-      await nextTick();
-      expect(
-        updateWrapper.find(
-          '[data-test="iam-add-service-account-identifier-input"]',
-        ).exists(),
-      ).toBe(false);
-
-      // Act — reset both modelValue and isUpdated to reflect add mode.
-      // The watcher sets beingUpdated = props.isUpdated when email is absent,
-      // so isUpdated must also be cleared for the email field to reappear.
-      await updateWrapper.setProps({
-        isUpdated: false,
-        modelValue: {
-          org_member_id: "",
-          role: "admin",
-          first_name: "",
-          email: "",
-          organization: "",
-        },
-      });
-      await nextTick();
-
-      // Assert — email field re-appears
-      expect(
-        updateWrapper.find(
-          '[data-test="iam-add-service-account-identifier-input"]',
-        ).exists(),
-      ).toBe(true);
-
-      updateWrapper.unmount();
-    });
-  });
-
-  // ── Edge cases ─────────────────────────────────────────────────────────────
-
-  describe("edge cases", () => {
-    it("does not emit 'updated' when save is clicked with empty email (add mode)", async () => {
-      // Act — click save without filling email
-      await getSaveButton(wrapper).trigger("click");
-      await flushPromises();
-
-      // Assert
-      expect(wrapper.emitted("updated")).toBeFalsy();
-    });
-
-    it("treats email with leading/trailing whitespace as invalid", async () => {
-      // Arrange
-      await getIdentifierInput(wrapper).setValue("   invalid   ");
-
-      // Act
-      await getSaveButton(wrapper).trigger("click");
-
-      // Assert — the regex /^[^\s@]+@[^\s@]+\.[^\s@]+$/ rejects strings with spaces
-      expect(service_accounts.create).not.toHaveBeenCalled();
-    });
-
-    it("accepts a valid email with subdomains", async () => {
-      // Arrange
-      vi.mocked(service_accounts.create).mockResolvedValue({ data: {} });
-      await getIdentifierInput(wrapper).setValue("user@sub.example.com");
-
-      // Act
-      await getSaveButton(wrapper).trigger("click");
-      await flushPromises();
-
-      // Assert
-      expect(service_accounts.create).toHaveBeenCalled();
-    });
-
-    it("encodes other_organization when selectedOrg is 'other'", async () => {
-      // Arrange — set store org identifier to "other" to exercise the encodeURIComponent branch
-      store.commit("setSelectedOrganization", {
-        identifier: "other",
-        label: "Other Org",
-        user_email: "example@gmail.com",
-      });
-      vi.mocked(service_accounts.create).mockResolvedValue({ data: {} });
-
-      const otherWrapper = mountComp();
-      await nextTick();
-
-      // Give formData.other_organization a value so encodeURIComponent has input
-      // (no public API to set this; set via vm — only way to reach this branch)
-      otherWrapper.vm.formData.other_organization = "my custom org";
-
-      await getIdentifierInput(otherWrapper).setValue("test@example.com");
-
-      // Act
-      await getSaveButton(otherWrapper).trigger("click");
-      await flushPromises();
-
-      // Assert — create was still called (branch executed without throwing)
-      expect(service_accounts.create).toHaveBeenCalled();
-
-      // Restore store state for subsequent tests
-      store.commit("setSelectedOrganization", {
-        identifier: "default",
-        label: "default Organization",
-        user_email: "example@gmail.com",
-      });
-
-      otherWrapper.unmount();
-    });
-  });
-
-  // ── Identifier field labeling ──────────────────────────────────────────────
-
-  describe("identifier field", () => {
-    it("renders the identifier input with the correct data-test id", () => {
-      expect(wrapper.find('[data-test="iam-add-service-account-identifier-input"]').exists()).toBe(true);
-    });
-
-    it("renders identifier label from i18n", () => {
-      const identifierDiv = wrapper.find('[data-test="iam-add-service-account-identifier-input"]');
-      const label = identifierDiv.find('[data-test="o-input-label"]');
-      expect(label.exists()).toBe(true);
-      expect(label.text()).toBe("Identifier *");
-    });
-
-    it("passes placeholder from i18n to the identifier input", () => {
-      const input = getIdentifierInput(wrapper);
-      expect(input.attributes("placeholder")).toBe("Enter email address");
-    });
-
-    it("renders help text from i18n", () => {
-      const identifierDiv = wrapper.find('[data-test="iam-add-service-account-identifier-input"]');
-      const help = identifierDiv.find('[data-test="o-input-help"]');
-      expect(help.exists()).toBe(true);
-      expect(help.text()).toBe("Email address used as the service account identifier");
-    });
-
-    it("validates email format using the same regex after identifier rename", async () => {
-      // The validation logic (email regex) is unchanged even though the label says "Identifier"
-      await getIdentifierInput(wrapper).setValue("not-an-email");
-
-      await getSaveButton(wrapper).trigger("click");
-      await nextTick();
-
-      // Error should still appear for invalid email format
-      expect(wrapper.find('[role="alert"]').exists()).toBe(true);
-    });
-
-    it("accepts a valid email when identifier is filled correctly", async () => {
-      vi.mocked(service_accounts.create).mockResolvedValue({ data: {} });
-      await getIdentifierInput(wrapper).setValue("valid@example.com");
-
-      await getSaveButton(wrapper).trigger("click");
-      await flushPromises();
-
-      expect(service_accounts.create).toHaveBeenCalled();
     });
   });
 });

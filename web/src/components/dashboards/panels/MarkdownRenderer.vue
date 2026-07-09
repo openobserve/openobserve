@@ -18,12 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="scroll"
     data-test="markdown-renderer-scroll-container"
-    style="width: 100%; height: 100%; overflow: auto; padding: 1%"
+    style="width: 100%; height: 100%; overflow: auto"
   >
     <div
       :class="[
-        'tw:prose tw:prose-sm tw:max-w-none',
-        store.state?.theme === 'dark' && 'tw:prose-invert',
+        'prose prose-sm max-w-none px-2 py-1',
+        store.state?.theme === 'dark' && 'prose-invert',
       ]"
       v-html="DOMPurify.sanitize(marked(processedContent))"
       data-test="markdown-renderer"

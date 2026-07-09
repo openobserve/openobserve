@@ -290,7 +290,7 @@ describe("SpanBlock", () => {
       const spanBlock = newWrapper.find(
         '[data-test="span-block-select-trigger"]',
       );
-      expect(spanBlock.classes()).toContain("tw:opacity-30");
+      expect(spanBlock.classes()).toContain("opacity-30");
     });
 
     it("Should not show border when span is not selected", async () => {
@@ -537,6 +537,56 @@ describe("SpanBlock", () => {
       const hasHex = style.includes(`background-color: ${mockSpan.style.color}`);
       const hasRgb = style.includes("background-color: rgb(26, 184, 190)");
       expect(hasHex || hasRgb).toBe(true);
+    });
+  });
+
+  describe("pre-selected span_id scroll behavior", () => {
+    let scrollSpy: ReturnType<typeof vi.fn>;
+    let originalScrollIntoView: any;
+
+    beforeEach(() => {
+      scrollSpy = vi.fn();
+      // jsdom does not implement scrollIntoView — install a spy.
+      originalScrollIntoView = (Element.prototype as any).scrollIntoView;
+      (Element.prototype as any).scrollIntoView = scrollSpy;
+    });
+
+    afterEach(async () => {
+      (Element.prototype as any).scrollIntoView = originalScrollIntoView;
+      await router.push({ query: {} });
+    });
+
+    // Regression: with virtualized rows, a SpanBlock remounts every time it
+    // scrolls into the viewport. It must NOT scroll the URL's span_id back into
+    // view on each mount (that fought the user's scroll). Centering the
+    // pre-selected span is owned by TraceTree via the virtualizer.
+    it("should not scroll the span into view on mount when span_id is in the route query", async () => {
+      await router.push({ query: { span_id: mockSpan.spanId } });
+
+      const localWrapper = mount(SpanBlock, {
+        attachTo: document.body,
+        props: {
+          span: mockSpan,
+          baseTracePosition: mockBaseTracePosition,
+          depth: 0,
+          styleObj: mockStyle,
+          showCollapse: true,
+          isCollapsed: false,
+          spanDimensions: mockSpanDimensions,
+          spanData: mockSpanData,
+        },
+        global: {
+          plugins: [i18n, router],
+          provide: { store: mockStore },
+          stubs: { "q-resize-observer": true },
+        },
+      });
+
+      await flushPromises();
+
+      expect(scrollSpy).not.toHaveBeenCalled();
+
+      localWrapper.unmount();
     });
   });
 });

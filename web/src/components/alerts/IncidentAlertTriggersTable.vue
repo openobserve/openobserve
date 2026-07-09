@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="alert-triggers-table" class="alert-triggers-table tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+  <div data-test="alert-triggers-table" class="alert-triggers-table flex flex-col h-full overflow-hidden">
     <OTable
       data-test="triggers-qtable"
       :data="triggers"
@@ -33,27 +33,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @row-click="onRowClick"
     >
       <template #empty>
-        <div data-test="no-triggers-message" class="tw:text-center tw:py-8">
-          <span :class="isDarkMode ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-sm">
+        <div data-test="no-triggers-message" class="text-center py-8">
+          <span :class="isDarkMode ? 'text-gray-500' : 'text-gray-400'" class="text-sm">
             No triggers loaded
           </span>
         </div>
       </template>
 
       <template #cell-alert_name="{ row }">
-        <span data-test="alert-name-text" :class="isDarkMode ? 'tw:text-gray-200' : 'tw:text-gray-800'" class="tw:text-xs tw:font-medium">
+        <span data-test="alert-name-text" :class="isDarkMode ? 'text-gray-200' : 'text-gray-800'" class="text-xs font-medium">
           {{ row.alert_name }}
         </span>
       </template>
 
       <template #cell-alert_fired_at="{ row }">
-        <span data-test="fired-at-timestamp" class="tw:text-xs">
+        <span data-test="fired-at-timestamp" class="text-xs">
           {{ formatTimestamp(row.alert_fired_at) }}
         </span>
       </template>
 
       <template #cell-correlation_reason="{ row }">
-        <span class="tw:inline-flex">
+        <span class="inline-flex">
           <OTag
             data-test="correlation-reason-badge"
             type="correlationReason"

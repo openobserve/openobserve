@@ -16,46 +16,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:border-b tw:border-[var(--color-border-default)] tw:cursor-pointer tw:hover:bg-[var(--o2-hover-gray)] tw:relative tw:py-1 tw:transition-colors tw:duration-150 tw:ease-in-out"
-    :class="wrap ? 'tw:items-start' : 'tw:items-center'"
+    class="flex border-b border-[var(--color-border-default)] cursor-pointer hover:bg-[var(--o2-hover-gray)] relative py-1 transition-colors duration-150 ease-in-out"
+    :class="wrap ? 'items-start' : 'items-center'"
     @click="$emit('click', pattern, index)"
     :data-test="`pattern-card-${index}`"
   >
     <!-- Status level left border -->
     <div
-      class="tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:z-10"
+      class="absolute left-0 inset-y-0 w-1 z-10"
       :style="{ backgroundColor: statusColor }"
     />
     <!-- Pattern Column -->
-    <div class="tw:flex-1 tw:min-w-0 tw:px-2 tw:pl-3" :class="wrap ? '' : 'tw:overflow-hidden'">
+    <div class="flex-1 min-w-0 px-2 pl-3" :class="wrap ? '' : 'overflow-hidden'">
       <!-- Template rendered as tokenized chips so wildcards are visually distinct -->
       <div
-        class="tw:font-mono tw:text-xs tw:w-full"
+        class="font-mono text-xs w-full"
         :class="[
-          store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-500',
+          store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-500',
           wrap
-            ? 'tw:break-all'
-            : 'tw:flex tw:items-baseline tw:gap-x-[2px] tw:gap-y-[1px] tw:flex-nowrap tw:overflow-hidden',
+            ? 'break-all'
+            : 'flex items-baseline gap-x-[2px] gap-y-[1px] flex-nowrap overflow-hidden',
         ]"
         :data-test="`pattern-card-${index}-template`"
       >
         <template v-for="(tok, i) in templateTokens" :key="i">
           <span
             v-if="tok.kind === 'text'"
-            :class="wrap ? 'tw:whitespace-pre-wrap tw:break-all' : 'tw:whitespace-pre'"
+            :class="wrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'"
           >
             <template v-for="(seg, si) in highlightLevels(tok.value)" :key="si">
               <span
                 v-if="seg.color"
                 :style="{ color: seg.color }"
-                class="tw:font-bold"
+                class="font-bold"
               >{{ seg.text }}</span>
               <span v-else>{{ seg.text }}</span>
             </template>
           </span>
           <span
             v-else
-            class="tw:inline-flex"
+            class="inline-flex"
             @mouseenter="onMouseEnter(tok.value, tok.sampleValues, $event)"
             @mouseleave="onMouseLeave"
           >
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Anomaly badge with explanation tooltip -->
       <span
         v-if="pattern.is_anomaly"
-        class="tw:text-badge-error-ol-text text-weight-bold tw:text-[0.7rem] tw:cursor-help"
+        class="text-badge-error-ol-text text-weight-bold text-[0.7rem] cursor-help"
         :data-test="`pattern-card-${index}-anomaly-badge`"
       >
         ⚠️ {{ t("search.anomalyLabel") }}
@@ -82,16 +82,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Count & Percentage Column -->
-    <div class="tw:w-24 tw:flex-shrink-0 tw:px-2 tw:text-right">
+    <div class="w-24 flex-shrink-0 px-2 text-right">
       <div
-        class="tw:text-[var(--o2-text-4)] tw:font-bold"
+        class="text-[var(--o2-text-4)] font-bold"
         :data-test="`pattern-card-${index}-frequency`"
       >
         {{ pattern.frequency.toLocaleString() }}
       </div>
       <div
-        class="tw:text-[0.6875rem] tw:opacity-80"
-        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
+        class="text-[0.6875rem] opacity-80"
+        :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
         :data-test="`pattern-card-${index}-percentage`"
       >
         {{ pattern.percentage.toFixed(2) }}%
@@ -100,8 +100,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Actions Column -->
     <div
-      class="tw:w-20 tw:flex-shrink-0 tw:px-2 tw:flex tw:items-center tw:justify-center tw:gap-[2px]"
-      :class="wrap ? 'tw:pt-1' : ''"
+      class="w-20 flex-shrink-0 px-2 flex items-center justify-center gap-[2px]"
+      :class="wrap ? 'pt-1' : ''"
     >
       <OButton
         variant="ghost"

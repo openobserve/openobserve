@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <div class="tw:rounded-md tw:h-full tw:min-h-full! tw:max-h-full! tw:overflow-hidden! logPage" id="logPage" data-test="logs-page-container">
+  <div class="rounded-md h-full min-h-full! max-h-full! overflow-hidden! logPage" id="logPage" data-test="logs-page-container">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                lines the toolbar/editor up with the 10px field-list & results
                panels below. -->
           <div
-            class="tw:w-full tw:h-full"
+            class="w-full h-full"
           >
             <search-bar
               data-test="logs-search-bar"
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:after>
           <div
             id="thirdLevel"
-            class="tw:flex scroll relative-position thirdlevel full-height tw:overflow-hidden logsPageMainSection tw:w-full tw:border-t tw:border-border-default"
+            class="flex scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection w-full border-t border-border-default"
             v-show="
               searchObj.meta.logsVisualizeToggle == 'logs' ||
               searchObj.meta.logsVisualizeToggle == 'patterns'
@@ -70,13 +70,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSplitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
-              class="full-height tw:w-full logs-splitter-smooth"
+              class="full-height w-full logs-splitter-smooth"
               separatorClass="field-list-separator"
               :separatorStyle="{ width: '10px', marginLeft: '-5px', marginRight: '-5px', zIndex: '10' }"
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
-                <div class="relative-position tw:h-full tw:pl-[0.625rem] tw:pt-2 tw:border-r tw:border-border-default tw:bg-surface-panel">
+                <div class="relative-position h-full pl-[0.625rem] pt-2 border-r border-border-default bg-surface-panel">
                   <index-list
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
@@ -88,9 +88,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #after>
-                <div class="tw:h-full">
+                <div class="h-full">
                   <div
-                    class="card-container tw:h-full tw:w-full relative-position"
+                    class="card-container h-full w-full relative-position"
                   >
                     <div
                       v-if="
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.data.stream.streamLists.length > 0 &&
                         searchObj.data.stream.selectedStream.length == 0
                       "
-                      class="tw:h-full"
+                      class="h-full"
                     >
                       <LogsNoStreamState
                         :org-id="store.state.selectedOrganization.identifier"
@@ -203,6 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         preset="no-query-applied"
                         size="hero"
                         data-test="logs-search-apply-search-text"
+                        @action="() => searchBarRef?.handleRunQueryFn?.()"
                       />
                     </div>
                     <div
@@ -217,6 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         preset="no-query-applied"
                         size="hero"
                         data-test="logs-search-patterns-apply-search-text"
+                        @action="() => searchBarRef?.handleRunQueryFn?.()"
                       />
                     </div>
                     <div
@@ -227,12 +229,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <search-result
                         ref="searchResultRef"
                         :expandedLogs="expandedLogs"
+                        :stream-doc-time-range="streamDocTimeRange"
+                        :query-window-us="queryWindowUs"
                         @update:datetime="setHistogramDate"
                         @update:scroll="getMoreData"
                         @update:recordsPerPage="getMoreDataRecordsPerPage"
                         @expandlog="toggleExpandLog"
                         @send-to-ai-chat="sendToAiChat"
                         @run-query="searchData"
+                        @jump-to-stream-data="onJumpToStreamData"
                       />
                     </div>
                   </div>
@@ -242,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-show="searchObj.meta.logsVisualizeToggle == 'visualize'"
-            class="visualize-container tw:border-t tw:border-border-default"
+            class="visualize-container border-t border-border-default"
             :style="{ '--splitter-width': `${100 - splitterModel}vw` }"
           >
             <VisualizeLogsQuery
@@ -290,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="search-history-empty"
       >
         <div
-          class="search-history-empty__content tw:text-center tw:p-3 tw:flex flex-center"
+          class="search-history-empty__content text-center p-3 flex flex-center"
         >
           <div>
             <div>
@@ -298,22 +303,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="history"
                 class="search-history-empty__icon" style="width: 100px; height: 100px;" />
             </div>
-            <div class="tw:text-3xl tw:font-semibold search-history-empty__title">
+            <div class="text-3xl font-semibold search-history-empty__title">
               Search history is not enabled.
             </div>
             <div
-              class="search-history-empty__info tw:mt-2 tw:flex tw:items-center tw:justify-center"
+              class="search-history-empty__info mt-2 flex items-center justify-center"
             >
-              <OIcon name="info" class="tw:mr-1"
+              <OIcon name="info" class="mr-1"
 size="md" />
-              <span class="tw:text-xl tw:font-semibold tw:text-center">
+              <span class="text-xl font-semibold text-center">
                 Set ZO_USAGE_REPORTING_ENABLED to true to enable usage
                 reporting.</span
               >
             </div>
 
             <OButton
-              class="tw:mt-6"
+              class="mt-6"
               variant="outline"
               size="sm-action"
               @click="redirectBackToLogs"
@@ -1570,7 +1575,15 @@ export default defineComponent({
       searchObj.data.datetime.startTime = fromUs;
       searchObj.data.datetime.endTime = toUs;
       searchObj.data.datetime.type = "absolute";
-      searchObj.runQuery = true;
+      // The `runQuery` flag only drives the logs table search. Patterns are
+      // extracted through handleRunQueryFn (the same path as the Run query
+      // button), so a jump from the patterns empty state must route there —
+      // otherwise the new window is set but patterns never re-extract.
+      if (searchObj.meta.logsVisualizeToggle === "patterns") {
+        handleRunQueryFn();
+      } else {
+        searchObj.runQuery = true;
+      }
       nextTick(() => {
         searchObj.shouldIgnoreWatcher = false;
       });
@@ -2599,7 +2612,7 @@ export default defineComponent({
       }
 
       if (searchObj.meta.logsVisualizeToggle == "build") {
-        // Validate query before running - only tw:block if in custom query mode with empty query.
+        // Validate query before running - only block if in custom query mode with empty query.
         // In builder mode (non-custom), BuildQueryPage generates the query automatically.
         const isCustomQueryMode =
           buildDashboardPanelData.data.queries[0]?.customQuery === true;
@@ -3647,7 +3660,7 @@ export default defineComponent({
   box-sizing: border-box !important;
   height: 100% !important;
   overflow: visible !important;
-  /* Changed from tw:hidden to visible for button */
+  /* Changed from hidden to visible for button */
 }
 
 .field-list-separator::after {

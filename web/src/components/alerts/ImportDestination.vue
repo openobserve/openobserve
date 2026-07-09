@@ -21,32 +21,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     test-prefix="destination"
     :is-importing="isDestinationImporting"
     container-class=""
-    container-style="height: calc(100vh - 50px);"
-    :editor-heights="{
-      urlEditor: 'calc(100vh - 285px)',
-      fileEditor: 'calc(100vh - 282px)',
-      outputContainer: 'calc(100vh - 110px)',
-      errorReport: 'calc(100vh - 128px)',
-    }"
+    container-style=""
     @back="arrowBackFn"
     @cancel="router.back()"
     @import="importJson"
   >
     <!-- Output Section with Destination-specific Error Display -->
     <template #output-content>
-      <div class="tw:w-full tw:h-full tw:border-l tw:border-border-default" style="min-width: 400px;">
+      <div class="w-full h-full flex flex-col border-l border-border-default" style="min-width: 400px;">
         <div
           v-if="destinationErrorsToDisplay.length > 0 || destinationCreators.length > 0"
-          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
+          class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0"
         >
           {{ destinationErrorsToDisplay.length > 0 ? 'Error Validations' : 'Output Messages' }}
         </div>
-        <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
-        <OSeparator class="tw:mr-4 tw:mt-4" />
-        <div class="tw:h-[calc(60vh-8px)] tw:overflow-auto [resize:none] tw:w-full tw:min-w-100">
+        <div v-else class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0">Output Messages</div>
+        <OSeparator class="mt-1 shrink-0" />
+        <div class="flex-1 min-h-0 overflow-auto [resize:none] w-full min-w-100">
           <!-- Destination Errors Section -->
           <div
-            class="error-section tw:p-2.5 tw:mb-2.5"
+            class="error-section p-2.5 mb-2.5"
             v-if="destinationErrorsToDisplay.length > 0"
           >
             <div class="error-list">
@@ -59,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="(errorMessage, errorIndex) in errorGroup"
                   :key="errorIndex"
-                  class="tw:py-1.25 tw:px-0 tw:text-sm tw:wrap-break-word"
+                  class="py-1.25 px-0 text-sm wrap-break-word"
                   :data-test="`destination-import-error-${index}-${errorIndex}`"
                 >
                   <!-- Destination Name Error -->
@@ -130,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                         :options="destinationTypes"
                         :label="'Destination Type *'"
-                        class="tw:py-2 showLabelOnTop no-case"
+                        class="py-2 showLabelOnTop no-case"
                       />
                     </div>
                   </span>
@@ -154,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                         :options="destinationMethods"
                         :label="'Destination Method *'"
-                        class="tw:py-2 showLabelOnTop no-case"
+                        class="py-2 showLabelOnTop no-case"
                       />
                     </div>
                   </span>
@@ -179,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                         :options="filteredTemplates"
                         label="Templates *"
-                        class="tw:py-2 showLabelOnTop no-case"
+                        class="py-2 showLabelOnTop no-case"
                         :error="!!templateErrors[index]"
                         :error-message="templateErrors[index]"
                         @search="filterTemplates"
@@ -234,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         label="Actions *"
                         labelKey="label"
                         valueKey="value"
-                        class="tw:py-2 showLabelOnTop no-case"
+                        class="py-2 showLabelOnTop no-case"
                         :error="!!actionErrors[index]"
                         :error-message="actionErrors[index]"
                         @search="filterActions"
@@ -257,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="destination-import-skip-tls-verify-input"
                         :model-value="userSelectedSkipTlsVerify[index] ?? false"
                         :label="t('alert_destinations.skip_tls_verify')"
-                        class="tw:mt-2"
+                        class="mt-2"
                         @update:model-value="updateSkipTlsVerify($event, index)"
                       />
                     </div>
@@ -270,9 +264,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Destination Creation Success Messages -->
-          <div class="error-section tw:p-2.5 tw:mb-2.5" v-if="destinationCreators.length > 0">
+          <div class="error-section p-2.5 mb-2.5" v-if="destinationCreators.length > 0">
             <div
-              class="tw:text-base tw:mb-2.5 tw:uppercase text-primary"
+              class="text-base mb-2.5 uppercase text-primary"
               data-test="destination-import-creation-title"
             >
               Destination Creation
@@ -285,13 +279,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 :class="{
-                  'tw:font-bold tw:py-1.25 tw:px-0 tw:text-sm tw:wrap-break-word': true,
+                  'font-bold py-1.25 px-0 text-sm wrap-break-word': true,
                   'text-green ': val.success,
                   'text-red': !val.success,
                 }"
                 :data-test="`destination-import-creation-${index}-message`"
               >
-                <pre class="tw:[white-space:pre-wrap] tw:[word-wrap:break-word] tw:[word-break:break-word] tw:[overflow-wrap:break-word] tw:font-[inherit] tw:m-0">{{ val.message }}</pre>
+                <pre class="[white-space:pre-wrap] [word-wrap:break-word] [word-break:break-word] [overflow-wrap:break-word] font-[inherit] m-0">{{ val.message }}</pre>
               </div>
             </div>
           </div>

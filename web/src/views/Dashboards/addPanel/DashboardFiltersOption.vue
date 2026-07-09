@@ -9,12 +9,12 @@
         )
       "
       style="display: flex; flex-direction: row"
-      class="tw:pl-3"
+      class="pl-3"
     >
-      <div class="tw:text-sm tw:whitespace-nowrap tw:min-w-32.5 tw:flex tw:items-center" data-test="dashboard-filter-layout-label">{{ t("panel.filters") }}</div>
-      <span class="tw:flex tw:items-center tw:mx-0.5" data-test="dashboard-filter-layout-separator">:</span>
+      <div class="text-sm whitespace-nowrap min-w-32.5 flex items-center" data-test="dashboard-filter-layout-label">{{ t("panel.filters") }}</div>
+      <span class="flex items-center mx-0.5" data-test="dashboard-filter-layout-separator">:</span>
       <div
-        class="tw:m-1.25 tw:flex-wrap droppable scroll tw:flex"
+        class="m-1.25 flex-wrap droppable scroll flex"
         data-test="dashboard-filter-layout"
         :data-condition-count="conditionCount"
       >

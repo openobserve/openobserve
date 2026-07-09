@@ -16,19 +16,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:p-3 tw:rounded tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+    class="p-3 rounded border border-solid border-[var(--o2-border-color)]"
     :class="statusClass"
     :data-test="dataTest"
   >
-    <div class="tw:flex tw:items-start tw:justify-between tw:mb-1">
-      <div class="tw:flex tw:items-center tw:gap-2">
+    <div class="flex items-start justify-between mb-1">
+      <div class="flex items-center gap-2">
         <OIcon
           v-if="icon"
           :name="icon"
           size="sm"
           :class="statusColorClass"
         />
-        <span class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-secondary)]">
+        <span class="text-xs font-medium text-[var(--o2-text-secondary)]">
           {{ label }}
         </span>
       </div>
@@ -40,23 +40,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div class="tw:flex tw:items-baseline tw:gap-2">
-      <span class="tw:text-2xl tw:font-bold">
+    <div class="flex items-baseline gap-2">
+      <span class="text-2xl font-bold">
         {{ formattedValue }}
       </span>
-      <span v-if="displayUnit" class="tw:text-xs tw:text-[var(--o2-text-secondary)]">
+      <span v-if="displayUnit" class="text-xs text-[var(--o2-text-secondary)]">
         {{ displayUnit }}
       </span>
     </div>
 
-    <div v-if="description" class="tw:mt-2 tw:text-[10px] tw:text-[var(--o2-text-secondary)]">
+    <div v-if="description" class="mt-2 text-[10px] text-[var(--o2-text-secondary)]">
       {{ description }}
     </div>
 
-    <div v-if="threshold" class="tw:mt-2">
-      <div class="tw:flex tw:justify-between tw:text-[10px] tw:mb-1">
-        <span class="tw:text-[var(--o2-text-secondary)]">Threshold</span>
-        <span class="tw:font-medium">{{ threshold }}</span>
+    <div v-if="threshold" class="mt-2">
+      <div class="flex justify-between text-[10px] mb-1">
+        <span class="text-[var(--o2-text-secondary)]">Threshold</span>
+        <span class="font-medium">{{ threshold }}</span>
       </div>
       <OProgressBar
         :value="progressValue"
@@ -131,9 +131,9 @@ const statusClass = computed(() => {
   if (!props.status) return "";
 
   const classes = {
-    good: "tw:bg-green-50 tw:dark:bg-green-900/10",
-    "needs-improvement": "tw:bg-yellow-50 tw:dark:bg-yellow-900/10",
-    poor: "tw:bg-red-50 tw:dark:bg-red-900/10",
+    good: "bg-green-50 dark:bg-green-900/10",
+    "needs-improvement": "bg-yellow-50 dark:bg-yellow-900/10",
+    poor: "bg-red-50 dark:bg-red-900/10",
   };
 
   return classes[props.status] || "";
@@ -152,15 +152,15 @@ const statusIcon = computed(() => {
 });
 
 const statusColorClass = computed(() => {
-  if (!props.status) return "tw:text-gray-500";
+  if (!props.status) return "text-gray-500";
 
   const classes = {
-    good: "tw:text-[var(--o2-positive)]",
-    "needs-improvement": "tw:text-[var(--o2-warning)]",
-    poor: "tw:text-[var(--o2-negative)]",
+    good: "text-[var(--o2-positive)]",
+    "needs-improvement": "text-[var(--o2-warning)]",
+    poor: "text-[var(--o2-negative)]",
   };
 
-  return classes[props.status] || "tw:text-gray-500";
+  return classes[props.status] || "text-gray-500";
 });
 
 const progressValue = computed(() => {

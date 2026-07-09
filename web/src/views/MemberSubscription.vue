@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md">
+  <div class="rounded-md">
     <div
       style="text-align: center; width: 100%; font-size: 30px; margin: 40px 0px"
     >
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <SanitizedHtmlRenderer
       v-else-if="status == 'error' && error !== ''"
       :htmlContent="error"
-      class="tw:text-base tw:leading-7.5 tw:w-[70%] tw:mx-auto tw:text-left"
+      class="text-base leading-7.5 w-[70%] mx-auto text-left"
     />
 
     <div v-else>Thank you for your subscription.</div>
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="subscription_message q-btn-primary"
     >
       <b>Please click the button below to proceed with your subscription after taking above mentioned action.</b><br />
-      <OButton variant="primary" class="tw:mt-3" @click="ProcessSubscription(queryString, 'confirm')">Confirm Member Subscription</OButton>
+      <OButton variant="primary" class="mt-3" @click="ProcessSubscription(queryString, 'confirm')">Confirm Member Subscription</OButton>
     </div> -->
   </div>
 </template>
