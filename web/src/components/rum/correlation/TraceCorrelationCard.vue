@@ -203,6 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onMounted, watch } from "vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -237,8 +238,12 @@ const props = defineProps({
 });
 
 const router = useRouter();
+const store = useStore();
 
 const HALF_HOUR_US = 1800000000;
+
+/** Traces are ingested into the default stream (matches PlayerTracesTab). */
+const TRACE_STREAM = "default";
 
 const correlationRange = computed(() =>
   props.timestamp
@@ -303,11 +308,20 @@ const copyTraceId = () => {
 };
 
 const viewTraceDetails = () => {
-  // TODO: Navigate to trace detail view
-  // This will be implemented once we know the trace viewer route
-  toast({
-    variant: "info",
-    message: "Trace detail view coming soon",
+  if (!props.traceId) return;
+  // Bound the trace lookup to a window around the correlated event; fall
+  // back to the trailing hour when no event timestamp was supplied.
+  const now = Date.now() * 1000;
+  const center = props.timestamp || now;
+  router.push({
+    name: "traceDetails",
+    query: {
+      trace_id: props.traceId,
+      stream: TRACE_STREAM,
+      from: String(center - HALF_HOUR_US),
+      to: String(center + HALF_HOUR_US),
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
   });
 };
 

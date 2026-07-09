@@ -815,6 +815,54 @@ describe("TraceCorrelationCard", () => {
   });
 
   // =========================================================================
+  // View trace details navigation
+  // =========================================================================
+
+  describe("view trace details navigation", () => {
+    it("calls router.push with the traceDetails route bracketing timestamp by +/-30 min when backend trace exists", async () => {
+      // Arrange
+      const pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      const timestamp = 1_700_000_000_000_000;
+      wrapper.unmount();
+      wrapper = mountComponent({ props: { timestamp } });
+      await flushPromises();
+
+      // Act
+      const viewBtn = findButtonByText(wrapper, "View Trace Details");
+      await viewBtn?.trigger("click");
+
+      // Assert
+      expect(pushSpy).toHaveBeenCalledWith({
+        name: "traceDetails",
+        query: {
+          trace_id: "test-trace-id-123456789",
+          stream: "default",
+          from: String(timestamp - 1800000000),
+          to: String(timestamp + 1800000000),
+          org_identifier: "default",
+        },
+      });
+    });
+
+    it("does not call router.push when the View Trace Details button is disabled (no backend trace)", async () => {
+      // Arrange
+      const pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      wrapper.unmount();
+      mockHasBackendTrace.value = false;
+      mockBackendSpanCount.value = 0;
+      wrapper = mountComponent({ props: { timestamp: 1_700_000_000_000_000 } });
+      await flushPromises();
+
+      // Act
+      const viewBtn = findButtonByText(wrapper, "View Trace Details");
+      await viewBtn?.trigger("click");
+
+      // Assert
+      expect(pushSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  // =========================================================================
   // Integration scenarios
   // =========================================================================
 

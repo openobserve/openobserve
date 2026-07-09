@@ -40,21 +40,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ErrorHeader :error="errorDetails" />
       </div>
       <OSeparator class="w-full" />
-      <div class="p-[0.625rem]">
-        <ErrorTags :error="errorDetails" />
-        <ErrorStackTrace
-          :error_stack="errorDetails.error_stack || []"
-          :error="errorDetails"
+      <div class="p-[0.625rem] flex flex-col gap-3">
+        <!-- Impact: how bad, how new — answered above the fold -->
+        <ErrorImpactStrip
+          :metrics="metrics"
+          :spike-factor="deploySpikeFactor"
+          :release="errorDetails.version || null"
+          :loading="impactLoading"
         />
-        <ErrorSessionReplay :error="errorDetails" />
-        <TraceCorrelationCard
-          v-if="errorTraceId"
-          :trace-id="errorTraceId"
-          :session-id="errorDetails.session_id || ''"
-          :timestamp="errorDetails._timestamp || 0"
-          data-test="error-viewer-trace-correlation"
-        />
-        <ErrorEvents :error="errorDetails" />
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 items-start">
+          <!-- Root-cause narrative: trend -> user actions -> stack -->
+          <div class="lg:col-span-2 flex flex-col gap-3 min-w-0">
+            <div
+              class="h-[13.75rem] min-w-0"
+              data-test="error-viewer-occurrences-chart"
+            >
+              <ErrorsOverTimeChart
+                :buckets="chartBuckets"
+                :deploy="latestDeploy"
+                :spike-factor="deploySpikeFactor"
+                :loading="impactLoading"
+              />
+            </div>
+            <ErrorEvents :error="errorDetails" />
+            <ErrorStackTrace
+              :error_stack="errorDetails.error_stack || []"
+              :error="errorDetails"
+            />
+          </div>
+
+          <!-- Evidence: replay, backend trace, context -->
+          <aside class="flex flex-col gap-3 min-w-0">
+            <ErrorSessionReplay :error="errorDetails" />
+            <TraceCorrelationCard
+              v-if="errorTraceId"
+              :trace-id="errorTraceId"
+              :session-id="errorDetails.session_id || ''"
+              :timestamp="errorDetails._timestamp || 0"
+              data-test="error-viewer-trace-correlation"
+            />
+            <ErrorTags :error="errorDetails" />
+          </aside>
+        </div>
       </div>
     </div>
   </div>
@@ -72,7 +100,10 @@ import { useStore } from "vuex";
 import useErrorTracking from "@/composables/useErrorTracking";
 import searchService from "@/services/search";
 import ErrorStackTrace from "@/components/rum/errorTracking/view/ErrorStackTrace.vue";
+import ErrorImpactStrip from "@/components/rum/errorTracking/view/ErrorImpactStrip.vue";
+import ErrorsOverTimeChart from "@/components/rum/errorTracking/list/ErrorsOverTimeChart.vue";
 import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
+import useErrorImpact from "@/composables/rum/useErrorImpact";
 import { useI18n } from "vue-i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
@@ -86,9 +117,22 @@ const store = useStore();
 const { errorTrackingState } = useErrorTracking();
 const errorDetails = ref<any>({});
 
+// Issue-scoped impact: occurrences, users, crash-free, trend + deploy markers.
+const {
+  metrics,
+  chartBuckets,
+  latestDeploy,
+  deploySpikeFactor,
+  isLoading: impactLoading,
+  loadForError,
+} = useErrorImpact();
+
 onActivated(async () => {
   await getError();
   getErrorLogs();
+  if (errorDetails.value?.error_type || errorDetails.value?.error_message) {
+    loadForError(errorDetails.value, errorDetails.value.service || "");
+  }
 });
 
 const getTimestamp = computed(() => {
