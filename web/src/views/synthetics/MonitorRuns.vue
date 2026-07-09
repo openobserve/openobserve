@@ -49,246 +49,319 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OTabs>
 
     <div class="flex-1 min-h-0">
-      <OTabPanels
-        v-model="activeTab"
-        grow
-        scroll="y"
-        class="h-full min-h-0"
-      >
+      <OTabPanels v-model="activeTab" grow scroll="y" class="h-full min-h-0">
         <!-- ════════════ OVERVIEW ════════════ -->
         <OTabPanel name="overview">
           <div
             class="mx-auto px-5 py-[0.875rem] pb-[1.75rem] flex flex-col gap-[0.875rem]"
           >
-            <!-- Status Timeline -->
-            <MonitorStatusTimeline
-              :segments="timelineSegments"
-              :fail-count="timelineFailCount"
-              :pass-count="timelinePassCount"
-              :mixed-count="timelineMixedCount"
-              :start-label="timelineStartLabel"
-              :end-label="timelineEndLabel"
-            />
+            <!-- Skeleton (while loading or before first data arrives) -->
+            <template v-if="loading || !hasLoadedOnce">
+              <MonitorRunsSkeleton />
 
-            <!-- KPI Cards — LLMInsightsDashboard style -->
-            <div class="grid grid-cols-5 gap-[0.625rem]">
-              <div
-                v-for="card in kpiCards"
-                :key="card.key"
-                class="card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
-                :data-test="`monitor-runs-kpi-${card.key}`"
-              >
-                <div class="flex flex-col gap-[0.25rem]">
+              <!-- Charts skeleton -->
+              <div class="grid grid-cols-2 gap-[0.875rem]">
+                <div
+                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                >
                   <div
-                    class="kpi-label text-[0.7rem] font-semibold text-[var(--o2-text-muted)]"
+                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
                   >
-                    {{ card.label }}
+                    <SkeletonBox width="110px" height="14px" rounded />
+                    <span class="flex-1" />
+                    <SkeletonBox width="80px" height="20px" rounded />
                   </div>
-                  <div class="flex items-baseline gap-[0.2rem]">
-                    <span
-                      class="text-[1.4rem] font-bold leading-none text-[var(--o2-text-primary)]"
-                      :class="card.valueClass"
-                    >
-                      {{ card.value }}
-                    </span>
-                    <span
-                      v-if="card.unit"
-                      class="text-[0.8rem] font-semibold text-[var(--o2-text-secondary)]"
-                    >
-                      {{ card.unit }}
-                    </span>
+                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="p-4">
+                    <SkeletonBox width="100%" height="160px" rounded />
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <!-- Charts row -->
-            <div class="grid grid-cols-2 gap-[0.875rem]">
-              <div
-                class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
-              >
                 <div
-                  class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
                 >
-                  <span class="font-bold text-sm text-text-heading">
-                    Response Time
-                  </span>
-                  <span class="flex-1" />
-                  <OBadge variant="default" size="sm">
-                    p95 {{ p95Label }}
-                  </OBadge>
-                </div>
-                <div class="border-t border-[var(--o2-border-color)]" />
-                <div class="min-h-[180px] p-0">
-                  <ChartRenderer
-                    :data="{ options: responseChartOption }"
-                    height="180px"
-                  />
-                </div>
-              </div>
-              <div
-                class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
-              >
-                <div
-                  class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
-                >
-                  <span class="font-bold text-sm text-text-heading">
-                    Errors Over Time
-                  </span>
-                  <span class="flex-1" />
-                  <OBadge variant="error" size="sm">
-                    {{ failCount }} failed
-                  </OBadge>
-                </div>
-                <div class="border-t border-[var(--o2-border-color)]" />
-                <div class="min-h-[180px] p-0">
-                  <ChartRenderer
-                    :data="{ options: errorChartOption }"
-                    height="180px"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <!-- Breakdown cards -->
-            <div class="grid grid-cols-3 gap-[0.875rem]">
-              <div
-                class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
-              >
-                <div
-                  class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
-                >
-                  <OIcon name="language" size="sm" class="text-primary-700" />
-                  <span class="font-bold text-sm text-text-heading">
-                    Pass Rate by Browser
-                  </span>
-                </div>
-                <div class="border-t border-[var(--o2-border-color)]" />
-                <div class="px-[0.875rem] py-[0.5rem]">
                   <div
-                    v-for="b in browserBreakdown"
-                    :key="b.name"
-                    class="flex items-center gap-3 py-[9px] border-b border-border-default last:border-b-0"
+                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+                  >
+                    <SkeletonBox width="120px" height="14px" rounded />
+                    <span class="flex-1" />
+                    <SkeletonBox width="90px" height="20px" rounded />
+                  </div>
+                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="p-4">
+                    <SkeletonBox width="100%" height="160px" rounded />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Breakdown skeleton -->
+              <div class="grid grid-cols-3 gap-[0.875rem]">
+                <div
+                  v-for="n in 3"
+                  :key="n"
+                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                >
+                  <div
+                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+                  >
+                    <SkeletonBox
+                      width="16px"
+                      height="16px"
+                      :custom-radius="'4px'"
+                    />
+                    <SkeletonBox width="110px" height="14px" rounded />
+                  </div>
+                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="px-[0.875rem] py-[0.5rem] flex flex-col">
+                    <div
+                      v-for="row in 3"
+                      :key="row"
+                      class="flex items-center gap-3 py-[9px] border-b border-[var(--o2-border-color)] last:border-b-0"
+                    >
+                      <SkeletonBox
+                        width="16px"
+                        height="16px"
+                        :custom-radius="'4px'"
+                      />
+                      <SkeletonBox width="70px" height="12px" rounded />
+                      <div
+                        class="flex-1 h-1.5 rounded-full"
+                        style="background: var(--o2-border-color); opacity: 0.3"
+                      />
+                      <SkeletonBox width="36px" height="12px" rounded />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Real content (once loaded at least once) -->
+            <template v-else>
+              <MonitorStatusTimeline
+                :segments="timelineSegments"
+                :fail-count="timelineFailCount"
+                :pass-count="timelinePassCount"
+                :mixed-count="timelineMixedCount"
+                :start-label="timelineStartLabel"
+                :end-label="timelineEndLabel"
+              />
+
+              <div class="grid grid-cols-5 gap-[0.625rem]">
+                <div
+                  v-for="card in kpiCards"
+                  :key="card.key"
+                  class="card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+                  :data-test="`monitor-runs-kpi-${card.key}`"
+                >
+                  <div class="flex flex-col gap-[0.25rem]">
+                    <div
+                      class="kpi-label text-[0.7rem] font-semibold text-[var(--o2-text-muted)]"
+                    >
+                      {{ card.label }}
+                      <span v-if="card.unit"> ({{ card.unit }}) </span>
+                    </div>
+                    <div class="flex items-baseline gap-[0.2rem]">
+                      <span
+                        class="text-[1.4rem] font-bold leading-none text-[var(--o2-text-primary)]"
+                        :class="card.valueClass"
+                      >
+                        {{ card.value }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Charts row -->
+              <div class="grid grid-cols-2 gap-[0.875rem]">
+                <div
+                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                >
+                  <div
+                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+                  >
+                    <span class="font-bold text-sm text-text-heading">
+                      Response Time
+                    </span>
+                    <span class="flex-1" />
+                    <OBadge variant="default" size="sm">
+                      p95 {{ p95Label }}
+                    </OBadge>
+                  </div>
+                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="min-h-[180px] p-0">
+                    <ChartRenderer
+                      :data="{ options: responseChartOption }"
+                      height="180px"
+                    />
+                  </div>
+                </div>
+                <div
+                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                >
+                  <div
+                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+                  >
+                    <span class="font-bold text-sm text-text-heading">
+                      Errors Over Time
+                    </span>
+                    <span class="flex-1" />
+                    <OBadge variant="error" size="sm">
+                      {{ failCount }} failed
+                    </OBadge>
+                  </div>
+                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="min-h-[180px] p-0">
+                    <ChartRenderer
+                      :data="{ options: errorChartOption }"
+                      height="180px"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Breakdown cards -->
+              <div class="grid grid-cols-3 gap-[0.875rem]">
+                <div
+                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                >
+                  <div
+                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+                  >
+                    <OIcon name="language" size="sm" class="text-primary-700" />
+                    <span class="font-bold text-sm text-text-heading">
+                      Pass Rate by Browser
+                    </span>
+                  </div>
+                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="px-[0.875rem] py-[0.5rem]">
+                    <div
+                      v-for="b in browserBreakdown"
+                      :key="b.name"
+                      class="flex items-center gap-3 py-[9px] border-b border-border-default last:border-b-0"
+                    >
+                      <OIcon
+                        :name="b.icon"
+                        size="sm"
+                        class="text-text-secondary flex-none"
+                      />
+                      <span
+                        class="w-20 flex-none font-semibold text-xs text-text-heading"
+                      >
+                        {{ b.name }}
+                      </span>
+                      <div
+                        class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-[40px]"
+                      >
+                        <div
+                          class="h-full rounded-full"
+                          :style="{ width: b.pct, background: b.barColor }"
+                        />
+                      </div>
+                      <span
+                        class="font-mono tabular-nums font-bold text-xs w-12 text-right"
+                        :style="{ color: b.textColor }"
+                      >
+                        {{ b.pct }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                >
+                  <div
+                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
                   >
                     <OIcon
-                      :name="b.icon"
+                      name="location-on"
                       size="sm"
-                      class="text-text-secondary flex-none"
+                      class="text-primary-700"
                     />
-                    <span
-                      class="w-20 flex-none font-semibold text-xs text-text-heading"
-                    >
-                      {{ b.name }}
-                    </span>
-                    <div
-                      class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-[40px]"
-                    >
-                      <div
-                        class="h-full rounded-full"
-                        :style="{ width: b.pct, background: b.barColor }"
-                      />
-                    </div>
-                    <span
-                      class="font-mono tabular-nums font-bold text-xs w-12 text-right"
-                      :style="{ color: b.textColor }"
-                    >
-                      {{ b.pct }}
+                    <span class="font-bold text-sm text-text-heading">
+                      Pass Rate by Location
                     </span>
                   </div>
+                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="px-[0.875rem] py-[0.5rem]">
+                    <div
+                      v-for="l in locationBreakdown"
+                      :key="l.name"
+                      class="flex items-center gap-3 py-[9px] border-b border-border-default last:border-b-0"
+                    >
+                      <OIcon
+                        :name="l.icon"
+                        size="sm"
+                        class="text-text-secondary flex-none"
+                      />
+                      <span
+                        class="w-[110px] flex-none font-semibold text-xs text-text-heading"
+                      >
+                        {{ l.name }}
+                      </span>
+                      <div
+                        class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-[40px]"
+                      >
+                        <div
+                          class="h-full rounded-full"
+                          :style="{ width: l.pct, background: l.barColor }"
+                        />
+                      </div>
+                      <span
+                        class="font-mono tabular-nums font-bold text-xs w-12 text-right"
+                        :style="{ color: l.textColor }"
+                      >
+                        {{ l.pct }}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div
-                class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
-              >
                 <div
-                  class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
                 >
-                  <OIcon
-                  <OIcon name="location-on" size="sm" class="text-primary-700" />
-                  <span class="font-bold text-sm text-text-heading">
-                    Pass Rate by Location
-                  </span>
-                </div>
-                <div class="border-t border-[var(--o2-border-color)]" />
-                <div class="px-[0.875rem] py-[0.5rem]">
                   <div
-                    v-for="l in locationBreakdown"
-                    :key="l.name"
-                    class="flex items-center gap-3 py-[9px] border-b border-border-default last:border-b-0"
+                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
                   >
-                    <OIcon
-                      :name="l.icon"
-                      size="sm"
-                      class="text-text-secondary flex-none"
-                    />
-                    <span
-                      class="w-[110px] flex-none font-semibold text-xs text-text-heading"
-                    >
-                      {{ l.name }}
+                    <OIcon name="devices" size="sm" class="text-primary-700" />
+                    <span class="font-bold text-sm text-text-heading">
+                      Pass Rate by Device
                     </span>
+                  </div>
+                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="px-[0.875rem] py-[0.5rem]">
                     <div
-                      class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-[40px]"
+                      v-for="d in deviceBreakdown"
+                      :key="d.name"
+                      class="flex items-center gap-3 py-[9px] border-b border-border-default last:border-b-0"
                     >
-                      <div
-                        class="h-full rounded-full"
-                        :style="{ width: l.pct, background: l.barColor }"
+                      <OIcon
+                        :name="d.icon"
+                        size="sm"
+                        class="text-text-secondary flex-none"
                       />
+                      <span
+                        class="w-20 flex-none font-semibold text-xs text-text-heading"
+                      >
+                        {{ d.name }}
+                      </span>
+                      <div
+                        class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-[40px]"
+                      >
+                        <div
+                          class="h-full rounded-full"
+                          :style="{ width: d.pct, background: d.barColor }"
+                        />
+                      </div>
+                      <span
+                        class="font-mono tabular-nums font-bold text-xs w-12 text-right"
+                        :style="{ color: d.textColor }"
+                      >
+                        {{ d.pct }}
+                      </span>
                     </div>
-                    <span
-                      class="font-mono tabular-nums font-bold text-xs w-12 text-right"
-                      :style="{ color: l.textColor }"
-                    >
-                      {{ l.pct }}
-                    </span>
                   </div>
                 </div>
               </div>
-              <div
-                class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
-              >
-                <div
-                  class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
-                >
-                  <OIcon name="devices" size="sm" class="text-primary-700" />
-                  <span class="font-bold text-sm text-text-heading">
-                    Pass Rate by Device
-                  </span>
-                </div>
-                <div class="border-t border-[var(--o2-border-color)]" />
-                <div class="px-[0.875rem] py-[0.5rem]">
-                  <div
-                    v-for="d in deviceBreakdown"
-                    :key="d.name"
-                    class="flex items-center gap-3 py-[9px] border-b border-border-default last:border-b-0"
-                  >
-                    <OIcon
-                      :name="d.icon"
-                      size="sm"
-                      class="text-text-secondary flex-none"
-                    />
-                    <span
-                      class="w-20 flex-none font-semibold text-xs text-text-heading"
-                    >
-                      {{ d.name }}
-                    </span>
-                    <div
-                      class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-[40px]"
-                    >
-                      <div
-                        class="h-full rounded-full"
-                        :style="{ width: d.pct, background: d.barColor }"
-                      />
-                    </div>
-                    <span
-                      class="font-mono tabular-nums font-bold text-xs w-12 text-right"
-                      :style="{ color: d.textColor }"
-                    >
-                      {{ d.pct }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            </template>
 
             <!-- Filter bar -->
             <div class="flex items-center gap-2 flex-wrap">
@@ -437,7 +510,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </template>
                 <template #cell-location="{ row }">
-                  <span class="inline-flex items-center gap-1 text-xs text-text-secondary">
+                  <span
+                    class="inline-flex items-center gap-1 text-xs text-text-secondary"
+                  >
                     <OIcon
                       :name="locationIcon((row as VisibleRun).location)"
                       size="xs"
@@ -446,7 +521,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </template>
                 <template #cell-browser="{ row }">
-                  <span class="inline-flex items-center gap-1 text-xs text-text-secondary">
+                  <span
+                    class="inline-flex items-center gap-1 text-xs text-text-secondary"
+                  >
                     <OIcon
                       :name="browserIcon((row as VisibleRun).browser)"
                       size="xs"
@@ -455,9 +532,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </template>
                 <template #cell-device="{ row }">
-                  <span class="inline-flex items-center gap-1 text-xs text-text-secondary">
+                  <span
+                    class="inline-flex items-center gap-1 text-xs text-text-secondary"
+                  >
                     <OIcon
-                      :name="(row as VisibleRun).device === 'Desktop' ? 'computer' : (row as VisibleRun).device === 'Tablet' ? 'tablet' : 'smartphone'"
+                      :name="
+                        (row as VisibleRun).device === 'Desktop'
+                          ? 'computer'
+                          : (row as VisibleRun).device === 'Tablet'
+                            ? 'tablet'
+                            : 'smartphone'
+                      "
                       size="xs"
                     />
                     {{ (row as VisibleRun).device }}
@@ -553,10 +638,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ g.name }}
                       </div>
-                      <div
-                        v-if="g.sub"
-                        class="text-[11px] text-text-secondary"
-                      >
+                      <div v-if="g.sub" class="text-[11px] text-text-secondary">
                         {{ g.sub }}
                       </div>
                     </div>
@@ -594,10 +676,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </div>
                     </div>
-                    <svg
-                      viewBox="0 0 90 24"
-                      class="w-[90px] h-6 block"
-                    >
+                    <svg viewBox="0 0 90 24" class="w-[90px] h-6 block">
                       <polyline
                         :points="g.trendPts"
                         fill="none"
@@ -648,10 +727,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :key="br.name"
                         class="flex items-center gap-2.5 py-1"
                       >
-                        <span
-                          class="w-[70px] text-xs text-text-body"
-                          >{{ br.name }}</span
-                        >
+                        <span class="w-[70px] text-xs text-text-body">{{
+                          br.name
+                        }}</span>
                         <div
                           class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden"
                         >
@@ -677,10 +755,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :key="lr.name"
                         class="flex items-center gap-2.5 py-1"
                       >
-                        <span
-                          class="w-[90px] text-xs text-text-body"
-                          >{{ lr.name }}</span
-                        >
+                        <span class="w-[90px] text-xs text-text-body">{{
+                          lr.name
+                        }}</span>
                         <div
                           class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden"
                         >
@@ -787,6 +864,8 @@ import gcpSvgUrl from "@/assets/images/ingestion/gcp.svg";
 import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
 import firefoxSvgUrl from "@/assets/images/synthetics/firefox.svg";
 import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";
+import MonitorRunsSkeleton from "@/views/synthetics/MonitorRunsSkeleton.vue";
+import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 
 defineOptions({ name: "SyntheticMonitorRuns" });
 
@@ -808,6 +887,7 @@ const props = withDefaults(defineProps<Props>(), {
 // ── Synthetic results composable ──────────────────────────────────────────
 const synthetics = useSyntheticResults();
 const loading = computed(() => synthetics.loading.value);
+const hasLoadedOnce = computed(() => synthetics.hasLoadedOnce.value);
 
 // ── Seeded random (deterministic mock data) ──────────────────────────────
 function seedRand(seed: number) {
@@ -1011,10 +1091,14 @@ function fmtAge(min: number): string {
 
 function browserIcon(name: string): string {
   switch (name) {
-    case "Chromium": return "img:" + chromiumSvgUrl;
-    case "Firefox": return "img:" + firefoxSvgUrl;
-    case "WebKit": return "img:" + webkitSvgUrl;
-    default: return "open-in-browser";
+    case "Chromium":
+      return "img:" + chromiumSvgUrl;
+    case "Firefox":
+      return "img:" + firefoxSvgUrl;
+    case "WebKit":
+      return "img:" + webkitSvgUrl;
+    default:
+      return "open-in-browser";
   }
 }
 function locationIcon(region: string): string {
@@ -1083,15 +1167,28 @@ function uniqueValues(key: "browser" | "device" | "location"): string[] {
 }
 const browserOptions = computed<SelectOption[]>(() => [
   { label: "All browsers", value: "all", icon: "language" },
-  ...uniqueValues("browser").map((v) => ({ label: v, value: v, icon: browserIcon(v) })),
+  ...uniqueValues("browser").map((v) => ({
+    label: v,
+    value: v,
+    icon: browserIcon(v),
+  })),
 ]);
 const deviceOptions = computed<SelectOption[]>(() => [
   { label: "All devices", value: "all", icon: "devices" },
-  ...uniqueValues("device").map((v) => ({ label: v, value: v, icon: v === "Desktop" ? "computer" : v === "Tablet" ? "tablet" : "smartphone" })),
+  ...uniqueValues("device").map((v) => ({
+    label: v,
+    value: v,
+    icon:
+      v === "Desktop" ? "computer" : v === "Tablet" ? "tablet" : "smartphone",
+  })),
 ]);
 const locationOptions = computed<SelectOption[]>(() => [
   { label: "All locations", value: "all", icon: "location-on" },
-  ...uniqueValues("location").map((v) => ({ label: v, value: v, icon: locationIcon(v) })),
+  ...uniqueValues("location").map((v) => ({
+    label: v,
+    value: v,
+    icon: locationIcon(v),
+  })),
 ]);
 const durationOptions: SelectOption[] = [
   { label: "Any duration", value: "all" },
@@ -1187,8 +1284,10 @@ const totalFails = computed(
   () => allRuns.value.filter((r) => r.status === "fail").length,
 );
 
+const hasKpiData = computed(() => synthetics.kpi.value.totalRuns > 0);
+
 const p95Label = computed(() =>
-  synthetics.hasLoadedOnce.value && synthetics.kpi.value.p95Ms > 0
+  hasKpiData.value && synthetics.kpi.value.p95Ms > 0
     ? fmtDur(synthetics.kpi.value.p95Ms)
     : fmtDur(0),
 );
@@ -1204,7 +1303,8 @@ interface KpiCard {
 }
 const kpiCards = computed<KpiCard[]>(() => {
   const k = synthetics.kpi.value;
-  if (synthetics.hasLoadedOnce.value) {
+  console.log("Data ---", hasKpiData.value);
+  if (hasKpiData.value) {
     return [
       {
         key: "pass-rate",
@@ -1222,7 +1322,7 @@ const kpiCards = computed<KpiCard[]>(() => {
         value:
           k.totalRuns > 0
             ? ((k.retriedRuns / k.totalRuns) * 100).toFixed(1) + "%"
-            : "—",
+            : "0.0%",
         valueClass: k.retriedRuns > 0 ? "text-text-body!" : undefined,
       },
       {
@@ -1239,10 +1339,6 @@ const kpiCards = computed<KpiCard[]>(() => {
             ? "Failed"
             : "Passed"
           : "—",
-        unit: k.lastRunAt
-          ? fmtAge(Math.round((Date.now() - k.lastRunAt) / 60000)) +
-            " · Next in 3 min"
-          : undefined,
         valueClass:
           k.lastRunStatus === "failed"
             ? "text-status-error-text!"
@@ -1263,7 +1359,7 @@ const kpiCards = computed<KpiCard[]>(() => {
   return [
     { key: "pass-rate", label: "Pass Rate", value: fallbackPassPct },
     { key: "p95-duration", label: "p95 Duration", value: "—" },
-    { key: "retry-rate", label: "Retry Rate", value: "—" },
+    { key: "retry-rate", label: "Retry Rate", value: "0.0%" },
     {
       key: "failed-runs",
       label: "Failed Runs",
@@ -1273,7 +1369,6 @@ const kpiCards = computed<KpiCard[]>(() => {
       key: "last-run",
       label: "Last Run",
       value: lastRun?.status === "fail" ? "Failed" : "Passed",
-      unit: lastRun ? fmtAge(lastRun.ageMin) + " · Next in 3 min" : undefined,
       valueClass:
         lastRun?.status === "fail"
           ? "text-status-error-text!"
@@ -1469,11 +1564,9 @@ const locationBreakdown = computed<BreakdownItem[]>(() => {
     if (prefix === "gcp") return "img:" + gcpSvgUrl;
 
     // AWS format: xx-xxxx-N (us-east-1, eu-west-1, ap-south-1)
-    if (/^[a-z]{2}-[a-z]+-\d+$/.test(region))
-      return "img:" + awsSvgUrl;
+    if (/^[a-z]{2}-[a-z]+-\d+$/.test(region)) return "img:" + awsSvgUrl;
     // GCP format: xxx-xxxxN (us-central1, europe-west1)
-    if (/^[a-z]+-[a-z]+\d*$/.test(region))
-      return "img:" + gcpSvgUrl;
+    if (/^[a-z]+-[a-z]+\d*$/.test(region)) return "img:" + gcpSvgUrl;
     // Azure or just a single word like "eastus", "westeurope"
     return "location-on";
   }
@@ -1779,10 +1872,8 @@ const responseChartOption = computed(() => {
   const splitColor = cssVar("--o2-border-color", "#e2e8f0");
   const p95Color = cssVar("--o2-status-warning-text", "#f59e0b");
 
-  // Use real histogram data when available, fall back to seeded mock
   let seriesData: [number, number][];
-  if (synthetics.hasLoadedOnce.value && synthetics.buckets.value.length > 0) {
-    // p95 per bucket
+  if (synthetics.buckets.value.length > 0) {
     seriesData = synthetics.buckets.value.map(
       (b) => [b.tsMs, b.p95Ms] as [number, number],
     );
@@ -1852,7 +1943,7 @@ const errorChartOption = computed(() => {
 
   let categories: string[];
   let data: number[];
-  if (synthetics.hasLoadedOnce.value && synthetics.buckets.value.length > 0) {
+  if (synthetics.buckets.value.length > 0) {
     categories = synthetics.buckets.value.map((b) => {
       const d = new Date(b.tsMs);
       return d.toLocaleTimeString("en-US", {

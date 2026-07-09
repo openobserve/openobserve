@@ -41,7 +41,12 @@ export const SYNTHETIC_FIELDS = {
   executionId: "execution_id",
 } as const;
 
-export const STATUS_VALUES = { passed: "passed", warning: "warning", failed: "failed", error: "error" } as const;
+export const STATUS_VALUES = {
+  passed: "passed",
+  warning: "warning",
+  failed: "failed",
+  error: "error",
+} as const;
 
 // ── Typed UI models (stable regardless of stream schema) ─────────────────
 
@@ -206,7 +211,11 @@ function parseJson(raw: unknown): unknown {
 function parseJsonArray(raw: unknown): any[] {
   if (Array.isArray(raw)) return raw;
   if (typeof raw === "string") {
-    try { return JSON.parse(raw); } catch { return []; }
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return [];
+    }
   }
   return [];
 }
@@ -236,15 +245,24 @@ export function bucketInterval(durationMicros: number): string {
 
 function intervalSeconds(interval: string): number {
   switch (interval) {
-    case "10 seconds": return 10;
-    case "1 minute": return 60;
-    case "5 minutes": return 300;
-    case "15 minutes": return 900;
-    case "30 minutes": return 1800;
-    case "1 hour": return 3600;
-    case "6 hours": return 21_600;
-    case "1 day": return 86_400;
-    default: return 60;
+    case "10 seconds":
+      return 10;
+    case "1 minute":
+      return 60;
+    case "5 minutes":
+      return 300;
+    case "15 minutes":
+      return 900;
+    case "30 minutes":
+      return 1800;
+    case "1 hour":
+      return 3600;
+    case "6 hours":
+      return 21_600;
+    case "1 day":
+      return 86_400;
+    default:
+      return 60;
   }
 }
 
@@ -259,7 +277,7 @@ export function buildKpiSql(monitorId: string): string {
   COUNT(*) as total_runs,
   COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.passed}') as passed_runs,
   COUNT(*) FILTER (WHERE ${F.status} != '${STATUS_VALUES.passed}') as failed_runs,
-  COUNT(*) FILTER (WHERE attempts > 1) as retried_runs,
+  COUNT(*) FILTER (WHERE attempt > 1) as retried_runs,
   COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration
 FROM ${TABLE}
 WHERE ${F.monitorId} = '${id}'`;
@@ -300,7 +318,11 @@ LIMIT ${limit}`;
 }
 
 /** Per-execution results for a single run — one row per engine×device combo. */
-export function buildRunDetailSql(monitorId: string, runId: string, executionId: string): string {
+export function buildRunDetailSql(
+  monitorId: string,
+  runId: string,
+  executionId: string,
+): string {
   const id = escapeSqlLiteral(monitorId);
   const rid = escapeSqlLiteral(runId);
   const eid = escapeSqlLiteral(executionId);
@@ -374,10 +396,14 @@ export function mapRunDetail(
     executionId: str(rawHit.execution_id),
     triggerType: str(rawHit.trigger_type),
     monitorName: str(rawHit.synthetics_name),
-    attempts: num(rawHit.attempts),
+    attempts: num(rawHit.attempt),
     failedStep: rawHit.failed_step ? str(rawHit.failed_step) : null,
-    recordedSteps: Array.isArray(rawRecordedSteps) ? (rawRecordedSteps as RecordedStep[]) : [],
-    lastAttemptSteps: Array.isArray(rawSteps) ? (rawSteps as StepExecution[]) : [],
+    recordedSteps: Array.isArray(rawRecordedSteps)
+      ? (rawRecordedSteps as RecordedStep[])
+      : [],
+    lastAttemptSteps: Array.isArray(rawSteps)
+      ? (rawSteps as StepExecution[])
+      : [],
     retryHistory: [],
     network: null,
     webVitals: null,
@@ -385,7 +411,9 @@ export function mapRunDetail(
   };
 }
 
-export function mapRunLocationResult(rawHit: Record<string, unknown>): RunLocationResult {
+export function mapRunLocationResult(
+  rawHit: Record<string, unknown>,
+): RunLocationResult {
   return {
     timestampMs: num(rawHit.ts) / 1000,
     status: toRunStatus(rawHit.status),
@@ -426,7 +454,13 @@ export function mapHistogram(
   const buckets = new Map<string, SyntheticBucket>();
   for (let t = startMs; t < endMs; t += stepMs) {
     const key = new Date(t).toISOString().slice(0, 19);
-    buckets.set(key, { tsMs: t, avgMs: 0, p95Ms: 0, uptimePct: 100, failedRuns: 0 });
+    buckets.set(key, {
+      tsMs: t,
+      avgMs: 0,
+      p95Ms: 0,
+      uptimePct: 100,
+      failedRuns: 0,
+    });
   }
 
   for (const hit of rawHits) {

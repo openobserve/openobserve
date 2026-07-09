@@ -42,9 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
     >
       <template #title>
-        <span data-test="synthetics-run-detail-title"
-          >Run Details</span
-        >
+        <span data-test="synthetics-run-detail-title">Run Details</span>
       </template>
       <template #title-trail>
         <OBadge
@@ -377,6 +375,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ),
                       }"
                     >
+                      <!-- Step number (colored status circle) -->
+                      <span
+                        :class="[
+                          st.status === 'fail'
+                            ? 'w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-error-soft-bg)] text-[var(--color-badge-error-soft-text)] border border-[var(--color-badge-error-soft-text)] text-xs font-semibold'
+                            : 'w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-success-soft-bg)] text-[var(--color-badge-success-soft-text)] border border-[var(--color-badge-success-soft-text)] text-xs font-semibold',
+                        ]"
+                      >
+                        {{ st.id }}
+                      </span>
                       <!-- Screenshot thumbnail 60×40 -->
                       <div
                         class="w-18 h-12 shrink-0 rounded border border-[var(--o2-border-color)] bg-surface-subtle flex items-center justify-center overflow-hidden"
@@ -394,17 +402,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-text-caption"
                         />
                       </div>
-
-                      <!-- Step number (colored status circle) -->
-                      <span
-                        :class="[
-                          st.status === 'fail'
-                            ? 'w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-error-soft-bg)] text-[var(--color-badge-error-soft-text)] border border-[var(--color-badge-error-soft-text)] text-xs font-semibold'
-                            : 'w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-success-soft-bg)] text-[var(--color-badge-success-soft-text)] border border-[var(--color-badge-success-soft-text)] text-xs font-semibold',
-                        ]"
-                      >
-                        {{ st.id }}
-                      </span>
 
                       <!-- Action icon -->
                       <span
@@ -815,7 +812,7 @@ function buildSteps(detail: SyntheticRunDetail | null): StepRow[] {
       duration: ex.duration_ms,
       status: isFail ? ("fail" as const) : ("pass" as const),
       icon: recorded ? actionIcon(recorded.action) : "radio_button_checked",
-      statusIcon: isFail ? "cancel" : "check_circle",
+      statusIcon: isFail ? "cancel" : "check-circle",
       durStr: fmtDur(ex.duration_ms),
       durColor: isFail
         ? "var(--o2-status-error-text)"
@@ -1021,7 +1018,7 @@ watch(
     const isF = status === "failed" || isErr;
     emit("update-status", {
       variant: isErr ? "error-soft" : isF ? "error" : "success",
-      icon: isErr ? "error" : isF ? "cancel" : "check_circle",
+      icon: isErr ? "error" : isF ? "cancel" : "check-circle",
       label: isErr ? "Error" : isF ? "Failed" : "Passed",
       url: currentRun.value.url,
       timestamp: currentRun.value.timestamp,
