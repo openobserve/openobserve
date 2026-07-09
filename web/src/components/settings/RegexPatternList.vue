@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md flex flex-col h-full p-0">
+  <div class="flex flex-col h-full p-0">
     <template v-if="!showImportRegexPatternDialog">
     <!-- Standard section header: title + actions only. Search moved to toolbar. -->
     <AppPageHeader
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #bottom>
         <div class="flex items-center gap-2">
-          <span class="text-xs text-text-primary font-medium">
+          <span class="o2-table-footer-title">
             {{ resultTotal }} {{ t("regex_patterns.bottom_header") }}
           </span>
           <OButton

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="rounded-md flex flex-col h-full overflow-hidden">
+  <div class="flex flex-col h-full overflow-hidden">
     <!-- Standard page header on top (full-width). The filter panel (left) + table
          (right) sit below in the splitter — the standard header + left + right model. -->
     <AppPageHeader

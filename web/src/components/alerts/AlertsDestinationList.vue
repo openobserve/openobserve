@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md flex flex-col h-full p-0">
+  <div class="flex flex-col h-full p-0">
 
     <div v-if="!showDestinationEditor && !showImportDestination" class="flex flex-col h-full">
       <AppPageHeader
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #bottom="{ totalRows }">
-            <span class="o2-table-footer-title text-primary">
+            <span class="o2-table-footer-title">
               {{ totalRows.toLocaleString() }} {{ t('alert_destinations.header') }}
             </span>
             <OButton
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @get:destinations="getDestinations"
       />
     </div>
-    <div v-else>
+    <div v-else class="flex-1 min-h-0">
       <ImportDestination
         :destinations="destinations"
         :templates="templates"
