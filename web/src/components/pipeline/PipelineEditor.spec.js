@@ -182,10 +182,15 @@ describe("PipelineEditor", () => {
       comparePipelinesById: vi.fn(),
     }));
 
-    // Create teleport target so Teleport to="#o2-page-actions" doesn't error
+    // Create teleport targets so Teleport to="#o2-page-actions" /
+    // "#o2-page-title-trail" (the name input) don't error
     const teleportTarget = document.createElement("div");
     teleportTarget.id = "o2-page-actions";
     document.body.appendChild(teleportTarget);
+
+    const titleTrailTarget = document.createElement("div");
+    titleTrailTarget.id = "o2-page-title-trail";
+    document.body.appendChild(titleTrailTarget);
 
     wrapper = mount(PipelineEditor, {
       attachTo: document.body,
@@ -255,9 +260,9 @@ describe("PipelineEditor", () => {
       expect(wrapper.vm.validationErrors).toEqual([]);
     });
 
-    it("initializes pipelineNameError as false", () => {
-      // pipelineNameError lives on pipelineObj (from useDnD), not on vm directly
-      expect(mockPipelineObj.pipelineNameError).toBeFalsy();
+    it("initializes the pipeline name form with an empty name", () => {
+      // Name validation is now owned by the OForm (metaForm); it starts empty.
+      expect(wrapper.vm.metaForm.state.values.name).toBe("");
     });
 
     it("initializes confirmDialogMeta as hidden", () => {
@@ -556,7 +561,6 @@ describe("PipelineEditor", () => {
   describe("savePipeline Validations", () => {
     beforeEach(async () => {
       wrapper.vm.onSubmitPipeline = vi.fn().mockResolvedValue(true);
-      wrapper.vm.pipelineNameInputRef = { focus: vi.fn() };
       const { toast } = await import("@/lib/feedback/Toast/useToast");
       vi.mocked(toast).mockClear();
     });
@@ -570,11 +574,11 @@ describe("PipelineEditor", () => {
       );
     });
 
-    it("sets pipelineNameError to true when name is empty", async () => {
+    it("blocks the save when the pipeline name is empty", async () => {
       mockPipelineObj.currentSelectedPipeline.name = "";
       await wrapper.vm.savePipeline();
-      // pipelineNameError is set on pipelineObj (from useDnD mock)
-      expect(mockPipelineObj.pipelineNameError).toBe(true);
+      // OForm validation fails, so save never reaches the create call.
+      expect(pipelineService.createPipeline).not.toHaveBeenCalled();
     });
 
     it("shows error notification when source node is missing", async () => {

@@ -77,8 +77,6 @@ const defaultObject = {
   previousNodeOptions:<any>[],
   userSelectedNode:<any>{},
   userClickedNode : <any>{},
-  pipelineNameError: false,
-  pipelineNameErrorMessage: "",
 };
 
 const pipelineObj = reactive(Object.assign({}, defaultObject));

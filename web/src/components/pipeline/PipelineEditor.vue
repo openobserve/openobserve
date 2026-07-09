@@ -49,6 +49,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </Teleport>
 
+      <!-- Pipeline name input for NEW pipelines, teleported into the shell
+           header (Functions.vue #o2-page-title-trail) next to the title —
+           mirrors the actions teleport above. Owned here, alongside
+           savePipeline, which validates it via the OForm schema. -->
+      <Teleport v-if="isCreatePipeline" defer to="#o2-page-title-trail">
+        <div class="w-64 shrink-0">
+          <OForm :form="metaForm">
+            <OFormInput
+              name="name"
+              :placeholder="t('pipeline.pipelineName')"
+              hide-bottom-space
+              data-test="pipeline-editor-name-input"
+            />
+          </OForm>
+        </div>
+      </Teleport>
+
 
       <div class="flex mt-3 px-2">
         <div class="nodes-drag-container pr-3 w-50">
@@ -185,6 +202,14 @@ import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import {
+  makePipelineMetaSchema,
+  pipelineMetaDefaults,
+  type PipelineMetaForm,
+} from "./pipelineMeta.schema";
 import jstransform from "@/services/jstransform";
 import NodeSidebar from "@/components/pipeline/NodeSidebar.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
@@ -443,15 +468,44 @@ const validationErrors = ref<string[]>([]);
 
 const { track } = useReo();
 
-// Clear pipeline name error when user starts typing
+// ── Pipeline name: OForm-owned (migrated from the store-driven OInput) ───────
+// The name input is a headless OForm so the teleported <OFormInput> validates
+// via the schema (submit-then-change timing; the inline error appears on the
+// first save attempt). `currentSelectedPipeline.name` stays the PERSISTED field
+// — the save payload, JSON editor and FlowChart all read it — so the two are
+// kept mirrored by the guarded watches below (guards break the echo loop).
+const isCreatePipeline = computed(
+  () => router.currentRoute.value.name === "createPipeline",
+);
+
+const metaForm = useOForm<PipelineMetaForm>({
+  defaultValues: pipelineMetaDefaults(),
+  schema: makePipelineMetaSchema(t),
+});
+
+// form → store: reflect what the user types into the persisted pipeline name.
+watch(
+  metaForm.useStore((s: any) => s.values.name),
+  (v: string) => {
+    if ((v ?? "") !== (pipelineObj.currentSelectedPipeline.name ?? "")) {
+      pipelineObj.currentSelectedPipeline.name = v ?? "";
+    }
+  },
+);
+
+// store → form: re-hydrate the field whenever the pipeline object is REPLACED
+// (edit-mode load, JSON-editor apply, reset). Guarded against the watch above.
+// flush:"sync" so the form reflects a store change in the SAME tick — the
+// JSON-editor apply path sets currentSelectedPipeline then calls savePipeline()
+// synchronously, and savePipeline validates the form value.
 watch(
   () => pipelineObj.currentSelectedPipeline.name,
-  (newValue) => {
-    if (newValue && newValue.trim() !== "") {
-      pipelineObj.pipelineNameError = false;
-      pipelineObj.pipelineNameErrorMessage = "";
+  (v: string) => {
+    if ((v ?? "") !== (metaForm.state.values.name ?? "")) {
+      metaForm.setFieldValue("name", v ?? "");
     }
-  }
+  },
+  { flush: "sync" },
 );
 
 // Watch for dialog changes to track node drops
@@ -699,20 +753,19 @@ const resetDialog = () => {
 
 const savePipeline = async () => {
   forceSkipBeforeUnloadListener = true;
-  if (pipelineObj.currentSelectedPipeline.name === "") {
-    pipelineObj.pipelineNameError = true;
-    pipelineObj.pipelineNameErrorMessage = t("pipeline.pipelineNameRequired");
-
+  // Name validation is owned by the OForm schema. handleSubmit runs the schema
+  // over the form values — this works even in edit mode / the JSON-editor path
+  // where the teleported field isn't mounted — and reveals the inline error on
+  // the field (create page). The toast preserves the previous UX and is the only
+  // feedback when the field isn't visible (edit / JSON apply).
+  await metaForm.handleSubmit();
+  if (!metaForm.state.isValid) {
     toast({
       message: t("pipeline.pipelineNameRequired"),
       variant: "warning",
     });
     return;
   }
-
-  // Clear error state if name is valid
-  pipelineObj.pipelineNameError = false;
-  pipelineObj.pipelineNameErrorMessage = "";
   // Find the input node
   const inputNodeIndex = pipelineObj.currentSelectedPipeline.nodes.findIndex(
     (node: any) =>
@@ -1106,6 +1159,9 @@ const savePipelineJson = async (json: string) => {
 
     // Only save if validation passes
     pipelineObj.currentSelectedPipeline = parsedPipeline;
+    // Seed the OForm field synchronously so savePipeline()'s validate sees the
+    // name from the edited JSON (the store→form watch flushes next-tick).
+    metaForm.setFieldValue("name", parsedPipeline.name ?? "");
     savePipeline();
   } catch (error) {
     // Handle JSON parsing errors

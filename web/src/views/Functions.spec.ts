@@ -27,8 +27,6 @@ vi.mock("@/components/pipeline/PipelineSectionTabs.vue", () => ({
 vi.mock("@/plugins/pipelines/useDnD", () => ({
   pipelineObj: {
     currentSelectedPipeline: { name: "" },
-    pipelineNameError: false,
-    pipelineNameErrorMessage: "",
   },
 }));
 
@@ -63,14 +61,6 @@ vi.mock("@/lib/overlay/Dropdown/ODropdownItem.vue", () => ({
     template:
       '<div :data-test="$attrs[\'data-test\']" @click="$emit(\'select\')"><slot /></div>',
     emits: ["select"],
-  },
-}));
-
-vi.mock("@/lib/forms/Input/OInput.vue", () => ({
-  default: {
-    name: "OInput",
-    template: '<input :data-test="$attrs[\'data-test\']" />',
-    props: ["modelValue", "placeholder", "error", "errorMessage"],
   },
 }));
 
