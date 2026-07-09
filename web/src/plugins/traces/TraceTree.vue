@@ -401,6 +401,7 @@ import {
   watch,
   computed,
   onMounted,
+  onBeforeUnmount,
 } from "vue";
 import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
@@ -523,6 +524,12 @@ export default defineComponent({
       }
     });
 
+    onBeforeUnmount(() => {
+      // Drop any queued scroll so it can't fire against a torn-down virtualizer
+      // (the tree can remount since searchObj is a module-level singleton).
+      cancelScroll();
+    });
+
     // ── CSS connector helpers (pre-computed, O(n) total) ────────────────────
     // nextSiblingMap[i] = true when spans[i] has a next sibling at the same
     // depth with no shallower span in between. Built in a single RTL scan so
@@ -641,15 +648,47 @@ export default defineComponent({
         .filter((index: any) => index !== -1);
     };
 
+    // Tracks the pending scrollToSpan setTimeout so a newer scroll or an
+    // explicit cancel can clear an in-flight one. Non-reactive — never used in
+    // the template.
+    let pendingScrollTimeout: ReturnType<typeof setTimeout> | null = null;
+
     const scrollToSpan = (spanId: string, delay: number = 0) => {
       const spanIndex = (props.spans as any[]).findIndex(
         (s: any) => s.spanId === spanId || s.span_id === spanId,
       );
 
       if (spanIndex !== -1) {
-        setTimeout(() => {
+        // Clear any previously queued scroll so only the latest one runs.
+        if (pendingScrollTimeout !== null) {
+          clearTimeout(pendingScrollTimeout);
+        }
+        pendingScrollTimeout = setTimeout(() => {
+          pendingScrollTimeout = null;
           rowVirtualizer.value.scrollToIndex(spanIndex, { align: "center" });
         }, delay);
+      }
+    };
+
+    // Cancels any pending and in-flight programmatic scroll. Called when the
+    // selection is cleared (e.g. sidebar close) so the virtualizer stops
+    // forcing the previously-selected span back into view while the user
+    // scrolls manually.
+    const cancelScroll = () => {
+      if (pendingScrollTimeout !== null) {
+        clearTimeout(pendingScrollTimeout);
+        pendingScrollTimeout = null;
+      }
+      // TanStack's scrollToIndex runs a requestAnimationFrame retry loop that
+      // keeps re-scrolling until the target offset is reached; the loop only
+      // bails when its captured `currentScrollToIndex` no longer matches the
+      // instance's. Resetting it to null (the value the library inits it to)
+      // makes the next frame bail. There is no public API for this, so guard
+      // the access in case the internal field is renamed in a future
+      // @tanstack/virtual-core release.
+      const virtualizer = rowVirtualizer.value as any;
+      if (virtualizer && "currentScrollToIndex" in virtualizer) {
+        virtualizer.currentScrollToIndex = null;
       }
     };
 
@@ -815,6 +854,7 @@ export default defineComponent({
       isHighlighted,
       currentSelectedValue,
       scrollToSpan,
+      cancelScroll,
       scrollToMatch,
       findMatches,
       getChildCount,
