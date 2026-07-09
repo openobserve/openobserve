@@ -19,6 +19,7 @@ use config::{
         dashboards::{Dashboard, ListDashboardsParams, v8},
         folder::{DEFAULT_FOLDER, Folder, FolderType},
         stream::{DistinctField, StreamType},
+        system_settings::SettingScope,
     },
     utils::time::now_micros,
 };
@@ -33,12 +34,20 @@ use infra::{
 };
 
 use super::{db::distinct_values, folders, stream::save_stream_settings};
-use crate::common::{
-    meta::authz::Authz,
-    utils::auth::{remove_ownership, set_ownership},
+use crate::{
+    common::{
+        meta::authz::Authz,
+        utils::auth::{remove_ownership, set_ownership},
+    },
+    service::db::system_settings,
 };
 pub mod reports;
 pub mod timed_annotations;
+
+/// Org-setting key holding the "pin dashboard to Home" snapshot
+/// (`{ dashboardId, folderId, label }`). Kept in sync when the pinned
+/// dashboard is moved or deleted so the pin never goes stale.
+const HOME_DASHBOARD_SETTING_KEY: &str = "home_dashboard";
 
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
@@ -443,6 +452,110 @@ pub async fn get_dashboard(org_id: &str, dashboard_id: &str) -> Result<Dashboard
         .map(|(_f, d)| d)
 }
 
+/// Given the current `home_dashboard` setting value, returns the new `folderId`
+/// to persist when `dashboard_id` is moved to `to_folder` — or `None` if the
+/// setting does not pin this dashboard, or the folder is already correct.
+fn home_pin_move_target(
+    value: &serde_json::Value,
+    dashboard_id: &str,
+    to_folder: &str,
+) -> Option<String> {
+    let pins_this = value.get("dashboardId").and_then(|v| v.as_str()) == Some(dashboard_id);
+    let folder_changed = value.get("folderId").and_then(|v| v.as_str()) != Some(to_folder);
+    if pins_this && folder_changed {
+        Some(to_folder.to_string())
+    } else {
+        None
+    }
+}
+
+/// Returns true if the `home_dashboard` setting pins `dashboard_id` and should
+/// therefore be cleared when that dashboard is deleted.
+fn home_pin_should_clear(value: &serde_json::Value, dashboard_id: &str) -> bool {
+    value.get("dashboardId").and_then(|v| v.as_str()) == Some(dashboard_id)
+}
+
+/// Keep the org's pinned `home_dashboard` setting in sync when the pinned
+/// dashboard is moved: if the setting points at `dashboard_id`, update its
+/// `folderId` to `to_folder`. Best-effort — never fails the caller.
+async fn reconcile_home_dashboard_on_move(org_id: &str, dashboard_id: &str, to_folder: &str) {
+    let setting = match system_settings::get(
+        &SettingScope::Org,
+        Some(org_id),
+        None,
+        HOME_DASHBOARD_SETTING_KEY,
+    )
+    .await
+    {
+        Ok(Some(s)) => s,
+        Ok(None) => return, // no pin for this org
+        Err(e) => {
+            log::error!(
+                "[Dashboard] reconcile home_dashboard (move) read failed for org {org_id}: {e}"
+            );
+            return;
+        }
+    };
+
+    let Some(new_folder) = home_pin_move_target(&setting.setting_value, dashboard_id, to_folder)
+    else {
+        return;
+    };
+
+    let mut updated = setting;
+    if let Some(obj) = updated.setting_value.as_object_mut() {
+        obj.insert(
+            "folderId".to_string(),
+            serde_json::Value::String(new_folder),
+        );
+    } else {
+        return; // malformed value; leave it alone
+    }
+
+    if let Err(e) = system_settings::set(&updated).await {
+        log::error!(
+            "[Dashboard] reconcile home_dashboard (move) write failed for org {org_id}: {e}"
+        );
+    }
+}
+
+/// Clear the org's pinned `home_dashboard` setting when the pinned dashboard is
+/// deleted. Best-effort — never fails the caller.
+async fn reconcile_home_dashboard_on_delete(org_id: &str, dashboard_id: &str) {
+    let setting = match system_settings::get(
+        &SettingScope::Org,
+        Some(org_id),
+        None,
+        HOME_DASHBOARD_SETTING_KEY,
+    )
+    .await
+    {
+        Ok(Some(s)) => s,
+        Ok(None) => return,
+        Err(e) => {
+            log::error!(
+                "[Dashboard] reconcile home_dashboard (delete) read failed for org {org_id}: {e}"
+            );
+            return;
+        }
+    };
+
+    if !home_pin_should_clear(&setting.setting_value, dashboard_id) {
+        return;
+    }
+
+    if let Err(e) = system_settings::delete(
+        &SettingScope::Org,
+        Some(org_id),
+        None,
+        HOME_DASHBOARD_SETTING_KEY,
+    )
+    .await
+    {
+        log::error!("[Dashboard] reconcile home_dashboard (delete) failed for org {org_id}: {e}");
+    }
+}
+
 #[tracing::instrument]
 pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), DashboardError> {
     let Some((folder, _dashboard)) = table::dashboards::get_by_id(org_id, dashboard_id).await?
@@ -450,6 +563,8 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
         return Err(DashboardError::DashboardNotFound);
     };
     table::dashboards::delete_from_folder(org_id, &folder.folder_id, dashboard_id).await?;
+    // Keep the org's "pin to Home" setting from dangling on a deleted dashboard.
+    reconcile_home_dashboard_on_delete(org_id, dashboard_id).await;
     if let Err(e) = infra::coordinator::dashboards::emit_delete_event(org_id, dashboard_id).await {
         log::error!("[Dashboard] error emitting coordinator delete event for {dashboard_id}: {e}");
     }
@@ -528,6 +643,9 @@ pub async fn move_dashboard(
         Some(&hash),
     )
     .await?;
+
+    // Keep the org's "pin to Home" setting pointing at the new folder.
+    reconcile_home_dashboard_on_move(org_id, dashboard_id, to_folder).await;
 
     #[cfg(feature = "enterprise")]
     {
@@ -1103,5 +1221,45 @@ mod tests {
         assert_eq!(layout.x, 96);
         assert_eq!(layout.y, 0);
         assert_eq!(layout.i, 2);
+    }
+
+    #[test]
+    fn home_pin_move_target_updates_when_pin_matches_and_folder_changed() {
+        let v = serde_json::json!({ "dashboardId": "abc", "folderId": "B", "label": "X" });
+        assert_eq!(
+            home_pin_move_target(&v, "abc", "A"),
+            Some("A".to_string())
+        );
+    }
+
+    #[test]
+    fn home_pin_move_target_none_when_folder_unchanged() {
+        let v = serde_json::json!({ "dashboardId": "abc", "folderId": "A", "label": "X" });
+        assert_eq!(home_pin_move_target(&v, "abc", "A"), None);
+    }
+
+    #[test]
+    fn home_pin_move_target_none_when_different_dashboard() {
+        let v = serde_json::json!({ "dashboardId": "other", "folderId": "B", "label": "X" });
+        assert_eq!(home_pin_move_target(&v, "abc", "A"), None);
+    }
+
+    #[test]
+    fn home_pin_should_clear_true_when_pin_matches() {
+        let v = serde_json::json!({ "dashboardId": "abc", "folderId": "B", "label": "X" });
+        assert!(home_pin_should_clear(&v, "abc"));
+    }
+
+    #[test]
+    fn home_pin_should_clear_false_when_pin_differs() {
+        let v = serde_json::json!({ "dashboardId": "other", "folderId": "B", "label": "X" });
+        assert!(!home_pin_should_clear(&v, "abc"));
+    }
+
+    #[test]
+    fn home_pin_handles_malformed_value_gracefully() {
+        let v = serde_json::json!("not-an-object");
+        assert_eq!(home_pin_move_target(&v, "abc", "A"), None);
+        assert!(!home_pin_should_clear(&v, "abc"));
     }
 }
