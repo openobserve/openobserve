@@ -16,59 +16,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col qp-2 h-full">
-    <div class="w-full flex items-end border-b border-border-default">
-      <div class="w-full flex card-container px-[0.625rem] py-[0.625rem]">
-        <div
-          class="flex justify-center items-center mr-3 cursor-pointer hover:text-[var(--o2-primary-btn-bg)] border-[1.5px] border-solid rounded-full w-[1.375rem] h-[1.375rem]"
-          title="Go Back"
-          @click="router.back()"
-        >
-          <OIcon name="arrow-back-ios-new" size="xs" />
-        </div>
-        <div class="text-xs truncate flex items-center gap-1.5 mr-3">
-          <OIcon name="language" size="sm" />
-          {{ sessionDetails.ip }}
-        </div>
-        <div class="text-xs truncate flex items-center gap-1.5 mr-3">
-          <OIcon name="calendar-month" size="sm" />
-          {{ sessionDetails.date }}
-        </div>
-        <div class="text-xs truncate flex items-center gap-1.5 mr-3">
-          <OIcon name="person" size="sm" />
-          {{ sessionDetails.user_email || "Unknown User" }}
-        </div>
-        <div class="text-xs truncate flex items-center gap-1.5 mr-3">
-          <OIcon name="location-on" size="sm" />
-          {{ sessionDetails.city }}, {{ sessionDetails.country }}
-        </div>
-        <div class="text-xs truncate flex items-center gap-1.5 mr-3">
-          <OIcon name="settings" size="sm" />
-          {{ sessionDetails.browser }}, {{ sessionDetails.os }}
-        </div>
-        <div
-          v-if="frustrationCount > 0"
-          class="text-xs truncate flex items-center"
-          :title="`${frustrationCount} frustration signal${frustrationCount > 1 ? 's' : ''} detected`"
-          data-test="session-viewer-frustration-summary"
-        >
-          <OIcon
-            name="sentiment-very-dissatisfied"
-            size="sm"
-            class="pr-1"
-            style="color: #fb923c"
-            data-test="frustration-summary-icon"
-          />
-          <span
-            class="font-semibold"
-            style="color: #fb923c"
-            data-test="frustration-summary-text"
-            >{{ frustrationCount }} Frustration{{
-              frustrationCount > 1 ? "s" : ""
-            }}</span
+    <AppPageHeader
+      :title="sessionDetails.id || t('rum.sessionReplay')"
+      :back="{ onClick: () => router.back(), dataTest: 'session-viewer-back-btn' }"
+      class="shrink-0 border-b border-border-default"
+    >
+      <template #subtitle>
+        <div class="flex items-center flex-wrap gap-x-3 gap-y-1 min-w-0">
+          <div class="text-xs truncate flex items-center gap-1.5">
+            <OIcon name="language" size="sm" />
+            {{ sessionDetails.ip }}
+          </div>
+          <div class="text-xs truncate flex items-center gap-1.5">
+            <OIcon name="calendar-month" size="sm" />
+            {{ sessionDetails.date }}
+          </div>
+          <div class="text-xs truncate flex items-center gap-1.5">
+            <OIcon name="person" size="sm" />
+            {{ sessionDetails.user_email || "Unknown User" }}
+          </div>
+          <div class="text-xs truncate flex items-center gap-1.5">
+            <OIcon name="location-on" size="sm" />
+            {{ sessionDetails.city }}, {{ sessionDetails.country }}
+          </div>
+          <div class="text-xs truncate flex items-center gap-1.5">
+            <OIcon name="settings" size="sm" />
+            {{ sessionDetails.browser }}, {{ sessionDetails.os }}
+          </div>
+          <div
+            v-if="frustrationCount > 0"
+            class="text-xs truncate flex items-center"
+            :title="`${frustrationCount} frustration signal${frustrationCount > 1 ? 's' : ''} detected`"
+            data-test="session-viewer-frustration-summary"
           >
+            <OIcon
+              name="sentiment-very-dissatisfied"
+              size="sm"
+              class="pr-1"
+              style="color: #fb923c"
+              data-test="frustration-summary-icon"
+            />
+            <span
+              class="font-semibold"
+              style="color: #fb923c"
+              data-test="frustration-summary-text"
+              >{{ frustrationCount }} Frustration{{
+                frustrationCount > 1 ? "s" : ""
+              }}</span
+            >
+          </div>
         </div>
-      </div>
-    </div>
+      </template>
+    </AppPageHeader>
     <div
       class="w-full flex card-container overflow-hidden h-[calc(100%-3.125)]! flex-1 min-h-0"
     >
@@ -122,12 +121,14 @@ import { cloneDeep } from "lodash-es";
 import { computed, onBeforeMount, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
 import useQuery from "@/composables/useQuery";
 import useSessionsReplay from "@/composables/useSessionReplay";
 import usePerformance from "@/composables/rum/usePerformance";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 import { formatDate } from "@/utils/date";
 import { getUUID } from "@/utils/zincutils";
@@ -151,6 +152,7 @@ const sessionId = ref("1");
 const currentTime = ref(0);
 const router = useRouter();
 const store = useStore();
+const { t } = useI18n();
 const isLoading = ref<boolean[]>([]);
 const { buildQueryPayload, getTimeInterval, parseQuery } = useQuery();
 const segments = ref<any[]>([]);

@@ -697,6 +697,19 @@ const isOpen = computed(() =>
   listboxModeEnabled.value ? popoverOpen.value : selectOpen.value,
 );
 
+// Clicking the field label opens the dropdown — mirroring how clicking an
+// OInput's label focuses its input. Reka's triggers open on `pointerdown`, so
+// the `click` a native <label for> forwards never opens them; open explicitly.
+// `.prevent` (on the template handler) stops the redundant native forwarding.
+function handleLabelClick() {
+  if (props.disabled) return;
+  if (listboxModeEnabled.value) {
+    popoverOpen.value = true;
+  } else {
+    selectOpen.value = true;
+  }
+}
+
 
 // When this OSelect is nested inside an ODropdown, signal its
 // open/close so the parent ignores the pointer event that closes us.
@@ -960,8 +973,9 @@ const fieldWidthClass = computed(() => {
       :for="inputId"
       :class="[
         'o-input-label text-sm font-semibold leading-tight flex items-center gap-1',
-        disabled && 'o-input-label--disabled',
+        disabled ? 'o-input-label--disabled' : 'cursor-pointer',
       ]"
+      @click.prevent="handleLabelClick"
     >
       {{ label }}<span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
@@ -1006,8 +1020,8 @@ const fieldWidthClass = computed(() => {
               labelPosition === 'inside' && label ? '' : ($slots['icon-left'] ? 'ps-2' : 'ps-3'),
               'bg-select-bg',
               hasError
-                ? 'border-select-border-error'
-                : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus',
+                ? 'border-select-border-error focus:ring-[0.125rem] focus:ring-select-border-error/30 data-[state=open]:ring-[0.125rem] data-[state=open]:ring-select-border-error/30'
+                : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-[0.125rem] focus:ring-primary-500/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-[0.125rem] data-[state=open]:ring-primary-500/25',
               /* Keep the red error border on focus; focus border color applies only when there's no error. */
               'focus:outline-none',
               'transition-[color,background-color,border-color,box-shadow] duration-150',
@@ -1538,8 +1552,8 @@ const fieldWidthClass = computed(() => {
             labelPosition === 'inside' && label ? '' : 'ps-3',
             'bg-select-bg',
             hasError
-              ? 'border-select-border-error'
-              : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus',
+              ? 'border-select-border-error focus:ring-[0.125rem] focus:ring-select-border-error/30 data-[state=open]:ring-[0.125rem] data-[state=open]:ring-select-border-error/30'
+              : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-[0.125rem] focus:ring-primary-500/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-[0.125rem] data-[state=open]:ring-primary-500/25',
             /* Keep the red error border on focus; focus border color applies only when there's no error. */
             'focus:outline-none',
             'transition-[color,background-color,border-color,box-shadow] duration-150',
