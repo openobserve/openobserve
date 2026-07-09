@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @get:templates="getTemplates"
       />
     </div>
-    <div v-else>
+    <div v-else class="flex-1 min-h-0">
       <ImportTemplate :templates="templates" @update:templates="getTemplates" />
     </div>
 

@@ -18,24 +18,24 @@ the Free Software Foundation, either version 3 of the License, or
     @import="importJson"
   >
     <template #output-content>
-      <div class="w-full" style="min-width: 380px">
+      <div class="w-full h-full flex flex-col" style="min-width: 380px">
         <div
           v-if="errors.length"
-          class="text-center text-xl font-semibold py-2"
+          class="text-center text-xl font-semibold py-2 shrink-0"
           data-test="score-config-import-errors-title"
         >
           {{ t("onlineEvals.scoreConfig.import.errors.title") }}
         </div>
         <div
           v-else
-          class="text-center text-xl font-semibold py-2"
+          class="text-center text-xl font-semibold py-2 shrink-0"
           data-test="score-config-import-output-title"
         >
           {{ t("onlineEvals.scoreConfig.import.outputMessages") }}
         </div>
-        <OSeparator class="mx-4 mt-4" />
+        <OSeparator class="mx-4 mt-4 shrink-0" />
 
-        <div class="overflow-auto">
+        <div class="flex-1 min-h-0 overflow-auto">
           <div v-if="errors.length" class="p-2.5 mb-2.5">
             <div class="error-list">
               <div

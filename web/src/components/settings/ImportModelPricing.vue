@@ -19,14 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('modelPricing.importTitle')"
     test-prefix="model-pricing"
     :is-importing="isImporting"
-    container-class=""
-    container-style="height: calc(100vh - 50px);"
-    :editor-heights="{
-      urlEditor: 'calc(100vh - 285px)',
-      fileEditor: 'calc(100vh - 282px)',
-      outputContainer: 'calc(100vh - 110px)',
-      errorReport: 'calc(100vh - 128px)',
-    }"
+    container-class="flex-1 min-h-0"
+    container-style=""
     :tabs="allTabs"
     @back="arrowBackFn"
     @cancel="arrowBackFn"
@@ -34,16 +28,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:active-tab="handleTabChange"
   >
     <template #output-content>
-      <div class="w-full h-full border-l border-border-default" style="min-width: 400px;">
+      <div class="w-full h-full flex flex-col border-l border-border-default" style="min-width: 400px;">
         <div
           v-if="modelPricingErrorsToDisplay.length > 0"
-          class="text-center text-xl font-semibold py-2"
+          class="text-center text-xl font-semibold py-2 shrink-0"
         >
           {{ t('modelPricing.errorValidations') }}
         </div>
-        <div v-else class="text-center text-xl font-semibold py-2">{{ t('modelPricing.outputMessages') }}</div>
-        <OSeparator class="mr-4 mt-4" />
-        <div class="overflow-auto resize-none" style="height: calc(100vh - 200px)">
+        <div v-else class="text-center text-xl font-semibold py-2 shrink-0">{{ t('modelPricing.outputMessages') }}</div>
+        <OSeparator class="mr-4 mt-4 shrink-0" />
+        <div class="flex-1 min-h-0 overflow-auto resize-none">
           <!-- Model Pricing Errors Section -->
           <div
             class="p-2.5 mb-2.5"

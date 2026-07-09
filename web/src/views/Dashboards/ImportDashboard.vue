@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="mx-2">
+  <div class="mx-2 flex flex-col h-[calc(100vh-var(--navbar-height))] min-h-0 overflow-hidden">
     <AppPageHeader
       :title="t('dashboard.importDashboard')"
       :back="{ label: t('dashboard.header'), onClick: goBack }"
@@ -47,17 +47,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </template>
     </AppPageHeader>
-    <div class="flex w-full">
-      <div class="flex w-full min-w-0">
+    <div class="flex w-full flex-1 min-h-0">
+      <div class="flex w-full min-w-0 min-h-0">
         <OSplitter
           v-model="splitterModel"
-          class="w-full min-w-0"
+          class="w-full min-w-0 h-full min-h-0"
         >
           <template #before>
-            <OForm id="import-dashboard-form" :form="form">
-            <div class="w-full h-full">
+            <OForm id="import-dashboard-form" :form="form" class="h-full flex flex-col min-h-0">
+            <div class="w-full h-full flex flex-col min-h-0">
               <div
-                class="card-container py-[0.625rem] pl-[0.625rem] mb-[0.625rem]"
+                class="card-container py-[0.625rem] pl-[0.625rem] mb-1 shrink-0"
               >
                 <div class="app-tabs-container h-[36px] w-fit">
                   <app-tabs
@@ -71,10 +71,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="activeTab == 'import_json_url'"
-                class="editor-container-url card-container py-1"
+                class="editor-container-url card-container py-1 flex-1 min-h-0 flex flex-col"
               >
-                <div class="mx-2 my-2">
-                  <div style="width: calc(100% - 10px)" class="flex gap-2 mt-2 w-full items-center">
+                <div class="mx-2 mt-1 mb-1 flex flex-col flex-1 min-h-0">
+                  <div style="width: calc(100% - 10px)" class="flex gap-2 w-full items-center shrink-0">
                     <div
                       data-test="dashboard-import-url-input"
                       style="width: 69%"
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-import-url-editor"
                     ref="queryEditorFileRef"
                     editor-id="dashboards-query-editor-file"
-                    class="my-4 h-[calc(100vh-285px)]! overflow-hidden resize-none border border-(--o2-border-color) rounded-md"
+                    class="mt-2 flex-1 min-h-0 overflow-hidden resize-none border border-(--o2-border-color) rounded-md"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -111,10 +111,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="activeTab == 'import_json_file'"
-                class="dashboard-import-json-container card-container py-1"
+                class="dashboard-import-json-container card-container py-1 flex-1 min-h-0 flex flex-col"
               >
-                <div class="mx-2 my-2">
-                  <div style="width: calc(100% - 10px)" class="flex gap-2 w-full items-center">
+                <div class="mx-2 mt-1 mb-1 flex flex-col flex-1 min-h-0">
+                  <div style="width: calc(100% - 10px)" class="flex gap-2 w-full items-center shrink-0">
                     <div
                       data-test="dashboard-import-file-input"
                       style="width: 69%"
@@ -159,13 +159,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-import-json-file-editor"
                     ref="queryEditorJsonRef"
                     editor-id="dashboards-query-editor-json"
-                    class="my-4 h-[calc(100vh-282px)]! overflow-hidden resize-none border border-(--o2-border-color) rounded-md"
+                    class="mt-2 flex-1 min-h-0 overflow-hidden resize-none border border-(--o2-border-color) rounded-md"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
                   />
-
-                  <div></div>
                 </div>
               </div>
             </div>
@@ -174,12 +172,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               data-test="dashboard-import-error-container"
-              class="card-container h-[calc(100vh-110px)] border-l border-border-default"
+              class="card-container h-full flex flex-col min-h-0 border-l border-border-default"
             >
-              <div class="text-center text-[1.0625rem] font-semibold leading-[1.45] tracking-[-0.02em] text-text-primary py-2">Error Validations</div>
-              <OSeparator class="mt-4" />
+              <div class="text-center text-[1.0625rem] font-semibold leading-[1.45] tracking-[-0.02em] text-text-primary py-2 shrink-0">Error Validations</div>
+              <OSeparator class="mt-4 shrink-0" />
               <div
-                class="error-section p-[10px] mb-[10px]"
+                class="error-section p-[10px] mb-[10px] flex-1 min-h-0 overflow-auto"
                 v-if="dashboardErrorsToDisplay.length > 0"
               >
                 <div class="error-reporter-container">

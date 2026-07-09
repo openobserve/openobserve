@@ -20,29 +20,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     title="Import Pipeline"
     test-prefix="pipeline"
     hide-header
+    container-class=""
     :is-importing="isPipelineImporting"
-    :editor-heights="{
-      urlEditor: 'calc(100vh - 285px)',
-      fileEditor: 'calc(100vh - 282px)',
-      outputContainer: 'calc(100vh - 112px)',
-      errorReport: 'calc(100vh - 132px)',
-    }"
     @back="router.back()"
     @cancel="router.back()"
     @import="importJson"
   >
     <!-- Output Section with Pipeline-specific Error Display -->
     <template #output-content>
-      <div class="w-full h-full border-l border-border-default" style="min-width: 400px;">
+      <div class="w-full h-full flex flex-col border-l border-border-default" style="min-width: 400px;">
         <div
           v-if="pipelineErrorsToDisplay.length > 0"
-          class="text-center text-xl font-semibold py-2"
+          class="text-center text-xl font-semibold py-2 shrink-0"
         >
           Error Validations
         </div>
-        <div v-else class="text-center text-xl font-semibold py-2">Output Messages</div>
-        <OSeparator class="mr-4 mt-4" />
-        <div class="error-report-container" style="height: calc(100vh - 128px) !important; overflow: auto; resize: none;">
+        <div v-else class="text-center text-xl font-semibold py-2 shrink-0">Output Messages</div>
+        <OSeparator class="mr-4 mt-4 shrink-0" />
+        <div class="error-report-container flex-1 min-h-0">
           <!-- Pipeline Errors Section -->
           <div
             class="p-2.5 mb-2.5"

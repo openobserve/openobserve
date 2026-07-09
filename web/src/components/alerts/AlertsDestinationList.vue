@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @get:destinations="getDestinations"
       />
     </div>
-    <div v-else>
+    <div v-else class="flex-1 min-h-0">
       <ImportDestination
         :destinations="destinations"
         :templates="templates"

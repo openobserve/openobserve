@@ -21,29 +21,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     test-prefix="destination"
     :is-importing="isDestinationImporting"
     container-class=""
-    container-style="height: calc(100vh - 50px);"
-    :editor-heights="{
-      urlEditor: 'calc(100vh - 285px)',
-      fileEditor: 'calc(100vh - 282px)',
-      outputContainer: 'calc(100vh - 110px)',
-      errorReport: 'calc(100vh - 128px)',
-    }"
+    container-style=""
     @back="arrowBackFn"
     @cancel="router.back()"
     @import="importJson"
   >
     <!-- Output Section with Destination-specific Error Display -->
     <template #output-content>
-      <div class="w-full h-full border-l border-border-default" style="min-width: 400px;">
+      <div class="w-full h-full flex flex-col border-l border-border-default" style="min-width: 400px;">
         <div
           v-if="destinationErrorsToDisplay.length > 0 || destinationCreators.length > 0"
-          class="text-center text-xl font-semibold py-2"
+          class="text-center text-xl font-semibold py-2 shrink-0"
         >
           {{ destinationErrorsToDisplay.length > 0 ? 'Error Validations' : 'Output Messages' }}
         </div>
-        <div v-else class="text-center text-xl font-semibold py-2">Output Messages</div>
-        <OSeparator class="mr-4 mt-4" />
-        <div class="h-[calc(60vh-8px)] overflow-auto [resize:none] w-full min-w-100">
+        <div v-else class="text-center text-xl font-semibold py-2 shrink-0">Output Messages</div>
+        <OSeparator class="mr-4 mt-4 shrink-0" />
+        <div class="flex-1 min-h-0 overflow-auto [resize:none] w-full min-w-100">
           <!-- Destination Errors Section -->
           <div
             class="error-section p-2.5 mb-2.5"
