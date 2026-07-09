@@ -165,6 +165,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
+
+      <!-- Reporting OFF → offer to enable so the daily chart can populate. -->
+      <div
+        v-else
+        data-test="usage-enable-cta"
+        class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-6 mt-4 flex flex-col items-start gap-3"
+      >
+        <div class="text-(length:--text-sm) font-semibold text-(--color-text-heading)">
+          {{ t("billing.usageTrends.enableTitle") }}
+        </div>
+        <div class="text-(length:--text-sm) text-(--color-text-body) max-w-[52ch]">
+          {{ t("billing.usageTrends.enableSubtitle") }}
+        </div>
+        <q-btn
+          data-test="usage-enable-btn"
+          no-caps
+          unelevated
+          color="primary"
+          :loading="enablingUsage"
+          :label="t('billing.usageTrends.enableButton')"
+          @click="enableUsageReporting"
+        />
+      </div>
     </div>
   </template>
   <script lang="ts">
@@ -172,6 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { useStore } from "vuex";
   import { useI18n } from "vue-i18n";
   import BillingService from "@/services/billings";
+  import organizations from "@/services/organizations";
   import { convertBillingData } from "@/utils/billing/convertBillingData";
 import router from "@/router";
 import { useRouter } from "vue-router";
@@ -243,6 +267,42 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
           !!store.state?.organizationData?.organizationSettings
             ?.usage_stream_enabled,
       );
+
+      const enablingUsage = ref(false);
+
+      // Persist an explicit opt-in. Merge with the current settings so we don't
+      // clobber other org-parameter fields, then update the store so
+      // usageStreamEnabled recomputes and the chart block replaces this CTA.
+      const enableUsageReporting = async () => {
+        if (enablingUsage.value) return;
+        enablingUsage.value = true;
+        const orgId = store.state.selectedOrganization.identifier;
+        const currentSettings =
+          store.state?.organizationData?.organizationSettings ?? {};
+        try {
+          await organizations.post_organization_settings(orgId, {
+            ...currentSettings,
+            usage_stream_enabled: true,
+          });
+          store.dispatch("setOrganizationSettings", {
+            ...currentSettings,
+            usage_stream_enabled: true,
+          });
+          toast({
+            variant: "success",
+            message: t("billing.usageTrends.enablePending"),
+            timeout: 5000,
+          });
+        } catch (e: any) {
+          toast({
+            variant: "error",
+            message: e?.message ?? "Failed to enable usage reporting",
+            timeout: 5000,
+          });
+        } finally {
+          enablingUsage.value = false;
+        }
+      };
 
       // The date-range picker lives in the Billing toolbar (next to GB/MB) and
       // shares its resolved window (microseconds) here via inject. `key` bumps
@@ -1028,6 +1088,8 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
         aiIcon,
         selectedMember,
         usageStreamEnabled,
+        enablingUsage,
+        enableUsageReporting,
         dailyTimeObj,
         combinedSchema,
         dailyChartKey,
