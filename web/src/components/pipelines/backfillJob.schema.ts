@@ -12,19 +12,22 @@
 //   • delayBetweenChunks — optional numeric range 1..3600.
 //   • deleteBeforeBackfill — optional checkbox.
 //
-// Numeric semantics mirror the Quasar BEFORE baseline `!v || (v>=min && v<=max)`:
-// a falsy value (empty input / null / undefined / 0 / NaN) means "use the
-// default" and PASSES; any other value must fall in [min, max]. (A number <input>
-// emits a string, so the preprocess coerces.)
+// Numeric semantics mirror the main baseline: only null/undefined are treated as
+// "absent" (field left blank → use the server default) and PASS. Everything else
+// is range-checked — in particular an empty string and 0 coerce to 0 and FAIL
+// (main did `Number(v) < min`, and `"" < 1` / `0 < 1` are true), so submit is
+// blocked with the range message. A non-numeric string (NaN, unreachable via a
+// number <input>) passes, mirroring main's short-circuiting comparisons.
+// (A number <input> emits a string, so the preprocess coerces.)
 
 import { z } from "zod";
 
 const optionalNumericRange = (min: number, max: number, message: string) =>
   z.preprocess(
     (v) => {
-      if (v === "" || v === null || v === undefined) return null;
+      if (v === null || v === undefined) return null;
       const n = Number(v);
-      return Number.isNaN(n) || n === 0 ? null : n;
+      return Number.isNaN(n) ? null : n;
     },
     z.union([z.null(), z.number().int().min(min, message).max(max, message)]),
   );

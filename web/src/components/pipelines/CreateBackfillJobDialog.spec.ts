@@ -454,18 +454,18 @@ describe("CreateBackfillJobDialog – onSubmit validation", () => {
     expect(backfillService.createBackfillJob).not.toHaveBeenCalled();
   });
 
-  // 0-passes / optional semantics of the shared Zod schema (Quasar BEFORE
-  // baseline `!v || (v>=min && v<=max)`): a falsy value (0/empty/null) means
-  // "use the default" and PASSES. Asserted through the REAL schema on submit.
-  it("saves when chunkPeriodMinutes and delayBetweenChunks are 0 (falsy passes)", async () => {
+  // Numeric semantics match main: only null/undefined skip the range check. 0
+  // coerces into the [min,max] check and FAILS (main did `Number(v) < min`, and
+  // `0 < 1` is true), so submit is blocked. Asserted through the REAL schema.
+  it("blocks submit when chunkPeriodMinutes and delayBetweenChunks are 0", async () => {
     const wrapper = createWrapper();
     setRange(wrapper, validRange());
     setField(wrapper, "chunkPeriodMinutes", 0);
     setField(wrapper, "delayBetweenChunks", 0);
     setField(wrapper, "deleteBeforeBackfill", false);
     await submitForm(wrapper);
-    expect((wrapper.vm as any).form.state.isValid).toBe(true);
-    expect(backfillService.createBackfillJob).toHaveBeenCalled();
+    expect((wrapper.vm as any).form.state.isValid).toBe(false);
+    expect(backfillService.createBackfillJob).not.toHaveBeenCalled();
   });
 
   it("saves at the inclusive numeric bounds (chunk=1440, delay=3600)", async () => {

@@ -492,10 +492,10 @@ describe("EditBackfillJobDialog", () => {
   });
 
   // These drive the REAL shared Zod schema (backfillJob.schema.ts) through the
-  // form submit — not a hand-rolled copy of the rule. They lock in the Quasar
-  // BEFORE baseline `!v || (v>=min && v<=max)` semantics: a falsy value
-  // (0/empty/null) is optional and PASSES; an in-range value passes; an
-  // out-of-range value blocks the save.
+  // form submit — not a hand-rolled copy of the rule. They lock in the main
+  // baseline: only null/undefined are optional and PASS; 0 and empty ("") coerce
+  // into the range check and BLOCK (main did `Number(v) < min`); an in-range
+  // value passes; an out-of-range value blocks the save.
   describe("numeric-range validation (real schema)", () => {
     // Set one numeric field, submit through the real OForm, and report whether
     // the save actually fired (job + valid range are seeded from mockJob).
@@ -510,11 +510,15 @@ describe("EditBackfillJobDialog", () => {
       return called;
     };
 
-    it("chunkPeriodMinutes: 0 (falsy) passes — save is called", async () => {
-      expect(await savesWith("chunkPeriodMinutes", 0)).toBe(true);
+    it("chunkPeriodMinutes: 0 blocks the save (0 < min)", async () => {
+      expect(await savesWith("chunkPeriodMinutes", 0)).toBe(false);
     });
 
-    it("chunkPeriodMinutes: null (empty) passes — save is called", async () => {
+    it("chunkPeriodMinutes: '' (cleared) blocks the save", async () => {
+      expect(await savesWith("chunkPeriodMinutes", "")).toBe(false);
+    });
+
+    it("chunkPeriodMinutes: null (unset) passes — save is called", async () => {
       expect(await savesWith("chunkPeriodMinutes", null)).toBe(true);
     });
 
@@ -530,8 +534,8 @@ describe("EditBackfillJobDialog", () => {
       expect(await savesWith("chunkPeriodMinutes", 1441)).toBe(false);
     });
 
-    it("delayBetweenChunks: 0 (falsy) passes — save is called", async () => {
-      expect(await savesWith("delayBetweenChunks", 0)).toBe(true);
+    it("delayBetweenChunks: 0 blocks the save (0 < min)", async () => {
+      expect(await savesWith("delayBetweenChunks", 0)).toBe(false);
     });
 
     it("delayBetweenChunks: 3600 (upper bound) passes", async () => {
