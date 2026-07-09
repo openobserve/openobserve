@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{Arc, LazyLock as Lazy};
+use std::sync::LazyLock as Lazy;
 
 use config::{
-    meta::promql::value::{Label, Labels},
+    meta::promql::value::Labels,
     utils::hash::{Sum64, gxhash},
 };
 use hashlink::lru_cache::LruCache;
@@ -133,6 +133,10 @@ impl LabelCache {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use config::meta::promql::value::Label;
+
     use super::*;
 
     fn make_labels(count: usize, value_len: usize) -> Labels {
