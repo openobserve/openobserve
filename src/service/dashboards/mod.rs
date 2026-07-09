@@ -1226,10 +1226,7 @@ mod tests {
     #[test]
     fn home_pin_move_target_updates_when_pin_matches_and_folder_changed() {
         let v = serde_json::json!({ "dashboardId": "abc", "folderId": "B", "label": "X" });
-        assert_eq!(
-            home_pin_move_target(&v, "abc", "A"),
-            Some("A".to_string())
-        );
+        assert_eq!(home_pin_move_target(&v, "abc", "A"), Some("A".to_string()));
     }
 
     #[test]

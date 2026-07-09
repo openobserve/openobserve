@@ -613,14 +613,37 @@ export default defineComponent({
 
     const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } =
       useHomeDashboard();
-    const openHomeDashboard = () => {
+    const openHomeDashboard = async () => {
       if (!homeDashboard.value) return;
+      const org = store.state.selectedOrganization?.identifier;
+      const dashId = homeDashboard.value.dashboardId;
+      const folder = homeDashboard.value.folderId || "default";
+      try {
+        // Confirm the pinned dashboard still resolves before navigating. The GET
+        // is folder-agnostic on the backend, so this both validates existence and
+        // lets the re-synced folder drive the route. A deleted dashboard throws /
+        // returns an empty object — clear the pin instead of routing to a 404.
+        const dash = await getDashboard(store, dashId, folder);
+        if (!dash || typeof dash !== "object" || !(dash as any).title) {
+          throw { response: { status: 404 } };
+        }
+      } catch (e: any) {
+        if (e?.response?.status === 404) {
+          clearHomeDashboard(org);
+          toast({
+            variant: "error",
+            message: "This dashboard no longer exists and was removed from Home.",
+          });
+          return;
+        }
+        // Non-404 (e.g. transient error): fall through and attempt navigation.
+      }
       router.push({
         path: "/dashboards/view",
         query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: homeDashboard.value.dashboardId,
-          folder: homeDashboard.value.folderId || "default",
+          org_identifier: org,
+          dashboard: dashId,
+          folder: homeDashboard.value?.folderId || "default",
         },
       });
     };
@@ -664,6 +687,11 @@ export default defineComponent({
     };
     onMounted(() => {
       onDashboardEvent(handleAiDashboardEvent);
+      // Re-read the authoritative home_dashboard setting so the shortcut button
+      // navigates to the pinned dashboard's CURRENT folder even if it was moved
+      // on another system since this tab last loaded.
+      const org = store.state.selectedOrganization?.identifier;
+      if (org) useHomeDashboard().load(org);
     });
     onUnmounted(() => {
       offDashboardEvent(handleAiDashboardEvent);
