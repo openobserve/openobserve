@@ -403,6 +403,34 @@ describe("Condition Component", () => {
       expect(mockAddNode).not.toHaveBeenCalled();
     });
 
+    it("blocks submit and does NOT call addNode when condition has a column but empty value", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.conditionGroup = makeConditionGroup("AND", [
+        makeCondition({ column: "_timestamp", operator: "=", value: "" }),
+      ]);
+      await nextTick();
+      await submitForm(wrapper);
+      expect(wrapper.vm.form.state.isValid).toBe(false);
+      expect(mockAddNode).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="add-condition-error"]').text()).toContain(
+        "Please fill in all condition fields"
+      );
+    });
+
+    it("blocks submit when any one of multiple conditions has an empty value", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.conditionGroup = makeConditionGroup("AND", [
+        makeCondition({ column: "level", value: "error", id: "cid-1" }),
+        makeCondition({ column: "service", value: "", id: "cid-2" }),
+      ]);
+      await nextTick();
+      await submitForm(wrapper);
+      expect(wrapper.vm.form.state.isValid).toBe(false);
+      expect(mockAddNode).not.toHaveBeenCalled();
+    });
+
     it("submits and calls addNode when at least one valid condition exists", async () => {
       const wrapper = createWrapper();
       await flushPromises();
