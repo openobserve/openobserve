@@ -54,9 +54,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         Clear Filters
       </OButton>
+      <OTableColumnToggle
+        :columns="columns"
+        :column-visibility="columnVisibility"
+        @update:column-visibility="setColumnVisibility"
+      />
       <OButton
-        variant="ghost-muted"
+        variant="outline"
         size="icon-sm"
+        class="shrink-0"
         @click="refreshJobs"
         :disabled="loading"
         data-test="refresh-btn"
@@ -74,6 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :frame="false"
             :data="filteredJobs"
             :columns="columns"
+            :column-visibility="columnVisibility"
             :default-columns="false"
             row-key="job_id"
             :loading="loading"
@@ -312,6 +319,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -355,12 +364,16 @@ const selectedPerPage = ref(10);
 
 const perPageOptionsList = [10, 20, 50, 100];
 
+const { columnVisibility, setColumnVisibility } = useExternalColumnToggle(
+  "pipelines-backfill-jobs-list",
+);
+
 const columns: OTableColumnDef[] = [
-  { id: "pipeline_name", header: "Pipeline", accessorKey: "pipeline_name", sortable: true, size: COL.streamName, meta: { align: "left", autoWidth: true } },
-  { id: "time_range", header: "Time Range", accessorKey: "start_time", sortable: true, size: COL.date, meta: { align: "left" } },
-  { id: "progress_percent", header: "Progress", accessorKey: "progress_percent", sortable: true, size: 400, meta: { align: "left" } },
-  { id: "created_at", header: "Created", accessorKey: "created_at", sortable: true, size: COL.createdAt, meta: { align: "left" } },
-  { id: "last_triggered_at", header: "Last Triggered", accessorKey: "last_triggered_at", sortable: true, size: COL.dateAbsolute, meta: { align: "left" } },
+  { id: "pipeline_name", header: "Pipeline", accessorKey: "pipeline_name", sortable: true, hideable: true, size: COL.streamName, meta: { align: "left", autoWidth: true } },
+  { id: "time_range", header: "Time Range", accessorKey: "start_time", sortable: true, hideable: true, size: COL.date, meta: { align: "left" } },
+  { id: "progress_percent", header: "Progress", accessorKey: "progress_percent", sortable: true, hideable: true, size: 400, meta: { align: "left" } },
+  { id: "created_at", header: "Created", accessorKey: "created_at", sortable: true, hideable: true, size: COL.createdAt, meta: { align: "left" } },
+  { id: "last_triggered_at", header: "Last Triggered", accessorKey: "last_triggered_at", sortable: true, hideable: true, size: COL.dateAbsolute, meta: { align: "left" } },
   { id: "actions", header: "Actions", accessorKey: "actions", meta: { align: "center", actionCount: 4 }, isAction: true, size: 128 },
 ];
 

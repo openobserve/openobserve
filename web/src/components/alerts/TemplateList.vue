@@ -89,6 +89,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="template-list-search-input"
           />
         </template>
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="template-list-refresh-btn"
+            @click="getTemplates"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="alertTemplatesRefresh" />
+          </OButton>
+        </template>
         <template #empty>
           <OEmptyState
             size="hero"
@@ -235,6 +247,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
