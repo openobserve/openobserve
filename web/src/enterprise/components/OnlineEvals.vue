@@ -212,6 +212,7 @@ the Free Software Foundation, either version 3 of the License, or
             @import-custom="goToImportScoreConfig"
             @export="exportScoreConfigRow"
             @export-bulk="exportScoreConfigBulk"
+            @refresh="loadAll(orgId)"
           />
           <ScorerList
             v-else-if="activeTab === 'scorers'"
@@ -232,6 +233,7 @@ the Free Software Foundation, either version 3 of the License, or
             @export="exportScorerRow"
             @export-bulk="exportScorerBulk"
             @add-provider="goToAddProvider"
+            @refresh="loadAll(orgId)"
           />
           <EvalJobList
             v-else-if="activeTab === 'jobs'"
@@ -246,6 +248,7 @@ the Free Software Foundation, either version 3 of the License, or
             @activate="(row: EvalJob) => activateJob(row)"
             @pause="(row: EvalJob) => pauseJob(row)"
             @delete="(row: EvalJob) => deleteRow(row)"
+            @refresh="loadAll(orgId)"
           />
         </div>
       </section>

@@ -51,6 +51,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('settings.searchOrgs')"
           />
         </template>
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="org-management-list-refresh-btn"
+            @click="getData"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="orgManagementRefresh" />
+          </OButton>
+        </template>
         <template #empty>
           <OEmptyState
             size="hero"
@@ -216,6 +228,8 @@ import orgStorageService from "@/services/org_storage";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "PageAlerts",
@@ -668,6 +682,10 @@ export default defineComponent({
       if (!filterQuery.value) return tabledata.value || [];
       return filterData(tabledata.value || [], filterQuery.value);
     });
+
+    useShortcuts([
+      { id: "orgManagementRefresh", handler: () => { if (!isInputFocused()) getData(); } },
+    ]);
 
     return {
       t,

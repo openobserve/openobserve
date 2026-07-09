@@ -1,5 +1,4 @@
 const testLogger = require('./test-logger.js');
-const logData = require('../../fixtures/log.json');
 const logsdata = require('../../../test-data/logs_data.json');
 const { getOrgIdentifier, getAuthHeaders } = require('./cloud-auth.js');
 
@@ -25,6 +24,19 @@ async function ingestForQueryBuilderTest(request, streamName = "e2e_automate") {
 }
 
 async function applyQueryButton(pm) {
+    // Stream selection fires an auto-search that leaves the Run button disabled,
+    // aria-busy, or swapped to "Cancel" while in flight. Clicking blind during that
+    // window fails with "Element is not visible" — wait for the button to be ready
+    // first. The catch falls through to the click, which then reports loudly.
+    await pm.page.waitForFunction((selector) => {
+        const el = document.querySelector(selector);
+        if (!el) return false;
+        if (el.getAttribute('aria-busy') === 'true') return false;
+        if (el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true') return false;
+        if (((el.textContent || '').trim()).includes('Cancel')) return false;
+        return el.offsetParent !== null;
+    }, pm.logsPage.queryButton, { timeout: 60000, polling: 100 }).catch(() => {});
+
     const searchPromise = pm.page.waitForResponse(
         response => response.url().includes('/_search') && response.status() === 200,
         { timeout: 60000 }
@@ -51,12 +63,19 @@ async function setupQueryAndSwitchToBuild(pm, page, query) {
 }
 
 /**
- * Full init: navigate, select stream, run initial match_all query.
+ * Full init: select stream (selectStream navigates to the logs page itself, so no
+ * separate page.goto here — that would just load the same page twice), then run
+ * the initial match_all query.
  * Ingestion is handled by ingestForQueryBuilderTest in beforeAll.
+ *
+ * The applyQueryButton call is NOT optional setup: selecting a stream fires an
+ * auto-search, and waiting for its /_search response here absorbs it before the
+ * test body runs. Skipping it lets that response land mid-test and overwrite the
+ * test's query state (observed as table/metric chart-type tests flaking to the
+ * default bar chart under load).
  */
 async function initQueryBuilderTest(page, pm) {
     await page.waitForLoadState('domcontentloaded');
-    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
     await pm.logsPage.selectStream("e2e_automate");
     await applyQueryButton(pm);
 }

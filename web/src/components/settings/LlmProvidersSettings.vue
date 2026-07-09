@@ -80,6 +80,18 @@
               data-test="llm-providers-search-input"
             />
           </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="isLoading"
+              data-test="llm-providers-list-refresh-btn"
+              @click="loadProviders"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="llmProvidersRefresh" />
+            </OButton>
+          </template>
           <template #empty>
             <OEmptyState
               size="hero"
@@ -152,6 +164,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -171,6 +184,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const { t } = useI18n();
 const store = useStore();
@@ -383,4 +398,8 @@ async function performDelete() {
     pendingDeleteRow.value = null;
   }
 }
+
+useShortcuts([
+  { id: "llmProvidersRefresh", handler: () => { if (!isInputFocused()) loadProviders(); } },
+]);
 </script>

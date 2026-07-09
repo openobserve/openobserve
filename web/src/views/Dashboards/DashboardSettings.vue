@@ -25,13 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-settings-main-container"
     class="p-0"
     :class="store.state.theme == 'dark' ? 'dark-mode bg-surface-panel' : 'bg-white'"
-    style="min-height: inherit"
+    style="min-height: inherit; height: 100%"
   >
 
     <OSplitter
       v-model="splitterModel"
       unit="px"
-      style="height: calc(100vh - 65px)"
+      style="height: 100%"
       disabled
     >
       <template v-slot:before>
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template v-slot:after>
-        <div class="scroll">
+        <div class="scroll settings-content-scroll">
           <OTabPanels
             v-model="activeTab"
             animated
@@ -167,5 +167,14 @@ export default defineComponent({
 
 .o-splitter__separator {
   display: none !important;
+}
+
+/* Let the settings tab content fill the splitter's full height so panels with a
+   sticky footer (e.g. Add Variable) can pin it to the bottom instead of leaving
+   dead space when the form is shorter than the drawer. */
+.settings-content-scroll,
+.settings-content-scroll > .o-tab-panels,
+.settings-content-scroll > .o-tab-panels > .o-tab-panel {
+  height: 100%;
 }
 </style>

@@ -4898,4 +4898,73 @@ describe("AddPanel.vue", () => {
       expect(inspector.props("open")).toBe(false);
     });
   });
+
+  // Real-OForm validation wiring (playbook §5). The previous tests shallowMount
+  // (OForm stubbed); here we FULLY mount so the real <OForm> runs the schema and
+  // prove the title gate actually blocks save when empty — an unwired `:schema`
+  // would be caught here.
+  describe("Panel title OForm (real form)", () => {
+    const AppPageHeaderStub = {
+      name: "AppPageHeader",
+      template:
+        "<div><slot /><slot name='tabs' /><slot name='actions' /></div>",
+    };
+
+    const mountReal = async () => {
+      const w = mount(AddPanel, {
+        global: {
+          plugins: [store, router, i18n],
+          mocks: {
+            $route: { query: { dashboard: "test-dashboard" }, params: {} },
+            $router: { push: vi.fn(), replace: vi.fn() },
+          },
+          stubs: {
+            AppPageHeader: AppPageHeaderStub,
+            PanelEditor: true,
+            DateTimePickerDashboard: true,
+            QueryInspector: true,
+            AddSettingVariable: true,
+            ConfigDrawer: true,
+          },
+        },
+        props: { metaData: null },
+      });
+      await nextTick();
+      return w;
+    };
+
+    const submitForm = async (w: any) => {
+      await w.vm.form.handleSubmit();
+      await nextTick();
+    };
+
+    it("blocks the save (schema invalid) when the title is empty", async () => {
+      wrapper = await mountReal();
+      wrapper.vm.form.setFieldValue("title", "");
+      await nextTick();
+
+      await submitForm(wrapper);
+
+      expect(wrapper.vm.form.state.isValid).toBe(false);
+    });
+
+    it("passes the schema when the title is provided", async () => {
+      wrapper = await mountReal();
+      wrapper.vm.form.setFieldValue("title", "My Panel");
+      await nextTick();
+
+      await submitForm(wrapper);
+
+      expect(wrapper.vm.form.state.isValid).toBe(true);
+    });
+
+    it("keeps the Save button enabled and wires it to the form (R3/R4)", async () => {
+      wrapper = await mountReal();
+      const saveBtn = wrapper.find('[data-test="dashboard-panel-save"]');
+      expect(saveBtn.exists()).toBe(true);
+      // Save is a submit button bound to the OForm id (Enter + click submit).
+      expect(saveBtn.attributes("form")).toBe("add-panel-form");
+      expect(wrapper.find("#add-panel-form").exists()).toBe(true);
+    });
+  });
 });

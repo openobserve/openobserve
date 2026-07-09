@@ -12,13 +12,20 @@
       "action": "扩大时间范围",
       "actionDesc": "在更长的时间内搜索"
     },
+    "noPatterns": {
+      "title": "未找到图案",
+      "description": "尝试增加时间范围或选择包含更多日志数据的其他流。对于至少 1,000 个日志，模式提取效果最佳。",
+      "logsAnalyzed": "只分析了 {count} 个日志。"
+    },
     "noStreamSelected": {
       "title": "选择数据流开始",
       "description": "选择一个直播，然后运行查询来浏览其数据。使用筛选条件和自定义时间范围优化结果。"
     },
     "noQueryApplied": {
       "title": "运行查询以查看日志",
-      "description": "调整您的过滤器并单击 “运行查询” 以加载此数据流的事件。"
+      "description": "调整您的过滤器并单击 “运行查询” 以加载此数据流的事件。",
+      "action": "运行查询",
+      "actionDesc": "加载所选过滤器的事件"
     },
     "noDashboards": {
       "title": "创建您的第一个仪表板",
@@ -80,7 +87,9 @@
       "title": "还没有目的地",
       "description": "目的地定义警报通知的发送地点——Slack、电子邮件、网络挂钩等。",
       "action": "新目的地",
-      "actionDesc": "连接通知频道"
+      "actionDesc": "连接通知频道",
+      "import": "导入目的地",
+      "importDesc": "从 JSON 文件导入"
     },
     "noPipelineDestinations": {
       "title": "还没有目的地",
@@ -92,7 +101,9 @@
       "title": "还没有模板",
       "description": "模板定义警报通知消息的格式。",
       "action": "新模板",
-      "actionDesc": "创建通知模板"
+      "actionDesc": "创建通知模板",
+      "import": "导入模板",
+      "importDesc": "从 JSON 文件导入"
     },
     "noEvalTemplates": {
       "title": "尚无评估模板",
@@ -142,6 +153,20 @@
       "title": "没有回填作业",
       "description": "回填任务通过管道重新处理历史数据。运行一个即可开始。"
     },
+    "noRegexPatterns": {
+      "title": "还没有正则表达式模式",
+      "description": "创建可重复使用的模式来编辑敏感数据，或从库中导入一个模式。",
+      "action": "新图案",
+      "actionDesc": "定义新的正则表达式模式",
+      "import": "导入模式",
+      "importDesc": "重复使用库中的图案"
+    },
+    "noStorageConfig": {
+      "title": "未配置存储桶",
+      "description": "将该组织的数据路由到专用的存储桶，独立于其他组织和全局默认值。",
+      "action": "配置存储",
+      "actionDesc": "连接 S3、GCS 或 Azure 存储桶"
+    },
     "noPipelineHistory": {
       "title": "尚无管道历史记录",
       "description": "管道运行后，管道执行历史记录将显示在此处。"
@@ -161,10 +186,12 @@
       "actionDesc": "写一个新的 VRL 函数"
     },
     "noStreams": {
-      "title": "等待你的第一批数据",
-      "description": "尚未收到任何数据。连接来源，您的数据流将自动显示在此处。",
+      "title": "连接源来创建你的第一个直播",
+      "description": "数据到达的那一刻就会自动创建流。开始使用您的应用程序、代理或收集器进行提取。",
       "action": "设置摄取",
-      "actionDesc": "连接数据源"
+      "actionDesc": "连接数据源",
+      "createAction": "新直播",
+      "createActionDesc": "手动定义直播架构"
     },
     "noAlerts": {
       "title": "创建您的第一个提醒",
@@ -174,7 +201,7 @@
     },
     "noIncidents": {
       "title": "没有活跃事件",
-      "description": "你们都被困住了——现在没有什么需要你注意的。触发的事件将出现在此处。"
+      "description": "事件是在警报触发时产生的，尚未触发任何警报。警报到位后，任何触发的事件都将显示在此处。"
     },
     "noLLMInsights": {
       "title": "还没有 LLM 活动",
@@ -191,20 +218,24 @@
     "noScorers": {
       "title": "还没有评分器",
       "description": "评分器根据你的分数配置对 LLM 回复进行评分——从 LLM 评分器开始，或者从库中导入一个。",
-      "action": "创建评分器",
-      "actionDesc": "定义 LLM 评分器或远程评分器"
+      "action": "新得分手",
+      "actionDesc": "定义 LLM 评分器或远程评分器",
+      "import": "导入记分器",
+      "importDesc": "从 JSON 文件导入"
     },
     "noEvalJobs": {
       "title": "尚无评测任务",
       "description": "在 LLM 数据流中安排评分器。创建一个，开始按节奏对对话进行评分。",
-      "action": "创建评测任务",
+      "action": "新工作",
       "actionDesc": "选择数据流 + 得分手 + 节奏"
     },
     "noScoreConfigs": {
       "title": "还没有分数配置",
       "description": "分数配置定义评分器生成的架构——数字、布尔值或分类。添加一个即可开始得分。",
-      "action": "创建分数配置",
-      "actionDesc": "定义分数形状 + 健康范围"
+      "action": "新的分数配置",
+      "actionDesc": "定义分数形状 + 健康范围",
+      "import": "导入分数配置",
+      "importDesc": "从 JSON 文件导入"
     },
     "loadError": {
       "title": "出了点问题",
@@ -271,6 +302,7 @@
     },
     "nouns": {
       "logs": "Logs",
+      "patterns": "模式",
       "dashboards": "仪表板",
       "pipelines": "管道",
       "functions": "功能",
@@ -305,7 +337,8 @@
       "scorers": "评分器",
       "evalJobs": "评估作业",
       "scoreConfigs": "评分配置",
-      "pipelineHistory": "管道历史记录"
+      "pipelineHistory": "管道历史记录",
+      "regexPatterns": "正则表达式模式"
     }
   },
   "common": {
@@ -1612,6 +1645,11 @@
     "subtitle": "索引管理和流配置",
     "streamNameHelpText": "仅使用字母数字字符、下划线和冒号。",
     "search": "搜索数据流",
+    "emptyOr": "或者：",
+    "emptyKubernetes": "Kubernetes",
+    "emptyAws": "AWS/CloudWatch",
+    "emptyLinux": "Linux的",
+    "emptyWindows": "Windows",
     "name": "名称",
     "docNum": "数据量",
     "storageSize": "采集数据",
@@ -2547,13 +2585,33 @@
     "goTo": "前往：",
     "selectLogsMode": "选择日志模式：",
     "enterCustomQuery": "输入自定义查询：",
-    "enterUrl": "输入网址：",
+    "sqlQueryRequired": "SQL 查询是必填项",
+    "enterUrl": "输入网址",
+    "variableNameRequired": "变量名称是必填项",
+    "variableNameInvalid": "只允许使用字母、数字、连字符和下划线",
+    "atLeastOneTabRequired": "至少需要一个选项卡",
+    "atLeastOnePanelRequired": "至少需要一个面板",
+    "streamTypeRequired": "流类型是必填项",
+    "streamIndexRequired": "流 / 索引是必填项",
+    "fieldRequired": "字段为必填字段",
+    "constantValueRequired": "常量值是必填项",
+    "operatorRequired": "运算符是必填项",
+    "filterValueRequired": "必填",
+    "labelRequired": "标签是必填项",
+    "optionValueRequired": "字段为必填字段！",
+    "seriesValueRequired": "系列值是必填项",
+    "colorRequired": "颜色是必填项",
+    "onlyHttpsUrlsAllowed": "仅允许使用 HTTP(S) URL",
+    "urlRequired": "网址为必填项",
+    "folderRequired": "文件夹为必填项",
+    "dashboardRequired": "仪表盘为必填项",
+    "tabRequired": "选项卡为必填项",
     "invalidUrl": "网址无效",
-    "selectFolderDrilldown": "选择文件夹 *:",
+    "selectFolderDrilldown": "选择文件夹",
     "noFoldersAvailable": "没有可用的文件夹",
-    "selectDashboardDrilldown": "选择控制面板 *:",
+    "selectDashboardDrilldown": "选择控制面板",
     "noDashboardsAvailable": "没有可用的仪表板",
-    "selectTabDrilldown": "选择选项卡 *:",
+    "selectTabDrilldown": "选择选项卡",
     "noTabAvailable": "没有可用的选项卡",
     "variables": "变量：",
     "passAllCurrentVariables": "传递所有当前变量：",
@@ -2619,7 +2677,8 @@
     "configSectionDrilldown": "向下钻取",
     "configSectionComparison": "对比",
     "configSectionMarkLines": "Mark Lines",
-    "configSectionBackground": "背景"
+    "configSectionBackground": "背景",
+    "editTab": "编辑选项卡"
   },
   "panel": {
     "header": "面板",
@@ -2706,7 +2765,12 @@
     "mapvalue": "值",
     "source": "来源",
     "target": "目标",
-    "value": "值"
+    "value": "值",
+    "xAxisShort": "X轴",
+    "yAxisShort": "Y轴",
+    "rowFields": "行字段",
+    "valueFields": "值字段",
+    "noData": "无数据"
   },
   "home": {
     "streams": "数据流",
@@ -3017,9 +3081,9 @@
     "searchAllFolders": "所有文件夹",
     "streamConfig": "直播配置",
     "alertRules": "警报规则",
-    "noTemplatesMsg": "看来你还没有创建任何模板。要创建提醒，你需要至少有一个目的地和一个模板",
+    "noTemplatesMsg": "要创建警报，您至少需要一个模板和一个目的地。模板定义通知消息的格式——首先创建一个。",
     "createTemplateBtn": "创建模板",
-    "noDestinationsMsg": "看来你还没有创建任何目的地。要创建提醒，你需要至少有一个目的地和一个模板",
+    "noDestinationsMsg": "要创建警报，你需要至少一个目的地和一个模板。目的地定义通知的发送位置——首先创建通知。",
     "createDestinationBtn": "创建目的地",
     "add": "添加告警",
     "edit": "编辑",
@@ -4204,6 +4268,51 @@
     "querySource": "查询来源"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "搜索服务",
+      "noStreamsDetected": "未检测到任何直播。确保服务图表指标包含 stream_name 标签。",
+      "streamOnlyInfo": "服务图使用纯流架构，内存状态为零",
+      "borderColor": "边框颜色",
+      "borderColorMetric": "错误",
+      "nodeSize": "节点大小",
+      "nodeSizeMetric": "请求",
+      "sizeLow": "低",
+      "sizeHigh": "高",
+      "status": {
+        "healthy": "健康",
+        "degraded": "已降级",
+        "warning": "警告",
+        "critical": "关键"
+      },
+      "range": {
+        "healthy": "< 1%",
+        "degraded": "1 — 5%",
+        "warning": "5 — 10%",
+        "critical": "> 10%"
+      },
+      "entities": "实体",
+      "distribution": "分发",
+      "total": "总计",
+      "showTypes": "显示类型",
+      "typesFiltered": "有些类型是隐藏的。打开以更改显示的内容。",
+      "zoomIn": "放大",
+      "zoomOut": "缩小",
+      "fitToScreen": "适合屏幕",
+      "layout": "布局",
+      "types": "类型",
+      "mode": {
+        "auto": "汽车",
+        "expanded": "已扩展",
+        "collapsed": "崩溃了"
+      },
+      "kind": {
+        "service": "服务",
+        "database": "数据存储",
+        "queue": "队列",
+        "external": "外部",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "以全视图打开",
     "viewLogs": "查看日志",
     "viewRelated": "查看相关",
@@ -4482,6 +4591,7 @@
     "servicesCatalog": {
       "tabLabel": "服务目录",
       "title": "服务目录",
+      "footerTitle": "服务",
       "filterPlaceholder": "按服务名称筛选...",
       "noServicesFound": "在所选时间范围内未找到任何服务。",
       "loading": "正在加载服务...",
@@ -4508,6 +4618,15 @@
       "servicesLabel": "服务",
       "viewTraces": "查看踪迹",
       "exportCsv": "导出 CSV",
+      "types": {
+        "all": "全部",
+        "service": "服务",
+        "datastore": "数据存储",
+        "queue": "队列",
+        "external": "外部",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{count} {状态}",
       "legend": {
         "title": "错误率"
       }
@@ -5245,6 +5364,7 @@
     },
     "quality": {
       "scopeLabel": "此工作空间中的所有质量维度",
+      "agentPlaceholder": "所有代理",
       "timeRange": {
         "label": "时间范围",
         "last1h": "过去 1 小时",
