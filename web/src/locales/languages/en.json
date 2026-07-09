@@ -2971,6 +2971,9 @@
     "enterpriseNote": "High volume needs? Let's talk scale! Contact us for tailored solutions.",
     "contactSupport": "Contact Support",
     "totalUsage": "Total Usage",
+    "usageTrends": {
+      "dailyUsage": "Daily usage"
+    },
     "aiCredits": "AI Credits",
     "aiModeFree": "Free",
     "aiModePayAsYouGo": "Pay as you go",

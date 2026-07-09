@@ -387,6 +387,26 @@ fn default_enable_streaming_search() -> bool {
     false
 }
 
+/// Default for `usage_stream_enabled`. In **cloud** builds, when self-reporting
+/// to the org's own usage stream is turned on globally
+/// (`ZO_USAGE_REPORT_TO_OWN_ORG`), orgs opt in by default so their `usage`
+/// stream is populated and the daily Usage Trends view works out of the box.
+/// Users can still toggle it off per org, which persists an explicit `false`
+/// and falls back to the billing-API (cycle-total) view.
+///
+/// In OSS and self-hosted enterprise builds — or when the global flag is off —
+/// the default stays `false` (nothing writes per-org usage streams by default).
+fn default_usage_stream_enabled() -> bool {
+    #[cfg(feature = "cloud")]
+    {
+        config::get_config().common.usage_report_to_own_org
+    }
+    #[cfg(not(feature = "cloud"))]
+    {
+        false
+    }
+}
+
 #[cfg(feature = "enterprise")]
 fn default_claim_parser_function() -> String {
     "".to_string()
@@ -453,7 +473,7 @@ pub struct OrganizationSetting {
     pub dark_mode_theme_color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_series_per_query: Option<usize>,
-    #[serde(default)]
+    #[serde(default = "default_usage_stream_enabled")]
     pub usage_stream_enabled: bool,
     #[cfg(feature = "enterprise")]
     #[serde(default = "default_claim_parser_function")]
@@ -490,7 +510,7 @@ impl Default for OrganizationSetting {
             light_mode_theme_color,
             dark_mode_theme_color,
             max_series_per_query: None,
-            usage_stream_enabled: false,
+            usage_stream_enabled: default_usage_stream_enabled(),
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
             cross_links: Vec::new(),
@@ -1375,5 +1395,48 @@ mod tests {
         assert!(obj.contains_key("light_mode_theme_color"));
         assert!(obj.contains_key("dark_mode_theme_color"));
         assert!(obj.contains_key("max_series_per_query"));
+    }
+
+    /// In OSS / self-hosted enterprise builds (cloud feature off), usage stream
+    /// self-reporting must NOT be on by default — the default helper and the
+    /// struct default both stay `false`, and a stored setting that omits the
+    /// field deserializes to `false`.
+    #[cfg(not(feature = "cloud"))]
+    #[test]
+    fn test_usage_stream_enabled_defaults_off_when_not_cloud() {
+        assert!(!default_usage_stream_enabled());
+        assert!(!OrganizationSetting::default().usage_stream_enabled);
+
+        // A stored setting missing the field falls back to the (false) default.
+        let json = r#"{
+            "scrape_interval": 15,
+            "trace_id_field_name": "trace_id",
+            "span_id_field_name": "span_id"
+        }"#;
+        let parsed: OrganizationSetting = serde_json::from_str(json).unwrap();
+        assert!(!parsed.usage_stream_enabled);
+    }
+
+    /// An explicit value always wins over the default, in every build — this is
+    /// what makes a per-org opt-out (or opt-in) stick.
+    #[test]
+    fn test_usage_stream_enabled_explicit_value_is_respected() {
+        let json_true = r#"{
+            "scrape_interval": 15,
+            "trace_id_field_name": "trace_id",
+            "span_id_field_name": "span_id",
+            "usage_stream_enabled": true
+        }"#;
+        let parsed: OrganizationSetting = serde_json::from_str(json_true).unwrap();
+        assert!(parsed.usage_stream_enabled);
+
+        let json_false = r#"{
+            "scrape_interval": 15,
+            "trace_id_field_name": "trace_id",
+            "span_id_field_name": "span_id",
+            "usage_stream_enabled": false
+        }"#;
+        let parsed: OrganizationSetting = serde_json::from_str(json_false).unwrap();
+        assert!(!parsed.usage_stream_enabled);
     }
 }
