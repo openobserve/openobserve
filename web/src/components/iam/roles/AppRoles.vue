@@ -52,7 +52,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @delete="showConfirmDialog"
           @bulk-delete="openBulkDeleteDialog"
           @create="addRole"
-        />
+        >
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="iam-roles-refresh-btn"
+              @click="setupRoles"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="iamRolesRefresh" />
+            </OButton>
+          </template>
+        </RoleTable>
       </div>
     </div>
   </div>
@@ -82,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { onBeforeMount, ref } from "vue";
 import AddRole from "./AddRole.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { useI18n } from "vue-i18n";
 import RoleTable from "./RoleTable.vue";

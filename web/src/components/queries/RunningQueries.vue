@@ -32,18 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="query-stats"
             :subtitle="'Inspect and cancel running queries'"
             class="-mx-4 px-4 border-b border-border-default mb-3"
-          >
-            <template #actions>
-              <OButton
-                data-test="running-queries-refresh-btn"
-                variant="primary"
-                size="sm"
-                @click="refreshData"
-              >
-                {{ t(`queries.refreshQuery`) }}
-              </OButton>
-            </template>
-          </AppPageHeader>
+          />
           <div
             data-test="running-queries-filter-container"
             class="flex justify-start items-center gap-3"
@@ -92,26 +81,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div class="flex justify-end items-center gap-4 mt-3">
-            <OToggleGroup
-              v-if="selectedQueryTypeTab === 'all'"
-              :model-value="selectedSearchType"
-              @update:model-value="onChangeSearchType($event as string)"
-              data-test="running-queries-search-type-tabs"
-            >
-              <OToggleGroupItem
-                v-for="visual in searchTypes"
-                :key="visual"
-                :value="visual"
-                size="sm"
-              >
-                {{ searchTypeLabels[visual] ?? visual }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <span class="text-xs font-bold">
-              Last Data Refresh Time: {{ lastRefreshed }}
-            </span>
-          </div>
         </div>
       </div>
     </div>
@@ -127,11 +96,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <RunningQueriesList
               :rows="rowsQuery"
               :filtered="!!filterQuery"
+              :last-refreshed="lastRefreshed"
+              :search-type="selectedSearchType"
+              :search-types="searchTypes"
+              :search-type-labels="searchTypeLabels"
+              @update:search-type="onChangeSearchType"
               v-model:selectedRows="selectedRow['all']"
               @delete:query="confirmDeleteAction"
               @delete:queries="handleMultiQueryCancel"
               @show:schema="listSchema"
               @clear:filters="filterQuery = ''"
+              @refresh="refreshData"
             />
           </div>
           <div
@@ -142,10 +117,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <SummaryList
               :rows="summaryRows"
               :filtered="!!filterQuery"
+              :last-refreshed="lastRefreshed"
               v-model:selectedRows="selectedRow['summary']"
               @filter:queries="filterUserQueries"
               @delete:queries="handleMultiQueryCancel"
               @clear:filters="filterQuery = ''"
+              @refresh="refreshData"
             />
           </div>
         </div>
@@ -188,7 +165,6 @@ import {
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
 import OSelect from '@/lib/forms/Select/OSelect.vue';
 import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
 import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
@@ -205,7 +181,7 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 export default defineComponent({
   name: "RunningQueries",
-  components: { AppPageHeader, QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OButton, OToggleGroup, OToggleGroupItem, ODrawer, OSelect, OSearchInput,
+  components: { AppPageHeader, QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OToggleGroup, OToggleGroupItem, ODrawer, OSelect, OSearchInput,
 },
   setup() {
     const store = useStore();
