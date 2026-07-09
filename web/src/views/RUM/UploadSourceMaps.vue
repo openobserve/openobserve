@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OForm
       id="upload-source-maps-form"
+      class="contents"
       :schema="uploadSourceMapsSchema"
       :default-values="uploadSourceMapsDefaults"
       @submit="uploadSourceMaps"
