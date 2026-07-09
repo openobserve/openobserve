@@ -149,9 +149,8 @@ export default defineConfig(({ mode }) => {
 
   // Feature-group logging: console.log/debug/info('<namespace>', ...) calls
   // are kept in dev only when their namespace matches VITE_DEBUG_GROUPS
-  // (.env.local, comma-separated, supports trailing-* wildcards). loadEnv
-  // (not dotenv) so .env.local is picked up. console.error/warn are never
-  // filtered or stripped.
+  // (.env, comma-separated, supports trailing-* wildcards). loadEnv reads
+  // every .env* file. console.error/warn are never filtered or stripped.
   const allowedGroups = (
     loadEnv(mode, process.cwd(), "").VITE_DEBUG_GROUPS ?? ""
   )
