@@ -84,6 +84,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
   </div>
+
+  <!-- ════════════ Run Detail Drawer ════════════ -->
+  <ODrawer
+    v-model:open="drawerOpen"
+    side="right"
+    :width="80"
+    :title="drawerTitle"
+    data-test="synthetics-run-detail-drawer"
+    @update:open="onDrawerClose"
+  >
+    <template #header-right>
+      <OBadge
+        v-if="drawerRunStatus"
+        :variant="drawerRunStatus.variant"
+        size="sm"
+        :icon="drawerRunStatus.icon"
+      >
+        {{ drawerRunStatus.label }}
+      </OBadge>
+    </template>
+    <RunDetail
+      :drawer-mode="true"
+      :override-monitor-id="monitorId"
+      :override-run-id="selectedRunId"
+      :override-execution-id="selectedExecutionId"
+      @update-status="onRunStatusUpdate"
+    />
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
@@ -94,7 +122,9 @@ import DateTime from "@/components/DateTime.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import MonitorRuns from "@/views/synthetics/MonitorRuns.vue";
+import RunDetail from "@/views/synthetics/RunDetail.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 
 defineOptions({ name: "SyntheticMonitorResults" });
@@ -147,6 +177,38 @@ const timeRange = ref({ startTime: 0, endTime: 0 });
 const dateTimeRef = ref<any>(null);
 const runsRef = ref<any>(null);
 const isRefreshing = ref(false);
+
+// ── Run Detail Drawer ────────────────────────────────────────────────────────
+const drawerOpen = ref(false);
+const selectedRunId = ref("");
+const selectedExecutionId = ref("");
+const drawerTitle = computed(() =>
+  selectedRunId.value ? `Run #${selectedRunId.value}` : "",
+);
+const drawerRunStatus = ref<{
+  variant: string;
+  icon: string;
+  label: string;
+} | null>(null);
+
+function onRunStatusUpdate(status: {
+  variant: string;
+  icon: string;
+  label: string;
+}) {
+  drawerRunStatus.value = status;
+}
+
+function onDrawerClose(open: boolean) {
+  if (!open) {
+    drawerRunStatus.value = null;
+    // Clear drawer query params
+    const next = { ...route.query };
+    delete next.run;
+    delete next.exec;
+    router.replace({ query: next }).catch(() => {});
+  }
+}
 
 function applyRelative(period: string) {
   const range = getConsumableRelativeTime(period);
@@ -247,10 +309,16 @@ function editMonitor() {
 
 function openRunDetail(runId: string, executionId: string) {
   if (!runId || !executionId) return;
-  router.push({
-    name: "synthetic-run-detail",
-    params: { id: monitorId.value, runId, executionId },
-  });
+  selectedRunId.value = runId;
+  selectedExecutionId.value = executionId;
+  drawerRunStatus.value = null;
+  drawerOpen.value = true;
+  // Track selected run in query params for shareability / refresh
+  router
+    .replace({
+      query: { ...route.query, run: runId, exec: executionId },
+    })
+    .catch(() => {});
 }
 
 onMounted(() => {
@@ -258,6 +326,16 @@ onMounted(() => {
     applyRelative(DEFAULT_RELATIVE);
   }
   writeToUrl();
+
+  // Auto-open drawer if query params present
+  const runQ = route.query.run;
+  const execQ = route.query.exec;
+  if (typeof runQ === "string" && typeof execQ === "string" && runQ && execQ) {
+    selectedRunId.value = runQ;
+    selectedExecutionId.value = execQ;
+    drawerOpen.value = true;
+  }
+
   nextTick(() => {
     runsRef.value?.refresh?.(
       timeRange.value.startTime,

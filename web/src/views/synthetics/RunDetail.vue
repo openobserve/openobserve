@@ -31,7 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="synthetics-run-detail"
   >
     <!-- ════════ HEADER ════════ -->
+    <!-- ── Route mode header ── -->
     <AppPageHeader
+      v-if="!drawerMode"
       class="px-4"
       :back="{
         label: t('synthetics.results.monitors'),
@@ -122,12 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OTabs>
 
     <div class="flex-1 min-h-0">
-      <OTabPanels
-        v-model="activeTab"
-        grow
-        scroll="y"
-        class="h-full min-h-0"
-      >
+      <OTabPanels v-model="activeTab" grow scroll="y" class="h-full min-h-0">
         <!-- ════════════ SUMMARY ════════════ -->
         <OTabPanel name="summary" data-test="synthetics-run-detail-summary-tab">
           <div
@@ -229,9 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >Session Replay</span
                   >
                   <span class="flex-1" />
-                  <span
-                    class="font-mono text-[11px] text-text-secondary"
-                  >
+                  <span class="font-mono text-[11px] text-text-secondary">
                     Step {{ selectedStep.id }} of {{ steps.length }}
                   </span>
                 </OCardSection>
@@ -251,9 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- ── Right: Execution Timeline ── -->
               <OCard class="p-0 gap-0 flex-1 min-w-0">
                 <OCardSection role="header" class="gap-2">
-                  <span class="font-bold text-sm text-text-heading"
-                    >Steps</span
-                  >
+                  <span class="font-bold text-sm text-text-heading">Steps</span>
                   <OBadge variant="default" size="sm">{{
                     steps.length
                   }}</OBadge>
@@ -287,9 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="mt-0.5 text-status-error-text"
                       aria-hidden="true"
                     />
-                    <div
-                      class="flex flex-col gap-0.5 flex-1 min-w-0"
-                    >
+                    <div class="flex flex-col gap-0.5 flex-1 min-w-0">
                       <span
                         class="text-sm text-status-error-text font-semibold"
                       >
@@ -326,8 +317,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       class="flex items-center gap-1.5 px-2 h-16 min-h-16 rounded"
                       :class="{
-                        'border-b border-[var(--o2-border-color)]':
-                          isExpanded(st.id),
+                        'border-b border-[var(--o2-border-color)]': isExpanded(
+                          st.id,
+                        ),
                       }"
                     >
                       <!-- Screenshot thumbnail 60×40 -->
@@ -431,19 +423,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                       </div>
                       <div class="px-3 py-3">
-                        <p
-                          class="text-[12.5px] text-[var(--o2-text-body)] m-0"
-                        >
+                        <p class="text-[12.5px] text-[var(--o2-text-body)] m-0">
                           {{ st.error }}
                         </p>
                       </div>
                     </div>
 
                     <!-- Expanded content -->
-                    <div
-                      v-if="isExpanded(st.id)"
-                      class="flex gap-4 p-3"
-                    >
+                    <div v-if="isExpanded(st.id)" class="flex gap-4 p-3">
                       <!-- Screenshot preview 280px -->
                       <div class="w-[280px] shrink-0">
                         <div
@@ -537,9 +524,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             URL
                           </dt>
-                          <dd
-                            class="font-mono truncate text-text-body"
-                          >
+                          <dd class="font-mono truncate text-text-body">
                             {{ st.detail }}
                           </dd>
                           <dt
@@ -667,14 +652,43 @@ import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";
 
 defineOptions({ name: "SyntheticRunDetail" });
 
+const emit = defineEmits<{
+  (
+    e: "update-status",
+    status: { variant: string; icon: string; label: string },
+  ): void;
+}>();
+
+// ── Props — enable embedding in ODrawer ──────────────────────────────────────
+interface Props {
+  drawerMode?: boolean;
+  overrideMonitorId?: string;
+  overrideRunId?: string;
+  overrideExecutionId?: string;
+}
+const props = withDefaults(defineProps<Props>(), {
+  drawerMode: false,
+  overrideMonitorId: "",
+  overrideRunId: "",
+  overrideExecutionId: "",
+});
+
 const { t } = useI18n();
 const route = useRoute();
 const store = useStore();
 
-// ── Route params ──────────────────────────────────────────────────────────
-const monitorId = computed(() => String(route.params.id ?? ""));
-const runIdParam = computed(() => String(route.params.runId ?? ""));
-const executionIdParam = computed(() => String(route.params.executionId ?? ""));
+// ── Source IDs — props in drawer mode, route params otherwise ────────────────
+const monitorId = computed(() =>
+  props.drawerMode ? props.overrideMonitorId : String(route.params.id ?? ""),
+);
+const runIdParam = computed(() =>
+  props.drawerMode ? props.overrideRunId : String(route.params.runId ?? ""),
+);
+const executionIdParam = computed(() =>
+  props.drawerMode
+    ? props.overrideExecutionId
+    : String(route.params.executionId ?? ""),
+);
 
 // ── Composable ─────────────────────────────────────────────────────────────
 const synthetics = useSyntheticResults();
@@ -920,6 +934,20 @@ const infoChips = computed(() => [
   },
   { label: "Timestamp", value: currentRun.value.timestamp, icon: "" },
 ]);
+
+// ── Emit status to parent (for drawer header-right badge) ──────────────────
+watch(
+  () => synthetics.runDetail.value?.status ?? null,
+  (status) => {
+    if (!props.drawerMode || !status) return;
+    const isFail = status === "failed";
+    emit("update-status", {
+      variant: isFail ? "error" : "success",
+      icon: isFail ? "cancel" : "check_circle",
+      label: isFail ? "Failed" : "Passed",
+    });
+  },
+);
 
 // ── Fetch data on mount / route change ────────────────────────────────────
 async function loadRun() {
