@@ -1006,8 +1006,8 @@ const fieldWidthClass = computed(() => {
               labelPosition === 'inside' && label ? '' : ($slots['icon-left'] ? 'ps-2' : 'ps-3'),
               'bg-select-bg',
               hasError
-                ? 'border-select-border-error'
-                : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus',
+                ? 'border-select-border-error focus:ring-[0.125rem] focus:ring-select-border-error/30'
+                : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-[0.125rem] focus:ring-primary-500/25',
               /* Keep the red error border on focus; focus border color applies only when there's no error. */
               'focus:outline-none',
               'transition-[color,background-color,border-color,box-shadow] duration-150',
@@ -1539,8 +1539,8 @@ const fieldWidthClass = computed(() => {
             labelPosition === 'inside' && label ? '' : 'ps-3',
             'bg-select-bg',
             hasError
-              ? 'border-select-border-error'
-              : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus',
+              ? 'border-select-border-error focus:ring-[0.125rem] focus:ring-select-border-error/30'
+              : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-[0.125rem] focus:ring-primary-500/25',
             /* Keep the red error border on focus; focus border color applies only when there's no error. */
             'focus:outline-none',
             'transition-[color,background-color,border-color,box-shadow] duration-150',
