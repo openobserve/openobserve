@@ -1684,6 +1684,10 @@ pub struct Limit {
     pub metrics_cache_max_entries: usize,
     #[env_config(name = "ZO_METRICS_INLIST_FILTER_ENABLED", default = false)]
     pub metrics_inlist_filter_enabled: bool,
+    // Memory budget in MB for the PromQL series label cache. 0 (default)
+    // means auto: 10% of total memory, capped at 1024 MB.
+    #[env_config(name = "ZO_METRICS_LABEL_CACHE_MAX_SIZE", default = 0)]
+    pub metrics_label_cache_max_size: usize,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
