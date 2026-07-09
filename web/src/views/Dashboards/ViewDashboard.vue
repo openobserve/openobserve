@@ -498,12 +498,6 @@ export default defineComponent({
     };
 
     onBeforeMount(async () => {
-      // TEMP: Add console logs to verify that onBeforeMount is being called correctly
-      console.log("ViewDashboard onBeforeMount log");
-      console.debug("ViewDashboard onBeforeMount debug");
-      console.info("ViewDashboard onBeforeMount info");
-      console.warn("ViewDashboard onBeforeMount warn");
-      console.error("ViewDashboard onBeforeMount error");
       await importMoment();
       setTimeString();
     });
