@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="synthetics-run-detail-drawer"
     @update:open="onDrawerClose"
   >
-    <template #header-right>
+    <template #header-left>
       <OBadge
         v-if="drawerRunStatus"
         :variant="drawerRunStatus.variant"
@@ -103,6 +103,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ drawerRunStatus.label }}
       </OBadge>
+      <OBadge
+        v-if="drawerUrl"
+        variant="default"
+        size="sm"
+        icon="link"
+        class="truncate max-w-[200px]"
+      >
+        {{ drawerUrl }}
+      </OBadge>
+      <span class="font-mono text-xs text-text-secondary shrink-0">
+        {{ drawerTimestamp }}
+      </span>
     </template>
     <RunDetail
       :drawer-mode="true"
@@ -182,26 +194,32 @@ const isRefreshing = ref(false);
 const drawerOpen = ref(false);
 const selectedRunId = ref("");
 const selectedExecutionId = ref("");
-const drawerTitle = computed(() =>
-  selectedRunId.value ? `Run #${selectedRunId.value}` : "",
-);
+const drawerTitle = "Run Details";
 const drawerRunStatus = ref<{
   variant: string;
   icon: string;
   label: string;
 } | null>(null);
+const drawerUrl = ref("");
+const drawerTimestamp = ref("");
 
 function onRunStatusUpdate(status: {
   variant: string;
   icon: string;
   label: string;
+  url: string;
+  timestamp: string;
 }) {
   drawerRunStatus.value = status;
+  drawerUrl.value = status.url;
+  drawerTimestamp.value = status.timestamp;
 }
 
 function onDrawerClose(open: boolean) {
   if (!open) {
     drawerRunStatus.value = null;
+    drawerUrl.value = "";
+    drawerTimestamp.value = "";
     // Clear drawer query params
     const next = { ...route.query };
     delete next.run;

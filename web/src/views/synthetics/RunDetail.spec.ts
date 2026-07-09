@@ -37,6 +37,15 @@ vi.mock("vue-i18n", () => ({
   })),
 }));
 
+vi.mock("vuex", () => ({
+  useStore: () => ({
+    state: {
+      timezone: "UTC",
+      selectedOrganization: { identifier: "org-1" },
+    },
+  }),
+}));
+
 const mockRunDetail = {
   timestamp: Date.now() / 1000,
   scheduledTs: Date.now() / 1000,
@@ -148,12 +157,12 @@ describe("RunDetail", () => {
     ).toBe(true);
   });
 
-  it("should render the page title with run ID", () => {
+  it("should render the page title", () => {
     const title = wrapper.find(
       '[data-test="synthetics-run-detail-title"]',
     );
     expect(title.exists()).toBe(true);
-    expect(title.text()).toContain("4821");
+    expect(title.text()).toBe("Run Details");
   });
 
   it("should render the status badge", () => {
@@ -162,7 +171,7 @@ describe("RunDetail", () => {
     ).toBe(true);
   });
 
-  it("should render the info bar with 5 chips", () => {
+  it("should render the info bar with 4 chips", () => {
     const infoBar = wrapper.find(
       '[data-test="synthetics-run-detail-info-bar"]',
     );
@@ -170,7 +179,7 @@ describe("RunDetail", () => {
     const chips = infoBar.findAll(
       ":scope > div",
     );
-    expect(chips.length).toBe(5);
+    expect(chips.length).toBe(4);
   });
 
   it("should render the summary tab by default", () => {

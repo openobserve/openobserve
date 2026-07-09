@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #title>
         <span data-test="synthetics-run-detail-title"
-          >Run #{{ currentRun.id }}</span
+          >Run Details</span
         >
       </template>
       <template #title-trail>
@@ -55,6 +55,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ statusLabel }}
         </OBadge>
+        <OBadge
+          v-if="currentRun.url"
+          variant="default"
+          size="sm"
+          icon="link"
+          class="truncate max-w-[200px]"
+          data-test="synthetics-run-detail-url-badge"
+        >
+          {{ currentRun.url }}
+        </OBadge>
+        <span
+          class="font-mono text-xs text-text-secondary shrink-0"
+          data-test="synthetics-run-detail-timestamp-label"
+        >
+          {{ currentRun.timestamp }}
+        </span>
         <div class="flex ml-1">
           <OButton
             variant="ghost"
@@ -99,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OTab name="summary" data-test="synthetics-run-detail-tab-summary">
         <span class="flex items-center gap-1.5">
-          <OIcon name="summarize" size="sm" />
+          <OIcon name="article" size="sm" />
           Summary
         </span>
       </OTab>
@@ -111,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTab>
       <OTab name="traces" data-test="synthetics-run-detail-tab-traces">
         <span class="flex items-center gap-1.5">
-          <OIcon name="account_tree" size="sm" />
+          <OIcon name="account-tree" size="sm" />
           Traces
         </span>
       </OTab>
@@ -130,10 +146,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="mx-auto px-5 py-[0.875rem] pb-[1.75rem] flex flex-col gap-[0.875rem]"
           >
+            <!-- Info chips -->
+            <div
+              class="grid grid-cols-4 gap-[0.625rem]"
+              data-test="synthetics-run-detail-info-bar"
+            >
+              <div
+                v-for="chip in infoChips"
+                :key="chip.label"
+                class="card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
+              >
+                <span
+                  class="kpi-label text-[0.7rem] font-semibold text-[var(--o2-text-muted)] capitalize"
+                >
+                  {{ chip.label }}
+                </span>
+                <span
+                  class="flex items-center gap-1 text-xs font-bold leading-none text-[var(--o2-text-primary)]"
+                >
+                  <OIcon
+                    v-if="chip.icon"
+                    :name="chip.icon"
+                    size="sm"
+                    class="shrink-0"
+                  />
+                  {{ chip.value }}
+                </span>
+              </div>
+            </div>
+
             <!-- Error callout -->
             <div
               v-if="isFailed"
-              class="border border-[var(--o2-status-error-border)] bg-[var(--o2-status-error-subtle)] rounded-lg overflow-hidden"
+              class="bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30 rounded-lg overflow-hidden"
               data-test="synthetics-run-detail-error-callout"
             >
               <div class="flex items-start gap-3 p-[0.875rem]">
@@ -148,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ errorType }}
                     </span>
-                    <OBadge variant="error" size="sm">
+                    <OBadge v-if="failedStepLabel" variant="error" size="sm">
                       {{ failedStepLabel }}
                     </OBadge>
                   </div>
@@ -157,19 +202,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorReason }}
                   </p>
-                  <button
-                    type="button"
-                    class="flex items-center gap-1 bg-transparent border-0 p-0 mt-2 cursor-pointer font-inherit text-[11.5px] font-semibold text-[var(--o2-status-error-text)]"
+                  <OButton
+                    variant="outline-destructive"
+                    size="xs"
+                    class="mt-2"
+                    data-test="synthetics-run-detail-error-expand-btn"
                     @click="toggleStack"
                   >
-                    <OIcon
-                      name="expand_more"
-                      size="xs"
-                      class="transition-transform duration-150"
-                      :class="{ 'rotate-180': stackOpen }"
-                    />
-                    View full error &amp; stack trace
-                  </button>
+                    <template #icon-left>
+                      <OIcon
+                        name="expand-more"
+                        size="xs"
+                        class="transition-transform duration-150"
+                        :class="{ 'rotate-180': stackOpen }"
+                      />
+                    </template>
+                    <span
+                      class="text-[11.5px] font-semibold text-[var(--o2-status-error-text)]"
+                    >
+                      View full error &amp; stack trace
+                    </span>
+                  </OButton>
                   <pre
                     v-if="stackOpen"
                     class="mt-2 text-[11px] leading-[1.6] text-text-body bg-[var(--o2-code-bg)] rounded-md p-[10px_12px] overflow-auto whitespace-pre-wrap font-mono"
@@ -180,37 +233,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <!-- Info bar -->
-            <div
-              class="grid grid-cols-5 border border-border-default rounded-lg bg-surface-subtle overflow-hidden"
-              data-test="synthetics-run-detail-info-bar"
-            >
-              <div
-                v-for="chip in infoChips"
-                :key="chip.label"
-                class="flex flex-col gap-0.5 px-4 py-[0.625rem] border-r border-border-default last:border-r-0"
-              >
-                <span
-                  class="text-xs pb-1 font-semibold text-text-secondary capitalize tracking-wide"
-                >
-                  {{ chip.label }}
-                </span>
-                <span
-                  class="flex items-center gap-1 font-mono tabular-nums text-[13px] font-bold text-text-heading"
-                >
-                  <OIcon
-                    v-if="chip.icon"
-                    :name="chip.icon"
-                    size="sm"
-                    class="shrink-0"
-                  />
-                  {{ chip.value }}
-                </span>
-              </div>
-            </div>
-
             <!-- ══ Split: Replay Player (left) + Steps Timeline (right) ══ -->
-            <div class="flex gap-[0.875rem] items-start">
+            <div
+              v-if="steps.length > 0"
+              class="flex gap-[0.875rem] items-start"
+            >
               <!-- ── Left: Session Replay Player ── -->
               <OCard
                 v-if="currentRun.hasReplay"
@@ -252,7 +279,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}</OBadge>
                   <span class="flex-1" />
                   <OBadge
-                    v-if="isFailed"
+                    v-if="isErrorRun"
+                    variant="error-soft"
+                    size="sm"
+                    data-test="synthetics-run-detail-error-step-badge"
+                  >
+                    Lambda Error
+                  </OBadge>
+                  <OBadge
+                    v-else-if="isFailed"
                     variant="error"
                     size="sm"
                     dot
@@ -269,7 +304,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <!-- Steps pass/fail banner -->
                   <div
-                    v-if="isFailed"
+                    v-if="isErrorRun"
+                    class="flex items-start gap-2 px-3 py-2 mb-2 rounded bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30"
+                    role="alert"
+                    data-test="synthetics-run-detail-steps-error-banner"
+                  >
+                    <OIcon
+                      name="error"
+                      size="sm"
+                      class="mt-0.5 text-badge-error-ol-text"
+                      aria-hidden="true"
+                    />
+                    <div class="flex flex-col gap-0.5 flex-1 min-w-0">
+                      <span
+                        class="text-sm text-badge-error-ol-text font-semibold"
+                      >
+                        Lambda execution failed — check the error details above
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    v-else-if="isFailed"
                     class="flex items-start gap-2 px-3 py-2 mb-2 rounded bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30"
                     role="alert"
                     data-test="synthetics-run-detail-steps-failed-banner"
@@ -277,12 +332,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       name="error"
                       size="sm"
-                      class="mt-0.5 text-status-error-text"
+                      class="mt-0.5 text-badge-error-ol-text"
                       aria-hidden="true"
                     />
                     <div class="flex flex-col gap-0.5 flex-1 min-w-0">
                       <span
-                        class="text-sm text-status-error-text font-semibold"
+                        class="text-sm text-badge-error-ol-text font-semibold"
                       >
                         Run failed — {{ failedStepLabel || "execution error" }}
                       </span>
@@ -626,6 +681,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import syntheticsService from "@/services/synthetics";
+import { timestampToTimezoneDate } from "@/utils/timezone";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
@@ -655,7 +711,13 @@ defineOptions({ name: "SyntheticRunDetail" });
 const emit = defineEmits<{
   (
     e: "update-status",
-    status: { variant: string; icon: string; label: string },
+    status: {
+      variant: string;
+      icon: string;
+      label: string;
+      url: string;
+      timestamp: string;
+    },
   ): void;
 }>();
 
@@ -770,12 +832,10 @@ function capitalizeEngine(engine: string): string {
 }
 
 function fmtTimestamp(tsMs: number): string {
-  const d = new Date(tsMs);
-  return (
-    d.toLocaleDateString("en-US", { day: "numeric", month: "short" }) +
-    " " +
-    d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) +
-    " UTC"
+  return timestampToTimezoneDate(
+    tsMs,
+    store.state.timezone,
+    "MMM dd, HH:mm ZZZ",
   );
 }
 
@@ -819,12 +879,13 @@ function screenshotUrl(key: string | null): string {
 interface DisplayRun {
   id: string;
   monitorName: string;
-  status: "pass" | "fail";
+  status: "pass" | "fail" | "error";
   duration: number;
   browser: string;
   device: string;
   location: string;
   timestamp: string;
+  url: string;
   hasReplay: boolean;
   errorType?: string;
   errorReason?: string;
@@ -844,21 +905,29 @@ function toDisplayRun(detail: SyntheticRunDetail | null): DisplayRun {
       device: "",
       location: "",
       timestamp: "",
+      url: "",
       hasReplay: false,
     };
   }
   const isFail = detail.status === "failed";
+  const isError = detail.status === "error";
+  const hasIssue = isFail || isError;
   return {
     id: detail.runId,
     monitorName: detail.monitorName,
-    status: isFail ? ("fail" as const) : ("pass" as const),
+    status: isFail
+      ? ("fail" as const)
+      : isError
+        ? ("error" as const)
+        : ("pass" as const),
     duration: detail.durationMs,
     browser: capitalizeEngine(detail.browserEngine),
     device: detail.device,
     location: detail.location,
     timestamp: fmtTimestamp(detail.timestamp),
+    url: detail.recordedSteps[0]?.url ?? "",
     hasReplay: false,
-    ...(isFail
+    ...(hasIssue
       ? {
           errorType: detail.error ? detail.error.split(":")[0] : "Error",
           errorReason: detail.error || "",
@@ -895,7 +964,12 @@ const currentRun = computed<DisplayRun>(() => {
     : toDisplayRun(null);
 });
 
-const isFailed = computed(() => currentRun.value.status === "fail");
+const isFailed = computed(
+  () =>
+    currentRun.value.status === "fail" || currentRun.value.status === "error",
+);
+
+const isErrorRun = computed(() => currentRun.value.status === "error");
 
 const steps = computed<StepRow[]>(() => {
   if (synthetics.runDetail.value) {
@@ -905,10 +979,14 @@ const steps = computed<StepRow[]>(() => {
 });
 
 const statusBadgeVariant = computed(() =>
-  isFailed.value ? "error" : "success",
+  isErrorRun.value ? "error-soft" : isFailed.value ? "error" : "success",
 );
-const statusIcon = computed(() => (isFailed.value ? "cancel" : "check_circle"));
-const statusLabel = computed(() => (isFailed.value ? "Failed" : "Passed"));
+const statusIcon = computed(() =>
+  isErrorRun.value ? "error" : isFailed.value ? "cancel" : "check_circle",
+);
+const statusLabel = computed(() =>
+  isErrorRun.value ? "Error" : isFailed.value ? "Failed" : "Passed",
+);
 
 const errorType = computed(() => currentRun.value.errorType ?? "");
 const errorReason = computed(() => currentRun.value.errorReason ?? "");
@@ -932,7 +1010,6 @@ const infoChips = computed(() => [
     value: "AWS " + currentRun.value.location,
     icon: locationIcon(currentRun.value.location),
   },
-  { label: "Timestamp", value: currentRun.value.timestamp, icon: "" },
 ]);
 
 // ── Emit status to parent (for drawer header-right badge) ──────────────────
@@ -940,11 +1017,14 @@ watch(
   () => synthetics.runDetail.value?.status ?? null,
   (status) => {
     if (!props.drawerMode || !status) return;
-    const isFail = status === "failed";
+    const isErr = status === "error";
+    const isF = status === "failed" || isErr;
     emit("update-status", {
-      variant: isFail ? "error" : "success",
-      icon: isFail ? "cancel" : "check_circle",
-      label: isFail ? "Failed" : "Passed",
+      variant: isErr ? "error-soft" : isF ? "error" : "success",
+      icon: isErr ? "error" : isF ? "cancel" : "check_circle",
+      label: isErr ? "Error" : isF ? "Failed" : "Passed",
+      url: currentRun.value.url,
+      timestamp: currentRun.value.timestamp,
     });
   },
 );
