@@ -741,25 +741,15 @@ watch(formType, (t) => {
 // Continue used to blindly advance the OStepper; a user could walk past a blank
 // required field and only discover it at Save. This runs the SAME schema-driven
 // validation the footer Save uses (mirrors OForm.validate(): validate each field,
-// then read its meta.errors), but SCOPED to the fields owned by the current step.
+// then read its meta.errors), and gates the advance ONLY on the fields listed at
+// the call site (the step's own fields — see the template's Continue buttons).
 //
-// Scoping is needed because the schema is form-level: TanStack has no isolated
-// single-field validation, so each form.validateField() runs the whole Zod schema
-// and writes every field's error into its meta (FormApi.validateSync). Left as-is
-// that bleeds across steps — e.g. validating step 2's cron would paint a "required"
-// error on the always-mounted `name` field above the stepper, and pre-seed step 3's
-// service_account error before the user ever reaches it. So after validating we
-// clear the error meta on every field NOT in the current step, keeping each
-// Continue about that step's part only. (Save still validates the whole form.)
-const clearFieldErrorsExcept = (keep: string[]) => {
-  for (const name of Object.keys(form.state.fieldMeta ?? {})) {
-    if (keep.includes(name)) continue;
-    const meta = form.getFieldMeta(name);
-    if (!meta) continue;
-    form.setFieldMeta(name, { ...meta, errorMap: {} });
-  }
-};
-
+// We deliberately do NOT clear other fields' error meta here. The schema is
+// form-level, so form.validateField() runs the whole Zod schema and records every
+// field's error — but that write is additive, so Save's cross-step errors stay
+// put (clearing them made a later Continue wipe the errors Save had just surfaced
+// on other steps). We simply don't READ the out-of-step fields when deciding
+// whether to advance.
 const validateStepFields = async (fields: string[]): Promise<boolean> => {
   let valid = true;
   for (const name of fields) {
@@ -767,8 +757,6 @@ const validateStepFields = async (fields: string[]): Promise<boolean> => {
     const errors = form.getFieldMeta(name)?.errors ?? [];
     if (errors.length > 0) valid = false;
   }
-  // Drop errors the whole-form schema run wrote onto out-of-step fields.
-  clearFieldErrorsExcept(fields);
   return valid;
 };
 
