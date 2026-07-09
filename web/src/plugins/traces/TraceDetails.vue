@@ -1683,6 +1683,8 @@ export default defineComponent({
     const resetTraceDetails = () => {
       searchObj.data.traceDetails.showSpanDetails = false;
       searchObj.data.traceDetails.selectedSpanId = "";
+      // Selection is being cleared — cancel any live scroll targeting it.
+      traceTreeRef.value?.cancelScroll?.();
       searchObj.data.traceDetails.selectedTrace = {
         trace_id: "",
         trace_start_time: 0,
@@ -1747,6 +1749,8 @@ export default defineComponent({
       showTraceDetails.value = false;
       searchObj.data.traceDetails.showSpanDetails = false;
       searchObj.data.traceDetails.selectedSpanId = "";
+      // Cancel any scroll left over from a previous trace before (re)loading.
+      traceTreeRef.value?.cancelScroll?.();
 
       // If embedded mode with span list provided, skip fetching
       if (props.mode === "embedded" && props.spanListProp.length > 0) {
@@ -2448,6 +2452,9 @@ export default defineComponent({
       hoveredSpanId.value = "";
       searchObj.data.traceDetails.showSpanDetails = false;
       searchObj.data.traceDetails.selectedSpanId = null;
+      // Stop any pending/in-flight programmatic scroll so the closed span no
+      // longer snaps back into view while the user scrolls the tree.
+      traceTreeRef.value?.cancelScroll?.();
     };
     const toggleSpanCollapse = (spanId: number | string) => {
       collapseMapping.value[spanId] = !collapseMapping.value[spanId];
