@@ -171,7 +171,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-action-script-step1-continue-btn"
                       variant="primary"
                       size="sm"
-                      @click="step = formType === 'scheduled' ? 2 : 3"
+                      @click="
+                        goToStep(['codeZip'], formType === 'scheduled' ? 2 : 3)
+                      "
                       >Continue</OButton
                     >
                   </div>
@@ -298,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-action-script-step2-continue-btn"
                       variant="primary"
                       size="sm"
-                      @click="step++"
+                      @click="goToStep(['cron', 'timezone'], 3)"
                       >Continue</OButton
                     >
                   </div>
@@ -359,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-action-script-step3-continue-btn"
                       variant="primary"
                       size="sm"
-                      @click="step++"
+                      @click="goToStep(['service_account'], 4)"
                       >Continue</OButton
                     >
                   </div>
@@ -734,6 +736,46 @@ const formType = computed<string>(
 watch(formType, (t) => {
   if (t !== "scheduled" && step.value === 2) step.value = 3;
 });
+
+// ── Per-step "Continue" validation ───────────────────────────────────────────
+// Continue used to blindly advance the OStepper; a user could walk past a blank
+// required field and only discover it at Save. This runs the SAME schema-driven
+// validation the footer Save uses (mirrors OForm.validate(): validate each field,
+// then read its meta.errors), but SCOPED to the fields owned by the current step.
+//
+// Scoping is needed because the schema is form-level: TanStack has no isolated
+// single-field validation, so each form.validateField() runs the whole Zod schema
+// and writes every field's error into its meta (FormApi.validateSync). Left as-is
+// that bleeds across steps — e.g. validating step 2's cron would paint a "required"
+// error on the always-mounted `name` field above the stepper, and pre-seed step 3's
+// service_account error before the user ever reaches it. So after validating we
+// clear the error meta on every field NOT in the current step, keeping each
+// Continue about that step's part only. (Save still validates the whole form.)
+const clearFieldErrorsExcept = (keep: string[]) => {
+  for (const name of Object.keys(form.state.fieldMeta ?? {})) {
+    if (keep.includes(name)) continue;
+    const meta = form.getFieldMeta(name);
+    if (!meta) continue;
+    form.setFieldMeta(name, { ...meta, errorMap: {} });
+  }
+};
+
+const validateStepFields = async (fields: string[]): Promise<boolean> => {
+  let valid = true;
+  for (const name of fields) {
+    await form.validateField(name, "submit");
+    const errors = form.getFieldMeta(name)?.errors ?? [];
+    if (errors.length > 0) valid = false;
+  }
+  // Drop errors the whole-form schema run wrote onto out-of-step fields.
+  clearFieldErrorsExcept(fields);
+  return valid;
+};
+
+// Validate the given fields; only advance to `next` when they all pass.
+const goToStep = async (fields: string[], next: number) => {
+  if (await validateStepFields(fields)) step.value = next;
+};
 
 // Bridge the component-owned frequency tabs (repeat/once) into the form so the
 // schema's cron superRefine can branch on it. Default-values seeds the initial
