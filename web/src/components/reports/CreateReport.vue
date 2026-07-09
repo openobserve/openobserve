@@ -365,7 +365,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="add-report-step1-continue-btn"
                     variant="primary"
                     size="sm-action"
-                    @click="step++"
+                    @click="
+                      goToStep(
+                        [
+                          'dashboards[0].folder',
+                          'dashboards[0].dashboard',
+                          'dashboards[0].tabs',
+                          'dashboards[0].timerange',
+                        ],
+                        2,
+                      )
+                    "
                   >
                     Continue
                   </OButton>
@@ -583,7 +593,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="add-report-step2-continue-btn"
                     variant="primary"
                     size="sm-action"
-                    @click="step++"
+                    @click="
+                      goToStep(
+                        ['cron', 'customInterval', 'customPeriod', 'timezone', 'date', 'time'],
+                        3,
+                      )
+                    "
                   >
                     Continue
                   </OButton>
@@ -1043,6 +1058,41 @@ const submissionAttempts = form.useStore((s: any) => s.submissionAttempts ?? 0);
 watch(submissionAttempts, (n, o) => {
   if (n > o) jumpToFirstErrorStep();
 });
+
+// ── Per-step "Continue" validation ───────────────────────────────────────────
+// Continue used to blindly advance the OStepper; a user could walk past a blank
+// required field and only discover it at Save. This runs the SAME schema-driven
+// validation the footer Save uses (mirrors OForm.validate(): validate each field,
+// then read its meta.errors), and gates the advance ONLY on the fields listed at
+// the call site (the step's own fields — see the template's Continue buttons).
+// `name`/`description` (top of form) stay handled by Save.
+//
+// The field lists are static supersets per step; no mode branching is needed
+// because the schema is already mode-aware — validating step 2's cron/custom/
+// scheduleLater fields only produces errors for whichever mode is active, so the
+// irrelevant ones simply pass (e.g. "Once + Schedule Now" requires none of them
+// and advances freely). Same static-list approach as EditScript's stepper.
+//
+// We deliberately do NOT clear other fields' error meta here. The schema is
+// form-level, so form.validateField() runs the whole Zod schema and records every
+// field's error — but that write is additive, so Save's cross-step errors stay
+// put (clearing them made a later Continue wipe the errors Save had just surfaced
+// on other steps). We simply don't READ the out-of-step fields when deciding
+// whether to advance.
+const validateStepFields = async (fields: string[]): Promise<boolean> => {
+  let valid = true;
+  for (const name of fields) {
+    await form.validateField(name, "submit");
+    const errors = form.getFieldMeta(name)?.errors ?? [];
+    if (errors.length > 0) valid = false;
+  }
+  return valid;
+};
+
+// Validate the given fields; only advance to `next` when they all pass.
+const goToStep = async (fields: string[], next: number) => {
+  if (await validateStepFields(fields)) step.value = next;
+};
 
 const setInitialReportData = async () => {
   const queryParams = router.currentRoute.value.query;
