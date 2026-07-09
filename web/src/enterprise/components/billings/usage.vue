@@ -166,28 +166,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- Reporting OFF → offer to enable so the daily chart can populate. -->
-      <div
+      <!-- Reporting OFF → illustrated empty state inviting the user to enable
+           usage reporting so the daily chart can populate. Uses the app-wide
+           OEmptyState primitive with the animated bar-chart illustration. -->
+      <OEmptyState
         v-else
         data-test="usage-enable-cta"
-        class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-6 mt-4 flex flex-col items-start gap-3"
-      >
-        <div class="text-(length:--text-sm) font-semibold text-(--color-text-heading)">
-          {{ t("billing.usageTrends.enableTitle") }}
-        </div>
-        <div class="text-(length:--text-sm) text-(--color-text-body) max-w-[52ch]">
-          {{ t("billing.usageTrends.enableSubtitle") }}
-        </div>
-        <q-btn
-          data-test="usage-enable-btn"
-          no-caps
-          unelevated
-          color="primary"
-          :loading="enablingUsage"
-          :label="t('billing.usageTrends.enableButton')"
-          @click="enableUsageReporting"
-        />
-      </div>
+        class="mt-4 border border-(--o2-border-color) rounded-lg bg-(--o2-card-bg)"
+        size="block"
+        illustration="wave-bars"
+        :title="t('billing.usageTrends.enableTitle')"
+        :description="t('billing.usageTrends.enableSubtitle')"
+        :action-label="t('billing.usageTrends.enableButton')"
+        action-icon="check"
+        @action="showEnableConfirm = true"
+      />
+
+      <!-- Confirm before enabling — turning this on starts writing the org's
+           own usage stream, so we ask first. -->
+      <ConfirmDialog
+        v-model="showEnableConfirm"
+        data-test="usage-enable-confirm"
+        :title="t('billing.usageTrends.enableConfirmTitle')"
+        :message="t('billing.usageTrends.enableConfirmMessage')"
+        :ok-label="t('billing.usageTrends.enableButton')"
+        @update:ok="onConfirmEnable"
+        @update:cancel="showEnableConfirm = false"
+      />
     </div>
   </template>
   <script lang="ts">
@@ -204,6 +209,8 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
 
   let currentDate = new Date(); // Get the current date and time
@@ -220,6 +227,8 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
       CustomChartRenderer,
       PanelSchemaRenderer,
       OSpinner,
+      OEmptyState,
+      ConfirmDialog,
     },
     setup() {
       const { t } = useI18n();
@@ -269,6 +278,8 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
       );
 
       const enablingUsage = ref(false);
+      // Controls the "are you sure?" dialog shown before we enable reporting.
+      const showEnableConfirm = ref(false);
 
       // Persist an explicit opt-in. Merge with the current settings so we don't
       // clobber other org-parameter fields, then update the store so
@@ -302,6 +313,12 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
         } finally {
           enablingUsage.value = false;
         }
+      };
+
+      // Confirm-dialog OK handler: close the dialog, then run the enable flow.
+      const onConfirmEnable = () => {
+        showEnableConfirm.value = false;
+        enableUsageReporting();
       };
 
       // The date-range picker lives in the Billing toolbar (next to GB/MB) and
@@ -1090,6 +1107,8 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
         usageStreamEnabled,
         enablingUsage,
         enableUsageReporting,
+        showEnableConfirm,
+        onConfirmEnable,
         dailyTimeObj,
         combinedSchema,
         dailyChartKey,

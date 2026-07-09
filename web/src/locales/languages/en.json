@@ -2981,7 +2981,9 @@
       "enableSubtitle": "Turn on usage reporting to chart your ingestion and query volume day by day. Your totals above stay available either way.",
       "enableButton": "Enable usage reporting",
       "enablePending": "Usage reporting enabled. Your daily chart will start filling in shortly as new usage is recorded.",
-      "enableSuccess": "Usage reporting enabled"
+      "enableSuccess": "Usage reporting enabled",
+      "enableConfirmTitle": "Enable usage reporting?",
+      "enableConfirmMessage": "This starts recording your organization's usage to its own stream so we can chart daily ingestion and query volume. It applies to this organization only and can be turned off later in organization settings."
     },
     "aiCredits": "AI Credits",
     "aiModeFree": "Free",
