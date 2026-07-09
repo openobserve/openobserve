@@ -23,9 +23,10 @@ use hashlink::lru_cache::LruCache;
 use parking_lot::Mutex;
 
 const SHARD_COUNT: usize = 32;
-// Auto budget when ZO_METRICS_LABEL_CACHE_MAX_SIZE is 0: 10% of total
-// memory, capped at 1 GiB (roughly 1M typical series at ~1KB per label set).
-const AUTO_MEM_PERCENT: usize = 10;
+// Auto budget when ZO_METRICS_LABEL_CACHE_MAX_SIZE is 0: 5% of total memory,
+// clamped to [100 MB, 1 GiB] (a typical series costs ~1KB per label set).
+const AUTO_MEM_PERCENT: usize = 5;
+const AUTO_MIN_BYTES: usize = 100 * 1024 * 1024;
 const AUTO_MAX_BYTES: usize = 1024 * 1024 * 1024;
 // Fixed per-entry overhead: key + LRU node bookkeeping.
 const ENTRY_OVERHEAD: usize = 80;
@@ -57,7 +58,7 @@ pub(crate) static LABEL_CACHE: Lazy<LabelCache> = Lazy::new(|| {
     let max_bytes = if cfg.limit.metrics_label_cache_max_size > 0 {
         cfg.limit.metrics_label_cache_max_size * 1024 * 1024
     } else {
-        (cfg.limit.mem_total * AUTO_MEM_PERCENT / 100).min(AUTO_MAX_BYTES)
+        (cfg.limit.mem_total * AUTO_MEM_PERCENT / 100).clamp(AUTO_MIN_BYTES, AUTO_MAX_BYTES)
     };
     LabelCache::new(max_bytes)
 });
