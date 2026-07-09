@@ -2976,7 +2976,12 @@
     "contactSupport": "Contact Support",
     "totalUsage": "Total Usage",
     "usageTrends": {
-      "dailyUsage": "Daily usage"
+      "dailyUsage": "Daily usage",
+      "enableTitle": "See your daily usage",
+      "enableSubtitle": "Turn on usage reporting to chart your ingestion and query volume day by day. Your totals above stay available either way.",
+      "enableButton": "Enable usage reporting",
+      "enablePending": "Usage reporting enabled. Your daily chart will start filling in shortly as new usage is recorded.",
+      "enableSuccess": "Usage reporting enabled"
     },
     "aiCredits": "AI Credits",
     "aiModeFree": "Free",
