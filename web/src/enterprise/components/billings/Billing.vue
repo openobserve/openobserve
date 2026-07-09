@@ -208,7 +208,10 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const router: any = useRouter();
-    const billingtab = ref(resolveTab("billings", router.currentRoute.value.name as string, "usage"));
+    // Default/fallback tab is "plans" — that's where /billings redirects on
+    // mount, so falling back to "usage" made the Usage tab flash-highlight
+    // first before the redirect settled.
+    const billingtab = ref(resolveTab("billings", router.currentRoute.value.name as string, "plans"));
     const usageDataType = ref(router.currentRoute.value.query.data_type || "gb");
     const showSidebar = ref(true);
     const lastSplitterPosition = ref(200);
