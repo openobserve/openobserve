@@ -2585,13 +2585,33 @@
     "goTo": "前往：",
     "selectLogsMode": "选择日志模式：",
     "enterCustomQuery": "输入自定义查询：",
-    "enterUrl": "输入网址：",
+    "sqlQueryRequired": "SQL 查询是必填项",
+    "enterUrl": "输入网址",
+    "variableNameRequired": "变量名称是必填项",
+    "variableNameInvalid": "只允许使用字母、数字、连字符和下划线",
+    "atLeastOneTabRequired": "至少需要一个选项卡",
+    "atLeastOnePanelRequired": "至少需要一个面板",
+    "streamTypeRequired": "流类型是必填项",
+    "streamIndexRequired": "流 / 索引是必填项",
+    "fieldRequired": "字段为必填字段",
+    "constantValueRequired": "常量值是必填项",
+    "operatorRequired": "运算符是必填项",
+    "filterValueRequired": "必填",
+    "labelRequired": "标签是必填项",
+    "optionValueRequired": "字段为必填字段！",
+    "seriesValueRequired": "系列值是必填项",
+    "colorRequired": "颜色是必填项",
+    "onlyHttpsUrlsAllowed": "仅允许使用 HTTP(S) URL",
+    "urlRequired": "网址为必填项",
+    "folderRequired": "文件夹为必填项",
+    "dashboardRequired": "仪表盘为必填项",
+    "tabRequired": "选项卡为必填项",
     "invalidUrl": "网址无效",
-    "selectFolderDrilldown": "选择文件夹 *:",
+    "selectFolderDrilldown": "选择文件夹",
     "noFoldersAvailable": "没有可用的文件夹",
-    "selectDashboardDrilldown": "选择控制面板 *:",
+    "selectDashboardDrilldown": "选择控制面板",
     "noDashboardsAvailable": "没有可用的仪表板",
-    "selectTabDrilldown": "选择选项卡 *:",
+    "selectTabDrilldown": "选择选项卡",
     "noTabAvailable": "没有可用的选项卡",
     "variables": "变量：",
     "passAllCurrentVariables": "传递所有当前变量：",
@@ -2657,7 +2677,8 @@
     "configSectionDrilldown": "向下钻取",
     "configSectionComparison": "对比",
     "configSectionMarkLines": "Mark Lines",
-    "configSectionBackground": "背景"
+    "configSectionBackground": "背景",
+    "editTab": "编辑选项卡"
   },
   "panel": {
     "header": "面板",
@@ -2744,7 +2765,12 @@
     "mapvalue": "值",
     "source": "来源",
     "target": "目标",
-    "value": "值"
+    "value": "值",
+    "xAxisShort": "X轴",
+    "yAxisShort": "Y轴",
+    "rowFields": "行字段",
+    "valueFields": "值字段",
+    "noData": "无数据"
   },
   "home": {
     "streams": "数据流",
@@ -4242,6 +4268,51 @@
     "querySource": "查询来源"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "搜索服务",
+      "noStreamsDetected": "未检测到任何直播。确保服务图表指标包含 stream_name 标签。",
+      "streamOnlyInfo": "服务图使用纯流架构，内存状态为零",
+      "borderColor": "边框颜色",
+      "borderColorMetric": "错误",
+      "nodeSize": "节点大小",
+      "nodeSizeMetric": "请求",
+      "sizeLow": "低",
+      "sizeHigh": "高",
+      "status": {
+        "healthy": "健康",
+        "degraded": "已降级",
+        "warning": "警告",
+        "critical": "关键"
+      },
+      "range": {
+        "healthy": "< 1%",
+        "degraded": "1 — 5%",
+        "warning": "5 — 10%",
+        "critical": "> 10%"
+      },
+      "entities": "实体",
+      "distribution": "分发",
+      "total": "总计",
+      "showTypes": "显示类型",
+      "typesFiltered": "有些类型是隐藏的。打开以更改显示的内容。",
+      "zoomIn": "放大",
+      "zoomOut": "缩小",
+      "fitToScreen": "适合屏幕",
+      "layout": "布局",
+      "types": "类型",
+      "mode": {
+        "auto": "汽车",
+        "expanded": "已扩展",
+        "collapsed": "崩溃了"
+      },
+      "kind": {
+        "service": "服务",
+        "database": "数据存储",
+        "queue": "队列",
+        "external": "外部",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "以全视图打开",
     "viewLogs": "查看日志",
     "viewRelated": "查看相关",
@@ -4520,6 +4591,7 @@
     "servicesCatalog": {
       "tabLabel": "服务目录",
       "title": "服务目录",
+      "footerTitle": "服务",
       "filterPlaceholder": "按服务名称筛选...",
       "noServicesFound": "在所选时间范围内未找到任何服务。",
       "loading": "正在加载服务...",
@@ -4546,6 +4618,15 @@
       "servicesLabel": "服务",
       "viewTraces": "查看踪迹",
       "exportCsv": "导出 CSV",
+      "types": {
+        "all": "全部",
+        "service": "服务",
+        "datastore": "数据存储",
+        "queue": "队列",
+        "external": "外部",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{count} {状态}",
       "legend": {
         "title": "错误率"
       }

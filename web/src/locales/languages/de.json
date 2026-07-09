@@ -2585,13 +2585,33 @@
     "goTo": "Gehe zu:",
     "selectLogsMode": "Wählen Sie den Protokollmodus aus:",
     "enterCustomQuery": "Geben Sie eine benutzerdefinierte Abfrage ein:",
-    "enterUrl": "URL eingeben:",
+    "sqlQueryRequired": "SQL-Abfrage ist erforderlich",
+    "enterUrl": "URL eingeben",
+    "variableNameRequired": "Variablenname ist erforderlich.",
+    "variableNameInvalid": "Nur Buchstaben, Zahlen, Bindestriche und Unterstriche sind erlaubt",
+    "atLeastOneTabRequired": "Mindestens ein Tab ist erforderlich.",
+    "atLeastOnePanelRequired": "Mindestens ein Panel ist erforderlich.",
+    "streamTypeRequired": "Stream-Typ ist erforderlich.",
+    "streamIndexRequired": "Stream / Index ist erforderlich.",
+    "fieldRequired": "Feld ist erforderlich.",
+    "constantValueRequired": "Konstantenwert ist erforderlich.",
+    "operatorRequired": "Operator ist erforderlich.",
+    "filterValueRequired": "Erforderlich",
+    "labelRequired": "Bezeichnung ist erforderlich.",
+    "optionValueRequired": "Feld ist erforderlich!",
+    "seriesValueRequired": "Serienwert ist erforderlich",
+    "colorRequired": "Farbe ist erforderlich",
+    "onlyHttpsUrlsAllowed": "Nur HTTP(S)-URLs sind erlaubt",
+    "urlRequired": "URL ist erforderlich",
+    "folderRequired": "Ordner ist erforderlich",
+    "dashboardRequired": "Dashboard ist erforderlich",
+    "tabRequired": "Tab ist erforderlich",
     "invalidUrl": "Ungültige URL",
-    "selectFolderDrilldown": "Ordner auswählen*:",
+    "selectFolderDrilldown": "Ordner auswählen",
     "noFoldersAvailable": "Keine Ordner verfügbar",
-    "selectDashboardDrilldown": "Wählen Sie Dashboard aus*:",
+    "selectDashboardDrilldown": "Wählen Sie Dashboard aus",
     "noDashboardsAvailable": "Keine Dashboards verfügbar",
-    "selectTabDrilldown": "Tab auswählen*:",
+    "selectTabDrilldown": "Tab auswählen",
     "noTabAvailable": "Kein Tab verfügbar",
     "variables": "Variablen:",
     "passAllCurrentVariables": "Übergeben Sie alle aktuellen Variablen:",
@@ -2657,7 +2677,8 @@
     "configSectionDrilldown": "Drilldown",
     "configSectionComparison": "Vergleich",
     "configSectionMarkLines": "Linien markieren",
-    "configSectionBackground": "Hintergrund"
+    "configSectionBackground": "Hintergrund",
+    "editTab": "Tab bearbeiten"
   },
   "panel": {
     "header": "Panel",
@@ -2736,7 +2757,7 @@
     "enterCustomSql": "Geben Sie Ihre benutzerdefinierte SQL-Abfrage ein...",
     "back": "<< Zurück",
     "sqlBuilder": "SQL-Generator",
-    "promQL": "proMQL",
+    "promQL": "PromQL",
     "latitude": "Breitengrad",
     "longitude": "Längengrad",
     "weight": "Gewichtung",
@@ -2744,7 +2765,12 @@
     "mapvalue": "Wert",
     "source": "Quelle",
     "target": "Ziel",
-    "value": "Wert"
+    "value": "Wert",
+    "xAxisShort": "X-Achse",
+    "yAxisShort": "Y-Achse",
+    "rowFields": "Zeilenfelder",
+    "valueFields": "Wertfelder",
+    "noData": "Keine Daten"
   },
   "home": {
     "streams": "Streams",
@@ -4242,6 +4268,51 @@
     "querySource": "Quelle abfragen"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "Dienste suchen",
+      "noStreamsDetected": "Keine Streams erkannt. Stellen Sie sicher, dass die Service-Graph-Metriken stream_name-Labels enthalten.",
+      "streamOnlyInfo": "Service Graph verwendet eine reine Stream-Architektur ohne In-Memory-Status",
+      "borderColor": "Farbe des Randes",
+      "borderColorMetric": "Fehler",
+      "nodeSize": "Knotengröße",
+      "nodeSizeMetric": "Anfragen",
+      "sizeLow": "Niedrig",
+      "sizeHigh": "Hoch",
+      "status": {
+        "healthy": "Gesund",
+        "degraded": "Degradiert",
+        "warning": "Warnung",
+        "critical": "Kritisch"
+      },
+      "range": {
+        "healthy": "< 1%",
+        "degraded": "1—5%",
+        "warning": "5 — 10%",
+        "critical": "> 10%"
+      },
+      "entities": "Entitäten",
+      "distribution": "Vertrieb",
+      "total": "Insgesamt",
+      "showTypes": "Typen anzeigen",
+      "typesFiltered": "Einige Typen sind versteckt. Öffnen, um zu ändern, was angezeigt wird.",
+      "zoomIn": "Hineinzoomen",
+      "zoomOut": "Verkleinern",
+      "fitToScreen": "An den Bildschirm anpassen",
+      "layout": "Raumaufteilung",
+      "types": "Typen",
+      "mode": {
+        "auto": "Automatisch",
+        "expanded": "Erweitert",
+        "collapsed": "Zusammengebrochen"
+      },
+      "kind": {
+        "service": "Dienstleistungen",
+        "database": "Datenspeicher",
+        "queue": "Warteschlangen",
+        "external": "Extern",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "In Vollansicht öffnen",
     "viewLogs": "Protokolle anzeigen",
     "viewRelated": "Verwandtes anzeigen",
@@ -4520,6 +4591,7 @@
     "servicesCatalog": {
       "tabLabel": "Servicekatalog",
       "title": "Servicekatalog",
+      "footerTitle": "Dienstleistungen",
       "filterPlaceholder": "Nach Dienstnamen filtern...",
       "noServicesFound": "Im ausgewählten Zeitraum wurden keine Dienste gefunden.",
       "loading": "Dienste werden geladen...",
@@ -4546,6 +4618,15 @@
       "servicesLabel": "Dienste",
       "viewTraces": "Spuren ansehen",
       "exportCsv": "CSV exportieren",
+      "types": {
+        "all": "Alle",
+        "service": "Dienstleistungen",
+        "datastore": "Datenspeicher",
+        "queue": "Warteschlangen",
+        "external": "Extern",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{Anzahl} {Status}",
       "legend": {
         "title": "Fehlerrate"
       }

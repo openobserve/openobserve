@@ -2585,13 +2585,33 @@
     "goTo": "Vai a:",
     "selectLogsMode": "Seleziona la modalità Log:",
     "enterCustomQuery": "Inserisci una query personalizzata:",
-    "enterUrl": "Inserisci l'URL:",
+    "sqlQueryRequired": "La query SQL è obbligatoria",
+    "enterUrl": "Inserisci l'URL",
+    "variableNameRequired": "Il nome della variabile è obbligatorio.",
+    "variableNameInvalid": "Sono consentiti solo lettere, numeri, trattini e trattini bassi",
+    "atLeastOneTabRequired": "È richiesta almeno una scheda.",
+    "atLeastOnePanelRequired": "È richiesto almeno un pannello.",
+    "streamTypeRequired": "Il tipo di stream è obbligatorio.",
+    "streamIndexRequired": "Lo stream / indice è obbligatorio.",
+    "fieldRequired": "Il campo è obbligatorio.",
+    "constantValueRequired": "Il valore costante è obbligatorio.",
+    "operatorRequired": "L'operatore è obbligatorio.",
+    "filterValueRequired": "Obbligatorio",
+    "labelRequired": "L'etichetta è obbligatoria.",
+    "optionValueRequired": "Il campo è obbligatorio!",
+    "seriesValueRequired": "Il valore della serie è obbligatorio",
+    "colorRequired": "Il colore è obbligatorio",
+    "onlyHttpsUrlsAllowed": "Sono consentiti solo URL HTTP(S)",
+    "urlRequired": "L'URL è obbligatorio",
+    "folderRequired": "La cartella è obbligatoria",
+    "dashboardRequired": "La dashboard è obbligatoria",
+    "tabRequired": "La scheda è obbligatoria",
     "invalidUrl": "URL non valido",
-    "selectFolderDrilldown": "Seleziona cartella *:",
+    "selectFolderDrilldown": "Seleziona cartella",
     "noFoldersAvailable": "Nessuna cartella disponibile",
-    "selectDashboardDrilldown": "Seleziona Dashboard *:",
+    "selectDashboardDrilldown": "Seleziona Dashboard",
     "noDashboardsAvailable": "Nessuna dashboard disponibile",
-    "selectTabDrilldown": "Seleziona scheda *:",
+    "selectTabDrilldown": "Seleziona scheda",
     "noTabAvailable": "Nessuna scheda disponibile",
     "variables": "Variabili:",
     "passAllCurrentVariables": "Passa tutte le variabili correnti:",
@@ -2657,7 +2677,8 @@
     "configSectionDrilldown": "Drilldown",
     "configSectionComparison": "Confronto",
     "configSectionMarkLines": "Segna linee",
-    "configSectionBackground": "Sfondo"
+    "configSectionBackground": "Sfondo",
+    "editTab": "Modifica scheda"
   },
   "panel": {
     "header": "Pannello",
@@ -2736,7 +2757,7 @@
     "enterCustomSql": "Inserisci la tua query SQL personalizzata...",
     "back": "<< Indietro",
     "sqlBuilder": "SQL Builder",
-    "promQL": "ProMQL",
+    "promQL": "PromQL",
     "latitude": "Latitudine",
     "longitude": "Longitudine",
     "weight": "Peso",
@@ -2744,7 +2765,12 @@
     "mapvalue": "Valore",
     "source": "Fonte",
     "target": "Obiettivo",
-    "value": "Valore"
+    "value": "Valore",
+    "xAxisShort": "Asse X",
+    "yAxisShort": "Asse Y",
+    "rowFields": "Campi riga",
+    "valueFields": "Campi valore",
+    "noData": "Nessun dato"
   },
   "home": {
     "streams": "Stream",
@@ -4242,6 +4268,51 @@
     "querySource": "Fonte della query"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "Servizi di ricerca",
+      "noStreamsDetected": "Non sono stati rilevati stream. Assicurati che le metriche del grafico del servizio includano le etichette stream_name.",
+      "streamOnlyInfo": "Service Graph utilizza un'architettura di solo streaming con zero stati in memoria",
+      "borderColor": "Colore del bordo",
+      "borderColorMetric": "Errori",
+      "nodeSize": "Dimensione del nodo",
+      "nodeSizeMetric": "Richieste",
+      "sizeLow": "Basso",
+      "sizeHigh": "Alto",
+      "status": {
+        "healthy": "Salutare",
+        "degraded": "Degradato",
+        "warning": "Avvertenza",
+        "critical": "Critico"
+      },
+      "range": {
+        "healthy": "< 1%",
+        "degraded": "1-5%",
+        "warning": "5-10%",
+        "critical": "> 10%"
+      },
+      "entities": "entità",
+      "distribution": "Distribuzione",
+      "total": "Totale",
+      "showTypes": "Mostra tipi",
+      "typesFiltered": "Alcuni tipi sono nascosti. Apri per modificare ciò che viene mostrato.",
+      "zoomIn": "Ingrandisci",
+      "zoomOut": "Rimpicciolisci",
+      "fitToScreen": "Adatta allo schermo",
+      "layout": "Layout",
+      "types": "Tipi",
+      "mode": {
+        "auto": "Auto",
+        "expanded": "Espanso",
+        "collapsed": "Crollato"
+      },
+      "kind": {
+        "service": "Servizi",
+        "database": "Datastore",
+        "queue": "Code",
+        "external": "Esterno",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "Apri a piena vista",
     "viewLogs": "Visualizza i log",
     "viewRelated": "Visualizza correlati",
@@ -4520,6 +4591,7 @@
     "servicesCatalog": {
       "tabLabel": "Catalogo dei servizi",
       "title": "Catalogo dei servizi",
+      "footerTitle": "Servizi",
       "filterPlaceholder": "Filtra per nome del servizio...",
       "noServicesFound": "Nessun servizio trovato nell'intervallo di tempo selezionato.",
       "loading": "Caricamento dei servizi...",
@@ -4546,6 +4618,15 @@
       "servicesLabel": "servizi",
       "viewTraces": "Visualizza tracce",
       "exportCsv": "Esporta CSV",
+      "types": {
+        "all": "Tutti",
+        "service": "Servizi",
+        "datastore": "Datastore",
+        "queue": "Code",
+        "external": "Esterno",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{count} {status}",
       "legend": {
         "title": "Tasso di errore"
       }

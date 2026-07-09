@@ -2585,13 +2585,33 @@
     "goTo": "次の場所に移動:",
     "selectLogsMode": "ログモードを選択:",
     "enterCustomQuery": "カスタムクエリを入力:",
-    "enterUrl": "URL を入力:",
+    "sqlQueryRequired": "SQLクエリが必要です",
+    "enterUrl": "URL を入力",
+    "variableNameRequired": "変数名が必要です",
+    "variableNameInvalid": "文字、数字、ハイフン、アンダースコアのみ使用できます",
+    "atLeastOneTabRequired": "少なくとも1つのタブが必要です",
+    "atLeastOnePanelRequired": "少なくとも1つのパネルが必要です",
+    "streamTypeRequired": "ストリームタイプが必要です",
+    "streamIndexRequired": "ストリーム / インデックスが必要です",
+    "fieldRequired": "フィールドは必須です",
+    "constantValueRequired": "定数値が必要です",
+    "operatorRequired": "演算子が必要です",
+    "filterValueRequired": "必須",
+    "labelRequired": "ラベルが必要です",
+    "optionValueRequired": "フィールドは必須です！",
+    "seriesValueRequired": "系列の値が必要です",
+    "colorRequired": "色が必要です",
+    "onlyHttpsUrlsAllowed": "HTTP(S) の URL のみ使用できます",
+    "urlRequired": "URL が必要です",
+    "folderRequired": "フォルダが必要です",
+    "dashboardRequired": "ダッシュボードが必要です",
+    "tabRequired": "タブが必要です",
     "invalidUrl": "URL が無効です",
-    "selectFolderDrilldown": "フォルダを選択*:",
+    "selectFolderDrilldown": "フォルダを選択",
     "noFoldersAvailable": "使用可能なフォルダはありません",
-    "selectDashboardDrilldown": "ダッシュボードを選択*:",
+    "selectDashboardDrilldown": "ダッシュボードを選択",
     "noDashboardsAvailable": "使用可能なダッシュボードはありません",
-    "selectTabDrilldown": "タブを選択*:",
+    "selectTabDrilldown": "タブを選択",
     "noTabAvailable": "タブはありません",
     "variables": "変数:",
     "passAllCurrentVariables": "現在の変数をすべて渡す:",
@@ -2657,7 +2677,8 @@
     "configSectionDrilldown": "ドリルダウン",
     "configSectionComparison": "比較",
     "configSectionMarkLines": "マークライン",
-    "configSectionBackground": "バックグラウンド"
+    "configSectionBackground": "バックグラウンド",
+    "editTab": "タブを編集"
   },
   "panel": {
     "header": "パネル",
@@ -2744,7 +2765,12 @@
     "mapvalue": "値",
     "source": "ソース",
     "target": "ターゲット",
-    "value": "値"
+    "value": "値",
+    "xAxisShort": "X軸",
+    "yAxisShort": "Y軸",
+    "rowFields": "行フィールド",
+    "valueFields": "値フィールド",
+    "noData": "データなし"
   },
   "home": {
     "streams": "ストリーム",
@@ -4242,6 +4268,51 @@
     "querySource": "クエリーソース"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "検索サービス",
+      "noStreamsDetected": "ストリームは検出されませんでした。サービスグラフのメトリクスに stream_name ラベルが含まれていることを確認してください。",
+      "streamOnlyInfo": "Service Graphは、メモリ内状態がゼロのストリーム専用アーキテクチャを使用しています",
+      "borderColor": "ボーダーカラー",
+      "borderColorMetric": "エラー",
+      "nodeSize": "ノードサイズ",
+      "nodeSizeMetric": "リクエスト",
+      "sizeLow": "低い",
+      "sizeHigh": "ハイ",
+      "status": {
+        "healthy": "ヘルシー",
+        "degraded": "劣化しました",
+        "warning": "警告",
+        "critical": "クリティカル"
+      },
+      "range": {
+        "healthy": "1% 未満",
+        "degraded": "1 — 5%",
+        "warning": "5 — 10%",
+        "critical": "> 10%"
+      },
+      "entities": "エンティティ",
+      "distribution": "ディストリビューション",
+      "total": "合計",
+      "showTypes": "タイプを表示",
+      "typesFiltered": "一部のタイプは非表示になっています。開くと表示内容を変更できます。",
+      "zoomIn": "ズームイン",
+      "zoomOut": "[ズームアウト]",
+      "fitToScreen": "画面に合わせる",
+      "layout": "[レイアウト]",
+      "types": "タイプ",
+      "mode": {
+        "auto": "オート",
+        "expanded": "拡張",
+        "collapsed": "折りたたまれた"
+      },
+      "kind": {
+        "service": "サービス",
+        "database": "データストア",
+        "queue": "キュー",
+        "external": "外部",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "フルビューで開く",
     "viewLogs": "ログを表示",
     "viewRelated": "関連を表示",
@@ -4520,6 +4591,7 @@
     "servicesCatalog": {
       "tabLabel": "サービスカタログ",
       "title": "サービスカタログ",
+      "footerTitle": "サービス",
       "filterPlaceholder": "サービス名で絞り込み...",
       "noServicesFound": "選択した時間範囲にサービスが見つかりません。",
       "loading": "サービスを読み込んでいます...",
@@ -4546,6 +4618,15 @@
       "servicesLabel": "サービス",
       "viewTraces": "トレースを表示",
       "exportCsv": "CSV をエクスポート",
+      "types": {
+        "all": "[すべて]",
+        "service": "サービス",
+        "datastore": "データストア",
+        "queue": "キュー",
+        "external": "外部",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{カウント} {ステータス}",
       "legend": {
         "title": "エラー率"
       }

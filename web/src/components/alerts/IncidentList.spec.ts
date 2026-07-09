@@ -57,6 +57,7 @@ const OTableStub = {
   template: `
     <div data-test="incident-list-table">
       <slot name="toolbar" />
+      <slot name="toolbar-trailing" />
       <slot name="empty" />
       <slot name="bottom" />
       <template v-for="row in data" :key="row.id">
@@ -191,7 +192,8 @@ describe("IncidentList.vue", () => {
 
     it("renders the refresh button", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="incident-refresh-btn"]').exists()).toBe(true);
+      // Refresh moved into the table's own toolbar (#toolbar-trailing slot).
+      expect(wrapper.find('[data-test="incident-list-refresh-btn"]').exists()).toBe(true);
     });
 
     it("renders the table", () => {

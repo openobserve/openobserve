@@ -39,10 +39,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="primary"
           size="sm-action"
-          :disabled="!!isLoading"
           type="submit"
+          form="import-dashboard-form"
+          :loading="!!isLoading"
           data-test="dashboard-import-submit-btn"
-          @click="importDashboard"
           >{{ t("dashboard.import") }}</OButton
         >
       </template>
@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="w-full min-w-0"
         >
           <template #before>
+            <OForm id="import-dashboard-form" :form="form">
             <div class="w-full h-full">
               <div
                 class="card-container py-[0.625rem] pl-[0.625rem] mb-[0.625rem]"
@@ -78,9 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="dashboard-import-url-input"
                       style="width: 69%"
                     >
-                      <OInput
+                      <OFormInput
                         data-test="dashboard-import-url-control"
-                        v-model="url"
+                        name="url"
                         label="URL"
                         :placeholder="t('dashboard.addURL')"
                       />
@@ -118,9 +119,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="dashboard-import-file-input"
                       style="width: 69%"
                     >
-                      <OFile
+                      <OFormFile
                         data-test="dashboard-import-file-control"
-                        v-model="jsonFiles"
+                        name="jsonFiles"
                         :label="t('dashboard.selectFile')"
                         :placeholder="t('dashboard.dropFileMsg')"
                         accept=".json"
@@ -168,6 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
+            </OForm>
           </template>
           <template #after>
             <div
@@ -293,7 +295,14 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OFile from "@/lib/forms/File/OFile.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormFile from "@/lib/forms/File/OFormFile.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import {
+  makeImportDashboardSchema,
+  importDashboardDefaults,
+} from "./ImportDashboard.schema";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { defineAsyncComponent } from "vue";
@@ -319,9 +328,8 @@ export default defineComponent({
       value: route.query.folder,
     });
 
-    // hold the values of 3 supported import types
-    const jsonFiles = ref<any>();
-    const url = ref("");
+    // Monaco editor content (a non-OForm* code editor, bridged at @submit).
+    // url + jsonFiles are form-owned and read below via form.useStore.
     const jsonStr = ref("");
 
     const tabs = reactive([
@@ -357,6 +365,23 @@ export default defineComponent({
 
     // store the results of the import (for files)
     const filesImportResults = ref([]);
+
+    // OWNER pattern (rule ③): the page owns <OForm> (url + jsonFiles) and the
+    // fetch/parse watchers + import logic read those values, so it creates the
+    // form with useOForm and reads it via form.useStore — ONE source, no mirror.
+    // url/jsonFiles are name=-owned; every write goes through setFormField. The
+    // deep JSON validation + recovery inputs + the Monaco editor stay outside the
+    // form (documented no-OForm* exceptions).
+    const form = useOForm({
+      defaultValues: importDashboardDefaults(),
+      schema: makeImportDashboardSchema(t),
+      // forward to importDashboard defined below (avoids a TDZ ref at setup time)
+      onSubmit: () => importDashboard(),
+    });
+    const setFormField = (name: string, val: unknown) =>
+      form.setFieldValue(name, val);
+    const url = form.useStore((s: any) => s.values?.url ?? "");
+    const jsonFiles = form.useStore((s: any) => s.values?.jsonFiles);
 
     onMounted(async () => {
       filesImportResults.value = [];
@@ -415,8 +440,8 @@ export default defineComponent({
         }
       }
       if (newVal == "") {
-        jsonFiles.value = null;
-        url.value = "";
+        setFormField("jsonFiles", null);
+        setFormField("url", "");
       }
     });
 
@@ -595,12 +620,12 @@ export default defineComponent({
     const resetAndRefresh = async (type, selectedFolder) => {
       switch (type) {
         case ImportType.FILES:
-          jsonFiles.value = null;
+          setFormField("jsonFiles", null);
           jsonStr.value = "";
           isLoading.value = false;
           break;
         case ImportType.URL:
-          url.value = "";
+          setFormField("url", "");
           isLoading.value = false;
           break;
         case ImportType.JSON_STRING:
@@ -720,8 +745,8 @@ export default defineComponent({
 
     // back button to render dashboard List page
     const goBack = () => {
-      jsonFiles.value = [];
-      url.value = "";
+      setFormField("jsonFiles", []);
+      setFormField("url", "");
       jsonStr.value = "";
       filesImportResults.value = [];
       return router.push({
@@ -735,8 +760,8 @@ export default defineComponent({
 
     const updateActiveTab = () => {
       jsonStr.value = "";
-      jsonFiles.value = null;
-      url.value = "";
+      setFormField("jsonFiles", null);
+      setFormField("url", "");
     };
     const importDashboard = () => {
       try {
@@ -856,9 +881,11 @@ export default defineComponent({
       streamTypeSelectOptions,
       dashboardTitles,
       streamTypes,
+      form,
     };
   },
-  components: { OSeparator, SelectFolderDropdown, AppTabs, AppPageHeader, QueryEditor, OButton, OInput, OSelect, OFile,
+  components: { OSeparator, SelectFolderDropdown, AppTabs, AppPageHeader, QueryEditor, OButton, OInput, OSelect,
+    OForm, OFormInput, OFormFile,
     OIcon, OSplitter,
 },
 });

@@ -129,6 +129,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </template>
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="model-pricing-list-refresh-btn"
+            @click="fetchModels"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="modelPricingRefresh" />
+          </OButton>
+        </template>
         <template #tree-warning="{ row }">
           <div class="flex items-center gap-2 py-1 text-sm leading-none">
             <OIcon name="warning-amber" size="sm" class="text-[#f59e0b] opacity-85" />
@@ -503,6 +515,8 @@ import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const { t } = useI18n();
 const store = useStore();
@@ -928,6 +942,10 @@ onActivated(() => {
     showImportModelPricingPage.value = true;
   }
 });
+
+useShortcuts([
+  { id: "modelPricingRefresh", handler: () => { if (!isInputFocused()) fetchModels(); } },
+]);
 </script>
 
 <style>
