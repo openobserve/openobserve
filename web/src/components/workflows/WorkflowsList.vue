@@ -126,6 +126,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </OButton>
                 <OButton
+                  :data-test="`workflow-list-${row.name}-view`"
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="visibility"
+                  :title="t('workflow.view')"
+                >
+                  <OTooltip max-width="none" side="left">
+                    <template #content><WorkflowView :workflow="row" /></template>
+                  </OTooltip>
+                </OButton>
+                <OButton
                   :data-test="`workflow-list-${row.name}-edit`"
                   variant="ghost"
                   size="icon-sm"
@@ -236,6 +247,7 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import WorkflowTriggerDialog from "@/components/workflows/WorkflowTriggerDialog.vue";
+import WorkflowView from "@/components/workflows/WorkflowView.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
@@ -341,7 +353,7 @@ const columns = computed(() => [
     header: t("workflow.actions"),
     sortable: false,
     isAction: true,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
+    meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
   },
 ]);
 const otableColumns = computed(() => columns.value);

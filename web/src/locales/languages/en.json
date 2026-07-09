@@ -1651,6 +1651,7 @@
     "updated": "Updated",
     "actions": "Actions",
     "edit": "Edit",
+    "view": "View",
     "viewRuns": "View Runs",
     "delete": "Delete",
     "deleteTitle": "Delete Workflow",
