@@ -23,6 +23,9 @@ use hashlink::lru_cache::LruCache;
 use parking_lot::Mutex;
 
 const SHARD_COUNT: usize = 32;
+// Max number of series label sets kept in memory. Roughly 0.5-2KB per entry
+// depending on label sizes.
+const MAX_ENTRIES: usize = 262144;
 
 /// Process-wide cache of series labels keyed by (context fingerprint, series
 /// hash).
@@ -36,17 +39,13 @@ pub(crate) struct LabelCache {
     shards: Vec<Mutex<LruCache<(u64, u64), Labels>>>,
 }
 
-pub(crate) static LABEL_CACHE: Lazy<Option<LabelCache>> = Lazy::new(|| {
-    let max_entries = config::get_config().limit.metrics_label_cache_max_entries;
-    if max_entries == 0 {
-        return None;
-    }
-    let per_shard = max_entries.div_ceil(SHARD_COUNT);
-    Some(LabelCache {
+pub(crate) static LABEL_CACHE: Lazy<LabelCache> = Lazy::new(|| {
+    let per_shard = MAX_ENTRIES.div_ceil(SHARD_COUNT);
+    LabelCache {
         shards: (0..SHARD_COUNT)
             .map(|_| Mutex::new(LruCache::new(per_shard)))
             .collect(),
-    })
+    }
 });
 
 /// Fingerprint of the query context a cached label set belongs to.

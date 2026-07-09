@@ -119,8 +119,7 @@ impl Engine {
         if self.disable_label_selector {
             self.label_selector.clear();
         }
-        self.skip_labels = config::get_config().limit.metrics_skip_unused_labels
-            && !self.ctx.query_ctx.query_exemplars
+        self.skip_labels = !self.ctx.query_ctx.query_exemplars
             && !self.ctx.query_ctx.query_data
             && labels_dropped_at_root(prom_expr);
         let value = self.exec_expr(prom_expr).await?;
@@ -1409,26 +1408,22 @@ async fn selector_load_data_from_datafusion(
     // ingest time — so serve them from the process-wide cache and scan the
     // label columns only for series that are not cached yet.
     let start2 = std::time::Instant::now();
-    let label_cache = label_cache::LABEL_CACHE.as_ref();
+    let label_cache = &*label_cache::LABEL_CACHE;
     let ctx_fp = label_cache::context_fingerprint(&query_ctx.org_id, table_name, &label_col_names);
-    let missing_hashes: Vec<u64> = match label_cache {
-        // attach cached labels in parallel; millions of series make the
-        // lookup+clone loop CPU-bound
-        Some(cache) => metrics
-            .iter_mut()
-            .collect::<Vec<_>>()
-            .into_par_iter()
-            .filter_map(|(hash, range_val)| match cache.get(ctx_fp, *hash) {
-                Some(labels) => {
-                    range_val.labels =
-                        maybe_prepend_hash_label(labels, *hash, query_ctx.query_data);
-                    None
-                }
-                None => Some(*hash),
-            })
-            .collect(),
-        None => metrics.keys().copied().collect(),
-    };
+    // attach cached labels in parallel; millions of series make the
+    // lookup+clone loop CPU-bound
+    let missing_hashes: Vec<u64> = metrics
+        .iter_mut()
+        .collect::<Vec<_>>()
+        .into_par_iter()
+        .filter_map(|(hash, range_val)| match label_cache.get(ctx_fp, *hash) {
+            Some(labels) => {
+                range_val.labels = maybe_prepend_hash_label(labels, *hash, query_ctx.query_data);
+                None
+            }
+            None => Some(*hash),
+        })
+        .collect();
     let cache_hits = metrics.len() - missing_hashes.len();
 
     if !missing_hashes.is_empty() {
@@ -1455,10 +1450,7 @@ async fn selector_load_data_from_datafusion(
         let mut df_series = df_group;
         // narrow the scan to the missing series when the hash column allows
         // building an in-list filter of reasonable size
-        if label_cache.is_some()
-            && hash_field_type == &DataType::UInt64
-            && missing_hashes.len() <= MAX_HASH_INLIST_FILTER
-        {
+        if hash_field_type == &DataType::UInt64 && missing_hashes.len() <= MAX_HASH_INLIST_FILTER {
             df_series = df_series.filter(col(HASH_LABEL).in_list(
                 missing_hashes.iter().map(|&v| lit(v)).collect::<Vec<_>>(),
                 false,
@@ -1529,9 +1521,7 @@ async fn selector_load_data_from_datafusion(
                     }));
                 }
                 labeled_set.insert(hash);
-                if let Some(cache) = label_cache {
-                    cache.put(ctx_fp, hash, labels.clone());
-                }
+                label_cache.put(ctx_fp, hash, labels.clone());
                 range_val.labels = maybe_prepend_hash_label(labels, hash, query_ctx.query_data);
             };
             if hash_field_type == &DataType::UInt64 {
