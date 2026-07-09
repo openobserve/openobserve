@@ -41,14 +41,8 @@ const EST_LABEL_BYTES: usize = LABEL_OVERHEAD + 24;
 const ADMIT_MAX_PERCENT: usize = 50;
 
 /// Process-wide cache of series labels keyed by (context fingerprint, series
-/// hash), bounded by memory size rather than entry count — label sets vary
-/// wildly in size, so an entry cap can blow memory long before it is reached.
-///
-/// A series' label set is immutable — the series hash stored with each sample
-/// is derived from the labels at ingest time — so entries never need
-/// invalidation, only LRU eviction. The context fingerprint covers org,
-/// stream, and the projected label columns, because column pruning changes
-/// which labels are loaded for the same series hash.
+/// hash), bounded by memory size. Labels are immutable per series hash, so
+/// entries never need invalidation, only LRU eviction.
 pub(crate) struct LabelCache {
     shards: Vec<Mutex<Shard>>,
     max_bytes: usize,
@@ -108,15 +102,9 @@ impl LabelCache {
         }
     }
 
-    /// Admission control: returns false when caching `series_count` label
-    /// sets of `label_count` labels each would claim more than a single
-    /// query's share of the budget. An LRU cycled by a working set larger
-    /// than its capacity degrades to a near-zero hit rate, so lookups,
-    /// inserts and evictions become pure overhead on top of the full label
-    /// scan — the caller should bypass the cache entirely instead (scan
-    /// resistance). The share is capped below 100% because the cache is
-    /// shared by concurrent queries: one oversized working set must not
-    /// evict everything the others rely on.
+    /// Returns false when the estimated working set exceeds a single query's
+    /// share of the budget, so the caller should bypass the cache instead of
+    /// thrashing it.
     pub fn admit(&self, label_count: usize, series_count: usize) -> bool {
         let est_entry =
             ENTRY_OVERHEAD + std::mem::size_of::<Labels>() + label_count * EST_LABEL_BYTES;

@@ -1406,15 +1406,12 @@ async fn selector_load_data_from_datafusion(
         return Ok(metrics);
     }
 
-    // Series labels are immutable — the series hash is derived from them at
-    // ingest time — so serve them from the process-wide cache and scan the
-    // label columns only for series that are not cached yet.
+    // Labels are immutable per series hash: serve them from the cache and
+    // scan the label columns only for series that are not cached yet.
     let start2 = std::time::Instant::now();
     let label_cache = &*label_cache::LABEL_CACHE;
-    // Bypass the cache when this selector's label working set clearly
-    // exceeds the cache budget — cycling an LRU with an oversized working
-    // set yields a near-zero hit rate, so caching would only add overhead
-    // to the full label scan. The stored labels exclude the hash column.
+    // bypass the cache when the working set won't fit (stored labels
+    // exclude the hash column)
     let cache_enabled = label_cache.admit(label_col_names.len().saturating_sub(1), metrics.len());
     if !cache_enabled {
         log::info!(
@@ -1453,9 +1450,8 @@ async fn selector_load_data_from_datafusion(
         .inc_by(missing_hashes.len() as u64);
 
     if !missing_hashes.is_empty() {
-        // membership test for the extraction loop below: only rows of
-        // cache-missed series need label extraction. When every series
-        // missed (cache bypassed or cold), skip the set entirely.
+        // membership test for the extraction loop; skip the set when every
+        // series missed (cache bypassed or cold)
         let all_missing = missing_hashes.len() == metrics.len();
         let missing_set: HashSet<u64> = if all_missing {
             HashSet::new()
