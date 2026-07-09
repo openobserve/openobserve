@@ -849,6 +849,12 @@
     "webVitals": "关键指标",
     "errors": "错误",
     "api": "API",
+    "uploadSourceMapsForm": {
+      "serviceRequired": "服务是必填项",
+      "versionRequired": "版本是必填项",
+      "fileRequired": "请选择要上传的 ZIP 文件",
+      "fileTypeZip": "仅允许 ZIP 文件"
+    },
     "emptyState": {
       "title": "使用真实用户监控监控您的用户",
       "description": "RUM 跟踪真实的用户交互——页面加载、错误、API 调用和会话重播——因此您可以确切地了解用户对应用程序的体验。",
@@ -2934,6 +2940,7 @@
       "inviteTitle": "邀请组织",
       "inviteOrgIdLabel": "组织标识符",
       "inviteOrgIdPlaceholder": "输入组织标识符",
+      "inviteOrgIdRequired": "组织标识符是必填项",
       "sendInvite": "发送邀请",
       "inviteSent": "邀请已成功发送",
       "inviteSameOrg": "组织无法邀请自己",

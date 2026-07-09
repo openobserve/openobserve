@@ -849,6 +849,12 @@
     "webVitals": "Vitals Web",
     "errors": "Erreurs",
     "api": "API",
+    "uploadSourceMapsForm": {
+      "serviceRequired": "Le service est obligatoire",
+      "versionRequired": "La version est obligatoire",
+      "fileRequired": "Veuillez sélectionner un fichier ZIP à télécharger",
+      "fileTypeZip": "Seuls les fichiers ZIP sont autorisés"
+    },
     "emptyState": {
       "title": "Surveillez vos utilisateurs grâce à Real User Monitoring",
       "description": "RUM suit les interactions réelles des utilisateurs (chargements de pages, erreurs, appels d'API et rediffusions de session) afin que vous puissiez voir exactement comment les utilisateurs utilisent votre application.",
@@ -2934,6 +2940,7 @@
       "inviteTitle": "Inviter une organisation",
       "inviteOrgIdLabel": "Identifiant de l'organisation",
       "inviteOrgIdPlaceholder": "Entrez l'identifiant de l'organisation",
+      "inviteOrgIdRequired": "L'identifiant de l'organisation est obligatoire",
       "sendInvite": "Envoyer une invitation",
       "inviteSent": "Invitation envoyée avec succès",
       "inviteSameOrg": "Une organisation ne peut pas s'inviter",

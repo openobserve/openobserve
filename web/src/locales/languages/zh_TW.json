@@ -491,6 +491,12 @@
     "webVitals": "Web Vitals",
     "errors": "錯誤",
     "api": "API",
+    "uploadSourceMapsForm": {
+      "serviceRequired": "服務為必填",
+      "versionRequired": "版本為必填",
+      "fileRequired": "請選擇要上傳的 ZIP 檔案",
+      "fileTypeZip": "僅允許 ZIP 檔案"
+    },
     "aboutRUMTitle": "探索真實使用者監控以提升使用體驗",
     "aboutRUMMessage": "真實使用者監控可讓您從真實使用者的角度追蹤和分析網站或應用程式的效能。這代表了解實際使用者的體驗，找出哪裡有延遲、哪些頁面最常被使用等資訊。",
     "getStartedTitle": "開始使用真實使用者監控",
@@ -2428,6 +2434,7 @@
       "inviteTitle": "邀請組織",
       "inviteOrgIdLabel": "組織識別碼",
       "inviteOrgIdPlaceholder": "輸入組織識別碼",
+      "inviteOrgIdRequired": "組織識別碼為必填",
       "sendInvite": "傳送邀請",
       "inviteSent": "已成功傳送邀請",
       "inviteSameOrg": "組織無法邀請自己",

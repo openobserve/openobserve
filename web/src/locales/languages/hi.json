@@ -535,6 +535,12 @@
     "uploadSourceMaps": "सोर्स मैप अपलोड करें",
     "files": "फ़ाइलें",
     "uploadedAt": "अपलोड समय",
+    "uploadSourceMapsForm": {
+      "serviceRequired": "सेवा आवश्यक है",
+      "versionRequired": "संस्करण आवश्यक है",
+      "fileRequired": "कृपया अपलोड करने के लिए एक ZIP फ़ाइल चुनें",
+      "fileTypeZip": "केवल ZIP फ़ाइलों की अनुमति है"
+    },
     "emptyState": {
       "title": "Real User Monitoring के साथ अपने उपयोगकर्ताओं की निगरानी करें",
       "description": "RUM वास्तविक उपयोगकर्ता इंटरैक्शन ट्रैक करता है — पेज लोड, त्रुटियाँ, API कॉल और सत्र रीप्ले — ताकि आप ठीक देख सकें कि उपयोगकर्ता आपके एप्लिकेशन का अनुभव कैसे करते हैं।",
@@ -1987,6 +1993,7 @@
       "inviteTitle": "एक संगठन आमंत्रित करें",
       "inviteOrgIdLabel": "संगठन पहचानकर्ता",
       "inviteOrgIdPlaceholder": "संगठन पहचानकर्ता दर्ज करें",
+      "inviteOrgIdRequired": "संगठन पहचानकर्ता आवश्यक है",
       "sendInvite": "आमंत्रण भेजें",
       "inviteSent": "आमंत्रण सफलतापूर्वक भेजा गया",
       "inviteSameOrg": "एक संगठन स्वयं को आमंत्रित नहीं कर सकता",
