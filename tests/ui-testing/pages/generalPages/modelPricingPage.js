@@ -305,6 +305,24 @@ export class ModelPricingPage {
         }, { timeout: 5000 }).toBe(true);
     }
 
+    /** Fill a tier's "add price" draft row WITHOUT committing it (no Add click).
+     *  Used to exercise the save-time draft-key guard: an uncommitted key with
+     *  spaces or a pure-integer key produces a toast at submit. (Committing the
+     *  row instead surfaces an inline per-row error via the schema.)
+     *  @param {string} key
+     *  @param {number|string} valuePricePerMillion
+     *  @param {number} [tierIndex=0]
+     */
+    async fillDraftPriceRow(key, valuePricePerMillion, tierIndex = 0) {
+        const keyInput = this.page.locator(`[data-test="model-pricing-add-price-key-input-${tierIndex}-field"]`);
+        await keyInput.waitFor({ state: 'visible', timeout: 5000 });
+        await keyInput.fill(key);
+
+        const valueInput = this.page.locator(`[data-test="model-pricing-add-price-value-input-${tierIndex}-field"]`);
+        await valueInput.waitFor({ state: 'visible', timeout: 5000 });
+        await valueInput.fill(String(valuePricePerMillion));
+    }
+
     async clickSave() {
         await this.saveBtn.click();
         await Promise.race([

@@ -19,24 +19,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <!-- Section header (title + description) is provided full-width by the
          Settings shell; this component renders only the form content. -->
-    <!-- platform settings section -->
-    <div class="">
+    <!-- platform settings section. The page gutter is owned by the Settings
+         shell's ConstrainedPage; this block adds none of its own. -->
+    <div>
       <GroupHeader :title="t('settings.platformSettings')" :showIcon="false" />
       <div class="w-full flex flex-col">
-        <OForm @submit.stop="onSubmit.execute">
+        <OForm
+          :schema="generalSettingsSchema"
+          :default-values="generalSettingsDefaults"
+          @submit="saveGeneralSettings"
+          v-slot="{ isSubmitting }"
+        >
           <!-- scape interval section -->
           <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-(--o2-border-color)">
             <span class="individual-setting-title text-sm font-medium leading-5">
               {{ t("settings.scrapintervalLabel") }}
             </span>
-            <OInput
-              v-model.number="scrapeIntereval"
+            <OFormInput
+              name="scrape_interval"
               type="number"
               min="0"
               class="ml-2"
-              :error="!!scrapeIntervalError"
-              :error-message="scrapeIntervalError"
-              @update:model-value="scrapeIntervalError = ''"
               data-test="general-settings-scrape-interval"
               style="width: 120px"
             />
@@ -50,15 +53,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="individual-setting-title text-sm font-medium leading-5">
               {{ t("settings.maxSeriesPerQueryLabel") }}
             </span>
-            <OInput
-              v-model.number="maxSeriesPerQuery"
+            <OFormInput
+              name="max_series_per_query"
               type="number"
               :min="1000"
               :max="1000000"
               class="ml-2"
-              :error="!!maxSeriesError"
-              :error-message="maxSeriesError"
-              @update:model-value="maxSeriesError = ''"
               :placeholder="'40000 (' + t('settings.systemDefault') + ')'"
               data-test="general-settings-max-series-per-query"
               style="width: 180px"
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip side="top" :content="t('settings.maxSeriesPerQueryTooltip')" />
                 </OIcon>
               </template>
-            </OInput>
+            </OFormInput>
             <span class="individual-setting-description text-[13px] opacity-70">
               {{ t("settings.maxSeriesPerQueryDescription") }}
             </span>
@@ -143,10 +143,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex justify-start">
             <OButton
               data-test="dashboard-add-submit"
-              :loading="onSubmit.isLoading.value"
+              :loading="isSubmitting"
               variant="primary"
               size="sm-action"
-              @click="onSubmit.execute"
+              type="submit"
             >
               {{ t("dashboard.save") }}
             </OButton>
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :showIcon="false"
         />
       </div>
-      <div class="">
+      <div>
         <div class="settings-grid-item no-border-bottom grid grid-cols-3 gap-4 items-center py-4 border-b border-(--o2-border-color)">
           <span class="individual-setting-title text-sm font-medium leading-5">
             {{ t("settings.customLogoText") }}
@@ -192,10 +192,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OButton
                 data-test="settings_ent_logo_custom_text_save_btn"
-                :loading="onSubmit.isLoading.value"
+                :loading="loadingState"
                 variant="outline"
                 size="icon-xs-sq"
-                type="submit"
+                type="button"
                 @click="updateCustomText"
                 icon-left="check"
               />
@@ -217,11 +217,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <OButton
               data-test="settings_ent_logo_custom_text_edit_btn"
-              :loading="onSubmit.isLoading.value"
+              :loading="loadingState"
               variant="outline"
               size="icon-xs-sq"
               class="ml-2"
-              type="submit"
+              type="button"
               @click="editingText = !editingText"
               icon-left="edit"
             />
@@ -286,10 +286,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OButton
                 data-test="settings_ent_logo_custom_light_save_btn"
-                :loading="onSubmit.isLoading.value"
+                :loading="loadingState"
                 variant="outline"
                 size="icon-xs-sq"
-                type="submit"
+                type="button"
                 @click="uploadImage(filesLight, 'light')"
                 icon-left="check"
               />
@@ -357,10 +357,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OButton
                 data-test="settings_ent_logo_custom_dark_save_btn"
-                :loading="onSubmit.isLoading.value"
+                :loading="loadingState"
                 variant="outline"
                 size="icon-xs-sq"
-                type="submit"
+                type="button"
                 @click="uploadImage(filesDark, 'dark')"
                 icon-left="check"
               />
@@ -405,11 +405,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, onActivated, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, defineComponent, onActivated, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useLoading } from "@/composables/useLoading";
 import organizations from "@/services/organizations";
 import settingsService from "@/services/settings";
 import config from "@/aws-exports";
@@ -426,8 +425,13 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  makeGeneralSettingsSchema,
+  type GeneralSettingsForm,
+} from "./General.schema";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -454,6 +458,7 @@ export default defineComponent({
     OInput,
     OFile,
     OForm,
+    OFormInput,
     OColor,
 },
   setup() {
@@ -461,16 +466,20 @@ export default defineComponent({
 
     const store = useStore();
     const router: any = useRouter();
-    const scrapeIntervalError = ref("");
-    const maxSeriesError = ref("");
-    const scrapeIntereval = ref(
-      store.state?.organizationData?.organizationSettings?.scrape_interval ??
+
+    // Schema-driven validation replaces the manual scrapeIntervalError /
+    // maxSeriesError refs + the imperative if-checks in onSubmit.
+    // Built once from the component's `t` so the messages are localized.
+    const generalSettingsSchema = makeGeneralSettingsSchema(t);
+    // Dynamic defaults (edit-prefill from the store) → a typed computed.
+    const generalSettingsDefaults = computed((): GeneralSettingsForm => ({
+      scrape_interval:
+        store.state?.organizationData?.organizationSettings?.scrape_interval ??
         15,
-    );
-    const maxSeriesPerQuery = ref(
-      store.state?.organizationData?.organizationSettings
-        ?.max_series_per_query ?? null,
-    );
+      max_series_per_query:
+        store.state?.organizationData?.organizationSettings
+          ?.max_series_per_query ?? null,
+    }));
 
     const loadingState = ref(false);
     const customText = ref("");
@@ -514,10 +523,7 @@ export default defineComponent({
      * Priority: Vuex store tempThemeColors > organizationSettings > defaults
      */
     const updateFromStore = () => {
-      // Update scrape interval setting
-      scrapeIntereval.value =
-        store.state?.organizationData?.organizationSettings?.scrape_interval ??
-        15;
+      // (scrape_interval is now form-owned via :default-values — no ref to sync.)
 
       // Get theme colors from store with priority order
       // 1. Check Vuex store for temporary preview colors (highest priority)
@@ -585,44 +591,24 @@ export default defineComponent({
       },
     );
 
-    const onSubmit = useLoading(async () => {
-      // Validate scrape interval
-      if (!scrapeIntereval.value && scrapeIntereval.value !== 0) {
-        scrapeIntervalError.value = t("settings.scrapeIntervalRequired") || "Scrape interval is required";
-        return;
-      }
-      if (scrapeIntereval.value < 0) {
-        scrapeIntervalError.value = t("settings.scrapeIntervalPositive") || "Scrape interval must be a positive number";
-        return;
-      }
-      // Validate max series per query (optional field — only validate when provided)
-      if (
-        maxSeriesPerQuery.value !== null &&
-        maxSeriesPerQuery.value !== undefined &&
-        maxSeriesPerQuery.value !== ""
-      ) {
-        if (maxSeriesPerQuery.value < 1000) {
-          maxSeriesError.value = t("settings.maxSeriesMinError") || "Minimum value is 1000";
-          return;
-        }
-        if (maxSeriesPerQuery.value > 1000000) {
-          maxSeriesError.value = t("settings.maxSeriesMaxError") || "Maximum value is 1000000";
-          return;
-        }
-      }
+    // @submit handler — fires only once the schema passes (scrape_interval
+    // required + ≥0; max_series_per_query optional range). The <input
+    // type="number"> emits a string, so coerce at use. Awaited by OForm so the
+    // inline Save button's spinner spans the POST (no useLoading wrapper).
+    const saveGeneralSettings = async (value: GeneralSettingsForm) => {
+      const maxSeriesRaw = value.max_series_per_query;
+      const maxSeriesNum =
+        maxSeriesRaw === null || maxSeriesRaw === undefined || maxSeriesRaw === ""
+          ? null
+          : Number(maxSeriesRaw);
 
       try {
         //set organizations settings in store
         //scrape interval will be in number
         store.dispatch("setOrganizationSettings", {
           ...store.state?.organizationData?.organizationSettings,
-          scrape_interval: scrapeIntereval.value,
-          max_series_per_query:
-            maxSeriesPerQuery.value === null ||
-            maxSeriesPerQuery.value === undefined ||
-            maxSeriesPerQuery.value === ""
-              ? null
-              : maxSeriesPerQuery.value,
+          scrape_interval: Number(value.scrape_interval),
+          max_series_per_query: maxSeriesNum,
           light_mode_theme_color: customLightColor.value,
           dark_mode_theme_color: customDarkColor.value,
         });
@@ -654,7 +640,7 @@ export default defineComponent({
           message: err?.message || t("settings.somethingWentWrong"),
         });
       }
-    });
+    };
 
     const uploadImage = (fileList: any = null, theme: string = "light") => {
       const selectedFiles = fileList || files.value;
@@ -1024,11 +1010,11 @@ export default defineComponent({
       store,
       config,
       router,
-      scrapeIntereval,
-      scrapeIntervalError,
-      maxSeriesPerQuery,
-      maxSeriesError,
-      onSubmit,
+      // Form wiring (Options-API: schema + defaults MUST be returned so :schema
+      // resolves and validation runs).
+      generalSettingsSchema,
+      generalSettingsDefaults,
+      saveGeneralSettings,
       files,
       filesLight,
       filesDark,
@@ -1088,4 +1074,3 @@ export default defineComponent({
   border-color: rgba(255, 255, 255, 0.25);
 }
 </style>
-
