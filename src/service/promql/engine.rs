@@ -1409,21 +1409,39 @@ async fn selector_load_data_from_datafusion(
     // label columns only for series that are not cached yet.
     let start2 = std::time::Instant::now();
     let label_cache = &*label_cache::LABEL_CACHE;
+    // Bypass the cache when this selector's label working set clearly
+    // exceeds the cache budget — cycling an LRU with an oversized working
+    // set yields a near-zero hit rate, so caching would only add overhead
+    // to the full label scan. The stored labels exclude the hash column.
+    let cache_enabled = label_cache.admit(label_col_names.len().saturating_sub(1), metrics.len());
+    if !cache_enabled {
+        log::info!(
+            "[trace_id: {}] label cache bypassed: {} series x {} label cols exceeds the cache budget",
+            query_ctx.trace_id,
+            metrics.len(),
+            label_col_names.len(),
+        );
+    }
     let ctx_fp = label_cache::context_fingerprint(&query_ctx.org_id, table_name, &label_col_names);
     // attach cached labels in parallel; millions of series make the
     // lookup+clone loop CPU-bound
-    let missing_hashes: Vec<u64> = metrics
-        .iter_mut()
-        .collect::<Vec<_>>()
-        .into_par_iter()
-        .filter_map(|(hash, range_val)| match label_cache.get(ctx_fp, *hash) {
-            Some(labels) => {
-                range_val.labels = maybe_prepend_hash_label(labels, *hash, query_ctx.query_data);
-                None
-            }
-            None => Some(*hash),
-        })
-        .collect();
+    let missing_hashes: Vec<u64> = if cache_enabled {
+        metrics
+            .iter_mut()
+            .collect::<Vec<_>>()
+            .into_par_iter()
+            .filter_map(|(hash, range_val)| match label_cache.get(ctx_fp, *hash) {
+                Some(labels) => {
+                    range_val.labels =
+                        maybe_prepend_hash_label(labels, *hash, query_ctx.query_data);
+                    None
+                }
+                None => Some(*hash),
+            })
+            .collect()
+    } else {
+        metrics.keys().copied().collect()
+    };
     let cache_hits = metrics.len() - missing_hashes.len();
 
     if !missing_hashes.is_empty() {
@@ -1521,7 +1539,9 @@ async fn selector_load_data_from_datafusion(
                     }));
                 }
                 labeled_set.insert(hash);
-                label_cache.put(ctx_fp, hash, labels.clone());
+                if cache_enabled {
+                    label_cache.put(ctx_fp, hash, labels.clone());
+                }
                 range_val.labels = maybe_prepend_hash_label(labels, hash, query_ctx.query_data);
             };
             if hash_field_type == &DataType::UInt64 {

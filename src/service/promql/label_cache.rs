@@ -33,6 +33,9 @@ const ENTRY_OVERHEAD: usize = 80;
 // Fixed per-label overhead: Arc counters + the two String headers + the
 // Vec slot holding the Arc pointer.
 const LABEL_OVERHEAD: usize = 72;
+// Rough per-label size estimate for admission control, before the actual
+// label values are known: overhead + ~24 bytes of name/value strings.
+const EST_LABEL_BYTES: usize = LABEL_OVERHEAD + 24;
 
 /// Process-wide cache of series labels keyed by (context fingerprint, series
 /// hash), bounded by memory size rather than entry count — label sets vary
@@ -45,6 +48,7 @@ const LABEL_OVERHEAD: usize = 72;
 /// which labels are loaded for the same series hash.
 pub(crate) struct LabelCache {
     shards: Vec<Mutex<Shard>>,
+    max_bytes: usize,
     shard_max_bytes: usize,
 }
 
@@ -96,8 +100,21 @@ impl LabelCache {
                     })
                 })
                 .collect(),
+            max_bytes,
             shard_max_bytes: max_bytes / SHARD_COUNT,
         }
+    }
+
+    /// Admission control: returns false when caching `series_count` label
+    /// sets of `label_count` labels each would clearly overflow the whole
+    /// budget. An LRU cycled by a working set larger than its capacity
+    /// degrades to a near-zero hit rate, so lookups, inserts and evictions
+    /// become pure overhead on top of the full label scan — the caller
+    /// should bypass the cache entirely instead (scan resistance).
+    pub fn admit(&self, label_count: usize, series_count: usize) -> bool {
+        let est_entry =
+            ENTRY_OVERHEAD + std::mem::size_of::<Labels>() + label_count * EST_LABEL_BYTES;
+        series_count.saturating_mul(est_entry) <= self.max_bytes
     }
 
     fn shard(&self, series_hash: u64) -> &Mutex<Shard> {
@@ -186,6 +203,17 @@ mod tests {
         let huge = make_labels(64, 64 * 1024);
         cache.put(1, 7, huge);
         assert!(cache.get(1, 7).is_none());
+    }
+
+    #[test]
+    fn test_admit_bypasses_oversized_working_sets() {
+        let cache = LabelCache::new(1024 * 1024); // 1MB budget
+        // small working set: admitted
+        assert!(cache.admit(10, 100));
+        // ~10k series x ~1KB estimated entries >> 1MB: bypassed
+        assert!(!cache.admit(10, 10_000));
+        // huge series count must not overflow
+        assert!(!cache.admit(20, usize::MAX / 2));
     }
 
     #[test]
