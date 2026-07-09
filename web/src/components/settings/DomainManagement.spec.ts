@@ -287,7 +287,7 @@ describe("DomainManagement Component", () => {
       expect(vm.domains).toContainEqual(
         expect.objectContaining({
           name: "newdomain.com",
-          allowAllUsers: true,
+          policy: "allow_all",
           allowedEmails: [],
         })
       );
@@ -305,7 +305,7 @@ describe("DomainManagement Component", () => {
       const vm = wrapper.vm;
       
       // Manually add some test data to simulate loaded state
-      vm.domains.push({ name: "example.com", allowAllUsers: true, allowedEmails: [] });
+      vm.domains.push({ name: "example.com", policy: "allow_all", allowedEmails: [] });
       const initialDomainsCount = vm.domains.length;
       
       // Try to add a domain that already exists
@@ -335,7 +335,7 @@ describe("DomainManagement Component", () => {
       const vm = wrapper.vm;
 
       // Add a test domain first
-      vm.domains.push({ name: "test.com", allowAllUsers: true, allowedEmails: [] });
+      vm.domains.push({ name: "test.com", policy: "allow_all", allowedEmails: [] });
       await nextTick();
 
       const initialDomainCount = vm.domains.length;
@@ -367,7 +367,7 @@ describe("DomainManagement Component", () => {
       const vm = wrapper.vm;
       
       // Find a domain that doesn't allow all users
-      const restrictedDomain = vm.domains.find(d => !d.allowAllUsers);
+      const restrictedDomain = vm.domains.find(d => d.policy === "allow_specific");
       if (restrictedDomain) {
         const initialEmailCount = restrictedDomain.allowedEmails.length;
         
@@ -383,7 +383,7 @@ describe("DomainManagement Component", () => {
     it("should not add invalid email", async () => {
       const vm = wrapper.vm;
       
-      const restrictedDomain = vm.domains.find(d => !d.allowAllUsers);
+      const restrictedDomain = vm.domains.find(d => d.policy === "allow_specific");
       if (restrictedDomain) {
         const initialEmailCount = restrictedDomain.allowedEmails.length;
         
@@ -397,7 +397,7 @@ describe("DomainManagement Component", () => {
     it("should not add duplicate email", async () => {
       const vm = wrapper.vm;
       
-      const restrictedDomain = vm.domains.find(d => !d.allowAllUsers);
+      const restrictedDomain = vm.domains.find(d => d.policy === "allow_specific");
       if (restrictedDomain && restrictedDomain.allowedEmails.length > 0) {
         const initialEmailCount = restrictedDomain.allowedEmails.length;
         const existingEmail = restrictedDomain.allowedEmails[0];
@@ -422,7 +422,7 @@ describe("DomainManagement Component", () => {
       // Add some test data
       vm.domains.push({ 
         name: "testdomain.com", 
-        allowAllUsers: false, 
+        policy: "allow_specific", 
         allowedEmails: ["user@testdomain.com"] 
       });
       
@@ -448,7 +448,7 @@ describe("DomainManagement Component", () => {
       // Add a domain without emails when not allowing all users
       vm.domains.push({
         name: "test.com",
-        allowAllUsers: false,
+        policy: "allow_specific",
         allowedEmails: [],
         newEmail: "",
       });
@@ -544,7 +544,7 @@ describe("DomainManagement Component", () => {
       const vm = wrapper.vm;
       
       // Add some test data first
-      vm.domains.push({ name: "test.com", allowAllUsers: true, allowedEmails: [] });
+      vm.domains.push({ name: "test.com", policy: "allow_all", allowedEmails: [] });
       await nextTick();
       
       // Check that domains are loaded and count is correct
@@ -727,7 +727,7 @@ describe("DomainManagement Component", () => {
         for (let i = 0; i < 50; i++) {
           largeDomainSet.push({
             name: `domain${i}.com`,
-            allowAllUsers: i % 2 === 0,
+            policy: i % 2 === 0 ? "allow_all" : "allow_specific",
             allowedEmails: i % 2 === 0 ? [] : [`user${i}@domain${i}.com`]
           });
         }
@@ -749,7 +749,7 @@ describe("DomainManagement Component", () => {
         // Set up initial state
         vm.domains.push({ 
           name: "test.com", 
-          allowAllUsers: false, 
+          policy: "allow_specific", 
           allowedEmails: ["user1@test.com"],
           newEmail: ""
         });
@@ -817,7 +817,7 @@ describe("DomainManagement Component", () => {
         for (let i = 0; i < 30; i++) {
           vm.domains.push({
             name: `stress-test-${i}.com`,
-            allowAllUsers: false,
+            policy: "allow_specific",
             allowedEmails: [`user@stress-test-${i}.com`],
             newEmail: ""
           });
