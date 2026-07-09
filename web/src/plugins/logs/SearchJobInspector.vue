@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </AppPageHeader>
-    <div class="w-full flex flex-col flex-1 min-h-0 overflow-hidden">
+    <div class="w-full flex flex-col flex-1 min-h-0 overflow-hidden pt-2.5">
       <!-- Summary Stats Card -->
       <div v-if="!loading" class="mb-[0.625rem] mx-2.5 shrink-0">
         <div class="grid gap-3" style="grid-template-columns: 1fr 1fr 1fr 1.6fr 0.9fr;">
