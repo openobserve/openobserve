@@ -48,7 +48,9 @@ use promql_parser::{
         VectorMatchCardinality, VectorSelector, token,
     },
 };
-use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
+use rayon::iter::{
+    IntoParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator,
+};
 
 use super::{
     PromqlContext, label_cache,
@@ -1446,14 +1448,20 @@ async fn selector_load_data_from_datafusion(
 
     if !missing_hashes.is_empty() {
         // membership test for the extraction loop below: only rows of
-        // cache-missed series need label extraction
-        let missing_set: HashSet<u64> = missing_hashes.iter().copied().collect();
+        // cache-missed series need label extraction. When every series
+        // missed (cache bypassed or cold), skip the set entirely.
+        let all_missing = missing_hashes.len() == metrics.len();
+        let missing_set: HashSet<u64> = if all_missing {
+            HashSet::new()
+        } else {
+            missing_hashes.iter().copied().collect()
+        };
         // hashes whose labels were extracted in this scan (dedup)
         let mut labeled_set: HashSet<u64> = HashSet::new();
         // Each missing series has a row at its own max timestamp, so scanning
         // those timestamps yields at least one label row per missing series.
         let series_timestamps = missing_hashes
-            .iter()
+            .par_iter()
             .filter_map(|hash| {
                 let range_val = metrics.get(hash)?;
                 let sample_max = range_val.samples.iter().map(|s| s.timestamp).max();
@@ -1522,7 +1530,7 @@ async fn selector_load_data_from_datafusion(
                 })
                 .collect::<Vec<(_, _)>>();
             let mut attach_row_labels = |hash: u64, i: usize| {
-                if !missing_set.contains(&hash) || labeled_set.contains(&hash) {
+                if (!all_missing && !missing_set.contains(&hash)) || labeled_set.contains(&hash) {
                     return;
                 }
                 let Some(range_val) = metrics.get_mut(&hash) else {
