@@ -522,6 +522,7 @@ import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
 import { applyThemeColors } from "@/utils/theme";
+import { useLocalOrganization } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -728,6 +729,17 @@ export default defineComponent({
         toast({
           variant: "success",
           message: t("settings.deleteOrganizationInitiated"),
+        });
+        // The just-deleted org is now hidden/blocked by the backend, so we must
+        // move the user off it. Clear the locally-remembered org and re-fetch the
+        // org list (via the update_org flag MainLayout watches): its stale-org
+        // guard then auto-selects a surviving org, or lands on the empty state if
+        // this was the user's only org.
+        useLocalOrganization("");
+        store.dispatch("setSelectedOrganization", {});
+        router.push({
+          path: "/",
+          query: { update_org: Date.now().toString() },
         });
       } catch (e: any) {
         toast({

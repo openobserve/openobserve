@@ -65,6 +65,25 @@ pub async fn handle_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
+    // Do not execute scheduled work for an org that is soft-deleted (pending_deletion)
+    // or actively deleting: the org is hidden and blocked everywhere, so firing its
+    // scheduled alerts/pipelines/reports would send notifications for an org the user
+    // believes is gone. Keep the trigger alive (reschedule ~1h out) so it resumes if
+    // the org is resurrected; on hard-delete the scheduler rows are purged by cleanup.
+    if crate::service::db::org_status::is_blocked(&trigger.org) {
+        log::debug!(
+            "[scheduler] org={} is pending deletion/deleting; skipping {:?} trigger {}",
+            trigger.org,
+            trigger.module,
+            trigger.module_key
+        );
+        let mut trigger = trigger;
+        trigger.next_run_at = config::utils::time::now_micros() + 3600 * 1_000_000;
+        trigger.status = db::scheduler::TriggerStatus::Waiting;
+        db::scheduler::update_trigger(trigger, false, trace_id).await?;
+        return Ok(());
+    }
+
     match trigger.module {
         db::scheduler::TriggerModule::Report => handle_report_triggers(trace_id, trigger).await,
         db::scheduler::TriggerModule::Alert => handle_alert_triggers(trace_id, trigger).await,

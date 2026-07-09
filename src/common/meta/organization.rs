@@ -25,6 +25,15 @@ pub const CUSTOM: &str = "custom";
 pub const USER_DEFAULT: &str = "user_default";
 pub const THRESHOLD: i64 = 9383939382;
 
+/// Status of an organization — used to gate ingestion and query while deletion is
+/// in progress. Cached in `common::infra::config::ORG_STATUS_CACHE`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OrgStatus {
+    Active,
+    PendingDeletion,
+    Deleting,
+}
+
 use config::meta::{cluster::Node, self_reporting::usage};
 
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]

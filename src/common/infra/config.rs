@@ -39,7 +39,7 @@ use vector_enrichment::TableRegistry;
 use crate::{
     common::meta::{
         maxmind::MaxmindClient,
-        organization::{Organization, OrganizationSetting},
+        organization::{OrgStatus, Organization, OrganizationSetting},
     },
     service::{
         db::scheduler as db_scheduler, enrichment::StreamTable, enrichment_table::geoip::Geoip,
@@ -114,14 +114,6 @@ pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
 /// Org ingestion token cache — key format: "org_id/token", value = token name.
 /// Presence means the token is valid and enabled. Absence means cache miss (check DB).
 pub static ORG_INGESTION_TOKENS: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
-
-/// Status of an organization — used to gate ingestion and query while deletion is in progress.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum OrgStatus {
-    Active,
-    PendingDeletion,
-    Deleting,
-}
 
 /// Cache of org_id → OrgStatus for O(1) synchronous checks during request handling.
 pub static ORG_STATUS_CACHE: Lazy<Arc<RwHashMap<String, OrgStatus>>> =

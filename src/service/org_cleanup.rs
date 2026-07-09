@@ -73,6 +73,20 @@ pub fn fixed_steps(org_id: &str, org_name: &str) -> Vec<org_cleanup_tasks::NewCl
 }
 
 pub async fn run() -> Result<(), anyhow::Error> {
+    // A compactor that crashed mid-step leaves its task marked 'running'. Since
+    // list_pending only returns pending/failed rows, such a task would never be
+    // re-picked and the deletion would stall forever. Reset stale 'running' rows
+    // back to 'pending' on startup so they requeue. This is safe cluster-wide:
+    // the per-task mark_running CAS still guarantees exactly-once execution, and
+    // attempts are preserved so MAX_ATTEMPTS still applies.
+    match org_cleanup_tasks::requeue_running().await {
+        Ok(n) if n > 0 => {
+            log::warn!("[org_cleanup] requeued {n} stale 'running' task(s) on startup")
+        }
+        Ok(_) => {}
+        Err(e) => log::error!("[org_cleanup] failed to requeue stale running tasks: {e}"),
+    }
+
     spawn_pausable_job!("org_cleanup_worker", POLL_INTERVAL_SECS, {
         run_once().await;
     });
@@ -117,7 +131,9 @@ async fn run_once() {
 
     for f in futures {
         if let Err(e) = f.await {
-            log::error!("[org_cleanup] task panic: {e}");
+            // JoinError from a spawned per-org task (panic or cancellation). The
+            // step error itself is already logged inside process_org_tasks.
+            log::error!("[org_cleanup] task error: {e}");
         }
     }
 }
@@ -187,7 +203,16 @@ async fn process_org_tasks(tasks: Vec<org_cleanup_tasks::CleanupTask>) {
         match result {
             Ok(()) => {
                 log::info!("[org_cleanup] org={} step={} done", task.org_id, task.step);
-                let _ = org_cleanup_tasks::mark_done(&task.id).await;
+                if let Err(e) = org_cleanup_tasks::mark_done(&task.id).await {
+                    // The step succeeded but we could not persist 'done'. It will
+                    // be re-run next poll (still marked 'running' until requeued),
+                    // so surface this — a silently dropped write stalls progress.
+                    log::error!(
+                        "[org_cleanup] org={} step={} completed but failed to mark done: {e}",
+                        task.org_id,
+                        task.step
+                    );
+                }
             }
             Err(e) => {
                 log::error!(
@@ -196,7 +221,15 @@ async fn process_org_tasks(tasks: Vec<org_cleanup_tasks::CleanupTask>) {
                     task.step,
                     task.attempts + 1
                 );
-                let _ = org_cleanup_tasks::mark_failed(&task.id, &e.to_string()).await;
+                if let Err(mark_err) =
+                    org_cleanup_tasks::mark_failed(&task.id, &e.to_string()).await
+                {
+                    log::error!(
+                        "[org_cleanup] org={} step={} failed to mark failed: {mark_err}",
+                        task.org_id,
+                        task.step
+                    );
+                }
             }
         }
     }
@@ -262,21 +295,11 @@ async fn step_delete_streams(org_id: &str, org_name: &str) -> Result<(), anyhow:
         .collect();
 
     if !sub_tasks.is_empty() {
+        // add_batch is INSERT ... ON CONFLICT DO NOTHING on the (org_id, step)
+        // unique index, so it is idempotent across retries and reports its own
+        // errors. A post-insert count re-check would false-positive on a partial
+        // re-run (already-present rows are skipped), so we rely on the insert.
         org_cleanup_tasks::add_batch(&sub_tasks).await?;
-
-        // Verify all sub-tasks were inserted
-        let all = org_cleanup_tasks::list_by_org_status(org_id, None).await?;
-        let inserted = all
-            .iter()
-            .filter(|t| t.step.starts_with("delete_stream:"))
-            .count();
-        if inserted != sub_tasks.len() {
-            return Err(anyhow::anyhow!(
-                "sub-task count mismatch: expected {} got {}",
-                sub_tasks.len(),
-                inserted
-            ));
-        }
     }
 
     Ok(())
@@ -304,17 +327,65 @@ async fn step_delete_stream(org_id: &str, type_and_name: &str) -> Result<(), any
 }
 
 async fn step_delete_file_list(org_id: &str) -> Result<(), anyhow::Error> {
+    // Catch-all for any file_list rows left behind after per-stream deletion (e.g.
+    // rows whose stream schema was already gone). delete_by_org moves rows into
+    // file_list_deleted before removing them so the file GC deletes the S3 objects
+    // — a bare delete here would orphan those files in object store.
     infra::file_list::delete_by_org(org_id).await?;
+    Ok(())
+}
+
+/// Delete every alert in an org through the service layer so the ALERTS /
+/// STREAM_ALERTS caches evict cluster-wide (via the coordinator delete event) and
+/// each alert's scheduler trigger + OFGA ownership is removed — none of which a
+/// raw table wipe would do.
+async fn delete_org_alerts(org_id: &str) -> Result<(), anyhow::Error> {
+    use infra::db::{ORM_CLIENT, connect_to_orm};
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let alerts = crate::service::db::alerts::alert::list(org_id, None, None).await?;
+    for alert in alerts {
+        let Some(alert_id) = alert.id else { continue };
+        crate::service::alerts::alert::delete_by_id(conn, org_id, alert_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("alert {alert_id}: {e}"))?;
+    }
+    Ok(())
+}
+
+/// Delete every cipher key in an org. On enterprise builds this goes through the
+/// service `db::keys::remove` path so the in-memory `REGISTRY` evicts on all nodes
+/// (coordinator delete watch) and the super-cluster is notified — none of which a
+/// raw table wipe does. On OSS builds (no cipher REGISTRY / db::keys module) it
+/// falls back to a direct table delete.
+async fn delete_org_cipher_keys(org_id: &str) -> Result<(), anyhow::Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        use infra::table::cipher::{EntryKind, ListFilter};
+        let filter = ListFilter {
+            org: Some(org_id.to_string()),
+            kind: Some(EntryKind::CipherKey),
+            name: None,
+            is_system: false,
+        };
+        let keys = infra::table::cipher::list_filtered(filter, None).await?;
+        for key in keys {
+            crate::service::db::keys::remove(org_id, EntryKind::CipherKey, &key.name)
+                .await
+                .map_err(|e| anyhow::anyhow!("cipher key {}: {e}", key.name))?;
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    infra::table::cipher::delete_by_org(org_id).await?;
     Ok(())
 }
 
 async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     use infra::table::{
-        action_scripts, alert_incidents, alerts, backfill_jobs, cipher, compactor_manual_jobs,
-        dashboards, destinations, distinct_values, enrichment_table_urls, enrichment_tables,
-        folders, incident_events, kv_store, org_ingestion_tokens, org_storage_providers,
-        re_pattern, re_pattern_stream_map, reports, search_queue, service_streams, short_urls,
-        system_settings, templates, timed_annotations, trial_quota_usage,
+        action_scripts, alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards,
+        destinations, distinct_values, enrichment_table_urls, enrichment_tables, folders,
+        incident_events, kv_store, org_ingestion_tokens, org_storage_providers, re_pattern,
+        re_pattern_stream_map, reports, search_queue, service_streams, short_urls, system_settings,
+        templates, timed_annotations, trial_quota_usage,
     };
 
     // FK-constrained children must be deleted before their parents.
@@ -326,7 +397,11 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     incident_events::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/incident_events: {e}"))?;
-    alerts::delete_by_org(org_id)
+    // Delete alerts through the service layer (not a raw table wipe) so the
+    // ALERTS/STREAM_ALERTS in-memory caches evict cluster-wide via the coordinator
+    // delete event, and each alert's scheduler trigger is torn down. A direct table
+    // delete would leave stale alerts in every node's memory until the next restart.
+    delete_org_alerts(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/alerts: {e}"))?;
     // timed_annotation_panels cascade from timed_annotations; both are deleted here
@@ -363,7 +438,10 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     kv_store::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/kv_store: {e}"))?;
-    cipher::delete_by_org(org_id)
+    // Delete cipher keys through the service layer so the in-memory key REGISTRY
+    // evicts cluster-wide (via the coordinator delete + super-cluster propagation);
+    // a raw table wipe would leave decrypted keys resident in every node's memory.
+    delete_org_cipher_keys(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/cipher: {e}"))?;
     enrichment_tables::delete_by_org(org_id)
@@ -400,10 +478,15 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/system_settings: {e}"))?;
 
-    // Delete pipelines (iterate-delete because there is no delete_by_org batch call)
+    // Delete pipelines through the service layer so derived-stream triggers,
+    // backfill jobs, OFGA ownership, and the executable-pipeline caches are all
+    // torn down and evicted cluster-wide — a raw infra::pipeline::delete would
+    // leave those side effects (and stale cache entries) behind.
     let pipelines = infra::pipeline::list_by_org(org_id).await?;
     for p in pipelines {
-        infra::pipeline::delete(&p.id).await?;
+        crate::service::pipeline::delete_pipeline(&p.id)
+            .await
+            .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipeline {}: {e}", p.id))?;
     }
 
     // Delete saved views from the meta key-value store. Reuse the canonical key
@@ -429,9 +512,27 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     compactor_manual_jobs::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/compactor_manual_jobs: {e}"))?;
+    // Delete the S3 result objects backing this org's search jobs BEFORE dropping
+    // the DB rows — the result paths are derived from each job's created_at/trace_id,
+    // so once the rows are gone the objects can no longer be located and would leak.
+    // (search_jobs service is enterprise-only; OSS just drops the rows below.)
+    #[cfg(feature = "enterprise")]
+    crate::service::search_jobs::delete_org_result_files(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/search_job_results: {e}"))?;
     infra::table::search_job::search_jobs::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/search_jobs: {e}"))?;
+
+    // Cloud-only resources: pending org invites, billing-group invites, and
+    // billing-group memberships. The enterprise crate owns the ordering/error
+    // handling; we invoke the single bundled entry point. Subscriptions are NOT
+    // cancelled here — deletion is only reached once the org is billing-free
+    // (enforced by the org_has_active_billing guard in initiate_deletion).
+    #[cfg(feature = "cloud")]
+    o2_enterprise::enterprise::cloud::delete_org_cloud_resources(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/cloud_resources: {e}"))?;
 
     Ok(())
 }
@@ -509,6 +610,7 @@ async fn step_delete_users(org_id: &str) -> Result<(), anyhow::Error> {
 
 /// Emit an audit entry to the _meta org for an org status transition.
 /// Fire-and-forget; never blocks the transition. Enterprise-only.
+#[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
 async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
     #[cfg(feature = "enterprise")]
     {
@@ -529,10 +631,6 @@ async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
             },
         })
         .await;
-    }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let _ = (org_id, actor, from, to);
     }
 }
 
@@ -667,9 +765,26 @@ pub async fn promote_expired() -> Result<usize, anyhow::Error> {
     let window_micros = grace_days * 24 * 3600 * 1_000_000;
     let now = config::utils::time::now_micros();
 
-    let orgs = infra::table::organizations::list(Default::default()).await?;
+    // Reuse the status cache (synced from DB + coordinator) to find pending orgs
+    // instead of scanning every org from the DB. The cache only holds
+    // pending_deletion/deleting orgs, so this is already the small candidate set.
+    let pending_org_ids: Vec<String> = crate::common::infra::config::ORG_STATUS_CACHE
+        .iter()
+        .filter(|e| *e.value() == crate::common::meta::organization::OrgStatus::PendingDeletion)
+        .map(|e| e.key().clone())
+        .collect();
+
     let mut promoted = 0usize;
-    for org in orgs {
+    for org_id in pending_org_ids {
+        // Re-read the row for the authoritative deleted_at + org_name (the cache
+        // doesn't carry them). A concurrent resurrect may have flipped it already.
+        let org = match infra::table::organizations::get(&org_id).await {
+            Ok(o) => o,
+            Err(e) => {
+                log::warn!("[org_cleanup] promote: cannot load org={org_id}: {e}");
+                continue;
+            }
+        };
         if org.status != "pending_deletion" {
             continue;
         }
@@ -697,6 +812,12 @@ pub async fn promote_expired() -> Result<usize, anyhow::Error> {
             }
         };
         if !won {
+            // Another compactor won the promotion CAS for this org — expected under
+            // multiple compactors; log so we know we at least attempted.
+            log::debug!(
+                "[org_cleanup] lost promotion race for org={} (another node promoted it)",
+                org.identifier
+            );
             continue;
         }
         let tasks = fixed_steps(&org.identifier, &org.org_name);

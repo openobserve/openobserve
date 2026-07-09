@@ -14,37 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
-    ColumnTrait, Condition, ConnectionTrait, EntityTrait, Order, QueryFilter, QueryOrder, Schema,
-    Set, entity::prelude::*,
+    ColumnTrait, Condition, EntityTrait, Order, QueryFilter, QueryOrder, Set, entity::prelude::*,
 };
-use serde::{Deserialize, Serialize};
 
-use super::get_lock;
+use super::{
+    entity::org_cleanup_tasks::{ActiveModel, Column, Entity, Model},
+    get_lock,
+};
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     errors,
 };
-
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
-#[sea_orm(table_name = "org_cleanup_tasks")]
-pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub id: String,
-    pub org_id: String,
-    pub org_name: String,
-    pub step: String,
-    pub step_order: i32,
-    pub status: String,
-    pub attempts: i32,
-    pub last_error: Option<String>,
-    pub created_at: i64,
-    pub updated_at: i64,
-}
-
-#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
-
-impl ActiveModelBehavior for ActiveModel {}
 
 pub type CleanupTask = Model;
 
@@ -55,24 +35,14 @@ pub struct NewCleanupTask {
     pub step_order: i32,
 }
 
-pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let builder = client.get_database_backend();
-    let schema = Schema::new(builder);
-    let stmt = builder.build(schema.create_table_from_entity(Entity).if_not_exists());
-    client
-        .execute(stmt)
-        .await
-        .map_err(|e| errors::Error::Message(e.to_string()))?;
-    Ok(())
-}
-
 pub async fn add_batch(tasks: &[NewCleanupTask]) -> Result<(), errors::Error> {
     if tasks.is_empty() {
         return Ok(());
     }
-    let _lock = get_lock().await;
+    // Init the ORM client BEFORE taking the lock: connect_to_orm acquires the
+    // same lock internally, so locking first can deadlock on the initial connect.
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
     let now = config::utils::time::now_micros();
     let models: Vec<ActiveModel> = tasks
         .iter()
@@ -122,6 +92,7 @@ pub async fn list_pending(max_attempts: i32) -> Result<Vec<CleanupTask>, errors:
 /// Returns true if this node won the CAS; false if another node beat us.
 pub async fn mark_running(id: &str) -> Result<bool, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
     let now = config::utils::time::now_micros();
     let result = Entity::update_many()
         .col_expr(Column::Status, Expr::value("running"))
@@ -137,6 +108,7 @@ pub async fn mark_running(id: &str) -> Result<bool, errors::Error> {
 
 pub async fn mark_done(id: &str) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
     let now = config::utils::time::now_micros();
     Entity::update_many()
         .col_expr(Column::Status, Expr::value("done"))
@@ -150,6 +122,7 @@ pub async fn mark_done(id: &str) -> Result<(), errors::Error> {
 
 pub async fn mark_failed(id: &str, error: &str) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
     let now = config::utils::time::now_micros();
     Entity::update_many()
         .col_expr(Column::Status, Expr::value("failed"))
@@ -160,6 +133,25 @@ pub async fn mark_failed(id: &str, error: &str) -> Result<(), errors::Error> {
         .await
         .map_err(|e| errors::Error::Message(e.to_string()))?;
     Ok(())
+}
+
+/// Reset any task stuck in 'running' back to 'pending' so it is re-picked by the
+/// worker loop. Called on compactor startup: a node that crashed mid-step leaves
+/// its task marked 'running', and `list_pending` (pending/failed only) would never
+/// return it again — the deletion would stall forever. `attempts` is left as-is so
+/// the MAX_ATTEMPTS ceiling still applies across restarts.
+pub async fn requeue_running() -> Result<u64, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+    let now = config::utils::time::now_micros();
+    let result = Entity::update_many()
+        .col_expr(Column::Status, Expr::value("pending"))
+        .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::Status.eq("running"))
+        .exec(client)
+        .await
+        .map_err(|e| errors::Error::Message(e.to_string()))?;
+    Ok(result.rows_affected)
 }
 
 pub async fn list_by_org_status(
@@ -182,6 +174,7 @@ pub async fn list_by_org_status(
 /// nonexistent/restored org has no value.
 pub async fn delete_by_org(org_id: &str) -> Result<u64, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
     let result = Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
         .exec(client)

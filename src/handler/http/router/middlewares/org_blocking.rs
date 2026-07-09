@@ -15,6 +15,13 @@
 
 use axum::{extract::Request, middleware::Next, response::Response};
 
+/// Extract the org_id (first path segment) from a request path. Shared by the
+/// blocking check and the cloud trial "late check" below so both agree on how the
+/// org is derived.
+fn extract_org_id(path: &str) -> &str {
+    path.split('/').next().unwrap_or("")
+}
+
 pub async fn blocked_orgs_middleware(request: Request, next: Next) -> Response {
     let path = request
         .uri()
@@ -28,7 +35,7 @@ pub async fn blocked_orgs_middleware(request: Request, next: Next) -> Response {
     // Extract org_id as first path segment.
     // Skip the check for known non-org top-level path prefixes that share this router.
     const SYSTEM_PREFIXES: &[&str] = &["organizations", "invites", "proxy"];
-    let org_id = path.split('/').next().unwrap_or("");
+    let org_id = extract_org_id(path);
 
     if !org_id.is_empty()
         && !SYSTEM_PREFIXES.contains(&org_id)
@@ -79,16 +86,12 @@ pub async fn blocked_orgs_middleware(request: Request, next: Next) -> Response {
 mod tests {
     #[test]
     fn test_org_id_extracted_from_path() {
-        let path = "myorg/api/logs";
-        let org_id = path.split('/').next().unwrap_or("");
-        assert_eq!(org_id, "myorg");
+        assert_eq!(super::extract_org_id("myorg/api/logs"), "myorg");
     }
 
     #[test]
     fn test_empty_path_gives_empty_org_id() {
-        let path = "";
-        let org_id = path.split('/').next().unwrap_or("");
-        assert_eq!(org_id, "");
+        assert_eq!(super::extract_org_id(""), "");
     }
 
     #[test]

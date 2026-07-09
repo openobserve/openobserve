@@ -17,15 +17,7 @@ use std::sync::Arc;
 
 use infra::{coordinator::org_status as coordinator, db, errors, table::organizations};
 
-use crate::common::infra::config::{ORG_STATUS_CACHE, OrgStatus};
-
-/// Mark an org as deleting: persist to DB, update local cache, and broadcast to cluster.
-pub async fn set_deleting(org_id: &str) -> Result<(), errors::Error> {
-    organizations::set_status(org_id, "deleting").await?;
-    ORG_STATUS_CACHE.insert(org_id.to_string(), OrgStatus::Deleting);
-    coordinator::emit_deleting_event(org_id).await?;
-    Ok(())
-}
+use crate::common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
 
 /// Update local cache and broadcast to cluster — used when the DB write was already done
 /// atomically via `set_status_if` (e.g. in `initiate_deletion`).
@@ -56,14 +48,6 @@ pub async fn set_active(org_id: &str) -> Result<(), errors::Error> {
     ORG_STATUS_CACHE.remove(org_id);
     coordinator::emit_evict_event(org_id).await?;
     Ok(())
-}
-
-/// Synchronous O(1) check — safe to call from request handlers without await.
-pub fn is_deleting(org_id: &str) -> bool {
-    ORG_STATUS_CACHE
-        .get(org_id)
-        .map(|v| *v == OrgStatus::Deleting)
-        .unwrap_or(false)
 }
 
 /// True when the org is either pending deletion or actively being deleted — used
@@ -99,7 +83,7 @@ pub async fn load_from_db() -> Result<(), anyhow::Error> {
 /// updates the cache; a `Delete` on that key evicts the org (active/gone).
 pub async fn watch() -> Result<(), anyhow::Error> {
     use infra::coordinator::org_status::{
-        ORG_STATUS_KEY_PREFIX, STATUS_DELETING, STATUS_PENDING_DELETION,
+        ORG_STATUS_KEY_PREFIX, STATUS_ACTIVE, STATUS_DELETING, STATUS_PENDING_DELETION,
     };
 
     let cluster_coordinator = db::get_coordinator().await;
@@ -134,10 +118,19 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         ORG_STATUS_CACHE.insert(org_id.to_string(), OrgStatus::PendingDeletion);
                         log::info!("[org_status] org {org_id} marked pending_deletion in cache");
                     }
-                    other => {
-                        // Any other status (e.g. "active") means no longer blocked.
+                    STATUS_ACTIVE => {
+                        // active (e.g. resurrected) → no longer blocked.
                         ORG_STATUS_CACHE.remove(org_id);
-                        log::info!("[org_status] org {org_id} status={other}, cleared from cache");
+                        log::info!("[org_status] org {org_id} active, cleared from cache");
+                    }
+                    other => {
+                        // No code path should emit any other status. Warn loudly:
+                        // silently clearing the cache here could un-block an org that
+                        // is genuinely pending_deletion/deleting.
+                        log::warn!(
+                            "[org_status] org {org_id} unexpected status={other:?}; clearing from cache"
+                        );
+                        ORG_STATUS_CACHE.remove(org_id);
                     }
                 }
             }

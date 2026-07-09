@@ -117,7 +117,6 @@ pub async fn create_user_tables() -> Result<(), anyhow::Error> {
     organizations::create_table().await?;
     users::create_table().await?;
     org_users::create_table().await?;
-    org_cleanup_tasks::create_table().await?;
 
     Ok(())
 }

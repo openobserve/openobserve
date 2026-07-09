@@ -24,6 +24,7 @@ pub const ORG_STATUS_KEY_PREFIX: &str = "/organization/status/";
 /// Status values carried in the coordinator event value.
 pub const STATUS_DELETING: &str = "deleting";
 pub const STATUS_PENDING_DELETION: &str = "pending_deletion";
+pub const STATUS_ACTIVE: &str = "active";
 
 /// Sends a coordinator event indicating that an org has been marked for deletion.
 pub async fn emit_deleting_event(org_id: &str) -> Result<(), Error> {

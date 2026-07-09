@@ -731,8 +731,10 @@ fn update_mutable_fields(
 
 /// Deletes all alerts belonging to the given org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    let _lock = super::get_lock().await;
+    // Init the ORM client BEFORE taking the lock: connect_to_orm acquires the
+    // same lock internally, so locking first can deadlock on the initial connect.
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = super::get_lock().await;
     alerts::Entity::delete_many()
         .filter(alerts::Column::Org.eq(org_id))
         .exec(client)
