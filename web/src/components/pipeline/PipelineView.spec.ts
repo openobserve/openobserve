@@ -79,9 +79,9 @@ vi.mock("@/plugins/pipelines/CustomNode.vue", () => ({
   },
 }));
 
-vi.mock("@/plugins/pipelines/CustomEdge.vue", () => ({
+vi.mock("@/components/flow/FlowEdge.vue", () => ({
   default: {
-    name: "CustomEdge",
+    name: "FlowEdge",
     template: '<div data-test="custom-edge">{{ id }}</div>',
     props: [
       "id",
@@ -148,7 +148,7 @@ function createWrapper(pipeline: Record<string, any> = mockPipeline) {
           props: ["nodes", "edges", "options", "defaultViewport"],
         },
         CustomNode: true,
-        CustomEdge: true,
+        FlowEdge: true,
         DropzoneBackground: true,
         Controls: true,
         ControlButton: true,

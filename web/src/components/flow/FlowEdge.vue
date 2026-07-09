@@ -14,9 +14,11 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- Workflow canvas edge — fork of plugins/pipelines/CustomEdge.vue.
-     Smooth curved connector with an arrowhead. Deletion is via keyboard
-     (Backspace/Delete) as in the pipeline canvas. -->
+<!--
+  Shared flow-canvas edge (Pipelines + Workflows). A smooth curved connector
+  with an arrowhead. Deletion is handled by the canvas via keyboard
+  (Backspace/Delete) using VueFlow events, so the edge itself is purely visual.
+-->
 <template>
   <BaseEdge
     :id="id"
@@ -42,6 +44,8 @@ const props = defineProps({
   data: { type: Object, required: false },
   markerEnd: { type: String, required: false },
   style: { type: Object, required: false },
+  // Accepted for pipeline call-site compatibility; not used for rendering.
+  isInView: { type: Boolean, required: false, default: false },
 });
 
 const path = computed(() => getBezierPath(props));

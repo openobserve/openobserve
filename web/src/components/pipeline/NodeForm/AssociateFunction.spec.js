@@ -13,39 +13,40 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// AssociateFunction is now a thin drawer wrapper around the shared FunctionPicker
+// (the picker body — select / inline-create / flatten toggle — is covered by
+// FunctionPicker.spec.ts). These tests cover the drawer integration: save wiring
+// to addNode, delete/cancel dialogs, and create-mode button visibility.
+
 import { mount, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { nextTick } from "vue";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import AssociateFunction from "./AssociateFunction.vue";
 import useDnD from "@/plugins/pipelines/useDnD";
 
-vi.mock("@/lib/feedback/Toast/useToast", () => ({
-  toast: vi.fn(),
-}));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
-// ---------------------------------------------------------------------------
-// Shared mocks
-// ---------------------------------------------------------------------------
 const mockAddNode = vi.fn();
 const mockDeletePipelineNode = vi.fn();
-
 let mockPipelineObj = {};
 
-vi.mock("@/plugins/pipelines/useDnD", () => ({
-  default: vi.fn(),
-}));
+vi.mock("@/plugins/pipelines/useDnD", () => ({ default: vi.fn() }));
 
-vi.mock("@/utils/zincutils", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    getImageURL: vi.fn(() => ""),
-  };
-});
+// Controllable FunctionPicker stub — getPayload() returns whatever the test sets.
+let mockGetPayload = vi.fn(() => ({ name: "alpha", after_flatten: true }));
+const FunctionPickerStub = {
+  name: "FunctionPicker",
+  template: '<div class="function-picker-stub"></div>',
+  props: ["initialName", "initialAfterFlatten", "showFlatten", "isUpdating", "duplicateNames"],
+  emits: ["expand", "created"],
+  methods: {
+    getPayload() {
+      return mockGetPayload();
+    },
+  },
+};
 
-// ODrawer stub — renders slot content so inner elements are accessible in tests.
 const ODrawerStub = {
   name: "ODrawer",
   props: [
@@ -61,31 +62,19 @@ const ODrawerStub = {
   </div>`,
 };
 
-// ---------------------------------------------------------------------------
-// Factory helpers
-// ---------------------------------------------------------------------------
 function createPipelineObj(overrides = {}) {
   return {
     isEditNode: false,
-    currentSelectedNodeData: {
-      data: {},
-      type: "function",
-    },
+    currentSelectedNodeData: { data: {}, type: "function" },
     currentSelectedNodeID: "node-abc",
     userSelectedNode: {},
     userClickedNode: {},
-    functions: {
-      alpha: { name: "alpha", function: 'def alpha(row):\n  return row' },
-      beta:  { name: "beta",  function: 'def beta(row):\n  return row' },
-      gamma: { name: "gamma", function: 'def gamma(row):\n  return row' },
-    },
     ...overrides,
   };
 }
 
 function createWrapper(props = {}, pipelineObjOverrides = {}) {
   mockPipelineObj = createPipelineObj(pipelineObjOverrides);
-
   vi.mocked(useDnD).mockImplementation(() => ({
     pipelineObj: mockPipelineObj,
     addNode: mockAddNode,
@@ -96,14 +85,9 @@ function createWrapper(props = {}, pipelineObjOverrides = {}) {
     global: {
       plugins: [i18n, store],
       stubs: {
-        AddFunction: {
-          name: "AddFunction",
-          template: '<div class="add-function-stub"></div>',
-          props: ["isUpdated", "heightOffset"],
-          emits: ["update:list", "cancel:hideform"],
-        },
         ConfirmDialog: true,
         ODrawer: ODrawerStub,
+        FunctionPicker: FunctionPickerStub,
       },
     },
     props: {
@@ -114,557 +98,137 @@ function createWrapper(props = {}, pipelineObjOverrides = {}) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 describe("AssociateFunction Component", () => {
   afterEach(() => {
     vi.clearAllMocks();
+    mockGetPayload = vi.fn(() => ({ name: "alpha", after_flatten: true }));
   });
 
-  // -------------------------------------------------------------------------
-  describe("Component Initialization", () => {
+  describe("Initialization", () => {
     it("mounts successfully", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("renders the outer section element with data-test attribute", async () => {
+    it("renders the routing section and the FunctionPicker", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       expect(
-        wrapper.find('[data-test="add-function-node-routing-section"]').exists()
+        wrapper.find('[data-test="add-function-node-routing-section"]').exists(),
       ).toBe(true);
+      expect(wrapper.findComponent(FunctionPickerStub).exists()).toBe(true);
     });
 
-    it("initializes createNewFunction as false by default", async () => {
+    it("passes node data + associatedFunctions to FunctionPicker", async () => {
+      const wrapper = createWrapper(
+        { associatedFunctions: ["delta", "omega"] },
+        {
+          currentSelectedNodeData: {
+            data: { name: "alpha", after_flatten: false },
+            type: "function",
+          },
+        },
+      );
+      await flushPromises();
+      const picker = wrapper.findComponent(FunctionPickerStub);
+      expect(picker.props("initialName")).toBe("alpha");
+      expect(picker.props("initialAfterFlatten")).toBe(false);
+      expect(picker.props("duplicateNames")).toEqual(["delta", "omega"]);
+    });
+
+    it("defaults initialAfterFlatten to true when unset", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      expect(wrapper.vm.createNewFunction).toBe(false);
-    });
-
-    it("initializes afterFlattening as true by default", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.afterFlattening).toBe(true);
-    });
-
-    it("initializes loading as false", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.loading).toBe(false);
-    });
-
-    it("initializes selectedFunction as empty string when no node data", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.selectedFunction).toBe("");
-    });
-
-    it("initializes functionExists as false", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.functionExists).toBe(false);
-    });
-
-    it("populates filteredFunctions from the functions prop and sorts alphabetically", async () => {
-      const wrapper = createWrapper({ functions: ["gamma", "alpha", "beta"] });
-      await flushPromises();
-      expect(wrapper.vm.filteredFunctions).toEqual(["alpha", "beta", "gamma"]);
-    });
-
-    it("clears userSelectedNode on mount", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(mockPipelineObj.userSelectedNode).toEqual({});
+      expect(
+        wrapper.findComponent(FunctionPickerStub).props("initialAfterFlatten"),
+      ).toBe(true);
     });
   });
 
-  // -------------------------------------------------------------------------
-  describe("Edit Mode Initialization", () => {
-    it("reads selectedFunction from currentSelectedNodeData in edit mode", async () => {
-      const wrapper = createWrapper({}, {
-        isEditNode: true,
-        currentSelectedNodeData: {
-          data: { name: "alpha", after_flatten: false },
-          type: "function",
-        },
-      });
-      await flushPromises();
-      expect(wrapper.vm.selectedFunction).toBe("alpha");
-    });
-
-    it("reads afterFlattening as false when node data has after_flatten: false", async () => {
-      const wrapper = createWrapper({}, {
-        isEditNode: true,
-        currentSelectedNodeData: {
-          data: { name: "beta", after_flatten: false },
-        },
-      });
-      await flushPromises();
-      expect(wrapper.vm.afterFlattening).toBe(false);
-    });
-
-    it("defaults afterFlattening to true when after_flatten is undefined", async () => {
-      const wrapper = createWrapper({}, {
-        isEditNode: true,
-        currentSelectedNodeData: { data: { name: "gamma" } },
-      });
-      await flushPromises();
-      expect(wrapper.vm.afterFlattening).toBe(true);
-    });
-
-    it("shows delete button when isEditNode is true", async () => {
-      const wrapper = createWrapper({}, {
-        isEditNode: true,
-        currentSelectedNodeData: { data: { name: "alpha" } },
-      });
-      await flushPromises();
-      const deleteBtn = wrapper.find('[data-test="o-drawer-neutral-btn"]');
-      expect(deleteBtn.exists()).toBe(true);
-    });
-
-    it("hides delete button when isEditNode is false", async () => {
+  describe("Save", () => {
+    it("adds the node with the picker payload and closes on save", async () => {
+      mockGetPayload = vi.fn(() => ({ name: "alpha", after_flatten: false }));
       const wrapper = createWrapper();
       await flushPromises();
-      const deleteBtn = wrapper.find('[data-test="o-drawer-neutral-btn"]');
-      expect(deleteBtn.exists()).toBe(false);
+      await wrapper.find('[data-test="o-drawer-primary-btn"]').trigger("click");
+      expect(mockAddNode).toHaveBeenCalledWith({ name: "alpha", after_flatten: false });
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
 
-    it("emits cancel:hideform when the header close icon button is clicked", async () => {
+    it("does nothing when the picker returns null (invalid)", async () => {
+      mockGetPayload = vi.fn(() => null);
+      const wrapper = createWrapper();
+      await flushPromises();
+      await wrapper.find('[data-test="o-drawer-primary-btn"]').trigger("click");
+      expect(mockAddNode).not.toHaveBeenCalled();
+      expect(wrapper.emitted("cancel:hideform")).toBeFalsy();
+    });
+  });
+
+  describe("Create mode (expand)", () => {
+    it("hides Save/Cancel and shows a wide drawer while creating inline", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.findComponent(FunctionPickerStub).vm.$emit("expand", true);
+      await nextTickFlush(wrapper);
+      expect(wrapper.find('[data-test="o-drawer-primary-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="o-drawer-secondary-btn"]').exists()).toBe(false);
+    });
+
+    it("re-emits add:function when the picker creates a function", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.findComponent(FunctionPickerStub).vm.$emit("created", { name: "new_fn" });
+      expect(wrapper.emitted("add:function")?.[0]).toEqual([{ name: "new_fn" }]);
+    });
+  });
+
+  describe("Delete", () => {
+    it("shows the delete control only in edit mode", async () => {
+      const view = createWrapper({}, { isEditNode: false });
+      await flushPromises();
+      expect(view.find('[data-test="o-drawer-neutral-btn"]').exists()).toBe(false);
+
+      const edit = createWrapper({}, { isEditNode: true });
+      await flushPromises();
+      expect(edit.find('[data-test="o-drawer-neutral-btn"]').exists()).toBe(true);
+    });
+
+    it("deletes the node via the confirm dialog callback", async () => {
+      const wrapper = createWrapper({}, { isEditNode: true });
+      await flushPromises();
+      await wrapper.find('[data-test="o-drawer-neutral-btn"]').trigger("click");
+      // invoke the dialog's ok callback directly
+      wrapper.vm.dialog.okCallback();
+      expect(mockDeletePipelineNode).toHaveBeenCalledWith("node-abc");
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+    });
+  });
+
+  describe("Cancel / close", () => {
+    it("emits cancel:hideform when the drawer is closed", async () => {
       vi.useFakeTimers();
       const wrapper = createWrapper();
       await flushPromises();
-      // The close button is inside ODrawer's header — simulate via update:open event
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.exists()).toBe(true);
-      drawer.vm.$emit("update:open", false);
-      vi.advanceTimersByTime(400);
-      await nextTick();
+      wrapper.findComponent(ODrawerStub).vm.$emit("update:open", false);
+      vi.runAllTimers();
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
       vi.useRealTimers();
     });
-  });
 
-  // -------------------------------------------------------------------------
-  describe("UI Rendering", () => {
-    it("shows the function select input when createNewFunction is false", async () => {
+    it("opens a discard dialog on cancel", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="associate-function-select-function-input"]').exists()
-      ).toBe(true);
-    });
-
-    it("shows after-flattening toggle when createNewFunction is false", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(
-        wrapper.find('[data-test="associate-function-after-flattening-toggle"]').exists()
-      ).toBe(true);
-    });
-
-    it("shows cancel and save buttons when createNewFunction is false", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.find('[data-test="o-drawer-secondary-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="o-drawer-primary-btn"]').exists()).toBe(true);
-    });
-
-    it("hides select input and flattening toggle when createNewFunction is true", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.createNewFunction = true;
-      await nextTick();
-      expect(
-        wrapper.find('[data-test="associate-function-select-function-input"]').exists()
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test="associate-function-after-flattening-toggle"]').exists()
-      ).toBe(false);
-    });
-
-    it("shows AddFunction stub when createNewFunction is true", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.createNewFunction = true;
-      await nextTick();
-      expect(wrapper.find(".pipeline-add-function").exists()).toBe(true);
-    });
-
-    it("shows spinner when loading is true", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.loading = true;
-      await nextTick();
-      expect(wrapper.find('[data-test="associate-function-loading-indicator"]').exists()).toBe(true);
-    });
-
-    it("hides stream-routing-container when loading is true", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.loading = true;
-      await nextTick();
-      expect(wrapper.find('[data-test="associate-function-routing-container"]').exists()).toBe(false);
-    });
-
-    it("shows stream-routing-container when loading is false", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.find('[data-test="associate-function-routing-container"]').exists()).toBe(true);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("computedStyleForFunction", () => {
-    it("returns width+height 100% when createNewFunction is false", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.computedStyleForFunction).toEqual({
-        width: "100%",
-        height: "100%",
-      });
-    });
-
-    it("returns only width 100% when createNewFunction is true", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.createNewFunction = true;
-      await nextTick();
-      expect(wrapper.vm.computedStyleForFunction).toEqual({ width: "100%" });
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("Function List Filtering", () => {
-    it("filterFunctions calls update callback", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const mockUpdate = vi.fn();
-      wrapper.vm.filterFunctions("alpha", mockUpdate);
-      expect(mockUpdate).toHaveBeenCalled();
-    });
-
-    it("filterFunctions narrows results by search string", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const mockUpdate = vi.fn((cb) => cb());
-      wrapper.vm.filterFunctions("alpha", mockUpdate);
-      expect(wrapper.vm.filteredFunctions).toEqual(["alpha"]);
-    });
-
-    it("filterFunctions is case-insensitive", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const mockUpdate = vi.fn((cb) => cb());
-      wrapper.vm.filterFunctions("ALPHA", mockUpdate);
-      expect(wrapper.vm.filteredFunctions).toContain("alpha");
-    });
-
-    it("filterFunctions returns all sorted functions when search is empty", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const mockUpdate = vi.fn((cb) => cb());
-      wrapper.vm.filterFunctions("", mockUpdate);
-      expect(wrapper.vm.filteredFunctions).toEqual(["alpha", "beta", "gamma"]);
-    });
-
-    it("updates filteredFunctions reactively when functions prop changes", async () => {
-      const wrapper = createWrapper({ functions: ["z", "a"] });
-      await flushPromises();
-      expect(wrapper.vm.filteredFunctions).toEqual(["a", "z"]);
-      await wrapper.setProps({ functions: ["z", "a", "m"] });
-      await flushPromises();
-      expect(wrapper.vm.filteredFunctions).toEqual(["a", "m", "z"]);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("saveFunction – existing function", () => {
-    it("calls addNode with name and after_flatten when function is valid", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.selectedFunction = "alpha";
-      wrapper.vm.afterFlattening = true;
-      await wrapper.vm.saveFunction();
-      expect(mockAddNode).toHaveBeenCalledWith({
-        name: "alpha",
-        after_flatten: true,
-      });
-    });
-
-    it("emits cancel:hideform after successful save", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.selectedFunction = "beta";
-      await wrapper.vm.saveFunction();
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-    });
-
-    it("sets functionExists and does NOT call addNode when function is already associated", async () => {
-      const wrapper = createWrapper({ associatedFunctions: ["alpha"] });
-      await flushPromises();
-      wrapper.vm.selectedFunction = "alpha";
-      await wrapper.vm.saveFunction();
-      expect(wrapper.vm.functionExists).toBe(true);
-      expect(mockAddNode).not.toHaveBeenCalled();
-    });
-
-    it("resets functionExists to false at the start of each save", async () => {
-      const wrapper = createWrapper({ associatedFunctions: ["alpha"] });
-      await flushPromises();
-      wrapper.vm.functionExists = true;
-      wrapper.vm.selectedFunction = "beta";
-      await wrapper.vm.saveFunction();
-      // beta is not already associated so save succeeds and functionExists stays false
-      expect(wrapper.vm.functionExists).toBe(false);
-    });
-
-    it("saves with afterFlattening false correctly", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.selectedFunction = "gamma";
-      wrapper.vm.afterFlattening = false;
-      await wrapper.vm.saveFunction();
-      expect(mockAddNode).toHaveBeenCalledWith({
-        name: "gamma",
-        after_flatten: false,
-      });
-    });
-
-    it("skips duplicate-check when isUpdating is true (edit mode)", async () => {
-      const wrapper = createWrapper({ associatedFunctions: ["alpha"] }, {
-        isEditNode: true,
-        currentSelectedNodeData: { data: { name: "alpha" } },
-      });
-      await flushPromises();
-      wrapper.vm.isUpdating = true;
-      wrapper.vm.selectedFunction = "alpha";
-      await wrapper.vm.saveFunction();
-      // In updating mode duplicate check is bypassed
-      expect(wrapper.vm.functionExists).toBe(false);
-      expect(mockAddNode).toHaveBeenCalled();
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("saveFunction – create new function mode", () => {
-    it("shows notify when createNewFunction is true but function name is empty", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.createNewFunction = true;
-      await nextTick();
-      // Provide a fake addFunctionRef with empty name
-      wrapper.vm.addFunctionRef = {
-        formData: { name: "", function: "" },
-      };
-      const { toast } = await import("@/lib/feedback/Toast/useToast");
-      vi.mocked(toast).mockClear();
-      await wrapper.vm.saveFunction();
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: "Function Name is required",
-        })
-      );
-      expect(mockAddNode).not.toHaveBeenCalled();
-    });
-
-    it("does NOT show notify when createNewFunction is true and function name is set", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.createNewFunction = true;
-      await nextTick();
-      wrapper.vm.addFunctionRef = {
-        formData: { name: "newFunc", function: "def newFunc(r): return r" },
-      };
-      const { toast } = await import("@/lib/feedback/Toast/useToast");
-      vi.mocked(toast).mockClear();
-      await wrapper.vm.saveFunction();
-      expect(toast).not.toHaveBeenCalled();
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("onFunctionCreation callback", () => {
-    it("sets selectedFunction to the newly created function name", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.createNewFunction = true;
-      await nextTick();
-      await wrapper.vm.onFunctionCreation({ name: "newFunc" });
-      await flushPromises();
-      expect(wrapper.vm.selectedFunction).toBe("newFunc");
-    });
-
-    it("sets createNewFunction back to false after function creation", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.createNewFunction = true;
-      await nextTick();
-      await wrapper.vm.onFunctionCreation({ name: "newFunc" });
-      expect(wrapper.vm.createNewFunction).toBe(false);
-    });
-
-    it("emits add:function event with the new function data", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const functionData = { name: "newFunc", function: "def f(r): return r" };
-      await wrapper.vm.onFunctionCreation(functionData);
-      expect(wrapper.emitted("add:function")).toBeTruthy();
-      expect(wrapper.emitted("add:function")[0][0]).toEqual(functionData);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("cancelFunctionCreation", () => {
-    it("emits cancel:hideform when cancelFunctionCreation is called", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.cancelFunctionCreation();
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("openCancelDialog", () => {
-    it("shows the confirm dialog with correct title and message", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.selectedFunction = "alpha";
-      await wrapper.vm.openCancelDialog();
+      await wrapper.find('[data-test="o-drawer-secondary-btn"]').trigger("click");
       expect(wrapper.vm.dialog.show).toBe(true);
       expect(wrapper.vm.dialog.title).toBe("Discard Changes");
-      expect(wrapper.vm.dialog.message).toBe(
-        "Are you sure you want to cancel changes?"
-      );
-    });
-
-    it("dialog okCallback emits cancel:hideform", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.selectedFunction = "alpha";
-      await wrapper.vm.openCancelDialog();
-      wrapper.vm.dialog.okCallback();
-      await nextTick();
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-    });
-
-    it("resets userClickedNode and userSelectedNode on openCancelDialog", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      mockPipelineObj.userClickedNode = { id: "x" };
-      mockPipelineObj.userSelectedNode = { id: "y" };
-      wrapper.vm.selectedFunction = "alpha";
-      await wrapper.vm.openCancelDialog();
-      expect(mockPipelineObj.userClickedNode).toEqual({});
-      expect(mockPipelineObj.userSelectedNode).toEqual({});
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("openDeleteDialog", () => {
-    it("shows the confirm dialog with Delete Node title", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      await wrapper.vm.openDeleteDialog();
-      expect(wrapper.vm.dialog.show).toBe(true);
-      expect(wrapper.vm.dialog.title).toBe("Delete Node");
-    });
-
-    it("sets the correct delete message", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      await wrapper.vm.openDeleteDialog();
-      expect(wrapper.vm.dialog.message).toBe(
-        "Are you sure you want to delete function association?"
-      );
-    });
-
-    it("dialog okCallback calls deleteFunction which calls deletePipelineNode", async () => {
-      const wrapper = createWrapper({}, { currentSelectedNodeID: "node-abc" });
-      await flushPromises();
-      await wrapper.vm.openDeleteDialog();
-      wrapper.vm.dialog.okCallback();
-      await nextTick();
-      expect(mockDeletePipelineNode).toHaveBeenCalledWith("node-abc");
-    });
-
-    it("dialog okCallback emits cancel:hideform", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      await wrapper.vm.openDeleteDialog();
-      wrapper.vm.dialog.okCallback();
-      await nextTick();
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("After Flattening Toggle", () => {
-    it("toggling the after-flattening toggle changes afterFlattening state", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.afterFlattening).toBe(true);
-      await wrapper
-        .find('[data-test="associate-function-after-flattening-toggle"]')
-        .trigger("click");
-      expect(wrapper.vm.afterFlattening).toBe(false);
-    });
-
-    it("afterFlattening value is included in addNode payload", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.selectedFunction = "alpha";
-      wrapper.vm.afterFlattening = false;
-      await wrapper.vm.saveFunction();
-      expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({ after_flatten: false })
-      );
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("Function Definition Display", () => {
-    it("shows function definition card when a valid function is selected", async () => {
-      const wrapper = createWrapper({}, {
-        functions: {
-          alpha: { name: "alpha", function: "def alpha(r): return r" },
-        },
-      });
-      await flushPromises();
-      wrapper.vm.selectedFunction = "alpha";
-      await nextTick();
-      expect(wrapper.find('[data-test="associate-function-definition-section"]').exists()).toBe(true);
-    });
-
-    it("does NOT show function definition card when no function is selected", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.find('[data-test="associate-function-definition-section"]').exists()).toBe(false);
-    });
-
-    it("does NOT show function definition card when createNewFunction is true", async () => {
-      const wrapper = createWrapper({}, {
-        functions: {
-          alpha: { name: "alpha", function: "def alpha(r): return r" },
-        },
-      });
-      await flushPromises();
-      wrapper.vm.selectedFunction = "alpha";
-      wrapper.vm.createNewFunction = true;
-      await nextTick();
-      expect(wrapper.find('[data-test="associate-function-definition-section"]').exists()).toBe(false);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("saveUpdatedLink helper", () => {
-    it("updates nodeLink with from/to values", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.saveUpdatedLink({ from: "nodeA", to: "nodeB" });
-      expect(wrapper.vm.nodeLink).toEqual({ from: "nodeA", to: "nodeB" });
     });
   });
 });
+
+// Helper: flush a tick so a reactive emit propagates to the stubbed drawer props.
+async function nextTickFlush(wrapper) {
+  await wrapper.vm.$nextTick();
+  await flushPromises();
+}

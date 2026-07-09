@@ -420,8 +420,6 @@ const updateStreamFields = async () => {
 };
 
 const closeDialog = () => {
-  pipelineObj.userClickedNode = {};
-  pipelineObj.userSelectedNode = {};
   emit("cancel:hideform");
 };
 

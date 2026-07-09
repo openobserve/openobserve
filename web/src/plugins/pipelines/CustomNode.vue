@@ -15,26 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup>
-import { Handle } from "@vue-flow/core";
 import useDragAndDrop from "./useDnD";
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import { getImageURL } from "@/utils/zincutils";
 import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
 
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
 
-const functionImage = getImageURL("images/pipeline/function.svg");
-const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
-const conditionImage = getImageURL("images/pipeline/condition.svg");
-const externalOutputImage = getImageURL("images/pipeline/externalOutput.svg");
 
 const props = defineProps({
   id: {
@@ -52,11 +46,9 @@ const emit = defineEmits(["delete:node"]);
 const {
   pipelineObj,
   deletePipelineNode,
-  onDragStart,
-  onDrop,
   checkIfDefaultDestinationNode,
+  openStepPicker,
 } = useDragAndDrop();
-const menu = ref(false);
 const showButtons = ref(false);
 const showDeleteTooltip = ref(false);
 let hideButtonsTimeout = null;
@@ -205,82 +197,11 @@ const navigateToFunction = (functionName) => {
   });
 };
 
-const onFunctionClick = (data, event, id) => {
-  pipelineObj.userSelectedNode = data;
-  const dataToOpen = {
-    label: "Function",
-    subtype: "function",
-    io_type: "default",
-    icon: "img:" + functionImage,
-    tooltip: "Function Node",
-    isSectionHeader: false,
-  };
-  pipelineObj.userClickedNode = id;
-  onDragStart(event, dataToOpen);
-  onDrop(event, { x: 100, y: 100 });
-  menu.value = false;
-};
-
-const onConditionClick = (data, event, id) => {
-  data.label = id;
-  pipelineObj.userSelectedNode = data;
-
-  const dataToOpen = {
-    label: "Condition",
-    subtype: "condition",
-    io_type: "default",
-    icon: "img:" + conditionImage,
-    tooltip: "Condition Node",
-    isSectionHeader: false,
-  };
-  pipelineObj.userClickedNode = id;
-  onDragStart(event, dataToOpen);
-  onDrop(event, { x: 100, y: 100 });
-  menu.value = false;
-};
-
-const onStreamOutputClick = (data, event, id) => {
-  pipelineObj.userSelectedNode = data;
-
-  if (!id) {
-    pipelineObj.userClickedNode = data.label;
-  } else {
-    pipelineObj.userClickedNode = id;
-  }
-  const dataToOpen = {
-    label: "Stream",
-    subtype: "stream",
-    io_type: "output",
-    icon: "img:" + streamOutputImage,
-    tooltip: "Destination: Stream Node",
-    isSectionHeader: false,
-  };
-  // pipelineObj.userClickedNode = id
-  onDragStart(event, dataToOpen);
-  onDrop(event, { x: 100, y: 100 });
-  menu.value = false;
-};
-const onExternalDestinationClick = (data, event, id) => {
-  pipelineObj.userSelectedNode = data;
-
-  if (!id) {
-    pipelineObj.userClickedNode = data.label;
-  } else {
-    pipelineObj.userClickedNode = id;
-  }
-  const dataToOpen = {
-    label: "Remote",
-    subtype: "remote_stream",
-    io_type: "output",
-    icon: "img:" + externalOutputImage,
-    tooltip: "Destination: Remote Node",
-    isSectionHeader: false,
-  };
-  // pipelineObj.userClickedNode = id
-  onDragStart(event, dataToOpen);
-  onDrop(event, { x: 100, y: 100 });
-  menu.value = false;
-};
+// (The onFunctionClick/onConditionClick/onStreamOutputClick/onExternalDestinationClick
+// handlers were removed — they drove the old context-menu "add connected node"
+// feature that no longer exists, and were the only writers of the now-deleted
+// userClickedNode/userSelectedNode. Adding a downstream node is done via the
+// hover-`+` step picker (useDnD.addNodeAfter).)
 
 const { t } = useI18n();
 const router = useRouter();
@@ -474,546 +395,159 @@ function getIcon(data, ioType) {
 </script>
 
 <template>
-  <!-- Input Handle (Target) -->
   <div class="">
-    <Handle
-      v-if="io_type == 'output' || io_type === 'default'"
-      id="input"
-      type="target"
-      :position="'top'"
-      :class="`node_handle_custom handle_${io_type}`"
-      :data-test="`pipeline-node-${io_type}-input-handle`"
-    />
-
-    <div
-      v-if="data.node_type == 'function'"
-      class="tw:p-0 btn-fixed-width"
-      :data-test="`pipeline-node-${io_type}-function-node`"
-      data-node-type="function"
-      style="
-        padding: 5px 0px;
-        width: fit-content;
-        display: flex;
-        align-items: center;
-        border: none;
-        cursor: pointer;
-      "
+    <FlowNodeCard
+      :icon="getIcon(data, io_type)"
+      :io-type="io_type"
+      :has-input="io_type === 'output' || io_type === 'default'"
+      :has-output="io_type === 'input' || io_type === 'default'"
+      :input-handle-test="`pipeline-node-${io_type}-input-handle`"
+      :output-handle-test="`pipeline-node-${io_type}-output-handle`"
+      :data-test="`pipeline-node-${io_type}-${data.node_type.replace(/_/g, '-')}-node`"
+      :data-node-type="data.node_type"
+      class="btn-fixed-width"
       @mouseenter="handleNodeHover(id, io_type)"
       @mouseleave="handleNodeLeave(id)"
       @click="editNode(id)"
     >
-      <div class="icon-container tw:flex tw:items-center">
-        <!-- Icon -->
-        <OIcon
-          :name="getIcon(data, io_type)"
-          size="md"
-          class="tw:my-2 tw:mr-2"
-        />
-      </div>
-
-      <!-- Separator -->
-      <OSeparator vertical class="tw:mr-2" />
-
-      <!-- Label -->
-      <div class="container">
+      <!-- Per-type label content -->
+      <template #body>
         <div
+          v-if="data.node_type == 'function'"
           class="tw:flex tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!"
           align="left"
-          style="
-            text-align: left;
-            text-wrap: wrap;
-            width: auto;
-            text-overflow: ellipsis;
-          "
+          style="text-align: left; text-wrap: wrap; width: auto; text-overflow: ellipsis"
         >
           {{ data.name }} -
           <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
         </div>
-      </div>
 
-      <!-- Error Badge for Function Nodes -->
-      <div
-        v-if="hasNodeError"
-        data-test="pipeline-node-error-badge"
-        class="tw:absolute tw:top-[-12px] tw:right-[-12px] tw:w-[20px] tw:h-[20px] tw:bg-[#ef4444] tw:border-2 tw:border-white tw:rounded-full tw:flex tw:items-center tw:justify-center tw:cursor-pointer tw:z-[15] tw:shadow-[0_2px_6px_rgba(239,68,68,0.5)] tw:transition-all tw:duration-200 error-badge"
-        @click.stop="navigateToFunction(data.name)"
-      >
-        <OIcon name="error" size="sm" />
-        <span
-          data-test="pipeline-node-error-count"
-          v-if="
-            pipelineObj.currentSelectedPipeline?.last_error?.node_errors?.[id]
-              ?.error_count
-          "
-          class="tw:absolute tw:top-[-6px] tw:right-[-6px] tw:bg-[#dc2626] tw:text-white tw:text-[9px] tw:font-bold tw:min-w-[14px] tw:h-[14px] tw:rounded-[7px] tw:flex tw:items-center tw:justify-center tw:px-[3px] tw:border-[1.5px] tw:border-solid tw:border-white tw:shadow-[0_1px_3px_rgba(0,0,0,0.4)]"
-        >
-          {{
-            pipelineObj.currentSelectedPipeline.last_error.node_errors[id]
-              .error_count
-          }}
-        </span>
-        <OTooltip side="top" align="center" :sideOffset="10" max-width="600px">
-          <template #content>
-            <div style="max-height: 300px; overflow-y: auto">
-              {{ getNodeErrorInfo || "Error occurred" }}
-            </div>
-          </template>
-        </OTooltip>
-      </div>
+        <template v-else-if="data.node_type == 'stream'">
+          <div
+            v-if="data.stream_name && data.stream_name.hasOwnProperty('label')"
+            class="tw:flex tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!"
+            style="text-align: left; text-wrap: wrap; width: auto; text-overflow: ellipsis"
+          >
+            {{ data.stream_type }} - {{ data.stream_name.label }}
+          </div>
+          <div
+            v-else
+            class="tw:flex tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!"
+            style="text-align: left; text-wrap: wrap; width: auto; text-overflow: ellipsis"
+          >
+            {{ data.stream_type }} - {{ data.stream_name }}
+          </div>
+        </template>
 
-      <div
-        v-show="showButtons"
-        class="tw:absolute tw:top-[-30px] tw:right-0 tw:flex tw:gap-[6px] tw:transition-all tw:duration-300 tw:z-10 tw:pt-[5px] tw:px-[5px] tw:pb-[10px] node-action-buttons"
-        :data-test="`pipeline-node-${io_type}-actions`"
-        :style="{ '--node-color': getNodeColor(io_type) }"
-        @mouseenter="handleActionButtonsEnter"
-        @mouseleave="handleActionButtonsLeave"
-      >
-        <OButton
-          variant="ghost"
-          size="icon"
-          @click.stop="deleteNode(id)"
-          class="tw:min-w-[20px]! tw:w-[20px]! tw:h-[20px]! tw:p-0! tw:rounded! tw:bg-[rgba(255,255,255,0.95)]! tw:border! tw:border-(--node-color)! tw:text-(--node-color)! tw:transition-all! tw:duration-200! node-action-btn delete-btn"
-          :data-test="`pipeline-node-${io_type}-delete-btn`"
-          @mouseenter="handleDeleteTooltipEnter"
-          @mouseleave="handleDeleteTooltipLeave"
-        >
-          <OIcon name="delete" size="sm" />
-        </OButton>
         <div
-          v-if="showDeleteTooltip"
-          class="tw:fixed tw:bg-[#dc2626] tw:text-white tw:py-[6px] tw:px-[10px] tw:rounded-md tw:text-[11px] tw:z-[1000] tw:shadow-[0_4px_12px_rgba(0,0,0,0.3)] tw:pointer-events-none tw:whitespace-nowrap"
-          style="left: 15px"
-        >
-          Delete Node
-          <div class="tw:absolute tw:top-full tw:left-1/2 tw:-translate-x-1/2 tw:w-0 tw:h-0 tw:border-l-[5px] tw:border-l-transparent tw:border-r-[5px] tw:border-r-transparent tw:border-t-[5px] tw:[border-top-color:#dc2626]"></div>
-        </div>
-      </div>
-    </div>
-
-    <div
-      v-if="data.node_type == 'stream'"
-      class="tw:p-0 btn-fixed-width"
-      :data-test="`pipeline-node-${io_type}-stream-node`"
-      data-node-type="stream"
-      style="
-        width: fit-content;
-        display: flex;
-        align-items: center;
-        border: none;
-        cursor: pointer;
-        padding: 5px 0px;
-      "
-      @mouseenter="handleNodeHover(id, io_type)"
-      @mouseleave="handleNodeLeave(id)"
-      @click="editNode(id)"
-    >
-      <div class="icon-container tw:flex tw:items-center">
-        <!-- Icon -->
-        <OIcon
-          :name="getIcon(data, io_type)"
-          size="md"
-          class="tw:my-2 tw:mr-2"
-        />
-      </div>
-
-      <!-- Separator -->
-      <OSeparator vertical class="tw:mr-2" />
-
-      <!-- Label -->
-      <div class="container">
-        <div
-          v-if="data.stream_name && data.stream_name.hasOwnProperty('label')"
+          v-else-if="data.node_type == 'query'"
           class="tw:flex tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!"
-          style="
-            text-align: left;
-            text-wrap: wrap;
-            width: auto;
-            text-overflow: ellipsis;
-          "
-        >
-          {{ data.stream_type }} - {{ data.stream_name.label }}
-        </div>
-        <div
-          v-else
-          class="tw:flex tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!"
-          style="
-            text-align: left;
-            text-wrap: wrap;
-            width: auto;
-            text-overflow: ellipsis;
-          "
+          style="text-align: left; text-wrap: wrap; width: auto; text-overflow: ellipsis"
         >
           {{ data.stream_type }} - {{ data.stream_name }}
         </div>
-      </div>
-      <div
-        v-show="showButtons"
-        class="tw:absolute tw:top-[-30px] tw:right-0 tw:flex tw:gap-[6px] tw:transition-all tw:duration-300 tw:z-10 tw:pt-[5px] tw:px-[5px] tw:pb-[10px] node-action-buttons"
-        :data-test="`pipeline-node-${io_type}-actions`"
-        :style="{ '--node-color': getNodeColor(io_type) }"
-        @mouseenter="handleActionButtonsEnter"
-        @mouseleave="handleActionButtonsLeave"
-      >
-        <OButton
-          variant="ghost"
-          size="icon"
-          @click.stop="deleteNode(id)"
-          class="tw:min-w-[20px]! tw:w-[20px]! tw:h-[20px]! tw:p-0! tw:rounded! tw:bg-[rgba(255,255,255,0.95)]! tw:border! tw:border-(--node-color)! tw:text-(--node-color)! tw:transition-all! tw:duration-200! node-action-btn delete-btn"
-          :data-test="`pipeline-node-${io_type}-delete-btn`"
-          @mouseenter="handleDeleteTooltipEnter"
-          @mouseleave="handleDeleteTooltipLeave"
-        >
-          <OIcon name="delete" size="sm" />
-        </OButton>
-        <div
-          v-if="showDeleteTooltip"
-          class="tw:fixed tw:bg-[#dc2626] tw:text-white tw:py-[6px] tw:px-[10px] tw:rounded-md tw:text-[11px] tw:z-[1000] tw:shadow-[0_4px_12px_rgba(0,0,0,0.3)] tw:pointer-events-none tw:whitespace-nowrap"
-          style="left: 15px"
-        >
-          Delete Node
-          <div class="tw:absolute tw:top-full tw:left-1/2 tw:-translate-x-1/2 tw:w-0 tw:h-0 tw:border-l-[5px] tw:border-l-transparent tw:border-r-[5px] tw:border-r-transparent tw:border-t-[5px] tw:[border-top-color:#dc2626]"></div>
-        </div>
-      </div>
-    </div>
-    <div
-      v-if="data.node_type == 'remote_stream'"
-      class="tw:p-0 btn-fixed-width"
-      :data-test="`pipeline-node-${io_type}-remote-stream-node`"
-      data-node-type="remote_stream"
-      style="
-        width: fit-content;
-        display: flex;
-        align-items: center;
-        border: none;
-        cursor: pointer;
-        padding: 5px 0px;
-      "
-      @mouseenter="handleNodeHover(id, io_type)"
-      @mouseleave="handleNodeLeave(id)"
-      @click="editNode(id)"
-    >
-      <div class="icon-container tw:flex tw:items-center">
-        <!-- Icon -->
-        <OIcon
-          :name="getIcon(data, io_type)"
-          size="md"
-          class="tw:my-2 tw:mr-2"
-        />
-      </div>
 
-      <!-- Separator -->
-      <OSeparator vertical class="tw:mr-2" />
-
-      <!-- Label -->
-      <div class="container">
         <div
+          v-else-if="data.node_type == 'remote_stream'"
           class="tw:flex tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!"
-          style="
-            text-align: left;
-            text-wrap: wrap;
-            width: auto;
-            text-overflow: ellipsis;
-          "
+          style="text-align: left; text-wrap: wrap; width: auto; text-overflow: ellipsis"
         >
           {{ data.destination_name }}
         </div>
-      </div>
-      <div
-        v-show="showButtons"
-        class="tw:absolute tw:top-[-30px] tw:right-0 tw:flex tw:gap-[6px] tw:transition-all tw:duration-300 tw:z-10 tw:pt-[5px] tw:px-[5px] tw:pb-[10px] node-action-buttons"
-        :data-test="`pipeline-node-${io_type}-actions`"
-        :style="{ '--node-color': getNodeColor(io_type) }"
-        @mouseenter="handleActionButtonsEnter"
-        @mouseleave="handleActionButtonsLeave"
-      >
-        <OButton
-          variant="ghost"
-          size="icon"
-          @click.stop="deleteNode(id)"
-          class="tw:min-w-[20px]! tw:w-[20px]! tw:h-[20px]! tw:p-0! tw:rounded! tw:bg-[rgba(255,255,255,0.95)]! tw:border! tw:border-(--node-color)! tw:text-(--node-color)! tw:transition-all! tw:duration-200! node-action-btn delete-btn"
-          :data-test="`pipeline-node-${io_type}-delete-btn`"
-          @mouseenter="handleDeleteTooltipEnter"
-          @mouseleave="handleDeleteTooltipLeave"
-        >
-          <OIcon name="delete" size="sm" />
-        </OButton>
+
         <div
-          v-if="showDeleteTooltip"
-          class="tw:fixed tw:bg-[#dc2626] tw:text-white tw:py-[6px] tw:px-[10px] tw:rounded-md tw:text-[11px] tw:z-[1000] tw:shadow-[0_4px_12px_rgba(0,0,0,0.3)] tw:pointer-events-none tw:whitespace-nowrap"
-          style="left: 15px"
-        >
-          Delete Node
-          <div class="tw:absolute tw:top-full tw:left-1/2 tw:-translate-x-1/2 tw:w-0 tw:h-0 tw:border-l-[5px] tw:border-l-transparent tw:border-r-[5px] tw:border-r-transparent tw:border-t-[5px] tw:[border-top-color:#dc2626]"></div>
-        </div>
-      </div>
-    </div>
-
-    <div
-      v-if="data.node_type == 'query'"
-      class="tw:p-0 btn-fixed-width"
-      :data-test="`pipeline-node-${io_type}-query-node`"
-      data-node-type="query"
-      style="
-        width: fit-content;
-        display: flex;
-        align-items: center;
-        border: none;
-        cursor: pointer;
-        padding: 5px 0px;
-      "
-      @mouseenter="handleNodeHover(id, io_type)"
-      @mouseleave="handleNodeLeave(id)"
-      @click="editNode(id)"
-    >
-      <div class="icon-container tw:flex tw:items-center">
-        <!-- Icon -->
-        <OIcon
-          :name="getIcon(data, io_type)"
-          size="md"
-          class="tw:my-2 tw:mr-2"
-        />
-      </div>
-
-      <!-- Separator -->
-      <OSeparator vertical class="tw:mr-2" />
-
-      <!-- Label -->
-      <div class="container">
-        <div
-          class="tw:flex tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!"
-          style="
-            text-align: left;
-            text-wrap: wrap;
-            width: auto;
-            text-overflow: ellipsis;
-          "
-        >
-          {{ data.stream_type }} - {{ data.stream_name }}
-        </div>
-      </div>
-
-      <div
-        v-show="showButtons"
-        class="tw:absolute tw:top-[-30px] tw:right-0 tw:flex tw:gap-[6px] tw:transition-all tw:duration-300 tw:z-10 tw:pt-[5px] tw:px-[5px] tw:pb-[10px] node-action-buttons"
-        :data-test="`pipeline-node-${io_type}-actions`"
-        :style="{ '--node-color': getNodeColor(io_type) }"
-        @mouseenter="handleActionButtonsEnter"
-        @mouseleave="handleActionButtonsLeave"
-      >
-        <OButton
-          variant="ghost"
-          size="icon"
-          @click.stop="deleteNode(id)"
-          class="tw:min-w-[20px]! tw:w-[20px]! tw:h-[20px]! tw:p-0! tw:rounded! tw:bg-[rgba(255,255,255,0.95)]! tw:border! tw:border-(--node-color)! tw:text-(--node-color)! tw:transition-all! tw:duration-200! node-action-btn delete-btn"
-          :data-test="`pipeline-node-${io_type}-delete-btn`"
-          @mouseenter="handleDeleteTooltipEnter"
-          @mouseleave="handleDeleteTooltipLeave"
-        >
-          <OIcon name="delete" size="sm" />
-        </OButton>
-        <div
-          v-if="showDeleteTooltip"
-          class="tw:fixed tw:bg-[#dc2626] tw:text-white tw:py-[6px] tw:px-[10px] tw:rounded-md tw:text-[11px] tw:z-[1000] tw:shadow-[0_4px_12px_rgba(0,0,0,0.3)] tw:pointer-events-none tw:whitespace-nowrap"
-          style="left: 15px"
-        >
-          Delete Node
-          <div class="tw:absolute tw:top-full tw:left-1/2 tw:-translate-x-1/2 tw:w-0 tw:h-0 tw:border-l-[5px] tw:border-l-transparent tw:border-r-[5px] tw:border-r-transparent tw:border-t-[5px] tw:[border-top-color:#dc2626]"></div>
-        </div>
-      </div>
-    </div>
-
-    <div
-      v-if="data.node_type == 'condition'"
-      class="tw:p-0 btn-fixed-width"
-      :data-test="`pipeline-node-${io_type}-condition-node`"
-      data-node-type="condition"
-      style="
-        width: fit-content;
-        display: flex;
-        align-items: center;
-        border: none;
-        cursor: pointer;
-      "
-      @mouseenter="handleNodeHover(id, io_type)"
-      @mouseleave="handleNodeLeave(id)"
-      @click="editNode(id)"
-    >
-      <div class="icon-container tw:flex tw:items-center">
-        <!-- Icon -->
-        <OIcon
-          :name="getIcon(data, io_type)"
-          size="md"
-          class="tw:my-2 tw:mr-2"
-        />
-      </div>
-
-      <!-- Separator -->
-      <OSeparator vertical class="tw:mr-2" />
-
-      <!-- Label -->
-      <div class="container">
-        <div
+          v-else-if="data.node_type == 'condition'"
           class="tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!"
-          style="
-            text-align: left;
-            text-wrap: wrap;
-            width: auto;
-            text-overflow: ellipsis;
-          "
+          style="text-align: left; text-wrap: wrap; width: auto; text-overflow: ellipsis"
         >
           {{ getTruncatedConditions(data.condition || data.conditions) }}
         </div>
-      </div>
 
-      <div
-        v-show="showButtons"
-        class="tw:absolute tw:top-[-30px] tw:right-0 tw:flex tw:gap-[6px] tw:transition-all tw:duration-300 tw:z-10 tw:pt-[5px] tw:px-[5px] tw:pb-[10px] node-action-buttons"
-        :data-test="`pipeline-node-${io_type}-actions`"
-        :style="{ '--node-color': getNodeColor(io_type) }"
-        @mouseenter="handleActionButtonsEnter"
-        @mouseleave="handleActionButtonsLeave"
-      >
-        <OButton
-          variant="ghost"
-          size="icon"
-          @click.stop="deleteNode(id)"
-          class="tw:min-w-[20px]! tw:w-[20px]! tw:h-[20px]! tw:p-0! tw:rounded! tw:bg-[rgba(255,255,255,0.95)]! tw:border! tw:border-(--node-color)! tw:text-(--node-color)! tw:transition-all! tw:duration-200! node-action-btn delete-btn"
-          :data-test="`pipeline-node-${io_type}-delete-btn`"
-          @mouseenter="handleDeleteTooltipEnter"
-          @mouseleave="handleDeleteTooltipLeave"
-        >
-          <OIcon name="delete" size="sm" />
-        </OButton>
+      </template>
+
+      <!-- Error badge (function nodes) + delete button, shared across types -->
+      <template #actions>
         <div
-          v-if="showDeleteTooltip"
-          class="tw:fixed tw:bg-[#dc2626] tw:text-white tw:py-[6px] tw:px-[10px] tw:rounded-md tw:text-[11px] tw:z-[1000] tw:shadow-[0_4px_12px_rgba(0,0,0,0.3)] tw:pointer-events-none tw:whitespace-nowrap"
-          style="left: 15px"
+          v-if="data.node_type == 'function' && hasNodeError"
+          data-test="pipeline-node-error-badge"
+          class="tw:absolute tw:top-[-12px] tw:right-[-12px] tw:w-[20px] tw:h-[20px] tw:bg-[#ef4444] tw:border-2 tw:border-white tw:rounded-full tw:flex tw:items-center tw:justify-center tw:cursor-pointer tw:z-[15] tw:shadow-[0_2px_6px_rgba(239,68,68,0.5)] tw:transition-all tw:duration-200 error-badge"
+          @click.stop="navigateToFunction(data.name)"
         >
-          Delete Node
-          <div class="tw:absolute tw:top-full tw:left-1/2 tw:-translate-x-1/2 tw:w-0 tw:h-0 tw:border-l-[5px] tw:border-l-transparent tw:border-r-[5px] tw:border-r-transparent tw:border-t-[5px] tw:[border-top-color:#dc2626]"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- LLM Evaluation Node -->
-    <div
-      v-if="data.node_type == 'llm_evaluation'"
-      class="tw:p-0 btn-fixed-width"
-      :data-test="`pipeline-node-${io_type}-llm-evaluation-node`"
-      data-node-type="llm_evaluation"
-      style="
-        width: fit-content;
-        display: flex;
-        align-items: center;
-        border: none;
-        cursor: pointer;
-      "
-      @mouseenter="handleNodeHover(id, io_type)"
-      @mouseleave="handleNodeLeave(id)"
-      @click="editNode(id)"
-    >
-      <div class="icon-container tw:flex tw:items-center">
-        <!-- Icon -->
-        <OIcon
-          :name="getIcon(data, io_type)"
-          size="md"
-          class="tw:my-2 tw:mr-2"
-        />
-      </div>
-
-      <!-- Separator -->
-      <OSeparator vertical class="tw:mr-2" />
-
-      <!-- Label -->
-      <div class="container">
-        <div
-          class="tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!"
-          style="
-            text-align: left;
-            text-wrap: wrap;
-            width: auto;
-            text-overflow: ellipsis;
-          "
-        >
-          <span>{{ data.name || "LLM Evaluation" }}</span>
+          <OIcon name="error" size="sm" />
           <span
-            v-if="data.sampling_rate"
-            style="font-size: 0.85em; color: #666; margin-left: 8px"
+            data-test="pipeline-node-error-count"
+            v-if="
+              pipelineObj.currentSelectedPipeline?.last_error?.node_errors?.[id]
+                ?.error_count
+            "
+            class="tw:absolute tw:top-[-6px] tw:right-[-6px] tw:bg-[#dc2626] tw:text-white tw:text-[9px] tw:font-bold tw:min-w-[14px] tw:h-[14px] tw:rounded-[7px] tw:flex tw:items-center tw:justify-center tw:px-[3px] tw:border-[1.5px] tw:border-solid tw:border-white tw:shadow-[0_1px_3px_rgba(0,0,0,0.4)]"
           >
-            ({{ (data.sampling_rate * 100).toFixed(0) }}%)
+            {{
+              pipelineObj.currentSelectedPipeline.last_error.node_errors[id]
+                .error_count
+            }}
           </span>
-          <OTooltip
-            side="top"
-            align="center"
-            :sideOffset="10"
-            max-width="400px"
-          >
+          <OTooltip side="top" align="center" :sideOffset="10" max-width="600px">
             <template #content>
-              <div class="tw:p-2">
-                <div class="tw:font-bold tw:mb-2">
-                  {{ t("pipeline.llmEvaluationNodeTitle") }}
-                </div>
-                <div>
-                  <strong>{{ t("pipeline.nameLabel") }}:</strong>
-                  {{ data.name || "evaluate" }}
-                </div>
-                <div v-if="data.sampling_rate">
-                  <strong>{{ t("pipeline.samplingLabel") }}:</strong>
-                  {{ (data.sampling_rate * 100).toFixed(1) }}%
-                  {{ t("pipeline.samplingOfTraces") }}
-                </div>
-                <div v-else>
-                  <strong>{{ t("pipeline.samplingLabel") }}:</strong>
-                  {{ t("pipeline.samplingAllTraces") }}
-                </div>
-                <div class="tw:mt-2 tw:text-xs tw:text-gray-400">
-                  {{ t("pipeline.llmEvaluationDescription") }}
-                </div>
+              <div style="max-height: 300px; overflow-y: auto">
+                {{ getNodeErrorInfo || "Error occurred" }}
               </div>
             </template>
           </OTooltip>
         </div>
-      </div>
 
-      <div
-        v-show="showButtons"
-        class="tw:absolute tw:top-[-30px] tw:right-0 tw:flex tw:gap-[6px] tw:transition-all tw:duration-300 tw:z-10 tw:pt-[5px] tw:px-[5px] tw:pb-[10px] node-action-buttons"
-        :data-test="`pipeline-node-${io_type}-actions`"
-        :style="{ '--node-color': getNodeColor(io_type) }"
-        @mouseenter="handleActionButtonsEnter"
-        @mouseleave="handleActionButtonsLeave"
-      >
-        <OButton
-          variant="ghost"
-          size="icon"
-          @click.stop="deleteNode(id)"
-          class="tw:min-w-[20px]! tw:w-[20px]! tw:h-[20px]! tw:p-0! tw:rounded! tw:bg-[rgba(255,255,255,0.95)]! tw:border! tw:border-(--node-color)! tw:text-(--node-color)! tw:transition-all! tw:duration-200! node-action-btn delete-btn"
-          :data-test="`pipeline-node-${io_type}-delete-btn`"
-          @mouseenter="handleDeleteTooltipEnter"
-          @mouseleave="handleDeleteTooltipLeave"
-        >
-          <OIcon name="delete" size="sm" />
-        </OButton>
         <div
-          v-if="showDeleteTooltip"
-          class="tw:fixed tw:bg-[#dc2626] tw:text-white tw:py-[6px] tw:px-[10px] tw:rounded-md tw:text-[11px] tw:z-[1000] tw:shadow-[0_4px_12px_rgba(0,0,0,0.3)] tw:pointer-events-none tw:whitespace-nowrap"
-          style="left: 15px"
+          v-show="showButtons"
+          class="tw:absolute tw:top-[-30px] tw:right-0 tw:flex tw:gap-[6px] tw:transition-all tw:duration-300 tw:z-10 tw:pt-[5px] tw:px-[5px] tw:pb-[10px] node-action-buttons"
+          :data-test="`pipeline-node-${io_type}-actions`"
+          :style="{ '--node-color': getNodeColor(io_type) }"
+          @mouseenter="handleActionButtonsEnter"
+          @mouseleave="handleActionButtonsLeave"
         >
-          Delete Node
-          <div class="tw:absolute tw:top-full tw:left-1/2 tw:-translate-x-1/2 tw:w-0 tw:h-0 tw:border-l-[5px] tw:border-l-transparent tw:border-r-[5px] tw:border-r-transparent tw:border-t-[5px] tw:[border-top-color:#dc2626]"></div>
+          <OButton
+            variant="ghost"
+            size="icon"
+            @click.stop="deleteNode(id)"
+            class="tw:min-w-[20px]! tw:w-[20px]! tw:h-[20px]! tw:p-0! tw:rounded! tw:bg-[rgba(255,255,255,0.95)]! tw:border! tw:border-(--node-color)! tw:text-(--node-color)! tw:transition-all! tw:duration-200! node-action-btn delete-btn"
+            :data-test="`pipeline-node-${io_type}-delete-btn`"
+            @mouseenter="handleDeleteTooltipEnter"
+            @mouseleave="handleDeleteTooltipLeave"
+          >
+            <OIcon name="delete" size="sm" />
+          </OButton>
+          <div
+            v-if="showDeleteTooltip"
+            class="tw:fixed tw:bg-[#dc2626] tw:text-white tw:py-[6px] tw:px-[10px] tw:rounded-md tw:text-[11px] tw:z-[1000] tw:shadow-[0_4px_12px_rgba(0,0,0,0.3)] tw:pointer-events-none tw:whitespace-nowrap"
+            style="left: 15px"
+          >
+            Delete Node
+            <div class="tw:absolute tw:top-full tw:left-1/2 tw:-translate-x-1/2 tw:w-0 tw:h-0 tw:border-l-[5px] tw:border-l-transparent tw:border-r-[5px] tw:border-r-transparent tw:border-t-[5px] tw:[border-top-color:#dc2626]"></div>
+          </div>
         </div>
-      </div>
-    </div>
+      </template>
 
-    <Handle
-      v-if="io_type === 'input' || io_type === 'default'"
-      id="output"
-      type="source"
-      :position="'bottom'"
-      :class="`node_handle_custom handle_${io_type}`"
-      :data-test="`pipeline-node-${io_type}-output-handle`"
-    />
+      <!-- hover-`+` "add next step" — non-terminal (non-output) nodes only. -->
+      <template #footer>
+        <div
+          v-show="showButtons && io_type !== 'output'"
+          class="pl-plus nodrag"
+          :data-test="`pipeline-node-${io_type}-add`"
+          @pointerdown.stop
+          @click.stop
+          @mouseenter="handleActionButtonsEnter"
+          @mouseleave="handleActionButtonsLeave"
+        >
+          <button
+            type="button"
+            class="pl-plus-btn"
+            :data-test="`pipeline-node-${io_type}-add-btn`"
+            @click.stop="openStepPicker(id)"
+          >
+            <OIcon name="add" size="xs" />
+          </button>
+        </div>
+      </template>
+    </FlowNodeCard>
   </div>
 
   <confirm-dialog
@@ -1027,6 +561,44 @@ function getIcon(data, ioType) {
 </template>
 
 <style>
+/* hover-`+` "add next step" affordance — positioned below the node card. */
+.pl-plus {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-top: 12px;
+  transform: translateX(-50%);
+  z-index: 5;
+}
+.pl-plus-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px dashed var(--o2-border-strong, #d9dce4);
+  background: #fff;
+  color: #6b7280;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.14s;
+}
+.pl-plus-btn:hover {
+  border-style: solid;
+  border-color: #5a61cc;
+  color: #5a61cc;
+  background: #eceefb;
+}
+.body--dark .pl-plus-btn {
+  background: rgba(30, 34, 45, 0.95);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.7);
+}
+.body--dark .pl-plus-btn:hover {
+  border-color: #818cf8;
+  color: #818cf8;
+  background: rgba(129, 140, 248, 0.15);
+}
+
 .node_handle_custom {
   width: 16px !important;
   height: 16px !important;

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   No sidebar / drag-drop wiring (FD2): nodes are added via the hover-`+`
   StepMenu (a later slice). This slice renders the VueFlow surface with the
-  colour-coded WorkflowNode, WorkflowEdge, a dotted grid background, zoom
+  colour-coded WorkflowNode, shared FlowEdge, a dotted grid background, zoom
   controls and an empty-state hint.
 -->
 <template>
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #edge-custom="edgeProps">
-      <WorkflowEdge
+      <FlowEdge
         :id="edgeProps.id"
         :source-x="edgeProps.sourceX"
         :source-y="edgeProps.sourceY"
@@ -68,11 +68,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <Controls :show-interactive="false" class="controls-grp" position="top-left" />
-
-    <!-- Floating node palette, anchored bottom-left inside the canvas. -->
-    <Panel position="bottom-left" class="wf-palette-panel">
-      <WorkflowNodePalette />
-    </Panel>
   </VueFlow>
 
   <div
@@ -86,13 +81,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { VueFlow, useVueFlow, Panel } from "@vue-flow/core";
+import { VueFlow, useVueFlow } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import { useI18n } from "vue-i18n";
 import WorkflowNode from "./WorkflowNode.vue";
-import WorkflowEdge from "./WorkflowEdge.vue";
-import WorkflowNodePalette from "./WorkflowNodePalette.vue";
+import FlowEdge from "@/components/flow/FlowEdge.vue";
 import useWorkflowCanvas from "./useWorkflowCanvas";
 
 import "@vue-flow/core/dist/style.css";
@@ -160,13 +154,28 @@ defineExpose({ vueFlowRef });
   backdrop-filter: blur(10px);
   transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
 }
-.o2vf_node .vue-flow__node:hover {
-  box-shadow: 0 8px 24px rgba(20, 24, 33, 0.14);
-}
 .o2vf_node .vue-flow__node:active,
 .o2vf_node .vue-flow__node.dragging {
   cursor: grabbing;
   transition: none !important;
+}
+
+/* Per-type coloured hover glow (mirrors PipelineEditor): input=blue,
+   default=amber, output=green. */
+.o2vf_node .vue-flow__node-input:hover {
+  background: rgba(239, 246, 255, 1);
+  border-color: rgba(96, 165, 250, 0.9);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.2);
+}
+.o2vf_node .vue-flow__node-default:hover {
+  background: rgba(255, 251, 235, 0.95);
+  border-color: #f59e0b;
+  box-shadow: 0 6px 16px rgba(217, 119, 6, 0.2);
+}
+.o2vf_node .vue-flow__node-output:hover {
+  background: rgba(240, 253, 244, 1);
+  border-color: rgba(74, 222, 128, 0.8);
+  box-shadow: 0 6px 16px rgba(34, 197, 94, 0.2);
 }
 
 /* Node colours mirror PipelineEditor exactly: input=blue, default=amber,
@@ -197,26 +206,40 @@ defineExpose({ vueFlowRef });
   box-shadow: 0 0 0 3px rgba(90, 97, 204, 0.22);
 }
 
-/* handles (ported from pipeline) */
+/* Handles — ported from pipeline exactly: a coloured ring with a darker
+   coloured inner dot (the `::before`), giving the "connection dot" look. */
 .node_handle_custom {
-  width: 14px !important;
-  height: 14px !important;
+  width: 16px !important;
+  height: 16px !important;
   border: 3px solid rgba(255, 255, 255, 0.9);
   border-radius: 50% !important;
   background: #6b7280;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+.node_handle_custom::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #374151;
+  transition: all 0.3s ease;
 }
 .handle_input { background: #dbeafe !important; }
-.handle_default { background: #eef1fe !important; }
+.handle_input::before { background: #3b82f6 !important; }
 .handle_output { background: #dcfce7 !important; }
+.handle_output::before { background: #22c55e !important; }
+.handle_default { background: #fef3c7 !important; }
+.handle_default::before { background: #f59e0b !important; }
 
 /* ── Dark mode ── mirrors PipelineEditor's `.dark .vue-flow__node-*` values. */
 .dark .o2vf_node .vue-flow__node {
   background: rgba(30, 34, 45, 0.9) !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-}
-.dark .o2vf_node .vue-flow__node:hover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 .dark .o2vf_node .vue-flow__node-input {
   background: rgba(30, 58, 138, 0.2) !important;
@@ -233,8 +256,21 @@ defineExpose({ vueFlowRef });
   border-color: rgba(74, 222, 128, 0.3) !important;
   color: rgba(255, 255, 255, 0.9) !important;
 }
-/* handle ring blends with the dark canvas instead of a bright white ring */
-.dark .node_handle_custom {
-  border-color: rgba(30, 34, 45, 0.9);
+
+/* Per-type coloured hover glow in dark (mirrors PipelineEditor). */
+.dark .o2vf_node .vue-flow__node-input:hover {
+  background: rgba(30, 58, 138, 0.3) !important;
+  border-color: rgba(96, 165, 250, 0.5) !important;
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.2) !important;
+}
+.dark .o2vf_node .vue-flow__node-default:hover {
+  background: rgba(120, 53, 15, 0.3) !important;
+  border-color: rgba(251, 146, 60, 0.5) !important;
+  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.2) !important;
+}
+.dark .o2vf_node .vue-flow__node-output:hover {
+  background: rgba(20, 83, 45, 0.3) !important;
+  border-color: rgba(74, 222, 128, 0.5) !important;
+  box-shadow: 0 6px 16px rgba(34, 197, 94, 0.2) !important;
 }
 </style>

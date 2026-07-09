@@ -51,29 +51,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
       <div class="tw:flex tw:mt-3 tw:px-2">
-        <div class="nodes-drag-container tw:pr-3 tw:w-50">
-          <div
-            data-test="pipeline-editor-nodes-list-title"
-            class="nodes-header tw:mb-2 tw:mx-2 tw:text-base tw:font-semibold tw:px-1 tw:pb-2 tw:text-center tw:border-b-2 tw:tracking-wide tw:relative"
-            :class="
-              store.state.theme === 'dark'
-                ? 'tw:text-[rgba(255,255,255,0.95)] tw:border-[rgba(255,255,255,0.2)]'
-                : 'tw:text-[#1f2937] tw:border-[#e5e7eb]'
-            "
-          >
-            {{ t("pipeline.nodes") }}
-          </div>
-
-
-          <div class="tw:flex tw:mt-2">
-            <NodeSidebar
-              v-show="
-                !pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'
-              "
-              :nodeTypes="nodeTypes"
-            />
-          </div>
-        </div>
+        <!-- Docked node palette (shared with Workflows). Same component drives
+             both editors, so the two palettes can never drift apart. -->
+        <NodePalette
+          v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'"
+          :items="pipelineObj.nodeTypes"
+          :title="t('pipeline.nodes')"
+          test-prefix="pipeline-node-sidebar"
+          :on-drag-start="onDragStart"
+        />
         <div
           id="pipelineChartContainer"
           ref="chartContainerRef"
@@ -116,6 +102,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="pipelineObj.dialog.name === 'remote_stream'"
     :open="true"
     @cancel:hideform="resetDialog"
+  />
+  <!-- shared "add next step" picker (opened by the hover-+ on a node) -->
+  <StepPickerDialog
+    v-if="pipelineObj.stepPicker.show"
+    :items="stepItems"
+    :title="t('flow.stepPicker.title')"
+    :search-placeholder="t('flow.stepPicker.search')"
+    :no-match-text="t('flow.stepPicker.noMatch')"
+    test-prefix="pipeline-step"
+    @pick="onStepPick"
+    @close="closeStepPicker"
   />
   <ODrawer data-test="pipeline-editor-json-editor-drawer"
     v-model:open="showJsonEditorDialog"
@@ -181,12 +178,13 @@ import { useStore } from "vuex";
 import pipelineService from "@/services/pipelines";
 import { onBeforeRouteLeave, useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
+import NodePalette from "@/components/flow/NodePalette.vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import jstransform from "@/services/jstransform";
-import NodeSidebar from "@/components/pipeline/NodeSidebar.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
 import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
@@ -369,7 +367,33 @@ const nodeTypes: any = [
 ];
 const functions = ref<{ [key: string]: Function }>({});
 
-const { pipelineObj, resetPipelineData } = useDragAndDrop();
+const { pipelineObj, resetPipelineData, addNodeAfter, closeStepPicker, onDragStart } =
+  useDragAndDrop();
+
+// Items for the shared step picker: the downstream-addable node types
+// (Transform + Destination; sources aren't "added after" a node).
+const stepItems = computed(() =>
+  (pipelineObj.nodeTypes || [])
+    .filter((n: any) => !n.isSectionHeader && n.io_type !== "input")
+    .map((n: any) => ({
+      key: `${n.subtype}-${n.io_type}`,
+      title: n.label,
+      description: n.tooltip,
+      icon: n.icon,
+      iconTint:
+        n.io_type === "output"
+          ? "tw:bg-[#e6f6ee] tw:text-[#1f9d63]"
+          : "tw:bg-[#fdf3e2] tw:text-[#e0891d]",
+      subtype: n.subtype,
+      io_type: n.io_type,
+    })),
+);
+
+const onStepPick = (item: any) => {
+  const source = pipelineObj.stepPicker.source;
+  closeStepPicker();
+  addNodeAfter(source, { subtype: item.subtype, io_type: item.io_type });
+};
 pipelineObj.nodeTypes = nodeTypes;
 pipelineObj.functions = functions;
 
@@ -693,6 +717,8 @@ const getFunctions = () => {
 const resetDialog = () => {
   pipelineObj.dialog.show = false;
   pipelineObj.dialog.name = "";
+  // Discard any staged hover-`+` edge so a cancelled add doesn't wire the next node.
+  pipelineObj.pendingEdge = null;
   editingFunctionName.value = "";
   editingStreamRouteName.value = "";
 };
@@ -1149,17 +1175,6 @@ const cleanupPipelinesContextProvider = () => {
 </script>
 
 <style>
-.nodes-header::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: #8b5cf6;
-  border-radius: 1px;
-}
-
 /* Global rule to eliminate ALL transitions during any Vue Flow drag operation */
 .vue-flow.dragging *,
 .vue-flow:has(.vue-flow__node:active) * {
@@ -1298,10 +1313,6 @@ const cleanupPipelinesContextProvider = () => {
 .o2vf_node .vue-flow__node-default:active *,
 .o2vf_node .vue-flow__node-default.dragging * {
   transition: none !important;
-}
-
-.dark .nodes-header::after {
-  background: #a855f7 !important;
 }
 
 .dark .vue-flow__node-input,

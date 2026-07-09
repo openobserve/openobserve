@@ -15,105 +15,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  Workflow canvas node — follows the pipeline CustomNode structure (icon |
-  separator | label). The card border/background come from the VueFlow node
-  wrapper styled by WorkflowFlow's `.o2vf_node` rules (same approach as
-  PipelineEditor), so the node looks consistent with pipeline nodes. Handle
-  layout is derived from node_type (via nodeMeta), not a stored io_type.
-
-  Condition renders TWO source handles (true / false); every other node has a
-  single output handle, and every node except the trigger has an input handle.
+  Workflow canvas node — a thin wrapper over the shared FlowNodeCard. The card
+  frame/handles/icon/label are shared with pipelines; this component adds the
+  workflow interactions: click-to-edit, hover-delete (trigger is fixed), and the
+  hover-`+` "add next step" affordance (Condition is a single-output filter, so
+  one output — no true/false branch).
 -->
 <template>
-  <div
-    class="wf-node"
+  <FlowNodeCard
+    :icon="nodeIcon"
+    :label="meta ? t(meta.titleKey) : data?.node_type"
+    :io-type="meta?.ioType || 'default'"
+    :has-input="meta?.ioType !== 'input'"
+    :has-output="meta?.ioType !== 'output'"
     :data-test="`workflow-node-${data?.node_type}`"
+    @click="onClick"
     @mouseenter="handleNodeHover"
     @mouseleave="handleNodeLeave"
-    @click="onClick"
   >
-    <!-- input handle -->
-    <Handle
-      v-if="meta?.ioType !== 'input'"
-      id="input"
-      type="target"
-      :position="'top'"
-      :class="`node_handle_custom handle_${meta?.ioType || 'default'}`"
-    />
-
-    <div class="icon-container tw:flex tw:items-center">
-      <OIcon :name="meta?.icon || 'help'" size="md" class="tw:my-2 tw:mr-2" />
-    </div>
-
-    <OSeparator vertical class="tw:mr-2" />
-
-    <div class="container">
-      <div class="wf-node-title tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!">
-        {{ meta ? t(meta.titleKey) : data?.node_type }}
-      </div>
-    </div>
-
     <!-- hover actions (delete) — trigger is fixed -->
-    <div
-      v-show="showButtons && meta?.category !== 'trigger'"
-      class="tw:absolute tw:top-[-30px] tw:right-0 tw:flex tw:gap-[6px] tw:z-10 tw:pt-[5px] tw:px-[5px] tw:pb-[10px]"
-      :data-test="`workflow-node-${data?.node_type}-actions`"
-      @mouseenter="handleActionsEnter"
-      @mouseleave="handleActionsLeave"
-    >
-      <OButton
-        variant="ghost"
-        size="icon"
-        class="tw:min-w-[20px]! tw:w-[20px]! tw:h-[20px]! tw:p-0! tw:rounded! tw:bg-[rgba(255,255,255,0.95)]! tw:border! tw:border-[#dc2626]! tw:text-[#dc2626]!"
-        :data-test="`workflow-node-${data?.node_type}-delete-btn`"
-        @click.stop="requestDeleteNode(id)"
+    <template #actions>
+      <div
+        v-show="showButtons && meta?.category !== 'trigger'"
+        class="tw:absolute tw:top-[-30px] tw:right-0 tw:flex tw:gap-[6px] tw:z-10 tw:pt-[5px] tw:px-[5px] tw:pb-[10px]"
+        :data-test="`workflow-node-${data?.node_type}-actions`"
+        @mouseenter="handleActionsEnter"
+        @mouseleave="handleActionsLeave"
       >
-        <OIcon name="delete" size="sm" />
-      </OButton>
-    </div>
+        <OButton
+          variant="ghost"
+          size="icon"
+          class="tw:min-w-[20px]! tw:w-[20px]! tw:h-[20px]! tw:p-0! tw:rounded! tw:bg-[rgba(255,255,255,0.95)]! tw:border! tw:border-[#dc2626]! tw:text-[#dc2626]!"
+          :data-test="`workflow-node-${data?.node_type}-delete-btn`"
+          @click.stop="requestDeleteNode(id)"
+        >
+          <OIcon name="delete" size="sm" />
+        </OButton>
+      </div>
+    </template>
 
-    <!-- output handle. Condition is a filter (single output): matching records
-         continue, the rest are dropped — no true/false branch. -->
-    <Handle
-      v-if="meta?.ioType !== 'output'"
-      id="output"
-      type="source"
-      :position="'bottom'"
-      :class="`node_handle_custom handle_${meta?.ioType || 'default'}`"
-    />
-
-    <!-- hover-`+` add-next affordance. Terminal (action) nodes have none. -->
-    <div
-      v-for="p in pluses"
-      :key="p.handle"
-      class="wf-plus nodrag"
-      :class="p.cls"
-      @pointerdown.stop
-      @click.stop
-    >
-      <button
-        type="button"
-        class="wf-plus-btn"
-        :data-test="`workflow-node-${data?.node_type}-add-${p.handle}`"
-        @click.stop="openStepPicker(id, p.handle)"
+    <!-- hover-`+` add-next affordance (shown on hover). Terminal (action) nodes
+         have none. -->
+    <template #footer>
+      <div
+        v-for="p in pluses"
+        v-show="showButtons"
+        :key="p.handle"
+        class="wf-plus nodrag"
+        :class="p.cls"
+        @pointerdown.stop
+        @click.stop
+        @mouseenter="handleActionsEnter"
+        @mouseleave="handleActionsLeave"
       >
-        <OIcon name="add" size="xs" />
-      </button>
-      <span v-if="p.tag" class="wf-plus-tag" :class="`wf-plus-tag-${p.handle}`">
-        {{ p.tag }}
-      </span>
-    </div>
-  </div>
+        <button
+          type="button"
+          class="wf-plus-btn"
+          :data-test="`workflow-node-${data?.node_type}-add-${p.handle}`"
+          @click.stop="openStepPicker(id, p.handle)"
+        >
+          <OIcon name="add" size="xs" />
+        </button>
+        <span v-if="p.tag" class="wf-plus-tag" :class="`wf-plus-tag-${p.handle}`">
+          {{ p.tag }}
+        </span>
+      </div>
+    </template>
+  </FlowNodeCard>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { Handle } from "@vue-flow/core";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
 import useWorkflowCanvas, { nodeMeta } from "./useWorkflowCanvas";
+import { workflowNodeImage } from "./nodeIcons";
 
 const props = defineProps<{
   id: string;
@@ -124,6 +102,12 @@ const { t } = useI18n();
 const { editNode, requestDeleteNode, openStepPicker } = useWorkflowCanvas();
 const showButtons = ref(false);
 const meta = computed(() => nodeMeta(props.data?.node_type));
+// Icon for this node type: the pipeline node image as an "img:<url>" string
+// (rendered by OIcon exactly like pipeline canvas nodes), or the OIcon glyph name.
+const nodeIcon = computed(() => {
+  const img = workflowNodeImage(props.data?.node_type);
+  return img ? `img:${img}` : meta.value?.icon || "help";
+});
 
 // Hover-action visibility (pipeline pattern): a short delay before hiding, and
 // the action buttons cancel the hide while hovered — so moving the cursor from
@@ -160,27 +144,10 @@ const pluses = computed(() => {
   return [{ handle: "out", cls: "wf-plus-out", tag: "" }];
 });
 
-
 const onClick = () => editNode(props.id);
 </script>
 
 <style scoped>
-.wf-node {
-  display: flex;
-  align-items: center;
-  border: none;
-  cursor: pointer;
-  width: fit-content;
-}
-.container {
-  text-align: left;
-  min-width: 0;
-}
-.wf-node-title {
-  text-align: left;
-  white-space: nowrap;
-}
-
 /* hover-`+` add affordance — positioned below the node card (the VueFlow node
    wrapper is the positioned ancestor). */
 .wf-plus {

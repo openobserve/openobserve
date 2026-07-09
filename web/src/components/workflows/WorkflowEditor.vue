@@ -29,74 +29,95 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="workflow-editor-page"
     class="tw:flex tw:flex-col tw:h-[calc(100vh-var(--navbar-height,2.25rem))] tw:min-h-0"
   >
-    <!-- toolbar -->
-    <header
-      class="tw:flex tw:items-center tw:gap-3 tw:px-4 tw:h-[54px] tw:shrink-0 tw:border-b tw:border-border-default"
+    <!-- Toolbar — the shared AppPageHeader (same as the pipeline editor): a
+         back chevron in the module-icon slot, the workflow name input inline
+         after the title, and the Test / Cancel / Save actions right-aligned. -->
+    <AppPageHeader
+      :title="t('workflow.header')"
+      :back="{ label: t('workflow.header'), onClick: goBack, dataTest: 'workflow-editor-back' }"
+      class="tw:px-4 tw:border-b tw:border-border-default"
     >
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="arrow-back"
-        data-test="workflow-editor-back"
-        @click="goBack"
-      >
-        <OTooltip side="bottom" :content="t('workflow.backToList')" />
-      </OButton>
+      <template #title-trail>
+        <div class="tw:w-64 tw:shrink-0 tw:flex tw:items-center tw:gap-2">
+          <OInput
+            v-model="workflowObj.currentSelectedWorkflow.name"
+            data-test="workflow-editor-name"
+            hide-bottom-space
+            :placeholder="t('workflow.namePlaceholder')"
+            :error="workflowObj.nameError"
+            @update:model-value="workflowObj.nameError = false"
+          />
+          <OTag
+            v-if="workflowObj.currentSelectedWorkflow.id"
+            type="alertStatus"
+            :value="workflowObj.currentSelectedWorkflow.enabled ? 'active' : 'paused'"
+          />
+        </div>
+      </template>
 
-      <OInput
-        v-model="workflowObj.currentSelectedWorkflow.name"
-        class="tw:w-[260px]"
-        data-test="workflow-editor-name"
-        :placeholder="t('workflow.namePlaceholder')"
-        :error="workflowObj.nameError"
-        @update:model-value="workflowObj.nameError = false"
+      <template #actions>
+        <OButton
+          variant="outline"
+          size="sm-action"
+          data-test="workflow-editor-test"
+          @click="onTest"
+        >
+          {{ t("workflow.test") }}
+        </OButton>
+        <OButton
+          variant="outline"
+          size="sm-action"
+          data-test="workflow-editor-cancel"
+          @click="goBack"
+        >
+          {{ t("common.cancel") }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          data-test="workflow-editor-save"
+          :loading="saving"
+          :disabled="saving"
+          @click="onSave"
+        >
+          {{ t("common.save") }}
+        </OButton>
+      </template>
+    </AppPageHeader>
+
+    <!-- workspace: docked palette + canvas (+ drawer region for node forms) -->
+    <div class="tw:flex-1 tw:flex tw:min-h-0 tw:relative tw:pt-3 tw:px-2">
+      <!-- Docked node palette — same shared component as Pipelines, so the two
+           palettes can never drift apart. Workflows add click-to-append. -->
+      <NodePalette
+        :items="paletteItems"
+        :title="t('workflow.node.paletteTitle')"
+        test-prefix="workflow-palette"
+        :on-drag-start="paletteDragStart"
+        :on-item-click="paletteClick"
       />
-
-      <OTag
-        v-if="workflowObj.currentSelectedWorkflow.id"
-        type="alertStatus"
-        :value="workflowObj.currentSelectedWorkflow.enabled ? 'active' : 'paused'"
-      />
-
-      <div class="tw:flex-1"></div>
-
-      <OButton
-        variant="outline"
-        size="sm-action"
-        data-test="workflow-editor-test"
-        @click="onTest"
+      <!-- Canvas drop area — gray rounded inset card, matching the pipeline
+           editor's `#pipelineChartContainer` so both look identical. -->
+      <div
+        class="tw:flex-1 tw:relative tw:min-w-0 tw:rounded-xl tw:overflow-hidden tw:mb-3"
+        :class="store.state.theme === 'dark' ? '' : 'tw:bg-gray-100'"
       >
-        {{ t("workflow.test") }}
-      </OButton>
-      <OButton
-        variant="outline"
-        size="sm-action"
-        data-test="workflow-editor-cancel"
-        @click="goBack"
-      >
-        {{ t("common.cancel") }}
-      </OButton>
-      <OButton
-        variant="primary"
-        size="sm-action"
-        data-test="workflow-editor-save"
-        :loading="saving"
-        :disabled="saving"
-        @click="onSave"
-      >
-        {{ t("common.save") }}
-      </OButton>
-    </header>
-
-    <!-- workspace: canvas (+ drawer region for node forms in later slices) -->
-    <div class="tw:flex-1 tw:flex tw:min-h-0 tw:relative">
-      <div class="tw:flex-1 tw:relative tw:min-w-0">
         <WorkflowFlow />
       </div>
     </div>
 
-    <!-- "add next step" picker (opened by the hover-+ on a node) -->
-    <WorkflowStepDialog v-if="workflowObj.stepPicker.show" />
+    <!-- "add next step" picker (opened by the hover-+ on a node) — shared with
+         pipelines. -->
+    <StepPickerDialog
+      v-if="workflowObj.stepPicker.show"
+      :items="stepItems"
+      :title="t('workflow.node.stepDialogTitle')"
+      :search-placeholder="t('workflow.node.stepSearchPlaceholder')"
+      :no-match-text="t('workflow.node.stepNoMatch')"
+      test-prefix="workflow-step"
+      @pick="onStepPick"
+      @close="closeStepPicker"
+    />
 
     <!-- node config side panel — mounted fresh per open (like PipelineEditor's
          node forms) so the drawer renders already-open without replaying the
@@ -117,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref } from "vue";
+import { computed, onMounted, onBeforeUnmount, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -125,25 +146,96 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { getUUID } from "@/utils/zincutils";
 
 import WorkflowFlow from "@/plugins/workflows/WorkflowFlow.vue";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
-import WorkflowStepDialog from "./WorkflowStepDialog.vue";
+import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
+import NodePalette from "@/components/flow/NodePalette.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useWorkflowCanvas, {
   workflowObj,
   hydrateWorkflow,
+  nodeMeta,
+  ADDABLE_NODE_TYPES,
 } from "@/plugins/workflows/useWorkflowCanvas";
+import { workflowNodeImage } from "@/plugins/workflows/nodeIcons";
 import workflowService from "@/services/workflows";
 
 const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
-const { resetWorkflowData, editNode, deleteNode, cancelDeleteNode } =
-  useWorkflowCanvas();
+const {
+  resetWorkflowData,
+  editNode,
+  deleteNode,
+  cancelDeleteNode,
+  addNodeAfter,
+  closeStepPicker,
+  onDragStart,
+  addNodeToEnd,
+} = useWorkflowCanvas();
+
+// Docked palette items, grouped into sections (Transform / Destination) to
+// mirror the pipeline sidebar. The trigger is pre-placed and not addable, so
+// there's no Source section. Icons reuse the pipeline node images (shared map)
+// so the two palettes look identical — the shared palette renders an "img:"
+// glyph as an <img>, else falls back to the OIcon name. Workflows support
+// click-to-append (addNodeToEnd) in addition to drag.
+const paletteCard = (nt: string) => {
+  const m = nodeMeta(nt);
+  const img = workflowNodeImage(nt);
+  return {
+    label: t(m?.titleKey || nt),
+    icon: img ? "img:" + img : m?.icon || "help",
+    io_type: m?.ioType || "default",
+    subtype: nt,
+    tooltip: t(m?.descKey || ""),
+    isSectionHeader: false,
+  };
+};
+const paletteItems = computed(() => {
+  const transforms = ADDABLE_NODE_TYPES.filter(
+    (nt) => nodeMeta(nt)?.ioType !== "output",
+  );
+  const destinations = ADDABLE_NODE_TYPES.filter(
+    (nt) => nodeMeta(nt)?.ioType === "output",
+  );
+  return [
+    { label: t("workflow.node.sectionTransform"), isSectionHeader: true },
+    ...transforms.map(paletteCard),
+    { label: t("workflow.node.sectionDestination"), isSectionHeader: true },
+    ...destinations.map(paletteCard),
+  ];
+});
+const paletteDragStart = (e: DragEvent, item: any) => onDragStart(e, item.subtype);
+const paletteClick = (item: any) => addNodeToEnd(item.subtype);
+
+// Items for the shared step picker (the addable step types).
+const stepItems = computed(() =>
+  ADDABLE_NODE_TYPES.map((nt: string) => {
+    const m = nodeMeta(nt);
+    const img = workflowNodeImage(nt);
+    return {
+      key: nt,
+      title: t(m?.titleKey || nt),
+      description: t(m?.descKey || ""),
+      icon: img ? `img:${img}` : m?.icon || "help",
+      iconTint:
+        m?.category === "action"
+          ? "tw:bg-[#e6f6ee] tw:text-[#1f9d63]"
+          : "tw:bg-[#fdf3e2] tw:text-[#e0891d]",
+    };
+  }),
+);
+
+const onStepPick = (item: any) => {
+  const { source, handle } = workflowObj.stepPicker;
+  closeStepPicker();
+  addNodeAfter(source, handle, item.key);
+};
 
 const orgId = () => store.state.selectedOrganization.identifier as string;
 

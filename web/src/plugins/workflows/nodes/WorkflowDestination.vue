@@ -15,136 +15,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  "Send To Destination" node body (drawer content only — chrome lives in
-  WorkflowNodeDrawer). Mirrors pipeline's ExternalDestination: pick an existing
-  Pipeline (remote) Destination or create one inline. The serialized node_type is
-  `remote_stream` (NodeData::RemoteStream { org_id, destination_name }) — the same
-  node the pipeline uses to forward records to an external destination.
+  "Send To Destination" node body — a thin wrapper over the shared
+  DestinationPicker (same body the pipeline external-destination form uses).
+  Pick an existing Pipeline (remote) Destination or create one inline.
 
-  NOTE: v1 uses pipeline/remote destinations (not alert destinations). Backend
-  just needs RemoteStream added to `is_workflow_node()` to accept this on save.
+  Payload -> NodeData::Destination { destination_id, template_override }
+  (node_type `destination`). `destination_id` is the Pipeline Destination's NAME
+  (the shared picker returns it as `destination_name`; we remap here — pipelines
+  keep the RemoteStream shape). `template_override` is null in v1 (uses the
+  destination's own template).
 
-  WorkflowNodeDrawer's Save calls submit(), which returns { org_id,
-  destination_name } or null when nothing is selected. While the inline create
-  form is open, WorkflowNodeDrawer hides its own footer (CreateDestinationForm
-  has its own Save/Cancel) — it reads `createNewDestination` (exposed below).
+  WorkflowNodeDrawer's Save calls submit() → { destination_id, template_override }
+  or null. While the inline create form is open the drawer hides its own footer —
+  it reads `createNewDestination` (exposed below, synced from the picker's expand).
 -->
 <template>
-  <div
-    data-test="workflow-destination-body"
-    class="tw:w-full tw:flex tw:flex-col tw:gap-4"
-  >
-    <OSwitch
-      v-model="createNewDestination"
-      :label="t('workflow.node.destinationCreateNew')"
-      data-test="workflow-destination-create-toggle"
+  <div data-test="workflow-destination-body" class="tw:w-full">
+    <DestinationPicker
+      ref="picker"
+      :initial-name="savedData.destination_id || ''"
+      @expand="(v) => (creating = v)"
     />
-
-    <!-- inline create destination form (own save/cancel) -->
-    <div v-if="createNewDestination" class="tw:w-full">
-      <CreateDestinationForm
-        @created="onDestinationCreated"
-        @cancel="createNewDestination = false"
-      />
-    </div>
-
-    <!-- pick existing destination -->
-    <template v-else>
-      <OSelect
-        v-model="selectedDestination"
-        :label="t('workflow.node.destinationSelect') + ' *'"
-        :options="destinationOptions"
-        :loading="loading"
-        tabindex="0"
-        data-test="workflow-destination-select"
-      />
-    </template>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { computed, onBeforeMount, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
-import destinationService from "@/services/alert_destination";
-import CreateDestinationForm from "@/components/pipeline/NodeForm/CreateDestinationForm.vue";
+import { ref } from "vue";
+import DestinationPicker from "@/components/flow/forms/DestinationPicker.vue";
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 
-const { t } = useI18n();
-const store = useStore();
+const savedData: any = workflowObj.currentSelectedNodeData?.data || {};
+const picker = ref<any>(null);
+const creating = ref(false);
 
-const savedData = workflowObj.currentSelectedNodeData?.data || {};
-
-const loading = ref(false);
-const destinations = ref<any[]>([]);
-const selectedDestination = ref<string>(savedData.destination_name || "");
-const createNewDestination = ref(false);
-
-// Refresh the list when returning from create mode (a new one may exist).
-watch(createNewDestination, (v) => {
-  if (!v) getDestinations();
-});
-
-// Show the destination URL as a sub-label, like pipeline's ExternalDestination.
-const destinationOptions = computed(() =>
-  destinations.value.map((d: any) => ({
-    label: d.name,
-    value: d.name,
-    subLabel: d.url && d.url.length > 70 ? d.url.slice(0, 70) + "..." : d.url,
-    subLabelInline: true,
-  })),
-);
-
-// Pipeline-module external destinations (same source the pipeline form uses).
-const getDestinations = async () => {
-  loading.value = true;
-  try {
-    const res = await destinationService.list({
-      page_num: 1,
-      page_size: 100000,
-      sort_by: "name",
-      desc: false,
-      org_identifier: store.state.selectedOrganization.identifier,
-      module: "pipeline",
-    });
-    destinations.value = res.data || [];
-  } catch (e: any) {
-    if (e?.response?.status !== 403) {
-      toast({ variant: "error", message: t("workflow.node.destinationLoadError") });
-    }
-  } finally {
-    loading.value = false;
-  }
-};
-
-onBeforeMount(getDestinations);
-
-const onDestinationCreated = (name: string) => {
-  createNewDestination.value = false;
-  selectedDestination.value = name;
-  getDestinations();
-};
-
-// Called by WorkflowNodeDrawer on Save. Toasts on no selection (pipeline's
-// ExternalDestination behaviour) and returns null to block the save.
+// Map the shared picker's { org_id, destination_name } into the workflow
+// destination shape { destination_id, template_override }.
 const submit = () => {
-  if (!selectedDestination.value) {
-    toast({
-      variant: "warning",
-      message: t("workflow.node.destinationRequired"),
-    });
-    return null;
-  }
+  const payload = picker.value?.getPayload();
+  if (!payload) return null;
   return {
-    org_id: store.state.selectedOrganization.identifier,
-    destination_name: selectedDestination.value,
+    destination_id: payload.destination_name,
+    template_override: savedData.template_override ?? null,
   };
 };
 
-// Exposed so the drawer can hide its own Save/Cancel while the inline create
-// form (which has its own footer) is open — mirrors pipeline ExternalDestination.
-defineExpose({ submit, createNewDestination });
+// `createNewDestination` lets WorkflowNodeDrawer hide its footer while the inline
+// create form (with its own Save/Cancel) is open.
+defineExpose({ submit, createNewDestination: creating });
 </script>

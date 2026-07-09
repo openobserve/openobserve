@@ -13,127 +13,69 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// ExternalDestination is now a thin drawer wrapper around the shared
+// DestinationPicker (the picker body — list / create / select — is covered by
+// DestinationPicker.spec.ts). These tests cover the drawer integration: save
+// wiring to addNode, delete/cancel, and create-mode button visibility.
+
 import { mount, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { nextTick } from "vue";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import ExternalDestination from "./ExternalDestination.vue";
+import useDnD from "@/plugins/pipelines/useDnD";
 
-
-// --------------------------------------------------------------------------
-// Module mocks
-// --------------------------------------------------------------------------
-
-vi.mock("@/utils/zincutils", async (importOriginal) => {
-  const actual: any = await importOriginal();
-  return {
-    ...actual,
-    getImageURL: (path: string) => `/mock/${path}`,
-    isValidResourceName: (name: string) => /^[a-zA-Z0-9+=,.@_-]+$/.test(name),
-  };
-});
-
-vi.mock("@/services/alert_destination", () => ({
-  default: {
-    create: vi.fn(),
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
 const mockAddNode = vi.fn();
 const mockDeletePipelineNode = vi.fn();
+let mockPipelineObj: any = {};
 
-vi.mock("@/plugins/pipelines/useDnD", () => ({
-  default: vi.fn(),
-}));
+vi.mock("@/plugins/pipelines/useDnD", () => ({ default: vi.fn() }));
 
-vi.mock("vue-router", async () => {
-  const actual: any = await vi.importActual("vue-router");
-  return {
-    ...actual,
-    useRouter: () => ({
-      push: vi.fn(),
-      replace: vi.fn(),
-      go: vi.fn(),
-      back: vi.fn(),
-      forward: vi.fn(),
-    }),
-  };
-});
+// Controllable DestinationPicker stub.
+let mockGetPayload = vi.fn(() => ({ org_id: "test-org", destination_name: "sink-1" }));
+const DestinationPickerStub = {
+  name: "DestinationPicker",
+  template: '<div class="destination-picker-stub"></div>',
+  props: ["initialName"],
+  emits: ["expand"],
+  methods: {
+    getPayload() {
+      return mockGetPayload();
+    },
+  },
+};
 
-// --------------------------------------------------------------------------
-// Late imports that must come after vi.mock declarations
-// --------------------------------------------------------------------------
-
-import destinationService from "@/services/alert_destination";
-import useDnD from "@/plugins/pipelines/useDnD";
-
-// --------------------------------------------------------------------------
-// Sample data
-// --------------------------------------------------------------------------
-
-const sampleDestinations = [
-  { name: "dest1", url: "http://dest1.example.com", destination_type_name: "openobserve" },
-  { name: "dest2", url: "http://dest2.example.com", destination_type_name: "splunk" },
-];
-
-// ODrawer stub — renders slot content, title, and action buttons so tests can
-// interact with save/cancel/delete controls.
 const ODrawerStub = {
   name: "ODrawer",
   props: [
-    "open",
-    "size",
-    "showClose",
-    "title",
-    "width",
-    "persistent",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
+    "open", "size", "showClose", "title", "width", "persistent",
+    "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel",
+    "neutralButtonVariant",
   ],
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div class="o-drawer-stub">
-      <div class="o-drawer-title">{{ title }}</div>
-      <slot />
-      <button
-        v-if="secondaryButtonLabel"
-        data-test="add-destination-cancel-btn"
-        @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
-      <button
-        v-if="primaryButtonLabel"
-        data-test="add-destination-save-btn"
-        @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
-      <button
-        v-if="neutralButtonLabel"
-        data-test="add-destination-delete-btn"
-        @click="$emit('click:neutral')"
-      >{{ neutralButtonLabel }}</button>
-    </div>
-  `,
+  template: `<div class="o-drawer-stub">
+    <slot />
+    <button v-if="neutralButtonLabel" data-test="o-drawer-neutral-btn" @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
+    <button v-if="secondaryButtonLabel" data-test="o-drawer-secondary-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
+    <button v-if="primaryButtonLabel" data-test="o-drawer-primary-btn" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
+  </div>`,
 };
 
-// --------------------------------------------------------------------------
-// Factory helper
-// --------------------------------------------------------------------------
-
-function buildMockPipelineObj(overrides: Record<string, any> = {}) {
+function makePipelineObj(overrides = {}) {
   return {
-    currentSelectedNodeData: { data: {}, type: "destination" },
-    currentSelectedNodeID: "node-123",
-    userSelectedNode: {},
     isEditNode: false,
+    currentSelectedNodeData: { data: {}, type: "remote_stream" },
+    currentSelectedNodeID: "dest-node-1",
+    userSelectedNode: {},
+    userClickedNode: {},
     ...overrides,
   };
 }
 
-function createWrapper(pipelineObjOverrides: Record<string, any> = {}) {
-  const mockPipelineObj = buildMockPipelineObj(pipelineObjOverrides);
-
+function createWrapper(pipelineObjOverrides = {}) {
+  mockPipelineObj = makePipelineObj(pipelineObjOverrides);
   vi.mocked(useDnD).mockImplementation(() => ({
     pipelineObj: mockPipelineObj,
     addNode: mockAddNode,
@@ -144,591 +86,98 @@ function createWrapper(pipelineObjOverrides: Record<string, any> = {}) {
     global: {
       plugins: [i18n, store],
       stubs: {
-        QSeparator: true,
-        QItem: true,
-        QItemSection: true,
-        QItemLabel: true,
         ConfirmDialog: true,
         ODrawer: ODrawerStub,
-        CreateDestinationForm: {
-          name: "CreateDestinationForm",
-          template: '<div data-test="create-destination-form" />',
-          emits: ["created", "cancel"],
-        },
+        DestinationPicker: DestinationPickerStub,
       },
     },
   });
 }
 
-// --------------------------------------------------------------------------
-// Test suite
-// --------------------------------------------------------------------------
-
-describe("ExternalDestination.vue", () => {
-  let wrapper: ReturnType<typeof createWrapper>;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-
-    // Default: list returns two destinations
-    vi.mocked(destinationService.list).mockResolvedValue({
-      data: sampleDestinations,
-    } as any);
-  });
-
+describe("ExternalDestination Component", () => {
   afterEach(() => {
-    if (wrapper) wrapper.unmount();
+    vi.clearAllMocks();
+    mockGetPayload = vi.fn(() => ({ org_id: "test-org", destination_name: "sink-1" }));
   });
 
-  // -----------------------------------------------------------------------
-  // 1. Component Initialization
-  // -----------------------------------------------------------------------
-
-  describe("1. Component Initialization", () => {
-    it("1.1 mounts successfully", async () => {
-      wrapper = createWrapper();
+  describe("Initialization", () => {
+    it("mounts and renders the DestinationPicker", async () => {
+      const wrapper = createWrapper();
       await flushPromises();
-      expect(wrapper.exists()).toBe(true);
+      expect(wrapper.findComponent(DestinationPickerStub).exists()).toBe(true);
     });
 
-    it("1.2 initialises createNewDestination as false", async () => {
-      wrapper = createWrapper();
+    it("passes the saved destination name to the picker", async () => {
+      const wrapper = createWrapper({
+        currentSelectedNodeData: {
+          data: { destination_name: "existing-sink" },
+          type: "remote_stream",
+        },
+      });
       await flushPromises();
-      expect(wrapper.vm.createNewDestination).toBe(false);
-    });
-
-    it("1.3 loads destinations on mount via onBeforeMount", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-      expect(destinationService.list).toHaveBeenCalledWith(
-        expect.objectContaining({
-          org_identifier: "default",
-          module: "pipeline",
-        }),
+      expect(wrapper.findComponent(DestinationPickerStub).props("initialName")).toBe(
+        "existing-sink",
       );
-      expect(wrapper.vm.destinations).toHaveLength(2);
-    });
-
-    it("1.4 initialises selectedDestination with empty string by default", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.selectedDestination).toBe("");
-    });
-
-    it("1.5 pre-populates selectedDestination when currentSelectedNodeData has a destination_name", async () => {
-      // Re-mock useDnD before mounting with an existing destination
-      vi.mocked(useDnD).mockImplementation(() => ({
-        pipelineObj: buildMockPipelineObj({
-          currentSelectedNodeData: {
-            data: { destination_name: "existing-dest" },
-          },
-          isEditNode: true,
-        }),
-        addNode: mockAddNode,
-        deletePipelineNode: mockDeletePipelineNode,
-      }));
-
-      const w = mount(ExternalDestination, {
-        global: {
-          plugins: [i18n, store],
-          stubs: { ConfirmDialog: true, CreateDestinationForm: true },
-        },
-      });
-      await flushPromises();
-
-      expect(w.vm.selectedDestination).toBe("existing-dest");
-      w.unmount();
-    });
-
-    it("1.6 pipelineObj is accessible from component", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.pipelineObj).toBeDefined();
     });
   });
 
-  // -----------------------------------------------------------------------
-  // 2. getDestinations
-  // -----------------------------------------------------------------------
-
-  describe("2. getDestinations", () => {
-    it("2.1 fetches destinations with correct API parameters", async () => {
-      wrapper = createWrapper();
+  describe("Save", () => {
+    it("adds a remote_stream node with the picker payload", async () => {
+      mockGetPayload = vi.fn(() => ({ org_id: "org-x", destination_name: "sink-9" }));
+      const wrapper = createWrapper();
       await flushPromises();
-
-      expect(destinationService.list).toHaveBeenCalledWith({
-        page_num: 1,
-        page_size: 100000,
-        sort_by: "name",
-        desc: false,
-        org_identifier: "default",
-        module: "pipeline",
-      });
-    });
-
-    it("2.2 populates destinations ref after successful fetch", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.destinations).toEqual(sampleDestinations);
-    });
-
-    it("2.3 updates destinations when called again with new data", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      vi.mocked(destinationService.list).mockResolvedValueOnce({
-        data: [{ name: "new-dest", url: "http://new.example.com" }],
-      } as any);
-      await wrapper.vm.getDestinations();
-      await flushPromises();
-
-      expect(wrapper.vm.destinations).toHaveLength(1);
-      expect(wrapper.vm.destinations[0].name).toBe("new-dest");
-    });
-
-    it("2.4 handles 403 error silently without modifying destinations", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Store current destinations count
-      const before = wrapper.vm.destinations.length;
-
-      vi.mocked(destinationService.list).mockRejectedValueOnce({
-        response: { status: 403 },
-      });
-      await wrapper.vm.getDestinations();
-      await flushPromises();
-
-      // Should not throw – destinations count could reset or remain
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("2.5 handles non-403 API errors without crashing", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      vi.mocked(destinationService.list).mockRejectedValueOnce({
-        response: { status: 500, data: { message: "Internal error" } },
-      });
-      await wrapper.vm.getDestinations();
-      await flushPromises();
-
-      // Component should remain mounted
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // 3. getFormattedDestinations (computed)
-  // -----------------------------------------------------------------------
-
-  describe("3. getFormattedDestinations", () => {
-    beforeEach(async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-    });
-
-    it("3.1 returns formatted objects with label, value, subLabel", () => {
-      wrapper.vm.destinations = [
-        { name: "dest1", url: "http://dest1.com" },
-        { name: "dest2", url: "http://dest2.com" },
-      ];
-      const formatted = wrapper.vm.getFormattedDestinations;
-      expect(formatted).toEqual([
-        { label: "dest1", value: "dest1", subLabel: "http://dest1.com", subLabelInline: true },
-        { label: "dest2", value: "dest2", subLabel: "http://dest2.com", subLabelInline: true },
-      ]);
-    });
-
-    it("3.2 returns empty array when destinations is empty", () => {
-      wrapper.vm.destinations = [];
-      expect(wrapper.vm.getFormattedDestinations).toEqual([]);
-    });
-
-    it("3.3 truncates URLs longer than 70 characters with ellipsis", () => {
-      wrapper.vm.destinations = [
-        {
-          name: "long-dest",
-          url: "https://very-long-url-that-definitely-exceeds-seventy-characters.example.com/path/to/resource",
-        },
-      ];
-      const formatted = wrapper.vm.getFormattedDestinations;
-      expect(formatted[0].subLabel.endsWith("...")).toBe(true);
-      expect(formatted[0].subLabel.length).toBeLessThanOrEqual(73); // 70 chars + "..."
-    });
-
-    it("3.4 does not truncate URLs of exactly 70 characters", () => {
-      const url70 = "a".repeat(70);
-      wrapper.vm.destinations = [{ name: "exact", url: url70 }];
-      const formatted = wrapper.vm.getFormattedDestinations;
-      expect(formatted[0].subLabel).toBe(url70);
-      expect(formatted[0].subLabel.endsWith("...")).toBe(false);
-    });
-
-    it("3.5 does not truncate URLs shorter than 70 characters", () => {
-      wrapper.vm.destinations = [{ name: "short", url: "http://short.io" }];
-      const formatted = wrapper.vm.getFormattedDestinations;
-      expect(formatted[0].subLabel).toBe("http://short.io");
-    });
-
-    it("3.6 handles a large list of destinations", () => {
-      wrapper.vm.destinations = Array.from({ length: 50 }, (_, i) => ({
-        name: `dest-${i}`,
-        url: `http://dest${i}.example.com`,
-      }));
-      const formatted = wrapper.vm.getFormattedDestinations;
-      expect(formatted).toHaveLength(50);
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // 4. saveDestination
-  // -----------------------------------------------------------------------
-
-  describe("4. saveDestination", () => {
-    beforeEach(async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-    });
-
-    it("4.1 calls addNode with correct payload when a destination is selected", () => {
-      wrapper.vm.selectedDestination = "dest1";
-      wrapper.vm.saveDestination();
-
+      await wrapper.find('[data-test="o-drawer-primary-btn"]').trigger("click");
       expect(mockAddNode).toHaveBeenCalledWith({
-        destination_name: "dest1",
+        destination_name: "sink-9",
         node_type: "remote_stream",
         io_type: "output",
-        org_id: "default",
+        org_id: "org-x",
       });
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
 
-    it("4.2 emits cancel:hideform after a successful save", () => {
-      wrapper.vm.selectedDestination = "dest1";
-      wrapper.vm.saveDestination();
-      expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
-      expect(wrapper.emitted()["cancel:hideform"]).toHaveLength(1);
-    });
-
-    it("4.3 does NOT call addNode when selectedDestination value is empty", () => {
-      wrapper.vm.selectedDestination = "";
-      wrapper.vm.saveDestination();
+    it("does nothing when the picker returns null", async () => {
+      mockGetPayload = vi.fn(() => null);
+      const wrapper = createWrapper();
+      await flushPromises();
+      await wrapper.find('[data-test="o-drawer-primary-btn"]').trigger("click");
       expect(mockAddNode).not.toHaveBeenCalled();
-    });
-
-    it("4.4 uses the store selectedOrganization identifier as org_id", () => {
-      wrapper.vm.selectedDestination = "dest2";
-      wrapper.vm.saveDestination();
-      expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({ org_id: "default" }),
-      );
-    });
-
-    it("4.5 sets correct node_type as remote_stream", () => {
-      wrapper.vm.selectedDestination = "dest1";
-      wrapper.vm.saveDestination();
-      expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({ node_type: "remote_stream" }),
-      );
-    });
-
-    it("4.6 sets correct io_type as output", () => {
-      wrapper.vm.selectedDestination = "dest1";
-      wrapper.vm.saveDestination();
-      expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({ io_type: "output" }),
-      );
+      expect(wrapper.emitted("cancel:hideform")).toBeFalsy();
     });
   });
 
-  // -----------------------------------------------------------------------
-  // 5. handleDestinationCreated
-  // -----------------------------------------------------------------------
-
-  describe("5. handleDestinationCreated", () => {
-    beforeEach(async () => {
-      wrapper = createWrapper();
+  describe("Create mode", () => {
+    it("hides Save/Cancel while creating inline", async () => {
+      const wrapper = createWrapper();
       await flushPromises();
-    });
-
-    it("5.1 sets selectedDestination to the newly created destination name", async () => {
-      await wrapper.vm.handleDestinationCreated("brand-new-dest");
-      expect(wrapper.vm.selectedDestination).toBe("brand-new-dest");
-    });
-
-    it("5.2 switches createNewDestination back to false", async () => {
-      wrapper.vm.createNewDestination = true;
-      await wrapper.vm.handleDestinationCreated("brand-new-dest");
-      expect(wrapper.vm.createNewDestination).toBe(false);
-    });
-
-    it("5.3 calls getDestinations after creation to refresh the list", async () => {
-      vi.mocked(destinationService.list).mockClear();
-      await wrapper.vm.handleDestinationCreated("brand-new-dest");
-      await flushPromises();
-      expect(destinationService.list).toHaveBeenCalled();
+      wrapper.findComponent(DestinationPickerStub).vm.$emit("expand", true);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="o-drawer-primary-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="o-drawer-secondary-btn"]').exists()).toBe(false);
     });
   });
 
-  // -----------------------------------------------------------------------
-  // 6. createNewDestination watcher
-  // -----------------------------------------------------------------------
-
-  describe("6. createNewDestination watcher", () => {
-    beforeEach(async () => {
-      wrapper = createWrapper();
+  describe("Delete", () => {
+    it("shows delete only in edit mode and deletes via the dialog callback", async () => {
+      const view = createWrapper({ isEditNode: false });
       await flushPromises();
-    });
+      expect(view.find('[data-test="o-drawer-neutral-btn"]').exists()).toBe(false);
 
-    it("6.1 can be toggled to true", async () => {
-      wrapper.vm.createNewDestination = true;
-      await nextTick();
-      expect(wrapper.vm.createNewDestination).toBe(true);
-    });
-
-    it("6.2 calls getDestinations when switched from true back to false", async () => {
-      wrapper.vm.createNewDestination = true;
-      await nextTick();
-
-      vi.mocked(destinationService.list).mockClear();
-
-      wrapper.vm.createNewDestination = false;
-      await nextTick();
+      const wrapper = createWrapper({ isEditNode: true });
       await flushPromises();
-
-      expect(destinationService.list).toHaveBeenCalled();
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // 7. handleCancel
-  // -----------------------------------------------------------------------
-
-  describe("7. handleCancel", () => {
-    beforeEach(async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-    });
-
-    it("7.1 emits cancel:hideform", () => {
-      wrapper.vm.handleCancel();
-      expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
-    });
-
-    it("7.2 emits cancel:hideform only once per call", () => {
-      wrapper.vm.handleCancel();
-      expect(wrapper.emitted()["cancel:hideform"]).toHaveLength(1);
-    });
-
-    it("7.3 emits cancel:hideform multiple times when called multiple times", () => {
-      wrapper.vm.handleCancel();
-      wrapper.vm.handleCancel();
-      wrapper.vm.handleCancel();
-      expect(wrapper.emitted()["cancel:hideform"]).toHaveLength(3);
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // 8. openDeleteDialog
-  // -----------------------------------------------------------------------
-
-  describe("8. openDeleteDialog", () => {
-    beforeEach(async () => {
-      wrapper = createWrapper({ isEditNode: true });
-      await flushPromises();
-    });
-
-    it("8.1 sets dialog.show to true", () => {
-      wrapper.vm.openDeleteDialog();
-      expect(wrapper.vm.dialog.show).toBe(true);
-    });
-
-    it("8.2 sets dialog.title to 'Delete Node'", () => {
-      wrapper.vm.openDeleteDialog();
-      expect(wrapper.vm.dialog.title).toBe("Delete Node");
-    });
-
-    it("8.3 sets dialog.message to the expected deletion message", () => {
-      wrapper.vm.openDeleteDialog();
-      expect(wrapper.vm.dialog.message).toBe(
-        "Are you sure you want to delete stream routing?",
-      );
-    });
-
-    it("8.4 sets dialog.okCallback to a function (deleteRoute)", () => {
-      wrapper.vm.openDeleteDialog();
-      expect(typeof wrapper.vm.dialog.okCallback).toBe("function");
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // 9. deleteRoute (via dialog okCallback)
-  // -----------------------------------------------------------------------
-
-  describe("9. deleteRoute via dialog okCallback", () => {
-    beforeEach(async () => {
-      wrapper = createWrapper({ isEditNode: true });
-      await flushPromises();
-    });
-
-    it("9.1 calls deletePipelineNode with the current node ID", () => {
-      wrapper.vm.openDeleteDialog();
+      await wrapper.find('[data-test="o-drawer-neutral-btn"]').trigger("click");
       wrapper.vm.dialog.okCallback();
-      expect(mockDeletePipelineNode).toHaveBeenCalledWith("node-123");
-    });
-
-    it("9.2 emits cancel:hideform after deleting", () => {
-      wrapper.vm.openDeleteDialog();
-      wrapper.vm.dialog.okCallback();
-      expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // 10. Exposed members
-  // -----------------------------------------------------------------------
-
-  describe("10. Exposed members", () => {
-    beforeEach(async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-    });
-
-    it("10.1 exposes getDestinations as a function", () => {
-      expect(typeof wrapper.vm.getDestinations).toBe("function");
-    });
-
-    it("10.2 exposes saveDestination as a function", () => {
-      expect(typeof wrapper.vm.saveDestination).toBe("function");
-    });
-
-    it("10.3 exposes handleDestinationCreated as a function", () => {
-      expect(typeof wrapper.vm.handleDestinationCreated).toBe("function");
-    });
-
-    it("10.4 exposes handleCancel as a function", () => {
-      expect(typeof wrapper.vm.handleCancel).toBe("function");
-    });
-
-    it("10.5 exposes selectedDestination ref", () => {
-      expect(wrapper.vm.selectedDestination).toBeDefined();
-    });
-
-    it("10.6 exposes destinations ref", () => {
-      expect(wrapper.vm.destinations).toBeDefined();
-    });
-
-    it("10.7 exposes createNewDestination ref", () => {
-      expect(wrapper.vm.createNewDestination).toBeDefined();
-    });
-
-    it("10.8 exposes getFormattedDestinations computed", () => {
-      expect(wrapper.vm.getFormattedDestinations).toBeDefined();
-    });
-
-    it("10.9 exposes pipelineObj", () => {
-      expect(wrapper.vm.pipelineObj).toBeDefined();
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // 11. Template – static structure
-  // -----------------------------------------------------------------------
-
-  describe("11. Template structure", () => {
-    beforeEach(async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-    });
-
-    it("11.1 renders the External Destination title text", () => {
-      expect(wrapper.html()).toContain("External Destination");
-    });
-
-    it("11.2 renders the destination select when createNewDestination is false", () => {
-      wrapper.vm.createNewDestination = false;
-      expect(
-        wrapper.find('[data-test="external-destination-select"]').exists(),
-      ).toBe(true);
-    });
-
-    it("11.3 shows CreateDestinationForm stub when createNewDestination is true", async () => {
-      wrapper.vm.createNewDestination = true;
-      await nextTick();
-      expect(wrapper.find('[data-test="create-destination-form"]').exists()).toBe(true);
-    });
-
-    it("11.4 hides destination select when createNewDestination is true", async () => {
-      wrapper.vm.createNewDestination = true;
-      await nextTick();
-      expect(
-        wrapper.find('[data-test="external-destination-select"]').exists(),
-      ).toBe(false);
-    });
-
-    it("11.5 renders cancel button", () => {
-      expect(wrapper.find('[data-test="add-destination-cancel-btn"]').exists()).toBe(true);
-    });
-
-    it("11.6 renders save button", () => {
-      expect(wrapper.find('[data-test="add-destination-save-btn"]').exists()).toBe(true);
-    });
-
-    it("11.7 does NOT render delete button when isEditNode is false", () => {
-      expect(wrapper.find('[data-test="add-destination-delete-btn"]').exists()).toBe(false);
-    });
-
-    it("11.8 renders delete button when isEditNode is true", async () => {
-      wrapper.unmount();
-      wrapper = createWrapper({ isEditNode: true });
-      await flushPromises();
-      expect(wrapper.find('[data-test="add-destination-delete-btn"]').exists()).toBe(true);
-    });
-
-    it("11.9 emits 'cancel:hideform' when the ODrawer close event fires", async () => {
-      // The close button is inside ODrawer's header (showClose prop).
-      // Simulate it by emitting update:open=false on the ODrawer component.
-      vi.useFakeTimers();
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.exists()).toBe(true);
-      drawer.vm.$emit("update:open", false);
-      vi.advanceTimersByTime(400);
-      await nextTick();
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-      expect(wrapper.emitted("cancel:hideform")).toHaveLength(1);
-      vi.useRealTimers();
-    });
-
-    it("11.10 does NOT emit 'close' on cancel button click (cancel emits cancel:hideform)", async () => {
-      const cancelBtn = wrapper.find('[data-test="add-destination-cancel-btn"]');
-      await cancelBtn.trigger("click");
-      expect(wrapper.emitted("close")).toBeFalsy();
+      expect(mockDeletePipelineNode).toHaveBeenCalledWith("dest-node-1");
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
   });
 
-  // -----------------------------------------------------------------------
-  // 12. Theme awareness
-  // -----------------------------------------------------------------------
-
-  describe("12. Theme awareness", () => {
-    it("12.1 renders correctly in dark theme", async () => {
-      store.state.theme = "dark";
-      wrapper = createWrapper();
+  describe("Cancel", () => {
+    it("emits cancel:hideform on cancel", async () => {
+      const wrapper = createWrapper();
       await flushPromises();
-      expect(wrapper.find('[data-test="external-destination-select"]').exists()).toBe(true);
-    });
-
-    it("12.2 renders correctly in light theme", async () => {
-      store.state.theme = "light";
-      wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.find('[data-test="external-destination-select"]').exists()).toBe(true);
-    });
-
-    afterEach(() => {
-      // Reset theme after theme tests
-      store.state.theme = "dark";
+      await wrapper.find('[data-test="o-drawer-secondary-btn"]').trigger("click");
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
   });
 });

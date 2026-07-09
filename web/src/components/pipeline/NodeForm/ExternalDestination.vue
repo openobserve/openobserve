@@ -14,6 +14,12 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
+<!--
+  Pipeline "External Destination" node form. The drawer chrome + save/delete live
+  here; the picker body (create-toggle · inline CreateDestinationForm · select)
+  is the SHARED DestinationPicker, so it stays in sync with the workflow
+  destination form.
+-->
 <template>
   <ODrawer
     :open="internalOpen"
@@ -22,39 +28,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="lg"
     :show-close="true"
     @keydown.stop
-    :primaryButtonLabel="!createNewDestination ? t('alerts.save') : undefined"
-    :secondaryButtonLabel="!createNewDestination ? t('alerts.cancel') : undefined"
-    :neutralButtonLabel="!createNewDestination && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
+    :primaryButtonLabel="!isCreating ? t('alerts.save') : undefined"
+    :secondaryButtonLabel="!isCreating ? t('alerts.cancel') : undefined"
+    :neutralButtonLabel="!isCreating && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
     neutralButtonVariant="outline-destructive"
     @click:primary="saveDestination"
     @click:secondary="handleCancel"
     @click:neutral="openDeleteDialog"
   >
     <div class="tw:w-full tw:pt-3 tw:pb-3 tw:px-3 tw:flex tw:flex-col tw:gap-4">
-      <OSwitch
-        data-test="create-stream-toggle"
-        :label="'Create new Destination'"
-        v-model="createNewDestination"
+      <DestinationPicker
+        ref="picker"
+        :initial-name="initialName"
+        @expand="(v) => (isCreating = v)"
       />
-
-      <div v-if="createNewDestination" class="tw:w-full">
-        <!-- Create New Destination Form -->
-        <CreateDestinationForm
-          @created="handleDestinationCreated"
-          @cancel="handleCancel"
-        />
-      </div>
-
-      <!-- Select Existing Destination -->
-      <template v-else>
-        <OSelect
-          data-test="external-destination-select"
-          v-model="selectedDestination"
-          :label="'Destination *'"
-          :options="getFormattedDestinations"
-          tabindex="0"
-        />
-      </template>
     </div>
   </ODrawer>
   <confirm-dialog
@@ -67,23 +54,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onBeforeMount, watch } from "vue";
+import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import destinationService from "@/services/alert_destination";
-import { useStore } from "vuex";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import CreateDestinationForm from "./CreateDestinationForm.vue";
+import DestinationPicker from "@/components/flow/forms/DestinationPicker.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
-import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
 
+const { t } = useI18n();
+const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
+
 const internalOpen = ref(!!props.open);
-watch(() => props.open, (v) => { internalOpen.value = !!v; });
+watch(
+  () => props.open,
+  (v) => {
+    internalOpen.value = !!v;
+  },
+);
 
 function handleDrawerClose(v: boolean) {
   internalOpen.value = v;
@@ -91,15 +81,12 @@ function handleDrawerClose(v: boolean) {
     setTimeout(() => emit("cancel:hideform"), 300);
   }
 }
-const store = useStore();
-const { t } = useI18n();
 
-const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
-const createNewDestination = ref(false);
-const selectedDestination = ref<string>(
-  pipelineObj.currentSelectedNodeData?.data?.destination_name ?? "",
-);
-const destinations = ref([]);
+const picker = ref<any>(null);
+const isCreating = ref(false);
+const initialName =
+  (pipelineObj.currentSelectedNodeData?.data as { destination_name?: string })
+    ?.destination_name ?? "";
 
 const dialog = ref({
   show: false,
@@ -108,89 +95,16 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-onBeforeMount(() => {
-  getDestinations();
-});
-
-watch(
-  () => createNewDestination.value,
-  (val) => {
-    if (!val) {
-      // When switching back to select mode, refresh destinations
-      getDestinations();
-    }
-  },
-);
-
-const getFormattedDestinations = computed(() => {
-  return destinations.value.map((destination: any) => {
-    const truncatedUrl =
-      destination.url.length > 70
-        ? destination.url.slice(0, 70) + "..."
-        : destination.url;
-
-    return {
-      label: destination.name,
-      value: destination.name,
-      subLabel: truncatedUrl,
-      subLabelInline: true,
-    };
-  });
-});
-
-const getDestinations = () => {
-  const dismiss = toast({
-    variant: "loading",
-    message: "Please wait while loading destinations...",
-      timeout: 0,
-});
-  destinationService
-    .list({
-      page_num: 1,
-      page_size: 100000,
-      sort_by: "name",
-      desc: false,
-      org_identifier: store.state.selectedOrganization.identifier,
-      module: "pipeline",
-    })
-    .then((res) => {
-      destinations.value = res.data;
-    })
-    .catch((err) => {
-      if (err.response.status != 403) {
-        toast({
-          variant: "error",
-          message: "Error while pulling destinations.",
-        });
-      }
-      dismiss();
-    })
-    .finally(() => dismiss());
-};
-
 const saveDestination = () => {
-  const destinationData = {
-    destination_name: selectedDestination.value,
+  const payload = picker.value?.getPayload();
+  if (!payload) return; // picker surfaced its own validation
+  addNode({
+    destination_name: payload.destination_name,
     node_type: "remote_stream",
     io_type: "output",
-    org_id: store.state.selectedOrganization.identifier,
-  };
-  if (!selectedDestination.value) {
-    toast({
-      variant: "warning",
-      message: "Please select External destination from the list",
-    });
-    return;
-  }
-  addNode(destinationData);
+    org_id: payload.org_id,
+  });
   emit("cancel:hideform");
-};
-
-const handleDestinationCreated = (destinationName: string) => {
-  // Switch back to selection mode and select the newly created destination
-  selectedDestination.value = destinationName;
-  createNewDestination.value = false;
-  getDestinations();
 };
 
 const handleCancel = () => {
@@ -209,16 +123,5 @@ const deleteRoute = () => {
   emit("cancel:hideform");
 };
 
-// Expose functions for testing
-defineExpose({
-  getDestinations,
-  saveDestination,
-  selectedDestination,
-  destinations,
-  getFormattedDestinations,
-  createNewDestination,
-  pipelineObj,
-  handleDestinationCreated,
-  handleCancel,
-});
+defineExpose({ isCreating, saveDestination });
 </script>

@@ -217,9 +217,6 @@ const selectedNodeType = ref(
   (pipelineObj.currentSelectedNodeData as { io_type?: string })?.io_type || "",
 );
 onMounted(async () => {
-  if (pipelineObj.userSelectedNode) {
-    pipelineObj.userSelectedNode = {};
-  }
   usedStreams.value = await getUsedStreamsList();
   await getStreamList();
 });
@@ -355,8 +352,6 @@ const openCancelDialog = () => {
   dialog.value.message = "Are you sure you want to cancel changes?";
   dialog.value.warningMessage = "";
   dialog.value.okCallback = () => emit("cancel:hideform");
-  pipelineObj.userClickedNode = {};
-  pipelineObj.userSelectedNode = {};
 };
 
 const openDeleteDialog = () => {

@@ -68,6 +68,12 @@ vi.mock("@/plugins/pipelines/useDnD", () => ({
 vi.mock("@vue-flow/core", () => ({
   MarkerType: { ArrowClosed: "arrowclosed" },
   VueFlow: { name: "VueFlow", template: "<div />" },
+  Handle: { name: "Handle", template: "<div />" },
+  Position: { Top: "top", Bottom: "bottom", Left: "left", Right: "right" },
+  BaseEdge: { name: "BaseEdge", template: "<path />" },
+  getBezierPath: () => ["M0 0", 0, 0],
+  useVueFlow: () => ({}),
+  Panel: { name: "Panel", template: "<div><slot /></div>" },
 }));
 
 // Mock URL and document anchor element for export tests

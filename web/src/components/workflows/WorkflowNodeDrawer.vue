@@ -101,21 +101,21 @@ const BODY_COMPONENTS: Record<string, any> = {
   workflow_trigger: WorkflowAlertTrigger,
   condition: WorkflowCondition,
   function: WorkflowFunction,
-  remote_stream: WorkflowDestination,
+  destination: WorkflowDestination,
 };
 const bodyComponent = computed(() => BODY_COMPONENTS[workflowObj.dialog.name]);
 // Match the pipeline node-form drawer widths per type:
 //   condition -> width 45, function -> width 30 (97 while creating inline),
-//   remote_stream -> size "lg", trigger -> size "md".
+//   destination -> size "lg", trigger -> size "md".
 // `width` (vw) takes precedence in ODrawer; when it's undefined, `size` applies.
 const drawerWidth = computed(() => {
   if (workflowObj.dialog.expand) return 97; // full-width (inline function editor)
   if (workflowObj.dialog.name === "condition") return 45;
   if (workflowObj.dialog.name === "function") return 30;
-  return undefined; // remote_stream + trigger fall back to `size`
+  return undefined; // destination + trigger fall back to `size`
 });
 const drawerSize = computed(() =>
-  workflowObj.dialog.name === "remote_stream" ? "lg" : "md",
+  workflowObj.dialog.name === "destination" ? "lg" : "md",
 );
 
 // Ref to the active body so Save can pull its payload / let it veto.

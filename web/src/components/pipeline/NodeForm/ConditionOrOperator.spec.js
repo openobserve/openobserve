@@ -3,8 +3,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import useDnD from '@/plugins/pipelines/useDnD';
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
-import Condition from "./Condition.vue";
+// The condition-group logic these tests exercise now lives in the shared
+// ConditionBuilder (Condition.vue is a thin drawer wrapper around it).
+import ConditionBuilder from "@/components/flow/forms/ConditionBuilder.vue";
 
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
 // Mock the services and composables
 vi.mock("@/services/search", () => ({
@@ -120,21 +123,18 @@ describe("Condition Component - OR Operator Tests", () => {
       deletePipelineNode: vi.fn()
     }));
 
-    wrapper = mount(Condition, {
+    wrapper = mount(ConditionBuilder, {
       global: {
         plugins: [i18n],
         provide: {
           store: mockStore,
         },
         stubs: {
-          RealtimePipeline: true,
-          ConfirmDialog: true,
+          FilterGroup: true,
         }
       }
     });
 
-    await flushPromises();
-    await wrapper.vm.getFields();
     await flushPromises();
   });
 

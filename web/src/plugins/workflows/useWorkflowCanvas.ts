@@ -32,6 +32,8 @@ import { MarkerType, useVueFlow } from "@vue-flow/core";
 import { getUUID } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import { detectCycle } from "@/composables/flow/detectCycle";
+import { makeEdge } from "@/composables/flow/makeEdge";
 
 export type WorkflowNodeCategory = "trigger" | "logic" | "action";
 
@@ -85,16 +87,15 @@ export const WORKFLOW_NODE_TYPES: Record<string, WorkflowNodeMeta> = {
     icon: "code",
     ioType: "default",
   },
-  // Serialized node_type is `remote_stream` — the existing backend
-  // NodeData::RemoteStream ({ org_id, destination_name }) that forwards records
-  // to a Pipeline (remote) Destination, the same node the pipeline "External
-  // Destination" uses. v1 reuses this instead of a new alert-dispatch node;
-  // backend just needs to add RemoteStream to `is_workflow_node()`.
+  // Serialized node_type is `destination` — the backend NodeData::Destination
+  // ({ destination_id, template_override }), where `destination_id` is the
+  // Pipeline (remote) Destination's NAME. Added to `is_workflow_node()` (commit
+  // "feat: add destination as a workflow node"); save-time validation checks the
+  // destination exists and `is_pipeline_destination()`.
   //
-  // `ioType: "output"` — for v1 the destination is a terminal *leaf* (green, no
-  // output handle / hover-`+`), matching the backend's "leaves must be
-  // Stream/RemoteStream" rule.
-  remote_stream: {
+  // `ioType: "output"` — the destination is a terminal *leaf* (green, no output
+  // handle / hover-`+`).
+  destination: {
     category: "action",
     kindKey: "workflow.node.kindAction",
     titleKey: "workflow.node.sendToDestination",
@@ -109,7 +110,7 @@ export const nodeMeta = (nodeType: string): WorkflowNodeMeta | undefined =>
 
 // Node types offered by the hover-`+` StepMenu (everything but the trigger,
 // which is fixed and can only be the first node).
-export const ADDABLE_NODE_TYPES = ["condition", "function", "remote_stream"];
+export const ADDABLE_NODE_TYPES = ["condition", "function", "destination"];
 
 // Trigger kinds the user chooses from when creating a workflow. `key` maps to
 // the future backend WorkflowTriggerKind (B1). Only Alert Fired is enabled in
@@ -252,40 +253,10 @@ export default function useWorkflowCanvas() {
     useVueFlow();
 
   // --- edge helpers ----------------------------------------------------------
-  const newEdge = (source: string, target: string, sourceHandle?: string) => ({
-    id: `e${source}-${target}${sourceHandle ? `-${sourceHandle}` : ""}`,
-    source,
-    target,
-    ...(sourceHandle ? { sourceHandle } : {}),
-    markerEnd: { type: MarkerType.ArrowClosed, width: 20, height: 20 },
-    type: "custom",
-    style: { strokeWidth: 2 },
-    animated: true,
-  });
-
-  // Cycle detection on plain source/target strings (robust — does not rely on
-  // VueFlow's runtime-enriched sourceNode/targetNode).
-  const detectCycle = (edges: any[], connection: any): boolean => {
-    const graph: Record<string, string[]> = {};
-    edges.forEach((e: any) => {
-      (graph[e.source] ||= []).push(e.target);
-    });
-    (graph[connection.source] ||= []).push(connection.target);
-
-    const dfs = (node: string, visited: Set<string>, stack: Set<string>): boolean => {
-      if (!visited.has(node)) {
-        visited.add(node);
-        stack.add(node);
-        for (const next of graph[node] || []) {
-          if (!visited.has(next) && dfs(next, visited, stack)) return true;
-          if (stack.has(next)) return true;
-        }
-      }
-      stack.delete(node);
-      return false;
-    };
-    return dfs(connection.source, new Set(), new Set());
-  };
+  // Edge factory + cycle detection are shared with the pipeline canvas
+  // (composables/flow). `newEdge` keeps the existing name for internal callers
+  // and the exported API.
+  const newEdge = makeEdge;
 
   // --- VueFlow event handlers ------------------------------------------------
   function onNodeChange() {}
@@ -440,8 +411,10 @@ export default function useWorkflowCanvas() {
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
   }
-  // Drop: stage the node at the drop point, wired to the chain's end node (so it
-  // isn't an orphan), and open its config drawer — committed on Save.
+  // Drop: stage the node AT the drop point and open its config drawer — committed
+  // on Save. Unlike the palette-click / hover-`+` add, a dragged-and-dropped node
+  // is placed UNCONNECTED (no auto-edge); the user wires it manually, same as the
+  // pipeline canvas. (Palette click still appends+wires via addNodeToEnd.)
   function onDrop(event: DragEvent) {
     const nodeType =
       workflowObj.draggedNodeType ||
@@ -450,15 +423,6 @@ export default function useWorkflowCanvas() {
     workflowObj.draggedNodeType = "";
     const meta = nodeMeta(nodeType);
     if (!meta) return;
-
-    const src = endNodeId();
-    if (isTerminal(src)) {
-      toast({
-        message: "This branch already ends in a Destination.",
-        variant: "warning",
-      });
-      return;
-    }
 
     const flow = screenToFlowCoordinate({ x: event.clientX, y: event.clientY });
     // Roughly center the node on the cursor (half a node card).
@@ -471,7 +435,9 @@ export default function useWorkflowCanvas() {
       position,
       data: { label: id, node_type: nodeType },
     };
-    workflowObj.pendingEdge = src ? { source: src, sourceHandle: undefined } : null;
+    // No auto-wire on drag-drop — the node is placed where dropped and stays
+    // unconnected until the user draws an edge.
+    workflowObj.pendingEdge = null;
     workflowObj.currentSelectedNodeID = id;
     workflowObj.isEditNode = false;
     workflowObj.dialog.name = nodeType;

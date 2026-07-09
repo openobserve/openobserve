@@ -14,17 +14,23 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
+<!--
+  Pipeline "Function" node form. The drawer chrome + save/cancel/delete live
+  here; the picker body (create-toggle · inline AddFunction · select · preview ·
+  After-Flattening toggle) is the SHARED FunctionPicker, so it stays in sync with
+  the workflow function form.
+-->
 <template>
   <ODrawer
     data-test="associate-function-drawer"
     :open="internalOpen"
     @update:open="handleDrawerClose"
     :title="t('pipeline.associateFunction')"
-    :width="createNewFunction ? 97 : 30"
+    :width="isCreating ? 97 : 30"
     @keydown.stop
-    :primaryButtonLabel="!createNewFunction ? t('alerts.save') : undefined"
-    :secondaryButtonLabel="!createNewFunction ? t('alerts.cancel') : undefined"
-    :neutralButtonLabel="!createNewFunction && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
+    :primaryButtonLabel="!isCreating ? t('alerts.save') : undefined"
+    :secondaryButtonLabel="!isCreating ? t('alerts.cancel') : undefined"
+    :neutralButtonLabel="!isCreating && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
     neutralButtonVariant="outline-destructive"
     @click:primary="saveFunction"
     @click:secondary="openCancelDialog"
@@ -35,141 +41,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:flex-col tw:h-full"
       :class="store.state.theme === 'dark' ? 'tw:bg-(--o2-bg-card-dark,#1a1a1a)' : 'tw:bg-white'"
     >
-
-
-    <div v-if="loading">
-      <OSpinner
-        v-if="loading"
-        size="md"
-        class="tw:absolute tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2"
-        data-test="associate-function-loading-indicator"
-      />
-    </div>
-    <div
-      v-else
-      data-test="associate-function-routing-container"
-      class="tw:rounded-lg tw:w-full tw:pt-3 tw:pb-3 tw:flex tw:flex-col tw:gap-4 tw:flex-1 tw:min-h-0"
-    >
-      <div class="tw:flex tw:items-center tw:gap-3 tw:px-(--spacing-dialog-header-px)">
-        <OSwitch
-          data-test="create-function-toggle"
-          :label="isUpdating ? 'Edit function' : 'Create new function'"
-          v-model="createNewFunction"
+      <div
+        data-test="associate-function-routing-container"
+        class="tw:rounded-lg tw:w-full tw:pt-3 tw:pb-3 tw:flex tw:flex-col tw:flex-1 tw:min-h-0"
+        :class="!isCreating ? 'tw:px-3' : ''"
+      >
+        <FunctionPicker
+          ref="picker"
+          :initial-name="initialName"
+          :initial-after-flatten="initialAfterFlatten"
+          :duplicate-names="(associatedFunctions as string[])"
+          @expand="onExpand"
+          @created="onCreated"
         />
-        <div
-          v-if="createNewFunction"
-          class="tw:text-sm tw:text-gray-600"
-        >
-          ({{ t("alerts.newFunctionAssociationMsg") }})
-        </div>
       </div>
-      <div class="tw:flex tw:flex-col tw:gap-4" :class="[!createNewFunction ? 'tw:px-3' : 'tw:flex-1 tw:min-h-0']">
-        <div
-          v-if="!createNewFunction"
-          class="tw:w-full"
-        >
-          <OSelect
-            v-model="selectedFunction"
-            :options="props.functions"
-            :label="t('function.selectFunction') + ' *'"
-            searchable
-            :readonly="isUpdating"
-            :disabled="isUpdating"
-            :error="functionExists || (showFunctionRequiredError && !selectedFunction)"
-            :error-message="
-              functionExists
-                ? 'Function is already associated'
-                : (showFunctionRequiredError && !selectedFunction)
-                  ? 'Field is required'
-                  : ''
-            "
-            data-test="associate-function-select-function-input"
-          />
-        </div>
-
-        <!-- Function Definition Display -->
-        <div
-          v-if="
-            !createNewFunction &&
-            selectedFunction &&
-            pipelineObj.functions[selectedFunction]
-          "
-          data-test="associate-function-definition-section"
-          class="tw:mt-4 tw:mb-4"
-        >
-          <OCard class="function-definition-card tw:border tw:border-[#e1e5e9] tw:dark:border-[#2d3748] tw:rounded-lg tw:shadow-[0_2px_4px_rgba(0,0,0,0.05)] tw:dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] tw:overflow-hidden tw:dark:bg-[#1a202c]">
-            <OCardSection role="header" class="function-definition-header tw:bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)] tw:dark:bg-[linear-gradient(135deg,#2d3748_0%,#1a202c_100%)] tw:border-b tw:border-b-[#e2e8f0] tw:dark:border-b-[#4a5568]">
-              <div class="tw:text-base tw:font-semibold tw:text-[#2d3748] tw:dark:text-white">
-                {{ t("function.function_definition") }}
-              </div>
-            </OCardSection>
-            <OSeparator />
-            <OCardSection class="tw:p-0 function-definition-content">
-              <div class="function-code-container tw:bg-[#fafbfc] tw:dark:bg-[#0d1117] tw:dark:border tw:dark:border-[#21262d] tw:rounded-none tw:max-w-[584px] tw:max-h-[250px] tw:overflow-y-auto tw:relative">
-                <pre class="function-code tw:text-[#2d3748] tw:dark:text-[#f7fafc] tw:bg-transparent tw:m-0 tw:p-4 tw:font-[JetBrains_Mono,Fira_Code,Monaco,Menlo,Ubuntu_Mono,monospace] tw:text-[13px] tw:leading-normal tw:whitespace-pre-wrap tw:break-words tw:border-0 tw:font-normal tw:cursor-default tw:select-text">{{
-                  pipelineObj.functions[selectedFunction]?.function ||
-                  "No definition available"
-                }}</pre>
-              </div>
-            </OCardSection>
-          </OCard>
-        </div>
-
-        <div v-if="createNewFunction" class="pipeline-add-function tw:w-full tw:flex-1 tw:min-h-0">
-          <AddFunction
-            ref="addFunctionRef"
-            :is-updated="isUpdating"
-            @update:list="onFunctionCreation"
-            @cancel:hideform="cancelFunctionCreation"
-            :heightOffset="75"
-          />
-        </div>
-
-        <div
-          class="tw:w-full tw:flex tw:flex-col tw:gap-3"
-          v-if="!createNewFunction"
-        >
-          <OSwitch
-            data-test="associate-function-after-flattening-toggle"
-            :label="t('pipeline.flatteningLbl')"
-            v-model="afterFlattening"
-          />
-
-          <!-- Info note explaining RAF/RBF -->
-          <div class="tw:bg-[#f9f290] tw:text-[#2d3748] tw:w-full tw:rounded-md tw:p-3 tw:flex tw:flex-col tw:gap-2">
-            <div class="tw:text-sm tw:text-[#2d3748]">
-              Function Execution Guidelines:
-            </div>
-            <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-[#2d3748]">
-              <div class="tw:flex tw:items-start tw:gap-2">
-                <OIcon
-                  name="info"
-                  size="sm"
-                  class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500"
-                />
-                <span>
-                  <span class="tw:font-bold tw:text-[#007bff]">RBF (Run Before Flattening):</span>
-                  Function executes before data structure is flattened
-                </span>
-              </div>
-              <div class="tw:flex tw:items-start tw:gap-2">
-                <OIcon
-                  name="info"
-                  size="sm"
-                  class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500"
-                />
-                <span>
-                  <span class="tw:font-bold tw:text-[#007bff]">RAF (Run After Flattening):</span>
-                  Function executes after data structure is flattened
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-
-      </div>
-    </div>
     </div>
   </ODrawer>
   <confirm-dialog
@@ -180,67 +65,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:cancel="dialog.show = false"
   />
 </template>
+
 <script lang="ts" setup>
-import {
-  ref,
-  type Ref,
-  watch,
-  nextTick,
-  defineAsyncComponent,
-  onMounted,
-  computed,
-} from "vue";
+import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
-
-interface RouteCondition {
-  column: string;
-  operator: string;
-  value: any;
-  id: string;
-}
-
-interface StreamRoute {
-  sourceStreamName: string;
-  destinationStreamName: string;
-  sourceStreamType: string;
-  destinationStreamType: string;
-  conditions: RouteCondition[];
-}
-
-const AddFunction = defineAsyncComponent(
-  () => import("@/components/functions/AddFunction.vue"),
-);
+import FunctionPicker from "@/components/flow/forms/FunctionPicker.vue";
 
 const props = defineProps({
   open: {
     type: Boolean,
     default: false,
   },
+  // Kept for call-site compatibility; the picker self-fetches its VRL list.
   functions: {
     type: Array,
-    required: true,
-    default: () => {
-      return [];
-    },
+    required: false,
+    default: () => [],
   },
   associatedFunctions: {
     type: Array,
     required: true,
-    default: () => {
-      return [];
-    },
+    default: () => [],
   },
 });
 
@@ -251,8 +100,17 @@ const emit = defineEmits([
   "add:function",
 ]);
 
+const { t } = useI18n();
+const store = useStore();
+const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
+
 const internalOpen = ref(!!props.open);
-watch(() => props.open, (v) => { internalOpen.value = !!v; });
+watch(
+  () => props.open,
+  (v) => {
+    internalOpen.value = !!v;
+  },
+);
 
 function handleDrawerClose(v: boolean) {
   internalOpen.value = v;
@@ -261,50 +119,21 @@ function handleDrawerClose(v: boolean) {
   }
 }
 
-const { t } = useI18n();
+const picker = ref<any>(null);
+// True while the picker's inline "Create New Function" editor is open — widens
+// the drawer and hides its Save/Cancel (AddFunction's toolbar owns them).
+const isCreating = ref(false);
+const onExpand = (v: boolean) => {
+  isCreating.value = v;
+};
+const onCreated = (fn: any) => emit("add:function", fn);
 
-const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
-
-const addFunctionRef: any = ref(null);
-
-const isUpdating = ref(false);
-
-const selectedFunction = ref(
-  (pipelineObj.currentSelectedNodeData?.data as { name?: string })?.name || "",
-);
-
-const loading = ref(false);
-
-const afterFlattening = ref(
-  (pipelineObj.currentSelectedNodeData?.data as { after_flatten?: boolean })
-    ?.after_flatten ?? true,
-);
-
-const filteredFunctions: Ref<any[]> = ref([]);
-
-const createNewFunction = ref(false);
-
-const store = useStore();
-
-const functionExists = ref(false);
-// Toggle for "Field is required" — flipped on save when no function is selected.
-const showFunctionRequiredError = ref(false);
-
-// Clear the "Field is required" error as soon as the user picks a function.
-watch(selectedFunction, (next) => {
-  if (next) showFunctionRequiredError.value = false;
-});
-
-const nodeLink = ref({
-  from: "",
-  to: "",
-});
-
-const computedStyleForFunction = computed(() => {
-  return createNewFunction.value
-    ? { width: "100%" }
-    : { width: "100%", height: "100%" };
-});
+const savedData = (pipelineObj.currentSelectedNodeData?.data ?? {}) as {
+  name?: string;
+  after_flatten?: boolean;
+};
+const initialName = savedData.name || "";
+const initialAfterFlatten = savedData.after_flatten ?? true;
 
 const dialog = ref({
   show: false,
@@ -313,42 +142,11 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-watch(
-  () => props.functions,
-  (newVal) => {
-    filteredFunctions.value = [...newVal].sort((a: any, b: any) => {
-      return a.localeCompare(b);
-    });
-  },
-  {
-    deep: true,
-    immediate: true,
-  },
-);
-onMounted(() => {
-  if (pipelineObj.userSelectedNode) {
-    pipelineObj.userSelectedNode = {};
-  }
-});
-
 const openCancelDialog = () => {
-  if (!isUpdating) {
-    if (
-      createNewFunction.value == true &&
-      addFunctionRef.value.formData.name == "" &&
-      addFunctionRef.value.formData.function == ""
-    ) {
-      createNewFunction.value = false;
-      return;
-    }
-  }
-
   dialog.value.show = true;
   dialog.value.title = "Discard Changes";
   dialog.value.message = "Are you sure you want to cancel changes?";
   dialog.value.okCallback = () => emit("cancel:hideform");
-  pipelineObj.userClickedNode = {};
-  pipelineObj.userSelectedNode = {};
 };
 
 const openDeleteDialog = () => {
@@ -360,139 +158,17 @@ const openDeleteDialog = () => {
 };
 
 const saveFunction = () => {
-  functionExists.value = false;
-
-  if (createNewFunction.value) {
-    if (addFunctionRef.value.formData.name == "") {
-      toast({
-        message: "Function Name is required",
-        variant: "warning",
-      });
-      return;
-    }
-    return;
-  }
-
-  // Validate that a function has been selected before allowing save.
-  if (!selectedFunction.value) {
-    showFunctionRequiredError.value = true;
-    return;
-  }
-  showFunctionRequiredError.value = false;
-
-  if (
-    !isUpdating.value &&
-    selectedFunction.value &&
-    props.associatedFunctions.includes(selectedFunction.value)
-  ) {
-    functionExists.value = true;
-    return;
-  }
-
-  const functionNode = {
-    name: selectedFunction.value,
-    after_flatten: afterFlattening.value,
-  };
-  addNode(functionNode);
-  // emit("update:node", {
-  //   data: { name: selectedFunction.value, order: functionOrder.value },
-  //   link: nodeLink.value,
-  // });
+  const payload = picker.value?.getPayload();
+  if (!payload) return; // picker surfaced its own validation
+  addNode(payload);
   emit("cancel:hideform");
-};
-
-const onFunctionCreation = async (_function: any) => {
-  // Assign newly created function to the block
-  createNewFunction.value = false;
-  emit("add:function", _function);
-  await nextTick();
-  selectedFunction.value = _function.name;
-};
-
-const cancelFunctionCreation = () => {
-  emit("cancel:hideform");
-};
-
-const saveUpdatedLink = (link: { from: string; to: string }) => {
-  nodeLink.value = link;
 };
 
 const deleteFunction = () => {
   deletePipelineNode(pipelineObj.currentSelectedNodeID);
-
   emit("cancel:hideform");
 };
-const filterFunctions = (val: any, update: any) => {
-  const filtered = props.functions
-    .filter((func: any) => func.toLowerCase().includes(val.toLowerCase()))
-    .sort((a: any, b: any) => a.localeCompare(b));
 
-  update(() => {
-    filteredFunctions.value = filtered;
-  });
-};
+// exposed for tests / parent access
+defineExpose({ isCreating, saveFunction });
 </script>
-
-<style>
-.pipeline-add-function :deep(.add-function-back-btn),
-.pipeline-add-function :deep(.add-function-fullscreen-btn),
-.pipeline-add-function :deep(.add-function-title) {
-  display: none;
-}
-
-.function-code::selection {
-  background-color: #bee3f8;
-}
-
-/* Custom scrollbar */
-.function-code-container::-webkit-scrollbar {
-  width: 6px;
-}
-
-.function-code-container::-webkit-scrollbar-track {
-  background: #f7fafc;
-}
-
-.function-code-container::-webkit-scrollbar-thumb {
-  background: #cbd5e0;
-  border-radius: 3px;
-}
-
-.function-code-container::-webkit-scrollbar-thumb:hover {
-  background: #a0aec0;
-}
-
-.dark .function-code::selection {
-  background-color: #2b6cb0;
-  color: #ffffff;
-}
-
-.dark .function-code-container::-webkit-scrollbar {
-  width: 8px;
-}
-
-.dark .function-code-container::-webkit-scrollbar-track {
-  background: #0d1117;
-  border-radius: 4px;
-}
-
-.dark .function-code-container::-webkit-scrollbar-thumb {
-  background: #4a5568;
-  border-radius: 4px;
-  border: 1px solid #2d3748;
-}
-
-.dark .function-code-container::-webkit-scrollbar-thumb:hover {
-  background: #718096;
-}
-
-.pipeline-add-function .add-function-name-input {
-  width: 100%;
-  margin-left: 0px !important;
-}
-
-.pipeline-add-function .add-function-name-input label {
-  width: 100%;
-  padding-left: 0;
-}
-</style>
