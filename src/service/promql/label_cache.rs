@@ -36,6 +36,9 @@ const LABEL_OVERHEAD: usize = 72;
 // Rough per-label size estimate for admission control, before the actual
 // label values are known: overhead + ~24 bytes of name/value strings.
 const EST_LABEL_BYTES: usize = LABEL_OVERHEAD + 24;
+// A single query may claim at most this share of the budget: the cache is
+// shared by concurrent queries, so one query must not evict everything.
+const ADMIT_MAX_PERCENT: usize = 50;
 
 /// Process-wide cache of series labels keyed by (context fingerprint, series
 /// hash), bounded by memory size rather than entry count — label sets vary
@@ -106,15 +109,18 @@ impl LabelCache {
     }
 
     /// Admission control: returns false when caching `series_count` label
-    /// sets of `label_count` labels each would clearly overflow the whole
-    /// budget. An LRU cycled by a working set larger than its capacity
-    /// degrades to a near-zero hit rate, so lookups, inserts and evictions
-    /// become pure overhead on top of the full label scan — the caller
-    /// should bypass the cache entirely instead (scan resistance).
+    /// sets of `label_count` labels each would claim more than a single
+    /// query's share of the budget. An LRU cycled by a working set larger
+    /// than its capacity degrades to a near-zero hit rate, so lookups,
+    /// inserts and evictions become pure overhead on top of the full label
+    /// scan — the caller should bypass the cache entirely instead (scan
+    /// resistance). The share is capped below 100% because the cache is
+    /// shared by concurrent queries: one oversized working set must not
+    /// evict everything the others rely on.
     pub fn admit(&self, label_count: usize, series_count: usize) -> bool {
         let est_entry =
             ENTRY_OVERHEAD + std::mem::size_of::<Labels>() + label_count * EST_LABEL_BYTES;
-        series_count.saturating_mul(est_entry) <= self.max_bytes
+        series_count.saturating_mul(est_entry) <= self.max_bytes * ADMIT_MAX_PERCENT / 100
     }
 
     fn shard(&self, series_hash: u64) -> &Mutex<Shard> {
