@@ -55,8 +55,11 @@ const pageSizeSelectOptions = computed(() =>
     :data-test="`o2-table-pagination-${position}`"
     class="flex items-center flex-wrap justify-between gap-x-3 gap-y-1 py-1 px-3 border-t border-border-default min-h-10"
   >
-    <!-- Left: bulk actions slot or row count -->
-    <div class="flex items-center gap-2">
+    <!-- Left: bulk actions slot or row count.
+         The footer-title typography lives on this wrapper so BOTH the default
+         row count and any custom #bottom (actions) slot content inherit it —
+         consumers don't need to remember to add `o2-table-footer-title`. -->
+    <div class="flex items-center gap-2 o2-table-footer-title">
       <!-- Loading: always skeleton, regardless of slot/count -->
       <span
         v-if="loading"
@@ -65,10 +68,7 @@ const pageSizeSelectOptions = computed(() =>
         data-test="o2-table-pagination-count-skel"
       />
       <slot v-else-if="slots.actions" name="actions" />
-      <span
-        v-else
-        class="o2-table-footer-title"
-      >
+      <span v-else>
         {{ totalCount.toLocaleString() }} {{ title }}
       </span>
     </div>
