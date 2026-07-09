@@ -66,6 +66,7 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pageManager.pipelinesPage.enterPipelineName(pipelineName);
     await pageManager.pipelinesPage.savePipeline();
+    await pageManager.pipelinesPage.waitForPipelineSaved();
 
     // Navigate to pipeline list via stream exploration
     await pageManager.pipelinesPage.exploreStreamAndNavigateToPipeline('destination_node');
@@ -187,9 +188,7 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
     const pipelineName = `vrl-pipeline-${Math.random().toString(36).substring(7)}`;
     await pageManager.pipelinesPage.enterPipelineName(pipelineName);
     await pageManager.pipelinesPage.savePipeline();
-
-    // Verify pipeline was created
-    await page.waitForTimeout(2000);
+    await pageManager.pipelinesPage.waitForPipelineSaved();
 
     // Cleanup - navigate to pipeline list and delete
     try {
@@ -248,6 +247,7 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pageManager.pipelinesPage.enterPipelineName(pipelineName);
     await pageManager.pipelinesPage.savePipeline();
+    await pageManager.pipelinesPage.waitForPipelineSaved();
 
     // Navigate to pipeline list via stream exploration
     await pageManager.pipelinesPage.exploreStreamAndNavigateToPipeline('destination_node');
