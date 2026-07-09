@@ -282,6 +282,13 @@ impl NodeData {
             _ => false,
         }
     }
+
+    pub fn is_a_leaf_node(&self) -> bool {
+        match self {
+            Self::Stream(_) | Self::RemoteStream(_) | Self::Destination(_) => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
