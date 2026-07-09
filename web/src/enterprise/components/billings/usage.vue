@@ -279,15 +279,15 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
         const orgId = store.state.selectedOrganization.identifier;
         const currentSettings =
           store.state?.organizationData?.organizationSettings ?? {};
+        // Build the merged object once so the POST and the store update can
+        // never drift apart.
+        const updatedSettings = {
+          ...currentSettings,
+          usage_stream_enabled: true,
+        };
         try {
-          await organizations.post_organization_settings(orgId, {
-            ...currentSettings,
-            usage_stream_enabled: true,
-          });
-          store.dispatch("setOrganizationSettings", {
-            ...currentSettings,
-            usage_stream_enabled: true,
-          });
+          await organizations.post_organization_settings(orgId, updatedSettings);
+          store.dispatch("setOrganizationSettings", updatedSettings);
           toast({
             variant: "success",
             message: t("billing.usageTrends.enablePending"),
