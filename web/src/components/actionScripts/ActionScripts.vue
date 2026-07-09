@@ -53,6 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filter-mode="client"
           :default-columns="false"
           :show-global-filter="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="actions-action-scripts-list"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
@@ -62,6 +65,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('actions.search')"
               data-test="action-list-search-input"
             />
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="action-scripts-list-refresh-btn"
+              @click="getActionScripts"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="actionsRefresh" />
+            </OButton>
           </template>
             <template #empty>
               <NoData />
@@ -282,6 +297,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 interface ActionScriptList {
   "#": string | number;
@@ -382,6 +399,7 @@ export default defineComponent({
         header: t("alerts.name"),
         accessorKey: "name",
         sortable: true,
+        hideable: true,
         size: COL.name,
         meta: { align: "left", autoWidth: true },
       },
@@ -390,6 +408,7 @@ export default defineComponent({
         header: t("alerts.createdBy"),
         accessorKey: "created_by",
         sortable: true,
+        hideable: true,
         size: COL.owner,
         meta: { align: "left" },
       },
@@ -398,6 +417,7 @@ export default defineComponent({
         header: t("alerts.createdAt"),
         accessorKey: "created_at",
         sortable: true,
+        hideable: true,
         size: COL.createdAt,
         meta: { align: "left" },
       },
@@ -406,6 +426,7 @@ export default defineComponent({
         header: t("actions.type"),
         accessorKey: "execution_details_type",
         sortable: true,
+        hideable: true,
         size: COL.type,
         meta: { align: "left" },
       },
@@ -414,6 +435,7 @@ export default defineComponent({
         header: t("alerts.lastRunAt"),
         accessorKey: "last_run_at",
         sortable: true,
+        hideable: true,
         size: COL.dateAbsolute,
         meta: { align: "left" },
       },
@@ -422,6 +444,7 @@ export default defineComponent({
         header: t("alerts.lastSuccessfulAt"),
         accessorKey: "last_successful_at",
         sortable: true,
+        hideable: true,
         size: COL.dateAbsolute,
         meta: { align: "left" },
       },
@@ -430,6 +453,7 @@ export default defineComponent({
         header: t("alerts.status"),
         accessorKey: "status",
         sortable: true,
+        hideable: true,
         size: COL.status,
         meta: { align: "left" },
       },
@@ -814,6 +838,10 @@ export default defineComponent({
       },
       { immediate: true },
     );
+
+    useShortcuts([
+      { id: "actionsRefresh", handler: () => { if (!isInputFocused()) getActionScripts(); } },
+    ]);
 
     return {
       t,

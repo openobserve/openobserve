@@ -763,12 +763,33 @@ export default defineComponent({
       cleanupDraggingFields,
       selectedStreamFieldsBasedOnUserDefinedSchema,
       fetchPromQLLabels,
-      currentXLabel,
-      currentYLabel,
       isPivotMode,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     const { parsePromQlQuery } = usePromqlSuggestions();
+
+    // Translated axis labels. The composable's currentXLabel/currentYLabel return
+    // hardcoded English; recompute them here through t() so they respect the
+    // active locale (mirrors the composable's type/pivot branching).
+    const currentXLabel = computed(() => {
+      if (dashboardPanelData.data.type == "table") {
+        return isPivotMode.value ? t("panel.rowFields") : t("panel.firstColumn");
+      }
+      return dashboardPanelData.data.type == "h-bar"
+        ? t("panel.yAxisShort")
+        : t("panel.xAxisShort");
+    });
+
+    const currentYLabel = computed(() => {
+      if (dashboardPanelData.data.type == "table") {
+        return isPivotMode.value
+          ? t("panel.valueFields")
+          : t("panel.otherColumn");
+      }
+      return dashboardPanelData.data.type == "h-bar"
+        ? t("panel.xAxisShort")
+        : t("panel.yAxisShort");
+    });
 
     // Initialize treatAsNonTimestamp for existing fields (only for table charts)
     const initializeTreatAsNonTimestamp = () => {

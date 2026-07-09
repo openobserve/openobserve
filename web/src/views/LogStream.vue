@@ -28,14 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #title><span data-test="log-stream-title-text">{{ t('logStream.header') }}</span></template>
           <template #actions>
             <OButton
-              data-test="log-stream-refresh-stats-btn"
-              variant="outline"
-              size="sm-action"
-              @click="getLogStream(true)"
-            >
-              {{ t(`logStream.refreshStats`) }}
-            </OButton>
-            <OButton
               v-if="isSchemaUDSEnabled"
               data-test="log-stream-add-stream-btn"
               variant="primary"
@@ -116,6 +108,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :debounce="300"
               />
             </div>
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loadingState"
+              data-test="log-stream-refresh-stats-btn"
+              @click="() => getLogStream(true)"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="streamsRefresh" />
+            </OButton>
           </template>
           <!--
             Render the stream-name cell with a deterministic per-name data-test.
@@ -328,6 +332,7 @@ import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
 import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -349,6 +354,7 @@ export default defineComponent({
     EmptyStateIngestionChip,
     AddStream,
     OButton,
+    OTooltip,
     ODialog,
     OIcon,
     OToggleGroup,

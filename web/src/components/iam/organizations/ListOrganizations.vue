@@ -68,6 +68,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="organizations-list-refresh-btn"
+              @click="getOrganizations"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="iamOrganizationsRefresh" />
+            </OButton>
+          </template>
           <template #empty>
             <OEmptyState
               size="hero"
@@ -130,6 +142,7 @@ import JoinOrganization from "./JoinOrganization.vue";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
@@ -142,6 +155,8 @@ import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "PageOrganization",
@@ -150,6 +165,7 @@ export default defineComponent({
     AddUpdateOrganization,
     OEmptyState,
     OButton,
+    OTooltip,
     OTag,
     AppPageHeader,
     OIcon,
@@ -427,6 +443,10 @@ export default defineComponent({
         },
       });
     };
+
+    useShortcuts([
+      { id: "iamOrganizationsRefresh", handler: () => { if (!isInputFocused()) getOrganizations(); } },
+    ]);
 
     return {
       t,
