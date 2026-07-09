@@ -1411,34 +1411,24 @@ async fn selector_load_data_from_datafusion(
     let start2 = std::time::Instant::now();
     let label_cache = label_cache::LABEL_CACHE.as_ref();
     let ctx_fp = label_cache::context_fingerprint(&query_ctx.org_id, table_name, &label_col_names);
-    let mut missing_hashes: Vec<u64> = Vec::new();
-    if let Some(cache) = label_cache {
+    let missing_hashes: Vec<u64> = match label_cache {
         // attach cached labels in parallel; millions of series make the
         // lookup+clone loop CPU-bound
-        let mut entries: Vec<(&u64, &mut RangeValue)> = metrics.iter_mut().collect();
-        missing_hashes = entries
-            .par_iter_mut()
-            .filter_map(|(hash, range_val)| match cache.get(ctx_fp, **hash) {
+        Some(cache) => metrics
+            .iter_mut()
+            .collect::<Vec<_>>()
+            .into_par_iter()
+            .filter_map(|(hash, range_val)| match cache.get(ctx_fp, *hash) {
                 Some(labels) => {
-                    range_val.labels = if query_ctx.query_data {
-                        let mut with_hash = Vec::with_capacity(labels.len() + 1);
-                        with_hash.push(Arc::new(Label {
-                            name: HASH_LABEL.to_string(),
-                            value: hash.to_string(),
-                        }));
-                        with_hash.extend(labels.iter().cloned());
-                        with_hash
-                    } else {
-                        labels
-                    };
+                    range_val.labels =
+                        maybe_prepend_hash_label(labels, *hash, query_ctx.query_data);
                     None
                 }
-                None => Some(**hash),
+                None => Some(*hash),
             })
-            .collect();
-    } else {
-        missing_hashes.extend(metrics.keys().copied());
-    }
+            .collect(),
+        None => metrics.keys().copied().collect(),
+    };
     let cache_hits = metrics.len() - missing_hashes.len();
 
     if !missing_hashes.is_empty() {
@@ -1482,10 +1472,15 @@ async fn selector_load_data_from_datafusion(
             || series_timestamps.is_empty()
         {
             df_series
-                .filter(col(TIMESTAMP_COL_NAME).in_list(
-                    series_timestamps.iter().map(|&v| lit(v)).collect::<Vec<_>>(),
-                    false,
-                ))?
+                .filter(
+                    col(TIMESTAMP_COL_NAME).in_list(
+                        series_timestamps
+                            .iter()
+                            .map(|&v| lit(v))
+                            .collect::<Vec<_>>(),
+                        false,
+                    ),
+                )?
                 .select(label_cols)?
                 .collect()
                 .await?
@@ -1516,6 +1511,29 @@ async fn selector_load_data_from_datafusion(
                     }
                 })
                 .collect::<Vec<(_, _)>>();
+            let mut attach_row_labels = |hash: u64, i: usize| {
+                if !missing_set.contains(&hash) || labeled_set.contains(&hash) {
+                    return;
+                }
+                let Some(range_val) = metrics.get_mut(&hash) else {
+                    return;
+                };
+                let mut labels = Vec::with_capacity(cols.len());
+                for (name, value) in cols.iter() {
+                    if value.is_null(i) {
+                        continue;
+                    }
+                    labels.push(Arc::new(Label {
+                        name: name.to_string(),
+                        value: value.value(i).to_string(),
+                    }));
+                }
+                labeled_set.insert(hash);
+                if let Some(cache) = label_cache {
+                    cache.put(ctx_fp, hash, labels.clone());
+                }
+                range_val.labels = maybe_prepend_hash_label(labels, hash, query_ctx.query_data);
+            };
             if hash_field_type == &DataType::UInt64 {
                 let hash_values = batch
                     .column_by_name(HASH_LABEL)
@@ -1524,38 +1542,7 @@ async fn selector_load_data_from_datafusion(
                     .downcast_ref::<UInt64Array>()
                     .unwrap();
                 for i in 0..batch.num_rows() {
-                    let hash = hash_values.value(i);
-                    if !missing_set.contains(&hash) || labeled_set.contains(&hash) {
-                        continue;
-                    }
-                    let Some(range_val) = metrics.get_mut(&hash) else {
-                        continue;
-                    };
-                    let mut labels = Vec::with_capacity(cols.len());
-                    for (name, value) in cols.iter() {
-                        if value.is_null(i) {
-                            continue;
-                        }
-                        labels.push(Arc::new(Label {
-                            name: name.to_string(),
-                            value: value.value(i).to_string(),
-                        }));
-                    }
-                    labeled_set.insert(hash);
-                    if let Some(cache) = label_cache {
-                        cache.put(ctx_fp, hash, labels.clone());
-                    }
-                    range_val.labels = if query_ctx.query_data {
-                        let mut with_hash = Vec::with_capacity(labels.len() + 1);
-                        with_hash.push(Arc::new(Label {
-                            name: HASH_LABEL.to_string(),
-                            value: hash.to_string(),
-                        }));
-                        with_hash.extend(labels);
-                        with_hash
-                    } else {
-                        labels
-                    };
+                    attach_row_labels(hash_values.value(i), i);
                 }
             } else {
                 let hash_values = batch
@@ -1565,38 +1552,7 @@ async fn selector_load_data_from_datafusion(
                     .downcast_ref::<StringArray>()
                     .unwrap();
                 for i in 0..batch.num_rows() {
-                    let hash: u64 = gxhash::new().sum64(hash_values.value(i));
-                    if !missing_set.contains(&hash) || labeled_set.contains(&hash) {
-                        continue;
-                    }
-                    let Some(range_val) = metrics.get_mut(&hash) else {
-                        continue;
-                    };
-                    let mut labels = Vec::with_capacity(cols.len());
-                    for (name, value) in cols.iter() {
-                        if value.is_null(i) {
-                            continue;
-                        }
-                        labels.push(Arc::new(Label {
-                            name: name.to_string(),
-                            value: value.value(i).to_string(),
-                        }));
-                    }
-                    labeled_set.insert(hash);
-                    if let Some(cache) = label_cache {
-                        cache.put(ctx_fp, hash, labels.clone());
-                    }
-                    range_val.labels = if query_ctx.query_data {
-                        let mut with_hash = Vec::with_capacity(labels.len() + 1);
-                        with_hash.push(Arc::new(Label {
-                            name: HASH_LABEL.to_string(),
-                            value: hash.to_string(),
-                        }));
-                        with_hash.extend(labels);
-                        with_hash
-                    } else {
-                        labels
-                    };
+                    attach_row_labels(gxhash::new().sum64(hash_values.value(i)), i);
                 }
             }
         }
@@ -1849,6 +1805,21 @@ async fn load_exemplars_from_datafusion(
     Ok(metrics)
 }
 
+/// Prepend the synthetic `__hash__` label when the query asked for raw data
+/// (`query_data`); otherwise return the labels unchanged.
+fn maybe_prepend_hash_label(labels: Labels, hash: u64, query_data: bool) -> Labels {
+    if !query_data {
+        return labels;
+    }
+    let mut with_hash = Vec::with_capacity(labels.len() + 1);
+    with_hash.push(Arc::new(Label {
+        name: HASH_LABEL.to_string(),
+        value: hash.to_string(),
+    }));
+    with_hash.extend(labels);
+    with_hash
+}
+
 /// Aggregations that with no modifier group every series into a single
 /// labelless output series, so the input labels are provably unused.
 const LABEL_DROPPING_AGGS: [u8; 8] = [
@@ -2000,7 +1971,10 @@ mod tests {
             ("rate(metric[5m])", false),
             ("sum(rate(metric[5m])) / 2", false),
             // label-sensitive constructs
-            ("histogram_quantile(0.9, sum by (le) (rate(metric[5m])))", false),
+            (
+                "histogram_quantile(0.9, sum by (le) (rate(metric[5m])))",
+                false,
+            ),
             ("topk(3, rate(metric[5m]))", false),
             (
                 "sum(label_replace(metric, \"a\", \"$1\", \"b\", \"(.*)\"))",
@@ -2010,11 +1984,7 @@ mod tests {
         ];
         for (query, expected) in cases {
             let expr = promql_parser::parser::parse(query).unwrap();
-            assert_eq!(
-                labels_dropped_at_root(&expr),
-                expected,
-                "query: {query}"
-            );
+            assert_eq!(labels_dropped_at_root(&expr), expected, "query: {query}");
         }
     }
 
