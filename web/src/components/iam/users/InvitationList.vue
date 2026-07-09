@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md p-0 h-full flex flex-col">
+  <div class="p-0 h-full flex flex-col">
     <!-- Standard page header: title + icon + subtitle, matching the Users page. -->
     <AppPageHeader
       :title="t('invitation.pendingInvitations')"
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #bottom>
-            <span class="o2-table-footer-title text-text-primary">
+            <span class="o2-table-footer-title">
               {{ resultTotal }} {{ t('invitation.pendingInvitations') }}
             </span>
           </template>

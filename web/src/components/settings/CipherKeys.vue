@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="rounded-md flex flex-col h-full p-0">
+  <div class="flex flex-col h-full p-0">
     <div v-if="!showAddDialog" class="flex flex-col h-full">
       <!-- Standard section header: title + actions only. Search moved into the
            table's own toolbar below. -->

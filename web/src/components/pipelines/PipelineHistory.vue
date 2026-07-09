@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #bottom="{ totalRows }">
             <div
-              class="flex items-center font-bold text-[14px] mr-4 py-2"
+              class="flex items-center o2-table-footer-title mr-4 py-2"
             >
               {{ totalRows }} {{ t("pipeline.header") }}
             </div>
@@ -627,7 +627,11 @@ const columns = ref([
     accessorKey: "status",
     sortable: true,
     hideable: true,
-    size: 150,
+    // Wide enough for the longest status chip ("Condition Not Satisfied");
+    // minSize stops the column shrinking and clipping the pill on narrow
+    // viewports (the cell clips non-wrapped content by design).
+    size: 200,
+    minSize: 200,
     meta: { align: "left" as const },
   },
   {

@@ -2361,6 +2361,7 @@ export default defineComponent({
       // If using manager, delegate to manager's updateVariableValue
       if (useManager && manager) {
         try {
+          oldVariablesData[currentVariable.name] = currentVariable.value;
           await manager.updateVariableValue(
             currentVariable.name,
             currentVariable.scope || "global",

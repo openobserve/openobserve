@@ -15,61 +15,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
-    <div class="px-[0.625rem] py-[0.1rem]">
-      <div class="card-container mb-[0.625rem]">
-        <!-- Header -->
-        <div
-          class="flex justify-between items-center px-2 py-2"
+  <div class="w-full h-full flex flex-col min-h-0">
+    <AppPageHeader
+      :title="t('alerts.insights.title')"
+      :back="{ onClick: goBack, dataTest: 'alert-insights-back-btn' }"
+      tabs-below
+      class="shrink-0 px-4"
+    >
+      <template #actions>
+        <date-time
+          ref="dateTimeRef"
+          auto-apply
+          :default-type="dateTimeType"
+          :default-absolute-time="{
+            startTime: timeRange.__global.start_time.getTime(),
+            endTime: timeRange.__global.end_time.getTime(),
+          }"
+          :default-relative-time="relativeTime"
+          @on:date-change="updateDateTime"
+          @on:timezone-change="updateTimezone"
+          data-test="alert-insights-datetime"
+        />
+
+        <OButton
+          @click="refreshDashboard"
+          :loading="isLoading"
+          variant="ghost"
+          size="icon-sm"
+          data-test="alert-insights-refresh-btn"
         >
-          <div class="flex items-center">
-            <OButton
-              variant="outline"
-              size="icon-sm"
-              class="hideOnPrintMode el-border"
-              @click="goBack"
-              data-test="alert-insights-back-btn"
-            >
-              <OIcon name="arrow-back-ios-new" size="sm" />
-            </OButton>
-            <div class="text-xl tracking-[0.005em] font-[600] ml-2">{{ t("alerts.insights.title") }}</div>
-          </div>
+          <OIcon name="refresh" size="sm" />
+          <OTooltip :content="t('common.refresh')" />
+        </OButton>
+      </template>
 
-          <div class="flex items-center">
-            <date-time
-              ref="dateTimeRef"
-              auto-apply
-              :default-type="dateTimeType"
-              :default-absolute-time="{
-                startTime: timeRange.__global.start_time.getTime(),
-                endTime: timeRange.__global.end_time.getTime(),
-              }"
-              :default-relative-time="relativeTime"
-              @on:date-change="updateDateTime"
-              @on:timezone-change="updateTimezone"
-              class="mr-2"
-              data-test="alert-insights-datetime"
-            />
-
-            <OButton
-              @click="refreshDashboard"
-              :loading="isLoading"
-              variant="ghost"
-              size="icon-sm"
-              class="mr-1 el-border"
-              data-test="alert-insights-refresh-btn"
-            >
-              <OIcon name="refresh" size="sm" />
-              <OTooltip :content="t('common.refresh')" />
-            </OButton>
-          </div>
-        </div>
-
-        <!-- Tabs -->
+      <template #tabs>
         <OTabs
           v-model="currentTab"
           dense
-          class="alert-insights-tabs ml-2"
+          class="alert-insights-tabs"
           align="left"
           data-test="alert-insights-tabs"
         >
@@ -88,12 +72,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OTab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
         </OTabs>
+      </template>
+    </AppPageHeader>
 
-        <!-- Filters Section -->
-        <div
-          v-if="show"
-          class="flex items-center gap-2 flex-wrap px-4 py-3 border-b border-(--q-border-color)"
-        >
+    <!-- Filters Section -->
+    <div
+      v-if="show"
+      class="flex items-center gap-2 flex-wrap px-4 py-3 border-b border-(--q-border-color) shrink-0"
+    >
           <span class="text-sm font-semibold relative top-1">{{ t("common.filters") }}:</span>
 
           <!-- Failed Only Toggle -->
@@ -166,14 +152,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t('alerts.insights.filters.clearAll') }}
           </OButton>
-        </div>
-      </div>
     </div>
 
     <!-- Action Buttons Row -->
     <div
       v-if="selectedAlertForAction"
-      class="bg-primary bg-opacity-10 flex items-center px-4 py-3 gap-3 border-b border-(--q-border-color)"
+      class="bg-primary bg-opacity-10 flex items-center px-4 py-3 gap-3 border-b border-(--q-border-color) shrink-0"
       data-test="action-buttons-row"
     >
       <OIcon name="campaign" size="sm" />
@@ -228,8 +212,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Dashboard Content -->
-    <div class="w-full h-full px-[0.625rem] pb-[0.625rem]">
-      <div class="card-container mb-[0.625rem] h-[calc(100vh-208px)]">
+    <div class="flex-1 min-h-0 px-2.5 pb-2.5">
+      <div class="card-container mb-2.5 h-[calc(100vh-13rem)]">
         <div
           @contextmenu="handleNativeContextMenu"
         >
@@ -283,6 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OButton from '@/lib/core/Button/OButton.vue';
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { ref, computed, onMounted, watch, nextTick, reactive, provide } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";

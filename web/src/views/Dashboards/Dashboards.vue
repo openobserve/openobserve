@@ -340,14 +340,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex w-full justify-between items-center py-1"
               >
                 <div
-                  class="o2-table-footer-title flex items-center gap-2 shrink-0"
+                  class="o2-table-footer-title flex items-center shrink-0"
                 >
-                  <span class="text-text-primary">{{
-                    resultTotal || 0
-                  }}</span>
-                  <span class="text-text-secondary">{{
-                    t("dashboard.header")
-                  }}</span>
+                  {{ resultTotal || 0 }} {{ t("dashboard.header") }}
                 </div>
                 <div
                   v-if="selectedIds.length > 0"
