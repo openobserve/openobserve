@@ -1170,7 +1170,6 @@ const fieldWidthClass = computed(() => {
             ]"
             :style="[dropdownStyle, { maxHeight: 'min(18rem, var(--reka-popover-content-available-height, 18rem))' }]"
             @click.stop
-            @pointerdown.stop
           >
             <ListboxRoot
               :model-value="listboxStringModelValue"
