@@ -28,17 +28,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div>
           <!-- Advanced Options + numeric ranges + the time range are form-owned. -->
           <OForm id="edit-backfill-form" :form="form">
-          <!-- Time Range Section (form-owned via OFormDateTimeRange). -->
+          <!-- Time Range Section (form-owned via OFormDateTimeRange). The label is
+               rendered inline beside the picker (flex row) to match the Create
+               dialog; OFormDateTimeRange's built-in label stacks, so it's omitted. -->
           <div>
-            <OFormDateTimeRange
-              name="timerange"
-              label="Time Range"
-              required
-              disable-relative
-              min-date="1999/01/01"
-              auto-apply
-              data-test="time-range-picker"
-            />
+            <div class="flex items-center gap-4">
+              <div class="text-sm font-medium whitespace-nowrap">
+                Time Range <span class="text-red-600">*</span>
+              </div>
+              <OFormDateTimeRange
+                name="timerange"
+                disable-relative
+                min-date="1999/01/01"
+                auto-apply
+                data-test="time-range-picker"
+              />
+            </div>
             <div
               v-if="timerangeError"
               class="text-xs text-red-600 mt-1"

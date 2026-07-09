@@ -39,21 +39,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </template>
 
-    <div class="mx-6 my-3 space-y-3">
+    <div class="mx-6 my-3">
           <!-- Advanced Options + numeric ranges are form-owned. The time range is
-               a form-owned field too (OFormDateTimeRange). -->
-          <OForm id="create-backfill-form" :form="form">
-          <!-- Time Range Section (form-owned via OFormDateTimeRange). -->
+               a form-owned field too (OFormDateTimeRange). `space-y-3` lives on the
+               <form> (via OForm) so it spaces the sibling sections below — on the
+               outer div it would no-op (the <form> is its only child). -->
+          <OForm id="create-backfill-form" :form="form" class="space-y-3">
+          <!-- Time Range Section (form-owned via OFormDateTimeRange). The label is
+               rendered inline beside the picker (flex row); OFormDateTimeRange's
+               built-in label stacks above the control, so it's omitted here. -->
           <div>
-            <OFormDateTimeRange
-              name="timerange"
-              label="Time Range"
-              required
-              disable-relative
-              min-date="1999/01/01"
-              auto-apply
-              data-test="time-range-picker"
-            />
+            <div class="flex items-center gap-4">
+              <div class="text-sm font-medium whitespace-nowrap">
+                Time Range <span class="text-red-600">*</span>
+              </div>
+              <OFormDateTimeRange
+                name="timerange"
+                disable-relative
+                min-date="1999/01/01"
+                auto-apply
+                data-test="time-range-picker"
+              />
+            </div>
             <div
               v-if="timerangeError"
               class="text-xs text-red-600 mt-1"
