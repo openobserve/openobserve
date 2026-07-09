@@ -984,6 +984,34 @@ describe("ScheduledPipeline Component", () => {
       expect(onSubmit).not.toHaveBeenCalled();
       w.unmount();
     });
+
+    // The composite "number + unit" fields (frequency/period) suppress the
+    // built-in message with an empty #error slot and render the schema error in
+    // a FULL-WIDTH sibling below the bordered control — not inside the 7.5rem
+    // field where it would wrap/clip. Prove the external error text renders after
+    // an invalid submit, and that no inline OFormInput message (role="alert")
+    // leaks inside the narrow field.
+    it("renders the period schema error as a full-width sibling, not inside the field", async () => {
+      const { w, f } = mountHarness({
+        trigger_condition: {
+          ...buildDefaultValues().trigger_condition,
+          period: 0,
+        },
+      });
+      await flushPromises();
+
+      await f.handleSubmit();
+      await flushPromises();
+
+      const err = w.find(
+        '[data-test="scheduled-pipeline-period-error-text"]',
+      );
+      expect(err.exists()).toBe(true);
+      expect(err.text().length).toBeGreaterThan(0);
+      // the empty #error slot suppresses the inline message row inside the group
+      expect(w.findAll('[role="alert"]').length).toBe(0);
+      w.unmount();
+    });
   });
 
   // R1-strict: the remaining bare <OSelect>/<OInput> controls inside the <OForm>

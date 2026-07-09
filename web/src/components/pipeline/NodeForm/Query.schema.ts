@@ -118,7 +118,7 @@ export function makeQuerySchema(min: number, t: Translate = (k) => k) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["trigger_condition", "cron"],
-            message: t("pipeline.fieldRequired"),
+            message: t("pipeline.cronRequired"),
           });
         } else {
           try {

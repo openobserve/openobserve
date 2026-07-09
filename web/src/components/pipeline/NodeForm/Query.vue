@@ -537,7 +537,10 @@ const saveQueryData = async () => {
       silence: 0,
       timezone: formData.trigger_condition.timezone,
     },
-    delay: formData.delay,
+    // OFormInput (type="number") stores its value as a STRING, so coerce to an
+    // integer here — same as period/frequency above. The backend expects i32;
+    // sending the raw "-1" string fails deserialization ("invalid type: string").
+    delay: parseInt(String(formData.delay)) || 0,
   };
 
   if (formData.trigger_condition.frequency_type === "cron") {

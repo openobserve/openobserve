@@ -790,6 +790,18 @@ describe("Query Component", () => {
       expect(payload.trigger_condition.period).toBe(30);
     });
 
+    it("converts delay string to integer in payload", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      (searchService.search as any).mockResolvedValueOnce({ hits: [] });
+      // OFormInput (type="number") writes a string; the payload must send i32.
+      wrapper.vm.form.setFieldValue("delay", "-1");
+      await submit(wrapper);
+      const payload = mockAddNode.mock.calls[0][0];
+      expect(payload.delay).toBe(-1);
+      expect(typeof payload.delay).toBe("number");
+    });
+
     it("sets promql_condition for promql query type", async () => {
       const wrapper = createWrapper();
       await flushPromises();

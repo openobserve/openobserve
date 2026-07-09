@@ -606,6 +606,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <div class="flex flex-col gap-1">
                         <template v-if="triggerData.frequency_type == 'minutes'">
+                          <!-- Composite "number + unit" field: the control sits
+                               inside a shared w-fit/overflow-hidden border, so
+                               OFormInput's built-in message would render inside
+                               the 7.5rem field and wrap/clip. The empty #error
+                               slot keeps the field form-owned (name=) but
+                               suppresses its inline message; we surface the schema
+                               error in the full-width sibling below (R3-timed). -->
                           <div
                             class="flex items-stretch border border-[var(--o2-border-color)] rounded-md w-fit overflow-hidden"
                           >
@@ -620,7 +627,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 ) || 1
                               "
                               width="xs"
-                            />
+                            >
+                              <template #error />
+                            </OFormInput>
                             <div
                               data-test="scheduled-pipeline-frequency-unit"
                               :class="[
@@ -633,9 +642,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               {{ t("alerts.minutes") }}
                             </div>
                           </div>
+                          <div
+                            v-if="frequencyError"
+                            data-test="scheduled-pipeline-frequency-error-text"
+                            class="text-red-700 text-[11px] leading-3"
+                          >
+                            {{ frequencyError }}
+                          </div>
                         </template>
                         <template v-else>
-                          <div class="flex items-center gap-2">
+                          <div class="flex items-start gap-2">
                             <OFormInput
                               data-test="scheduled-pipeline-cron-input-field"
                               name="trigger_condition.cron"
@@ -680,6 +696,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OIcon>
                       </div>
                       <div class="flex flex-col gap-1">
+                        <!-- Composite "number + unit" field — same pattern as
+                             frequency: an empty #error slot on the form-owned
+                             field suppresses its inline message, and the schema
+                             error (period ≥ 1) is rendered as a full-width sibling
+                             below the bordered control instead of inside the
+                             7.5rem field, where it would wrap. -->
                         <div
                           class="flex items-stretch border border-[var(--o2-border-color)] rounded-md w-fit overflow-hidden"
                         >
@@ -691,7 +713,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :readonly="triggerData.frequency_type == 'minutes'"
                             :disabled="triggerData.frequency_type == 'minutes'"
                             class="silence-notification-input" width="xs"
-                          />
+                          >
+                            <template #error />
+                          </OFormInput>
                           <div
                             data-test="scheduled-pipeline-period-unit"
                             :class="[
@@ -704,11 +728,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ t("alerts.minutes") }}
                           </div>
                         </div>
-                        <!-- The required rule lives in the schema (period ≥ 1); the
-                             OFormInput above surfaces it after submit (R3). This is
-                             only the informational note, shown once a period is set. -->
+                        <!-- The required rule lives in the schema (period ≥ 1);
+                             surfaced here after submit (R3). Otherwise, once a
+                             period is set, show the informational note. -->
                         <div
-                          v-if="Number(triggerData.period)"
+                          v-if="periodError"
+                          data-test="scheduled-pipeline-period-error-text"
+                          class="text-red-700 text-[11px] leading-3"
+                        >
+                          {{ periodError }}
+                        </div>
+                        <div
+                          v-else-if="Number(triggerData.period)"
                           data-test="scheduled-pipeline-period-warning-text"
                           class="text-[var(--o2-primary)] text-[12px] leading-3 py-0.5"
                         >
@@ -721,7 +752,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="scheduled-pipeline-delay-title"
                         class="font-bold flex items-center gap-1 w-[160px] shrink-0"
                       >
-                        <span>{{ t("pipeline.delay") + " *" }}</span>
+                        <span>{{ t("pipeline.delay") }}</span>
                         <OIcon
                           name="info"
                           size="sm"
@@ -1024,6 +1055,7 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { inject } from "vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
 
 import DateTime from "@/components/DateTime.vue";
 
@@ -1200,6 +1232,19 @@ const aggregationData = form.useStore(
   (s: any) => s.values.query_condition?.aggregation ?? null,
 );
 const delayCondition = form.useStore((s: any) => s.values.delay);
+
+// The frequency (minutes) and period controls are composite "number + unit"
+// fields wrapped in a shared w-fit/overflow-hidden border, so their OFormInput
+// carries an empty #error slot (suppresses the built-in inline message) and we
+// render the schema error in a full-width sibling below the group. These read
+// the same R3-timed field errors OFormInput would have surfaced — single source
+// of truth, just displayed at column width.
+const frequencyError = form.useStore((s: any) =>
+  firstFieldError(s.fieldMeta?.["trigger_condition.frequency"]?.errors ?? []),
+);
+const periodError = form.useStore((s: any) =>
+  firstFieldError(s.fieldMeta?.["trigger_condition.period"]?.errors ?? []),
+);
 
 // Helper writers — set a nested key on the form-owned trigger object (single
 // source of truth). `dontUpdateMeta` keeps these programmatic writes from
