@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="rounded-md p-0 pt-1 overflow-hidden h-full flex flex-col">
+  <div class="p-0 pt-1 overflow-hidden h-full flex flex-col">
     <!-- Standard page header: title + icon. Usage date / data-type controls live
          in the toolbar row below. -->
     <AppPageHeader

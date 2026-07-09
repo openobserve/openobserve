@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md flex flex-col h-full p-0">
+  <div class="flex flex-col h-full p-0">
 
     <div v-if="!showDestinationEditor && !showImportDestination" class="flex flex-col h-full">
       <AppPageHeader

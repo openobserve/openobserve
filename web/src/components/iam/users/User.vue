@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="rounded-md p-0 h-full flex flex-col">
+  <div class="p-0 h-full flex flex-col">
     <!-- Standard page header: title + actions only. The user search moved into
          the table's own toolbar (built-in global filter) per the layout system. -->
     <AppPageHeader

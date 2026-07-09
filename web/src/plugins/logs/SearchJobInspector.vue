@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md p-0 bg-(--q-background) w-full h-full flex flex-col min-h-0">
+  <div class="p-0 bg-(--q-background) w-full h-full flex flex-col min-h-0">
     <AppPageHeader
       title="Search Job Inspector"
       :back="{ onClick: goBack, dataTest: 'inspector-close-button' }"
