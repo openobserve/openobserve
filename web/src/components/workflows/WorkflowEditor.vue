@@ -33,12 +33,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          back chevron in the module-icon slot, the workflow name input inline
          after the title, and the Test / Cancel / Save actions right-aligned. -->
     <AppPageHeader
-      :title="t('workflow.header')"
+      :title="
+        workflowObj.isEditWorkflow
+          ? workflowObj.currentSelectedWorkflow.name || t('workflow.header')
+          : t('workflow.header')
+      "
       :back="{ label: t('workflow.header'), onClick: goBack, dataTest: 'workflow-editor-back' }"
       class="tw:px-4 tw:border-b tw:border-border-default"
     >
-      <template #title-trail>
-        <div class="tw:w-64 tw:shrink-0 tw:flex tw:items-center tw:gap-2">
+      <!-- Name is editable on CREATE only; on edit it's shown read-only as the
+           header title (mirrors the pipeline editor, where the name input is
+           gated to the create route). Enable/disable status isn't shown here —
+           it's managed from the list, same as pipelines. -->
+      <template v-if="!workflowObj.isEditWorkflow" #title-trail>
+        <div class="tw:w-64 tw:shrink-0">
           <OInput
             v-model="workflowObj.currentSelectedWorkflow.name"
             data-test="workflow-editor-name"
@@ -46,11 +54,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('workflow.namePlaceholder')"
             :error="workflowObj.nameError"
             @update:model-value="workflowObj.nameError = false"
-          />
-          <OTag
-            v-if="workflowObj.currentSelectedWorkflow.id"
-            type="alertStatus"
-            :value="workflowObj.currentSelectedWorkflow.enabled ? 'active' : 'paused'"
           />
         </div>
       </template>
@@ -145,7 +148,6 @@ import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { getUUID } from "@/utils/zincutils";
@@ -163,6 +165,9 @@ import useWorkflowCanvas, {
 } from "@/plugins/workflows/useWorkflowCanvas";
 import { workflowNodeImage } from "@/plugins/workflows/nodeIcons";
 import workflowService from "@/services/workflows";
+
+// Emitted after a successful save so the parent WorkflowsList refreshes its rows.
+const emit = defineEmits<{ (e: "saved"): void }>();
 
 const { t } = useI18n();
 const router = useRouter();
@@ -394,23 +399,16 @@ const onSave = async () => {
       });
       toast({ message: t("workflow.updateSuccess"), variant: "success" });
     } else {
-      const res = await workflowService.createWorkflow({
+      await workflowService.createWorkflow({
         org_identifier: org,
         data,
       });
-      const newId = res.data?.id;
       toast({ message: t("workflow.createSuccess"), variant: "success" });
-      // Per the create flow: after create, land on that workflow's editor so
-      // the user can keep editing (and link alerts on the trigger).
-      if (newId) {
-        workflowObj.currentSelectedWorkflow.id = newId;
-        workflowObj.isEditWorkflow = true;
-        router.replace({
-          name: "workflowEditor",
-          query: { id: newId, org_identifier: org },
-        });
-      }
     }
+    // Tell the parent list to re-fetch, then return to it (mirrors the pipeline
+    // editor). The emit reaches WorkflowsList via its <router-view> slot binding.
+    emit("saved");
+    goBack();
   } catch (e: any) {
     toast({
       message: e?.response?.data?.message || t("workflow.saveError"),

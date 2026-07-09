@@ -20,10 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Mirrors the Pipelines/Alerts list patterns: PageLayout + AppPageHeader chrome,
   an OTable body with search toolbar + preset empty state + per-row actions.
 
-  Backend gaps on feat/workflows_v1 (see services/workflows.ts): no enable/toggle
-  route (Status is read-only), no run-log in the list response (Last Run column
-  omitted until B6). The editor + runs routes land in later todos (#5/#7/#14);
-  their nav handlers fall back to a toast until those routes exist.
+  Enable/disable is a per-row action (pause/resume); the standalone Status column
+  is intentionally NOT shown (state is conveyed by the pause/resume action icon).
+  No run-log in the list response yet (Last Run column omitted until B6).
 -->
 <template>
   <div
@@ -111,10 +110,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag :value="row.trigger" variant="amber-soft" />
             </template>
 
-            <template #cell-status="{ row }">
-              <OTag type="alertStatus" :value="row.enabled ? 'active' : 'paused'" />
-            </template>
-
             <template #cell-actions="{ row }">
               <div class="tw:flex tw:items-center actions-container">
                 <OButton
@@ -200,7 +195,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </PageLayout>
   </div>
 
-  <router-view v-else />
+  <!-- Editor (add/edit) renders here as a child route. On a successful save it
+       emits `saved`, so this parent refreshes the list — no route watcher. -->
+  <router-view v-else v-slot="{ Component }">
+    <component :is="Component" @saved="getWorkflows" />
+  </router-view>
 
   <ConfirmDialog
     :title="confirmDialogMeta.title"
@@ -329,15 +328,6 @@ const columns = computed(() => [
     meta: { align: "left" },
   },
   {
-    id: "status",
-    header: t("workflow.status"),
-    accessorKey: "status",
-    sortable: true,
-    resizable: true,
-    hideable: true,
-    meta: { align: "left" },
-  },
-  {
     id: "updated_at",
     header: t("workflow.updated"),
     accessorKey: "updated_at_display",
@@ -369,7 +359,6 @@ const getWorkflows = async () => {
       "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
       trigger: triggerLabel(wf),
       steps: (wf.nodes || []).length,
-      status: wf.enabled ? "active" : "paused",
       updated_at_display: formatTs(wf.updated_at),
     }));
   } catch (error) {
