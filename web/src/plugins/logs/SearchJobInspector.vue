@@ -15,64 +15,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md p-0 bg-(--q-background)">
-    <div class="w-full flex flex-col h-full overflow-hidden">
-      <!-- Header Card -->
-      <div class="card-container mb-[0.625rem] mt-[0.325rem] mx-2.5 shrink-0">
-        <div class="flex justify-between w-full py-3 px-4 items-center">
-          <div class="flex items-center gap-3">
-            <div class="text-xl tracking-[0.005em] font-[600]" data-test="inspector-title">
-              Search Job Inspector
-            </div>
-            <div
-              v-if="profileData && !hasNoData"
+  <div class="rounded-md p-0 bg-(--q-background) w-full h-full flex flex-col min-h-0">
+    <AppPageHeader
+      title="Search Job Inspector"
+      :back="{ onClick: goBack, dataTest: 'inspector-close-button' }"
+      class="shrink-0 px-4 border-b border-border-default"
+    >
+      <template #title>
+        <span data-test="inspector-title">Search Job Inspector</span>
+      </template>
+      <template #actions>
+        <div
+          v-if="profileData && !hasNoData"
+          :class="[
+            'flex items-center gap-1.5 px-2 py-1 rounded-md border',
+            store.state.theme === 'dark'
+              ? 'bg-gray-800/50 border-gray-600'
+              : 'bg-gray-50 border-gray-200'
+          ]"
+        >
+          <svg class="w-3.5 h-3.5 opacity-70" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="6" width="18" height="14" rx="2" :stroke="store.state.theme === 'dark' ? '#9CA3AF' : '#6B7280'" stroke-width="2"/>
+            <path d="M3 10h18M8 3v4M16 3v4" :stroke="store.state.theme === 'dark' ? '#9CA3AF' : '#6B7280'" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <div class="flex items-center gap-1.5">
+            <span
               :class="[
-                'flex items-center gap-1.5 px-2 py-1 rounded-md border',
+                'text-[10px] font-small px-1.5 py-0.5 rounded',
                 store.state.theme === 'dark'
-                  ? 'bg-gray-800/50 border-gray-600'
-                  : 'bg-gray-50 border-gray-200'
+                  ? 'text-gray-300 bg-gray-700/50'
+                  : 'text-gray-600 bg-gray-100'
               ]"
             >
-              <svg class="w-[14px] h-[14px] opacity-70" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="3" y="6" width="18" height="14" rx="2" :stroke="store.state.theme === 'dark' ? '#9CA3AF' : '#6B7280'" stroke-width="2"/>
-                <path d="M3 10h18M8 3v4M16 3v4" :stroke="store.state.theme === 'dark' ? '#9CA3AF' : '#6B7280'" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-              <div class="flex items-center gap-1.5">
-                <span
-                  :class="[
-                    'text-[10px] font-small px-1.5 py-0.5 rounded',
-                    store.state.theme === 'dark'
-                      ? 'text-gray-300 bg-gray-700/50'
-                      : 'text-gray-600 bg-gray-100'
-                  ]"
-                >
-                  {{ store.state.timezone || 'UTC' }}
-                </span>
-                <div
-                  :class="[
-                    'text-xs font-semibold',
-                    store.state.theme === 'dark' ? 'text-gray-200' : 'text-gray-800'
-                  ]"
-                >
-                  {{ formatTimeRange(profileData.start_time, profileData.end_time) }}
-                </div>
-              </div>
+              {{ store.state.timezone || 'UTC' }}
+            </span>
+            <div
+              :class="[
+                'text-xs font-semibold',
+                store.state.theme === 'dark' ? 'text-gray-200' : 'text-gray-800'
+              ]"
+            >
+              {{ formatTimeRange(profileData.start_time, profileData.end_time) }}
             </div>
           </div>
-          <div class="flex items-center">
-            <OButton
-              icon-left="close"
-              variant="ghost"
-              size="icon-sm"
-              @click="goBack"
-              data-test="inspector-close-button"
-            >
-              <OTooltip content="Close" />
-            </OButton>
-          </div>
         </div>
-      </div>
-
+      </template>
+    </AppPageHeader>
+    <div class="w-full flex flex-col flex-1 min-h-0 overflow-hidden">
       <!-- Summary Stats Card -->
       <div v-if="!loading" class="mb-[0.625rem] mx-2.5 shrink-0">
         <div class="grid gap-3" style="grid-template-columns: 1fr 1fr 1fr 1.6fr 0.9fr;">
@@ -370,6 +359,7 @@ import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -421,6 +411,7 @@ export default defineComponent({
   name: "SearchJobInspector",
   components: {
     NoData,
+    AppPageHeader,
     OButton,
     ODrawer,
     ODialog,
