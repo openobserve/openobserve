@@ -168,8 +168,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <slot name="output-section">
                 <!-- Default output section - only shown if slot not used -->
                 <slot name="output-content">
-                  <div class="text-center text-xl font-semibold py-2 shrink-0">Output Messages</div>
-                  <OSeparator class="mr-4 mt-4 shrink-0" />
+                  <div class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0">Output Messages</div>
+                  <OSeparator class="mt-1 shrink-0" />
                   <div class="error-report-container flex-1 min-h-0 overflow-auto">
                     <div class="text-center p-3 text-gray-400">
                       No messages to display

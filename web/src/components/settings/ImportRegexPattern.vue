@@ -64,12 +64,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="w-full h-full flex flex-col border-l border-border-default" style="min-width: 400px;">
         <div
           v-if="regexPatternErrorsToDisplay.length > 0"
-          class="text-center text-xl font-semibold py-2 shrink-0"
+          class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0"
         >
           Error Validations
         </div>
-        <div v-else class="text-center text-xl font-semibold py-2 shrink-0">Output Messages</div>
-        <OSeparator class="mt-4 shrink-0" />
+        <div v-else class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0">Output Messages</div>
+        <OSeparator class="mt-1 shrink-0" />
         <div class="flex-1 min-h-0 overflow-auto resize-none">
               <!-- Regex Pattern Errors Section -->
               <div

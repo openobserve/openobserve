@@ -174,8 +174,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-import-error-container"
               class="card-container h-full flex flex-col min-h-0 border-l border-border-default"
             >
-              <div class="text-center text-[1.0625rem] font-semibold leading-[1.45] tracking-[-0.02em] text-text-primary py-2 shrink-0">Error Validations</div>
-              <OSeparator class="mt-4 shrink-0" />
+              <div class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0">Error Validations</div>
+              <OSeparator class="mt-1 shrink-0" />
               <div
                 class="error-section p-[10px] mb-[10px] flex-1 min-h-0 overflow-auto"
                 v-if="dashboardErrorsToDisplay.length > 0"
