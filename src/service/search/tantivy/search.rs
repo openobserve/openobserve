@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, fmt::Display, sync::Arc};
+use std::{collections::HashSet, sync::Arc};
 
 use arrow::buffer::BooleanBuffer;
 #[cfg(not(feature = "enterprise"))]
@@ -47,6 +47,10 @@ pub enum TantivyResult {
         row_ids: Arc<BooleanBuffer>, // per-row match bitmap, length num_rows
         row_group_size: Option<u32>,
     },
+    SelectCandidates {
+        candidates: Arc<Vec<(i64, u32)>>, //(_timestamp, doc_id) pairs
+        row_group_size: Option<u32>,
+    },
     NoMatch, // the file should be excluded without building a bitmap
     Skipped {
         percent: usize, // skipped tantivy search, with the percentage
@@ -74,6 +78,10 @@ impl TantivyResult {
             }
             Self::RowIdsSelection { row_ids, .. } => {
                 row_ids.inner().len() + std::mem::size_of::<BooleanBuffer>()
+            }
+            Self::SelectCandidates { candidates, .. } => {
+                candidates.capacity() * std::mem::size_of::<(i64, u32)>()
+                    + std::mem::size_of::<Vec<(i64, u32)>>()
             }
             Self::NoMatch => 0,
             Self::Skipped { .. } => std::mem::size_of::<usize>(),
@@ -136,11 +144,31 @@ impl TantivyResult {
             ),
         )?;
 
-        let row_ids = res
+        if res.is_empty() {
+            return Ok(Self::SelectCandidates {
+                candidates: Arc::new(Vec::new()),
+                row_group_size: None,
+            });
+        }
+
+        // every index file stores _timestamp as a single-valued fast field,
+        // one value per doc_id; the caller enforces a single segment
+        let ts_col = searcher.segment_readers()[0]
+            .fast_fields()
+            .i64(TIMESTAMP_COL_NAME)?;
+        let candidates = res
             .into_iter()
-            .map(|(_, doc)| doc.doc_id)
-            .collect::<Vec<_>>();
-        Ok(Self::RowIds(row_ids))
+            .map(|(_, doc)| {
+                let ts = ts_col
+                    .first(doc.doc_id)
+                    .expect("_timestamp fast field has one value per doc");
+                (ts, doc.doc_id)
+            })
+            .collect();
+        Ok(Self::SelectCandidates {
+            candidates: Arc::new(candidates),
+            row_group_size: None,
+        })
     }
 
     pub fn handle_simple_count(searcher: &Searcher, query: Box<dyn Query>) -> anyhow::Result<Self> {
@@ -304,175 +332,78 @@ impl TantivyResult {
     }
 }
 
-// TantivyMultiResultBuilder is used to build a TantivyMultiResult from multiple TantivyResult
-pub enum TantivyMultiResultBuilder {
-    RowNums(u64),
-    Histogram(Vec<Vec<u64>>),
-    MultiHistogram(Vec<Vec<(i64, String, u64)>>),
-    TopN(Vec<(Vec<String>, u64)>),
-    Distinct(HashSet<String>),
-}
-
-impl TantivyMultiResultBuilder {
-    pub fn new(optimize_rule: &Option<IndexOptimizeMode>) -> Self {
-        match optimize_rule {
-            Some(IndexOptimizeMode::SimpleHistogram(..)) => Self::Histogram(vec![]),
-            Some(IndexOptimizeMode::SimpleMultiHistogram(..)) => Self::MultiHistogram(vec![]),
-            Some(IndexOptimizeMode::SimpleTopN(..)) => Self::TopN(vec![]),
-            Some(IndexOptimizeMode::SimpleDistinct(..)) => Self::Distinct(HashSet::new()),
-            Some(IndexOptimizeMode::SimpleSelect(..))
-            | Some(IndexOptimizeMode::SimpleCount)
-            | None => Self::RowNums(0),
-        }
-    }
-
-    pub fn add_row_nums(&mut self, row_nums: u64) {
-        match self {
-            Self::RowNums(a) => *a += row_nums,
-            _ => unreachable!("unsupported tantivy multi result"),
-        }
-    }
-
-    pub fn add_histogram(&mut self, histogram: Vec<u64>) {
-        match self {
-            Self::Histogram(a) => {
-                if !histogram.is_empty() {
-                    a.push(histogram);
-                }
-            }
-            _ => unreachable!("unsupported tantivy multi result"),
-        }
-    }
-
-    pub fn add_multi_histogram(&mut self, multi_histogram: Vec<(i64, String, u64)>) {
-        match self {
-            Self::MultiHistogram(a) => {
-                if !multi_histogram.is_empty() {
-                    a.push(multi_histogram);
-                }
-            }
-            _ => unreachable!("unsupported tantivy multi result"),
-        }
-    }
-
-    pub fn add_top_n(&mut self, top_n: Vec<(Vec<String>, u64)>) {
-        match self {
-            Self::TopN(a) => a.extend(top_n),
-            _ => unreachable!("unsupported tantivy multi result"),
-        }
-    }
-
-    pub fn add_distinct(&mut self, distinct: HashSet<String>) {
-        match self {
-            Self::Distinct(a) => a.extend(distinct),
-            _ => unreachable!("unsupported tantivy multi result"),
-        }
-    }
-
-    pub fn num_rows(&self) -> usize {
-        match self {
-            Self::RowNums(a) => *a as usize,
-            _ => 0,
-        }
-    }
-
-    pub fn build(self) -> TantivyMultiResult {
-        match self {
-            Self::RowNums(a) => TantivyMultiResult::RowNums(a),
-            Self::Histogram(histograms_hits) => {
-                if histograms_hits.is_empty() {
-                    return TantivyMultiResult::Histogram(vec![]);
-                }
-                let len = histograms_hits[0].len();
-                let histogram = (0..len)
-                    .map(|i| {
-                        histograms_hits
-                            .iter()
-                            .map(|v| v.get(i).unwrap_or(&0))
-                            .sum::<u64>()
-                    })
-                    .collect();
-                TantivyMultiResult::Histogram(histogram)
-            }
-            Self::MultiHistogram(results) => {
-                // Merge: flatten all per-file results into a single Vec
-                let merged: Vec<(i64, String, u64)> = results.into_iter().flatten().collect();
-                TantivyMultiResult::MultiHistogram(merged)
-            }
-            Self::TopN(a) => TantivyMultiResult::TopN(a),
-            Self::Distinct(a) => TantivyMultiResult::Distinct(a),
-        }
-    }
-}
-
-pub enum TantivyMultiResult {
-    RowNums(u64),
-    Histogram(Vec<u64>),
-    MultiHistogram(Vec<(i64, String, u64)>),
-    TopN(Vec<(Vec<String>, u64)>),
-    Distinct(HashSet<String>),
-}
-
-impl Display for TantivyMultiResult {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::RowNums(num) => write!(f, "row_nums: {num}"),
-            Self::Histogram(histogram) => {
-                write!(f, "histogram hits: {}", histogram.iter().sum::<u64>())
-            }
-            Self::MultiHistogram(multi_histogram) => {
-                write!(f, "multi_histogram hits: {}", multi_histogram.len())
-            }
-            Self::TopN(top_n) => write!(f, "top_n hits: {}", top_n.len()),
-            Self::Distinct(distinct) => write!(f, "distinct hits: {}", distinct.len()),
-        }
-    }
-}
-
-impl TantivyMultiResult {
-    pub fn num_rows(&self) -> usize {
-        match self {
-            Self::RowNums(a) => *a as usize,
-            _ => 0,
-        }
-    }
-
-    pub fn histogram(self) -> Vec<u64> {
-        match self {
-            Self::Histogram(a) => a,
-            _ => vec![],
-        }
-    }
-
-    pub fn multi_histogram(self) -> Vec<(i64, String, u64)> {
-        match self {
-            Self::MultiHistogram(a) => a,
-            _ => vec![],
-        }
-    }
-
-    pub fn top_n(self) -> Vec<(Vec<String>, u64)> {
-        match self {
-            Self::TopN(a) => a,
-            _ => vec![],
-        }
-    }
-
-    pub fn distinct(self) -> HashSet<String> {
-        match self {
-            Self::Distinct(a) => a,
-            _ => HashSet::new(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
 
-    use config::meta::inverted_index::IndexOptimizeMode;
-
     use super::*;
+
+    #[test]
+    fn test_handle_simple_select_reads_candidate_timestamps() {
+        const MARGIN_IN_BYTES: usize = 1_000_000;
+        const MEMORY_BUDGET_NUM_BYTES_MIN: usize = ((MARGIN_IN_BYTES as u32) * 15u32) as usize;
+
+        let mut schema_builder = tantivy::schema::SchemaBuilder::new();
+        let ts_field = schema_builder.add_i64_field(TIMESTAMP_COL_NAME, tantivy::schema::FAST);
+        let schema = schema_builder.build();
+        let index = tantivy::index::Index::create_in_ram(schema);
+        let mut writer = index
+            .writer_with_num_threads(1, MEMORY_BUDGET_NUM_BYTES_MIN)
+            .unwrap();
+        // rows are stored newest first, matching the descending doc_id
+        // ranking assumption of handle_simple_select
+        for ts in [100i64, 90, 80, 70] {
+            writer.add_document(tantivy::doc!(ts_field => ts)).unwrap();
+        }
+        writer.commit().unwrap();
+        let searcher = index.reader().unwrap().searcher();
+
+        let result = TantivyResult::handle_simple_select(
+            &searcher,
+            Box::new(tantivy::query::AllQuery),
+            2,
+            false,
+        )
+        .unwrap();
+        match result {
+            TantivyResult::SelectCandidates {
+                candidates,
+                row_group_size,
+            } => {
+                let mut candidates = (*candidates).clone();
+                candidates.sort_unstable();
+                assert_eq!(candidates, vec![(90, 1), (100, 0)]);
+                assert_eq!(row_group_size, None);
+            }
+            other => panic!("expected SelectCandidates, got {other:?}"),
+        }
+
+        // ascending order picks the highest doc ids (oldest rows)
+        let result = TantivyResult::handle_simple_select(
+            &searcher,
+            Box::new(tantivy::query::AllQuery),
+            2,
+            true,
+        )
+        .unwrap();
+        match result {
+            TantivyResult::SelectCandidates { candidates, .. } => {
+                let mut candidates = (*candidates).clone();
+                candidates.sort_unstable();
+                assert_eq!(candidates, vec![(70, 3), (80, 2)]);
+            }
+            other => panic!("expected SelectCandidates, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_select_candidates_memory_size() {
+        let result = TantivyResult::SelectCandidates {
+            candidates: Arc::new(vec![(100i64, 1u32), (99, 2)]),
+            row_group_size: None,
+        };
+        assert!(result.get_memory_size() >= 2 * std::mem::size_of::<(i64, u32)>());
+    }
 
     #[test]
     fn test_tantivy_result_percent() {
@@ -533,317 +464,6 @@ mod tests {
         // Should include HashSet overhead + string capacities
         assert!(memory_size > 0);
         assert!(memory_size >= std::mem::size_of::<HashSet<String>>());
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_builder_new() {
-        // Test with SimpleHistogram
-        let optimize_rule = Some(IndexOptimizeMode::SimpleHistogram(0, 1000, 10, 0));
-        let builder = TantivyMultiResultBuilder::new(&optimize_rule);
-        assert!(matches!(builder, TantivyMultiResultBuilder::Histogram(_)));
-
-        // Test with SimpleTopN
-        let optimize_rule = Some(IndexOptimizeMode::SimpleTopN(
-            vec!["field".to_string()],
-            10,
-            true,
-        ));
-        let builder = TantivyMultiResultBuilder::new(&optimize_rule);
-        assert!(matches!(builder, TantivyMultiResultBuilder::TopN(_)));
-
-        // Test with SimpleDistinct
-        let optimize_rule = Some(IndexOptimizeMode::SimpleDistinct(
-            "field".to_string(),
-            10,
-            true,
-        ));
-        let builder = TantivyMultiResultBuilder::new(&optimize_rule);
-        assert!(matches!(builder, TantivyMultiResultBuilder::Distinct(_)));
-
-        // Test with SimpleSelect
-        let optimize_rule = Some(IndexOptimizeMode::SimpleSelect(10, true));
-        let builder = TantivyMultiResultBuilder::new(&optimize_rule);
-        assert!(matches!(builder, TantivyMultiResultBuilder::RowNums(_)));
-
-        // Test with SimpleCount
-        let optimize_rule = Some(IndexOptimizeMode::SimpleCount);
-        let builder = TantivyMultiResultBuilder::new(&optimize_rule);
-        assert!(matches!(builder, TantivyMultiResultBuilder::RowNums(_)));
-
-        // Test with None
-        let builder = TantivyMultiResultBuilder::new(&None);
-        assert!(matches!(builder, TantivyMultiResultBuilder::RowNums(_)));
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_builder_add_row_nums() {
-        let mut builder = TantivyMultiResultBuilder::RowNums(10);
-        builder.add_row_nums(5);
-
-        match builder {
-            TantivyMultiResultBuilder::RowNums(count) => assert_eq!(count, 15),
-            _ => panic!("Expected RowNums variant"),
-        }
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_builder_add_histogram() {
-        let mut builder = TantivyMultiResultBuilder::Histogram(vec![]);
-
-        builder.add_histogram(vec![10, 20, 30]);
-        builder.add_histogram(vec![5, 15, 25]);
-
-        match &builder {
-            TantivyMultiResultBuilder::Histogram(histograms) => {
-                assert_eq!(histograms.len(), 2);
-                assert_eq!(histograms[0], vec![10, 20, 30]);
-                assert_eq!(histograms[1], vec![5, 15, 25]);
-            }
-            _ => panic!("Expected Histogram variant"),
-        }
-
-        // Test empty histogram is not added
-        builder.add_histogram(vec![]);
-        match &builder {
-            TantivyMultiResultBuilder::Histogram(histograms) => {
-                assert_eq!(histograms.len(), 2); // Should still be 2
-            }
-            _ => panic!("Expected Histogram variant"),
-        }
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_builder_add_top_n() {
-        let mut builder = TantivyMultiResultBuilder::TopN(vec![]);
-
-        let top_n1 = vec![
-            (vec!["term1".to_string()], 100),
-            (vec!["term2".to_string()], 50),
-        ];
-        let top_n2 = vec![(vec!["term3".to_string(), "sub1".to_string()], 75)];
-
-        builder.add_top_n(top_n1);
-        builder.add_top_n(top_n2);
-
-        match &builder {
-            TantivyMultiResultBuilder::TopN(results) => {
-                assert_eq!(results.len(), 3);
-                assert_eq!(results[0].0, vec!["term1".to_string()]);
-                assert_eq!(results[0].1, 100);
-                assert_eq!(results[2].0, vec!["term3".to_string(), "sub1".to_string()]);
-                assert_eq!(results[2].1, 75);
-            }
-            _ => panic!("Expected TopN variant"),
-        }
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_builder_add_distinct() {
-        let mut builder = TantivyMultiResultBuilder::Distinct(HashSet::new());
-
-        let mut distinct1 = HashSet::new();
-        distinct1.insert("value1".to_string());
-        distinct1.insert("value2".to_string());
-
-        let mut distinct2 = HashSet::new();
-        distinct2.insert("value2".to_string()); // Duplicate
-        distinct2.insert("value3".to_string());
-
-        builder.add_distinct(distinct1);
-        builder.add_distinct(distinct2);
-
-        match &builder {
-            TantivyMultiResultBuilder::Distinct(results) => {
-                assert_eq!(results.len(), 3); // Should deduplicate
-                assert!(results.contains("value1"));
-                assert!(results.contains("value2"));
-                assert!(results.contains("value3"));
-            }
-            _ => panic!("Expected Distinct variant"),
-        }
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_builder_num_rows() {
-        let builder = TantivyMultiResultBuilder::RowNums(42);
-        assert_eq!(builder.num_rows(), 42);
-
-        let builder = TantivyMultiResultBuilder::Histogram(vec![]);
-        assert_eq!(builder.num_rows(), 0);
-
-        let builder = TantivyMultiResultBuilder::TopN(vec![]);
-        assert_eq!(builder.num_rows(), 0);
-
-        let builder = TantivyMultiResultBuilder::Distinct(HashSet::new());
-        assert_eq!(builder.num_rows(), 0);
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_builder_build() {
-        // Test RowNums build
-        let builder = TantivyMultiResultBuilder::RowNums(100);
-        let result = builder.build();
-        match result {
-            TantivyMultiResult::RowNums(count) => assert_eq!(count, 100),
-            _ => panic!("Expected RowNums result"),
-        }
-
-        // Test empty Histogram build
-        let builder = TantivyMultiResultBuilder::Histogram(vec![]);
-        let result = builder.build();
-        match result {
-            TantivyMultiResult::Histogram(hist) => assert!(hist.is_empty()),
-            _ => panic!("Expected Histogram result"),
-        }
-
-        // Test Histogram build with data
-        let mut builder = TantivyMultiResultBuilder::Histogram(vec![]);
-        builder.add_histogram(vec![10, 20, 30]);
-        builder.add_histogram(vec![5, 15, 25]);
-        let result = builder.build();
-        match result {
-            TantivyMultiResult::Histogram(hist) => {
-                assert_eq!(hist.len(), 3);
-                assert_eq!(hist[0], 15); // 10 + 5
-                assert_eq!(hist[1], 35); // 20 + 15
-                assert_eq!(hist[2], 55); // 30 + 25
-            }
-            _ => panic!("Expected Histogram result"),
-        }
-
-        // Test TopN build
-        let mut builder = TantivyMultiResultBuilder::TopN(vec![]);
-        builder.add_top_n(vec![(vec!["term1".to_string()], 100)]);
-        let result = builder.build();
-        match result {
-            TantivyMultiResult::TopN(top_n) => {
-                assert_eq!(top_n.len(), 1);
-                assert_eq!(top_n[0].0, vec!["term1".to_string()]);
-                assert_eq!(top_n[0].1, 100);
-            }
-            _ => panic!("Expected TopN result"),
-        }
-
-        // Test Distinct build
-        let mut builder = TantivyMultiResultBuilder::Distinct(HashSet::new());
-        let mut distinct = HashSet::new();
-        distinct.insert("value1".to_string());
-        builder.add_distinct(distinct);
-        let result = builder.build();
-        match result {
-            TantivyMultiResult::Distinct(dist) => {
-                assert_eq!(dist.len(), 1);
-                assert!(dist.contains("value1"));
-            }
-            _ => panic!("Expected Distinct result"),
-        }
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_num_rows() {
-        let result = TantivyMultiResult::RowNums(123);
-        assert_eq!(result.num_rows(), 123);
-
-        let result = TantivyMultiResult::Histogram(vec![10, 20, 30]);
-        assert_eq!(result.num_rows(), 0);
-
-        let result = TantivyMultiResult::TopN(vec![(vec!["term".to_string()], 50)]);
-        assert_eq!(result.num_rows(), 0);
-
-        let mut distinct = HashSet::new();
-        distinct.insert("value".to_string());
-        let result = TantivyMultiResult::Distinct(distinct);
-        assert_eq!(result.num_rows(), 0);
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_histogram() {
-        let histogram_data = vec![10, 20, 30, 40];
-        let result = TantivyMultiResult::Histogram(histogram_data.clone());
-
-        let extracted = result.histogram();
-        assert_eq!(extracted, histogram_data);
-
-        // Test non-histogram returns empty vec
-        let result = TantivyMultiResult::RowNums(100);
-        let extracted = result.histogram();
-        assert!(extracted.is_empty());
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_top_n() {
-        let top_n_data = vec![
-            (vec!["term1".to_string()], 100),
-            (vec!["term2".to_string(), "sub1".to_string()], 50),
-        ];
-        let result = TantivyMultiResult::TopN(top_n_data.clone());
-
-        let extracted = result.top_n();
-        assert_eq!(extracted, top_n_data);
-
-        // Test non-top-n returns empty vec
-        let result = TantivyMultiResult::RowNums(100);
-        let extracted = result.top_n();
-        assert!(extracted.is_empty());
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_distinct() {
-        let mut distinct_data = HashSet::new();
-        distinct_data.insert("value1".to_string());
-        distinct_data.insert("value2".to_string());
-        let result = TantivyMultiResult::Distinct(distinct_data.clone());
-
-        let extracted = result.distinct();
-        assert_eq!(extracted, distinct_data);
-
-        // Test non-distinct returns empty set
-        let result = TantivyMultiResult::RowNums(100);
-        let extracted = result.distinct();
-        assert!(extracted.is_empty());
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_display() {
-        // Test RowNums display
-        let result = TantivyMultiResult::RowNums(12345);
-        assert_eq!(format!("{result}"), "row_nums: 12345");
-
-        // Test Histogram display
-        let result = TantivyMultiResult::Histogram(vec![10, 20, 30]);
-        assert_eq!(format!("{result}"), "histogram hits: 60");
-
-        // Test TopN display
-        let result =
-            TantivyMultiResult::TopN(vec![(vec!["a".to_string()], 1), (vec!["b".to_string()], 2)]);
-        assert_eq!(format!("{result}"), "top_n hits: 2");
-
-        // Test Distinct display
-        let mut distinct = HashSet::new();
-        distinct.insert("val1".to_string());
-        distinct.insert("val2".to_string());
-        distinct.insert("val3".to_string());
-        let result = TantivyMultiResult::Distinct(distinct);
-        assert_eq!(format!("{result}"), "distinct hits: 3");
-    }
-
-    #[test]
-    fn test_histogram_builder_edge_cases() {
-        // Test with histograms of different lengths
-        let mut builder = TantivyMultiResultBuilder::Histogram(vec![]);
-        builder.add_histogram(vec![10, 20]);
-        builder.add_histogram(vec![5, 15, 25]); // Different length
-
-        let result = builder.build();
-        match result {
-            TantivyMultiResult::Histogram(hist) => {
-                // Should use the length of the first histogram (2)
-                assert_eq!(hist.len(), 2);
-                assert_eq!(hist[0], 15); // 10 + 5
-                assert_eq!(hist[1], 35); // 20 + 15 (25 is ignored due to index bounds)
-            }
-            _ => panic!("Expected Histogram result"),
-        }
     }
 
     #[test]
