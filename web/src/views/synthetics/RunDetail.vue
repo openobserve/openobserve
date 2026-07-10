@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="md"
                 />
                 <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2 flex-wrap">
+                  <div class="flex items-center gap-2 flex-wrap h-6">
                     <span
                       class="text-[13.5px] font-bold text-[var(--o2-status-error-text)]"
                     >
@@ -214,15 +214,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Step {{ failedStepInfo.step.id }}: {{ failedStepInfo.step.action }} failed
                     </OBadge>
                   </div>
-                  <p
-                    v-if="failedStepInfo?.summary"
-                    class="text-[12.5px] leading-[1.6] text-text-body mt-1.5 mb-0"
-                  >
-                    {{ failedStepInfo.summary }}
-                  </p>
                   <OButton
                     v-if="errorStack"
-                    variant="outline-destructive"
+                    variant="ghost-destructive""
                     size="xs"
                     class="mt-2"
                     data-test="synthetics-run-detail-error-expand-btn"
@@ -369,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <!-- Compact row -->
                     <div
-                      class="flex items-center gap-1.5 px-2 h-16 min-h-16 rounded"
+                      class="flex items-center gap-2 px-2 h-16 min-h-16 rounded"
                       :class="{
                         'border-b border-[var(--o2-border-color)]': isExpanded(
                           st.id,
@@ -974,7 +968,7 @@ function toDisplayRun(detail: SyntheticRunDetail | null): DisplayRun {
 
 // ── State ─────────────────────────────────────────────────────────────────
 const activeTab = ref("summary");
-const stackOpen = ref(false);
+const stackOpen = ref(true);
 
 /** Multi-expand: set of expanded step IDs. */
 const expandedStepIds = ref(new Set<number>());
@@ -1127,7 +1121,6 @@ watch(
   ([newRunId, newExecId]) => {
     if (newRunId && newExecId) {
       expandedStepIds.value = new Set();
-      stackOpen.value = false;
       loadRun();
     }
   },
