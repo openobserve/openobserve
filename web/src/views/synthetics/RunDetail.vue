@@ -662,7 +662,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -1042,6 +1042,21 @@ watch(steps, (newSteps) => {
     }
   }
   if (changed) expandedStepIds.value = next;
+
+  // Scroll to the first failed step after layout settles
+  const failedStep = newSteps.find((st) => st.status === 'fail');
+  if (failedStep) {
+    nextTick(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const el = document.querySelector(
+            `[data-test="synthetics-run-detail-step-row-${failedStep.id}"]`,
+          );
+          el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+      });
+    });
+  }
 });
 
 const statusBadgeVariant = computed(() =>
