@@ -40,18 +40,18 @@
 
     <!-- Steps count (Browser mode) -->
     <template #cell-steps="{ row }">
-      <span class="tw:text-secondary">{{ (row as any).steps }} steps</span>
+      <span class="text-secondary">{{ (row as any).steps }} steps</span>
     </template>
 
     <!-- Assertions count (API mode) -->
     <template #cell-assertions="{ row }">
-      <span class="tw:text-secondary">{{ (row as any).assertions }} checks</span>
+      <span class="text-secondary">{{ (row as any).assertions }} checks</span>
     </template>
 
     <!-- Folder name (cross-folder search mode) — click navigates sidebar to that folder -->
     <template #cell-folder_name="{ row }">
       <button
-        class="tw:text-sm tw:text-[var(--o2-text-link)] tw:cursor-pointer tw:bg-transparent tw:border-0 tw:p-0 tw:hover:underline"
+        class="text-sm text-[var(--o2-text-link)] cursor-pointer bg-transparent border-0 p-0 hover:underline"
         @click.stop="emit('navigate-to-folder', (row as any).folderId)"
       >
         {{ (row as any).folder_name ?? '—' }}
@@ -90,7 +90,7 @@
             :value="(row as any).uptime / 100"
             :variant="(row as any).uptime >= 99 ? 'default' : (row as any).uptime >= 95 ? 'warning' : 'danger'"
             size="xs"
-            class="tw:flex-1"
+            class="flex-1"
           />
           <span
             class="mono"
@@ -99,7 +99,7 @@
           >{{ (row as any).uptime }}%</span>
         </div>
       </template>
-      <span v-else class="tw:text-secondary" style="font-size:13px">—</span>
+      <span v-else class="text-secondary" style="font-size:13px">—</span>
     </template>
 
     <!-- Locations with tooltip (monitors mode) -->
@@ -112,21 +112,21 @@
 
     <!-- Interval (monitors mode) -->
     <template #cell-interval="{ row }">
-      <span class="tw:text-secondary">{{ (row as any).interval }}</span>
+      <span class="text-secondary">{{ (row as any).interval }}</span>
     </template>
 
     <!-- Last check -->
     <template #cell-lastCheck="{ row }">
-      <span class="tw:text-secondary">{{ (row as any).lastCheck }}</span>
+      <span class="text-secondary">{{ (row as any).lastCheck }}</span>
     </template>
 
     <!-- Row actions -->
     <template #cell-actions="{ row }">
-      <div class="tw:flex tw:items-center row-actions" @click.stop>
+      <div class="flex items-center row-actions" @click.stop>
         <!-- Enable/Pause toggle with per-row spinner -->
         <div
           v-if="props.toggleLoadingMap[(row as any).id]"
-          class="tw:flex tw:items-center tw:justify-center tw:w-7 tw:h-8"
+          class="flex items-center justify-center w-7 h-8"
           :title="(row as any).enabled ? 'Pausing…' : 'Enabling…'"
           :data-test="`${dataTest}-toggle-spinner`"
         >
@@ -200,8 +200,8 @@
 
     <!-- Footer with count + bulk action buttons -->
     <template #bottom>
-      <div class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-2">
-        <span class="tw:text-sm tw:text-secondary">{{ data.length }} {{ footerTitle }}</span>
+      <div class="flex items-center gap-2 px-4 py-2">
+        <span class="text-sm text-secondary">{{ data.length }} {{ footerTitle }}</span>
         <template v-if="localSelectedIds.length > 0">
           <OButton
             variant="outline"
@@ -210,7 +210,7 @@
             @click="emit('move-selected')"
           >
             <OIcon name="drive-file-move" size="sm" />
-            <span class="tw:ml-1">Move</span>
+            <span class="ml-1">Move</span>
           </OButton>
           <OButton
             variant="outline-destructive"
@@ -219,7 +219,7 @@
             @click="emit('delete-selected')"
           >
             <OIcon name="delete" size="sm" />
-            <span class="tw:ml-1">Delete</span>
+            <span class="ml-1">Delete</span>
           </OButton>
         </template>
       </div>
@@ -322,7 +322,7 @@ const localSelectedIds = computed({
 const STATUS_COL: OTableColumnDef = {
   id: 'status', header: '', accessorKey: 'status',
   size: 36, minSize: 36, sortable: false,
-  meta: { align: 'center', cellClass: 'tw:px-0' },
+  meta: { align: 'center', cellClass: 'px-0' },
 }
 const NAME_COL: OTableColumnDef = {
   id: 'name', header: 'Monitor', accessorKey: 'name',
