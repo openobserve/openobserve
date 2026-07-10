@@ -144,34 +144,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="mx-auto px-5 py-[0.875rem] pb-[1.75rem] flex flex-col gap-[0.875rem]"
           >
-            <!-- Info chips -->
-            <div
-              class="grid grid-cols-4 gap-[0.625rem]"
-              data-test="synthetics-run-detail-info-bar"
-            >
+            <!-- Info chips skeleton -->
+            <template v-if="loading">
               <div
-                v-for="chip in infoChips"
-                :key="chip.label"
-                class="card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
+                class="grid grid-cols-4 gap-[0.625rem]"
+                data-test="synthetics-run-detail-info-skeleton"
               >
-                <span
-                  class="kpi-label text-[0.7rem] font-semibold text-[var(--o2-text-muted)] capitalize"
+                <div
+                  v-for="i in 4"
+                  :key="i"
+                  class="card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
                 >
-                  {{ chip.label }}
-                </span>
-                <span
-                  class="flex items-center gap-1 text-xs font-bold leading-none text-[var(--o2-text-primary)]"
-                >
-                  <OIcon
-                    v-if="chip.icon"
-                    :name="chip.icon"
-                    size="sm"
-                    class="shrink-0"
-                  />
-                  {{ chip.value }}
-                </span>
+                  <OSkeleton type="text" class="h-3 w-16" />
+                  <OSkeleton type="text" class="h-5 w-24 mt-1" />
+                </div>
               </div>
-            </div>
+            </template>
+            <!-- Info chips -->
+            <template v-else>
+              <div
+                class="grid grid-cols-4 gap-[0.625rem]"
+                data-test="synthetics-run-detail-info-bar"
+              >
+                <div
+                  v-for="chip in infoChips"
+                  :key="chip.label"
+                  class="card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
+                >
+                  <span
+                    class="kpi-label text-[0.7rem] font-semibold text-[var(--o2-text-muted)] capitalize"
+                  >
+                    {{ chip.label }}
+                  </span>
+                  <span
+                    class="flex items-center gap-1 text-xs font-bold leading-none text-[var(--o2-text-primary)]"
+                  >
+                    <OIcon
+                      v-if="chip.icon"
+                      :name="chip.icon"
+                      size="sm"
+                      class="shrink-0"
+                    />
+                    {{ chip.value }}
+                  </span>
+                </div>
+              </div>
+            </template>
 
             <!-- Error callout -->
             <div
@@ -231,11 +249,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
+            <!-- Steps skeleton -->
+            <template v-if="loading">
+              <OCard class="p-0 gap-0">
+                <OCardSection role="header" class="gap-2">
+                  <OSkeleton type="text" class="h-4 w-14" />
+                </OCardSection>
+                <OSeparator />
+                <OCardSection role="body" class="flex flex-col gap-2 p-3">
+                  <div
+                    v-for="i in 4"
+                    :key="i"
+                    class="flex items-center gap-2 rounded border border-[var(--o2-border-color)] p-2"
+                  >
+                    <OSkeleton type="rect" class="h-12 w-18 shrink-0 rounded" />
+                    <OSkeleton type="circle" class="h-6 w-6 shrink-0" />
+                    <OSkeleton type="text" class="h-4 flex-1" />
+                    <OSkeleton type="text" class="h-4 w-16 shrink-0" />
+                  </div>
+                </OCardSection>
+              </OCard>
+            </template>
             <!-- ══ Split: Replay Player (left) + Steps Timeline (right) ══ -->
-            <div
-              v-if="steps.length > 0"
-              class="flex gap-[0.875rem] items-start"
-            >
+            <div v-else-if="steps.length > 0" class="flex gap-[0.875rem] items-start">
               <!-- ── Left: Session Replay Player ── -->
               <OCard
                 v-if="currentRun.hasReplay"
@@ -689,6 +725,7 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import VideoPlayer from "@/components/rum/VideoPlayer.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
@@ -955,6 +992,7 @@ function toggleExpand(id: number) {
 }
 
 // Computed: current run from composable data
+const loading = computed(() => synthetics.loading.value);
 const currentRun = computed<DisplayRun>(() => {
   return synthetics.runDetail.value
     ? toDisplayRun(synthetics.runDetail.value)

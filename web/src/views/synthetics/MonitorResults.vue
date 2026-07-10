@@ -34,9 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="px-4"
     >
       <template #title-trail>
-        <OBadge v-if="statusBadge" :variant="statusBadge.variant" size="sm" dot>
+        <!-- <OBadge v-if="statusBadge" :variant="statusBadge.variant" size="sm" dot>
           {{ statusBadge.label }}
-        </OBadge>
+        </OBadge> -->
       </template>
       <template #actions>
         <DateTime
