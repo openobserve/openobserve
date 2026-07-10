@@ -903,8 +903,50 @@ function deviceIcon(name: string): string {
   return "devices";
 }
 
+// ── Artifact URLs — batch-presigned per run ────────────────────────────────
+// key → signed (or proxy) URL, populated once per run load. Backend decides
+// mode from its storage config; both URL kinds work directly in <img src>.
+const artifactUrls = ref<Record<string, string>>({});
+
+async function presignRunArtifacts() {
+  const detail = synthetics.runDetail.value;
+  if (!detail) return;
+  const keys = [
+    ...detail.lastAttemptSteps.map((s) => s.screenshot_key),
+    detail.traceKey,
+  ].filter((k): k is string => !!k);
+  if (!keys.length) return;
+  const orgId = store.state.selectedOrganization.identifier;
+  try {
+    const { data } = await syntheticsService.presignArtifacts(
+      orgId,
+      monitorId.value,
+      keys,
+    );
+    const map: Record<string, string> = {};
+    for (const entry of data.urls ?? []) {
+      map[entry.key] = entry.url;
+    }
+    artifactUrls.value = map;
+  } catch (e) {
+    // Presign failed — screenshotUrl falls back to the proxy endpoint per key.
+    console.error("[synthetics] presign artifacts failed:", e);
+    artifactUrls.value = {};
+  }
+}
+
+watch(
+  () => synthetics.runDetail.value,
+  (detail) => {
+    artifactUrls.value = {};
+    if (detail) presignRunArtifacts();
+  },
+);
+
 function screenshotUrl(key: string | null): string {
   if (!key) return "";
+  const signed = artifactUrls.value[key];
+  if (signed) return signed;
   const orgId = store.state.selectedOrganization.identifier;
   return syntheticsService.artifactUrl(orgId, key);
 }

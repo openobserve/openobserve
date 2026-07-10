@@ -187,16 +187,21 @@ pub struct ArtifactQuery {
     pub key: String,
 }
 
-pub async fn get_artifact_url(
-    Path((_org_id, _id, _job_id)): Path<(String, String, String)>,
-    Query(query): Query<ArtifactQuery>,
-) -> Response {
-    let content_type = if query.key.ends_with(".png") {
+/// Streams artifact bytes from the object store. Proxy target for local disk
+/// mode where presigned URLs are impossible.
+/// Keys are validated against the authed org + synthetic so a caller can only
+/// read artifacts belonging to that synthetic.
+async fn stream_artifact(org_id: &str, synthetics_id: &str, key: &str) -> Response {
+    let prefix = format!("synthetics/{org_id}/{synthetics_id}/");
+    if !key.starts_with(&prefix) || key.contains("..") {
+        return MetaHttpResponse::bad_request("invalid artifact key").into_response();
+    }
+    let content_type = if key.ends_with(".png") {
         "image/png"
     } else {
         "application/zip"
     };
-    match infra::storage::get_bytes("default", &query.key).await {
+    match infra::storage::get_bytes("default", key).await {
         Ok(bytes) => (
             StatusCode::OK,
             [(axum::http::header::CONTENT_TYPE, content_type)],
@@ -207,6 +212,53 @@ pub async fn get_artifact_url(
             MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
                 .into_response()
         }
+    }
+}
+
+/// GET /{org_id}/synthetics/{id}/artifact?key= — proxy download (local disk mode).
+pub async fn get_artifact(
+    Path((org_id, id)): Path<(String, String)>,
+    Query(query): Query<ArtifactQuery>,
+) -> Response {
+    stream_artifact(&org_id, &id, &query.key).await
+}
+
+/// POST /{org_id}/synthetics/{id}/artifacts/presign — batch-sign download URLs.
+/// Body: { "keys": [...] } (keys come from stream records: screenshot_key, trace_key).
+/// Returns { mode: "presigned" | "proxy", expires_in, urls: [{key, url}] }.
+pub async fn presign_artifacts(
+    Path((org_id, id)): Path<(String, String)>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match serde_json::from_value::<
+            o2_enterprise::enterprise::synthetics::job_api::PresignArtifactsRequest,
+        >(body)
+        {
+            Ok(req) => {
+                match o2_enterprise::enterprise::synthetics::job_api::presign_artifacts(
+                    &org_id, &id, req,
+                )
+                .await
+                {
+                    Ok(resp) => MetaHttpResponse::json(resp),
+                    Err(e) => {
+                        tracing::error!(
+                            synthetics_id = %id,
+                            "[synthetics] presign_artifacts: {e}"
+                        );
+                        MetaHttpResponse::bad_request(e.to_string())
+                    }
+                }
+            }
+            Err(e) => MetaHttpResponse::bad_request(e.to_string()),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, id, body);
+        MetaHttpResponse::forbidden("Not Supported")
     }
 }
 

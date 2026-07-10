@@ -68,12 +68,18 @@ const syntheticsService = {
     http().get(`/api/${orgIdentifier}/synthetics/${id}/runs/${runId}`),
 
   artifactUrl: (orgIdentifier: string, key: string) => {
-    // key format: synthetics/{org}/{synthetics_id}/{year}/{month}/{day}/{job_id}/{filename}
+    // Fallback proxy URL. key format:
+    // synthetics/{org}/{synthetics_id}/{yyyy}/{mm}/{dd}/{run_id}/{execution_id|job_id}/{filename}
     const parts = key.split('/')
     const synthetics_id = parts[2] ?? '_'
-    const job_id = parts[6] ?? '_'
-    return `/api/${orgIdentifier}/synthetics/${synthetics_id}/results/${job_id}/artifact?key=${encodeURIComponent(key)}`
+    return `/api/${orgIdentifier}/synthetics/${synthetics_id}/artifact?key=${encodeURIComponent(key)}`
   },
+
+  // Batch-sign artifact download URLs. Returns { mode: "presigned" | "proxy",
+  // expires_in, urls: [{key, url}] }. mode is decided by the backend from its
+  // storage config (local disk → proxy, S3/MinIO/Azure → presigned).
+  presignArtifacts: (orgIdentifier: string, syntheticsId: string, keys: string[]) =>
+    http().post(`/api/${orgIdentifier}/synthetics/${syntheticsId}/artifacts/presign`, { keys }),
 
   getLocations: (orgIdentifier: string) =>
     http().get(`/api/${orgIdentifier}/synthetics/locations`),
