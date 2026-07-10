@@ -162,7 +162,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :folderId="''"
             searchType="dashboards"
             :allowAnnotationsAPI="false"
+            @error="onChartError"
           />
+          <!-- Until the org reports any usage its `usage` stream doesn't exist,
+               so the search errors. Show the illustrated empty state OVER the
+               chart; it clears itself once data lands and the error resets. -->
+          <div
+            v-if="usageStreamMissing"
+            data-test="usage-waiting-for-data"
+            class="usage-daily-chart__waiting absolute inset-0 bg-(--o2-card-bg)"
+          >
+            <OEmptyState
+              size="block"
+              illustration="wave-bars"
+              :title="t('billing.usageTrends.waitingTitle')"
+              :description="t('billing.usageTrends.waitingForData')"
+            />
+          </div>
         </div>
       </div>
 
@@ -363,6 +379,20 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
         const dt = usageDataType.value === "mb" ? "mb" : "gb";
         return buildUsageCombinedLinePanelSchema({ orgId, dataType: dt });
       });
+
+      // The org's `usage` stream doesn't exist until it has reported some usage,
+      // so the chart's first search fails with "stream not found: usage". We
+      // catch that here and show the illustrated empty state OVER the chart
+      // (the chart stays mounted underneath). When usage finally lands the
+      // search succeeds, the error clears, and the overlay goes away.
+      const usageStreamMissing = ref(false);
+      const onChartError = (err: any) => {
+        const msg = (err?.message ?? "").toString().toLowerCase();
+        usageStreamMissing.value =
+          !!err?.message &&
+          msg.includes("stream not found") &&
+          msg.includes("usage");
+      };
       // ---------------------------------------------------------------------
 
       onMounted(async () => {
@@ -1112,6 +1142,8 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
         dailyTimeObj,
         combinedSchema,
         dailyChartKey,
+        usageStreamMissing,
+        onChartError,
       };
     },
   });
@@ -1134,5 +1166,13 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
 .usage-daily-chart__renderer {
   height: 100%;
   width: 100%;
+}
+/* "Waiting for usage data" overlay sits over the (still-mounted) chart until
+   the org's usage stream exists and the search stops erroring. */
+.usage-daily-chart__waiting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
 }
 </style>

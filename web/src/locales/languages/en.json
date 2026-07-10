@@ -2983,7 +2983,9 @@
       "enablePending": "Usage reporting enabled. Your daily chart will start filling in shortly as new usage is recorded.",
       "enableSuccess": "Usage reporting enabled",
       "enableConfirmTitle": "Enable usage reporting?",
-      "enableConfirmMessage": "This starts recording your organization's usage to its own stream so we can chart daily ingestion and query volume. It applies to this organization only and can be turned off later in organization settings."
+      "enableConfirmMessage": "This starts recording your organization's usage to its own stream so we can chart daily ingestion and query volume. It applies to this organization only and can be turned off later in organization settings.",
+      "waitingTitle": "Waiting for usage data",
+      "waitingForData": "Your daily chart will appear here once usage starts being reported for this organization."
     },
     "aiCredits": "AI Credits",
     "aiModeFree": "Free",

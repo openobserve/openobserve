@@ -870,5 +870,48 @@ describe("Usage Component", () => {
         store.state.organizationData.organizationSettings.usage_stream_enabled,
       ).toBe(true);
     });
+
+    it("shows the waiting-for-data graphic when the usage stream is missing", async () => {
+      store.state.organizationData.organizationSettings = {
+        usage_stream_enabled: true,
+      } as any;
+      const wrapper = mountUsage();
+      await flushPromises();
+      // No error yet → no overlay.
+      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(
+        false,
+      );
+      // Chart search errors because the org's usage stream doesn't exist yet.
+      wrapper
+        .findComponent({ name: "PanelSchemaRenderer" })
+        .vm.$emit("error", { message: "Search stream not found: usage" });
+      await flushPromises();
+      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(
+        true,
+      );
+      // When data lands the error clears → overlay goes away.
+      wrapper
+        .findComponent({ name: "PanelSchemaRenderer" })
+        .vm.$emit("error", null);
+      await flushPromises();
+      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("does not show the waiting graphic for unrelated chart errors", async () => {
+      store.state.organizationData.organizationSettings = {
+        usage_stream_enabled: true,
+      } as any;
+      const wrapper = mountUsage();
+      await flushPromises();
+      wrapper
+        .findComponent({ name: "PanelSchemaRenderer" })
+        .vm.$emit("error", { message: "SQL parse error near GROUP" });
+      await flushPromises();
+      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(
+        false,
+      );
+    });
   });
 });
