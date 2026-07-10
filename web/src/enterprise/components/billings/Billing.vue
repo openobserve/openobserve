@@ -121,7 +121,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="isUsageRoute"
             class="flex gap-2 items-center justify-end overflow-y-auto shrink-0 mb-2 ml-2 mr-3 px-3 py-2"
           >
-            <div class="custom-usage-date-select">
+            <!-- The billing-cycle range dropdown only applies to the totals
+                 view. When self-usage reporting is on, the daily view renders
+                 its own date-range picker, so hide this to avoid two selectors. -->
+            <div v-if="!usageStreamEnabled" class="custom-usage-date-select">
               <OSelect
                 v-model="usageDate"
                 :options="options"
@@ -135,6 +138,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </OSelect>
             </div>
+            <!-- Daily view's date-range picker — same toolbar line as GB/MB. -->
+            <DateTimePickerDashboard
+              v-if="usageStreamEnabled"
+              ref="dateTimePicker"
+              v-model="dateRange"
+              size="sm"
+              data-test="usage-daily-date-picker"
+              @hide="onRangeChange"
+            />
             <div class="flex items-center">
               <div class="app-tabs-container h-[36px]">
                 <AppTabs class="tabs-selection-container" :tabs="tabs" :activeTab="usageDataType" @update:activeTab="(value: any) => updateActiveTab(value)" />
@@ -168,7 +180,7 @@ import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OSelect from '@/lib/forms/Select/OSelect.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount, computed, onMounted, provide, reactive } from "vue";
+import { defineComponent, ref, onBeforeMount, computed, onMounted, provide, reactive, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -184,17 +196,22 @@ import BillingService from "@/services/billings";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import UsageMemberList from "./UsageMemberList.vue";
+import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import { getConsumableRelativeTime } from "@/utils/date";
 
 export default defineComponent({
   name: "PageIngestion",
   components: {
     AppPageHeader, OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs, OSelect,
-    OIcon, OSplitter, OButton, UsageMemberList },
+    OIcon, OSplitter, OButton, UsageMemberList, DateTimePickerDashboard },
   setup() {
     const { t } = useI18n();
     const store = useStore();
     const router: any = useRouter();
-    const billingtab = ref(resolveTab("billings", router.currentRoute.value.name as string, "usage"));
+    // Default/fallback tab is "plans" — that's where /billings redirects on
+    // mount, so falling back to "usage" made the Usage tab flash-highlight
+    // first before the redirect settled.
+    const billingtab = ref(resolveTab("billings", router.currentRoute.value.name as string, "plans"));
     const usageDataType = ref(router.currentRoute.value.query.data_type || "gb");
     const showSidebar = ref(true);
     const lastSplitterPosition = ref(200);
@@ -311,6 +328,52 @@ export default defineComponent({
     const isUsageRoute = computed(() => {
       return router.currentRoute.value.name == "usage";
     })
+    // Self-usage reporting on → the Usage tab renders the daily view (which has
+    // its own date-range picker), so the billing-cycle range dropdown is hidden.
+    const usageStreamEnabled = computed(
+      () =>
+        !!store.state?.organizationData?.organizationSettings
+          ?.usage_stream_enabled,
+    );
+
+    // Daily-view date range: the picker lives here (toolbar, next to GB/MB) and
+    // shares the RESOLVED window (microseconds) with the child usage.vue via
+    // provide/inject. `key` bumps on every change so the charts re-render.
+    const dateTimePicker = ref<any>(null);
+    const dateRange = ref<any>({
+      valueType: "relative",
+      relativeTimePeriod: "7d",
+    });
+    const usageRange = reactive({
+      start: (new Date().getTime() - 7 * 24 * 60 * 60 * 1000) * 1000,
+      end: new Date().getTime() * 1000,
+      key: 0,
+    });
+    provide("usageRange", usageRange);
+    const onRangeChange = () => {
+      const v: any = dateRange.value;
+      if (v?.valueType === "relative" && v.relativeTimePeriod) {
+        const r = getConsumableRelativeTime(v.relativeTimePeriod);
+        if (r) {
+          usageRange.start = r.startTime;
+          usageRange.end = r.endTime;
+        }
+      } else if (v?.valueType === "absolute" && v.startTime && v.endTime) {
+        usageRange.start = v.startTime;
+        usageRange.end = v.endTime;
+      } else if (dateTimePicker.value?.getConsumableDateTime) {
+        // Fallback: ask the picker to resolve its current selection.
+        const d = dateTimePicker.value.getConsumableDateTime();
+        if (d?.startTime && d?.endTime) {
+          usageRange.start = d.startTime;
+          usageRange.end = d.endTime;
+        }
+      }
+      usageRange.key++;
+    };
+    // Apply on any value change (relative or absolute), not just on @hide, so a
+    // calendar selection immediately re-renders the charts below.
+    watch(dateRange, onRangeChange, { deep: true });
     const isOrgGroupRoute = computed(() => {
       return router.currentRoute.value.name == "billing_group";
     })
@@ -338,12 +401,12 @@ export default defineComponent({
     }
     const tabs = [
     {
-        label: 'Gb',
+        label: 'GB',
         value: "gb",
         icon: "storage",
       },
       {
-        label: 'Mb',
+        label: 'MB',
         value: "mb",
         icon: "database",
       }
@@ -359,6 +422,10 @@ export default defineComponent({
       splitterModel,
       headerBasedOnRoute,
       options,
+      usageStreamEnabled,
+      dateTimePicker,
+      dateRange,
+      onRangeChange,
       usageDate,
       selectUsageDate,
       isUsageRoute,

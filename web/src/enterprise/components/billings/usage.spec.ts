@@ -47,10 +47,15 @@ vi.mock("vue-router", () => ({
   useRouter: () => mockRouter
 }));
 
-// Mock zincutils
-vi.mock("@/utils/zincutils", () => ({
-  getImageURL: vi.fn((path) => `mocked-image-url-${path}`),
-}));
+// Mock zincutils — partial so the store (pulled in transitively via the
+// dashboards renderer) still resolves useLocalOrganization etc.
+vi.mock("@/utils/zincutils", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/utils/zincutils")>();
+  return {
+    ...actual,
+    getImageURL: vi.fn((path) => `mocked-image-url-${path}`),
+  };
+});
 
 // Mock convertBillingData
 vi.mock("@/utils/billing/convertBillingData", () => ({
@@ -62,6 +67,25 @@ vi.mock("@/components/dashboards/panels/CustomChartRenderer.vue", () => ({
   default: {
     name: "CustomChartRenderer",
     template: "<div class='custom-chart-renderer'></div>",
+  },
+}));
+
+// Stub the heavy dashboards renderer + date picker the daily view uses.
+vi.mock("@/components/dashboards/PanelSchemaRenderer.vue", () => ({
+  default: {
+    name: "PanelSchemaRenderer",
+    template: "<div class='panel-schema-renderer'></div>",
+  },
+}));
+vi.mock("@/components/DateTimePickerDashboard.vue", () => ({
+  default: {
+    name: "DateTimePickerDashboard",
+    template: "<div class='date-time-picker'></div>",
+    methods: {
+      getConsumableDateTime() {
+        return { startTime: 1000, endTime: 2000 };
+      },
+    },
   },
 }));
 
@@ -95,6 +119,8 @@ describe("Usage Component", () => {
         provide: {
           store,
           $router: mockRouter,
+          // The daily view injects the resolved range from the Billing shell.
+          usageRange: { start: 1000, end: 2000, key: 1 },
         },
         mocks: {
           $t: (key: string) => key,
@@ -234,7 +260,6 @@ describe("Usage Component", () => {
 
     expect(wrapper.text()).toContain("Ingestion");
     expect(wrapper.text()).toContain("Search");
-    expect(wrapper.text()).toContain("Functions");
   });
 
   // Test 16: Usage data formatting in tiles
@@ -247,9 +272,39 @@ describe("Usage Component", () => {
     wrapper.vm.dataLoading = false;
     await nextTick();
 
-    expect(wrapper.text()).toContain("10.50 GB");
-    expect(wrapper.text()).toContain("5.25 GB");
-    expect(wrapper.text()).toContain("2.75 GB");
+    // Value and unit render in separate spans (no literal space in .text()).
+    expect(wrapper.text()).toContain("10.50");
+    expect(wrapper.text()).toContain("5.25");
+    expect(wrapper.text()).toContain("GB");
+  });
+
+  it("auto-scales large byte values up from the base unit", async () => {
+    // base GB: 10930.96 GB → 10.67 TB; 1095652 GB → ~1.05 PB
+    wrapper.vm.usageData = {
+      ingestion: "10930.96",
+      dataretention: "1095652",
+      search: "5.25",
+      ai_credits: "42",
+    };
+    wrapper.vm.dataLoading = false;
+    await nextTick();
+
+    const tiles = wrapper.vm.usageTiles;
+    const ing = tiles.find((t: any) => t.key === "ingestion");
+    expect(ing.unit).toBe("TB");
+    expect(parseFloat(ing.value)).toBeCloseTo(10.67, 1);
+
+    const ret = tiles.find((t: any) => t.key === "dataretention");
+    expect(ret.unit).toBe("PB");
+
+    // small value keeps the base unit
+    const srch = tiles.find((t: any) => t.key === "search");
+    expect(srch.unit).toBe("GB");
+    expect(srch.value).toBe("5.25");
+
+    // AI credits is a plain count, never scaled
+    const ai = tiles.find((t: any) => t.key === "ai_credits");
+    expect(ai.unit).toBe("Credits");
   });
 
 
@@ -562,7 +617,8 @@ describe("Usage Component", () => {
 
     expect(tileTexts).toContain('Ingestion');
     expect(tileTexts).toContain('Search');
-    expect(tileTexts).toContain('Functions');
+    // Functions card was removed (not a billable line item).
+    expect(tileTexts).not.toContain('Functions');
   });
 
   // Test 43: Usage tiles hidden when loading
@@ -588,8 +644,10 @@ describe("Usage Component", () => {
   });
 
   // Test 45: Total usage heading display
-  it("should display total usage heading", () => {
-    expect(wrapper.text()).toContain(wrapper.vm.t("billing.totalUsage"));
+  it("renders the billable usage tiles", () => {
+    // The "Total Usage" heading was removed; tiles carry the usage now.
+    const tiles = wrapper.findAll('[data-test="billings-usage-tile"]');
+    expect(tiles.length).toBeGreaterThan(0);
   });
 
   // Test 46: Component container styling
@@ -675,4 +733,69 @@ describe("Usage Component", () => {
   // The member-org selector now lives in Billing.vue (rendered beside this
   // component) and shares the selection via inject; its formatting/search is
   // covered in UsageMemberList.spec.ts.
+
+  // --- Daily chart appended below the existing cards (self-usage ON) -----
+  describe("Daily chart", () => {
+    afterEach(() => {
+      store.state.organizationData.organizationSettings.usage_stream_enabled = false;
+    });
+
+    it("hides the daily chart when self-usage is off", async () => {
+      store.state.organizationData.organizationSettings.usage_stream_enabled = false;
+      await nextTick();
+      expect(wrapper.vm.usageStreamEnabled).toBe(false);
+      expect(wrapper.find('[data-test="usage-daily-chart"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("shows the daily chart when self-usage is on", async () => {
+      store.state.organizationData.organizationSettings.usage_stream_enabled = true;
+      await nextTick();
+      expect(wrapper.vm.usageStreamEnabled).toBe(true);
+      expect(wrapper.find('[data-test="usage-daily-chart"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("builds one combined line panel over the org's usage stream", async () => {
+      store.state.organizationData.organizationSettings.usage_stream_enabled = true;
+      store.state.selectedOrganization.identifier = "org-daily";
+      await nextTick();
+      const schema = wrapper.vm.combinedSchema;
+      expect(schema.type).toBe("line");
+      expect(schema.queries).toHaveLength(1);
+      expect(schema.queries[0].fields.stream).toBe("usage");
+      expect(schema.queries[0].query).toContain("org_id = 'org-daily'");
+      expect(schema.queries[0].query).toContain(
+        "event IN ('Ingestion', 'Search', 'Pipeline', 'RemotePipeline')",
+      );
+      expect(schema.queries[0].query).not.toContain("Functions");
+      expect(schema.queries[0].fields.breakdown).toHaveLength(1);
+    });
+
+    it("uses the injected range for the chart's time window", async () => {
+      store.state.organizationData.organizationSettings.usage_stream_enabled = true;
+      await nextTick();
+      // injected usageRange = { start: 1000, end: 2000 } (micros)
+      expect(wrapper.vm.dailyTimeObj.start_time.getTime()).toBe(1000);
+      expect(wrapper.vm.dailyTimeObj.end_time.getTime()).toBe(2000);
+    });
+
+    it("fetches the cards with a calendar-derived <N>days range when on", async () => {
+      mockBillingService.get_data_usage.mockClear();
+      store.state.organizationData.organizationSettings.usage_stream_enabled = true;
+      store.state.selectedOrganization.identifier = "org-cal";
+      await nextTick();
+      await wrapper.vm.getUsage();
+      await flushPromises();
+      // injected sub-day window rounds up to "1days"
+      expect(mockBillingService.get_data_usage).toHaveBeenLastCalledWith(
+        "org-cal",
+        "1days",
+        expect.any(String),
+        undefined,
+      );
+    });
+  });
 });
