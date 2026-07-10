@@ -1843,6 +1843,11 @@
     "tooltipPromptTemplate": "Il prompt inviato al LLM. Usa {input}, {output} e {context} come segnaposto per i valori dinamici in fase di valutazione."
   },
   "function": {
+    "csvFileRequired": "Il file CSV è obbligatorio!",
+    "urlRequired": "L'URL è obbligatorio!",
+    "urlMustStartWithHttp": "L'URL deve iniziare con http:// o https://",
+    "nameRequired": "Questo campo è obbligatorio!",
+    "invalidMethodName": "Nome del metodo non valido. Deve iniziare con una lettera o un trattino basso. Usa solo lettere, numeri e trattini bassi.",
     "header": "Funzioni",
     "subtitle": "Funzioni VRL riutilizzabili applicate nelle pipeline",
     "clickTestFunctionHint": "Fai clic su Funzione di test per visualizzare gli eventi",

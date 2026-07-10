@@ -1843,6 +1843,11 @@
     "tooltipPromptTemplate": "El mensaje enviado al LLM. Utilice {input}, {output} y {context} como marcadores de posición para los valores dinámicos en el momento de la evaluación."
   },
   "function": {
+    "csvFileRequired": "¡El archivo CSV es obligatorio!",
+    "urlRequired": "¡La URL es obligatoria!",
+    "urlMustStartWithHttp": "La URL debe comenzar con http:// o https://",
+    "nameRequired": "¡Este campo es obligatorio!",
+    "invalidMethodName": "Nombre de método no válido. Debe comenzar con una letra o un guion bajo. Use solo letras, números y guiones bajos.",
     "header": "Funciones",
     "subtitle": "Funciones VRL reutilizables aplicadas en tuberías",
     "clickTestFunctionHint": "Haga clic en Probar función para ver los eventos",

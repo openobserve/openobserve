@@ -1843,6 +1843,11 @@
     "tooltipPromptTemplate": "提示已发送到 LLM。在评估时使用 {输入}、{输出} 和 {context} 作为动态值的占位符。"
   },
   "function": {
+    "csvFileRequired": "CSV 文件为必填项！",
+    "urlRequired": "URL 为必填项！",
+    "urlMustStartWithHttp": "URL 必须以 http:// 或 https:// 开头",
+    "nameRequired": "此字段为必填项！",
+    "invalidMethodName": "方法名称无效。必须以字母或下划线开头，且只能包含字母、数字和下划线。",
     "header": "函数",
     "subtitle": "应用于管道的可重复使用的 VRL 函数",
     "clickTestFunctionHint": "请单击 “测试功能” 查看事件",

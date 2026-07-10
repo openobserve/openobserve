@@ -1843,6 +1843,11 @@
     "tooltipPromptTemplate": "프롬프트가 LLM에 전송되었습니다.평가 시 동적 값의 자리 표시자로 {input}, {output} 및 {context} 를 사용하십시오."
   },
   "function": {
+    "csvFileRequired": "CSV 파일은 필수입니다!",
+    "urlRequired": "URL은 필수입니다!",
+    "urlMustStartWithHttp": "URL은 http:// 또는 https://로 시작해야 합니다",
+    "nameRequired": "이 필드는 필수입니다!",
+    "invalidMethodName": "잘못된 메서드 이름입니다. 문자 또는 밑줄로 시작해야 합니다. 문자, 숫자, 밑줄만 사용하세요.",
     "header": "함수",
     "subtitle": "파이프라인에 적용된 재사용 가능한 VRL 함수",
     "clickTestFunctionHint": "이벤트를 보려면 [함수 테스트] 를 클릭하십시오.",

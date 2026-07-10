@@ -5,7 +5,12 @@
 // `transType`.
 
 import { describe, it, expect } from "vitest";
-import { addFunctionSchema } from "./AddFunction.schema";
+import { makeAddFunctionSchema } from "./AddFunction.schema";
+
+// The schema is now a factory taking vue-i18n's `t`. These tests assert only
+// VALIDITY (success / error paths), not the message text, so a stub that echoes
+// the key is sufficient.
+const addFunctionSchema = makeAddFunctionSchema((k: string) => k);
 
 const errorPaths = (input: any): string[] => {
   const res = addFunctionSchema.safeParse(input);

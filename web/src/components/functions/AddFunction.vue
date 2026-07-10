@@ -194,7 +194,7 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import {
-  addFunctionSchema,
+  makeAddFunctionSchema,
   type AddFunctionForm,
 } from "./AddFunction.schema";
 export const defaultValue: any = () => {
@@ -310,7 +310,8 @@ export default defineComponent({
         name: props.modelValue?.name ?? "",
         transType: String(props.modelValue?.transType ?? "0"),
       },
-      schema: addFunctionSchema,
+      // Built with the component's `t` so validation messages are localized.
+      schema: makeAddFunctionSchema(t),
       onSubmit: (value) => onSubmit(value),
     });
 

@@ -25,21 +25,25 @@ import { z } from "zod";
 // numbers / underscores (case-insensitive). Mirrors the old `isValidMethodName`.
 export const functionNameRegex = /^[A-Z_][A-Z0-9_]*$/i;
 
-export const addFunctionSchema = z.object({
-  // NO .trim(): OForm/TanStack validates with the schema but SAVES the raw form
-  // value, so a .trim() would let "myfunc " PASS validation (the regex judges the
-  // trimmed copy) yet persist the space — breaking pipeline/query references to
-  // the function. Validate the RAW value; the anchored regex already rejects any
-  // leading/trailing whitespace (a leading space fails the first-char class, a
-  // trailing space fails the `$`).
-  name: z
-    .string()
-    .min(1, "Field is required!")
-    .regex(
-      functionNameRegex,
-      "Invalid method name. Must start with a letter or underscore. Use only letters, numbers, and underscores.",
-    ),
-  transType: z.string().optional().default("0"),
-});
+// A FACTORY (not a module-level schema): the messages are resolved by calling
+// the injected `t` (vue-i18n) when the schema is built. The owner builds it per
+// mount from its `useI18n()` context, so `t` resolves in the active locale. A
+// module-level schema would instead evaluate `t` at import time — before i18n is
+// ready and frozen to whatever locale loaded first. The `(t: (_key: string) =>
+// string)` signature mirrors makeAddDashboardSchema and the other form schemas.
+export const makeAddFunctionSchema = (t: (_key: string) => string) =>
+  z.object({
+    // NO .trim(): OForm/TanStack validates with the schema but SAVES the raw form
+    // value, so a .trim() would let "myfunc " PASS validation (the regex judges the
+    // trimmed copy) yet persist the space — breaking pipeline/query references to
+    // the function. Validate the RAW value; the anchored regex already rejects any
+    // leading/trailing whitespace (a leading space fails the first-char class, a
+    // trailing space fails the `$`).
+    name: z
+      .string()
+      .min(1, t("function.nameRequired"))
+      .regex(functionNameRegex, t("function.invalidMethodName")),
+    transType: z.string().optional().default("0"),
+  });
 
-export type AddFunctionForm = z.infer<typeof addFunctionSchema>;
+export type AddFunctionForm = z.infer<ReturnType<typeof makeAddFunctionSchema>>;

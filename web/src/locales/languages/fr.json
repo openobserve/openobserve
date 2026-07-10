@@ -1843,6 +1843,11 @@
     "tooltipPromptTemplate": "L'invite envoyée au LLM. Utilisez {input}, {output} et {context} comme espaces réservés pour les valeurs dynamiques au moment de l'évaluation."
   },
   "function": {
+    "csvFileRequired": "Le fichier CSV est obligatoire !",
+    "urlRequired": "L'URL est obligatoire !",
+    "urlMustStartWithHttp": "L'URL doit commencer par http:// ou https://",
+    "nameRequired": "Ce champ est obligatoire !",
+    "invalidMethodName": "Nom de méthode invalide. Doit commencer par une lettre ou un tiret bas. Utilisez uniquement des lettres, des chiffres et des tirets bas.",
     "header": "Fonctions",
     "subtitle": "Fonctions VRL réutilisables appliquées aux pipelines",
     "clickTestFunctionHint": "Cliquez sur Tester la fonction pour voir les événements",

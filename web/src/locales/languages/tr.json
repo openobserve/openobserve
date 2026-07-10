@@ -1843,6 +1843,11 @@
     "tooltipPromptTemplate": "LLM'ye gönderilen komut istemi. Değerlendirme sırasında dinamik değerler için yer tutucu olarak {input}, {output} ve {context} kullanın."
   },
   "function": {
+    "csvFileRequired": "CSV dosyası zorunludur!",
+    "urlRequired": "URL zorunludur!",
+    "urlMustStartWithHttp": "URL, http:// veya https:// ile başlamalıdır",
+    "nameRequired": "Bu alan zorunludur!",
+    "invalidMethodName": "Geçersiz yöntem adı. Bir harf veya alt çizgi ile başlamalıdır. Yalnızca harf, rakam ve alt çizgi kullanın.",
     "header": "Fonksiyonlar",
     "subtitle": "Boru hatlarında uygulanan yeniden kullanılabilir VRL fonksiyonları",
     "clickTestFunctionHint": "Etkinlikleri görmek için lütfen Test Fonksiyonu'na tıklayın",

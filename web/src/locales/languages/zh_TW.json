@@ -1456,6 +1456,11 @@
     "tooltipPromptTemplate": "傳送給 LLM 的提示。使用 {input}、{output} 和 {context} 作為評估時動態值的預留位置。"
   },
   "function": {
+    "csvFileRequired": "CSV 檔案為必填！",
+    "urlRequired": "URL 為必填！",
+    "urlMustStartWithHttp": "URL 必須以 http:// 或 https:// 開頭",
+    "nameRequired": "此欄位為必填！",
+    "invalidMethodName": "方法名稱無效。必須以字母或底線開頭，且只能使用字母、數字和底線。",
     "header": "函式",
     "add": "新增函式",
     "search": "搜尋函式",

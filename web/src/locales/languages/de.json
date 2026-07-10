@@ -1843,6 +1843,11 @@
     "tooltipPromptTemplate": "Die Aufforderung wurde an das LLM gesendet. Verwenden Sie {input}, {output} und {context} als Platzhalter für dynamische Werte zur Evaluierung."
   },
   "function": {
+    "csvFileRequired": "CSV-Datei ist erforderlich!",
+    "urlRequired": "URL ist erforderlich!",
+    "urlMustStartWithHttp": "Die URL muss mit http:// oder https:// beginnen",
+    "nameRequired": "Dieses Feld ist erforderlich!",
+    "invalidMethodName": "Ungültiger Methodenname. Muss mit einem Buchstaben oder Unterstrich beginnen. Verwenden Sie nur Buchstaben, Zahlen und Unterstriche.",
     "header": "Funktionen",
     "subtitle": "Wiederverwendbare VRL-Funktionen, die in Pipelines angewendet werden",
     "clickTestFunctionHint": "Bitte klicken Sie auf Funktion testen, um die Ereignisse zu sehen",

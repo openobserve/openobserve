@@ -17,10 +17,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import FunctionsToolbar from "./FunctionsToolbar.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
-import { addFunctionSchema } from "./AddFunction.schema";
+import { makeAddFunctionSchema } from "./AddFunction.schema";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
+
+// The schema is a factory taking vue-i18n's `t`; use the real i18n so messages
+// resolve exactly as they do in the app.
+const addFunctionSchema = makeAddFunctionSchema((k: string) =>
+  i18n.global.t(k as never),
+);
 
 describe("FunctionsToolbar", () => {
   let store: any;

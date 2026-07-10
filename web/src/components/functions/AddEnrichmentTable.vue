@@ -278,6 +278,7 @@ export default defineComponent({
     // `isUpdating` is a prop, read lazily inside superRefine. Named after the
     // form per the playbook house style.
     const addEnrichmentTableSchema = makeAddEnrichmentTableSchema(
+      t,
       () => props.isUpdating,
     );
 

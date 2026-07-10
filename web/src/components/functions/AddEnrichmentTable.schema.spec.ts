@@ -15,9 +15,12 @@ const errorPaths = (schema: any, input: any): string[] => {
 };
 
 describe("AddEnrichmentTable.schema", () => {
+  // The factory now takes vue-i18n's `t` first; a key-echo stub suffices since
+  // these tests assert error PATHS, not message text.
+  const t = (k: string) => k;
   // Two flavours: add mode (isUpdating=false) and update mode (isUpdating=true).
-  const createSchema = makeAddEnrichmentTableSchema(() => false);
-  const updateSchema = makeAddEnrichmentTableSchema(() => true);
+  const createSchema = makeAddEnrichmentTableSchema(t, () => false);
+  const updateSchema = makeAddEnrichmentTableSchema(t, () => true);
 
   describe("name (required + trim)", () => {
     it("requires a non-empty name", () => {

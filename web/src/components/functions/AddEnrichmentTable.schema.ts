@@ -25,11 +25,14 @@
 
 import { z } from "zod";
 
-export const makeAddEnrichmentTableSchema = (isUpdating: () => boolean) =>
+export const makeAddEnrichmentTableSchema = (
+  t: (_key: string) => string,
+  isUpdating: () => boolean,
+) =>
   z
     .object({
       // Restores the Quasar `!!v || 'Field is required!'` rule (+ trim).
-      name: z.string().trim().min(1, "Field is required!"),
+      name: z.string().trim().min(1, t("function.nameRequired")),
       source: z.enum(["file", "url"]).default("file"),
       // A File object (or "" when empty). Required-ness is conditional → checked
       // in superRefine, so the base type stays permissive.
@@ -45,7 +48,7 @@ export const makeAddEnrichmentTableSchema = (isUpdating: () => boolean) =>
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["file"],
-          message: "CSV File is required!",
+          message: t("function.csvFileRequired"),
         });
       }
 
@@ -58,13 +61,13 @@ export const makeAddEnrichmentTableSchema = (isUpdating: () => boolean) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["url"],
-            message: "URL is required!",
+            message: t("function.urlRequired"),
           });
         } else if (!url.startsWith("http://") && !url.startsWith("https://")) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["url"],
-            message: "URL must start with http:// or https://",
+            message: t("function.urlMustStartWithHttp"),
           });
         }
       }
