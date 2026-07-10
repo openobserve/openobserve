@@ -260,9 +260,13 @@ describe("PipelineEditor", () => {
       expect(wrapper.vm.validationErrors).toEqual([]);
     });
 
-    it("initializes the pipeline name form with an empty name", () => {
-      // Name validation is now owned by the OForm (metaForm); it starts empty.
-      expect(wrapper.vm.metaForm.state.values.name).toBe("");
+    it("seeds the OForm name from the pipeline already loaded in the store at mount", () => {
+      // Regression: `pipelineObj` is a module-level singleton that survives
+      // navigation, so on re-editing a pipeline its name is already present at
+      // mount (no post-mount change). The store→form watch is `immediate` so
+      // metaForm is seeded here — otherwise a change-only watch never fires and
+      // save wrongly reports "Pipeline name is required".
+      expect(wrapper.vm.metaForm.state.values.name).toBe("test-pipeline");
     });
 
     it("initializes confirmDialogMeta as hidden", () => {
@@ -579,6 +583,40 @@ describe("PipelineEditor", () => {
       await wrapper.vm.savePipeline();
       // OForm validation fails, so save never reaches the create call.
       expect(pipelineService.createPipeline).not.toHaveBeenCalled();
+    });
+
+    it("saves an edited pipeline whose name was only present at mount (no post-mount change)", async () => {
+      // Regression: re-editing a pipeline leaves its name in the module-level
+      // singleton store BEFORE mount, so there is no post-mount change to fire a
+      // change-only watch. The name here ("test-pipeline") comes from the mount
+      // fixture and is never reassigned — save must still clear name validation
+      // and reach the update call instead of toasting "Pipeline name is required".
+      mockPipelineObj.isEditPipeline = true;
+      mockPipelineObj.currentSelectedPipeline.nodes = [
+        {
+          id: "n1",
+          io_type: "input",
+          type: "input",
+          data: { node_type: "stream", stream_name: "in", stream_type: "logs" },
+        },
+        {
+          id: "n2",
+          io_type: "output",
+          type: "output",
+          data: { node_type: "stream", stream_name: "out", stream_type: "logs" },
+        },
+      ];
+      mockPipelineObj.currentSelectedPipeline.edges = [
+        { source: "n1", target: "n2" },
+      ];
+
+      await wrapper.vm.savePipeline();
+
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      expect(toast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining("required") })
+      );
+      expect(pipelineService.updatePipeline).toHaveBeenCalled();
     });
 
     it("shows error notification when source node is missing", async () => {

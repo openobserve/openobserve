@@ -498,6 +498,12 @@ watch(
 // flush:"sync" so the form reflects a store change in the SAME tick — the
 // JSON-editor apply path sets currentSelectedPipeline then calls savePipeline()
 // synchronously, and savePipeline validates the form value.
+// immediate:true so the form is seeded from the store on MOUNT, not only on a
+// later change. `pipelineObj` is a module-level singleton that survives
+// navigation, so on re-editing the same pipeline its name is already present at
+// mount (or getPipeline replaces it with an equal value) — a change-only watch
+// would never fire and metaForm would stay empty, failing the required-name
+// validation on save ("Pipeline name is required").
 watch(
   () => pipelineObj.currentSelectedPipeline.name,
   (v: string) => {
@@ -505,7 +511,7 @@ watch(
       metaForm.setFieldValue("name", v ?? "");
     }
   },
-  { flush: "sync" },
+  { flush: "sync", immediate: true },
 );
 
 // Watch for dialog changes to track node drops
