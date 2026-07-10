@@ -246,7 +246,7 @@ impl Engine {
                 // back to its representation.
                 let rhs = match rhs {
                     Value::Matrix(m) if m.len() == 1 && m[0].samples.len() == 1 => {
-                        Value::Float(m[0].samples[0].value)
+                        Value::Float(m[0].samples.values[0])
                     }
                     _ => rhs,
                 };
@@ -394,7 +394,7 @@ impl Engine {
         // TODO: make it parallel
         let mut result = Vec::with_capacity(metrics_cache.len());
         for metric in metrics_cache {
-            let mut selected_samples = Vec::with_capacity(eval_timestamps.len());
+            let mut selected_samples = Samples::with_capacity(eval_timestamps.len());
 
             for &eval_ts in &eval_timestamps {
                 // Calculate lookback window for this evaluation timestamp
@@ -407,14 +407,13 @@ impl Engine {
                     .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
 
                 let match_sample = if end_index > 0 {
-                    metric.samples.get(end_index - 1).and_then(|sample| {
-                        let adjusted_ts = sample.timestamp + offset_modifier;
-                        if adjusted_ts >= start && adjusted_ts <= eval_ts {
-                            Some(sample)
-                        } else {
-                            None
-                        }
-                    })
+                    let sample = metric.samples.get(end_index - 1);
+                    let adjusted_ts = sample.timestamp + offset_modifier;
+                    if adjusted_ts >= start && adjusted_ts <= eval_ts {
+                        Some(sample)
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 };
@@ -501,8 +500,9 @@ impl Engine {
         if offset_modifier != 0 {
             values.par_iter_mut().for_each(|rv| {
                 rv.samples
+                    .timestamps
                     .iter_mut()
-                    .for_each(|s| s.timestamp += offset_modifier);
+                    .for_each(|t| *t += offset_modifier);
             });
         }
 
@@ -534,7 +534,7 @@ impl Engine {
         let start = std::time::Instant::now();
         let mut metric_values = metrics.into_values().collect::<Vec<_>>();
         metric_values.par_iter_mut().for_each(|metric| {
-            metric.samples.sort_unstable_by_key(|k| k.timestamp);
+            metric.samples.sort_by_timestamp();
             if self.ctx.query_ctx.query_exemplars
                 && let Some(exemplars) = &mut metric.exemplars
             {
@@ -994,7 +994,7 @@ impl Engine {
                     // Found no arg to pass to, lets use a `matrix(time())` as the arg.
                     // https://prometheus.io/docs/prometheus/latest/querying/functions/#functions
                     let timestamps = self.eval_ctx.timestamps();
-                    let samples: Vec<Sample> = timestamps
+                    let samples: Samples = timestamps
                         .iter()
                         .map(|&ts| Sample::new(ts, ts as f64))
                         .collect();

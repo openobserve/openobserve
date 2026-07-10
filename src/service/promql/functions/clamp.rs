@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::{LabelsExt, RangeValue, Sample, Value};
+use config::meta::promql::value::{LabelsExt, RangeValue, Sample, Samples, Value};
 use datafusion::error::{DataFusionError, Result};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
@@ -25,7 +25,7 @@ pub(crate) fn clamp(data: Value, min: f64, max: f64) -> Result<Value> {
                 .into_par_iter()
                 .map(|mut range_value| {
                     // Apply clamp to all samples in this range
-                    let samples: Vec<Sample> = range_value
+                    let samples: Samples = range_value
                         .samples
                         .into_iter()
                         .map(|sample| {
@@ -66,7 +66,7 @@ mod tests {
             .into_iter()
             .map(|val| RangeValue {
                 labels: Labels::default(),
-                samples: vec![Sample::new(eval_ts, val)],
+                samples: vec![Sample::new(eval_ts, val)].into(),
                 exemplars: None,
                 time_window: Some(TimeWindow {
                     range: Duration::from_secs(5),
@@ -99,11 +99,11 @@ mod tests {
             Value::Matrix(m) => {
                 assert_eq!(m.len(), 3);
                 // 5.0 should be clamped to 10.0
-                assert!((m[0].samples[0].value - 10.0).abs() < 0.001);
+                assert!((m[0].samples.get(0).value - 10.0).abs() < 0.001);
                 // 15.0 should remain 15.0
-                assert!((m[1].samples[0].value - 15.0).abs() < 0.001);
+                assert!((m[1].samples.get(0).value - 15.0).abs() < 0.001);
                 // 25.0 should be clamped to 20.0
-                assert!((m[2].samples[0].value - 20.0).abs() < 0.001);
+                assert!((m[2].samples.get(0).value - 20.0).abs() < 0.001);
             }
             _ => panic!("Expected Matrix result"),
         }

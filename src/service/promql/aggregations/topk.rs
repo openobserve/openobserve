@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    meta::promql::value::{EvalContext, RangeValue, Value},
+    meta::promql::value::{EvalContext, RangeValue, Samples, Value},
     utils::sort::sort_float,
 };
 use datafusion::error::{DataFusionError, Result};
@@ -148,7 +148,7 @@ pub(super) fn select_topk_series(
 
         // Use with_capacity since we know samples won't exceed series.samples.len()
         let mut filtered_samples =
-            Vec::with_capacity(series.samples.len().min(eval_timestamps.len()));
+            Samples::with_capacity(series.samples.len().min(eval_timestamps.len()));
 
         for sample in &series.samples {
             // O(1) lookup to check if this timestamp has top-k data
@@ -156,7 +156,7 @@ pub(super) fn select_topk_series(
             if let Some(topk_indices) = topk_per_timestamp.get(&sample.timestamp)
                 && topk_indices.contains(&series_idx)
             {
-                filtered_samples.push(*sample);
+                filtered_samples.push(sample);
             }
         }
 
@@ -204,19 +204,19 @@ mod tests {
         let data = Value::Matrix(vec![
             RangeValue {
                 labels: labels1.clone(),
-                samples: vec![Sample::new(timestamp, 10.5)],
+                samples: vec![Sample::new(timestamp, 10.5)].into(),
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels2.clone(),
-                samples: vec![Sample::new(timestamp, 15.3)], // Highest value
+                samples: vec![Sample::new(timestamp, 15.3)].into(), // Highest value
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels3.clone(),
-                samples: vec![Sample::new(timestamp, 8.2)], // Lowest value
+                samples: vec![Sample::new(timestamp, 8.2)].into(), // Lowest value
                 exemplars: None,
                 time_window: None,
             },
@@ -231,14 +231,14 @@ mod tests {
             Value::Matrix(matrix) => {
                 assert_eq!(matrix.len(), 2);
                 // Should return the 2 highest values: 15.3 and 10.5
-                let mut values: Vec<f64> = matrix.iter().map(|s| s.samples[0].value).collect();
+                let mut values: Vec<f64> = matrix.iter().map(|s| s.samples.get(0).value).collect();
                 values.sort_by(|a, b| b.partial_cmp(a).unwrap()); // Sort descending
                 assert_eq!(values[0], 15.3); // Highest
                 assert_eq!(values[1], 10.5); // Second highest
 
                 // All samples should have the same timestamp
                 for series in &matrix {
-                    assert_eq!(series.samples[0].timestamp, timestamp);
+                    assert_eq!(series.samples.get(0).timestamp, timestamp);
                 }
             }
             _ => panic!("Expected Matrix result"),
@@ -273,7 +273,7 @@ mod tests {
 
         let data = Value::Matrix(vec![RangeValue {
             labels: labels.clone(),
-            samples: vec![Sample::new(timestamp, 10.5)],
+            samples: vec![Sample::new(timestamp, 10.5)].into(),
             exemplars: None,
             time_window: None,
         }]);
@@ -312,7 +312,7 @@ mod tests {
         let timestamp = 1640995200;
         let matrix = vec![RangeValue {
             labels: vec![Arc::new(Label::new("k", "v"))],
-            samples: vec![Sample::new(timestamp, 1.0)],
+            samples: vec![Sample::new(timestamp, 1.0)].into(),
             exemplars: None,
             time_window: None,
         }];
@@ -328,13 +328,13 @@ mod tests {
         let matrix = vec![
             RangeValue {
                 labels: vec![Arc::new(Label::new("i", "1"))],
-                samples: vec![Sample::new(timestamp, 5.0)],
+                samples: vec![Sample::new(timestamp, 5.0)].into(),
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: vec![Arc::new(Label::new("i", "2"))],
-                samples: vec![Sample::new(timestamp, 3.0)],
+                samples: vec![Sample::new(timestamp, 3.0)].into(),
                 exemplars: None,
                 time_window: None,
             },

@@ -16,7 +16,9 @@
 use config::{
     meta::promql::{
         BUCKET_LABEL, HASH_LABEL, NAME_LABEL,
-        value::{EvalContext, LabelsExt, RangeValue, Sample, Value, signature_without_labels},
+        value::{
+            EvalContext, LabelsExt, RangeValue, Sample, Samples, Value, signature_without_labels,
+        },
     },
     utils::sort::sort_float,
 };
@@ -75,7 +77,7 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
         base_labels
             .retain(|l| l.name != HASH_LABEL && l.name != NAME_LABEL && l.name != BUCKET_LABEL);
 
-        let mut samples = Vec::with_capacity(timestamps.len());
+        let mut samples = Samples::with_capacity(timestamps.len());
 
         // For each timestamp, compute histogram_quantile
         for &eval_ts in &timestamps {

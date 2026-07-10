@@ -149,7 +149,8 @@ mod tests {
                     Sample::new(ts1, 10.0),
                     Sample::new(ts2, 20.0),
                     Sample::new(ts3, 30.0),
-                ],
+                ]
+                .into(),
                 exemplars: None,
                 time_window: None,
             },
@@ -159,7 +160,8 @@ mod tests {
                     Sample::new(ts1, 5.0),
                     Sample::new(ts2, 15.0),
                     Sample::new(ts3, 25.0),
-                ],
+                ]
+                .into(),
                 exemplars: None,
                 time_window: None,
             },
@@ -169,7 +171,8 @@ mod tests {
                     Sample::new(ts1, 2.0),
                     Sample::new(ts2, 4.0),
                     Sample::new(ts3, 6.0),
-                ],
+                ]
+                .into(),
                 exemplars: None,
                 time_window: None,
             },
@@ -188,12 +191,12 @@ mod tests {
                 let series = &result_matrix[0];
                 assert!(series.labels.is_empty()); // No labels when grouping all together
                 assert_eq!(series.samples.len(), 3); // 3 timestamps
-                assert_eq!(series.samples[0].timestamp, ts1);
-                assert_eq!(series.samples[0].value, 17.0); // 10 + 5 + 2
-                assert_eq!(series.samples[1].timestamp, ts2);
-                assert_eq!(series.samples[1].value, 39.0); // 20 + 15 + 4
-                assert_eq!(series.samples[2].timestamp, ts3);
-                assert_eq!(series.samples[2].value, 61.0); // 30 + 25 + 6
+                assert_eq!(series.samples.get(0).timestamp, ts1);
+                assert_eq!(series.samples.get(0).value, 17.0); // 10 + 5 + 2
+                assert_eq!(series.samples.get(1).timestamp, ts2);
+                assert_eq!(series.samples.get(1).value, 39.0); // 20 + 15 + 4
+                assert_eq!(series.samples.get(2).timestamp, ts3);
+                assert_eq!(series.samples.get(2).value, 61.0); // 30 + 25 + 6
             }
             _ => panic!("Expected Matrix result"),
         }
@@ -229,15 +232,15 @@ mod tests {
 
                 // Verify node_exporter group (server1 + server2)
                 assert_eq!(node_exporter_series.samples.len(), 3);
-                assert_eq!(node_exporter_series.samples[0].value, 15.0); // 10 + 5
-                assert_eq!(node_exporter_series.samples[1].value, 35.0); // 20 + 15
-                assert_eq!(node_exporter_series.samples[2].value, 55.0); // 30 + 25
+                assert_eq!(node_exporter_series.samples.get(0).value, 15.0); // 10 + 5
+                assert_eq!(node_exporter_series.samples.get(1).value, 35.0); // 20 + 15
+                assert_eq!(node_exporter_series.samples.get(2).value, 55.0); // 30 + 25
 
                 // Verify prometheus group (server1 only)
                 assert_eq!(prometheus_series.samples.len(), 3);
-                assert_eq!(prometheus_series.samples[0].value, 2.0);
-                assert_eq!(prometheus_series.samples[1].value, 4.0);
-                assert_eq!(prometheus_series.samples[2].value, 6.0);
+                assert_eq!(prometheus_series.samples.get(0).value, 2.0);
+                assert_eq!(prometheus_series.samples.get(1).value, 4.0);
+                assert_eq!(prometheus_series.samples.get(2).value, 6.0);
             }
             _ => panic!("Expected Matrix result"),
         }

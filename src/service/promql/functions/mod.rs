@@ -15,7 +15,7 @@
 
 use std::{collections::HashSet, sync::LazyLock as Lazy, time::Duration};
 
-use config::meta::promql::value::{EvalContext, LabelsExt, RangeValue, Sample, Value};
+use config::meta::promql::value::{EvalContext, LabelsExt, RangeValue, Sample, SamplesRef, Value};
 use datafusion::error::{DataFusionError, Result};
 use rayon::prelude::*;
 use strum::EnumString;
@@ -173,7 +173,7 @@ pub static KEEP_METRIC_NAME_FUNC: Lazy<HashSet<&str>> =
 ///         "rate"
 ///     }
 ///
-///     fn exec(&self, samples: &[Sample], eval_ts: i64, range: &Duration) -> Option<f64> {
+///     fn exec(&self, samples: SamplesRef<'_>, eval_ts: i64, range: &Duration) -> Option<f64> {
 ///         if samples.len() < 2 {
 ///             return None;
 ///         }
@@ -207,7 +207,7 @@ pub trait RangeFunc: Sync {
     /// * `Some(f64)` - The computed value for this time window
     /// * `None` - If the function cannot produce a value (e.g., insufficient samples, invalid data,
     ///   or the result should be omitted)
-    fn exec(&self, samples: &[Sample], eval_ts: i64, range: &Duration) -> Option<f64>;
+    fn exec(&self, samples: SamplesRef<'_>, eval_ts: i64, range: &Duration) -> Option<f64>;
 }
 
 pub(crate) fn eval_range<F>(data: Value, func: F, eval_ctx: &EvalContext) -> Result<Value>
@@ -264,16 +264,18 @@ where
                 // Extract samples within this window using binary search
                 let start_index = metric
                     .samples
-                    .partition_point(|s| s.timestamp < window_start);
+                    .timestamps
+                    .partition_point(|&t| t < window_start);
                 let end_index = metric
                     .samples
-                    .partition_point(|s| s.timestamp <= window_end);
-                let window_samples = &metric.samples[start_index..end_index];
+                    .timestamps
+                    .partition_point(|&t| t <= window_end);
 
-                if window_samples.is_empty() {
+                if start_index == end_index {
                     continue;
                 }
 
+                let window_samples = metric.samples.slice(start_index, end_index);
                 if let Some(value) = func.exec(window_samples, eval_ts, &range) {
                     result_samples.push(Sample::new(eval_ts, value));
                 }
@@ -282,7 +284,7 @@ where
             if !result_samples.is_empty() {
                 Some(RangeValue {
                     labels,
-                    samples: result_samples,
+                    samples: result_samples.into_iter().collect(),
                     exemplars: None,
                     time_window: metric.time_window,
                 })

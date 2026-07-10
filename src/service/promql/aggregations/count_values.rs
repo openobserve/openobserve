@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use ahash::{HashMap, HashMapExt};
 use config::meta::promql::value::{
-    EvalContext, Label, Labels, LabelsExt, RangeValue, Sample, Value,
+    EvalContext, Label, Labels, LabelsExt, RangeValue, Sample, Samples, Value,
 };
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::LabelModifier;
@@ -135,7 +135,7 @@ pub fn count_values(
     // Step 3: Process each group in parallel
     // For each group, count unique sample values at each timestamp
     // Result structure: HashMap<value_string, HashMap<timestamp, count>>
-    let results: Vec<Vec<(Labels, Vec<Sample>)>> = groups
+    let results: Vec<Vec<(Labels, Samples)>> = groups
         .par_iter()
         .map(|(_, series_indices)| {
             // Get the base labels for this group (from the first series in the group)
@@ -172,7 +172,7 @@ pub fn count_values(
             }
 
             // For each unique value, create a series with the count at each timestamp
-            let mut value_series: Vec<(Labels, Vec<Sample>)> = Vec::new();
+            let mut value_series: Vec<(Labels, Samples)> = Vec::new();
             for value_str in unique_values {
                 // Create labels with the new label_name
                 let mut labels = base_labels.clone();
@@ -180,7 +180,7 @@ pub fn count_values(
                 labels.sort();
 
                 // Create samples for this value across all timestamps
-                let mut samples: Vec<Sample> = Vec::new();
+                let mut samples = Samples::default();
                 for (&timestamp, value_map) in &timestamp_value_counts {
                     if let Some(&count) = value_map.get(&value_str) {
                         samples.push(Sample::new(timestamp, count as f64));
@@ -188,7 +188,7 @@ pub fn count_values(
                 }
 
                 // Sort by timestamp to maintain order
-                samples.sort_by_key(|s| s.timestamp);
+                samples.sort_by_timestamp();
 
                 if !samples.is_empty() {
                     value_series.push((labels, samples));
@@ -200,7 +200,7 @@ pub fn count_values(
         .collect();
 
     // Flatten the nested Vec
-    let results: Vec<(Labels, Vec<Sample>)> = results.into_iter().flatten().collect();
+    let results: Vec<(Labels, Samples)> = results.into_iter().flatten().collect();
 
     log::info!(
         "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) parallel aggregation took: {:?}",
@@ -273,19 +273,19 @@ mod tests {
         let data = Value::Matrix(vec![
             RangeValue {
                 labels: labels1.clone(),
-                samples: vec![Sample::new(timestamp, 10.0)],
+                samples: vec![Sample::new(timestamp, 10.0)].into(),
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels2.clone(),
-                samples: vec![Sample::new(timestamp, 10.0)], // Same value
+                samples: vec![Sample::new(timestamp, 10.0)].into(), // Same value
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels1.clone(),
-                samples: vec![Sample::new(timestamp, 20.0)],
+                samples: vec![Sample::new(timestamp, 20.0)].into(),
                 exemplars: None,
                 time_window: None,
             },
@@ -307,14 +307,14 @@ mod tests {
 
                     let value_str = value_label.unwrap().value.as_str();
                     if value_str == "10" {
-                        assert_eq!(series.samples[0].value, 2.0); // Count of 10.0 is 2
+                        assert_eq!(series.samples.get(0).value, 2.0); // Count of 10.0 is 2
                     } else if value_str == "20" {
-                        assert_eq!(series.samples[0].value, 1.0); // Count of 20.0 is 1
+                        assert_eq!(series.samples.get(0).value, 1.0); // Count of 20.0 is 1
                     } else {
                         panic!("Unexpected value label: {value_str}");
                     }
 
-                    assert_eq!(series.samples[0].timestamp, timestamp);
+                    assert_eq!(series.samples.get(0).timestamp, timestamp);
                 }
             }
             _ => panic!("Expected Matrix result"),
@@ -329,7 +329,7 @@ mod tests {
 
         let data = Value::Matrix(vec![RangeValue {
             labels: labels.clone(),
-            samples: vec![Sample::new(timestamp, 10.5)],
+            samples: vec![Sample::new(timestamp, 10.5)].into(),
             exemplars: None,
             time_window: None,
         }]);
@@ -386,7 +386,8 @@ mod tests {
                     Sample::new(timestamp1, 10.0),
                     Sample::new(timestamp2, 20.0),
                     Sample::new(timestamp3, 10.0),
-                ],
+                ]
+                .into(),
                 exemplars: None,
                 time_window: None,
             },
@@ -396,7 +397,8 @@ mod tests {
                     Sample::new(timestamp1, 10.0),
                     Sample::new(timestamp2, 10.0),
                     Sample::new(timestamp3, 30.0),
-                ],
+                ]
+                .into(),
                 exemplars: None,
                 time_window: None,
             },
@@ -425,24 +427,24 @@ mod tests {
                             // Value 10 appears at timestamp1 (2 times), timestamp2 (1 time),
                             // timestamp3 (1 time)
                             assert_eq!(series.samples.len(), 3);
-                            assert_eq!(series.samples[0].timestamp, timestamp1);
-                            assert_eq!(series.samples[0].value, 2.0);
-                            assert_eq!(series.samples[1].timestamp, timestamp2);
-                            assert_eq!(series.samples[1].value, 1.0);
-                            assert_eq!(series.samples[2].timestamp, timestamp3);
-                            assert_eq!(series.samples[2].value, 1.0);
+                            assert_eq!(series.samples.get(0).timestamp, timestamp1);
+                            assert_eq!(series.samples.get(0).value, 2.0);
+                            assert_eq!(series.samples.get(1).timestamp, timestamp2);
+                            assert_eq!(series.samples.get(1).value, 1.0);
+                            assert_eq!(series.samples.get(2).timestamp, timestamp3);
+                            assert_eq!(series.samples.get(2).value, 1.0);
                         }
                         "20" => {
                             // Value 20 appears at timestamp2 (1 time)
                             assert_eq!(series.samples.len(), 1);
-                            assert_eq!(series.samples[0].timestamp, timestamp2);
-                            assert_eq!(series.samples[0].value, 1.0);
+                            assert_eq!(series.samples.get(0).timestamp, timestamp2);
+                            assert_eq!(series.samples.get(0).value, 1.0);
                         }
                         "30" => {
                             // Value 30 appears at timestamp3 (1 time)
                             assert_eq!(series.samples.len(), 1);
-                            assert_eq!(series.samples[0].timestamp, timestamp3);
-                            assert_eq!(series.samples[0].value, 1.0);
+                            assert_eq!(series.samples.get(0).timestamp, timestamp3);
+                            assert_eq!(series.samples.get(0).value, 1.0);
                         }
                         _ => panic!("Unexpected value label: {}", value_label.value),
                     }

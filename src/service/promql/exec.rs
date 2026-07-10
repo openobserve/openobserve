@@ -101,7 +101,7 @@ impl PromqlContext {
                         .filter_map(|range_val| {
                             range_val.samples.first().map(|sample| InstantValue {
                                 labels: range_val.labels.clone(),
-                                sample: *sample,
+                                sample,
                             })
                         })
                         .collect();
@@ -123,7 +123,7 @@ impl PromqlContext {
                 Value::Float(scalar_val) => {
                     // Generate samples for each time point
                     let timestamps = eval_ctx.timestamps();
-                    let samples: Vec<Sample> = timestamps
+                    let samples: Samples = timestamps
                         .into_iter()
                         .map(|ts| Sample::new(ts, scalar_val))
                         .collect();

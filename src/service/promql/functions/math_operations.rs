@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::{LabelsExt, RangeValue, Sample, Value};
+use config::meta::promql::value::{LabelsExt, RangeValue, Sample, Samples, Value};
 use datafusion::error::{DataFusionError, Result};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use strum::EnumIter;
@@ -97,7 +97,7 @@ fn exec(data: Value, op: &MathOperationsType) -> Result<Value> {
                 .into_par_iter()
                 .map(|mut range_value| {
                     // Apply the math operation to all samples in this range
-                    let samples: Vec<Sample> = range_value
+                    let samples: Samples = range_value
                         .samples
                         .into_iter()
                         .map(|sample| {
@@ -138,7 +138,7 @@ mod tests {
             .into_iter()
             .map(|val| RangeValue {
                 labels: Labels::default(),
-                samples: vec![Sample::new(eval_ts, val)],
+                samples: vec![Sample::new(eval_ts, val)].into(),
                 exemplars: None,
                 time_window: Some(TimeWindow {
                     range: Duration::from_secs(5),
@@ -204,8 +204,8 @@ mod tests {
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 2);
-            assert_eq!(result_matrix[0].samples[0].value, 5.0);
-            assert_eq!(result_matrix[1].samples[0].value, 3.0);
+            assert_eq!(result_matrix[0].samples.get(0).value, 5.0);
+            assert_eq!(result_matrix[1].samples.get(0).value, 3.0);
         } else {
             panic!("Expected Matrix result");
         }
@@ -219,8 +219,8 @@ mod tests {
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 2);
-            assert_eq!(result_matrix[0].samples[0].value, 4.0);
-            assert_eq!(result_matrix[1].samples[0].value, -3.0);
+            assert_eq!(result_matrix[0].samples.get(0).value, 4.0);
+            assert_eq!(result_matrix[1].samples.get(0).value, -3.0);
         } else {
             panic!("Expected Matrix result");
         }
@@ -234,8 +234,8 @@ mod tests {
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 2);
-            assert_eq!(result_matrix[0].samples[0].value, 3.0);
-            assert_eq!(result_matrix[1].samples[0].value, -4.0);
+            assert_eq!(result_matrix[0].samples.get(0).value, 3.0);
+            assert_eq!(result_matrix[1].samples.get(0).value, -4.0);
         } else {
             panic!("Expected Matrix result");
         }
@@ -249,8 +249,8 @@ mod tests {
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 2);
-            assert_eq!(result_matrix[0].samples[0].value, 1.0);
-            assert_eq!(result_matrix[1].samples[0].value, std::f64::consts::E);
+            assert_eq!(result_matrix[0].samples.get(0).value, 1.0);
+            assert_eq!(result_matrix[1].samples.get(0).value, std::f64::consts::E);
         } else {
             panic!("Expected Matrix result");
         }
@@ -264,8 +264,8 @@ mod tests {
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 2);
-            assert_eq!(result_matrix[0].samples[0].value, 0.0);
-            assert_eq!(result_matrix[1].samples[0].value, 1.0);
+            assert_eq!(result_matrix[0].samples.get(0).value, 0.0);
+            assert_eq!(result_matrix[1].samples.get(0).value, 1.0);
         } else {
             panic!("Expected Matrix result");
         }
@@ -279,9 +279,9 @@ mod tests {
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 3);
-            assert_eq!(result_matrix[0].samples[0].value, 0.0);
-            assert_eq!(result_matrix[1].samples[0].value, 1.0);
-            assert_eq!(result_matrix[2].samples[0].value, 2.0);
+            assert_eq!(result_matrix[0].samples.get(0).value, 0.0);
+            assert_eq!(result_matrix[1].samples.get(0).value, 1.0);
+            assert_eq!(result_matrix[2].samples.get(0).value, 2.0);
         } else {
             panic!("Expected Matrix result");
         }
@@ -295,9 +295,9 @@ mod tests {
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 3);
-            assert_eq!(result_matrix[0].samples[0].value, 0.0);
-            assert_eq!(result_matrix[1].samples[0].value, 1.0);
-            assert_eq!(result_matrix[2].samples[0].value, 2.0);
+            assert_eq!(result_matrix[0].samples.get(0).value, 0.0);
+            assert_eq!(result_matrix[1].samples.get(0).value, 1.0);
+            assert_eq!(result_matrix[2].samples.get(0).value, 2.0);
         } else {
             panic!("Expected Matrix result");
         }
@@ -311,9 +311,9 @@ mod tests {
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 3);
-            assert_eq!(result_matrix[0].samples[0].value, 0.0);
-            assert_eq!(result_matrix[1].samples[0].value, 1.0);
-            assert_eq!(result_matrix[2].samples[0].value, 2.0);
+            assert_eq!(result_matrix[0].samples.get(0).value, 0.0);
+            assert_eq!(result_matrix[1].samples.get(0).value, 1.0);
+            assert_eq!(result_matrix[2].samples.get(0).value, 2.0);
         } else {
             panic!("Expected Matrix result");
         }
@@ -327,9 +327,9 @@ mod tests {
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 3);
-            assert_eq!(result_matrix[0].samples[0].value, 3.0);
-            assert_eq!(result_matrix[1].samples[0].value, 4.0);
-            assert_eq!(result_matrix[2].samples[0].value, -3.0);
+            assert_eq!(result_matrix[0].samples.get(0).value, 3.0);
+            assert_eq!(result_matrix[1].samples.get(0).value, 4.0);
+            assert_eq!(result_matrix[2].samples.get(0).value, -3.0);
         } else {
             panic!("Expected Matrix result");
         }
@@ -343,9 +343,9 @@ mod tests {
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 3);
-            assert_eq!(result_matrix[0].samples[0].value, 1.0);
-            assert_eq!(result_matrix[1].samples[0].value, -1.0);
-            assert_eq!(result_matrix[2].samples[0].value, 1.0);
+            assert_eq!(result_matrix[0].samples.get(0).value, 1.0);
+            assert_eq!(result_matrix[1].samples.get(0).value, -1.0);
+            assert_eq!(result_matrix[2].samples.get(0).value, 1.0);
         } else {
             panic!("Expected Matrix result");
         }

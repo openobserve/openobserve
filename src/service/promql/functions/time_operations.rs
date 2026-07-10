@@ -15,7 +15,7 @@
 
 use chrono::{Datelike, NaiveDate, Timelike};
 use config::{
-    meta::promql::value::{LabelsExt, RangeValue, Sample, Value},
+    meta::promql::value::{LabelsExt, RangeValue, Sample, Samples, Value},
     utils::time::parse_i64_to_timestamp_micros,
 };
 use datafusion::error::{DataFusionError, Result};
@@ -104,7 +104,7 @@ pub(crate) fn timestamp(data: Value) -> Result<Value> {
                 .into_par_iter()
                 .map(|mut range_value| {
                     // Convert timestamp from microseconds to seconds for all samples
-                    let samples: Vec<Sample> = range_value
+                    let samples: Samples = range_value
                         .samples
                         .into_iter()
                         .map(|sample| {
@@ -137,7 +137,7 @@ fn exec(data: Value, op: &TimeOperationType) -> Result<Value> {
                 .into_par_iter()
                 .map(|mut range_value| {
                     // Apply the time operation to all samples in this range
-                    let samples: Vec<Sample> = range_value
+                    let samples: Samples = range_value
                         .samples
                         .into_iter()
                         .map(|sample| {

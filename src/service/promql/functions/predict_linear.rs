@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
+use config::meta::promql::value::{EvalContext, SamplesRef, Value};
 use datafusion::error::Result;
 
 use crate::service::promql::{common::linear_regression, functions::RangeFunc};
@@ -40,7 +40,7 @@ impl RangeFunc for PredictLinearFunc {
         "predict_linear"
     }
 
-    fn exec(&self, samples: &[Sample], eval_ts: i64, _range: &Duration) -> Option<f64> {
+    fn exec(&self, samples: SamplesRef<'_>, eval_ts: i64, _range: &Duration) -> Option<f64> {
         let (slope, intercept) = linear_regression(samples, eval_ts / 1000)?;
         Some(slope * self.duration + intercept)
     }
@@ -50,7 +50,7 @@ impl RangeFunc for PredictLinearFunc {
 mod tests {
     use std::time::Duration;
 
-    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+    use config::meta::promql::value::{Labels, RangeValue, Sample, Samples, TimeWindow};
 
     use super::*;
 
@@ -75,11 +75,12 @@ mod tests {
     #[test]
     fn test_predict_linear_function() {
         // Create a range value with a linear trend
-        let samples = vec![
+        let samples: Samples = vec![
             Sample::new(1000, 10.0),
             Sample::new(2000, 20.0),
             Sample::new(3000, 30.0),
-        ];
+        ]
+        .into();
         let range_value = RangeValue {
             labels: Labels::default(),
             samples,
@@ -97,8 +98,8 @@ mod tests {
                 assert_eq!(m.len(), 1);
                 assert_eq!(m[0].samples.len(), 1);
                 // Should return a predicted value (should be finite)
-                assert!(m[0].samples[0].value.is_finite());
-                assert_eq!(m[0].samples[0].timestamp, 3000);
+                assert!(m[0].samples.get(0).value.is_finite());
+                assert_eq!(m[0].samples.get(0).timestamp, 3000);
             }
             _ => panic!("Expected Matrix result"),
         }

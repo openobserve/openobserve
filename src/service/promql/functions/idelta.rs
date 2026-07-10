@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
+use config::meta::promql::value::{EvalContext, SamplesRef, Value};
 use datafusion::error::Result;
 
 use crate::service::promql::functions::RangeFunc;
@@ -37,12 +37,12 @@ impl RangeFunc for IdeltaFunc {
         "idelta"
     }
 
-    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+    fn exec(&self, samples: SamplesRef<'_>, _eval_ts: i64, _range: &Duration) -> Option<f64> {
         if samples.len() < 2 {
             return None;
         }
         let last = samples.last().unwrap();
-        let previous = samples.get(samples.len() - 2).unwrap();
+        let previous = samples.get(samples.len() - 2);
         Some(last.value - previous.value)
     }
 }
@@ -51,7 +51,7 @@ impl RangeFunc for IdeltaFunc {
 mod tests {
     use std::time::Duration;
 
-    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+    use config::meta::promql::value::{Labels, RangeValue, Sample, Samples, TimeWindow};
 
     use super::*;
     // Test helper
@@ -75,19 +75,23 @@ mod tests {
     #[test]
     fn test_idelta_exec_fewer_than_two_samples_returns_none() {
         let func = IdeltaFunc::new();
-        assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
-        let one = vec![Sample::new(1000, 5.0)];
-        assert!(func.exec(&one, 0, &Duration::ZERO).is_none());
+        assert!(
+            func.exec(Samples::default().as_slice(), 0, &Duration::ZERO)
+                .is_none()
+        );
+        let one: Samples = vec![Sample::new(1000, 5.0)].into();
+        assert!(func.exec(one.as_slice(), 0, &Duration::ZERO).is_none());
     }
 
     #[test]
     fn test_idelta_function() {
         // Create a range value with sample data
-        let samples = vec![
+        let samples: Samples = vec![
             Sample::new(1000, 10.0),
             Sample::new(2000, 15.0),
             Sample::new(3000, 25.0),
-        ];
+        ]
+        .into();
 
         let range_value = RangeValue {
             labels: Labels::default(),
@@ -108,8 +112,8 @@ mod tests {
                 assert_eq!(m.len(), 1);
                 assert_eq!(m[0].samples.len(), 1);
                 // Idelta should be 25.0 - 15.0 = 10.0
-                assert!((m[0].samples[0].value - 10.0).abs() < 0.001);
-                assert_eq!(m[0].samples[0].timestamp, 3000);
+                assert!((m[0].samples.get(0).value - 10.0).abs() < 0.001);
+                assert_eq!(m[0].samples.get(0).timestamp, 3000);
             }
             _ => panic!("Expected Matrix result"),
         }

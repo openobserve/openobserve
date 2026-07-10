@@ -16,7 +16,7 @@
 use std::time::Duration;
 
 use config::meta::promql::value::{
-    EvalContext, ExtrapolationKind, Sample, Value, extrapolated_rate,
+    EvalContext, ExtrapolationKind, SamplesRef, Value, extrapolated_rate,
 };
 use datafusion::error::Result;
 
@@ -39,7 +39,7 @@ impl RangeFunc for IncreaseFunc {
         "increase"
     }
 
-    fn exec(&self, samples: &[Sample], eval_ts: i64, range: &Duration) -> Option<f64> {
+    fn exec(&self, samples: SamplesRef<'_>, eval_ts: i64, range: &Duration) -> Option<f64> {
         extrapolated_rate(
             samples,
             eval_ts,
@@ -54,7 +54,7 @@ impl RangeFunc for IncreaseFunc {
 mod tests {
     use std::time::Duration;
 
-    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+    use config::meta::promql::value::{Labels, RangeValue, Sample, Samples, TimeWindow};
 
     use super::*;
     // Test helper
@@ -78,7 +78,7 @@ mod tests {
     #[test]
     fn test_increase_function() {
         // Create a range value with increasing counter values
-        let samples = vec![Sample::new(1000, 10.0)];
+        let samples: Samples = vec![Sample::new(1000, 10.0)].into();
 
         let range_value = RangeValue {
             labels: Labels::default(),

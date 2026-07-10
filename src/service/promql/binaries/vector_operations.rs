@@ -20,7 +20,7 @@ use std::{
 
 use config::meta::promql::{
     NAME_LABEL,
-    value::{Label, LabelsExt, RangeValue, Sample, Value, signature},
+    value::{Label, LabelsExt, RangeValue, Sample, Samples, Value, signature},
 };
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{BinaryExpr, VectorMatchCardinality, token};
@@ -54,7 +54,7 @@ pub async fn vector_scalar_bin_op(
     let output: Vec<RangeValue> = left
         .into_par_iter()
         .flat_map(|mut range| {
-            let new_samples: Vec<Sample> = range
+            let new_samples: Samples = range
                 .samples
                 .into_iter()
                 .flat_map(|sample| {
@@ -290,7 +290,7 @@ fn vector_arithmetic_operators(
                 .collect();
 
             // Apply operation to matching timestamps
-            let new_samples: Vec<Sample> = lhs_range
+            let new_samples: Samples = lhs_range
                 .samples
                 .into_iter()
                 .flat_map(|lhs_sample| {
@@ -423,8 +423,8 @@ mod tests {
     #[test]
     fn test_range_value_creation() {
         let range = create_test_range_value(vec![42.0], vec![("instance", "localhost")]);
-        assert_eq!(range.samples[0].value, 42.0);
-        assert_eq!(range.samples[0].timestamp, 1640995200000000i64);
+        assert_eq!(range.samples.get(0).value, 42.0);
+        assert_eq!(range.samples.get(0).timestamp, 1640995200000000i64);
         assert_eq!(range.labels.len(), 1);
         assert_eq!(range.labels[0].name, "instance");
         assert_eq!(range.labels[0].value, "localhost");
@@ -436,7 +436,7 @@ mod tests {
             vec![100.0],
             vec![("env", "prod"), ("region", "us-west"), ("service", "api")],
         );
-        assert_eq!(range.samples[0].value, 100.0);
+        assert_eq!(range.samples.get(0).value, 100.0);
         assert_eq!(range.labels.len(), 3);
 
         let label_names: Vec<&str> = range.labels.iter().map(|l| l.name.as_str()).collect();
@@ -448,7 +448,7 @@ mod tests {
     #[test]
     fn test_range_value_empty_labels() {
         let range = create_test_range_value(vec![0.0], vec![]);
-        assert_eq!(range.samples[0].value, 0.0);
+        assert_eq!(range.samples.get(0).value, 0.0);
         assert!(range.labels.is_empty());
     }
 
@@ -466,7 +466,11 @@ mod tests {
 
         for (value, description) in test_cases {
             let range = create_test_range_value(vec![value], vec![("test", description)]);
-            assert_eq!(range.samples[0].value, value, "Failed for: {description}");
+            assert_eq!(
+                range.samples.get(0).value,
+                value,
+                "Failed for: {description}"
+            );
         }
     }
 
@@ -476,8 +480,11 @@ mod tests {
         let range2 = create_test_range_value(vec![2.0], vec![("b", "2")]);
 
         // Both should have the same starting timestamp
-        assert_eq!(range1.samples[0].timestamp, range2.samples[0].timestamp);
-        assert_eq!(range1.samples[0].timestamp, 1640995200000000i64);
+        assert_eq!(
+            range1.samples.get(0).timestamp,
+            range2.samples.get(0).timestamp
+        );
+        assert_eq!(range1.samples.get(0).timestamp, 1640995200000000i64);
     }
 
     #[test]
@@ -532,7 +539,7 @@ mod tests {
         // Simulate parallel processing by mapping over the matrix
         let processed: Vec<f64> = matrix
             .par_iter()
-            .map(|range| range.samples[0].value * 2.0)
+            .map(|range| range.samples.get(0).value * 2.0)
             .collect();
 
         assert_eq!(processed.len(), 5);
@@ -553,14 +560,14 @@ mod tests {
             create_test_range_value(vec![f64::MIN], vec![("a", "2")]),
         ];
 
-        assert!(large_matrix[0].samples[0].value.is_finite());
-        assert!(large_matrix[1].samples[0].value.is_finite());
+        assert!(large_matrix[0].samples.get(0).value.is_finite());
+        assert!(large_matrix[1].samples.get(0).value.is_finite());
 
         // Test with NaN values
         let nan_matrix = [create_test_range_value(vec![f64::NAN], vec![("a", "1")])];
 
         // Should handle NaN gracefully
-        assert!(nan_matrix[0].samples[0].value.is_nan());
+        assert!(nan_matrix[0].samples.get(0).value.is_nan());
     }
 
     #[test]
@@ -568,7 +575,7 @@ mod tests {
         // Test RangeValue creation and properties
         let value =
             create_test_range_value(vec![42.0], vec![("label1", "value1"), ("label2", "value2")]);
-        assert_eq!(value.samples[0].value, 42.0);
+        assert_eq!(value.samples.get(0).value, 42.0);
         assert_eq!(value.labels.len(), 2);
         assert_eq!(value.labels[0].name, "label1");
         assert_eq!(value.labels[0].value, "value1");
@@ -580,7 +587,7 @@ mod tests {
     fn test_matrix_operations_timestamp_consistency() {
         let timestamp = 1640995200000000i64;
         let value = create_test_range_value(vec![10.0], vec![("test", "value")]);
-        assert_eq!(value.samples[0].timestamp, timestamp);
+        assert_eq!(value.samples.get(0).timestamp, timestamp);
     }
 
     #[test]
@@ -602,13 +609,13 @@ mod tests {
     fn test_matrix_operations_empty_labels() {
         let value = create_test_range_value(vec![0.0], vec![]);
         assert_eq!(value.labels.len(), 0);
-        assert_eq!(value.samples[0].value, 0.0);
+        assert_eq!(value.samples.get(0).value, 0.0);
     }
 
     #[test]
     fn test_matrix_operations_negative_values() {
         let value = create_test_range_value(vec![-15.5], vec![("negative", "test")]);
-        assert_eq!(value.samples[0].value, -15.5);
+        assert_eq!(value.samples.get(0).value, -15.5);
         assert_eq!(value.labels.len(), 1);
         assert_eq!(value.labels[0].name, "negative");
         assert_eq!(value.labels[0].value, "test");
@@ -617,22 +624,22 @@ mod tests {
     #[test]
     fn test_matrix_operations_large_numbers() {
         let value = create_test_range_value(vec![1e15], vec![("large", "number")]);
-        assert_eq!(value.samples[0].value, 1e15);
+        assert_eq!(value.samples.get(0).value, 1e15);
         assert_eq!(value.labels.len(), 1);
     }
 
     #[test]
     fn test_matrix_operations_special_floats() {
         let value = create_test_range_value(vec![f64::INFINITY], vec![("inf", "test")]);
-        assert!(value.samples[0].value.is_infinite());
-        assert!(value.samples[0].value.is_sign_positive());
+        assert!(value.samples.get(0).value.is_infinite());
+        assert!(value.samples.get(0).value.is_sign_positive());
 
         let value = create_test_range_value(vec![f64::NEG_INFINITY], vec![("neg_inf", "test")]);
-        assert!(value.samples[0].value.is_infinite());
-        assert!(value.samples[0].value.is_sign_negative());
+        assert!(value.samples.get(0).value.is_infinite());
+        assert!(value.samples.get(0).value.is_sign_negative());
 
         let value = create_test_range_value(vec![f64::NAN], vec![("nan", "test")]);
-        assert!(value.samples[0].value.is_nan());
+        assert!(value.samples.get(0).value.is_nan());
     }
 
     #[test]
@@ -676,14 +683,14 @@ mod tests {
     #[test]
     fn test_matrix_operations_edge_case_values() {
         let value = create_test_range_value(vec![f64::EPSILON], vec![("epsilon", "test")]);
-        assert_eq!(value.samples[0].value, f64::EPSILON);
+        assert_eq!(value.samples.get(0).value, f64::EPSILON);
 
         let value =
             create_test_range_value(vec![f64::MIN_POSITIVE], vec![("min_positive", "test")]);
-        assert_eq!(value.samples[0].value, f64::MIN_POSITIVE);
+        assert_eq!(value.samples.get(0).value, f64::MIN_POSITIVE);
 
         let value = create_test_range_value(vec![f64::MAX], vec![("max", "test")]);
-        assert_eq!(value.samples[0].value, f64::MAX);
+        assert_eq!(value.samples.get(0).value, f64::MAX);
     }
 
     #[test]
@@ -692,17 +699,17 @@ mod tests {
         assert_eq!(matrix_data.len(), 3);
 
         // Test first element
-        assert_eq!(matrix_data[0].samples[0].value, 1.0);
+        assert_eq!(matrix_data[0].samples.get(0).value, 1.0);
         assert_eq!(matrix_data[0].labels.len(), 2);
         assert_eq!(matrix_data[0].labels[0].name, "instance");
         assert_eq!(matrix_data[0].labels[0].value, "localhost");
 
         // Test second element
-        assert_eq!(matrix_data[1].samples[0].value, 2.0);
+        assert_eq!(matrix_data[1].samples.get(0).value, 2.0);
         assert_eq!(matrix_data[1].labels.len(), 2);
 
         // Test third element
-        assert_eq!(matrix_data[2].samples[0].value, 3.0);
+        assert_eq!(matrix_data[2].samples.get(0).value, 3.0);
         assert_eq!(matrix_data[2].labels.len(), 2);
         assert_eq!(matrix_data[2].labels[0].name, "instance");
         assert_eq!(matrix_data[2].labels[0].value, "remote");
@@ -742,7 +749,7 @@ mod tests {
             vec![("single", "test")],
         )];
         assert_eq!(single_element.len(), 1);
-        assert_eq!(single_element[0].samples[0].value, 42.0);
+        assert_eq!(single_element[0].samples.get(0).value, 42.0);
         assert_eq!(single_element[0].labels.len(), 1);
         assert_eq!(single_element[0].labels[0].name, "single");
         assert_eq!(single_element[0].labels[0].value, "test");
@@ -754,15 +761,15 @@ mod tests {
         let value =
             create_test_range_value(vec![1.0, 2.0, 3.0, 4.0, 5.0], vec![("metric", "test")]);
         assert_eq!(value.samples.len(), 5);
-        assert_eq!(value.samples[0].value, 1.0);
-        assert_eq!(value.samples[1].value, 2.0);
-        assert_eq!(value.samples[2].value, 3.0);
-        assert_eq!(value.samples[3].value, 4.0);
-        assert_eq!(value.samples[4].value, 5.0);
+        assert_eq!(value.samples.get(0).value, 1.0);
+        assert_eq!(value.samples.get(1).value, 2.0);
+        assert_eq!(value.samples.get(2).value, 3.0);
+        assert_eq!(value.samples.get(3).value, 4.0);
+        assert_eq!(value.samples.get(4).value, 5.0);
 
         // Check timestamps are incrementing
         for i in 1..value.samples.len() {
-            assert!(value.samples[i].timestamp > value.samples[i - 1].timestamp);
+            assert!(value.samples.get(i).timestamp > value.samples.get(i - 1).timestamp);
         }
     }
 }

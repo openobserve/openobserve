@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
+use config::meta::promql::value::{EvalContext, SamplesRef, Value};
 use datafusion::error::Result;
 
 use crate::service::promql::{common::calculate_trend, functions::RangeFunc};
@@ -53,13 +53,13 @@ impl RangeFunc for HoltWintersFunc {
         "holt_winters"
     }
 
-    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+    fn exec(&self, samples: SamplesRef<'_>, _eval_ts: i64, _range: &Duration) -> Option<f64> {
         holt_winters_calculation(samples, self.scaling_factor, self.trend_factor)
     }
 }
 
 pub fn holt_winters_calculation(
-    samples: &[Sample],
+    samples: SamplesRef<'_>,
     smoothing_factor: f64,
     trend_factor: f64,
 ) -> Option<f64> {
@@ -68,11 +68,11 @@ pub fn holt_winters_calculation(
     }
 
     let mut previous_smoothed = 0.0;
-    let mut current_smoothed = samples[0].value;
-    let mut trend = samples[1].value - samples[0].value;
+    let mut current_smoothed = samples.values[0];
+    let mut trend = samples.values[1] - samples.values[0];
 
-    for (i, sample) in samples[1..].iter().enumerate() {
-        let scaled_value = smoothing_factor * sample.value;
+    for (i, &value) in samples.values[1..].iter().enumerate() {
+        let scaled_value = smoothing_factor * value;
         trend = calculate_trend(
             i as i64,
             trend_factor,
@@ -92,7 +92,7 @@ pub fn holt_winters_calculation(
 mod tests {
     use std::time::Duration;
 
-    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+    use config::meta::promql::value::{Labels, RangeValue, Sample, Samples, TimeWindow};
 
     use super::*;
 
@@ -120,19 +120,20 @@ mod tests {
 
     #[test]
     fn test_holt_winters_calculation_fewer_than_two_samples() {
-        assert!(holt_winters_calculation(&[], 0.5, 0.3).is_none());
-        let one = vec![Sample::new(1000, 10.0)];
-        assert!(holt_winters_calculation(&one, 0.5, 0.3).is_none());
+        assert!(holt_winters_calculation(Samples::default().as_slice(), 0.5, 0.3).is_none());
+        let one: Samples = vec![Sample::new(1000, 10.0)].into();
+        assert!(holt_winters_calculation(one.as_slice(), 0.5, 0.3).is_none());
     }
 
     #[test]
     fn test_holt_winters_function() {
         // Create a range value with sample data
-        let samples = vec![
+        let samples: Samples = vec![
             Sample::new(1000, 10.0),
             Sample::new(2000, 15.0),
             Sample::new(3000, 20.0),
-        ];
+        ]
+        .into();
 
         let range_value = RangeValue {
             labels: Labels::default(),
@@ -153,8 +154,8 @@ mod tests {
                 assert_eq!(m.len(), 1);
                 assert_eq!(m[0].samples.len(), 1);
                 // Should return a forecasted value
-                assert!(m[0].samples[0].value.is_finite());
-                assert_eq!(m[0].samples[0].timestamp, 3000);
+                assert!(m[0].samples.get(0).value.is_finite());
+                assert_eq!(m[0].samples.get(0).timestamp, 3000);
             }
             _ => panic!("Expected Matrix result"),
         }

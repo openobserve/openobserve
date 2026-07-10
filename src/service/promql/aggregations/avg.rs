@@ -146,19 +146,19 @@ mod tests {
         let data = Value::Matrix(vec![
             RangeValue {
                 labels: labels1.clone(),
-                samples: vec![Sample::new(timestamp, 10.0)],
+                samples: vec![Sample::new(timestamp, 10.0)].into(),
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels1.clone(),
-                samples: vec![Sample::new(timestamp, 20.0)],
+                samples: vec![Sample::new(timestamp, 20.0)].into(),
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels2.clone(),
-                samples: vec![Sample::new(timestamp, 30.0)],
+                samples: vec![Sample::new(timestamp, 30.0)].into(),
                 exemplars: None,
                 time_window: None,
             },
@@ -174,8 +174,8 @@ mod tests {
                 assert_eq!(matrix.len(), 1);
                 let series = &matrix[0];
                 // All samples are grouped together when no label modifier is provided
-                assert_eq!(series.samples[0].value, 20.0); // (10 + 20 + 30) / 3
-                assert_eq!(series.samples[0].timestamp, timestamp);
+                assert_eq!(series.samples.get(0).value, 20.0); // (10 + 20 + 30) / 3
+                assert_eq!(series.samples.get(0).timestamp, timestamp);
                 // Should have empty labels since all samples are grouped together
                 assert!(series.labels.is_empty());
             }

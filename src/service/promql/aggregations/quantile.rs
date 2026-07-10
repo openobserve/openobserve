@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::{EvalContext, RangeValue, Sample, Value};
+use config::meta::promql::value::{EvalContext, RangeValue, Sample, Samples, Value};
 use datafusion::error::Result;
 use hashbrown::HashMap;
 
@@ -38,7 +38,7 @@ pub fn quantile(qtile: f64, data: Value, eval_ctx: &EvalContext) -> Result<Value
             _ => f64::NAN,
         };
         let timestamps = eval_ctx.timestamps();
-        let samples: Vec<Sample> = timestamps
+        let samples: Samples = timestamps
             .iter()
             .map(|&ts| Sample::new(ts, value))
             .collect();
@@ -149,8 +149,8 @@ mod tests {
         match result {
             Value::Matrix(m) => {
                 assert_eq!(m.len(), 1);
-                assert!(m[0].samples[0].value.is_infinite());
-                assert!(m[0].samples[0].value > 0.0);
+                assert!(m[0].samples.get(0).value.is_infinite());
+                assert!(m[0].samples.get(0).value > 0.0);
             }
             _ => panic!("Expected Matrix"),
         }
@@ -164,8 +164,8 @@ mod tests {
         match result {
             Value::Matrix(m) => {
                 assert_eq!(m.len(), 1);
-                assert!(m[0].samples[0].value.is_infinite());
-                assert!(m[0].samples[0].value < 0.0);
+                assert!(m[0].samples.get(0).value.is_infinite());
+                assert!(m[0].samples.get(0).value < 0.0);
             }
             _ => panic!("Expected Matrix"),
         }
@@ -179,7 +179,7 @@ mod tests {
         match result {
             Value::Matrix(m) => {
                 assert_eq!(m.len(), 1);
-                assert!(m[0].samples[0].value.is_nan());
+                assert!(m[0].samples.get(0).value.is_nan());
             }
             _ => panic!("Expected Matrix"),
         }

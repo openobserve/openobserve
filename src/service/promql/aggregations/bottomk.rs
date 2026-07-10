@@ -110,19 +110,19 @@ mod tests {
         let data = Value::Matrix(vec![
             RangeValue {
                 labels: labels1.clone(),
-                samples: vec![Sample::new(timestamp, 15.3)], // Highest value
+                samples: vec![Sample::new(timestamp, 15.3)].into(), // Highest value
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels2.clone(),
-                samples: vec![Sample::new(timestamp, 8.2)], // Lowest value
+                samples: vec![Sample::new(timestamp, 8.2)].into(), // Lowest value
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels3.clone(),
-                samples: vec![Sample::new(timestamp, 12.1)], // Middle value
+                samples: vec![Sample::new(timestamp, 12.1)].into(), // Middle value
                 exemplars: None,
                 time_window: None,
             },
@@ -137,14 +137,14 @@ mod tests {
             Value::Matrix(matrix) => {
                 assert_eq!(matrix.len(), 2);
                 // Should return the 2 lowest values: 8.2 and 12.1
-                let mut values: Vec<f64> = matrix.iter().map(|s| s.samples[0].value).collect();
+                let mut values: Vec<f64> = matrix.iter().map(|s| s.samples.get(0).value).collect();
                 values.sort_by(|a, b| a.partial_cmp(b).unwrap()); // Sort ascending
                 assert_eq!(values[0], 8.2); // Lowest
                 assert_eq!(values[1], 12.1); // Second lowest
 
                 // All samples should have the same timestamp
                 for series in &matrix {
-                    assert_eq!(series.samples[0].timestamp, timestamp);
+                    assert_eq!(series.samples.get(0).timestamp, timestamp);
                 }
             }
             _ => panic!("Expected Matrix result"),
@@ -179,7 +179,7 @@ mod tests {
 
         let data = Value::Matrix(vec![RangeValue {
             labels: labels.clone(),
-            samples: vec![Sample::new(timestamp, 10.5)],
+            samples: vec![Sample::new(timestamp, 10.5)].into(),
             exemplars: None,
             time_window: None,
         }]);

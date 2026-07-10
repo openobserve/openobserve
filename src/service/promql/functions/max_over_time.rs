@@ -16,7 +16,7 @@
 use std::time::Duration;
 
 use config::{
-    meta::promql::value::{EvalContext, Sample, Value},
+    meta::promql::value::{EvalContext, SamplesRef, Value},
     utils::sort::sort_float,
 };
 use datafusion::error::Result;
@@ -40,7 +40,7 @@ impl RangeFunc for MaxOverTimeFunc {
         "max_over_time"
     }
 
-    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+    fn exec(&self, samples: SamplesRef<'_>, _eval_ts: i64, _range: &Duration) -> Option<f64> {
         if samples.is_empty() {
             return None;
         }
@@ -52,7 +52,9 @@ impl RangeFunc for MaxOverTimeFunc {
 mod tests {
     use std::time::Duration;
 
-    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+    use config::meta::promql::value::{
+        Labels, RangeValue, Sample, Samples, SamplesRef, TimeWindow,
+    };
 
     use super::*;
     // Test helper
@@ -76,17 +78,21 @@ mod tests {
     #[test]
     fn test_max_over_time_exec_empty_samples_returns_none() {
         let func = MaxOverTimeFunc::new();
-        assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
+        assert!(
+            func.exec(Samples::default().as_slice(), 0, &Duration::ZERO)
+                .is_none()
+        );
     }
 
     #[test]
     fn test_max_over_time_function() {
         // Create a range value with sample data
-        let samples = vec![
+        let samples: Samples = vec![
             Sample::new(1000, 10.0),
             Sample::new(2000, 30.0),
             Sample::new(3000, 20.0),
-        ];
+        ]
+        .into();
 
         let range_value = RangeValue {
             labels: Labels::default(),
@@ -107,8 +113,8 @@ mod tests {
                 assert_eq!(m.len(), 1);
                 assert_eq!(m[0].samples.len(), 1);
                 // Should return the max value: 30.0
-                assert!((m[0].samples[0].value - 30.0).abs() < 0.001);
-                assert_eq!(m[0].samples[0].timestamp, 3000);
+                assert!((m[0].samples.get(0).value - 30.0).abs() < 0.001);
+                assert_eq!(m[0].samples.get(0).timestamp, 3000);
             }
             _ => panic!("Expected Matrix result"),
         }

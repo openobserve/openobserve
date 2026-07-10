@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
+use config::meta::promql::value::{EvalContext, SamplesRef, Value};
 use datafusion::error::Result;
 
 use crate::service::promql::{common::std_deviation, functions::RangeFunc};
@@ -38,7 +38,7 @@ impl RangeFunc for StddevOverTimeFunc {
         "stddev_over_time"
     }
 
-    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+    fn exec(&self, samples: SamplesRef<'_>, _eval_ts: i64, _range: &Duration) -> Option<f64> {
         if samples.is_empty() {
             return None;
         }
@@ -49,9 +49,11 @@ impl RangeFunc for StddevOverTimeFunc {
 
 #[cfg(test)]
 mod tests {
+    use config::meta::promql::value::{Sample, Samples};
+
     use super::*;
 
-    fn make_samples(values: &[f64]) -> Vec<Sample> {
+    fn make_samples(values: &[f64]) -> Samples {
         values
             .iter()
             .enumerate()
@@ -70,14 +72,20 @@ mod tests {
     #[test]
     fn test_stddev_over_time_empty() {
         let func = StddevOverTimeFunc::new();
-        assert!(func.exec(&[], 0, &Duration::from_secs(1)).is_none());
+        assert!(
+            func.exec(Samples::default().as_slice(), 0, &Duration::from_secs(1))
+                .is_none()
+        );
     }
 
     #[test]
     fn test_stddev_over_time_constant() {
         let func = StddevOverTimeFunc::new();
         let samples = make_samples(&[3.0, 3.0, 3.0]);
-        assert_eq!(func.exec(&samples, 0, &Duration::from_secs(1)), Some(0.0));
+        assert_eq!(
+            func.exec(samples.as_slice(), 0, &Duration::from_secs(1)),
+            Some(0.0)
+        );
     }
 
     #[test]
@@ -85,7 +93,9 @@ mod tests {
         let func = StddevOverTimeFunc::new();
         // [1,2,3]: mean=2, variance=2/3, stddev=sqrt(2/3)
         let samples = make_samples(&[1.0, 2.0, 3.0]);
-        let result = func.exec(&samples, 0, &Duration::from_secs(1)).unwrap();
+        let result = func
+            .exec(samples.as_slice(), 0, &Duration::from_secs(1))
+            .unwrap();
         assert!((result - (2.0_f64 / 3.0_f64).sqrt()).abs() < 1e-10);
     }
 }

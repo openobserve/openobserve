@@ -98,7 +98,7 @@ mod tests {
 
         let range_value1 = RangeValue {
             labels: labels1,
-            samples: vec![Sample::new(eval_ts, 42.0)],
+            samples: vec![Sample::new(eval_ts, 42.0)].into(),
             exemplars: None,
             time_window: None,
         };
@@ -110,7 +110,7 @@ mod tests {
 
         let range_value2 = RangeValue {
             labels: labels2,
-            samples: vec![Sample::new(eval_ts, 43.0)],
+            samples: vec![Sample::new(eval_ts, 43.0)].into(),
             exemplars: None,
             time_window: None,
         };
@@ -131,8 +131,8 @@ mod tests {
                 assert_eq!(combined_label1.unwrap().value, "server1-web");
                 assert_eq!(combined_label2.unwrap().value, "server2-web");
                 // Verify samples are preserved
-                assert_eq!(m[0].samples[0].value, 42.0);
-                assert_eq!(m[1].samples[0].value, 43.0);
+                assert_eq!(m[0].samples.get(0).value, 42.0);
+                assert_eq!(m[1].samples.get(0).value, 43.0);
             }
             _ => panic!("Expected Matrix result"),
         }

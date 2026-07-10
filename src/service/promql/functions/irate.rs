@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
+use config::meta::promql::value::{EvalContext, SamplesRef, Value};
 use datafusion::error::Result;
 
 use crate::service::promql::functions::RangeFunc;
@@ -37,12 +37,12 @@ impl RangeFunc for IrateFunc {
         "irate"
     }
 
-    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+    fn exec(&self, samples: SamplesRef<'_>, _eval_ts: i64, _range: &Duration) -> Option<f64> {
         if samples.len() < 2 {
             return None;
         }
         let last = samples.last().unwrap();
-        let previous = samples.get(samples.len() - 2).unwrap();
+        let previous = samples.get(samples.len() - 2);
         let dt_seconds = (last.timestamp - previous.timestamp) as f64 / 1_000_000.0;
         if dt_seconds == 0.0 {
             return Some(0.0);
@@ -60,7 +60,7 @@ impl RangeFunc for IrateFunc {
 mod tests {
     use std::time::Duration;
 
-    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+    use config::meta::promql::value::{Labels, RangeValue, Sample, Samples, TimeWindow};
 
     use super::*;
 
@@ -85,11 +85,12 @@ mod tests {
     #[test]
     fn test_irate_function() {
         // Create a range value with increasing counter values
-        let samples = vec![
+        let samples: Samples = vec![
             Sample::new(1000, 10.0),
             Sample::new(2000, 20.0),
             Sample::new(3000, 30.0),
-        ];
+        ]
+        .into();
 
         let range_value = RangeValue {
             labels: Labels::default(),
@@ -110,8 +111,8 @@ mod tests {
                 assert_eq!(m.len(), 1);
                 assert_eq!(m[0].samples.len(), 1);
                 // Irate should be positive for increasing counter
-                assert!(m[0].samples[0].value > 0.0);
-                assert_eq!(m[0].samples[0].timestamp, 3000);
+                assert!(m[0].samples.get(0).value > 0.0);
+                assert_eq!(m[0].samples.get(0).timestamp, 3000);
             }
             _ => panic!("Expected Matrix result"),
         }
@@ -120,18 +121,25 @@ mod tests {
     #[test]
     fn test_irate_exec_less_than_two_samples_returns_none() {
         let func = IrateFunc::new();
-        assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
         assert!(
-            func.exec(&[Sample::new(1000, 5.0)], 1000, &Duration::ZERO)
+            func.exec(Samples::default().as_slice(), 0, &Duration::ZERO)
                 .is_none()
+        );
+        assert!(
+            func.exec(
+                Samples::from(vec![Sample::new(1000, 5.0)]).as_slice(),
+                1000,
+                &Duration::ZERO
+            )
+            .is_none()
         );
     }
 
     #[test]
     fn test_irate_exec_same_timestamp_returns_zero() {
         let func = IrateFunc::new();
-        let samples = vec![Sample::new(1000, 10.0), Sample::new(1000, 20.0)];
-        let result = func.exec(&samples, 1000, &Duration::ZERO);
+        let samples: Samples = vec![Sample::new(1000, 10.0), Sample::new(1000, 20.0)].into();
+        let result = func.exec(samples.as_slice(), 1000, &Duration::ZERO);
         assert_eq!(result, Some(0.0));
     }
 
@@ -141,8 +149,9 @@ mod tests {
         // Counter reset: last.value < previous.value
         // dt = (2000 - 1000) / 1_000_000 = 0.001s
         // expected: last.value / dt = 5.0 / 0.001 = 5000.0
-        let samples = vec![Sample::new(1_000_000, 100.0), Sample::new(2_000_000, 5.0)];
-        let result = func.exec(&samples, 2_000_000, &Duration::ZERO);
+        let samples: Samples =
+            vec![Sample::new(1_000_000, 100.0), Sample::new(2_000_000, 5.0)].into();
+        let result = func.exec(samples.as_slice(), 2_000_000, &Duration::ZERO);
         assert!(result.is_some());
         let rate = result.unwrap();
         assert!((rate - 5.0).abs() < 1e-9); // 5.0 / 1.0s = 5.0

@@ -257,7 +257,7 @@ where
                     for sample in &matrix[series_idx].samples {
                         // Only include timestamps that are in eval_timestamps
                         if eval_timestamps.contains(&sample.timestamp) {
-                            acc.accumulate(sample);
+                            acc.accumulate(&sample);
                         }
                     }
                 }
@@ -290,7 +290,7 @@ where
 
             RangeValue {
                 labels,
-                samples,
+                samples: samples.into_iter().collect(),
                 exemplars: None,
                 time_window: None,
             }
@@ -422,7 +422,7 @@ mod tests {
         let matrix = vec![
             RangeValue {
                 labels: labels1,
-                samples: vec![Sample::new(1000, 1.0)],
+                samples: vec![Sample::new(1000, 1.0)].into(),
                 exemplars: None,
                 time_window: Some(TimeWindow {
                     range: Duration::from_secs(1),
@@ -431,7 +431,7 @@ mod tests {
             },
             RangeValue {
                 labels: labels2,
-                samples: vec![Sample::new(1000, 2.0)],
+                samples: vec![Sample::new(1000, 2.0)].into(),
                 exemplars: None,
                 time_window: Some(TimeWindow {
                     range: Duration::from_secs(1),
@@ -465,7 +465,7 @@ mod tests {
         let matrix = vec![
             RangeValue {
                 labels: labels_a,
-                samples: vec![Sample::new(1000, 1.0)],
+                samples: vec![Sample::new(1000, 1.0)].into(),
                 exemplars: None,
                 time_window: Some(TimeWindow {
                     range: Duration::from_secs(1),
@@ -474,7 +474,7 @@ mod tests {
             },
             RangeValue {
                 labels: labels_b,
-                samples: vec![Sample::new(1000, 2.0)],
+                samples: vec![Sample::new(1000, 2.0)].into(),
                 exemplars: None,
                 time_window: Some(TimeWindow {
                     range: Duration::from_secs(1),

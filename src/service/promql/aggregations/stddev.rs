@@ -150,19 +150,19 @@ mod tests {
         let data = Value::Matrix(vec![
             RangeValue {
                 labels: labels1.clone(),
-                samples: vec![Sample::new(timestamp, 10.0)],
+                samples: vec![Sample::new(timestamp, 10.0)].into(),
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels1.clone(),
-                samples: vec![Sample::new(timestamp, 20.0)],
+                samples: vec![Sample::new(timestamp, 20.0)].into(),
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels2.clone(),
-                samples: vec![Sample::new(timestamp, 30.0)],
+                samples: vec![Sample::new(timestamp, 30.0)].into(),
                 exemplars: None,
                 time_window: None,
             },
@@ -179,8 +179,8 @@ mod tests {
                 let series = &matrix[0];
                 // All samples are grouped together when no label modifier is provided
                 // Standard deviation of [10.0, 20.0, 30.0] should be approximately 8.165
-                assert!((series.samples[0].value - 8.165).abs() < 0.01);
-                assert_eq!(series.samples[0].timestamp, timestamp);
+                assert!((series.samples.get(0).value - 8.165).abs() < 0.01);
+                assert_eq!(series.samples.get(0).timestamp, timestamp);
                 // Should have empty labels since all samples are grouped together
                 assert!(series.labels.is_empty());
             }

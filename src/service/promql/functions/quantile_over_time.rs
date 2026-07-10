@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
+use config::meta::promql::value::{EvalContext, SamplesRef, Value};
 use datafusion::error::Result;
 
 use crate::service::promql::{common::quantile, functions::RangeFunc};
@@ -44,7 +44,7 @@ impl RangeFunc for QuantileOverTimeFunc {
         "quantile_over_time"
     }
 
-    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+    fn exec(&self, samples: SamplesRef<'_>, _eval_ts: i64, _range: &Duration) -> Option<f64> {
         let input: Vec<f64> = samples.iter().map(|x| x.value).collect();
         quantile(&input, self.phi_quantile)
     }
@@ -52,9 +52,11 @@ impl RangeFunc for QuantileOverTimeFunc {
 
 #[cfg(test)]
 mod tests {
+    use config::meta::promql::value::{Sample, Samples};
+
     use super::*;
 
-    fn make_samples(values: &[f64]) -> Vec<Sample> {
+    fn make_samples(values: &[f64]) -> Samples {
         values
             .iter()
             .enumerate()
@@ -73,27 +75,39 @@ mod tests {
     #[test]
     fn test_quantile_over_time_empty() {
         let func = QuantileOverTimeFunc::new(0.5);
-        assert!(func.exec(&[], 0, &Duration::from_secs(1)).is_none());
+        assert!(
+            func.exec(Samples::default().as_slice(), 0, &Duration::from_secs(1))
+                .is_none()
+        );
     }
 
     #[test]
     fn test_quantile_over_time_median() {
         let func = QuantileOverTimeFunc::new(0.5);
         let samples = make_samples(&[1.0, 2.0, 3.0]);
-        assert_eq!(func.exec(&samples, 0, &Duration::from_secs(1)), Some(2.0));
+        assert_eq!(
+            func.exec(samples.as_slice(), 0, &Duration::from_secs(1)),
+            Some(2.0)
+        );
     }
 
     #[test]
     fn test_quantile_over_time_min() {
         let func = QuantileOverTimeFunc::new(0.0);
         let samples = make_samples(&[3.0, 1.0, 2.0]);
-        assert_eq!(func.exec(&samples, 0, &Duration::from_secs(1)), Some(1.0));
+        assert_eq!(
+            func.exec(samples.as_slice(), 0, &Duration::from_secs(1)),
+            Some(1.0)
+        );
     }
 
     #[test]
     fn test_quantile_over_time_max() {
         let func = QuantileOverTimeFunc::new(1.0);
         let samples = make_samples(&[3.0, 1.0, 2.0]);
-        assert_eq!(func.exec(&samples, 0, &Duration::from_secs(1)), Some(3.0));
+        assert_eq!(
+            func.exec(samples.as_slice(), 0, &Duration::from_secs(1)),
+            Some(3.0)
+        );
     }
 }

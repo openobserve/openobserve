@@ -104,7 +104,7 @@ mod tests {
 
         let range_value = RangeValue {
             labels,
-            samples: vec![Sample::new(eval_ts, 42.0)],
+            samples: vec![Sample::new(eval_ts, 42.0)].into(),
             exemplars: None,
             time_window: None,
         };
@@ -128,7 +128,7 @@ mod tests {
                 assert!(hostname_label.is_some());
                 assert_eq!(hostname_label.unwrap().value, "123");
                 // Verify samples are preserved
-                assert_eq!(m[0].samples[0].value, 42.0);
+                assert_eq!(m[0].samples.get(0).value, 42.0);
             }
             _ => panic!("Expected Matrix result"),
         }
@@ -144,7 +144,7 @@ mod tests {
         ];
         let range_value = RangeValue {
             labels,
-            samples: vec![Sample::new(1000, 1.0)],
+            samples: vec![Sample::new(1000, 1.0)].into(),
             exemplars: None,
             time_window: None,
         };
@@ -168,7 +168,7 @@ mod tests {
         let labels = vec![Arc::new(Label::new("instance", "prod-server"))];
         let range_value = RangeValue {
             labels,
-            samples: vec![Sample::new(1000, 1.0)],
+            samples: vec![Sample::new(1000, 1.0)].into(),
             exemplars: None,
             time_window: None,
         };

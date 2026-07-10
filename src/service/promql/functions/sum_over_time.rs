@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
+use config::meta::promql::value::{EvalContext, SamplesRef, Value};
 use datafusion::error::Result;
 
 use crate::service::promql::functions::RangeFunc;
@@ -37,7 +37,7 @@ impl RangeFunc for SumOverTimeFunc {
         "sum_over_time"
     }
 
-    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+    fn exec(&self, samples: SamplesRef<'_>, _eval_ts: i64, _range: &Duration) -> Option<f64> {
         if samples.is_empty() {
             return None;
         }
@@ -47,9 +47,11 @@ impl RangeFunc for SumOverTimeFunc {
 
 #[cfg(test)]
 mod tests {
+    use config::meta::promql::value::{Sample, Samples};
+
     use super::*;
 
-    fn make_samples(values: &[f64]) -> Vec<Sample> {
+    fn make_samples(values: &[f64]) -> Samples {
         values
             .iter()
             .enumerate()
@@ -68,20 +70,29 @@ mod tests {
     #[test]
     fn test_sum_over_time_empty() {
         let func = SumOverTimeFunc::new();
-        assert!(func.exec(&[], 0, &Duration::from_secs(1)).is_none());
+        assert!(
+            func.exec(Samples::default().as_slice(), 0, &Duration::from_secs(1))
+                .is_none()
+        );
     }
 
     #[test]
     fn test_sum_over_time_single() {
         let func = SumOverTimeFunc::new();
         let samples = make_samples(&[5.0]);
-        assert_eq!(func.exec(&samples, 0, &Duration::from_secs(1)), Some(5.0));
+        assert_eq!(
+            func.exec(samples.as_slice(), 0, &Duration::from_secs(1)),
+            Some(5.0)
+        );
     }
 
     #[test]
     fn test_sum_over_time_multiple() {
         let func = SumOverTimeFunc::new();
         let samples = make_samples(&[1.0, 2.0, 3.0]);
-        assert_eq!(func.exec(&samples, 0, &Duration::from_secs(1)), Some(6.0));
+        assert_eq!(
+            func.exec(samples.as_slice(), 0, &Duration::from_secs(1)),
+            Some(6.0)
+        );
     }
 }

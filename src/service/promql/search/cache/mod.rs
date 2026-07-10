@@ -284,7 +284,7 @@ pub async fn set(
             let value_n = series.samples.len();
             let mut last_i = value_n;
             for i in (0..last_i).rev() {
-                if series.samples[i].timestamp < max_ts {
+                if series.samples.timestamps[i] < max_ts {
                     last_i = i;
                     break;
                 }
@@ -297,7 +297,7 @@ pub async fn set(
             } else {
                 // last_i is the last item not in retention time, so we need to drain the samples
                 // after last_i
-                series.samples.drain(last_i + 1..);
+                series.samples.truncate(last_i + 1);
             }
 
             // check exemplars
@@ -508,7 +508,7 @@ impl MetricsIndexCacheItem {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::promql::value::{Labels, Sample};
+    use config::meta::promql::value::{Labels, Sample, Samples};
 
     use super::*;
     use crate::service::promql::adjust_start_end;
@@ -547,7 +547,7 @@ mod tests {
         // Create test samples
         let mut range_values = vec![RangeValue {
             labels: Labels::new(),
-            samples: vec![],
+            samples: Samples::default(),
             exemplars: None,
             time_window: None,
         }];
@@ -578,7 +578,7 @@ mod tests {
             assert!(!cached_range_values.is_empty());
             assert_eq!(
                 cached_range_values[0].samples[0].value,
-                expected_value.samples[0].value
+                expected_value.samples.get(0).value
             );
             assert_eq!(new_start, valid_max_ts + step);
         } else {
@@ -604,7 +604,8 @@ mod tests {
                 samples: vec![Sample {
                     timestamp: start,
                     value: i as f64,
-                }],
+                }]
+                .into(),
                 exemplars: None,
                 time_window: None,
             }];
@@ -707,7 +708,8 @@ mod tests {
             samples: vec![Sample {
                 timestamp: start,
                 value: 42.0,
-            }],
+            }]
+            .into(),
             exemplars: None,
             time_window: None,
         }];

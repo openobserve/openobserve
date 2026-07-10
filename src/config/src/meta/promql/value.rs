@@ -238,6 +238,222 @@ impl Sample {
     }
 }
 
+/// Per-series samples in structure-of-arrays layout: parallel
+/// timestamp/value columns instead of an array of (timestamp, value)
+/// structs, so timestamp-only operations (window binary search, eval-set
+/// filtering) and value-only operations (aggregation, rate math) each touch
+/// half the memory. `Sample` remains the item type — it is `Copy`, so
+/// iteration materializes it on the fly for free.
+#[derive(Debug, Default, Clone)]
+pub struct Samples {
+    pub timestamps: Vec<i64>,
+    pub values: Vec<f64>,
+}
+
+impl Samples {
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            timestamps: Vec::with_capacity(capacity),
+            values: Vec::with_capacity(capacity),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.timestamps.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.timestamps.is_empty()
+    }
+
+    pub fn push(&mut self, sample: Sample) {
+        self.timestamps.push(sample.timestamp);
+        self.values.push(sample.value);
+    }
+
+    pub fn get(&self, index: usize) -> Sample {
+        Sample::new(self.timestamps[index], self.values[index])
+    }
+
+    pub fn first(&self) -> Option<Sample> {
+        (!self.is_empty()).then(|| self.get(0))
+    }
+
+    pub fn last(&self) -> Option<Sample> {
+        (!self.is_empty()).then(|| self.get(self.len() - 1))
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = Sample> + '_ {
+        self.timestamps
+            .iter()
+            .zip(self.values.iter())
+            .map(|(&timestamp, &value)| Sample { timestamp, value })
+    }
+
+    pub fn as_slice(&self) -> SamplesRef<'_> {
+        SamplesRef {
+            timestamps: &self.timestamps,
+            values: &self.values,
+        }
+    }
+
+    pub fn slice(&self, start: usize, end: usize) -> SamplesRef<'_> {
+        SamplesRef {
+            timestamps: &self.timestamps[start..end],
+            values: &self.values[start..end],
+        }
+    }
+
+    pub fn extend(&mut self, other: Samples) {
+        self.timestamps.extend(other.timestamps);
+        self.values.extend(other.values);
+    }
+
+    /// Sorts both columns by timestamp. Data loaded from a single scan
+    /// partition is usually already ordered, so check first.
+    pub fn sort_by_timestamp(&mut self) {
+        if self.timestamps.is_sorted() {
+            return;
+        }
+        let mut indices: Vec<u32> = (0..self.len() as u32).collect();
+        indices.sort_unstable_by_key(|&i| self.timestamps[i as usize]);
+        self.timestamps = indices
+            .iter()
+            .map(|&i| self.timestamps[i as usize])
+            .collect();
+        self.values = indices.iter().map(|&i| self.values[i as usize]).collect();
+    }
+
+    /// Shortens both columns to `len` samples.
+    pub fn truncate(&mut self, len: usize) {
+        self.timestamps.truncate(len);
+        self.values.truncate(len);
+    }
+
+    /// Index of the first sample for which `pred` returns false, assuming
+    /// the samples are partitioned by it (same contract as
+    /// [`slice::partition_point`]).
+    pub fn partition_point<P: FnMut(&Sample) -> bool>(&self, mut pred: P) -> usize {
+        let mut left = 0;
+        let mut right = self.len();
+        while left < right {
+            let mid = left + (right - left) / 2;
+            if pred(&self.get(mid)) {
+                left = mid + 1;
+            } else {
+                right = mid;
+            }
+        }
+        left
+    }
+}
+
+impl From<Vec<Sample>> for Samples {
+    fn from(samples: Vec<Sample>) -> Self {
+        samples.into_iter().collect()
+    }
+}
+
+impl FromIterator<Sample> for Samples {
+    fn from_iter<T: IntoIterator<Item = Sample>>(iter: T) -> Self {
+        let iter = iter.into_iter();
+        let mut samples = Samples::with_capacity(iter.size_hint().0);
+        for sample in iter {
+            samples.push(sample);
+        }
+        samples
+    }
+}
+
+impl IntoIterator for Samples {
+    type Item = Sample;
+    type IntoIter = std::iter::Map<
+        std::iter::Zip<std::vec::IntoIter<i64>, std::vec::IntoIter<f64>>,
+        fn((i64, f64)) -> Sample,
+    >;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.timestamps
+            .into_iter()
+            .zip(self.values)
+            .map(|(timestamp, value)| Sample { timestamp, value })
+    }
+}
+
+impl<'a> IntoIterator for &'a Samples {
+    type Item = Sample;
+    type IntoIter = std::iter::Map<
+        std::iter::Zip<std::slice::Iter<'a, i64>, std::slice::Iter<'a, f64>>,
+        fn((&'a i64, &'a f64)) -> Sample,
+    >;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.timestamps
+            .iter()
+            .zip(self.values.iter())
+            .map(|(&timestamp, &value)| Sample { timestamp, value })
+    }
+}
+
+impl Serialize for Samples {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(self.len()))?;
+        for sample in self.iter() {
+            seq.serialize_element(&sample)?;
+        }
+        seq.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for Samples {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let samples = Vec::<Sample>::deserialize(deserializer)?;
+        Ok(samples.into_iter().collect())
+    }
+}
+
+/// Borrowed view over a contiguous range of [`Samples`].
+#[derive(Debug, Clone, Copy)]
+pub struct SamplesRef<'a> {
+    pub timestamps: &'a [i64],
+    pub values: &'a [f64],
+}
+
+impl<'a> SamplesRef<'a> {
+    pub fn len(&self) -> usize {
+        self.timestamps.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.timestamps.is_empty()
+    }
+
+    pub fn get(&self, index: usize) -> Sample {
+        Sample::new(self.timestamps[index], self.values[index])
+    }
+
+    pub fn first(&self) -> Option<Sample> {
+        (!self.is_empty()).then(|| self.get(0))
+    }
+
+    pub fn last(&self) -> Option<Sample> {
+        (!self.is_empty()).then(|| self.get(self.len() - 1))
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = Sample> + 'a {
+        self.timestamps
+            .iter()
+            .zip(self.values.iter())
+            .map(|(&timestamp, &value)| Sample { timestamp, value })
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Exemplar {
     /// Time in microseconds
@@ -451,7 +667,7 @@ pub struct QueryContext {
 #[derive(Debug, Default, Clone)]
 pub struct RangeValue {
     pub labels: Labels,
-    pub samples: Vec<Sample>,
+    pub samples: Samples,
     pub exemplars: Option<Vec<Arc<Exemplar>>>,
     pub time_window: Option<TimeWindow>,
 }
@@ -459,7 +675,7 @@ pub struct RangeValue {
 impl RangeValue {
     /// Returns the values from the `samples` field as an array of f64
     pub fn get_sample_values(&self) -> Vec<f64> {
-        self.samples.iter().map(|sample| sample.value).collect()
+        self.samples.values.clone()
     }
 
     pub fn extend(&mut self, other: RangeValue) {
@@ -530,7 +746,7 @@ impl<'de> Deserialize<'de> for RangeValue {
                 V: serde::de::MapAccess<'de>,
             {
                 let mut labels_map: Option<FxIndexMap<String, String>> = None;
-                let mut samples: Option<Vec<Sample>> = None;
+                let mut samples: Option<Samples> = None;
                 let mut exemplars: Option<Vec<Arc<Exemplar>>> = None;
 
                 while let Some(key) = map.next_key::<String>()? {
@@ -577,7 +793,7 @@ impl RangeValue {
     {
         Self {
             labels,
-            samples: Vec::from_iter(samples),
+            samples: Samples::from_iter(samples),
             exemplars: None,
             time_window: None,
         }
@@ -589,7 +805,7 @@ impl RangeValue {
     {
         Self {
             labels,
-            samples: vec![],
+            samples: Samples::default(),
             exemplars: Some(Vec::from_iter(exemplars)),
             time_window: None,
         }
@@ -633,7 +849,7 @@ pub enum ExtrapolationKind {
 /// Panics if the samples are not in the range.
 // cf. https://github.com/prometheus/prometheus/blob/80b7f73d267a812b3689321554aec637b75f468d/promql/functions.go#L67
 pub fn extrapolated_rate(
-    samples: &[Sample],
+    samples: SamplesRef<'_>,
     eval_ts: i64,
     range: Duration,
     offset: Duration,
@@ -667,8 +883,8 @@ pub fn extrapolated_rate(
     assert!(end > 0);
     assert!(start <= end);
 
-    let first = &samples[0];
-    let last = &samples.last().unwrap();
+    let first = samples.get(0);
+    let last = samples.last().unwrap();
 
     // The caller must ensure that the samples are in the range.
     assert!(first.timestamp <= last.timestamp);
@@ -681,11 +897,11 @@ pub fn extrapolated_rate(
     if is_counter {
         // Handle counter resets.
         let mut prev_value = first.value;
-        for sample in &samples[1..] {
-            if sample.value < prev_value {
+        for &value in &samples.values[1..] {
+            if value < prev_value {
                 result += prev_value;
             }
-            prev_value = sample.value;
+            prev_value = value;
         }
     }
 
@@ -938,8 +1154,9 @@ mod tests {
     #[test]
     fn test_extrapolated_rate() {
         fn extrapolate(samples: &[Sample], kind: ExtrapolationKind) -> f64 {
+            let samples: Samples = samples.to_vec().into();
             extrapolated_rate(
-                samples,
+                samples.as_slice(),
                 75_000_000,
                 Duration::from_secs(60),
                 Duration::ZERO,
@@ -1174,11 +1391,12 @@ mod tests {
 
     #[test]
     fn test_range_value_get_sample_values() {
-        let samples = vec![
+        let samples: Samples = vec![
             Sample::new(1000, 1.5),
             Sample::new(2000, 2.5),
             Sample::new(3000, 3.5),
-        ];
+        ]
+        .into();
         let range_value = RangeValue::new(vec![], samples);
 
         let values = range_value.get_sample_values();
@@ -1192,15 +1410,15 @@ mod tests {
 
         range_value1.extend(range_value2);
         assert_eq!(range_value1.samples.len(), 2);
-        assert_eq!(range_value1.samples[0].value, 1.0);
-        assert_eq!(range_value1.samples[1].value, 2.0);
+        assert_eq!(range_value1.samples.get(0).value, 1.0);
+        assert_eq!(range_value1.samples.get(1).value, 2.0);
     }
 
     #[test]
     fn test_range_value_extend_with_exemplars() {
         let mut range_value1 = RangeValue {
             labels: vec![],
-            samples: vec![],
+            samples: vec![].into(),
             exemplars: Some(vec![Arc::new(Exemplar {
                 timestamp: 1000,
                 value: 1.0,
@@ -1211,7 +1429,7 @@ mod tests {
 
         let range_value2 = RangeValue {
             labels: vec![],
-            samples: vec![],
+            samples: vec![].into(),
             exemplars: Some(vec![Arc::new(Exemplar {
                 timestamp: 2000,
                 value: 2.0,
@@ -1457,9 +1675,9 @@ mod tests {
     #[test]
     fn test_extrapolated_rate_edge_cases() {
         // Test with insufficient samples
-        let samples = [Sample::new(1000, 1.0)];
+        let samples: Samples = vec![Sample::new(1000, 1.0)].into();
         let result = extrapolated_rate(
-            &samples,
+            samples.as_slice(),
             75_000_000,
             Duration::from_secs(60),
             Duration::ZERO,
@@ -1468,9 +1686,9 @@ mod tests {
         assert!(result.is_none());
 
         // Test with empty samples
-        let empty_samples: &[Sample] = &[];
+        let empty_samples = Samples::default();
         let result = extrapolated_rate(
-            empty_samples,
+            empty_samples.as_slice(),
             75_000_000,
             Duration::from_secs(60),
             Duration::ZERO,
@@ -1497,10 +1715,10 @@ mod tests {
             Arc::new(Label::new("__name__", "cpu")),
             Arc::new(Label::new("job", "node")),
         ];
-        let samples = vec![Sample::new(1000, 1.0), Sample::new(2000, 2.0)];
+        let samples: Samples = vec![Sample::new(1000, 1.0), Sample::new(2000, 2.0)].into();
         let rv = RangeValue::new(labels.clone(), samples);
         assert_eq!(rv.samples.len(), 2);
-        assert_eq!(rv.samples[0].value, 1.0);
+        assert_eq!(rv.samples.get(0).value, 1.0);
         assert!(rv.exemplars.is_none());
         assert!(rv.time_window.is_none());
     }

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::{EvalContext, Labels, RangeValue, Sample, Value};
+use config::meta::promql::value::{EvalContext, Labels, RangeValue, Sample, Samples, Value};
 use datafusion::error::{DataFusionError, Result};
 
 pub(crate) fn vector(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
@@ -27,7 +27,7 @@ pub(crate) fn vector(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     };
 
     // Generate samples using timestamps from eval_ctx
-    let samples: Vec<Sample> = eval_ctx
+    let samples: Samples = eval_ctx
         .timestamps()
         .iter()
         .map(|&ts| Sample::new(ts, value))
@@ -66,7 +66,7 @@ mod tests {
         };
         assert_eq!(ranges.len(), 1);
         assert_eq!(ranges[0].samples.len(), 1);
-        assert_eq!(ranges[0].samples[0].value, 7.0);
+        assert_eq!(ranges[0].samples.get(0).value, 7.0);
     }
 
     #[test]

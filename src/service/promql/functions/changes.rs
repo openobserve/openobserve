@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
+use config::meta::promql::value::{EvalContext, SamplesRef, Value};
 use datafusion::error::Result;
 
 use crate::service::promql::functions::RangeFunc;
@@ -38,7 +38,7 @@ impl RangeFunc for ChangesFunc {
         "changes"
     }
 
-    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+    fn exec(&self, samples: SamplesRef<'_>, _eval_ts: i64, _range: &Duration) -> Option<f64> {
         let changes = samples
             .iter()
             .zip(samples.iter().skip(1))
@@ -52,7 +52,7 @@ impl RangeFunc for ChangesFunc {
 mod tests {
     use std::time::Duration;
 
-    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+    use config::meta::promql::value::{Labels, RangeValue, Sample, Samples, TimeWindow};
 
     use super::*;
     // Test helper
@@ -76,24 +76,26 @@ mod tests {
     #[test]
     fn test_changes_no_changes() {
         let func = ChangesFunc::new();
-        let samples = vec![
+        let samples: Samples = vec![
             Sample::new(1000, 5.0),
             Sample::new(2000, 5.0),
             Sample::new(3000, 5.0),
-        ];
-        let result = func.exec(&samples, 3000, &Duration::from_secs(2));
+        ]
+        .into();
+        let result = func.exec(samples.as_slice(), 3000, &Duration::from_secs(2));
         assert_eq!(result, Some(0.0));
     }
 
     #[test]
     fn test_changes_function() {
         // Create a range value with changing counter values
-        let samples = vec![
+        let samples: Samples = vec![
             Sample::new(1000, 10.0),
             Sample::new(2000, 15.0),
             Sample::new(3000, 25.0),
             Sample::new(4000, 25.0), // No change
-        ];
+        ]
+        .into();
 
         let range_value = RangeValue {
             labels: Labels::default(),

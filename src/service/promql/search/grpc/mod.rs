@@ -478,7 +478,7 @@ pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: val
         value::Value::Range(v) => {
             resp.series.push(cluster_rpc::Series {
                 metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
-                samples: v.samples.iter().map(|x| x.into()).collect(),
+                samples: v.samples.iter().map(|x| (&x).into()).collect(),
                 ..Default::default()
             });
         }
@@ -493,7 +493,7 @@ pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: val
         }
         value::Value::Matrix(v) => {
             v.iter().for_each(|v| {
-                let samples = v.samples.iter().map(|x| x.into()).collect::<Vec<_>>();
+                let samples = v.samples.iter().map(|x| (&x).into()).collect::<Vec<_>>();
                 let exemplars = v.exemplars.as_ref().map(|v| {
                     let exemplars = v.iter().map(|x| x.as_ref().into()).collect::<Vec<_>>();
                     cluster_rpc::Exemplars { exemplars }

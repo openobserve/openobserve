@@ -16,7 +16,7 @@
 use std::time::Duration;
 
 use config::meta::promql::value::{
-    EvalContext, ExtrapolationKind, Sample, Value, extrapolated_rate,
+    EvalContext, ExtrapolationKind, SamplesRef, Value, extrapolated_rate,
 };
 use datafusion::error::Result;
 
@@ -39,7 +39,7 @@ impl RangeFunc for RateFunc {
         "rate"
     }
 
-    fn exec(&self, samples: &[Sample], eval_ts: i64, range: &Duration) -> Option<f64> {
+    fn exec(&self, samples: SamplesRef<'_>, eval_ts: i64, range: &Duration) -> Option<f64> {
         extrapolated_rate(
             samples,
             eval_ts,
@@ -52,6 +52,8 @@ impl RangeFunc for RateFunc {
 
 #[cfg(test)]
 mod tests {
+    use config::meta::promql::value::{Sample, Samples};
+
     use super::*;
 
     #[test]
@@ -62,7 +64,10 @@ mod tests {
     #[test]
     fn test_rate_empty_samples() {
         let func = RateFunc::new();
-        assert!(func.exec(&[], 0, &Duration::from_secs(60)).is_none());
+        assert!(
+            func.exec(Samples::default().as_slice(), 0, &Duration::from_secs(60))
+                .is_none()
+        );
     }
 
     #[test]
@@ -73,8 +78,12 @@ mod tests {
             value: 100.0,
         };
         assert!(
-            func.exec(&[sample], 120_000_000, &Duration::from_secs(60))
-                .is_none()
+            func.exec(
+                Samples::from(vec![sample]).as_slice(),
+                120_000_000,
+                &Duration::from_secs(60)
+            )
+            .is_none()
         );
     }
 
@@ -83,7 +92,7 @@ mod tests {
         let func = RateFunc::new();
         // range=60s, eval_ts=120s, start=60s
         // samples within [60s, 120s]
-        let samples = vec![
+        let samples: Samples = vec![
             Sample {
                 timestamp: 70_000_000,
                 value: 100.0,
@@ -92,8 +101,9 @@ mod tests {
                 timestamp: 110_000_000,
                 value: 200.0,
             },
-        ];
-        let result = func.exec(&samples, 120_000_000, &Duration::from_secs(60));
+        ]
+        .into();
+        let result = func.exec(samples.as_slice(), 120_000_000, &Duration::from_secs(60));
         assert!(result.is_some());
         assert!(result.unwrap() >= 0.0);
     }

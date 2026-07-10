@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
+use config::meta::promql::value::{EvalContext, SamplesRef, Value};
 use datafusion::error::Result;
 
 use crate::service::promql::functions::RangeFunc;
@@ -38,7 +38,7 @@ impl RangeFunc for AbsentOverTimeFunc {
         "absent_over_time"
     }
 
-    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+    fn exec(&self, samples: SamplesRef<'_>, _eval_ts: i64, _range: &Duration) -> Option<f64> {
         if samples.is_empty() {
             return Some(1.0);
         }
@@ -48,6 +48,8 @@ impl RangeFunc for AbsentOverTimeFunc {
 
 #[cfg(test)]
 mod tests {
+    use config::meta::promql::value::{Sample, Samples};
+
     use super::*;
 
     // Test helper
@@ -71,14 +73,17 @@ mod tests {
     #[test]
     fn test_absent_over_time_exec_samples_present_returns_none() {
         let func = AbsentOverTimeFunc::new();
-        let samples = vec![Sample::new(1000, 5.0)];
-        assert!(func.exec(&samples, 0, &Duration::ZERO).is_none());
+        let samples: Samples = vec![Sample::new(1000, 5.0)].into();
+        assert!(func.exec(samples.as_slice(), 0, &Duration::ZERO).is_none());
     }
 
     #[test]
     fn test_absent_over_time_exec_empty_returns_one() {
         let func = AbsentOverTimeFunc::new();
-        assert_eq!(func.exec(&[], 0, &Duration::ZERO), Some(1.0));
+        assert_eq!(
+            func.exec(Samples::default().as_slice(), 0, &Duration::ZERO),
+            Some(1.0)
+        );
     }
 
     #[test]

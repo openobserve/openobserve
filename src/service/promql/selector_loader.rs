@@ -22,7 +22,7 @@ use config::{
     TIMESTAMP_COL_NAME,
     meta::promql::{
         EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL,
-        value::{Exemplar, QueryContext, RangeValue, Sample},
+        value::{Exemplar, QueryContext, RangeValue, Sample, Samples},
     },
     utils::{
         hash::{Sum64, gxhash},
@@ -50,7 +50,7 @@ use super::{
     utils::{apply_label_selector, apply_matchers},
 };
 
-type TokioResult = tokio::task::JoinHandle<Result<HashMap<u64, Vec<Sample>>>>;
+type TokioResult = tokio::task::JoinHandle<Result<HashMap<u64, Samples>>>;
 type TokioExemplarsResult = tokio::task::JoinHandle<Result<HashMap<u64, Vec<Arc<Exemplar>>>>>;
 
 // Constants for optimization thresholds
@@ -225,7 +225,7 @@ async fn load_samples_from_datafusion(
     let mut tasks = Vec::new();
     for mut stream in streams {
         let hash_field_type = hash_field_type.clone();
-        let mut series: HashMap<u64, Vec<Sample>> = HashMap::new();
+        let mut series: HashMap<u64, Samples> = HashMap::new();
         let task: TokioResult = tokio::task::spawn(async move {
             loop {
                 match stream.try_next().await {
@@ -413,7 +413,7 @@ async fn load_exemplars_from_datafusion(
                 hash,
                 RangeValue {
                     labels: vec![],
-                    samples: vec![],
+                    samples: Samples::default(),
                     exemplars: Some(exemplars),
                     time_window: None,
                 },

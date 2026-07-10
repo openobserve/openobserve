@@ -15,12 +15,12 @@
 
 use std::collections::BTreeSet;
 
-use config::meta::promql::value::{EvalContext, Labels, RangeValue, Sample, Value};
+use config::meta::promql::value::{EvalContext, Labels, RangeValue, Sample, Samples, Value};
 use datafusion::error::{DataFusionError, Result};
 
 /// Helper function to generate a matrix with value 1.0 for all timestamps in the eval context
 fn generate_absent_matrix(eval_ctx: &EvalContext) -> Value {
-    let mut samples = Vec::new();
+    let mut samples = Samples::default();
     let mut ts = eval_ctx.start;
     while ts <= eval_ctx.end {
         samples.push(Sample::new(ts, 1.0));
@@ -56,7 +56,7 @@ pub(crate) fn absent(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
             }
 
             // Generate samples for timestamps that DON'T have data
-            let mut absent_samples = Vec::new();
+            let mut absent_samples = Samples::default();
             let mut ts = eval_ctx.start;
             while ts <= eval_ctx.end {
                 if !timestamps_with_data.contains(&ts) {
@@ -115,12 +115,12 @@ mod tests {
             assert_eq!(matrix.len(), 1);
             let samples = &matrix[0].samples;
             assert_eq!(samples.len(), 3); // 3 timestamps: 1000, 1001, 1002
-            assert_eq!(samples[0].timestamp, 1000);
-            assert_eq!(samples[0].value, 1.0);
-            assert_eq!(samples[1].timestamp, 1001);
-            assert_eq!(samples[1].value, 1.0);
-            assert_eq!(samples[2].timestamp, 1002);
-            assert_eq!(samples[2].value, 1.0);
+            assert_eq!(samples.get(0).timestamp, 1000);
+            assert_eq!(samples.get(0).value, 1.0);
+            assert_eq!(samples.get(1).timestamp, 1001);
+            assert_eq!(samples.get(1).value, 1.0);
+            assert_eq!(samples.get(2).timestamp, 1002);
+            assert_eq!(samples.get(2).value, 1.0);
         } else {
             panic!("Expected Matrix result");
         }
@@ -137,9 +137,9 @@ mod tests {
             assert_eq!(matrix.len(), 1);
             let samples = &matrix[0].samples;
             assert_eq!(samples.len(), 3);
-            assert_eq!(samples[0].value, 1.0);
-            assert_eq!(samples[1].value, 1.0);
-            assert_eq!(samples[2].value, 1.0);
+            assert_eq!(samples.get(0).value, 1.0);
+            assert_eq!(samples.get(1).value, 1.0);
+            assert_eq!(samples.get(2).value, 1.0);
         } else {
             panic!("Expected Matrix result");
         }
@@ -155,7 +155,8 @@ mod tests {
                 Sample::new(1000, 42.0),
                 Sample::new(1001, 43.0),
                 Sample::new(1002, 44.0),
-            ],
+            ]
+            .into(),
             exemplars: None,
             time_window: None,
         }]);
@@ -173,7 +174,8 @@ mod tests {
                 Sample::new(1000, 42.0),
                 // 1001 is missing
                 Sample::new(1002, 44.0),
-            ],
+            ]
+            .into(),
             exemplars: None,
             time_window: None,
         }]);
@@ -183,8 +185,8 @@ mod tests {
             assert_eq!(matrix.len(), 1);
             let samples = &matrix[0].samples;
             assert_eq!(samples.len(), 1); // Only 1 missing timestamp
-            assert_eq!(samples[0].timestamp, 1001);
-            assert_eq!(samples[0].value, 1.0);
+            assert_eq!(samples.get(0).timestamp, 1001);
+            assert_eq!(samples.get(0).value, 1.0);
         } else {
             panic!("Expected Matrix result with missing timestamp");
         }

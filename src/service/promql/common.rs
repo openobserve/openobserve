@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::promql::value::Sample, utils::sort::sort_float};
+use config::{meta::promql::value::SamplesRef, utils::sort::sort_float};
 
 /// Calculate mean over a slice of f64s
 pub fn mean(data: &[f64]) -> Option<f64> {
@@ -125,7 +125,7 @@ pub fn calculate_trend(
     scaled_trend + scaled_previous_trend
 }
 
-pub fn linear_regression(samples: &[Sample], intercept_time: i64) -> Option<(f64, f64)> {
+pub fn linear_regression(samples: SamplesRef<'_>, intercept_time: i64) -> Option<(f64, f64)> {
     let mut num_samples = 0.0;
     let mut sum_x = 0.0;
     let mut sum_y = 0.0;
@@ -174,6 +174,8 @@ pub fn kahan_sum_increment(increment: f64, sum: f64, c: f64) -> (f64, f64) {
 
 #[cfg(test)]
 mod tests {
+    use config::meta::promql::value::{Sample, Samples};
+
     use super::*;
 
     #[test]
@@ -250,55 +252,59 @@ mod tests {
     #[test]
     fn test_linear_regression_comprehensive() {
         // Test perfect linear relationship y = 2x + 3
-        let samples = vec![
+        let samples: Samples = vec![
             Sample::new(0, 3.0),
             Sample::new(1000, 5.0),
             Sample::new(2000, 7.0),
             Sample::new(3000, 9.0),
-        ];
-        let result = linear_regression(&samples, 0);
+        ]
+        .into();
+        let result = linear_regression(samples.as_slice(), 0);
         assert!(result.is_some());
         let (slope, intercept) = result.unwrap();
         assert!((slope - 2000.0).abs() < 1e-6); // 2 per second = 2000 per 1000ms
         assert!((intercept - 3.0).abs() < 1e-6);
 
         // Test constant values
-        let samples = vec![
+        let samples: Samples = vec![
             Sample::new(1000, 5.0),
             Sample::new(2000, 5.0),
             Sample::new(3000, 5.0),
-        ];
-        let result = linear_regression(&samples, 0);
+        ]
+        .into();
+        let result = linear_regression(samples.as_slice(), 0);
         assert!(result.is_some());
         let (slope, intercept) = result.unwrap();
         assert_eq!(slope, 0.0);
         assert_eq!(intercept, 5.0);
 
         // Test edge cases
-        let samples: Vec<Sample> = vec![];
-        assert!(linear_regression(&samples, 0).is_none()); // Empty
+        let samples = Samples::default();
+        assert!(linear_regression(samples.as_slice(), 0).is_none()); // Empty
 
-        let samples = vec![Sample::new(1000, 42.0)];
-        let result = linear_regression(&samples, 0);
+        let samples: Samples = vec![Sample::new(1000, 42.0)].into();
+        let result = linear_regression(samples.as_slice(), 0);
         assert!(result.is_some());
         let (slope, intercept) = result.unwrap();
         assert_eq!(slope, 0.0);
         assert_eq!(intercept, 42.0);
 
         // Test infinite values
-        let samples = vec![
+        let samples: Samples = vec![
             Sample::new(1000, f64::INFINITY),
             Sample::new(2000, f64::INFINITY),
-        ];
-        assert!(linear_regression(&samples, 0).is_none());
+        ]
+        .into();
+        assert!(linear_regression(samples.as_slice(), 0).is_none());
 
         // Test negative slope
-        let samples = vec![
+        let samples: Samples = vec![
             Sample::new(1000, 100.0),
             Sample::new(2000, 80.0),
             Sample::new(3000, 60.0),
-        ];
-        let result = linear_regression(&samples, 0);
+        ]
+        .into();
+        let result = linear_regression(samples.as_slice(), 0);
         assert!(result.is_some());
         let (slope, _) = result.unwrap();
         assert!(slope < 0.0);
@@ -466,24 +472,26 @@ mod tests {
     #[test]
     fn test_linear_regression() {
         // Test with constant y values
-        let samples = vec![
+        let samples: Samples = vec![
             Sample::new(1000, 5.0),
             Sample::new(2000, 5.0),
             Sample::new(3000, 5.0),
-        ];
-        let result = linear_regression(&samples, 0);
+        ]
+        .into();
+        let result = linear_regression(samples.as_slice(), 0);
         assert!(result.is_some());
         let (slope, intercept) = result.unwrap();
         assert_eq!(slope, 0.0);
         assert_eq!(intercept, 5.0);
 
         // Test with linear relationship
-        let samples = vec![
+        let samples: Samples = vec![
             Sample::new(1000, 1.0),
             Sample::new(2000, 2.0),
             Sample::new(3000, 3.0),
-        ];
-        let result = linear_regression(&samples, 0);
+        ]
+        .into();
+        let result = linear_regression(samples.as_slice(), 0);
         assert!(result.is_some());
         let (slope, intercept) = result.unwrap();
         // Slope should be 1000.0 (y increases by 1 for each 0.001 increase in x)
@@ -491,16 +499,17 @@ mod tests {
         assert!((intercept - 0.0).abs() < 1e-6);
 
         // Test with infinite values
-        let samples = vec![
+        let samples: Samples = vec![
             Sample::new(1000, f64::INFINITY),
             Sample::new(2000, f64::INFINITY),
-        ];
-        let result = linear_regression(&samples, 0);
+        ]
+        .into();
+        let result = linear_regression(samples.as_slice(), 0);
         assert!(result.is_none());
 
         // Test with empty samples
-        let samples: Vec<Sample> = vec![];
-        let result = linear_regression(&samples, 0);
+        let samples = Samples::default();
+        let result = linear_regression(samples.as_slice(), 0);
         assert!(result.is_none());
     }
 
