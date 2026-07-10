@@ -12,13 +12,20 @@
       "action": "Zaman aralığını genişletin",
       "actionDesc": "Daha uzun bir süre boyunca arama yapın"
     },
+    "noPatterns": {
+      "title": "Desen bulunamadı",
+      "description": "Zaman aralığını artırmayı veya daha fazla günlük verisi içeren farklı bir akış seçmeyi deneyin. Desen çıkarma en az 1.000 kütükle en iyi sonucu verir.",
+      "logsAnalyzed": "Yalnızca {count} günlükleri analiz edildi."
+    },
     "noStreamSelected": {
       "title": "Başlamak için bir yayın seçin",
       "description": "Bir akış seçin, ardından verilerini keşfetmek için sorgunuzu çalıştırın. Filtreler ve özel bir zaman aralığı ile sonuçları hassaslaştırın."
     },
     "noQueryApplied": {
       "title": "Günlükleri görmek için bir sorgu çalıştırın",
-      "description": "Filtrelerinizi ayarlayın ve bu akış için olayları yüklemek için “Sorgu çalıştır\"ı tıklayın."
+      "description": "Filtrelerinizi ayarlayın ve bu akış için olayları yüklemek için “Sorgu çalıştır\"ı tıklayın.",
+      "action": "Sorgu çalıştır",
+      "actionDesc": "Seçilen filtreler için olayları yükle"
     },
     "noDashboards": {
       "title": "İlk panonuzu oluşturun",
@@ -80,7 +87,9 @@
       "title": "Henüz destinasyon yok",
       "description": "Hedefler, uyarı bildirimlerinin nereye gönderileceğini tanımlar - Slack, e-posta, web kancaları ve daha fazlası.",
       "action": "Yeni hedef",
-      "actionDesc": "Bir bildirim kanalı bağlayın"
+      "actionDesc": "Bir bildirim kanalı bağlayın",
+      "import": "İçe aktarma hedefi",
+      "importDesc": "JSON dosyasından içe aktarma"
     },
     "noPipelineDestinations": {
       "title": "Henüz destinasyon yok",
@@ -92,7 +101,9 @@
       "title": "Henüz şablon yok",
       "description": "Şablonlar, uyarı bildirim mesajlarının biçimini tanımlar.",
       "action": "Yeni şablon",
-      "actionDesc": "Bildirim şablonu oluşturma"
+      "actionDesc": "Bildirim şablonu oluşturma",
+      "import": "Şablonu içe aktarma",
+      "importDesc": "JSON dosyasından içe aktarma"
     },
     "noEvalTemplates": {
       "title": "Henüz değerlendirme şablonu yok",
@@ -142,6 +153,20 @@
       "title": "Dolgu işi yok",
       "description": "Doldurma işleri, geçmiş verileri bir boru hattı aracılığıyla yeniden işler. Başlamak için birini çalıştırın."
     },
+    "noRegexPatterns": {
+      "title": "Henüz regex kalıpları yok",
+      "description": "Hassas verileri düzenlemek için yeniden kullanılabilir bir desen oluşturun veya kitaplığınızdan bir tane içe aktarın.",
+      "action": "Yeni desen",
+      "actionDesc": "Yeni bir normal ifade kalıbı tanımlayın",
+      "import": "İçe aktarma deseni",
+      "importDesc": "Kitaplığınızdaki bir deseni yeniden kullanma"
+    },
+    "noStorageConfig": {
+      "title": "Yapılandırılmış kova yok",
+      "description": "Bu kuruluşun verilerini, diğer organizasyonlardan ve global varsayılanlardan bağımsız olarak özel bir depoya yönlendirin.",
+      "action": "Depolamayı yapılandırın",
+      "actionDesc": "S3, GCS veya Azure klasörünü bağlama"
+    },
     "noPipelineHistory": {
       "title": "Henüz boru hattı geçmişi yok",
       "description": "Boru hatlarınız çalıştıktan sonra boru hattı yürütme geçmişi burada görünecektir."
@@ -161,10 +186,12 @@
       "actionDesc": "Yeni bir VRL işlevi yazın"
     },
     "noStreams": {
-      "title": "İlk verilerinizi bekliyorum",
-      "description": "Henüz veri gelmedi. Bir kaynak bağladığınızda yayınlarınız burada otomatik olarak görünecektir.",
+      "title": "İlk akışınızı oluşturmak için bir kaynak bağlayın",
+      "description": "Akışlar, veriler geldiği anda otomatik olarak oluşturulur. Başlamak için uygulamanızdan, aracınızdan veya toplayıcınızdan alımı ayarlayın.",
       "action": "Yutmayı ayarlayın",
-      "actionDesc": "Veri kaynağını bağlama"
+      "actionDesc": "Veri kaynağını bağlama",
+      "createAction": "Yeni yayın",
+      "createActionDesc": "Bir akış şemasını manuel olarak tanımlayın"
     },
     "noAlerts": {
       "title": "İlk uyarınızı oluşturun",
@@ -174,7 +201,7 @@
     },
     "noIncidents": {
       "title": "Aktif olay yok",
-      "description": "Hepiniz yakalandınız - şu anda hiçbir şeyin dikkatinize ihtiyacı yok. Tetiklenen olaylar burada görünecektir."
+      "description": "Olaylar, bir uyarı tetiklendiğinde oluşturulur - henüz hiçbiri ateşlenmedi. Uyarılarınız olduğunda, tetiklenen olaylar burada görünecektir."
     },
     "noLLMInsights": {
       "title": "Henüz LLM etkinliği yok",
@@ -191,20 +218,24 @@
     "noScorers": {
       "title": "Henüz golcü yok",
       "description": "Puanlar, LLM yanıtlarını puan yapılandırmalarınıza göre derecelendirir - bir LLM jüri ile başlayın veya kütüphaneden bir tane içe aktarın.",
-      "action": "Golcü oluştur",
-      "actionDesc": "Bir LLM hakimi veya uzaktan golcü tanımlayın"
+      "action": "Yeni golcü",
+      "actionDesc": "Bir LLM hakimi veya uzaktan golcü tanımlayın",
+      "import": "İthalat puanı",
+      "importDesc": "JSON dosyasından içe aktarma"
     },
     "noEvalJobs": {
       "title": "Henüz değerlendirme işi yok",
       "description": "Bir LLM akışına karşı işler skorları programlar. Bir kadans üzerinde konuşmalara not vermeye başlamak için bir tane oluşturun.",
-      "action": "Eval işi oluştur",
+      "action": "Yeni iş",
       "actionDesc": "Bir akış seçin + puanlar + kadans"
     },
     "noScoreConfigs": {
       "title": "Henüz puan yapılandırması yok",
       "description": "Puan yapılandırmaları, şema puanlarının ürettiklerini tanımlar - sayısal, boole veya kategorik. Puanlamaya başlamak için bir tane ekleyin.",
-      "action": "Puan yapılandırması oluştur",
-      "actionDesc": "Skor şeklini+sağlıklı aralığı tanımlayın"
+      "action": "Yeni puan yapılandırması",
+      "actionDesc": "Skor şeklini+sağlıklı aralığı tanımlayın",
+      "import": "Puan yapılandırmasını içe aktarma",
+      "importDesc": "JSON dosyasından içe aktarma"
     },
     "loadError": {
       "title": "Bir şeyler ters gitti",
@@ -271,6 +302,7 @@
     },
     "nouns": {
       "logs": "günlükler",
+      "patterns": "desenler",
       "dashboards": "gösterge tabloları",
       "pipelines": "boru hatları",
       "functions": "işlevleri",
@@ -305,7 +337,8 @@
       "scorers": "puanlayıcılar",
       "evalJobs": "değerlendirme işleri",
       "scoreConfigs": "puan yapılandırmaları",
-      "pipelineHistory": "pipeline geçmişi"
+      "pipelineHistory": "pipeline geçmişi",
+      "regexPatterns": "regex desenleri"
     }
   },
   "common": {
@@ -385,6 +418,8 @@
     "legendWidth": "Açıklama Genişliği",
     "exceptions": "İstisnalar",
     "nameRequired": "İsim zorunludur",
+    "invalidEmail": "Lütfen geçerli bir e-posta adresi girin.",
+    "nameMaxLength": "İsim en fazla {max} karakter olmalıdır.",
     "edit": "Düzenle",
     "delete": "Sil",
     "remove": "Kaldır",
@@ -1322,6 +1357,14 @@
     "newPassword": "Yeni Şifre",
     "organization": "Organizasyon",
     "otherOrganization": "Diğer Organizasyon",
+    "roleRequired": "Rol gerekli",
+    "fieldRequired": "Alan zorunludur",
+    "passwordRequired": "Şifre gereklidir.",
+    "passwordPolicyHint": "Şifre 8-128 karakter olmalı ve en az bir küçük harf, bir büyük harf, bir basamak ve bir özel karakter içermelidir.",
+    "currentPasswordRequired": "Geçerli şifre gereklidir.",
+    "newPasswordRequired": "Yeni şifre gereklidir.",
+    "otherOrgInvalid": "Kuruluş adı bir harfle başlamalı ve alfasayısal, _ veya - olmalıdır.",
+    "inviteEmailInvalid": "Lütfen doğru e-posta kimliğini girin.",
     "isExistingUser": "Mevcut Kullanıcı?",
     "deleteAPIKeyMessage": "Bu Kullanıcı API Anahtarını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz. Onaylamak için Tamam'ı tıklayın.",
     "apiKeyNotFound": "Kullanıcı API Anahtarı Bulunamadı.",
@@ -1362,6 +1405,7 @@
   },
   "serviceAccounts": {
     "header": "Hizmet Hesapları",
+    "emailInvalid": "Lütfen geçerli bir e-posta adresi girin",
     "headerSubtitle": "API'ler için programlı erişim belirteçleri",
     "search": "Servis Hesabını Ara",
     "refresh": "Hizmet Belirtecini Yenile",
@@ -1601,6 +1645,11 @@
     "subtitle": "Dizin yönetimi ve akış yapılandırması",
     "streamNameHelpText": "Yalnızca alfanümerik karakterler, alt çizgi ve iki nokta üst üste nokta kullanın.",
     "search": "Arama Akışı",
+    "emptyOr": "Veya:",
+    "emptyKubernetes": "Kubernetes",
+    "emptyAws": "AWS/CloudWatch",
+    "emptyLinux": "Linux",
+    "emptyWindows": "Windows",
     "name": "İsim",
     "docNum": "Doktor Numarası",
     "storageSize": "Alınan Veriler",
@@ -2047,6 +2096,7 @@
     "defaultTokenBadge": "VARSAYILAN",
     "createTokenBtn": "Yeni Token Oluştur",
     "createTokenTitle": "Token Oluştur",
+    "searchToken": "Token ara",
     "tokenNameLabel": "İsim",
     "tokenDescriptionLabel": "Açıklama",
     "rotateTokenBtn": "Döndür",
@@ -2091,6 +2141,17 @@
     "header": "Gösterge panoları",
     "subtitle": "Klasörler arasında gösterge panoları oluşturun, düzenleyin ve paylaşın",
     "add": "Yeni Kontrol Paneli",
+    "setAsHome": "Ana sayfaya sabitle",
+    "removeFromHome": "Ana sayfadan sabitlemeyi kaldırın",
+    "isHomeDashboard": "Ana sayfa gösterge paneli",
+    "openHomeDashboard": "Sabitlenmiş gösterge tablosunu görüntüleyin",
+    "pinnedOnHome": "Ana sayfada sabitlenmiş gösterge tablosu",
+    "deletedSuccessfully": "Kontrol paneli başarıyla silindi.",
+    "pinnedDeletedPinRemoved": "Sabitlenmiş gösterge tablosu silindi, bu nedenle Ana sayfa pimi kaldırıldı.",
+    "homePinNotFound": "Bu gösterge tablosu artık mevcut değil ve Ana Sayfa'dan kaldırıldı.",
+    "homePinUnavailable": "Bu gösterge tablosu artık kullanılamıyor ve Ana Sayfa'dan kaldırıldı.",
+    "setAsHomeDesc": "Kuruluştaki herkes için bu gösterge tablosunu ana sayfada göster",
+    "moreActions": "Daha fazla eylem",
     "save": "Kaydet",
     "cancel": "İptal",
     "delete": "Kontrol Panelini Sil",
@@ -2160,6 +2221,7 @@
     "selectVariableScope": "Değişken kapsamı seçin",
     "variableScopeHelp": "Genel seçilmişse değişkenler tüm sekmelere ve panellere uygulanacaktır.",
     "newTab": "Sekme Ekle",
+    "editTab": "Sekmeyi Düzenle",
     "generalSettingsTitle": "Genel Ayarlar",
     "tabSettingsTitle": "Sekmeler Ayarları",
     "addGeneralSettings": "General",
@@ -2534,14 +2596,34 @@
     "editDrilldown": "Ayrıntıyı Düzenle",
     "goTo": "Şuraya git:",
     "selectLogsMode": "Günlükler Modunu Seçin:",
-    "enterCustomQuery": "Özel Sorgu Girin:",
-    "enterUrl": "URL girin:",
+    "enterCustomQuery": "Özel SQL Sorgusu *:",
+    "sqlQueryRequired": "SQL sorgusu gerekli",
+    "variableNameRequired": "Değişken adı gerekli.",
+    "variableNameInvalid": "Yalnızca harflere, rakamlara, kısa çizgilere ve alt çizgilere izin verilir",
+    "atLeastOneTabRequired": "En az bir sekme gereklidir.",
+    "atLeastOnePanelRequired": "En az bir panel gereklidir.",
+    "streamTypeRequired": "Akış türü gereklidir.",
+    "streamIndexRequired": "Akış / dizin gereklidir.",
+    "fieldRequired": "Alan zorunludur.",
+    "constantValueRequired": "Sabit değer gereklidir.",
+    "operatorRequired": "Operatör gereklidir.",
+    "filterValueRequired": "Gerekli",
+    "labelRequired": "Etiket gereklidir.",
+    "optionValueRequired": "Alan zorunludur!",
+    "seriesValueRequired": "Seri değeri gereklidir",
+    "colorRequired": "Renk gereklidir",
+    "onlyHttpsUrlsAllowed": "Yalnızca HTTP(S) URL'lerine izin verilir",
+    "urlRequired": "URL gerekli",
+    "folderRequired": "Klasör gerekli",
+    "dashboardRequired": "Gösterge tablosu gerekli",
+    "tabRequired": "Sekme gerekli",
+    "enterUrl": "URL'yi girin",
     "invalidUrl": "Geçersiz URL",
-    "selectFolderDrilldown": "Klasör Seçiniz *:",
+    "selectFolderDrilldown": "Klasör Seç",
     "noFoldersAvailable": "Kullanılabilir klasör yok",
-    "selectDashboardDrilldown": "Gösterge tablosunu seçin *:",
+    "selectDashboardDrilldown": "Kontrol Panelini Seçin",
     "noDashboardsAvailable": "Gösterge paneli yok",
-    "selectTabDrilldown": "Sekmeyi Seçin *:",
+    "selectTabDrilldown": "Sekme Seç",
     "noTabAvailable": "Mevcut sekme yok",
     "variables": "Değişkenler:",
     "passAllCurrentVariables": "Mevcut tüm değişkenleri iletin:",
@@ -2664,6 +2746,11 @@
     "operations": "Operasyonlar",
     "promQLBuilder": "PromQL Oluşturucu",
     "joins": "Katılır",
+    "xAxisShort": "X Ekseni",
+    "yAxisShort": "Y Ekseni",
+    "rowFields": "Satır Alanları",
+    "valueFields": "Değer Alanları",
+    "noData": "Veri Yok",
     "addJoin": "Katıl Ekle",
     "removeJoin": "Katılmayı Kaldır",
     "leftJoin": "Sol Katılım",
@@ -2739,6 +2826,7 @@
     "tabAiAssistant": "O2 AI Asistanı",
     "tabOverview": "Genel Bakış",
     "tabUsage": "Kullanımı",
+    "removeHomeDashboard": "Ana sayfa gösterge panelini kaldır",
     "subtitle": "Bir bakışta gözlemlenebilirlik çalışma alanınız"
   },
   "overview": {
@@ -2891,6 +2979,9 @@
     "enterpriseNote": "Yüksek hacimli ihtiyaçlar? Ölçekten bahsedelim! Özel çözümler için bizimle iletişime geçin.",
     "contactSupport": "Destek ile iletişime geçin",
     "totalUsage": "Toplam Kullanım",
+    "usageTrends": {
+      "dailyUsage": "Günlük kullanım"
+    },
     "aiCredits": "AI Kredileri",
     "aiModeFree": "Bedava",
     "aiModePayAsYouGo": "Kullandıkça öde",
@@ -3005,9 +3096,9 @@
     "searchAllFolders": "Tüm klasörler",
     "streamConfig": "Akış Yapılandırması",
     "alertRules": "Uyarı Kuralları",
-    "noTemplatesMsg": "Henüz herhangi bir Şablon oluşturmadınız gibi görünüyor. Uyarı oluşturmak için en az bir Hedef ve bir Şablon bulundurmanız gerekir",
+    "noTemplatesMsg": "Bir uyarı oluşturmak için en az bir şablona ve bir hedefe ihtiyacınız vardır. Şablonlar bildirim mesajının biçimini tanımlar - bir tane oluşturarak başlayın.",
     "createTemplateBtn": "Şablon Oluştur",
-    "noDestinationsMsg": "Görünüşe göre henüz herhangi bir Hedef oluşturmadınız. Uyarı oluşturmak için en az bir Hedef ve bir Şablon bulundurmanız gerekir",
+    "noDestinationsMsg": "Bir uyarı oluşturmak için en az bir hedef ve bir şablona ihtiyacınız vardır. Hedefler bildirimlerin nereye gönderileceğini tanımlar - bir tane oluşturarak başlayın.",
     "createDestinationBtn": "Hedef Oluştur",
     "add": "Uyarı ekle",
     "edit": "Düzenle",
@@ -3875,6 +3966,8 @@
     "saveChanges": "Kaydet",
     "invalidDomain": "Lütfen geçerli bir alan adı girin",
     "invalidEmail": "Lütfen bu alan adı için geçerli bir e-posta adresi girin",
+    "domainRequired": "Alan adı gereklidir",
+    "emailRequired": "E-posta adresi gereklidir",
     "domainAlreadyExists": "Bu alan adı zaten eklendi",
     "domainAdded": "Etki alanı başarıyla eklendi",
     "confirmRemoveDomain": "'{ domain} 'alan adını kaldırmak istediğinizden emin misiniz?",
@@ -3891,6 +3984,7 @@
     "pageSubtitle": "Uygulamanızın ayarlarını ayarlama",
     "platformSettings": "Platform Ayarları",
     "scrapeIntervalRequired": "Kazıma aralığı gereklidir",
+    "scrapeIntervalPositive": "Kazıma aralığı pozitif bir sayı olmalıdır",
     "scrapeIntervalDescription": "Kazıma aralığı, izleme sisteminin metrikleri topladığı saniye cinsinden sıklıktır.",
     "maxSeriesPerQueryLabel": "Sorgu Başına Maksimum Seri",
     "maxSeriesPerQueryDescription": "Tek bir PromQL sorgusundan döndürülebilecek maksimum seri sayısı. Büyük sonuç kümeleriyle kullanıcı arayüzünün donmasını önlemeye yardımcı olur. Sistem varsayılanını kullanmak için boş bırakın (40.000).",
@@ -4192,6 +4286,51 @@
     "querySource": "Sorgu Kaynağı"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "Arama Hizmetleri",
+      "noStreamsDetected": "Akış algılanmadı. Hizmet grafiği metriklerinin akış_adı etiketleri içerdiğinden emin olun.",
+      "streamOnlyInfo": "Hizmet grafiği, sıfır bellek içi durumla yalnızca akış mimarisini kullanır",
+      "borderColor": "Kenarlık Rengi",
+      "borderColorMetric": "Hatalar",
+      "nodeSize": "Düğüm Boyutu",
+      "nodeSizeMetric": "İstekler",
+      "sizeLow": "Düşük",
+      "sizeHigh": "Yüksek",
+      "status": {
+        "healthy": "Sağlıklı",
+        "degraded": "Bozulmuş",
+        "warning": "Uyarı",
+        "critical": "Kritik"
+      },
+      "range": {
+        "healthy": "< 1%",
+        "degraded": "1 — %5",
+        "warning": "%5 — %10",
+        "critical": ">% 10"
+      },
+      "entities": "işletmeler",
+      "distribution": "Dağıtım",
+      "total": "Toplam",
+      "showTypes": "Türleri göster",
+      "typesFiltered": "Bazı türler gizlidir. Gösterilen şeyi değiştirmek için açın.",
+      "zoomIn": "Yakınlaştır",
+      "zoomOut": "Uzaklaştır",
+      "fitToScreen": "Ekrana sığdır",
+      "layout": "Düzen",
+      "types": "Türleri",
+      "mode": {
+        "auto": "Oto",
+        "expanded": "Genişletilmiş",
+        "collapsed": "Daraltılmış"
+      },
+      "kind": {
+        "service": "HİZMETLER",
+        "database": "Veri depoları",
+        "queue": "Kuyruklar",
+        "external": "Harici",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "Tam görünümde aç",
     "viewLogs": "Günlükleri Görüntüle",
     "viewRelated": "İlgili Görüntüle",
@@ -4470,6 +4609,7 @@
     "servicesCatalog": {
       "tabLabel": "Hizmet Kataloğu",
       "title": "Hizmet Kataloğu",
+      "footerTitle": "HİZMETLER",
       "filterPlaceholder": "Hizmet adına göre filtrele...",
       "noServicesFound": "Seçilen zaman aralığında hiçbir hizmet bulunamadı.",
       "loading": "Hizmetler yükleniyor...",
@@ -4496,6 +4636,15 @@
       "servicesLabel": "servisler",
       "viewTraces": "İzleri Görüntüle",
       "exportCsv": "CSV'yi dışa aktarma",
+      "types": {
+        "all": "Hepsi",
+        "service": "HİZMETLER",
+        "datastore": "Veri depoları",
+        "queue": "Kuyruklar",
+        "external": "Harici",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{count} {durum}",
       "legend": {
         "title": "Hata Oranı"
       }
@@ -5233,6 +5382,7 @@
     },
     "quality": {
       "scopeLabel": "Bu çalışma alanındaki tüm kalite boyutları",
+      "agentPlaceholder": "Tüm acenteler",
       "timeRange": {
         "label": "Zaman aralığı",
         "last1h": "Son 1 saat",
@@ -6097,6 +6247,10 @@
       "functions": "Fonksiyonlar",
       "reports": "Raporlar",
       "iam": "IAM",
+      "settings": "Ayarlar",
+      "onlineEvals": "Çevrimiçi Değerlendirmeler",
+      "actions": "Eylemler",
+      "rum": "ROM",
       "runningQueries": "Çalışan Sorgular"
     },
     "pages": {
@@ -6122,7 +6276,30 @@
       "panelEditor": "Panel Düzenleyicisi",
       "traceDetail": "İzleme Detayı",
       "runningQueries": "Çalışan Sorgular",
-      "ingestionTokens": "IAM — Yutma Belirteçleri"
+      "ingestionTokens": "IAM — Yutma Belirteçleri",
+      "alertIncidents": "Uyarılar — Olaylar",
+      "pipelineDestinations": "Boru Hatları - Destinasyonlar",
+      "enrichmentTables": "Zenginleştirme Tabloları",
+      "iamInvitations": "IAM — Davetiyeler",
+      "iamOrganizations": "IAM — Organizasyonlar",
+      "regexPatterns": "Regex Desenleri",
+      "cipherKeys": "Şifre Anahtarları",
+      "nodes": "düğümler",
+      "modelPricing": "Model Fiyatlandırması",
+      "searchSchedulers": "Arama Zamanlayıcıları",
+      "searchHistory": "Arama Geçmişi",
+      "sessions": "Oturumlar",
+      "evalTemplates": "Çevrimiçi Değerlendirmeler - Şablonlar",
+      "scorers": "Online Evals — Gol Sahipleri",
+      "evalJobs": "Çevrimiçi Değerlendirmeler - İş İlanları",
+      "scoreConfigs": "Çevrimiçi Değerlendirmeler - Puan Yapılandırmaları",
+      "actions": "Eylemler",
+      "llmProviders": "LLM Sağlayıcıları",
+      "aiToolsets": "Yapay Zeka Araç Setleri",
+      "orgManagement": "Organizasyon Yönetimi",
+      "rumErrors": "RUM - Hata Takibi",
+      "rumSessions": "RUM — Oturumlar",
+      "sourceMaps": "RUM - Kaynak Haritaları"
     },
     "actions": {
       "openCheatsheet": "Klavye kısayolları hile sayfasını aç",
@@ -6202,7 +6379,30 @@
       "logsExport": "Sonuçları CSV olarak dışa aktarın",
       "tableRowOpen": "Havalanan satırı aç/genişletin",
       "tableRowInspect": "Havalanan satırı inceleyin",
-      "tracesCopyUrl": "İzleme paylaşım URL'sini kopyala"
+      "tracesCopyUrl": "İzleme paylaşım URL'sini kopyala",
+      "alertIncidentsRefresh": "Listeyi yenileme",
+      "pipelineDestinationsRefresh": "Listeyi yenileme",
+      "enrichmentTablesRefresh": "Listeyi yenileme",
+      "iamInvitationsRefresh": "Listeyi yenileme",
+      "iamOrganizationsRefresh": "Listeyi yenileme",
+      "regexPatternsRefresh": "Listeyi yenileme",
+      "cipherKeysRefresh": "Listeyi yenileme",
+      "nodesRefresh": "Listeyi yenileme",
+      "modelPricingRefresh": "Listeyi yenileme",
+      "searchSchedulersRefresh": "Listeyi yenileme",
+      "searchHistoryRefresh": "Listeyi yenileme",
+      "sessionsRefresh": "Listeyi yenileme",
+      "evalTemplatesRefresh": "Listeyi yenileme",
+      "scorersRefresh": "Listeyi yenileme",
+      "evalJobsRefresh": "Listeyi yenileme",
+      "scoreConfigsRefresh": "Listeyi yenileme",
+      "actionsRefresh": "Listeyi yenileme",
+      "llmProvidersRefresh": "Listeyi yenileme",
+      "aiToolsetsRefresh": "Listeyi yenileme",
+      "orgManagementRefresh": "Listeyi yenileme",
+      "rumErrorsRefresh": "Listeyi yenileme",
+      "rumSessionsRefresh": "Listeyi yenileme",
+      "sourceMapsRefresh": "Listeyi yenileme"
     }
   }
 }

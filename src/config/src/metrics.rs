@@ -1190,6 +1190,30 @@ pub static NODE_CONSISTENT_HASH: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 // query disk cache metrics
+pub static QUERY_METRICS_LABEL_CACHE_HIT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_metrics_label_cache_hit_count",
+            "promql series label cache hit count".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_METRICS_LABEL_CACHE_MISS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_metrics_label_cache_miss_count",
+            "promql series label cache miss count".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
 pub static QUERY_DISK_CACHE_HIT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -1597,7 +1621,7 @@ pub static SELF_REPORTING_DROPPED_TRIGGERS: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &[],
+        &["queue_type"], // "usage" or "error"
     )
     .expect("Metric created")
 });
@@ -1610,7 +1634,7 @@ pub static SELF_REPORTING_TIMEOUT_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &[],
+        &["queue_type"], // "usage" or "error"
     )
     .expect("Metric created")
 });
@@ -2144,6 +2168,13 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(NODE_CONSISTENT_HASH.clone()))
         .expect("Metric registered");
 
+    // promql series label cache metrics
+    registry
+        .register(Box::new(QUERY_METRICS_LABEL_CACHE_HIT_COUNT.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_METRICS_LABEL_CACHE_MISS_COUNT.clone()))
+        .expect("Metric registered");
     // query disk cache metrics
     registry
         .register(Box::new(QUERY_DISK_CACHE_HIT_COUNT.clone()))

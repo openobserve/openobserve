@@ -12,13 +12,20 @@
       "action": "時間範囲を広げる",
       "actionDesc": "より長い期間にわたる検索"
     },
+    "noPatterns": {
+      "title": "パターンが見つかりません",
+      "description": "時間範囲を広げるか、ログデータの多い別のストリームを選択してみてください。パターン抽出は、少なくとも 1,000 個のログで最適に機能します。",
+      "logsAnalyzed": "{count} 個のログのみが分析されました。"
+    },
     "noStreamSelected": {
       "title": "ストリームを選択して始めましょう",
       "description": "ストリームを選択し、クエリを実行してそのデータを調べます。フィルターとカスタム時間範囲を使用して結果を絞り込みます。"
     },
     "noQueryApplied": {
       "title": "クエリを実行してログを確認する",
-      "description": "フィルターを調整し、[クエリを実行] をクリックしてこのストリームのイベントをロードします。"
+      "description": "フィルターを調整し、[クエリを実行] をクリックしてこのストリームのイベントをロードします。",
+      "action": "クエリーを実行",
+      "actionDesc": "選択したフィルターのイベントをロードします"
     },
     "noDashboards": {
       "title": "はじめてのダッシュボードを作成",
@@ -80,7 +87,9 @@
       "title": "目的地はまだありません",
       "description": "送信先は、アラート通知の送信先 (Slack、メール、Webhook など) を定義します。",
       "action": "新しい目的地",
-      "actionDesc": "通知チャネルを接続する"
+      "actionDesc": "通知チャネルを接続する",
+      "import": "インポート先",
+      "importDesc": "JSON ファイルからのインポート"
     },
     "noPipelineDestinations": {
       "title": "目的地はまだありません",
@@ -92,7 +101,9 @@
       "title": "テンプレートはまだありません",
       "description": "テンプレートはアラート通知メッセージの形式を定義します。",
       "action": "新しいテンプレート",
-      "actionDesc": "通知テンプレートを作成する"
+      "actionDesc": "通知テンプレートを作成する",
+      "import": "テンプレートをインポート",
+      "importDesc": "JSON ファイルからのインポート"
     },
     "noEvalTemplates": {
       "title": "評価テンプレートはまだありません",
@@ -142,6 +153,20 @@
       "title": "バックフィルジョブなし",
       "description": "バックフィルジョブは、パイプラインを通じて履歴データを再処理します。1 つ実行して始めましょう。"
     },
+    "noRegexPatterns": {
+      "title": "正規表現パターンはまだありません",
+      "description": "再利用可能なパターンを作成して機密データを編集するか、ライブラリからインポートします。",
+      "action": "新しいパターン",
+      "actionDesc": "新しい正規表現パターンを定義する",
+      "import": "インポートパターン",
+      "importDesc": "ライブラリからパターンを再利用する"
+    },
+    "noStorageConfig": {
+      "title": "バケットが設定されていません",
+      "description": "この組織のデータは、他の組織やグローバルデフォルトとは無関係に、専用のバケットにルーティングします。",
+      "action": "ストレージの設定",
+      "actionDesc": "S3、GCS、または Azure バケットを接続する"
+    },
     "noPipelineHistory": {
       "title": "パイプライン履歴はまだありません",
       "description": "パイプラインが実行されると、パイプライン実行履歴がここに表示されます。"
@@ -161,10 +186,12 @@
       "actionDesc": "新しい VRL 関数を書く"
     },
     "noStreams": {
-      "title": "最初のデータを待っています",
-      "description": "データはまだ届いていません。ソースを接続すると、ストリームが自動的にここに表示されます。",
+      "title": "ソースを接続して最初のストリームを作成",
+      "description": "ストリームは、データが到着した瞬間に自動的に作成されます。アプリ、エージェント、コレクターからの取り込みを設定して始めましょう。",
       "action": "取り込みを設定する",
-      "actionDesc": "データソースを接続する"
+      "actionDesc": "データソースを接続する",
+      "createAction": "新しいストリーム",
+      "createActionDesc": "ストリームスキーマを手動で定義する"
     },
     "noAlerts": {
       "title": "最初のアラートを作成する",
@@ -174,7 +201,7 @@
     },
     "noIncidents": {
       "title": "アクティブなインシデントなし",
-      "description": "みなさん、追いつきました。今、注意が必要なことは何もありません。トリガーされたインシデントはここに表示されます。"
+      "description": "インシデントはアラートがトリガーされたときに作成されますが、まだアラートは発生していません。アラートを設定すると、トリガーされたすべてのインシデントがここに表示されます。"
     },
     "noLLMInsights": {
       "title": "LLM アクティビティはまだありません",
@@ -191,20 +218,24 @@
     "noScorers": {
       "title": "スコアラーはまだいません",
       "description": "スコア担当者は、LLM回答をスコア設定に照らして採点します。LLMジャッジから始めるか、ライブラリからLLMジャッジをインポートします。",
-      "action": "スコアラーを作成",
-      "actionDesc": "LLMジャッジまたはリモートスコアラーの定義"
+      "action": "新得点者",
+      "actionDesc": "LLMジャッジまたはリモートスコアラーの定義",
+      "import": "スコアラー (インポート)",
+      "importDesc": "JSON ファイルからのインポート"
     },
     "noEvalJobs": {
       "title": "評価用の仕事はまだありません",
       "description": "ジョブは LLM ストリームに対してスコアラーをスケジュールします。スコアを作成すると、定期的に会話の採点を開始できます。",
-      "action": "評価ジョブの作成",
+      "action": "新しい仕事",
       "actionDesc": "ストリームを選択 + スコアラー + ケイデンス"
     },
     "noScoreConfigs": {
       "title": "スコア設定はまだありません",
       "description": "スコア構成は、スコアラーが生成するスキーマ（数値、ブール値、またはカテゴリ）を定義します。1 つ追加してスコアリングを開始します。",
-      "action": "スコア設定を作成",
-      "actionDesc": "スコアシェイプ+ヘルシーレンジを定義"
+      "action": "新しいスコア設定",
+      "actionDesc": "スコアシェイプ+ヘルシーレンジを定義",
+      "import": "スコア設定をインポート",
+      "importDesc": "JSON ファイルからのインポート"
     },
     "loadError": {
       "title": "何かがおかしくなった",
@@ -271,6 +302,7 @@
     },
     "nouns": {
       "logs": "ログ",
+      "patterns": "パターン",
       "dashboards": "ダッシュボード",
       "pipelines": "パイプライン",
       "functions": "機能",
@@ -305,7 +337,8 @@
       "scorers": "スコアラー",
       "evalJobs": "評価ジョブ",
       "scoreConfigs": "スコア設定",
-      "pipelineHistory": "パイプライン履歴"
+      "pipelineHistory": "パイプライン履歴",
+      "regexPatterns": "正規表現パターン"
     }
   },
   "common": {
@@ -385,6 +418,8 @@
     "legendWidth": "レジェンド幅",
     "exceptions": "例外",
     "nameRequired": "名前が必要です",
+    "invalidEmail": "有効なEメールアドレスを入力してください。",
+    "nameMaxLength": "名前は最大 {max} 文字でなければなりません。",
     "edit": "編集",
     "delete": "削除",
     "remove": "削除",
@@ -1322,6 +1357,14 @@
     "newPassword": "新しいパスワード",
     "organization": "組織",
     "otherOrganization": "その他の組織",
+    "roleRequired": "役割が必要です",
+    "fieldRequired": "フィールドは必須です",
+    "passwordRequired": "パスワードが必要です。",
+    "passwordPolicyHint": "パスワードは 8 ～ 128 文字で、少なくとも 1 つの小文字、1 つの大文字、1 つの数字、1 つの特殊文字を含む必要があります。",
+    "currentPasswordRequired": "現在のパスワードが必要です。",
+    "newPasswordRequired": "新しいパスワードが必要です。",
+    "otherOrgInvalid": "組織名は文字で始まり、英数字、_ または-でなければなりません。",
+    "inviteEmailInvalid": "正しい電子メール ID を入力してください。",
     "isExistingUser": "既存のユーザー?",
     "deleteAPIKeyMessage": "このユーザー API キーを削除してよろしいですか?このアクションは元に戻せません。「OK」をクリックして確定します。",
     "apiKeyNotFound": "ユーザー API キーが見つかりません。",
@@ -1362,6 +1405,7 @@
   },
   "serviceAccounts": {
     "header": "サービスアカウント",
+    "emailInvalid": "有効なEメールアドレスを入力してください",
     "headerSubtitle": "API のプログラマティックアクセストークン",
     "search": "サービスアカウントを検索",
     "refresh": "サービス用トークンをリフレッシュ",
@@ -1601,6 +1645,11 @@
     "subtitle": "インデックス管理とストリーム構成",
     "streamNameHelpText": "英数字、アンダースコア、コロンのみを使用してください。",
     "search": "ストリームを検索",
+    "emptyOr": "または:",
+    "emptyKubernetes": "クベルネテス",
+    "emptyAws": "AWS/CloudWatch",
+    "emptyLinux": "リナックス",
+    "emptyWindows": "Windows",
     "name": "名前",
     "docNum": "ドキュメント数",
     "storageSize": "取り込み済みデータサイズ",
@@ -2047,6 +2096,7 @@
     "defaultTokenBadge": "デフォルト",
     "createTokenBtn": "新しいトークンを作成",
     "createTokenTitle": "トークンを作成",
+    "searchToken": "トークンを検索",
     "tokenNameLabel": "[名前]",
     "tokenDescriptionLabel": "[説明]",
     "rotateTokenBtn": "回転",
@@ -2091,6 +2141,17 @@
     "header": "ダッシュボード",
     "subtitle": "複数のフォルダでダッシュボードを作成、整理、共有",
     "add": "ダッシュボードを追加",
+    "setAsHome": "ホームページに固定",
+    "removeFromHome": "ホームページからピン留め解除",
+    "isHomeDashboard": "ホームダッシュボード",
+    "openHomeDashboard": "ピン留めされたダッシュボードを表示",
+    "pinnedOnHome": "ホームページの固定ダッシュボード",
+    "deletedSuccessfully": "ダッシュボードは正常に削除されました。",
+    "pinnedDeletedPinRemoved": "ピン留めされたダッシュボードが削除され、ホームピンも削除されました。",
+    "homePinNotFound": "このダッシュボードはもう存在せず、ホームから削除されました。",
+    "homePinUnavailable": "このダッシュボードは利用できなくなり、ホームから削除されました。",
+    "setAsHomeDesc": "このダッシュボードを組織の全員のホームページに表示する",
+    "moreActions": "その他のアクション",
     "save": "保存",
     "cancel": "キャンセル",
     "delete": "ダッシュボードを削除",
@@ -2160,6 +2221,7 @@
     "selectVariableScope": "変数スコープの選択",
     "variableScopeHelp": "グローバルが選択されている場合、変数はすべてのタブとパネルに適用されます。",
     "newTab": "タブを追加",
+    "editTab": "タブを編集",
     "generalSettingsTitle": "一般設定",
     "tabSettingsTitle": "タブ設定",
     "addGeneralSettings": "一般設定",
@@ -2534,14 +2596,34 @@
     "editDrilldown": "ドリルダウンを編集",
     "goTo": "次の場所に移動:",
     "selectLogsMode": "ログモードを選択:",
-    "enterCustomQuery": "カスタムクエリを入力:",
-    "enterUrl": "URL を入力:",
+    "enterCustomQuery": "カスタム SQL クエリ*:",
+    "sqlQueryRequired": "SQLクエリが必要です",
+    "variableNameRequired": "変数名が必要です",
+    "variableNameInvalid": "文字、数字、ハイフン、アンダースコアのみ使用できます",
+    "atLeastOneTabRequired": "少なくとも1つのタブが必要です",
+    "atLeastOnePanelRequired": "少なくとも1つのパネルが必要です",
+    "streamTypeRequired": "ストリームタイプが必要です",
+    "streamIndexRequired": "ストリーム / インデックスが必要です",
+    "fieldRequired": "フィールドは必須です",
+    "constantValueRequired": "定数値が必要です",
+    "operatorRequired": "演算子が必要です",
+    "filterValueRequired": "必須",
+    "labelRequired": "ラベルが必要です",
+    "optionValueRequired": "フィールドは必須です！",
+    "seriesValueRequired": "系列の値が必要です",
+    "colorRequired": "色が必要です",
+    "onlyHttpsUrlsAllowed": "HTTP(S) の URL のみ使用できます",
+    "urlRequired": "URL が必要です",
+    "folderRequired": "フォルダが必要です",
+    "dashboardRequired": "ダッシュボードが必要です",
+    "tabRequired": "タブが必要です",
+    "enterUrl": "URL を入力",
     "invalidUrl": "URL が無効です",
-    "selectFolderDrilldown": "フォルダを選択*:",
+    "selectFolderDrilldown": "[フォルダを選択]",
     "noFoldersAvailable": "使用可能なフォルダはありません",
-    "selectDashboardDrilldown": "ダッシュボードを選択*:",
+    "selectDashboardDrilldown": "[ダッシュボード] を選択",
     "noDashboardsAvailable": "使用可能なダッシュボードはありません",
-    "selectTabDrilldown": "タブを選択*:",
+    "selectTabDrilldown": "[タブを選択]",
     "noTabAvailable": "タブはありません",
     "variables": "変数:",
     "passAllCurrentVariables": "現在の変数をすべて渡す:",
@@ -2664,6 +2746,11 @@
     "operations": "オペレーション",
     "promQLBuilder": "プロムQLビルダー",
     "joins": "参加します",
+    "xAxisShort": "X軸",
+    "yAxisShort": "Y軸",
+    "rowFields": "行フィールド",
+    "valueFields": "値フィールド",
+    "noData": "データなし",
     "addJoin": "追加ジョイン",
     "removeJoin": "[結合を削除]",
     "leftJoin": "レフト・ジョイン",
@@ -2739,6 +2826,7 @@
     "tabAiAssistant": "O2 人工知能アシスタント",
     "tabOverview": "概要",
     "tabUsage": "使い方",
+    "removeHomeDashboard": "ホームダッシュボードを削除",
     "subtitle": "一目でわかるオブザーバビリティワークスペース"
   },
   "overview": {
@@ -2891,6 +2979,9 @@
     "enterpriseNote": "大量生産が必要ですか？スケールについて話そう！カスタマイズされたソリューションについてはお問い合わせください。",
     "contactSupport": "サポートに連絡",
     "totalUsage": "合計使用量",
+    "usageTrends": {
+      "dailyUsage": "毎日の使用量"
+    },
     "aiCredits": "AI クレジット",
     "aiModeFree": "無料",
     "aiModePayAsYouGo": "従量課金制",
@@ -3005,9 +3096,9 @@
     "searchAllFolders": "すべてのフォルダー",
     "streamConfig": "ストリーム構成",
     "alertRules": "アラートルール",
-    "noTemplatesMsg": "まだテンプレートを作成していないようです。アラートを作成するには、少なくとも 1 つの送信先と 1 つのテンプレートを用意する必要があります。",
+    "noTemplatesMsg": "アラートを作成するには、少なくとも 1 つのテンプレートと 1 つの宛先が必要です。テンプレートは通知メッセージの形式を定義します。まずはテンプレートを作成します。",
     "createTemplateBtn": "テンプレートを作成",
-    "noDestinationsMsg": "まだ目的地を作成していないようです。アラートを作成するには、少なくとも 1 つの送信先と 1 つのテンプレートを用意する必要があります。",
+    "noDestinationsMsg": "アラートを作成するには、少なくとも 1 つの宛先と 1 つのテンプレートが必要です。送信先は通知の送信先を定義します。まずは通知を作成します。",
     "createDestinationBtn": "目的地の作成",
     "add": "アラートを追加",
     "edit": "編集",
@@ -3875,6 +3966,8 @@
     "saveChanges": "[保存]",
     "invalidDomain": "有効なドメイン名を入力してください",
     "invalidEmail": "このドメインの有効なメールアドレスを入力してください",
+    "domainRequired": "ドメインが必要です",
+    "emailRequired": "メールアドレスが必要です",
     "domainAlreadyExists": "このドメインは既に追加されています",
     "domainAdded": "ドメインは正常に追加されました",
     "confirmRemoveDomain": "ドメイン '{domain}' を削除してよろしいですか?",
@@ -3891,6 +3984,7 @@
     "pageSubtitle": "アプリケーションの設定を調整する",
     "platformSettings": "プラットフォーム設定",
     "scrapeIntervalRequired": "スクレイプ間隔が必要です",
+    "scrapeIntervalPositive": "スクレイプ間隔は正の数でなければなりません",
     "scrapeIntervalDescription": "スクレイプ間隔は、モニタリングシステムがメトリックを収集する頻度（秒単位）です。",
     "maxSeriesPerQueryLabel": "クエリあたりの最大シリーズ数",
     "maxSeriesPerQueryDescription": "1 つの PromQL クエリから返されるシリーズの最大数。結果セットが大きい場合に UI がフリーズするのを防ぐのに役立ちます。システムデフォルト (40,000) を使用するには空のままにします。",
@@ -4192,6 +4286,51 @@
     "querySource": "クエリーソース"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "検索サービス",
+      "noStreamsDetected": "ストリームは検出されませんでした。サービスグラフのメトリクスに stream_name ラベルが含まれていることを確認してください。",
+      "streamOnlyInfo": "Service Graphは、メモリ内状態がゼロのストリーム専用アーキテクチャを使用しています",
+      "borderColor": "ボーダーカラー",
+      "borderColorMetric": "エラー",
+      "nodeSize": "ノードサイズ",
+      "nodeSizeMetric": "リクエスト",
+      "sizeLow": "低い",
+      "sizeHigh": "ハイ",
+      "status": {
+        "healthy": "ヘルシー",
+        "degraded": "劣化しました",
+        "warning": "警告",
+        "critical": "クリティカル"
+      },
+      "range": {
+        "healthy": "1% 未満",
+        "degraded": "1 — 5%",
+        "warning": "5 — 10%",
+        "critical": "> 10%"
+      },
+      "entities": "エンティティ",
+      "distribution": "ディストリビューション",
+      "total": "合計",
+      "showTypes": "タイプを表示",
+      "typesFiltered": "一部のタイプは非表示になっています。開くと表示内容を変更できます。",
+      "zoomIn": "ズームイン",
+      "zoomOut": "[ズームアウト]",
+      "fitToScreen": "画面に合わせる",
+      "layout": "[レイアウト]",
+      "types": "タイプ",
+      "mode": {
+        "auto": "オート",
+        "expanded": "拡張",
+        "collapsed": "折りたたまれた"
+      },
+      "kind": {
+        "service": "サービス",
+        "database": "データストア",
+        "queue": "キュー",
+        "external": "外部",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "フルビューで開く",
     "viewLogs": "ログを表示",
     "viewRelated": "関連を表示",
@@ -4470,6 +4609,7 @@
     "servicesCatalog": {
       "tabLabel": "サービスカタログ",
       "title": "サービスカタログ",
+      "footerTitle": "サービス",
       "filterPlaceholder": "サービス名で絞り込み...",
       "noServicesFound": "選択した時間範囲にサービスが見つかりません。",
       "loading": "サービスを読み込んでいます...",
@@ -4496,6 +4636,15 @@
       "servicesLabel": "サービス",
       "viewTraces": "トレースを表示",
       "exportCsv": "CSV をエクスポート",
+      "types": {
+        "all": "[すべて]",
+        "service": "サービス",
+        "datastore": "データストア",
+        "queue": "キュー",
+        "external": "外部",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{カウント} {ステータス}",
       "legend": {
         "title": "エラー率"
       }
@@ -5197,13 +5346,13 @@
     "loading": "オンライン評価設定をロード中...",
     "loadError": "オンライン評価を読み込めませんでした",
     "deletePrompt": "{name} を削除しますか?",
-    "deleteTitle": "{ラベル} を削除",
+    "deleteTitle": "{label} を削除",
     "deleteConfirmMessage": "「{name}」を削除してよろしいですか？このアクションは元に戻せません。",
-    "deleted": "{ラベル} は削除されました",
+    "deleted": "{label} は削除されました",
     "deleteError": "{label} を削除できませんでした",
     "saved": "{label} が保存されました",
-    "newButton": "新規 {ラベル}",
-    "search": "検索 {ラベル}",
+    "newButton": "新規 {label}",
+    "search": "検索 {label}",
     "refresh": "リフレッシュ",
     "allStatuses": "すべてのステータス",
     "noRowsFound": "{label} が見つかりません",
@@ -5233,6 +5382,7 @@
     },
     "quality": {
       "scopeLabel": "このワークスペースのすべての品質ディメンション",
+      "agentPlaceholder": "すべてのエージェント",
       "timeRange": {
         "label": "時間範囲",
         "last1h": "過去 1 時間",
@@ -6097,6 +6247,10 @@
       "functions": "機能",
       "reports": "レポート",
       "iam": "IAM",
+      "settings": "[設定]",
+      "onlineEvals": "オンライン評価",
+      "actions": "[アクション]",
+      "rum": "ラム酒",
       "runningQueries": "クエリの実行"
     },
     "pages": {
@@ -6122,7 +6276,30 @@
       "panelEditor": "パネルエディター",
       "traceDetail": "トレースの詳細",
       "runningQueries": "クエリの実行",
-      "ingestionTokens": "IAM — インジェストトークン"
+      "ingestionTokens": "IAM — インジェストトークン",
+      "alertIncidents": "アラート — インシデント",
+      "pipelineDestinations": "パイプライン — 目的地",
+      "enrichmentTables": "エンリッチメントテーブル",
+      "iamInvitations": "IAM — 招待状",
+      "iamOrganizations": "IAM — 組織",
+      "regexPatterns": "正規表現パターン",
+      "cipherKeys": "暗号キー",
+      "nodes": "ノード",
+      "modelPricing": "モデル価格",
+      "searchSchedulers": "検索スケジューラー",
+      "searchHistory": "検索履歴",
+      "sessions": "セッション",
+      "evalTemplates": "オンライン評価 — テンプレート",
+      "scorers": "オンライン評価 — スコアラー",
+      "evalJobs": "オンライン評価 — 求人",
+      "scoreConfigs": "オンライン評価 — スコア構成",
+      "actions": "[アクション]",
+      "llmProviders": "LLM プロバイダー",
+      "aiToolsets": "AI ツールセット",
+      "orgManagement": "組織管理",
+      "rumErrors": "RUM — エラートラッキング",
+      "rumSessions": "RUM — セッション",
+      "sourceMaps": "RUM — ソースマップ"
     },
     "actions": {
       "openCheatsheet": "キーボードショートカットのチートシートを開く",
@@ -6202,7 +6379,30 @@
       "logsExport": "結果を CSV としてエクスポート",
       "tableRowOpen": "カーソルを合わせた行を開く/展開する",
       "tableRowInspect": "カーソルを合わせた行を検査",
-      "tracesCopyUrl": "トレース共有 URL をコピー"
+      "tracesCopyUrl": "トレース共有 URL をコピー",
+      "alertIncidentsRefresh": "リストを更新",
+      "pipelineDestinationsRefresh": "リストを更新",
+      "enrichmentTablesRefresh": "リストを更新",
+      "iamInvitationsRefresh": "リストを更新",
+      "iamOrganizationsRefresh": "リストを更新",
+      "regexPatternsRefresh": "リストを更新",
+      "cipherKeysRefresh": "リストを更新",
+      "nodesRefresh": "リストを更新",
+      "modelPricingRefresh": "リストを更新",
+      "searchSchedulersRefresh": "リストを更新",
+      "searchHistoryRefresh": "リストを更新",
+      "sessionsRefresh": "リストを更新",
+      "evalTemplatesRefresh": "リストを更新",
+      "scorersRefresh": "リストを更新",
+      "evalJobsRefresh": "リストを更新",
+      "scoreConfigsRefresh": "リストを更新",
+      "actionsRefresh": "リストを更新",
+      "llmProvidersRefresh": "リストを更新",
+      "aiToolsetsRefresh": "リストを更新",
+      "orgManagementRefresh": "リストを更新",
+      "rumErrorsRefresh": "リストを更新",
+      "rumSessionsRefresh": "リストを更新",
+      "sourceMapsRefresh": "リストを更新"
     }
   }
 }

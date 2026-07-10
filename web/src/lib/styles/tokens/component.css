@@ -199,8 +199,8 @@
   --color-field-list-expansion-border: var(--color-border-default);
 
   /* Stepper */
-  --color-stepper-indicator-default: var(--color-border-strong);
-  --color-stepper-indicator-default-text: var(--color-text-primary);
+  --color-stepper-indicator-default: var(--color-surface-subtle);
+  --color-stepper-indicator-default-text: var(--color-text-secondary);
   --color-stepper-indicator-active: var(--color-primary-600);
   --color-stepper-indicator-done: var(--color-primary-600);
   --color-stepper-indicator-error: var(--color-error-600);
@@ -3907,6 +3907,19 @@ button.date-time-button {
   font-size: 12px !important;
 }
 
+/* This "table" lays out entirely with flexbox + explicit column widths — it
+   does not use native table column layout. Rendering the table/thead/tbody as
+   block boxes makes `position: relative` (the containing block for the
+   position:absolute virtual rows), `height`, and `position: sticky` on the
+   header behave identically across browsers. Firefox does NOT honor these on
+   native table-row-group boxes, which left the Firefox results table collapsed
+   with no visible rows. */
+.logs-table,
+.logs-table > thead,
+.logs-table > tbody {
+  display: block;
+}
+
 .logs-table thead {
   font-family: var(--font-sans);
   font-size: 14px !important;
@@ -4197,9 +4210,15 @@ button.date-time-button {
   border-bottom: 0.03rem solid var(--o2-border-color);
 }
 
+/* Single source of truth for the count/label shown in a listing-table footer
+   (e.g. "20 Dashboards"). Deliberately sets NO color so it inherits the exact
+   same ambient color as the "Showing X of Y / Records per page" pagination
+   text sitting beside it — the two must always read identically. Only size and
+   weight are fixed here; consumers apply ONLY this class plus layout utilities,
+   never their own color/size/weight, so every listing footer reads the same. */
 .o2-table-footer-title {
-  font-size: 0.875rem;
-  font-weight: 700;
+  font-size: 0.75rem;
+  font-weight: 400;
   line-height: 1rem;
 }
 

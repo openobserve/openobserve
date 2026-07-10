@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Products — OpenObserve RUM CDN Sample</title>
+
+  <link rel="preconnect" href="https://browsersdk.openobserve.ai" crossorigin />
+  <link rel="dns-prefetch" href="https://browsersdk.openobserve.ai" />
+
+  <!-- Same RUM + Logs async loader stub as every page -->
+  <script>
+    (function (h, o, u, n, g) {
+      h[g] = h[g] || { q: [], onReady: function (c) { this.q.push(c); } };
+      var s = o.createElement(u); s.async = 1; s.src = n;
+      var f = o.getElementsByTagName(u)[0]; f.parentNode.insertBefore(s, f);
+    })(window, document, 'script', 'https://browsersdk.openobserve.ai/0.3.4/openobserve-logs.js', 'OO_LOGS');
+    (function (h, o, u, n, g) {
+      h[g] = h[g] || { q: [], onReady: function (c) { this.q.push(c); } };
+      var s = o.createElement(u); s.async = 1; s.src = n;
+      var f = o.getElementsByTagName(u)[0]; f.parentNode.insertBefore(s, f);
+    })(window, document, 'script', 'https://browsersdk.openobserve.ai/0.3.4/openobserve-rum.js', 'OO_RUM');
+  </script>
+
+  <script src="./oo-rum.js"></script>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <nav class="site-nav" aria-label="Primary">
+    <span class="brand">O2 RUM Demo</span>
+    <a href="./index.html" data-test="nav-home-link">Home</a>
+    <a href="./products.html" data-test="nav-products-link" aria-current="page">Products</a>
+    <a href="./checkout.html" data-test="nav-checkout-link">Checkout</a>
+    <a href="./about.html" data-test="nav-about-link">About</a>
+  </nav>
+
+  <main>
+    <h1>Products</h1>
+    <p class="sub">Each "Add to cart" is a named RUM action. The list loads via a simulated fetch so you get a loading → populated view transition.</p>
+
+    <section>
+      <div id="products-loading" data-test="products-loading">Loading products…</div>
+      <div class="grid" id="product-grid" data-test="product-grid" hidden></div>
+    </section>
+
+    <section>
+      <h2>Cart</h2>
+      <div id="cart" data-test="products-cart" class="status">Cart is empty.</div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+      var PRODUCTS = [
+        { id: 'sku-logs',    name: 'Log Pipeline',   price: 29 },
+        { id: 'sku-metrics', name: 'Metrics Engine',  price: 49 },
+        { id: 'sku-traces',  name: 'Trace Explorer',  price: 39 },
+        { id: 'sku-rum',     name: 'RUM + Replay',    price: 59 },
+      ];
+      var cart = [];
+
+      function renderCart() {
+        var el = document.querySelector('[data-test="products-cart"]');
+        el.textContent = cart.length
+          ? cart.length + ' item(s): ' + cart.map(function (c) { return c.name; }).join(', ')
+          : 'Cart is empty.';
+      }
+
+      function addToCart(p) {
+        cart.push(p);
+        renderCart();
+        // Custom RUM action with context — appears in RUM under data-test name.
+        if (window.OO_RUM) window.OO_RUM.onReady(function () {
+          window.OO_RUM.addAction('add_to_cart', { sku: p.id, price: p.price });
+        });
+        if (window.OO_LOGS) window.OO_LOGS.onReady(function () {
+          window.OO_LOGS.logger.info('Product added to cart', { sku: p.id });
+        });
+      }
+
+      function renderProducts() {
+        var grid = document.getElementById('product-grid');
+        PRODUCTS.forEach(function (p) {
+          var card = document.createElement('article');
+          card.className = 'card';
+          card.innerHTML =
+            '<h3>' + p.name + '</h3>' +
+            '<p class="price">$' + p.price + '</p>';
+          var btn = document.createElement('button');
+          btn.className = 'primary';
+          btn.textContent = 'Add to cart';
+          btn.setAttribute('data-test', 'products-add-' + p.id + '-btn');
+          btn.addEventListener('click', function () { addToCart(p); });
+          card.appendChild(btn);
+          grid.appendChild(card);
+        });
+        document.getElementById('products-loading').hidden = true;
+        grid.hidden = false;
+      }
+
+      // Simulate async load so RUM records a loading -> populated transition.
+      // (No setTimeout in tests — this is demo app code, not a test.)
+      window.setTimeout(renderProducts, 600);
+    })();
+  </script>
+</body>
+</html>

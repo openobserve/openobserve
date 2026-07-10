@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col">
+  <div class="flex flex-col h-full">
     <!-- Patterns Table — hidden during loading so skeleton always shows on re-run -->
     <div v-if="!loading && patterns?.length > 0" class="flex flex-col">
       <!-- Table Header -->
@@ -144,30 +144,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Empty State -->
-    <div
-      v-else
-      class="flex-1 flex flex-col items-center justify-center p-[1.25rem] text-center"
-    >
-      <div class="text-[3rem] mb-[1rem] opacity-30">📊</div>
-      <div
-        class="text-xl font-semibold mb-2"
-        :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
+    <div v-else class="flex-1 flex items-center justify-center">
+      <OEmptyState
+        size="hero"
+        preset="no-patterns"
+        data-test="log-patterns-empty-state"
       >
-        No patterns found
-      </div>
-      <div
-        class="text-sm max-w-[31.25rem]"
-        :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'"
-      >
-        <div v-if="totalLogsAnalyzed">
-          Only {{ totalLogsAnalyzed }} logs were analyzed.
-        </div>
-        <div class="mt-2">
-          Try increasing the time range or selecting a different stream with
-          more log data.
-          <br />Pattern extraction works best with at least 1000+ logs.
-        </div>
-      </div>
+        <!-- When the selected time range has no logs but the stream has data
+             elsewhere, offer a precise jump to the latest data — same as the
+             logs search empty state. -->
+        <template v-if="jumpTarget" #actions>
+          <EmptyStateActionCard
+            icon="schedule"
+            :label="t('logs.noEvents.jumpToData')"
+            :sublabel="jumpTargetSublabel"
+            data-test="log-patterns-jump-to-data-card"
+            @click="emit('jump-to-stream-data', jumpTarget.from, jumpTarget.to)"
+          />
+        </template>
+        <template v-if="totalLogsAnalyzed" #extra>
+          <span class="text-sm text-text-secondary">
+            {{ t("emptyState.noPatterns.logsAnalyzed", { count: totalLogsAnalyzed }) }}
+          </span>
+        </template>
+      </OEmptyState>
     </div>
 
     <!-- Bottom spacer so the last row isn't flush with the container edge -->
@@ -193,6 +193,10 @@ import PatternCard from "./PatternCard.vue";
 import WildcardValuePopover from "./WildcardValuePopover.vue";
 import useWildcardHover from "./useWildcardHover";
 import OVirtualScroll from "@/lib/core/VirtualScroll/OVirtualScroll.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import { computed } from "vue";
+import { DateTime } from "luxon";
 
 const SKELETON_WIDTHS = [
   "w-3/4",
@@ -224,13 +228,18 @@ const props = defineProps<{
   wrap?: boolean;
   /** External scroll container passed to q-virtual-scroll's scroll-target. */
   scrollTarget?: HTMLElement | null;
+  /** Selected stream's doc time range (µs) — from the logs Index. */
+  streamDocTimeRange?: { min: number; max: number };
+  /** Resolved current query window (µs) — from the logs Index. */
+  queryWindowUs?: { start: number; end: number };
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "open-details", pattern: any, index: number): void;
   (e: "add-to-search", pattern: any, action: "include" | "exclude"): void;
   (e: "create-alert", pattern: any): void;
   (e: "filter-value", value: string, action: "include" | "exclude"): void;
+  (e: "jump-to-stream-data", fromUs: number, toUs: number): void;
 }>();
 
 const store = useStore();
@@ -241,6 +250,39 @@ const {
   onPopoverEnter,
   onPopoverLeave,
 } = useWildcardHover();
+
+// --- "jump to latest data" (parity with the logs search empty state) --------
+const FIFTEEN_MINS_US = 15 * 60 * 1_000_000;
+const END_NUDGE_US = 1_000_000; // backend end boundary is exclusive
+const TOLERANCE_US = 30_000_000;
+
+// Offered only when the current window sits OUTSIDE the stream's data envelope
+// (i.e. there are no logs to extract patterns from here, but the stream has data
+// elsewhere). When the window overlaps data the panel is simply sparse — jumping
+// wouldn't help — so the card stays hidden.
+const jumpTarget = computed<{ from: number; to: number } | null>(() => {
+  const r = props.streamDocTimeRange;
+  const w = props.queryWindowUs;
+  if (!r) return null;
+  const windowOverlapsData =
+    !w || (w.start <= r.max + TOLERANCE_US && w.end >= r.min - TOLERANCE_US);
+  if (windowOverlapsData) return null;
+  return { from: r.max - FIFTEEN_MINS_US, to: r.max + END_NUDGE_US };
+});
+
+const jumpTargetSublabel = computed(() => {
+  const r = props.streamDocTimeRange;
+  if (!jumpTarget.value || !r) return "";
+  const tz = store.state.timezone || "UTC";
+  const zone =
+    tz.toLowerCase() === "local" || tz.toLowerCase() === "browser"
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : tz;
+  const formatted = DateTime.fromMillis(r.max / 1000)
+    .setZone(zone)
+    .toFormat("MMM d, yyyy HH:mm:ss");
+  return `Last data: ${formatted} (${zone})`;
+});
 </script>
 
 <style>

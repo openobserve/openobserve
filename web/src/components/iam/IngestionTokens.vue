@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md p-0 h-full flex flex-col">
+  <div class="p-0 h-full flex flex-col">
     <!-- Standard section header: title + description + Create action. -->
     <AppPageHeader
       icon="key"
@@ -79,13 +79,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="ingestion-tokens-refresh-btn"
+              @click="fetchTokens"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="ingestionTokensRefresh" />
+            </OButton>
+          </template>
           <template #empty>
             <OEmptyState
               size="hero"
               preset="no-ingestion-tokens"
               :filtered="!!filterQuery"
-              :hide-action="!filterQuery"
-              @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+              @action="(id) => id === 'clear-filters' ? (filterQuery = '') : (showCreateForm = true)"
             />
           </template>
 
@@ -126,21 +137,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('ingestion.createTokenTitle')"
       :primary-button-label="t('common.create')"
       :secondary-button-label="t('common.cancel')"
-      :primary-button-disabled="!newTokenName.trim() || loading"
-      @click:primary="createToken"
+      form-id="create-token-form"
       @click:secondary="showCreateForm = false"
     >
-      <OInput
-        v-model="newTokenName"
-        :label="t('ingestion.tokenNameLabel') + ' *'"
-        :maxlength="256"
-        autofocus
-      />
-      <OInput
-        v-model="newTokenDescription"
-        :label="t('ingestion.tokenDescriptionLabel')"
-        class="mt-4"
-      />
+      <OForm
+        id="create-token-form"
+        :schema="createTokenSchema"
+        :default-values="createTokenDefaults()"
+        @submit="createToken"
+      >
+        <OFormInput
+          name="name"
+          :label="t('ingestion.tokenNameLabel')"
+          required
+          :maxlength="256"
+          autofocus
+          data-test="ingestion-token-name-input"
+        />
+        <OFormInput
+          name="description"
+          :label="t('ingestion.tokenDescriptionLabel')"
+          class="mt-4"
+          data-test="ingestion-token-description-input"
+        />
+      </OForm>
     </ODialog>
 
     <!-- Revealed token dialog -->
@@ -199,10 +219,16 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import {
+  makeCreateTokenSchema,
+  createTokenDefaults,
+  type CreateTokenForm,
+} from "./IngestionTokens.schema";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -224,21 +250,25 @@ interface Token {
 
 export default defineComponent({
   name: "IngestionTokens",
-  components: { AppPageHeader, OButton, OEmptyState, OIcon, OSearchInput, OTooltip, ODialog, OInput, OTable, OCodeCell, OUserCell },
+  components: { AppPageHeader, OButton, OEmptyState, OIcon, OSearchInput, OTooltip, ODialog, OForm, OFormInput, OTable, OCodeCell, OUserCell },
   setup() {
     const store = useStore();
     const { t } = useI18n();
+
+    // Create-token dialog is an OForm — the schema (name required + max 256) and
+    // its defaults factory MUST be returned from setup() (Options-API), else
+    // :schema/:default-values resolve to undefined.
+    const createTokenSchema = makeCreateTokenSchema(t);
 
     const tokens = ref<Token[]>([]);
     const loading = ref(false);
     const filterQuery = ref("");
     const showCreateForm = ref(false);
     const showRevealedDialog = ref(false);
-    const newTokenName = ref("");
-    const newTokenDescription = ref("");
     const revealedToken = ref<{ name: string; token: string } | null>(null);
 
-    // Ready-to-paste "Basic base64(name:token)" for the just-created token.
+    // Ready-to-paste "Basic base64(name:token)" credential shown in the
+    // "New Token Generated" dialog (restored — the merge auto-drop lost it).
     const revealedBasicAuth = computed(() =>
       revealedToken.value
         ? getBasicAuth(revealedToken.value.name, revealedToken.value.token)
@@ -307,23 +337,24 @@ export default defineComponent({
       }
     };
 
-    const createToken = async () => {
-      if (!newTokenName.value.trim()) return;
+    // Plain async @submit handler — fires only after the schema passes (name
+    // required + max 256). Awaited by OForm, so the footer Save spinner spans the
+    // request automatically (no disabled gate). The dialog unmounts its body on
+    // close, so there's no model to reset.
+    const createToken = async (value: CreateTokenForm) => {
       loading.value = true;
       try {
         const res = await organizationsService.create_org_ingestion_token(
           store.state.selectedOrganization.identifier,
           {
-            name: newTokenName.value.trim(),
-            description: newTokenDescription.value.trim(),
+            name: value.name.trim(),
+            description: (value.description ?? "").trim(),
           },
         );
         revealedToken.value = {
-          name: newTokenName.value.trim(),
+          name: value.name.trim(),
           token: res.data.data.token,
         };
-        newTokenName.value = "";
-        newTokenDescription.value = "";
         showCreateForm.value = false;
         showRevealedDialog.value = true;
         await fetchTokens();
@@ -414,12 +445,12 @@ export default defineComponent({
       columns,
       showCreateForm,
       showRevealedDialog,
-      newTokenName,
-      newTokenDescription,
       revealedToken,
       revealedBasicAuth,
       fetchTokens,
       createToken,
+      createTokenSchema,
+      createTokenDefaults,
       toggleEnabled,
       copyToken,
       toBasicAuth,

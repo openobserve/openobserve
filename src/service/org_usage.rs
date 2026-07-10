@@ -64,13 +64,20 @@ pub async fn get_org_usage(
     let (sql, start_time, end_time) =
         org_usage::create_usage_query_sql_and_time_range(org_id, usage_range, cycle_details);
 
-    let mut usage_results = get_usage(sql, start_time, end_time, false)
-        .await
-        .map_err(|e| billings::BillingError::PartialUsageResults(e.to_string()))?
-        .into_iter()
-        .filter_map(|hit| json::from_value::<OrgUsageQueryResult>(hit).ok())
-        .filter(|r| r.event.is_billable())
-        .collect::<Vec<_>>();
+    // The main `usage` stream may not exist yet for a brand-new org. As with
+    // data retention below, a missing stream should read as "no usage" rather
+    // than failing the whole request.
+    let mut usage_results = match get_usage(sql, start_time, end_time, false).await {
+        Ok(hits) => hits
+            .into_iter()
+            .filter_map(|hit| json::from_value::<OrgUsageQueryResult>(hit).ok())
+            .filter(|r| r.event.is_billable())
+            .collect::<Vec<_>>(),
+        Err(e) => {
+            log::warn!("usage query failed for org {org_id}, treating as zero: {e}");
+            Vec::new()
+        }
+    };
 
     let (data_retention_query, ..) = org_usage::create_data_retention_usage_sql_and_time_range(
         org_id,
@@ -78,12 +85,23 @@ pub async fn get_org_usage(
         cycle_details,
     );
 
-    let mut data_retention_results = get_usage(data_retention_query, start_time, end_time, false)
-        .await
-        .map_err(|e| billings::BillingError::PartialUsageResults(e.to_string()))?
-        .into_iter()
-        .filter_map(|hit| json::from_value::<OrgUsageQueryResult>(hit).ok())
-        .collect::<Vec<_>>();
+    // Data-retention usage lives in a separate `data_retention_usage` stream
+    // that may not exist for an org yet (e.g. no retention usage recorded). A
+    // failure here (most commonly "stream not found") must NOT fail the whole
+    // usage response — treat it as zero retention and return the rest.
+    let mut data_retention_results =
+        match get_usage(data_retention_query, start_time, end_time, false).await {
+            Ok(hits) => hits
+                .into_iter()
+                .filter_map(|hit| json::from_value::<OrgUsageQueryResult>(hit).ok())
+                .collect::<Vec<_>>(),
+            Err(e) => {
+                log::warn!(
+                    "data_retention_usage query failed for org {org_id}, treating as zero: {e}"
+                );
+                Vec::new()
+            }
+        };
 
     usage_results.append(&mut data_retention_results);
 

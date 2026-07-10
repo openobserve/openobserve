@@ -107,10 +107,46 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
         usage_results.len()
     );
 
+    // Fallback: the usage stream is the primary discovery source, but if it is
+    // empty (self-reporting stalled/disabled, or a fresh instance) the service
+    // graph would silently go dark. When usage yields nothing, discover trace
+    // streams directly from the schema cache across all orgs so the graph keeps
+    // working regardless of the usage pipeline's health.
+    let discovered: Vec<RecentIngestedTraceStream> = if usage_results.is_empty() {
+        let mut fallback = Vec::new();
+        match crate::service::organization::list_all_orgs(None).await {
+            Ok(orgs) => {
+                for org in orgs {
+                    for stream_name in crate::service::db::schema::list_streams_from_cache(
+                        &org.identifier,
+                        StreamType::Traces,
+                    )
+                    .await
+                    {
+                        fallback.push(RecentIngestedTraceStream {
+                            org_id: org.identifier.clone(),
+                            stream_name,
+                        });
+                    }
+                }
+            }
+            Err(e) => log::warn!(
+                "[ServiceGraph] usage empty and org list failed, no fallback discovery: {e}"
+            ),
+        }
+        log::info!(
+            "[ServiceGraph] Usage empty; discovered {} trace streams via schema cache",
+            fallback.len()
+        );
+        fallback
+    } else {
+        usage_results
+    };
+
     for RecentIngestedTraceStream {
         org_id,
         stream_name,
-    } in usage_results
+    } in discovered
     {
         log::info!("[ServiceGraph] Processing stream {org_id}/{stream_name}");
 
@@ -193,16 +229,23 @@ async fn process_stream(
     // Such a dependency has no server span, so its latency is the client span's own
     // duration (the time spent waiting on it). The anti-join drops any inferred name
     // that is actually an instrumented service in this window, so it is not
-    // double-represented. Schema-gated: skip entirely on streams without the field.
-    let has_infer =
-        infra::schema::get_stream_schema_from_cache(org_id, stream_name, StreamType::Traces)
-            .await
-            .map(|s| {
-                s.field_with_name(crate::service::traces::inferred::INFER_SERVICE_NAME)
-                    .is_ok()
-            })
-            .unwrap_or(false);
+    // Schema-gated: skip only on streams that genuinely lack the field. Use the
+    // DB-backed schema lookup (NOT the cache-only variant) so a cold in-memory
+    // cache on the compactor node does not silently disable all inferred edges.
+    let has_infer = infra::schema::get(org_id, stream_name, StreamType::Traces)
+        .await
+        .map(|s| {
+            s.field_with_name(crate::service::traces::inferred::INFER_SERVICE_NAME)
+                .is_ok()
+        })
+        .unwrap_or(false);
     if has_infer {
+        // Emit ALL inferred-dependency edges. Classification (collision merge,
+        // rpc handling) happens downstream in build_topology via classify_entity,
+        // so there is no anti-join here: an inferred name that also matches a real
+        // service is resolved at topology-build time, not dropped at query time.
+        // (The old `NOT IN (subquery)` anti-join was both semantically wrong and
+        // unsupported by the query engine.)
         let inferred_sql = format!(
             r#"SELECT
                 service_name AS client,
@@ -219,11 +262,6 @@ async fn process_stream(
                 _timestamp >= {start_time} AND _timestamp < {end_time}
                 AND CAST(span_kind AS VARCHAR) IN ('3', '4')
                 AND infer_service_name IS NOT NULL AND infer_service_name != ''
-                AND infer_service_name NOT IN (
-                    SELECT DISTINCT service_name FROM "{stream_name}"
-                    WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
-                        AND service_name IS NOT NULL
-                )
             GROUP BY service_name, infer_service_name"#,
         );
         match run_graph_search(org_id, inferred_sql, start_time, end_time).await {
@@ -239,6 +277,47 @@ async fn process_stream(
             // Non-fatal: still write the instrumented edges we already have.
             Err(e) => log::error!(
                 "[ServiceGraph] Inferred-edge query failed for {org_id}/{stream_name}: {e}"
+            ),
+        }
+
+        // Queue CONSUMER edges (span_kind = 5): a consumer reads from a topic, so
+        // the edge is topic → service (reverse of the producer's service → topic).
+        // Inference does NOT tag consumer spans (only CLIENT/PRODUCER), so we read
+        // the raw messaging destination directly. This reconnects async flows
+        // (producer → topic → consumer, e.g. checkout → orders → fraud-detection)
+        // that the parent/child span join cannot, since consumers run in a
+        // separate trace. connection_type = 'queue' marks the topic as inferred.
+        let consumer_sql = format!(
+            r#"SELECT
+                messaging_destination_name AS client,
+                service_name AS server,
+                'queue' AS connection_type,
+                COUNT(*) AS total_requests,
+                COUNT(*) FILTER (WHERE span_status = 'ERROR') AS errors,
+                CAST(COUNT(*) FILTER (WHERE span_status = 'ERROR') * 100.0 / COUNT(*) AS DOUBLE) AS error_rate,
+                CAST(approx_median(end_time - start_time) AS BIGINT) AS p50,
+                CAST(approx_percentile_cont(end_time - start_time, 0.95) AS BIGINT) AS p95,
+                CAST(approx_percentile_cont(end_time - start_time, 0.99) AS BIGINT) AS p99
+            FROM "{stream_name}"
+            WHERE
+                _timestamp >= {start_time} AND _timestamp < {end_time}
+                AND CAST(span_kind AS VARCHAR) = '5'
+                AND messaging_destination_name IS NOT NULL AND messaging_destination_name != ''
+            GROUP BY messaging_destination_name, service_name"#,
+        );
+        match run_graph_search(org_id, consumer_sql, start_time, end_time).await {
+            Ok(mut consumer_hits) => {
+                log::info!(
+                    "[ServiceGraph] Query returned {} queue-consumer edges from {}/{}",
+                    consumer_hits.len(),
+                    org_id,
+                    stream_name
+                );
+                hits.append(&mut consumer_hits);
+            }
+            // Non-fatal: streams without messaging columns simply return an error.
+            Err(e) => log::debug!(
+                "[ServiceGraph] Consumer-edge query (non-fatal) for {org_id}/{stream_name}: {e}"
             ),
         }
     }

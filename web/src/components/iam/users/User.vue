@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="rounded-md p-0 h-full flex flex-col">
+  <div class="p-0 h-full flex flex-col">
     <!-- Standard page header: title + actions only. The user search moved into
          the table's own toolbar (built-in global filter) per the layout system. -->
     <AppPageHeader
@@ -79,6 +79,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex-1"
               />
             </div>
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="user-list-refresh-btn"
+              @click="refreshUsers"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="iamUsersRefresh" />
+            </OButton>
           </template>
           <template #empty>
             <OEmptyState
@@ -163,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <template #bottom>
-            <span class="o2-table-footer-title text-text-primary">{{ rows.length }} {{ isEnterpriseOrCloud ? (t('iam.organizationMembers') || 'Organization Members') : t('iam.basicUsers') }}</span>
+            <span class="o2-table-footer-title">{{ rows.length }} {{ isEnterpriseOrCloud ? (t('iam.organizationMembers') || 'Organization Members') : t('iam.basicUsers') }}</span>
             <OButton
               v-if="selectedUsers.length > 0"
               data-test="users-list-delete-users-btn"
@@ -239,6 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
@@ -281,6 +294,7 @@ export default defineComponent({
     AddUser,
     MemberInvitation,
     OButton,
+    OTooltip,
     OTag,
     OIcon,
     ODialog,
@@ -660,7 +674,17 @@ export default defineComponent({
                 rawEmail: data.email,
                 first_name: data.first_name,
                 last_name: data.last_name,
-                role: data?.status == "pending" ? toCamelCase(data.role) + " (Invited)": toCamelCase(data.role),
+                // Store the display-cased role (e.g. "Admin", "Admin (Invited)") so
+                // the edit/update payloads stay byte-identical to pre-migration, which
+                // sent the capitalized value. The role options from getRoles use the
+                // lowercase value ("admin"), so this seeded "Admin" doesn't match an
+                // option — but OSelect renders the raw value as a fallback, so the
+                // field still displays "Admin" correctly. The only cosmetic quirk is
+                // that the open dropdown won't highlight the lowercase option as active.
+                role:
+                  data?.status == "pending"
+                    ? toCamelCase(data.role) + " (Invited)"
+                    : toCamelCase(data.role),
                 roles: rolesArr,
                 auth_type: data?.auth_type
                   ? data.auth_type
@@ -763,6 +787,19 @@ export default defineComponent({
       });
     };
 
+    // Refresh handler for the toolbar refresh button. getOrgMembers() only seeds
+    // default action flags on each row — the real per-row permissions are
+    // computed by updateUserActions(), so it must run after every reload (this
+    // mirrors the onBeforeMount sequence). Binding refresh straight to
+    // getOrgMembers skipped this step and blanked out all row actions.
+    const refreshUsers = async () => {
+      try {
+        await getOrgMembers();
+      } finally {
+        updateUserActions();
+      }
+    };
+
     // const shouldAllowEdit = (user: any) => {
     //   if (isEnterprise.value) {
     //     return (
@@ -845,7 +882,9 @@ export default defineComponent({
     };
 
     const updateUser = (props: any) => {
-      selectedUser.value = props.row;
+      // The row already stores the canonical role VALUE, so it seeds the role
+      // select directly (matches an option, shows its label).
+      selectedUser.value = { ...props.row };
       showUpdateUserDialog.value = true;
     };
 
@@ -855,7 +894,9 @@ export default defineComponent({
         store.state.selectedOrganization.identifier;
 
       if (props.row != undefined) {
-        selectedUser.value = props.row;
+        // The row already stores the canonical role VALUE, so AddUser's role
+        // select matches an option directly (see updateUser).
+        selectedUser.value = { ...props.row };
         segment.track("Button Click", {
           button: "Actions",
           user_org: store.state.selectedOrganization.identifier,
@@ -1230,7 +1271,7 @@ export default defineComponent({
       },
       {
         id: "iamUsersRefresh",
-        handler: () => { if (!isInputFocused()) getOrgMembers(); },
+        handler: () => { if (!isInputFocused()) refreshUsers(); },
       },
       {
         id: "iamUsersFocusSearch",
@@ -1260,6 +1301,7 @@ export default defineComponent({
       confirmRevokeAction,
       handleInviteSent,
       getOrgMembers,
+      refreshUsers,
       updateUser,
       updateMember,
       addUser,

@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            (+ optional secondary) button(s) from preset/props -->
       <div
         v-if="$slots.actions || showCards || resolvedActionLabel || secondaryActionLabel"
-        :class="['flex flex-wrap items-center justify-center', sizeClass.actions]"
+        :class="['flex flex-nowrap items-stretch justify-center', sizeClass.actions]"
       >
         <slot name="actions">
           <template v-if="showCards">

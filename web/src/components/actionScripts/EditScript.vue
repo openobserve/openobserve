@@ -15,42 +15,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="add-action-script-section">
-    <div class="w-full h-full px-[0.625rem] pb-[0.625rem] pt-1">
-      <div class="card-container">
-        <div
-          class="flex items-center justify-between py-3 pl-4 pr-2 h-[68px]"
-        >
-          <div
-            data-test="add-action-script-back-btn"
-            class="flex justify-center items-center mr-3 cursor-pointer"
-            title="Go Back"
-            @click="router.back()"
-          >
-            <OIcon name="arrow-back-ios-new" size="xs" />
-            <div
-              v-if="isEditingActionScript"
-              class="text-xl font-semibold pl-2"
-              data-test="add-action-script-title"
-            >
-              {{ t("actions.update") }}
-            </div>
-            <div
-              v-else
-              class="text-xl font-semibold pl-2"
-              data-test="add-action-script-title"
-            >
-              {{ t("actions.add") }}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+  <div data-test="add-action-script-section" class="w-full h-full flex flex-col">
+    <AppPageHeader
+      :title="isEditingActionScript ? t('actions.update') : t('actions.add')"
+      :back="{
+        onClick: () => router.back(),
+        dataTest: 'add-action-script-back-btn',
+      }"
+      class="px-4 border-b border-border-default"
+    >
+      <template #title>
+        <span data-test="add-action-script-title">{{
+          isEditingActionScript ? t("actions.update") : t("actions.add")
+        }}</span>
+      </template>
+    </AppPageHeader>
 
     <!-- Inline (full-page) form. The footer Save lives INSIDE the <OForm>, so it
          is `type="submit"` and Enter submits natively — no `form-id` needed. -->
-    <OForm :form="form" v-slot="{ isSubmitting }">
-      <div class="w-full h-full px-[0.625rem] pb-[0.625rem]">
+    <OForm
+      :form="form"
+      v-slot="{ isSubmitting }"
+      class="w-full flex-1 min-h-0 flex flex-col"
+    >
+      <div class="w-full flex-1 min-h-0 px-2.5 pb-2.5 pt-1">
         <div
           class="card-container overflow-auto"
           style="max-height: calc(100vh - var(--navbar-height) - 157px)"
@@ -493,6 +481,7 @@ import type { Ref } from "vue";
 import { DateTime as _DateTime } from "luxon";
 import actions from "@/services/action_scripts";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import CronExpressionParser from "cron-parser";
 import { convertDateToTimestamp } from "@/utils/date";
 import service_accounts from "@/services/service_accounts";

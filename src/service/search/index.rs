@@ -123,6 +123,8 @@ impl IndexCondition {
             Err(anyhow::anyhow!(
                 "All AND conditions are failed to generate tantivy query"
             ))
+        } else if queries.len() == 1 {
+            Ok((queries.pop().unwrap().1, has_skipped))
         } else {
             Ok((Box::new(BooleanQuery::from(queries)), has_skipped))
         }

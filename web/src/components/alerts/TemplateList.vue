@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md flex flex-col h-full p-0">
+  <div class="flex flex-col h-full p-0">
     <div v-if="!showImportTemplate && !showTemplateEditor" class="flex flex-col h-full">
       <!-- Standard section header: title + actions only. Search moved to toolbar. -->
       <AppPageHeader
@@ -89,13 +89,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="template-list-search-input"
           />
         </template>
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="template-list-refresh-btn"
+            @click="getTemplates"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="alertTemplatesRefresh" />
+          </OButton>
+        </template>
         <template #empty>
           <OEmptyState
             size="hero"
             preset="no-alert-templates"
             :filtered="!!filterQuery"
-            :hide-action="!filterQuery"
-            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+            :actions="[
+              { id: 'create', icon: 'add', titleKey: 'emptyState.noAlertTemplates.action', descriptionKey: 'emptyState.noAlertTemplates.actionDesc' },
+              { id: 'import', icon: 'upload-file', titleKey: 'emptyState.noAlertTemplates.import', descriptionKey: 'emptyState.noAlertTemplates.importDesc' },
+            ]"
+            @action="(id) => id === 'clear-filters' ? (filterQuery = '') : id === 'import' ? importTemplate() : editTemplate(null)"
           />
         </template>
         <template #cell-name="{ row }">
@@ -192,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @get:templates="getTemplates"
       />
     </div>
-    <div v-else>
+    <div v-else class="flex-1 min-h-0">
       <ImportTemplate :templates="templates" @update:templates="getTemplates" />
     </div>
 
@@ -232,6 +247,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";

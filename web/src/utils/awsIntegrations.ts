@@ -178,7 +178,7 @@ export const awsIntegrations: AWSIntegration[] = [
     description: 'Monitor RDS database logs',
     cloudFormationTemplate: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/rds-logs-to-openobserve.yaml',
     hasDashboard: true,
-    dashboardGithubUrl: 'https://raw.githubusercontent.com/openobserve/dashboards/main/AWS_Cloudwatch_RDS_Metrics/OpenObserve_RDS_Introspection.dashboard.json',
+    dashboardGithubUrl: 'https://raw.githubusercontent.com/openobserve/dashboards/main/AWS_RDS_Logs/rds.dashboard.json',
     documentationUrl: 'https://short.openobserve.ai/aws/rds',
     category: 'logs',
     comingSoon: false,

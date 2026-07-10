@@ -64,7 +64,14 @@ export interface ShortcutModule {
  */
 export const SHORTCUT_MODULES: ShortcutModule[] = [
   { titleKey: "shortcuts.modules.global", pages: ["shortcuts.pages.global"] },
-  { titleKey: "shortcuts.modules.logs", pages: ["shortcuts.pages.logs"] },
+  {
+    titleKey: "shortcuts.modules.logs",
+    pages: [
+      "shortcuts.pages.logs",
+      "shortcuts.pages.searchSchedulers",
+      "shortcuts.pages.searchHistory",
+    ],
+  },
   {
     titleKey: "shortcuts.modules.dashboards",
     pages: [
@@ -77,7 +84,11 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
   { titleKey: "shortcuts.modules.metrics", pages: ["shortcuts.pages.metrics"] },
   {
     titleKey: "shortcuts.modules.traces",
-    pages: ["shortcuts.pages.traces", "shortcuts.pages.traceDetail"],
+    pages: [
+      "shortcuts.pages.traces",
+      "shortcuts.pages.traceDetail",
+      "shortcuts.pages.sessions",
+    ],
   },
   {
     titleKey: "shortcuts.modules.alerts",
@@ -85,11 +96,24 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
       "shortcuts.pages.alerts",
       "shortcuts.pages.alertDestinations",
       "shortcuts.pages.alertTemplates",
+      "shortcuts.pages.alertIncidents",
     ],
   },
   { titleKey: "shortcuts.modules.streams", pages: ["shortcuts.pages.streams"] },
-  { titleKey: "shortcuts.modules.pipelines", pages: ["shortcuts.pages.pipelines"] },
-  { titleKey: "shortcuts.modules.functions", pages: ["shortcuts.pages.functions"] },
+  {
+    titleKey: "shortcuts.modules.pipelines",
+    pages: [
+      "shortcuts.pages.pipelines",
+      "shortcuts.pages.pipelineDestinations",
+    ],
+  },
+  {
+    titleKey: "shortcuts.modules.functions",
+    pages: [
+      "shortcuts.pages.functions",
+      "shortcuts.pages.enrichmentTables",
+    ],
+  },
   { titleKey: "shortcuts.modules.reports", pages: ["shortcuts.pages.reports"] },
   {
     titleKey: "shortcuts.modules.iam",
@@ -99,6 +123,41 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
       "shortcuts.pages.iamGroups",
       "shortcuts.pages.iamServiceAccounts",
       "shortcuts.pages.ingestionTokens",
+      "shortcuts.pages.iamInvitations",
+      "shortcuts.pages.iamOrganizations",
+    ],
+  },
+  {
+    titleKey: "shortcuts.modules.settings",
+    pages: [
+      "shortcuts.pages.regexPatterns",
+      "shortcuts.pages.cipherKeys",
+      "shortcuts.pages.nodes",
+      "shortcuts.pages.modelPricing",
+      "shortcuts.pages.llmProviders",
+      "shortcuts.pages.aiToolsets",
+      "shortcuts.pages.orgManagement",
+    ],
+  },
+  {
+    titleKey: "shortcuts.modules.actions",
+    pages: ["shortcuts.pages.actions"],
+  },
+  {
+    titleKey: "shortcuts.modules.rum",
+    pages: [
+      "shortcuts.pages.rumErrors",
+      "shortcuts.pages.rumSessions",
+      "shortcuts.pages.sourceMaps",
+    ],
+  },
+  {
+    titleKey: "shortcuts.modules.onlineEvals",
+    pages: [
+      "shortcuts.pages.evalTemplates",
+      "shortcuts.pages.scorers",
+      "shortcuts.pages.evalJobs",
+      "shortcuts.pages.scoreConfigs",
     ],
   },
   {
@@ -388,6 +447,214 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { id: "runningQueriesFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
     ],
   },
+
+  // ── Alert Incidents ─────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.alertIncidents",
+    scope: "alert-incidents",
+    shortcuts: [
+      { id: "alertIncidentsRefresh", key: "r", descriptionKey: "shortcuts.actions.alertIncidentsRefresh" },
+    ],
+  },
+
+  // ── Pipeline Destinations ───────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.pipelineDestinations",
+    scope: "pipeline-destinations",
+    shortcuts: [
+      { id: "pipelineDestinationsRefresh", key: "r", descriptionKey: "shortcuts.actions.pipelineDestinationsRefresh" },
+    ],
+  },
+
+  // ── Enrichment Tables ───────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.enrichmentTables",
+    scope: "enrichment-tables",
+    shortcuts: [
+      { id: "enrichmentTablesRefresh", key: "r", descriptionKey: "shortcuts.actions.enrichmentTablesRefresh" },
+    ],
+  },
+
+  // ── IAM — Invitations ───────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.iamInvitations",
+    scope: "iam-invitations",
+    shortcuts: [
+      { id: "iamInvitationsRefresh", key: "r", descriptionKey: "shortcuts.actions.iamInvitationsRefresh" },
+    ],
+  },
+
+  // ── IAM — Organizations ─────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.iamOrganizations",
+    scope: "iam-organizations",
+    shortcuts: [
+      { id: "iamOrganizationsRefresh", key: "r", descriptionKey: "shortcuts.actions.iamOrganizationsRefresh" },
+    ],
+  },
+
+  // ── Regex Patterns ──────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.regexPatterns",
+    scope: "regex-patterns",
+    shortcuts: [
+      { id: "regexPatternsRefresh", key: "r", descriptionKey: "shortcuts.actions.regexPatternsRefresh" },
+    ],
+  },
+
+  // ── Cipher Keys ─────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.cipherKeys",
+    scope: "cipher-keys",
+    shortcuts: [
+      { id: "cipherKeysRefresh", key: "r", descriptionKey: "shortcuts.actions.cipherKeysRefresh" },
+    ],
+  },
+
+  // ── Nodes ───────────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.nodes",
+    scope: "nodes",
+    shortcuts: [
+      { id: "nodesRefresh", key: "r", descriptionKey: "shortcuts.actions.nodesRefresh" },
+    ],
+  },
+
+  // ── Model Pricing ───────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.modelPricing",
+    scope: "model-pricing",
+    shortcuts: [
+      { id: "modelPricingRefresh", key: "r", descriptionKey: "shortcuts.actions.modelPricingRefresh" },
+    ],
+  },
+
+  // ── Search Schedulers ───────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.searchSchedulers",
+    scope: "search-schedulers",
+    shortcuts: [
+      { id: "searchSchedulersRefresh", key: "r", descriptionKey: "shortcuts.actions.searchSchedulersRefresh" },
+    ],
+  },
+
+  // ── Search History ──────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.searchHistory",
+    scope: "search-history",
+    shortcuts: [
+      { id: "searchHistoryRefresh", key: "r", descriptionKey: "shortcuts.actions.searchHistoryRefresh" },
+    ],
+  },
+
+  // ── Sessions ────────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.sessions",
+    scope: "sessions",
+    shortcuts: [
+      { id: "sessionsRefresh", key: "r", descriptionKey: "shortcuts.actions.sessionsRefresh" },
+    ],
+  },
+
+  // ── Online Evals — Templates ────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.evalTemplates",
+    scope: "eval-templates",
+    shortcuts: [
+      { id: "evalTemplatesRefresh", key: "r", descriptionKey: "shortcuts.actions.evalTemplatesRefresh" },
+    ],
+  },
+
+  // ── Online Evals — Scorers ──────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.scorers",
+    scope: "scorers",
+    shortcuts: [
+      { id: "scorersRefresh", key: "r", descriptionKey: "shortcuts.actions.scorersRefresh" },
+    ],
+  },
+
+  // ── Online Evals — Jobs ─────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.evalJobs",
+    scope: "eval-jobs",
+    shortcuts: [
+      { id: "evalJobsRefresh", key: "r", descriptionKey: "shortcuts.actions.evalJobsRefresh" },
+    ],
+  },
+
+  // ── Online Evals — Score Configs ────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.scoreConfigs",
+    scope: "score-configs",
+    shortcuts: [
+      { id: "scoreConfigsRefresh", key: "r", descriptionKey: "shortcuts.actions.scoreConfigsRefresh" },
+    ],
+  },
+
+  // ── Actions ─────────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.actions",
+    scope: "actions",
+    shortcuts: [
+      { id: "actionsRefresh", key: "r", descriptionKey: "shortcuts.actions.actionsRefresh" },
+    ],
+  },
+
+  // ── LLM Providers ───────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.llmProviders",
+    scope: "llm-providers",
+    shortcuts: [
+      { id: "llmProvidersRefresh", key: "r", descriptionKey: "shortcuts.actions.llmProvidersRefresh" },
+    ],
+  },
+
+  // ── AI Toolsets ─────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.aiToolsets",
+    scope: "ai-toolsets",
+    shortcuts: [
+      { id: "aiToolsetsRefresh", key: "r", descriptionKey: "shortcuts.actions.aiToolsetsRefresh" },
+    ],
+  },
+
+  // ── Organization Management ─────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.orgManagement",
+    scope: "organization-management",
+    shortcuts: [
+      { id: "orgManagementRefresh", key: "r", descriptionKey: "shortcuts.actions.orgManagementRefresh" },
+    ],
+  },
+
+  // ── RUM — Errors ────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.rumErrors",
+    scope: "rum-errors",
+    shortcuts: [
+      { id: "rumErrorsRefresh", key: "r", descriptionKey: "shortcuts.actions.rumErrorsRefresh" },
+    ],
+  },
+
+  // ── RUM — Sessions ──────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.rumSessions",
+    scope: "rum-sessions",
+    shortcuts: [
+      { id: "rumSessionsRefresh", key: "r", descriptionKey: "shortcuts.actions.rumSessionsRefresh" },
+    ],
+  },
+
+  // ── RUM — Source Maps ───────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.sourceMaps",
+    scope: "rum-source-maps",
+    shortcuts: [
+      { id: "sourceMapsRefresh", key: "r", descriptionKey: "shortcuts.actions.sourceMapsRefresh" },
+    ],
+  },
+
 ];
 
 // ---------------------------------------------------------------------------

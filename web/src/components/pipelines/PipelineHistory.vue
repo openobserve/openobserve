@@ -56,9 +56,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>No pipelines found</span>
         </template>
       </OSelect>
+      <OTableColumnToggle
+        :columns="columns"
+        :column-visibility="columnVisibility"
+        @update:column-visibility="setColumnVisibility"
+      />
       <OButton
-        variant="ghost"
-        size="icon-xs-sq"
+        variant="outline"
+        size="icon-sm"
+        class="shrink-0"
         @click="refreshData"
         data-test="pipeline-history-refresh-btn"
         :loading="loading"
@@ -76,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :frame="false"
           :data="rows"
           :columns="columns"
+          :column-visibility="columnVisibility"
           :default-columns="false"
           row-key="id"
           width="100%"
@@ -219,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #bottom="{ totalRows }">
             <div
-              class="flex items-center font-bold text-[14px] mr-4 py-2"
+              class="flex items-center o2-table-footer-title mr-4 py-2"
             >
               {{ totalRows }} {{ t("pipeline.header") }}
             </div>
@@ -481,6 +488,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import ONumberCell from "@/lib/core/Table/cells/ONumberCell.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
@@ -509,6 +518,10 @@ const pagination = ref({
 });
 
 const pageSizeOptions = [10, 20, 50, 100];
+
+const { columnVisibility, setColumnVisibility } = useExternalColumnToggle(
+  "pipelines-pipeline-history-list",
+);
 
 // Date time - default to last 15 minutes (relative)
 const dateTimeRef = ref<any>(null);
@@ -549,6 +562,7 @@ const columns = ref([
     header: "Pipeline Name",
     accessorKey: "pipeline_name",
     sortable: true,
+    hideable: true,
     size: 320,
     minSize: 320,
     meta: { align: "left" as const },
@@ -558,6 +572,7 @@ const columns = ref([
     header: "Type",
     accessorKey: "is_realtime",
     sortable: true,
+    hideable: true,
     size: 70,
     meta: { align: "left" as const },
   },
@@ -566,6 +581,7 @@ const columns = ref([
     header: "Is Silenced",
     accessorKey: "is_silenced",
     sortable: true,
+    hideable: true,
     size: 100,
     meta: { align: "left" as const },
   },
@@ -574,6 +590,7 @@ const columns = ref([
     header: "Timestamp",
     accessorKey: "timestamp",
     sortable: true,
+    hideable: true,
     size: COL.dateAbsolute,
     meta: { align: "left" as const },
   },
@@ -582,6 +599,7 @@ const columns = ref([
     header: "Start Time",
     accessorKey: "start_time",
     sortable: true,
+    hideable: true,
     size: COL.dateAbsolute,
     meta: { align: "left" as const },
   },
@@ -590,6 +608,7 @@ const columns = ref([
     header: "End Time",
     accessorKey: "end_time",
     sortable: true,
+    hideable: true,
     size: COL.dateAbsolute,
     meta: { align: "left" as const },
   },
@@ -598,6 +617,7 @@ const columns = ref([
     header: "Duration",
     accessorFn: (row: any) => row.end_time - row.start_time,
     sortable: true,
+    hideable: true,
     size: 90,
     meta: { align: "right" as const },
   },
@@ -606,7 +626,12 @@ const columns = ref([
     header: "Status",
     accessorKey: "status",
     sortable: true,
-    size: 150,
+    hideable: true,
+    // Wide enough for the longest status chip ("Condition Not Satisfied");
+    // minSize stops the column shrinking and clipping the pill on narrow
+    // viewports (the cell clips non-wrapped content by design).
+    size: 200,
+    minSize: 200,
     meta: { align: "left" as const },
   },
   {
@@ -614,6 +639,7 @@ const columns = ref([
     header: "Retries",
     accessorKey: "retries",
     sortable: true,
+    hideable: true,
     size: 50,
     meta: { align: "right" as const },
   },
@@ -622,6 +648,7 @@ const columns = ref([
     header: "Partial",
     accessorKey: "is_partial",
     sortable: false,
+    hideable: true,
     size: 60,
     meta: { align: "left" as const },
   },
@@ -630,6 +657,7 @@ const columns = ref([
     header: "Delay (s)",
     accessorKey: "delay_in_secs",
     sortable: true,
+    hideable: true,
     size: 80,
     meta: { align: "right" as const },
   },
@@ -638,6 +666,7 @@ const columns = ref([
     header: "Eval Time (s)",
     accessorKey: "evaluation_took_in_secs",
     sortable: true,
+    hideable: true,
     size: 100,
     meta: { align: "right" as const },
   },
@@ -646,6 +675,7 @@ const columns = ref([
     header: "Query Time (ms)",
     accessorKey: "query_took",
     sortable: true,
+    hideable: true,
     size: 110,
     meta: { align: "right" as const },
   },

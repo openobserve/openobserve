@@ -109,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="chartRendererRef"
           :data="chartRendererData"
           :height="chartPanelHeight"
+          :render-type="panelSchema?.type === 'metric' ? 'svg' : 'canvas'"
           @updated:data-zoom="onDataZoom"
           @error="errorDetail = $event"
           @click="onChartClick"
@@ -134,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost"
             size="icon-xs-sq"
             style="position: absolute"
-            :style="metricIconStyle(m)"
+            :style="m.iconStyle"
             @click="copyMetricItem(m)"
             data-test="dashboard-metric-copy-btn"
             :data-copied="metricCopiedIdx === m.idx ? 'true' : undefined"
@@ -156,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         size="inline"
         icon="bar-chart"
-        :title="noData"
+        :title="t('panel.noData')"
         :backdrop="false"
         data-test="no-data"
         class="noData absolute! inset-0 w-full h-full !min-h-0 !p-2 [container-type:size]"
@@ -304,6 +305,7 @@ import {
   onUnmounted,
 } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import { getDataValue } from "@/utils/dashboard/aliasUtils";
@@ -515,6 +517,7 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const store = useStore();
+    const { t } = useI18n();
     const route = useRoute();
     const router = useRouter();
 
@@ -584,6 +587,8 @@ export default defineComponent({
     // Metric chart: one copy icon per rendered value (multi-SQL renders many).
     // Values are already unit/decimal/timestamp formatted at the metric level;
     // _metricLayout gives the canvas pixel position so the icon sits beside it.
+    // Values whose cell has no overlap-free spot for the icon are dropped —
+    // no copy affordance beats covering the digits.
     const metricItems = computed(() => {
       if (props.panelSchema?.type !== "metric") return [];
       const series = panelData.value?.options?.series ?? [];
@@ -600,36 +605,79 @@ export default defineComponent({
             String(m.text).replace(/,/g, "").replace(/[^0-9.eE+-]/g, ""),
           );
           return Number.isNaN(num) || num !== 0;
-        });
+        })
+        .map((m: any) => ({ ...m, iconStyle: metricIconStyle(m) }))
+        .filter((m: any) => m?.iconStyle !== null);
     });
     // Hover zone = each value's grid cell.
     const metricZoneStyle = (m: any) => ({
-      left: `${m.layout.left}px`,
-      top: `${m.layout.top}px`,
-      width: `${m.layout.width}px`,
-      height: `${m.layout.height}px`,
+      left: `${m?.layout?.left ?? 0}px`,
+      top: `${m?.layout?.top ?? 0}px`,
+      width: `${m?.layout?.width ?? 0}px`,
+      height: `${m?.layout?.height ?? 0}px`,
     });
-    // Fixed copy-button width (icon-xs-sq), matching the table chart.
+    // Fixed copy-button size (icon-xs-sq), matching the table chart.
     const COPY_BTN_PX = 28;
-    // Sit just past the number's measured right edge, clamped inside the cell.
-    // Measuring (vs estimating) keeps the icon off the digits for any value.
+    // Icon placement: beside the value (the font fit reserves the slot),
+    // else wrapped below/above it, else docked at the right edge (tiny cells).
     const metricIconStyle = (m: any) => {
-      const fs = m.layout?.fontSize || 24;
-      const textWidth = calculateWidthText(String(m.text), `${fs}px`);
-      const left = m.layout.cx - m.layout.left + textWidth / 2 + 2;
-      const maxLeft = m.layout.width - COPY_BTN_PX - 2;
+      const layout = m?.layout;
+      if (!layout) return null;
+      const fs = layout?.fontSize || 24;
+      const width = layout?.width ?? 0;
+      const height = layout?.height ?? 0;
+      const cxLocal = (layout?.cx ?? 0) - (layout?.left ?? 0);
+      const cyLocal = (layout?.cy ?? 0) - (layout?.top ?? 0);
+      const textWidth = calculateWidthText(String(m?.text ?? ""), `${fs}px`);
+
+      const besideLeft = cxLocal + textWidth / 2 + 2;
+      if (
+        besideLeft + COPY_BTN_PX + 2 <= width &&
+        height >= COPY_BTN_PX
+      ) {
+        return {
+          left: `${besideLeft}px`,
+          top: `${Math.min(
+            Math.max(cyLocal, COPY_BTN_PX / 2),
+            height - COPY_BTN_PX / 2,
+          )}px`,
+          transform: "translateY(-50%)",
+        };
+      }
+
+      const centeredLeft = Math.max(
+        0,
+        Math.min(cxLocal - COPY_BTN_PX / 2, width - COPY_BTN_PX),
+      );
+      // rendered line is ~1.2em tall around the vertical center
+      const halfTextHeight = (fs * 1.2) / 2;
+      const belowTop =
+        cyLocal + halfTextHeight + (layout?.labelClearance ?? 0) + 2;
+      if (belowTop + COPY_BTN_PX <= height) {
+        return { left: `${centeredLeft}px`, top: `${belowTop}px` };
+      }
+      const aboveTop = cyLocal - halfTextHeight - 2 - COPY_BTN_PX;
+      if (aboveTop >= 0) {
+        return { left: `${centeredLeft}px`, top: `${aboveTop}px` };
+      }
+
+      // cell too small for any clean spot — dock at the right edge with a
+      // solid background so the icon stays legible over the value's edge
       return {
-        left: `${Math.min(left, maxLeft)}px`,
-        top: `${m.layout.cy - m.layout.top}px`,
+        left: `${Math.max(0, width - COPY_BTN_PX - 2)}px`,
+        top: `${Math.max(cyLocal, COPY_BTN_PX / 2)}px`,
         transform: "translateY(-50%)",
+        backgroundColor:
+          store?.state?.theme === "dark" ? "#27272a" : "#ffffff",
+        boxShadow: "0 0 3px rgba(0, 0, 0, 0.35)",
       };
     };
     const hoveredMetricIdx = ref<number | null>(null);
     const metricCopiedIdx = ref<number | null>(null);
     const copyMetricItem = (m: any) => {
-      if (m.text == null) return;
+      if (m?.text == null) return;
       copyToClipboard(String(m.text), { silent: true }).then(() => {
-        metricCopiedIdx.value = m.idx;
+        metricCopiedIdx.value = m?.idx;
         setTimeout(() => {
           if (metricCopiedIdx.value === m.idx) metricCopiedIdx.value = null;
         }, 3000);
@@ -1617,6 +1665,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       store,
       chartPanelRef,
       chartRendererRef,

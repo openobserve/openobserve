@@ -168,31 +168,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-base font-bold mb-3">
         {{ t("settings.domainAndAllowedUsers") }}
       </div>
-
-      <div class="flex gap-x-2 items-center">
-          <!-- Fixed-width wrapper: OInput fills its parent (w-full), so
-               constraining the parent sizes the input without overriding it. -->
+      
+      <OForm
+        ref="addDomainForm"
+        :schema="addDomainSchema"
+        :default-values="addDomainDefaults()"
+        @submit="addDomain"
+        v-slot="{ isSubmitting }"
+        class="flex gap-x-2 items-start"
+      >
           <div class="w-[18.75rem] shrink-0">
-            <OInput
+            <OFormInput
               data-test="domain-management-new-domain-input"
-              v-model="newDomain"
+              name="newDomain"
               class="domain-input"
-              @keydown.enter="addDomain"
               :placeholder="t('settings.domainPlaceholder')"
-              :error="!!domainError"
-              :error-message="domainError"
-              @update:model-value="domainError = ''"
             />
           </div>
           <OButton
             data-test="domain-management-add-domain-btn"
             variant="primary"
             size="sm-action"
-            @click="addDomain"
-            :disabled="!newDomain || !isValidDomain(newDomain)"
+            type="submit"
+            :loading="isSubmitting"
           >{{ t('settings.addDomain') }}
           </OButton>
-      </div>
+      </OForm>
       <div class="text-xs text-gray-400 mt-1">
         {{ t('settings.domainHint', { at_sign: '@' }) }}
       </div>
@@ -211,7 +212,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="store.state.theme === 'dark' ? 'border-[#444] bg-[#1e1e1e]' : 'bg-white'"
         >
           <div class="flex items-center justify-between px-3 py-2 border-b border-b-(--o2-border) rounded-t-lg" :class="store.state.theme === 'dark' ? 'bg-[#2a2a2a] border-b-[#444]' : 'bg-[#f5f5f5]'">
-          <div class="text-base font-bold" :data-test="`domain-management-domain-name-${domain.name}`">{{ domain.name }}</div>
+          <div
+            :data-test="`domain-management-domain-name-${domain.name}`"
+            class="text-base font-bold"
+          >{{ domain.name }}</div>
           <OButton
             icon-left="close"
             variant="ghost-destructive"
@@ -249,20 +253,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Specific users section -->
           <div v-if="!domain.allowAllUsers" class="specific-users-section ml-6">
-              <div class="flex gap-x-2 items-end">
-                <OInput
-                  v-model="domain.newEmail"
-                  :label="t('settings.emailPlaceholder', { domain: '@' + domain.name })"
-                  class="email-input min-w-62.5"
-                  @keydown.enter="addEmail(domain)"
-                />
-                <OButton
-                  variant="primary"
-                  size="sm-action"
-                  @click="addEmail(domain)"
-                  :disabled="!domain.newEmail || !isValidEmail(domain.newEmail, domain.name)"
-                >{{ t('settings.addEmail') }}</OButton>
-              </div>
+              <OForm
+                :ref="(el) => setEmailFormRef(domain.name, el)"
+                :schema="getEmailSchema(domain.name)"
+                :default-values="addEmailDefaults()"
+                @submit="(v) => addEmail(domain, v.newEmail)"
+                v-slot="{ isSubmitting }"
+              >
+                <!-- Hint label above the row, so the error can grow below the
+                     input without shoving the Add button out of alignment. -->
+                <div class="o-input-label text-sm font-semibold leading-tight mb-1">
+                  {{ t('settings.emailPlaceholder', { domain: '@' + domain.name }) }}
+                </div>
+                <div class="flex gap-x-2 items-start">
+                  <OFormInput
+                    name="newEmail"
+                    class="email-input min-w-62.5"
+                  />
+                  <OButton
+                    variant="primary"
+                    size="sm-action"
+                    type="submit"
+                    :loading="isSubmitting"
+                  >{{ t('settings.addEmail') }}</OButton>
+                </div>
+              </OForm>
 
             <!-- Email List -->
             <div v-if="domain.allowedEmails && domain.allowedEmails.length > 0">
@@ -346,7 +361,8 @@ import { ref, reactive, onMounted, onActivated, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -364,12 +380,19 @@ import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import {
+  isValidEmail,
+  makeAddDomainSchema,
+  makeAddEmailSchema,
+  addDomainDefaults,
+  addEmailDefaults,
+  type AddDomainForm,
+} from "./DomainManagement.schema";
 
 interface Domain {
   name: string;
   allowAllUsers: boolean;
   allowedEmails: string[];
-  newEmail: string;
 }
 
 const { t } = useI18n();
@@ -382,10 +405,32 @@ const pendingRemoveEmail = ref<{ domain: any; emailIndex: number; email: string 
 const store = useStore();
 const router = useRouter();
 
-const newDomain = ref("");
-const domainError = ref("");
 const domains = reactive<Domain[]>([]);
 const saving = ref(false);
+
+// Schema-driven validation replaces the manual domainError ref + the
+// :disabled="!newDomain || !isValidDomain" gate (R3). The pure validators live
+// in the schema file (used by the Zod refines); the component only needs
+// `isValidEmail` for the addEmail guard, imported directly.
+
+const addDomainForm = ref<any>(null);
+const addDomainSchema = makeAddDomainSchema(t);
+
+// Per-domain email add-row forms: a schema cache (keyed by domain name, since
+// the email schema embeds the domain) + a ref map so each row can be reset
+// after a successful add.
+const emailSchemaCache = new Map<string, ReturnType<typeof makeAddEmailSchema>>();
+const getEmailSchema = (domainName: string) => {
+  if (!emailSchemaCache.has(domainName)) {
+    emailSchemaCache.set(domainName, makeAddEmailSchema(domainName, t));
+  }
+  return emailSchemaCache.get(domainName);
+};
+const emailFormRefs = ref<Record<string, any>>({});
+const setEmailFormRef = (domainName: string, el: any) => {
+  if (el) emailFormRefs.value[domainName] = el;
+  else delete emailFormRefs.value[domainName];
+};
 
 // Claim parser function state
 const claimParserFunction = ref("");
@@ -445,7 +490,7 @@ const loadDomainSettings = async () => {
         .map((domain: any) => ({
           name: domain.domain,
           allowAllUsers: domain.allow_all_users,
-          allowedEmails: domain.allowed_emails || []
+          allowedEmails: domain.allowed_emails || [],
         }));
       domains.splice(0, domains.length, ...loadedDomains);
     }
@@ -466,91 +511,15 @@ const loadDomainSettings = async () => {
   }
 };
 
-const isValidDomain = (domain: any): boolean => {
-  // Handle null, undefined, and non-string inputs
-  if (domain === null || domain === undefined) return true; // Empty is valid
-  if (typeof domain !== 'string') return false; // Non-strings are invalid
-
-  // Handle empty strings - empty is valid, but whitespace-only is not
-  const trimmed = domain.trim();
-  if (!trimmed) return domain.length === 0; // Empty string is valid, whitespace-only is not
-
-  // Security: Check for potentially malicious content (more targeted patterns)
-  const maliciousPatterns = [
-    '<script', '</script', 'javascript:', 'DROP TABLE', 'SELECT FROM', 'INSERT INTO',
-    'UPDATE SET', 'DELETE FROM', 'UNION SELECT', '--', '/*', '*/', '\0', '\n', '\r'
-  ];
-
-  const upperDomain = trimmed.toUpperCase();
-  if (maliciousPatterns.some(pattern => upperDomain.includes(pattern.toUpperCase()))) {
-    return false;
-  }
-
-  // Length validation (DNS limit is 253 characters)
-  if (trimmed.length > 253) return false;
-
-  // Remove trailing dot if present (valid in DNS)
-  const cleanDomain = trimmed.endsWith('.') ? trimmed.slice(0, -1) : trimmed;
-
-  // Improved domain validation that properly handles hyphens and edge cases
-  // Domain parts can contain letters, numbers, and hyphens (but not start/end with hyphens)
-  // Each label can be 1-63 characters, and the domain must have at least one dot
-  const domainRegex = /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
-
-  try {
-    return domainRegex.test(cleanDomain);
-  } catch (error) {
-    return false; // Any regex error means invalid
-  }
-};
-
-const isValidEmail = (email: any, domain: any): boolean => {
-  // Handle null, undefined, and non-string inputs
-  if (email === null || email === undefined || typeof email !== 'string') return false;
-  if (domain === null || domain === undefined || typeof domain !== 'string') return false;
-
-  // Handle empty strings
-  if (!email.trim() || !domain.trim()) return false;
-
-  // Security: Check for potentially malicious content
-  const maliciousPatterns = [
-    '<', '>', 'script', 'javascript:', 'DROP', 'SELECT', 'INSERT', 'UPDATE', 'DELETE',
-    'UNION', 'CREATE', 'ALTER', 'TABLE', 'FROM', '--', '/*', '*/', "'", '"',
-    '\0', '\n', '\r', '\t'
-  ];
-
-  const upperEmail = email.toUpperCase();
-  if (maliciousPatterns.some(pattern => upperEmail.includes(pattern.toUpperCase()))) {
-    return false;
-  }
-
-  // Length validation (practical email limit)
-  if (email.length > 254 || domain.length > 253) return false;
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-  try {
-    if (!emailRegex.test(email)) return false;
-
-    // Check if email belongs to the domain
-    return email.toLowerCase().endsWith(`@${domain.toLowerCase()}`);
-  } catch (error) {
-    return false; // Any error means invalid
-  }
-};
-
-const addDomain = () => {
-  if (!newDomain.value) {
-    domainError.value = t("settings.domainRequired") || "Domain is required";
-    return;
-  }
-  if (!isValidDomain(newDomain.value)) {
-    domainError.value = t("settings.invalidDomain") || "Please enter a valid domain (e.g. example.com)";
-    return;
-  }
+// @submit handler — fires only once the schema passes (required + valid
+// domain), so the old empty/invalid guards are gone. The submitted form value
+// is the single source of truth; the cross-state duplicate check stays here.
+const addDomain = (value?: AddDomainForm) => {
+  const candidate = (value?.newDomain ?? "").trim();
+  if (!candidate) return;
 
   // Check if domain already exists
-  if (domains.some(d => d.name.toLowerCase() === newDomain.value.toLowerCase())) {
+  if (domains.some(d => d.name.toLowerCase() === candidate.toLowerCase())) {
     toast({
       variant: "error",
       message: t("settings.domainAlreadyExists"),
@@ -559,19 +528,14 @@ const addDomain = () => {
   }
 
   domains.push({
-    name: newDomain.value,
+    name: candidate,
     allowAllUsers: true,
     allowedEmails: [],
-    newEmail: ""
   });
 
-  newDomain.value = "";
-
-  // toast({
-  //   variant: "success",
-  //   message: t("settings.domainAdded"),
-  //   timeout: 3000,
-  // });
+  // Inline add-row cleared after save → reset() clears the field AND submit
+  // state (submissionAttempts → 0), so no post-save "required" flash.
+  addDomainForm.value?.form?.reset();
 };
 
 const removeDomain = (index: number) => {
@@ -591,11 +555,15 @@ const doRemoveDomain = () => {
   });
 };
 
-const addEmail = (domain: Domain) => {
-  if (!domain.newEmail || !isValidEmail(domain.newEmail, domain.name)) return;
+// @submit handler for a domain's email add-row. The schema is conditional
+// (empty passes), so an empty submit is a no-op; otherwise the email must be
+// valid + belong to the domain. Still callable directly with the row model.
+const addEmail = (domain: Domain, emailValue?: string) => {
+  const email = (emailValue ?? "").trim();
+  if (!email || !isValidEmail(email, domain.name)) return;
 
   // Check if email already exists
-  if (domain.allowedEmails.includes(domain.newEmail.toLowerCase())) {
+  if (domain.allowedEmails.includes(email.toLowerCase())) {
     toast({
       variant: "error",
       message: t("settings.emailAlreadyExists"),
@@ -603,8 +571,8 @@ const addEmail = (domain: Domain) => {
     return;
   }
 
-  domain.allowedEmails.push(domain.newEmail.toLowerCase());
-  domain.newEmail = "";
+  domain.allowedEmails.push(email.toLowerCase());
+  emailFormRefs.value[domain.name]?.form?.reset();
 
   toast({
     variant: "success",
@@ -801,7 +769,7 @@ const viewAllErrors = () => {
 
 const saveChanges = async () => {
   saving.value = true;
-
+  
   try {
     // Validate all domains have proper configuration
     for (const domain of domains) {
@@ -844,8 +812,9 @@ const saveChanges = async () => {
 };
 
 const resetForm = () => {
-  newDomain.value = "";
+  // Reset the add-domain row through the form (clears the field + submit state),
+  // keeping TanStack the single owner of that field — no parallel ref.
+  addDomainForm.value?.form?.reset();
   loadDomainSettings();
 };
 </script>
-

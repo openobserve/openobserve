@@ -83,13 +83,13 @@ describe("ErrorHeader", () => {
       expect(wrapper.find('[data-test="back-button"]').exists()).toBe(true);
     });
 
-    it("has title attribute Go Back on the back button", async () => {
+    it("has a Back title attribute on the back button", async () => {
       // Arrange
       wrapper = mountComponent();
       await flushPromises();
 
-      // Assert
-      expect(wrapper.find('[data-test="back-button"]').attributes("title")).toBe("Go Back");
+      // Assert — AppPageHeader's back button uses the standard "Back" label.
+      expect(wrapper.find('[data-test="back-button"]').attributes("title")).toBe("Back");
     });
 
     it("calls router.back() when the back button is clicked", async () => {

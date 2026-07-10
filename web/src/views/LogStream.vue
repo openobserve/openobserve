@@ -28,14 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #title><span data-test="log-stream-title-text">{{ t('logStream.header') }}</span></template>
           <template #actions>
             <OButton
-              data-test="log-stream-refresh-stats-btn"
-              variant="outline"
-              size="sm-action"
-              @click="getLogStream(true)"
-            >
-              {{ t(`logStream.refreshStats`) }}
-            </OButton>
-            <OButton
               v-if="isSchemaUDSEnabled"
               data-test="log-stream-add-stream-btn"
               variant="primary"
@@ -117,6 +109,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loadingState"
+              data-test="log-stream-refresh-stats-btn"
+              @click="() => getLogStream(true)"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="streamsRefresh" />
+            </OButton>
+          </template>
           <!--
             Render the stream-name cell with a deterministic per-name data-test.
             Tests can target a specific stream row via
@@ -164,10 +168,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OEmptyState
                 size="hero"
                 preset="no-streams"
+                :actions="streamsEmptyActions"
                 :filtered="!!filterQuery"
-                :hide-action="!filterQuery"
-                @action="(id) => id === 'clear-filters' && (filterQuery = '')"
-              />
+                @action="onStreamsEmptyStateAction"
+              >
+                <template v-if="!filterQuery" #extra>
+                  <div class="flex items-center justify-center gap-2 flex-wrap">
+                    <span class="text-sm font-semibold text-text-secondary mr-1">
+                      {{ t('logStream.emptyOr') }}
+                    </span>
+                    <EmptyStateIngestionChip
+                      data-test="log-stream-empty-kubernetes-btn"
+                      @click="router.push({ name: 'ingestFromKubernetes', query: { org_identifier: store.state.selectedOrganization.identifier } })"
+                    >
+                      <img :src="getImageURL('images/common/kubernetes.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+                      {{ t('logStream.emptyKubernetes') }}
+                    </EmptyStateIngestionChip>
+                    <EmptyStateIngestionChip
+                      data-test="log-stream-empty-aws-btn"
+                      @click="router.push({ name: 'AWSConfig', query: { org_identifier: store.state.selectedOrganization.identifier } })"
+                    >
+                      <img :src="getImageURL('images/ingestion/aws.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+                      {{ t('logStream.emptyAws') }}
+                    </EmptyStateIngestionChip>
+                    <EmptyStateIngestionChip
+                      data-test="log-stream-empty-linux-btn"
+                      @click="router.push({ name: 'ingestFromLinux', query: { org_identifier: store.state.selectedOrganization.identifier } })"
+                    >
+                      <img :src="getImageURL('images/common/linux.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+                      {{ t('logStream.emptyLinux') }}
+                    </EmptyStateIngestionChip>
+                    <EmptyStateIngestionChip
+                      data-test="log-stream-empty-windows-btn"
+                      @click="router.push({ name: 'ingestFromWindows', query: { org_identifier: store.state.selectedOrganization.identifier } })"
+                    >
+                      <img :src="getImageURL('images/common/windows.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+                      {{ t('logStream.emptyWindows') }}
+                    </EmptyStateIngestionChip>
+                  </div>
+                </template>
+              </OEmptyState>
             </div>
           </template>
           <template #bottom="scope">
@@ -175,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center justify-between w-full py-2"
             >
               <div
-                class="flex items-center w-full font-bold text-[14px]"
+                class="flex items-center w-full o2-table-footer-title"
               >
                 {{ scope.totalRows }} Stream(s)
                 <OButton
@@ -279,6 +319,7 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import streamService from "../services/stream";
 import SchemaIndex from "../components/logstream/schema.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 import segment from "../services/segment_analytics";
 import {
   getImageURL,
@@ -291,6 +332,7 @@ import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
 import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -309,8 +351,10 @@ export default defineComponent({
     AppPageHeader,
     SchemaIndex,
     OEmptyState,
+    EmptyStateIngestionChip,
     AddStream,
     OButton,
+    OTooltip,
     ODialog,
     OIcon,
     OToggleGroup,
@@ -817,6 +861,43 @@ export default defineComponent({
       // });
     };
 
+    const streamsEmptyActions = computed(() => {
+      const actions: { id: string; icon: string; titleKey: string; descriptionKey: string }[] = [
+        {
+          id: "setup-ingestion",
+          icon: "cloud-upload",
+          titleKey: "emptyState.noStreams.action",
+          descriptionKey: "emptyState.noStreams.actionDesc",
+        },
+      ];
+      if (isSchemaUDSEnabled.value) {
+        actions.push({
+          id: "create",
+          icon: "add",
+          titleKey: "emptyState.noStreams.createAction",
+          descriptionKey: "emptyState.noStreams.createActionDesc",
+        });
+      }
+      return actions;
+    });
+
+    const onStreamsEmptyStateAction = (id?: string) => {
+      if (id === "clear-filters") {
+        filterQuery.value = "";
+        return;
+      }
+      if (id === "create") {
+        addStream();
+        return;
+      }
+      if (id === "setup-ingestion") {
+        router.push({
+          name: "ingestion",
+          query: { org_identifier: store.state.selectedOrganization.identifier },
+        });
+      }
+    };
+
     const onPaginationChange = async (params: { page: number; size: number }) => {
       currentPage.value = params.page;
       pageSize.value = params.size;
@@ -892,6 +973,8 @@ export default defineComponent({
       onChangeStreamFilter,
       addStreamDialog,
       addStream,
+      streamsEmptyActions,
+      onStreamsEmptyStateAction,
       loadingState,
       isDeleting,
       searchKeyword,

@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="rounded-md p-0 o2-custom-bg"
+  <div class="p-0 o2-custom-bg"
     style="height: calc(100vh - 48px); min-height: inherit"
   >
     <AppPageHeader
@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         label: t('alert_templates.header'),
         onClick: () => emit('cancel:hideform'),
       }"
-      class="card-container px-3 border-b border-border-default"
+      class="px-3 border-b border-border-default"
     >
       <template #title>
         <span data-test="add-template-title">
