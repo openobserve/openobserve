@@ -131,6 +131,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          saved graph. Results render as ✓ / error badges on the canvas nodes. -->
     <WorkflowTestDialog v-if="workflowObj.testRun.show" />
 
+    <!-- Link-to-alerts prompt — shown once, right after a workflow is created, so
+         the user can attach it to existing alerts without leaving for the alert
+         screen. Either action (Link / Skip) returns to the list. -->
+    <WorkflowLinkAlertsDialog
+      v-if="linkAlerts.show"
+      :workflow-id="linkAlerts.id"
+      :workflow-name="linkAlerts.name"
+      @linked="onLinkAlertsDone"
+      @close="onLinkAlertsDone"
+    />
+
     <!-- Save & Test prompt — Test runs the persisted workflow, so save first when
          it's new or has unsaved edits. -->
     <ConfirmDialog
@@ -170,6 +181,7 @@ import { getUUID } from "@/utils/zincutils";
 import WorkflowFlow from "@/plugins/workflows/WorkflowFlow.vue";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
 import WorkflowTestDialog from "./WorkflowTestDialog.vue";
+import WorkflowLinkAlertsDialog from "./WorkflowLinkAlertsDialog.vue";
 import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
 import NodePalette from "@/components/flow/NodePalette.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -445,8 +457,33 @@ const persist = async (): Promise<boolean> => {
   }
 };
 
+// After a brand-new workflow is created, offer to link it to existing alerts
+// (the link is stored on the alert side). Skipped on update — the workflow is
+// already in place and can be linked from an alert's settings.
+const linkAlerts = ref<{ show: boolean; id: string; name: string }>({
+  show: false,
+  id: "",
+  name: "",
+});
+
 const onSave = async () => {
-  if (await persist()) goBack();
+  const wasCreate = !workflowObj.currentSelectedWorkflow.id;
+  if (!(await persist())) return;
+  // persist() captures the new id on create; use it to open the link prompt.
+  if (wasCreate && workflowObj.currentSelectedWorkflow.id) {
+    linkAlerts.value = {
+      show: true,
+      id: workflowObj.currentSelectedWorkflow.id,
+      name: workflowObj.currentSelectedWorkflow.name || "",
+    };
+    return;
+  }
+  goBack();
+};
+
+const onLinkAlertsDone = () => {
+  linkAlerts.value.show = false;
+  goBack();
 };
 
 // Test runs the SAVED graph. If the workflow is new or has unsaved edits, prompt

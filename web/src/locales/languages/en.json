@@ -1724,6 +1724,26 @@
       "saveToTestBody": "Testing runs the saved version of this workflow. Save your changes first?",
       "saveAndTest": "Save & Test"
     },
+    "linkAlerts": {
+      "title": "Link Workflow To Alerts",
+      "intro": "Select alerts to run \"{name}\" when they fire. You can also link it later from an alert's settings.",
+      "folderLabel": "Folder",
+      "alertsLabel": "Alerts",
+      "alertsPlaceholder": "Select Alerts",
+      "noneSelected": "No Alerts Selected Yet.",
+      "selectedCount": "{count} Selected",
+      "clear": "Clear All",
+      "empty": "No Alerts Found In This Organization.",
+      "noAlertsInFolder": "No Alerts In This Folder.",
+      "loadError": "Unable To Load Alerts.",
+      "link": "Link Selected",
+      "linkN": "Link {count} Selected",
+      "skip": "Skip For Now",
+      "linking": "Linking...",
+      "linkSuccess": "Linked To {count} Alert(s)",
+      "linkPartial": "Linked To {ok} Alert(s), {failed} Failed",
+      "linkError": "Unable To Link Alerts."
+    },
     "canvasEmpty": "Add A Trigger To Start Building Your Workflow",
     "node": {
       "kindTrigger": "Trigger",

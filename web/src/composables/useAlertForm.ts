@@ -2142,6 +2142,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       beingUpdated.value = true;
       disableColor.value = "grey-5";
       formData.value = cloneDeep(props.modelValue);
+      // Guard the enterprise workflows link: the edited alert is expected to
+      // carry `workflows` (v2 GET returns it, serde-defaulted to []), but if a
+      // partially-populated row is ever passed, default it so an edit-save can't
+      // silently wipe existing links.
+      if (!Array.isArray(formData.value.workflows)) formData.value.workflows = [];
       isAggregationEnabled.value =
         !!formData.value.query_condition.aggregation;
 
