@@ -135,6 +135,11 @@ docker run -d \
       public.ecr.aws/zinclabs/openobserve:latest
 ```
 
+### ☁️ Managed hosting
+[![Deploy with Zenith](https://cdn.zenith.hosting/buttons/deploy-with-zenith.svg)](https://zenith.hosting/host/openobserve)
+
+One-click managed OpenObserve with storage, backups and a free subdomain included. No server to run.
+
 
 For other ways to quickly install OpenObserve or use OpenObserve cloud, check [quickstart documentation](https://openobserve.ai/docs/quickstart).
 
