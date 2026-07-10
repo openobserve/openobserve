@@ -1,0 +1,24 @@
+{
+  "name": "openobserve-web-benchmarks",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Frontend perf/a11y benchmark: Quasar baseline vs reka-ui + O2 components",
+  "scripts": {
+    "bench": "node run.mjs",
+    "bench:bundle": "node run.mjs --only=bundle,shortcuts",
+    "bench:baseline": "node run.mjs --commit=baseline",
+    "bench:current": "node run.mjs --commit=current",
+    "report": "node -e \"import('./report.mjs').then(m=>m.generateReport(require('./results/results.json'),'./results/report.html'))\"",
+    "postinstall": "playwright install chromium"
+  },
+  "dependencies": {
+    "@axe-core/playwright": "^4.10.1",
+    "axe-core": "^4.10.2",
+    "chrome-launcher": "^1.1.2",
+    "dotenv": "^16.4.5",
+    "http-proxy": "^1.18.1",
+    "lighthouse": "^12.2.1",
+    "playwright": "^1.48.0"
+  }
+}
