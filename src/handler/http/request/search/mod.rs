@@ -351,7 +351,9 @@ pub async fn search(
             let max_query_range =
                 get_settings_max_query_range(settings.max_query_range, &org_id, Some(user_id))
                     .await;
-            if max_query_range > 0
+            // Enrichment tables have no retention and must be searched in full; skip the clamp.
+            if stream_type != StreamType::EnrichmentTables
+                && max_query_range > 0
                 && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
             {
                 req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
@@ -1862,7 +1864,9 @@ pub async fn result_schema(
             let max_query_range =
                 get_settings_max_query_range(settings.max_query_range, &org_id, Some(user_id))
                     .await;
-            if max_query_range > 0
+            // Enrichment tables have no retention and must be searched in full; skip the clamp.
+            if stream_type != StreamType::EnrichmentTables
+                && max_query_range > 0
                 && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
             {
                 req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
