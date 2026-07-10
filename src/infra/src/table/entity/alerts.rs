@@ -49,6 +49,7 @@ pub struct Model {
     pub dedup_time_window_minutes: Option<i32>,
     pub dedup_config: Option<Json>,
     pub creates_incident: bool,
+    pub workflows: Json,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -121,6 +122,7 @@ mod tests {
             dedup_time_window_minutes: None,
             dedup_config: None,
             creates_incident: false,
+            workflows: serde_json::json!(vec!["abc123"]),
         };
         assert_eq!(m.id, "alert-1");
         assert_eq!(m.name, "High Error Rate");

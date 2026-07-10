@@ -127,6 +127,7 @@ mod m20260615_00001_create_workflow_errors_table;
 mod m20260615_00001_create_workflows_table;
 mod m20260622_000001_add_org_id_to_short_urls;
 mod m20260629_000001_create_gen_ai_agents_table;
+mod m20260710_000001_add_alert_workflows_col;
 
 pub struct Migrator;
 
@@ -243,6 +244,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260629_000001_create_gen_ai_agents_table::Migration),
             Box::new(m20260615_00001_create_workflows_table::Migration),
             Box::new(m20260615_00001_create_workflow_errors_table::Migration),
+            Box::new(m20260710_000001_add_alert_workflows_col::Migration),
         ]
     }
 }

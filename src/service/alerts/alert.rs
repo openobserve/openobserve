@@ -106,7 +106,7 @@ pub enum AlertError {
     #[error("Alert name cannot contain '/'")]
     AlertNameContainsForwardSlash,
 
-    #[error("Alert destinations is required")]
+    #[error("Alert destination or workflows is required")]
     AlertDestinationMissing,
 
     #[error("Alert already exists")]
@@ -193,6 +193,9 @@ pub enum AlertError {
     /// Not support save destination remote pipeline for alert so far
     #[error("Not support save destination {0} type for alert so far")]
     NotSupportedAlertDestinationType(Module),
+
+    #[error("Alert workflow {id} not found")]
+    AlertWorkflowNotFound { id: String },
 }
 
 pub async fn save(
@@ -343,7 +346,7 @@ async fn prepare_alert(
     }
 
     // before saving alert check alert destination
-    if alert.destinations.is_empty() {
+    if alert.destinations.is_empty() && alert.workflows.is_empty() {
         return Err(AlertError::AlertDestinationMissing);
     }
     for dest in alert.destinations.iter() {
@@ -357,6 +360,20 @@ async fn prepare_alert(
                 return Err(AlertError::AlertDestinationNotFound {
                     dest: dest.to_string(),
                 });
+            }
+        }
+    }
+
+    for workflow in alert.workflows.iter() {
+        match crate::service::workflows::get_workflow_by_id(org_id, workflow).await {
+            Ok(None) => {
+                return Err(AlertError::AlertWorkflowNotFound {
+                    id: workflow.to_owned(),
+                });
+            }
+            Ok(Some(_)) => {}
+            Err(e) => {
+                return Err(AlertError::InfraError(infra::errors::Error::OtherError(e)));
             }
         }
     }

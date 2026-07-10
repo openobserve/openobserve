@@ -7,9 +7,12 @@ use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::service::{
-    db,
-    pipeline::batch_execution::{ExecutablePipeline, WorkflowResult},
+use crate::{
+    common::infra::config::ALERTS,
+    service::{
+        db,
+        pipeline::batch_execution::{ExecutablePipeline, WorkflowResult},
+    },
 };
 
 #[derive(Serialize, Deserialize)]
@@ -208,6 +211,18 @@ fn is_permitted(workflow_id: &str, org_id: &str, permitted: Option<&Vec<String>>
 }
 
 pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
+    // TODO YJDoc2: later sometime, figure out a better scheme dot this check,
+    // as we support more and more places to add workflow, this might become infeasible
+    // to check for all cases
+    let cacher = ALERTS.read().await;
+    for (stream_key, (_, alert)) in cacher.iter() {
+        if stream_key.starts_with(&format!("{org_id}/"))
+            && alert.workflows.contains(&id.to_string())
+        {
+            return Err(anyhow::anyhow!("workflow is used by alert {}", alert.name));
+        }
+    }
+
     db::workflows::delete_workflow(org_id, id).await?;
     Ok(())
 }
