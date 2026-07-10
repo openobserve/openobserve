@@ -441,9 +441,15 @@ describe("EditScript", () => {
     });
 
     it("advances to the next step on Continue", async () => {
+      // Continue now gates on the step's own field: step 1's codeZip is required
+      // on create, so a valid file must be present before the stepper advances.
+      // goToStep() is async (awaits schema validation), so flush after the click.
+      setField(wrapper, "codeZip", new File(["code"], "script.zip"));
+      await nextTick();
       await wrapper
         .find('[data-test="add-action-script-step1-continue-btn"]')
         .trigger("click");
+      await flushPromises();
       expect(wrapper.vm.step).toBe(2);
     });
 
@@ -490,9 +496,14 @@ describe("EditScript", () => {
     });
 
     it("advances to step 4 on Continue", async () => {
+      // Continue gates on service_account (required); seed it before advancing.
+      // goToStep() is async (awaits schema validation), so flush after the click.
+      setField(wrapper, "service_account", "service1@example.com");
+      await nextTick();
       await wrapper
         .find('[data-test="add-action-script-step3-continue-btn"]')
         .trigger("click");
+      await flushPromises();
       expect(wrapper.vm.step).toBe(4);
     });
   });
