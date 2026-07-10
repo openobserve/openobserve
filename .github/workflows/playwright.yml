@@ -239,6 +239,7 @@ jobs:
                 "monaco-query-prefill.spec.js",
                 "logsqueries.matchall.spec.js",
                 "ftsDefaultColumn.spec.js",
+                "logsVisualizePersistence.spec.js",
               ]
           - testfolder: "Logs-Features"
             browser: "chrome"
