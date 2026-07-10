@@ -127,6 +127,13 @@ pub trait Accumulate: Send + Sync {
     /// its samples had been accumulated here. Lets a large group be
     /// aggregated in parallel chunks whose partials are merged at the end.
     ///
+    /// Floating-point caveat: if a partial sum overflows to ±Inf, merging
+    /// opposite infinities yields NaN where a sequential fold may yield ±Inf.
+    /// Summing such inputs is inherently order-dependent (sequentially,
+    /// `MAX, -MAX, MAX, -MAX` gives 0 while `MAX, MAX, -MAX, -MAX` gives
+    /// +Inf), so no chunking-independent result exists; NaN at least signals
+    /// the Inf - Inf cancellation.
+    ///
     /// # Panics
     ///
     /// Panics if `other` is a different accumulator type.
@@ -443,6 +450,25 @@ mod tests {
         let mut values = vec![1.0; n];
         values[0] = f64::INFINITY;
         assert_eq!(eval_chunked_single_group(&values, Sum), f64::INFINITY);
+
+        // Residuals surviving in the compensation term must themselves be
+        // merged with compensation: a plain `c + other_c` add rounds them
+        // away before the main sums cancel. Four chunks whose partials are
+        // (1e32, 2), (-2e16, 0), (-1e32, 1e16), (1e16 - 4, 0); the exact sum
+        // is -2 and only compensated merging of both components keeps it.
+        let n = 4 * AGG_PARALLEL_CHUNK;
+        let mut values = vec![0.0; n];
+        values[0] = 2.0;
+        values[1] = 1e32;
+        values[AGG_PARALLEL_CHUNK] = -1e16;
+        values[AGG_PARALLEL_CHUNK + 1] = -1e16;
+        values[2 * AGG_PARALLEL_CHUNK] = -1e32;
+        values[2 * AGG_PARALLEL_CHUNK + 1] = 1e16;
+        values[3 * AGG_PARALLEL_CHUNK] = 1e16;
+        values[3 * AGG_PARALLEL_CHUNK + 1] = -4.0;
+
+        assert_eq!(eval_chunked_single_group(&values, Sum), -2.0);
+        assert_eq!(eval_chunked_single_group(&values, Avg), -2.0 / n as f64);
     }
 
     #[test]

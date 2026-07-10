@@ -77,7 +77,11 @@ impl Accumulate for AvgAccumulate {
         let other = other.into_any().downcast::<Self>().expect("same type");
         for (timestamp, (other_sum, other_c)) in other.sum {
             let (sum, c) = self.sum.entry(timestamp).or_insert((0.0, 0.0));
-            (*sum, *c) = kahan_sum_increment(other_sum, *sum, *c + other_c);
+            // Fold the other partial's sum and compensation in as two
+            // separate compensated increments: a plain `c + other_c` add
+            // rounds residuals away before the main sums get to cancel.
+            (*sum, *c) = kahan_sum_increment(other_sum, *sum, *c);
+            (*sum, *c) = kahan_sum_increment(other_c, *sum, *c);
         }
         for (timestamp, count) in other.count {
             *self.count.entry(timestamp).or_insert(0) += count;
