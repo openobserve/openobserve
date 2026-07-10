@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     v-model:open="drawerOpen"
     side="right"
-    :width="80"
+    :width="90"
     :title="drawerTitle"
     data-test="synthetics-run-detail-drawer"
     @update:open="onDrawerClose"

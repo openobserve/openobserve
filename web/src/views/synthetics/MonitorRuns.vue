@@ -1209,9 +1209,9 @@ function toMockRun(r: SyntheticRun, idx: number): MockRun {
   return {
     id: idx + 1,
     runId: r.runId || "unknown-" + idx,
-    ageMin: Math.round((Date.now() / 1000 - r.timestamp) / 60),
+    ageMin: Math.round((Date.now() - r.timestamp) / 60000),
     scheduledTs: r.scheduledTs,
-    timestamp: r.timestamp * 1000,
+    timestamp: r.timestamp,
     triggerType: r.triggerType,
     duration: r.durationMs,
     status: r.status === "passed" ? ("pass" as const) : ("fail" as const),

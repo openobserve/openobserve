@@ -455,7 +455,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Expanded content (auto-expanded for failed steps) -->
                     <div v-if="isExpanded(st.id)" class="flex gap-4 p-3">
                       <!-- Screenshot preview 280px -->
-                      <div class="w-[30%] shrink-0">
+                      <div class="w-[40%] shrink-0">
                         <div
                           class="rounded border border-[var(--o2-border-color)] overflow-hidden"
                         >
@@ -507,9 +507,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
 
                       <!-- Details (right panel): error + KV metadata + actions -->
-                      <div class="flex-1 flex flex-col gap-2">
+                      <div class="flex-1 flex flex-col gap-2 relative">
+                        <div class="flex absolute right-0 top-0">
+                          <OButton
+                            variant="outline"
+                            size="xs"
+                            icon-left="fullscreen"
+                            data-test="synthetics-run-detail-step-fullscreen-btn"
+                            @click="openFullScreen(st.id)"
+                          />
+                        </div>
                         <dl
-                          class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs"
+                          class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs pt-4"
                         >
                           <dt
                             class="text-[10px] font-semibold text-text-secondary uppercase tracking-wide"
@@ -574,17 +583,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               {{ expandedStepErrors.has(st.id) ? 'Show less' : 'Show full error' }}
                             </button>
                           </div>
-                        </div>
-
-                        <div class="flex gap-2 mt-auto">
-                          <OButton
-                            variant="outline"
-                            size="sm"
-                            data-test="synthetics-run-detail-download-step-btn"
-                            aria-label="Download screenshot"
-                          >
-                            <OIcon name="file-download" size="sm" />
-                          </OButton>
                         </div>
                       </div>
                     </div>
@@ -660,6 +658,116 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabPanels>
     </div>
   </div>
+
+  <!-- ════════════ Full-Screen Step Content ════════════ -->
+  <ODialog
+    v-model:open="fullScreenOpen"
+    size="full"
+    :title="fullScreenTitle"
+    data-test="synthetics-run-detail-step-fullscreen"
+  >
+    <div class="flex flex-col h-full overflow-y-auto p-6 gap-6">
+      <!-- Screenshot (larger, full width) -->
+      <div
+        v-if="fullScreenStep"
+        class="rounded-lg border border-[var(--o2-border-color)] overflow-hidden"
+      >
+        <div
+          class="flex flex-col items-center justify-center"
+          :class="
+            fullScreenStep.status === 'fail'
+              ? 'bg-[var(--o2-status-error-subtle)]'
+              : 'bg-surface-subtle'
+          "
+        >
+          <img
+            v-if="fullScreenStep.screenshotKey"
+            :src="screenshotUrl(fullScreenStep.screenshotKey)"
+            alt="Step screenshot"
+            class="w-full object-contain max-h-[55vh]"
+          />
+          <template v-else>
+            <div class="flex flex-col items-center gap-2 py-12">
+              <OIcon
+                :name="fullScreenStep.status === 'fail' ? 'broken_image' : 'image'"
+                size="xl"
+                class="text-text-caption"
+              />
+              <span class="text-sm text-text-caption font-semibold">
+                {{
+                  fullScreenStep.status === 'fail'
+                    ? 'Failure screenshot'
+                    : 'Screenshot placeholder'
+                }}
+              </span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Metadata grid (wider, larger text) -->
+      <dl
+        v-if="fullScreenStep"
+        class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm"
+      >
+        <dt
+          class="text-[11px] font-semibold text-text-secondary uppercase tracking-wide"
+        >
+          Action
+        </dt>
+        <dd class="text-text-body">{{ fullScreenStep.action }}</dd>
+        <dt
+          class="text-[11px] font-semibold text-text-secondary uppercase tracking-wide"
+        >
+          Selector
+        </dt>
+        <dd class="font-mono text-text-body">
+          {{ fullScreenStep.detail }}
+        </dd>
+        <dt
+          class="text-[11px] font-semibold text-text-secondary uppercase tracking-wide"
+        >
+          URL
+        </dt>
+        <dd class="font-mono truncate text-text-body">
+          {{ fullScreenStep.detail }}
+        </dd>
+        <dt
+          class="text-[11px] font-semibold text-text-secondary uppercase tracking-wide"
+        >
+          Duration
+        </dt>
+        <dd class="text-text-heading">{{ fullScreenStep.durStr }}</dd>
+      </dl>
+
+      <!-- Error section (failed steps only) -->
+      <div
+        v-if="fullScreenStep?.status === 'fail' && fullScreenStep?.error"
+        class="rounded-lg border border-badge-error-ol-border/30 overflow-hidden"
+        data-test="synthetics-run-detail-step-fullscreen-error"
+      >
+        <div
+          class="flex items-center gap-2 px-4 py-2.5 bg-[var(--color-badge-error-soft-bg)]"
+        >
+          <OIcon
+            name="error"
+            size="sm"
+            class="text-[var(--o2-status-error)]"
+            aria-hidden="true"
+          />
+          <span
+            class="text-sm font-semibold text-[var(--o2-text-heading)] flex-1"
+            >Error</span
+          >
+        </div>
+        <div class="px-4 py-3">
+          <pre
+            class="text-sm text-[var(--o2-text-body)] m-0 whitespace-pre-wrap font-mono leading-relaxed"
+          >{{ fullScreenStep.error }}</pre>
+        </div>
+      </div>
+    </div>
+  </ODialog>
 </template>
 
 <script setup lang="ts">
@@ -682,6 +790,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import VideoPlayer from "@/components/rum/VideoPlayer.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
@@ -990,6 +1099,30 @@ function toggleExpand(id: number) {
   expandedStepIds.value = next;
 }
 
+// ── Full-screen step content ────────────────────────────────────────────────
+const fullScreenStepId = ref<number | null>(null);
+
+const fullScreenOpen = computed({
+  get: () => fullScreenStepId.value !== null,
+  set: (v: boolean) => {
+    if (!v) fullScreenStepId.value = null;
+  },
+});
+
+const fullScreenStep = computed(() => {
+  if (fullScreenStepId.value === null) return null;
+  return steps.value.find((s) => s.id === fullScreenStepId.value) ?? null;
+});
+
+const fullScreenTitle = computed(() => {
+  const s = fullScreenStep.value;
+  return s ? `Step ${s.id}: ${s.action}` : "";
+});
+
+function openFullScreen(id: number) {
+  fullScreenStepId.value = id;
+}
+
 // Computed: current run from composable data
 const loading = computed(() => synthetics.loading.value);
 const currentRun = computed<DisplayRun>(() => {
@@ -1129,6 +1262,7 @@ watch(
   ([newRunId, newExecId]) => {
     if (newRunId && newExecId) {
       expandedStepIds.value = new Set();
+      fullScreenStepId.value = null;
       loadRun();
     }
   },
