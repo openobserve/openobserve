@@ -108,6 +108,15 @@ export function buildUsageCombinedLinePanelSchema(opts: {
     title: "",
     description: "",
     type: "line",
+    // Silence PanelSchemaRenderer's own error text (e.g. "stream not found:
+    // usage", shown until the org reports any usage). We turn error handling
+    // ON but give NO custom_error_message, so both of the renderer's error
+    // blocks are suppressed — usage.vue then overlays the illustrated
+    // "waiting for usage data" empty state instead.
+    error_config: {
+      custom_error_handeling: true,
+      default_data_on_error: false,
+    },
     config: {
       show_legends: true,
       legends_position: "bottom",

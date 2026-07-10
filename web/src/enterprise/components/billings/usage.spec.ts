@@ -17,6 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import Usage from "@/enterprise/components/billings/usage.vue";
 import BillingService from "@/services/billings";
+import organizations from "@/services/organizations";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
@@ -27,6 +28,12 @@ import { nextTick } from "vue";
 vi.mock("@/services/billings", () => ({
   default: {
     get_data_usage: vi.fn(),
+  },
+}));
+
+vi.mock("@/services/organizations", () => ({
+  default: {
+    post_organization_settings: vi.fn(),
   },
 }));
 
@@ -43,9 +50,13 @@ vi.mock("@/router", () => ({
   default: mockRouter
 }));
 
-vi.mock("vue-router", () => ({
-  useRouter: () => mockRouter
-}));
+vi.mock("vue-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("vue-router")>();
+  return {
+    ...actual,
+    useRouter: () => mockRouter,
+  };
+});
 
 // Mock zincutils — partial so the store (pulled in transitively via the
 // dashboards renderer) still resolves useLocalOrganization etc.
@@ -795,6 +806,111 @@ describe("Usage Component", () => {
         "1days",
         expect.any(String),
         undefined,
+      );
+    });
+  });
+
+  describe("Usage enable-reporting CTA", () => {
+    const mountUsage = () =>
+      mount(Usage, {
+        global: {
+          plugins: [store, router, i18n],
+        },
+      });
+
+    beforeEach(() => {
+      (BillingService.get_data_usage as any).mockResolvedValue({
+        data: { data: [], start_time: 0, end_time: 0 },
+      });
+      store.state.selectedOrganization = { identifier: "org-a" } as any;
+      store.state.organizationData = store.state.organizationData || ({} as any);
+    });
+
+    it("shows the enable CTA when usage_stream_enabled is false", async () => {
+      store.state.organizationData.organizationSettings = {
+        usage_stream_enabled: false,
+      } as any;
+      const wrapper = mountUsage();
+      await flushPromises();
+      expect(wrapper.find('[data-test="usage-enable-cta"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="usage-daily-chart"]').exists()).toBe(false);
+    });
+
+    it("hides the CTA when usage_stream_enabled is true", async () => {
+      store.state.organizationData.organizationSettings = {
+        usage_stream_enabled: true,
+      } as any;
+      const wrapper = mountUsage();
+      await flushPromises();
+      expect(wrapper.find('[data-test="usage-enable-cta"]').exists()).toBe(false);
+    });
+
+    it("posts a merged settings payload with usage_stream_enabled:true on click", async () => {
+      store.state.organizationData.organizationSettings = {
+        usage_stream_enabled: false,
+        scrape_interval: 15,
+      } as any;
+      (organizations.post_organization_settings as any).mockResolvedValue({});
+      const wrapper = mountUsage();
+      await flushPromises();
+      // The CTA now opens a confirm dialog before enabling: fire the empty
+      // state's action, then confirm the dialog to run the enable flow.
+      wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action");
+      await flushPromises();
+      wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+      await flushPromises();
+      expect(organizations.post_organization_settings).toHaveBeenCalledWith(
+        "org-a",
+        expect.objectContaining({
+          scrape_interval: 15,
+          usage_stream_enabled: true,
+        }),
+      );
+      expect(
+        store.state.organizationData.organizationSettings.usage_stream_enabled,
+      ).toBe(true);
+    });
+
+    it("shows the waiting-for-data graphic when the usage stream is missing", async () => {
+      store.state.organizationData.organizationSettings = {
+        usage_stream_enabled: true,
+      } as any;
+      const wrapper = mountUsage();
+      await flushPromises();
+      // No error yet → no overlay.
+      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(
+        false,
+      );
+      // Chart search errors because the org's usage stream doesn't exist yet.
+      wrapper
+        .findComponent({ name: "PanelSchemaRenderer" })
+        .vm.$emit("error", { message: "Search stream not found: usage" });
+      await flushPromises();
+      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(
+        true,
+      );
+      // When data lands the error clears → overlay goes away.
+      wrapper
+        .findComponent({ name: "PanelSchemaRenderer" })
+        .vm.$emit("error", null);
+      await flushPromises();
+      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("does not show the waiting graphic for unrelated chart errors", async () => {
+      store.state.organizationData.organizationSettings = {
+        usage_stream_enabled: true,
+      } as any;
+      const wrapper = mountUsage();
+      await flushPromises();
+      wrapper
+        .findComponent({ name: "PanelSchemaRenderer" })
+        .vm.$emit("error", { message: "SQL parse error near GROUP" });
+      await flushPromises();
+      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(
+        false,
       );
     });
   });
