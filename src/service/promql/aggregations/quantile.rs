@@ -72,6 +72,12 @@ impl AggFunc for Quantile {
     fn build(&self) -> Box<dyn super::Accumulate> {
         Box::new(QuantileAccumulate::new(self.qtile))
     }
+
+    // Buffers every sample; merging partials would re-copy them at each
+    // reduction level.
+    fn mergeable(&self) -> bool {
+        false
+    }
 }
 
 pub struct QuantileAccumulate {

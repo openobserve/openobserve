@@ -49,6 +49,12 @@ impl AggFunc for Stdvar {
     fn build(&self) -> Box<dyn super::Accumulate> {
         Box::new(StdvarAccumulate::new())
     }
+
+    // Buffers every sample; merging partials would re-copy them at each
+    // reduction level.
+    fn mergeable(&self) -> bool {
+        false
+    }
 }
 
 pub struct StdvarAccumulate {

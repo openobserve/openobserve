@@ -80,6 +80,15 @@ pub trait AggFunc: Sync {
     /// collect and aggregate samples. This allows for parallel processing of multiple
     /// label groups.
     fn build(&self) -> Box<dyn Accumulate>;
+
+    /// Whether a huge group may be split into parallel chunks whose partial
+    /// accumulators are combined with [`Accumulate::merge`]. Value-buffering
+    /// accumulators (quantile/stddev/stdvar) opt out: each reduction level
+    /// re-copies every buffered sample, costing `O(N log P)` copying and extra
+    /// transient memory versus the sequential append.
+    fn mergeable(&self) -> bool {
+        true
+    }
 }
 
 /// Trait for accumulating and aggregating time series samples.
@@ -267,7 +276,7 @@ where
             // A huge group (e.g. `sum(...)` without a modifier puts every
             // series in one group) would otherwise aggregate on one thread;
             // fold it in parallel chunks and merge the partials.
-            let acc = if series_indices.len() >= 2 * AGG_PARALLEL_CHUNK {
+            let acc = if func.mergeable() && series_indices.len() >= 2 * AGG_PARALLEL_CHUNK {
                 series_indices
                     .par_chunks(AGG_PARALLEL_CHUNK)
                     .map(accumulate_chunk)
@@ -381,6 +390,59 @@ mod tests {
                 assert_eq!(e.value, m.value, "{}", func.name());
             }
         }
+    }
+
+    /// Runs `eval_aggregate` over a single group large enough to take the
+    /// parallel chunked path and returns the lone aggregated value.
+    fn eval_chunked_single_group<F: AggFunc>(values: &[f64], func: F) -> f64 {
+        assert!(values.len() >= 2 * AGG_PARALLEL_CHUNK);
+        let ts = 1000;
+        let matrix: Vec<RangeValue> = values
+            .iter()
+            .map(|&v| RangeValue {
+                labels: Labels::default(),
+                samples: vec![Sample::new(ts, v)],
+                exemplars: None,
+                time_window: None,
+            })
+            .collect();
+        let eval_ctx = EvalContext::new(ts, ts + 1, 1, "test".to_string());
+        match eval_aggregate(&None, Value::Matrix(matrix), func, &eval_ctx).unwrap() {
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 1);
+                m[0].samples
+                    .iter()
+                    .find(|s| s.timestamp == ts)
+                    .expect("sample at eval timestamp")
+                    .value
+            }
+            _ => panic!("Expected Matrix"),
+        }
+    }
+
+    #[test]
+    fn test_eval_aggregate_chunked_sum_avg_numerically_safe() {
+        use super::{avg::Avg, sum::Sum};
+
+        // Catastrophic cancellation across chunk boundaries: a naive chunked
+        // merge collapses `1e16 ... -1e16 ... 1.0` to 0.0 because the lone
+        // 1.0 is rounded away inside the second chunk's partial sum. The
+        // Kahan-compensated state must preserve it, matching the sequential
+        // fold.
+        let n = 2 * AGG_PARALLEL_CHUNK + 1;
+        let mut values = vec![0.0; n];
+        values[0] = 1e16;
+        values[AGG_PARALLEL_CHUNK + 100] = -1e16;
+        values[AGG_PARALLEL_CHUNK + 200] = 1.0;
+
+        assert_eq!(eval_chunked_single_group(&values, Sum), 1.0);
+        assert_eq!(eval_chunked_single_group(&values, Avg), 1.0 / n as f64);
+
+        // An infinite partial sum must stay +Inf through the merge instead of
+        // degrading to NaN via `Inf - Inf` in the compensation term.
+        let mut values = vec![1.0; n];
+        values[0] = f64::INFINITY;
+        assert_eq!(eval_chunked_single_group(&values, Sum), f64::INFINITY);
     }
 
     #[test]

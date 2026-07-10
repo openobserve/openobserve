@@ -49,6 +49,12 @@ impl AggFunc for Stddev {
     fn build(&self) -> Box<dyn super::Accumulate> {
         Box::new(StddevAccumulate::new())
     }
+
+    // Buffers every sample; merging partials would re-copy them at each
+    // reduction level.
+    fn mergeable(&self) -> bool {
+        false
+    }
 }
 
 pub struct StddevAccumulate {
