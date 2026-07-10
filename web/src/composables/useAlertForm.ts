@@ -133,6 +133,8 @@ export const defaultAlertValue: any = () => {
       timezone: "UTC",
     },
     destinations: [],
+    // Enterprise-only: workflows linked to this alert (run when it fires).
+    workflows: [],
     template: "",
     context_attributes: [],
     enabled: true,
@@ -1328,6 +1330,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const updateDestinations = (destinations: any[]) => {
     formData.value.destinations = destinations;
+  };
+
+  const updateWorkflows = (workflows: any[]) => {
+    formData.value.workflows = workflows;
   };
 
   const updateTab = (tab: string) => {
@@ -2853,6 +2859,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     refreshDestinations,
     refreshTemplates,
     updateDestinations,
+    updateWorkflows,
     updateTab,
     handleGoToSqlEditor,
     clearMultiWindows,

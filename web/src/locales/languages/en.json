@@ -3229,6 +3229,13 @@
     "multiWindow": "Compare with past",
     "multiWindowSubLabel": "Compare current results with data from another time period",
     "destination": "Destination",
+    "workflows": {
+      "label": "Workflows",
+      "tooltip": "Run a workflow when this alert fires — for conditional logic, enrichment, or routing beyond a single destination. Optional; add a destination or a workflow.",
+      "noneAvailable": "No Workflows Available",
+      "refresh": "Refresh Workflows",
+      "create": "Create Workflow"
+    },
     "searchDestinationType": "Search destination types...",
     "customDestination": "Custom Destination",
     "customDestinationDescription": "Configure a custom HTTP endpoint or email destination",
