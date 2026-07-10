@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md p-0 h-full flex flex-col">
+  <div class="p-0 h-full flex flex-col">
     <!-- Standard section header: title + description + Create action. -->
     <AppPageHeader
       icon="key"
@@ -78,6 +78,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="ingestion-tokens-search-input"
               />
             </div>
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="ingestion-tokens-refresh-btn"
+              @click="fetchTokens"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="ingestionTokensRefresh" />
+            </OButton>
           </template>
           <template #empty>
             <OEmptyState

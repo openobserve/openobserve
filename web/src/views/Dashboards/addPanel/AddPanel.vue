@@ -24,17 +24,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="px-4 border-b border-border-default"
     >
           <template #tabs>
-            <OInput
-              data-test="dashboard-panel-name"
-              v-model="dashboardPanelData.data.title"
-              :label="t('panel.name') + '*'"
-              labelPosition="inside"
-              class="dynamic-input min-w-[200px] max-w-[500px] [transition:width_0.2s_ease]"
-              :style="inputStyle"
-              :error="!!panelNameError"
-              :error-message="panelNameError"
-              @update:model-value="panelNameError = ''"
-            />
+            <OForm id="add-panel-form" :form="form">
+              <OFormInput
+                data-test="dashboard-panel-name"
+                name="title"
+                :label="t('panel.name')"
+                required
+                labelPosition="inside"
+                class="dynamic-input min-w-[200px] max-w-[500px] [transition:width_0.2s_ease]"
+                :style="inputStyle"
+              />
+            </OForm>
           </template>
           <template #actions>
             <OButton
@@ -77,8 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm-action"
               data-test="dashboard-panel-save"
-              @click.stop="savePanelData.execute()"
-              :loading="savePanelData.isLoading.value"
+              type="submit"
+              form="add-panel-form"
+              :loading="isSavingPanel"
               >{{ t("panel.save") }}</OButton
             >
             <template
@@ -169,8 +170,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="isAddVariableOpen"
       class="add-variable-drawer-overlay fixed top-0 left-0 right-0 bottom-0 z-6000 flex justify-end"
-      :class="store.state.theme === 'dark' ? 'theme-dark' : 'theme-light'"
       style="background-color: rgba(0, 0, 0, 0.5)"
+      :class="store.state.theme === 'dark' ? 'theme-dark' : 'theme-light'"
       @click.self="handleCloseAddVariable"
     >
       <div class="add-variable-drawer-panel px-6 pt-4 w-225 h-screen shadow-[-2px_0_8px_rgba(0,0,0,0.15)] overflow-hidden rounded-none!" :class="store.state.theme === 'dark' ? 'bg-[#1a1a1a]' : 'bg-white'">
@@ -240,11 +241,14 @@ import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import { makeAddPanelSchema, type AddPanelForm } from "./AddPanel.schema";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
 
@@ -261,7 +265,8 @@ export default defineComponent({
     OButtonGroup,
     OButton,
     AppPageHeader,
-    OInput,
+    OForm,
+    OFormInput,
     ODropdown,
     ODropdownItem,
     OTooltip,
@@ -311,7 +316,50 @@ export default defineComponent({
     const errorData: any = reactive({
       errors: [],
     });
-    const panelNameError = ref("");
+
+    // ── Panel title OForm (header #tabs slot) ────────────────────────────────
+    // OWNER pattern (rule ③): this component renders <OForm> in the header slot
+    // and needs the form's state, so it creates the form with useOForm and reads
+    // it via form.useStore — ONE source, no projection mirror. `title` is
+    // entangled with the editor's dashboardPanelData.data.title (read by the save
+    // flow + width preview + QueryInspector), so it's a name=-owned field synced
+    // both ways with guards: form → editor below (so the editor sees typing), and
+    // editor → form (external-source sync for async edit-prefill / import;
+    // dontUpdateMeta avoids a post-submit "required" flash). The header Save
+    // submits via `form="add-panel-form"` (R4); loading is form-driven.
+    const addPanelSchema = makeAddPanelSchema(t);
+    const form = useOForm<AddPanelForm>({
+      defaultValues: { title: dashboardPanelData.data.title ?? "" },
+      schema: addPanelSchema,
+      // forward to the onSave defined below (avoids a TDZ ref at setup time)
+      onSubmit: (value) => onSave(value),
+    });
+
+    // Form-driven Save spinner for the header Save button (outside <OForm>).
+    const isSavingPanel = form.useStore((s: any) => s.isSubmitting);
+
+    // Project the form-owned title OUT to the editor state so the live width
+    // preview / QueryInspector / save see it as the user types.
+    const titleStore = form.useStore((s: any) => s.values?.title);
+    watch(titleStore, (v: any) => {
+      if (dashboardPanelData.data.title !== (v ?? "")) {
+        dashboardPanelData.data.title = v ?? "";
+      }
+    });
+
+    // Panel title arrives async in edit mode (getPanel → Object.assign in
+    // onMounted) + on import; re-seed the form-owned `title` when the editor
+    // state changes externally (the `!==` guard stops a loop with the projection
+    // above; dontUpdateMeta avoids a post-submit "required" flash).
+    watch(
+      () => dashboardPanelData.data.title,
+      (newTitle) => {
+        if (form.state.values.title !== newTitle) {
+          form.setFieldValue("title", newTitle ?? "", { dontUpdateMeta: true });
+        }
+      },
+    );
+
     let variablesData: any = reactive({});
     const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
     const { getStream } = useStreams();
@@ -497,10 +545,16 @@ export default defineComponent({
     let isPanelConfigWatcherActivated = false;
     const isPanelConfigChanged = ref(false);
 
-    const savePanelData = useLoading(async () => {
+    // @submit fires only after the schema passes (title required+trim). The
+    // validated `value` is the source of truth (rule ②) — write it into the
+    // editor state, then run the existing save (which reads dashboardPanelData +
+    // does the deeper validatePanel checks). OForm awaits this → the header Save
+    // button shows its spinner from the form's isSubmitting (no useLoading).
+    const onSave = async (value: AddPanelForm) => {
+      dashboardPanelData.data.title = value.title;
       const dashboardId = route.query.dashboard + "";
       await savePanelChangesToDashboard(dashboardId);
-    });
+    };
 
     onUnmounted(async () => {
       // clear a few things
@@ -1088,7 +1142,6 @@ export default defineComponent({
 
       // Clear the tracking arrays
       variablesCreatedInSession.value = [];
-      panelNameError.value = "";
       variablesWithCurrentPanel.value = [];
 
       return router.push({
@@ -1180,7 +1233,6 @@ export default defineComponent({
           dashboardData.data.title.trim() == ""
         ) {
           errors.push("Name of Panel is required");
-          panelNameError.value = "Panel name is required.";
         }
       }
 
@@ -1473,14 +1525,20 @@ export default defineComponent({
 
     const inputStyle = computed(() => {
       if (!dashboardPanelData.data.title) {
-        return { width: "200px" };
+        return { width: "200px", transition: "width 0.2s ease" };
       }
 
+      // Grow with the title, but clamp to a 200px floor so the inside label
+      // ("Name of Panel *") always fits. The floor/ceiling used to come from
+      // the scoped `.dynamic-input` class, but that rule's `data-v-*` selector
+      // no longer matches OInput through the OFormInput → Field wrapper layers,
+      // so enforce the bounds inline — inline styles fall through via $attrs and
+      // DO reach the input.
       const contentWidth = Math.min(
-        dashboardPanelData.data.title.length * 8 + 60,
+        Math.max(dashboardPanelData.data.title.length * 8 + 60, 200),
         400,
       );
-      return { width: `${contentWidth}px` };
+      return { width: `${contentWidth}px`, transition: "width 0.2s ease" };
     });
 
     const debouncedUpdateChartConfig = debounce((newVal, oldVal) => {
@@ -1722,7 +1780,7 @@ export default defineComponent({
       isCachedDataDifferWithCurrentTimeRange.value = data;
     };
 
-    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    // ── Keyboard shortcuts ────────────────────────
     useShortcuts([
       {
         id: "panelEditorRun",
@@ -1730,7 +1788,8 @@ export default defineComponent({
       },
       {
         id: "panelEditorSave",
-        handler: () => savePanelData.execute(),
+        // our save is form-driven: submitting runs validation + onSave
+        handler: () => form.handleSubmit(),
       },
       {
         id: "panelEditorBack",
@@ -1807,7 +1866,9 @@ export default defineComponent({
       variablesData,
       liveVariablesData,
       updatedVariablesData,
-      savePanelData,
+      onSave,
+      form,
+      isSavingPanel,
       resetAggregationFunction,
       isOutDated,
       store,
@@ -1844,7 +1905,6 @@ export default defineComponent({
       currentPanelId,
       panelEditorRef,
       dashboardDataForPanelEditor,
-      panelNameError,
     };
   },
   methods: {

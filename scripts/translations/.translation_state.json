@@ -5960,6 +5960,51 @@
     "processExitCode": "c068ec09b664f807",
     "reviewAndApplyFilters": "28a6fd8929f1ffa5",
     "searchInSpans": "dc825d0a0f577ba4",
+    "serviceGraph": {
+      "borderColor": "a42d1353ab153ecc",
+      "borderColorMetric": "cb702378f31507ef",
+      "distribution": "72a23e549d099bbd",
+      "entities": "2cc497857559ff85",
+      "fitToScreen": "32bb0d298ca1545c",
+      "kind": {
+        "database": "7b180047ed9121ac",
+        "external": "68c114ea9c8c6604",
+        "queue": "be77db1156d1f1b5",
+        "rpc": "8f7520013b0ae42e",
+        "service": "604dce445e326d95"
+      },
+      "layout": "a511909161e1b84f",
+      "mode": {
+        "auto": "0286249762f7c943",
+        "collapsed": "b322b65227bc3ec9",
+        "expanded": "e72d5d8d0b167d21"
+      },
+      "noStreamsDetected": "c717d50ad90c60e5",
+      "nodeSize": "db8358bc2ff2f6fc",
+      "nodeSizeMetric": "ada27592c9578e90",
+      "range": {
+        "critical": "8dbe368dce32dd8c",
+        "degraded": "af6245531d42e19e",
+        "healthy": "d6ba0ed10f3af1bf",
+        "warning": "344d154f9c06ebd8"
+      },
+      "searchPlaceholder": "d1f0a94f3b85accc",
+      "showTypes": "7011e98af0aeb21b",
+      "sizeHigh": "c4ebc6d4a5832cd9",
+      "sizeLow": "f793de205ead5ac3",
+      "status": {
+        "critical": "427dd2969bd140be",
+        "degraded": "a8494c12f2243903",
+        "healthy": "7f1e323b6272c620",
+        "warning": "e981ddae45d8f4ca"
+      },
+      "streamOnlyInfo": "f6da6542b640ce91",
+      "total": "c9b3c38247f744e1",
+      "types": "a5fc918683bf9602",
+      "typesFiltered": "3d6dd8df44668a42",
+      "zoomIn": "0e47f09a748fa132",
+      "zoomOut": "bc7b631a689b45ca"
+    },
     "serviceGraphTab": "b4c43a3f8ce916fb",
     "serviceMap": "d20cdb31d1fbd506",
     "servicesCatalog": {
@@ -5978,6 +6023,7 @@
       },
       "exportCsv": "91f71c14c8d6cc64",
       "filterPlaceholder": "6c403ddc8a77c64c",
+      "footerTitle": "604dce445e326d95",
       "legend": {
         "title": "bf7d539c44f17179"
       },
@@ -5993,6 +6039,15 @@
       },
       "tabLabel": "bae55a50f9710b93",
       "title": "bae55a50f9710b93",
+      "types": {
+        "all": "a52ace420f2175d0",
+        "datastore": "7b180047ed9121ac",
+        "external": "68c114ea9c8c6604",
+        "queue": "be77db1156d1f1b5",
+        "rpc": "8f7520013b0ae42e",
+        "service": "604dce445e326d95"
+      },
+      "unhealthyTooltip": "23313ad5061c1743",
       "viewTraces": "884c82142ec36670"
     },
     "sessionDetail": {

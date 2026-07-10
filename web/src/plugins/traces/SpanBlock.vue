@@ -105,7 +105,6 @@ import { getImageURL, formatTimeWithSuffix } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { b64EncodeStandard } from "@/utils/zincutils";
-import { useRouter } from "vue-router";
 
 export default defineComponent({
   name: "SpanBlock",
@@ -158,7 +157,6 @@ export default defineComponent({
     });
 
     const durationStyle = ref({});
-    const router = useRouter();
     const { t } = useI18n();
 
     const leftPosition = ref(0);
@@ -189,21 +187,12 @@ export default defineComponent({
 
     onMounted(async () => {
       durationStyle.value = getDurationStyle();
-      const params = router.currentRoute.value.query;
-      const spanId = Array.isArray(params.span_id)
-        ? params.span_id[0]
-        : params.span_id; // Ensure it's a single string
 
-      if (spanId) {
-        const element = document.getElementById(spanId);
-        if (element) {
-          element.scrollIntoView({
-            behavior: "smooth", // Smooth scrolling
-            block: "center", // Attempt to align the element at the center of the screen
-            inline: "nearest", // Keep horizontal alignment as close as possible
-          });
-        }
-      }
+      // NOTE: do NOT scroll the pre-selected span into view here. Rows are
+      // virtualized, so a SpanBlock remounts every time it scrolls into the
+      // viewport — doing scrollIntoView on each mount snapped the view back to
+      // the URL's span_id and fought the user's scroll. Centering the
+      // pre-selected span is owned by TraceTree (virtualizer scrollToIndex).
 
       if (spanBlock.value) {
         _resizeObserver = new ResizeObserver(() => {

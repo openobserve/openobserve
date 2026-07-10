@@ -526,7 +526,7 @@ async fn search_tantivy_index(
     }
 
     warm_up_terms(
-        &searcher,
+        searcher.segment_reader(0),
         &warm_terms,
         need_all_term_fields,
         need_fast_field,

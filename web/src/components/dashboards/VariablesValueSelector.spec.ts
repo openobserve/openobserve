@@ -1652,6 +1652,52 @@ describe("VariablesValueSelector", () => {
         );
       }
     });
+
+    it("should not snap an emptied 'all'-default multiSelect variable back to SELECT_ALL", async () => {
+      const nodeVar: any = {
+        name: "node",
+        type: "query_values",
+        multiSelect: true,
+        selectAllValueForMultiSelect: "all",
+        value: ["__SELECT_ALL__"],
+        options: [
+          { label: "n1", value: "n1" },
+          { label: "n2", value: "n2" },
+        ],
+        scope: "global",
+        isLoading: false,
+        isVariableLoadingPending: false,
+        isVariablePartialLoaded: true,
+      };
+
+      const manager = {
+        ...mockVariablesManager,
+        variablesData: { global: [nodeVar], tabs: {}, panels: {} },
+        getAllVisibleVariables: vi.fn(() => [nodeVar]),
+        // Mirror the real manager: store whatever value it's handed.
+        updateVariableValue: vi.fn(
+          (_name, _scope, _tabId, _panelId, value) => {
+            nodeVar.value = value;
+          },
+        ),
+      };
+
+      wrapper = createWrapper({ variablesManager: manager, scope: "global" });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      expect(vm.variablesData.values[0].value).toEqual(["__SELECT_ALL__"]);
+
+      // Simulate the child emitting an empty selection (v-model sets the value),
+      // immediately followed by the update handler — same tick, no await between.
+      vm.variablesData.values[0].value = [];
+      await vm.onVariablesValueUpdated(0);
+      await nextTick();
+      await nextTick();
+
+      // Value must remain empty, not revert to SELECT_ALL.
+      expect(vm.variablesData.values[0].value).toEqual([]);
+    });
   });
 
   describe("Add Variable Button", () => {

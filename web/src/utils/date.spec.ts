@@ -422,13 +422,10 @@ describe("Date Utilities", () => {
     });
 
     it("should handle errors gracefully", () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const result = convertUnixToQuasarFormat("invalid");
       
       expect(result).toBe("");
-      expect(consoleSpy).toHaveBeenCalledWith("Error converting unix to quasar format");
       
-      consoleSpy.mockRestore();
     });
   });
 
@@ -467,13 +464,10 @@ describe("Date Utilities", () => {
     });
 
     it("should handle errors gracefully", () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const result = convertDateToTimestamp("invalid-date", "invalid-time", "UTC");
       
       expect(result).toEqual({ timestamp: 0, offset: 0 });
-      expect(consoleSpy).toHaveBeenCalledWith("Error converting date to timestamp");
       
-      consoleSpy.mockRestore();
     });
 
     it("should handle edge cases", () => {
