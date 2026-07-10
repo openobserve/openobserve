@@ -644,103 +644,6 @@ pub fn extrapolated_rate(
         return None;
     }
 
-    let first = &samples[0];
-    let last = &samples.last().unwrap();
-
-    let mut result = last.value - first.value;
-
-    let is_counter = matches!(kind, ExtrapolationKind::Rate | ExtrapolationKind::Increase);
-    if is_counter {
-        // Handle counter resets.
-        let mut prev_value = first.value;
-        for sample in &samples[1..] {
-            if sample.value < prev_value {
-                result += prev_value;
-            }
-            prev_value = sample.value;
-        }
-    }
-
-    extrapolate(
-        first,
-        last,
-        samples.len(),
-        result,
-        eval_ts,
-        range,
-        offset,
-        kind,
-    )
-}
-
-/// Prefix counter-reset corrections for a series: `out[i]` is the sum of the
-/// adjustments (the pre-reset value) at every counter reset in
-/// `samples[..=i]`. Lets [`extrapolated_rate_prepared`] answer any window in
-/// O(1) instead of rescanning its samples.
-pub fn reset_corrections(samples: &[Sample]) -> Vec<f64> {
-    let mut out = Vec::with_capacity(samples.len());
-    let mut acc = 0.0;
-    for (i, sample) in samples.iter().enumerate() {
-        if i > 0 && sample.value < samples[i - 1].value {
-            acc += samples[i - 1].value;
-        }
-        out.push(acc);
-    }
-    out
-}
-
-/// Same as [`extrapolated_rate`], but takes the full series plus the prefix
-/// from [`reset_corrections`] and a half-open index `window` into it, so each
-/// window costs O(1).
-pub fn extrapolated_rate_prepared(
-    samples: &[Sample],
-    resets: &[f64],
-    window: (usize, usize),
-    eval_ts: i64,
-    range: Duration,
-    offset: Duration,
-    kind: ExtrapolationKind,
-) -> Option<f64> {
-    let (win_start, win_end) = window;
-    if win_end - win_start < 2 {
-        // Not enough samples.
-        return None;
-    }
-
-    let first = &samples[win_start];
-    let last = &samples[win_end - 1];
-
-    let mut result = last.value - first.value;
-    if matches!(kind, ExtrapolationKind::Rate | ExtrapolationKind::Increase) {
-        result += resets[win_end - 1] - resets[win_start];
-    }
-
-    extrapolate(
-        first,
-        last,
-        win_end - win_start,
-        result,
-        eval_ts,
-        range,
-        offset,
-        kind,
-    )
-}
-
-/// Shared extrapolation tail of [`extrapolated_rate`] /
-/// [`extrapolated_rate_prepared`]: `result` is the reset-adjusted increase
-/// between `first` and `last`.
-#[allow(clippy::too_many_arguments)]
-fn extrapolate(
-    first: &Sample,
-    last: &Sample,
-    num_samples: usize,
-    mut result: f64,
-    eval_ts: i64,
-    range: Duration,
-    offset: Duration,
-    kind: ExtrapolationKind,
-) -> Option<f64> {
     let start = {
         let range_plus_offset = range
             .checked_add(offset)
@@ -764,19 +667,34 @@ fn extrapolate(
     assert!(end > 0);
     assert!(start <= end);
 
+    let first = &samples[0];
+    let last = &samples.last().unwrap();
+
     // The caller must ensure that the samples are in the range.
     assert!(first.timestamp <= last.timestamp);
     assert!(first.timestamp >= start);
     assert!(last.timestamp <= end);
 
+    let mut result = last.value - first.value;
+
     let is_counter = matches!(kind, ExtrapolationKind::Rate | ExtrapolationKind::Increase);
+    if is_counter {
+        // Handle counter resets.
+        let mut prev_value = first.value;
+        for sample in &samples[1..] {
+            if sample.value < prev_value {
+                result += prev_value;
+            }
+            prev_value = sample.value;
+        }
+    }
 
     // Duration between first/last samples and boundary of range.
     let mut duration_to_start = (first.timestamp - start) as f64 / 1_000.0;
     let duration_to_end = (end - last.timestamp) as f64 / 1_000.0;
 
     let sampled_interval = (last.timestamp - first.timestamp) as f64 / 1_000.0;
-    let avg_duration_between_samples = sampled_interval / (num_samples - 1) as f64;
+    let avg_duration_between_samples = sampled_interval / (samples.len() - 1) as f64;
 
     if is_counter && result > 0.0 && first.value >= 0.0 {
         // Counters cannot be negative. If we have any slope at all

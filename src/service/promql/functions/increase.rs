@@ -16,8 +16,7 @@
 use std::time::Duration;
 
 use config::meta::promql::value::{
-    EvalContext, ExtrapolationKind, Sample, Value, extrapolated_rate, extrapolated_rate_prepared,
-    reset_corrections,
+    EvalContext, ExtrapolationKind, Sample, Value, extrapolated_rate,
 };
 use datafusion::error::Result;
 
@@ -43,29 +42,6 @@ impl RangeFunc for IncreaseFunc {
     fn exec(&self, samples: &[Sample], eval_ts: i64, range: &Duration) -> Option<f64> {
         extrapolated_rate(
             samples,
-            eval_ts,
-            *range,
-            Duration::ZERO,
-            ExtrapolationKind::Increase,
-        )
-    }
-
-    fn prepare(&self, samples: &[Sample]) -> Option<Vec<f64>> {
-        Some(reset_corrections(samples))
-    }
-
-    fn exec_prepared(
-        &self,
-        samples: &[Sample],
-        prepared: &[f64],
-        window: (usize, usize),
-        eval_ts: i64,
-        range: &Duration,
-    ) -> Option<f64> {
-        extrapolated_rate_prepared(
-            samples,
-            prepared,
-            window,
             eval_ts,
             *range,
             Duration::ZERO,

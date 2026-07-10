@@ -208,29 +208,6 @@ pub trait RangeFunc: Sync {
     /// * `None` - If the function cannot produce a value (e.g., insufficient samples, invalid data,
     ///   or the result should be omitted)
     fn exec(&self, samples: &[Sample], eval_ts: i64, range: &Duration) -> Option<f64>;
-
-    /// Optional per-series precomputation that lets [`Self::exec_prepared`]
-    /// answer every window in O(1) instead of rescanning its samples — with a
-    /// range query's overlapping windows the rescans visit each sample many
-    /// times over. Functions that don't benefit keep the default `None` and
-    /// are evaluated through [`Self::exec`].
-    fn prepare(&self, _samples: &[Sample]) -> Option<Vec<f64>> {
-        None
-    }
-
-    /// Window evaluation using the state built by [`Self::prepare`].
-    /// `window` is a half-open index range into the full `samples` slice.
-    /// Only called when `prepare` returned `Some`.
-    fn exec_prepared(
-        &self,
-        _samples: &[Sample],
-        _prepared: &[f64],
-        _window: (usize, usize),
-        _eval_ts: i64,
-        _range: &Duration,
-    ) -> Option<f64> {
-        None
-    }
 }
 
 pub(crate) fn eval_range<F>(data: Value, func: F, eval_ctx: &EvalContext) -> Result<Value>
@@ -277,9 +254,6 @@ where
             let range = time_window.range;
             let range_micros = micros(range);
             let mut result_samples = Vec::with_capacity(timestamps.len());
-            // Per-series state that makes each window O(1) for functions that
-            // support it (e.g. rate's counter-reset prefix).
-            let prepared = func.prepare(&metric.samples);
 
             // For each eval timestamp, compute the function value
             for &eval_ts in &timestamps {
@@ -294,22 +268,13 @@ where
                 let end_index = metric
                     .samples
                     .partition_point(|s| s.timestamp <= window_end);
+                let window_samples = &metric.samples[start_index..end_index];
 
-                if start_index == end_index {
+                if window_samples.is_empty() {
                     continue;
                 }
 
-                let value = match &prepared {
-                    Some(prepared) => func.exec_prepared(
-                        &metric.samples,
-                        prepared,
-                        (start_index, end_index),
-                        eval_ts,
-                        &range,
-                    ),
-                    None => func.exec(&metric.samples[start_index..end_index], eval_ts, &range),
-                };
-                if let Some(value) = value {
+                if let Some(value) = func.exec(window_samples, eval_ts, &range) {
                     result_samples.push(Sample::new(eval_ts, value));
                 }
             }
