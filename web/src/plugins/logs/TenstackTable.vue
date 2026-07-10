@@ -280,6 +280,12 @@ class="mr-1" />
               transform: `translateY(${virtualRow.start}px)`,
               minWidth: '100%',
               width: (!defaultColumns && !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow) ? '100%' : undefined,
+              backgroundColor:
+                !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow &&
+                (tableRows[virtualRow.index] as any)[store.state.zoConfig.timestamp_column] !== highlightTimestamp &&
+                getRowBgColor(tableRows[virtualRow.index]) !== 'transparent'
+                  ? getRowBgColor(tableRows[virtualRow.index])
+                  : undefined,
             }"
             :data-index="virtualRow.index"
             :data-expanded="
@@ -309,7 +315,9 @@ class="mr-1" />
                   ? 'bg-zinc-700'
                   : 'bg-zinc-300'
                 : !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                  ? 'log-row-base bg-(--o2-log-table-row-bg)'
+                  ? getRowBgColor(tableRows[virtualRow.index]) !== 'transparent'
+                    ? 'log-row-base'
+                    : 'log-row-base bg-(--o2-log-table-row-bg)'
                   : '',
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'table-row-hover table-row-focus focus-visible:outline-none transition-[background-color,box-shadow] duration-[120ms] [transition-timing-function:ease-in-out] border-b-(--o2-log-table-row-border)!'
@@ -510,7 +518,7 @@ import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import { debounce } from "lodash-es";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
-import { extractStatusFromLog } from "@/utils/logs/statusParser";
+import { extractStatusFromLog, ROW_BG_COLORS, ROW_BG_COLORS_DARK } from "@/utils/logs/statusParser";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -668,6 +676,18 @@ const getRowStatusColor = (rowData: any) => {
 // is displayed (e.g. the FTS "body" column instead of the raw "source" JSON).
 const getRowStatusLevel = (rowData: any) => {
   return extractStatusFromLog(rowData).level;
+};
+
+/**
+ * Returns a subtle background tint color for the entire row based on log severity.
+ * Only error/warning/critical levels get visible coloring; info/debug stay transparent.
+ * This implements feature request #3398: "Color Log Based on Field Value".
+ */
+const getRowBgColor = (rowData: any) => {
+  const isDark = store.state.theme === 'dark';
+  const statusInfo = extractStatusFromLog(rowData, isDark);
+  const colorMap = isDark ? ROW_BG_COLORS_DARK : ROW_BG_COLORS;
+  return colorMap[statusInfo.level] || 'transparent';
 };
 
 watch(

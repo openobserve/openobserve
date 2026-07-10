@@ -73,6 +73,38 @@ export const STATUS_COLORS_DARK: Partial<Record<keyof typeof STATUS_COLORS, stri
 };
 
 /**
+ * Subtle row background colors for log-level colorization (light mode).
+ * These are very low-opacity tints so text remains readable.
+ * Only error/warning/critical/emergency get visible tinting; info/debug/ok stay transparent.
+ */
+export const ROW_BG_COLORS: Record<string, string> = {
+  emergency: 'rgba(229, 57, 53, 0.14)',
+  alert:     'rgba(234, 88, 12, 0.12)',
+  critical:  'rgba(244, 81, 30, 0.12)',
+  error:     'rgba(239, 83, 80, 0.10)',
+  warning:   'rgba(251, 140, 0, 0.09)',
+  notice:    'transparent',
+  info:      'transparent',
+  debug:     'transparent',
+  ok:        'transparent',
+};
+
+/**
+ * Dark-mode row background colors — slightly brighter alpha to be visible on dark bg.
+ */
+export const ROW_BG_COLORS_DARK: Record<string, string> = {
+  emergency: 'rgba(224, 112, 112, 0.18)',
+  alert:     'rgba(234, 88, 12, 0.15)',
+  critical:  'rgba(220, 96, 48, 0.15)',
+  error:     'rgba(217, 92, 92, 0.14)',
+  warning:   'rgba(212, 148, 74, 0.12)',
+  notice:    'transparent',
+  info:      'transparent',
+  debug:     'transparent',
+  ok:        'transparent',
+};
+
+/**
  * Standard field names to search for status information
  * Ordered by preference - first match will be used
  */
