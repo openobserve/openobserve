@@ -20,13 +20,25 @@ const randomFunctionName = `Pipeline${Math.floor(Math.random() * 1000)}`;
 
 test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCore'] }, () => {
   let pageManager;
+  // Worker-specific stream suffix. parallelIndex is 0..(workers-1), so two tests
+  // that run concurrently are always on different workers and therefore never share
+  // a source/destination stream — this removes the residual cross-file collision
+  // that per-test cleanup scoping alone could not (two concurrent tests on the same
+  // shared stream name). Same-worker tests run sequentially and are safe.
+  let streamSuffix;
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
     // Auth is handled via storageState - no login needed
     pageManager = new PageManager(page);
+    streamSuffix = `_w${testInfo.parallelIndex}`;
 
-    // Ingest data using page object method
-    const streamNames = ["e2e_automate", "e2e_automate1", "e2e_automate2", "e2e_automate3"];
+    // Ingest data using page object method (worker-scoped stream names)
+    const streamNames = [
+      `e2e_automate${streamSuffix}`,
+      `e2e_automate1${streamSuffix}`,
+      `e2e_automate2${streamSuffix}`,
+      `e2e_automate3${streamSuffix}`,
+    ];
     await pageManager.pipelinesPage.bulkIngestToStreams(streamNames, logsdata);
     // NOTE: pipeline cleanup is intentionally NOT done pool-wide here. A cleanup that
     // deletes pipelines across all four shared source streams races with sibling tests
@@ -37,14 +49,17 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    await pageManager.logsPage.selectStream("e2e_automate");
+    await pageManager.logsPage.selectStream(`e2e_automate${streamSuffix}`);
     await pageManager.logsPage.applyQuery();
   });
 
   test("should add source & destination node and then delete the pipeline", async ({ page }) => {
+    const sourceStream = `e2e_automate3${streamSuffix}`;
+    const destFill = `destination-node${streamSuffix}`;   // hyphen normalizes to "_" on create
+    const destStream = `destination_node${streamSuffix}`;  // resulting stream name to explore
     // Free only this test's own source stream so a sibling test's setup can never
     // delete this test's in-flight pipeline (was pool-wide cleanup in beforeEach).
-    await pageManager.apiCleanup.cleanupPipelines(["e2e_automate3"]).catch(() => {});
+    await pageManager.apiCleanup.cleanupPipelines([sourceStream]).catch(() => {});
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
@@ -53,8 +68,8 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
     await pageManager.pipelinesPage.selectLogs();
 
     await pageManager.pipelinesPage.enterStreamName("e2e");
-    await pageManager.pipelinesPage.enterStreamName("e2e_automate3");
-    await pageManager.pipelinesPage.selectStreamOption("e2e_automate3");
+    await pageManager.pipelinesPage.enterStreamName(sourceStream);
+    await pageManager.pipelinesPage.selectStreamOption(sourceStream);
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(3000);
 
@@ -63,7 +78,7 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
 
     // Drag and drop output stream instead of hover-click
     await pageManager.pipelinesPage.selectAndDragSecondStream();
-    await pageManager.pipelinesPage.fillDestinationStreamName("destination-node");
+    await pageManager.pipelinesPage.fillDestinationStreamName(destFill);
     await pageManager.pipelinesPage.clickInputNodeStreamSave();
 
     // Wait for dialog to close and connect nodes
@@ -75,14 +90,17 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
     await pageManager.pipelinesPage.savePipeline();
 
     // Navigate to pipeline list via stream exploration
-    await pageManager.pipelinesPage.exploreStreamAndNavigateToPipeline('destination_node');
+    await pageManager.pipelinesPage.exploreStreamAndNavigateToPipeline(destStream);
     await pageManager.pipelinesPage.searchPipeline(pipelineName);
     await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
   });
 
   test.skip("should add source, function, destination and then delete pipeline", async ({ page }) => {
+    const sourceStream = `e2e_automate1${streamSuffix}`;
+    const destFill = `destination-node${streamSuffix}`;
+    const destStream = `destination_node${streamSuffix}`;
     // Free only this test's own source stream (see note in beforeEach).
-    await pageManager.apiCleanup.cleanupPipelines(["e2e_automate1"]).catch(() => {});
+    await pageManager.apiCleanup.cleanupPipelines([sourceStream]).catch(() => {});
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
@@ -90,8 +108,8 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
     await pageManager.pipelinesPage.selectLogs();
     await pageManager.pipelinesPage.enterStreamName("e2e");
-    await pageManager.pipelinesPage.enterStreamName("e2e_automate1");
-    await pageManager.pipelinesPage.selectStreamOption("e2e_automate1");
+    await pageManager.pipelinesPage.enterStreamName(sourceStream);
+    await pageManager.pipelinesPage.selectStreamOption(sourceStream);
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(2000);
 
@@ -117,7 +135,7 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
 
     // Drag and drop output stream instead of hover-click
     await pageManager.pipelinesPage.selectAndDragSecondStream();
-    await pageManager.pipelinesPage.fillDestinationStreamName("destination-node");
+    await pageManager.pipelinesPage.fillDestinationStreamName(destFill);
     await pageManager.pipelinesPage.clickInputNodeStreamSave();
 
     // Wait for dialog to close and connect nodes via function
@@ -129,7 +147,7 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
     await pageManager.pipelinesPage.savePipeline();
 
     // Navigate to pipeline list via stream exploration
-    await pageManager.pipelinesPage.exploreStreamAndInteractWithLogDetails('destination_node');
+    await pageManager.pipelinesPage.exploreStreamAndInteractWithLogDetails(destStream);
     await pageManager.pipelinesPage.searchPipeline(pipelineName);
     await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
   });
@@ -141,8 +159,10 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
   test("should add pipeline with function node using VRL transform @P1 @function @vrl @regression", async ({ page }) => {
     testLogger.info('Test: Add pipeline with function node (VRL transform)');
 
+    const sourceStream = `e2e_automate${streamSuffix}`;
+    const destStream = `destination_node${streamSuffix}`;
     // Free only this test's own source stream (see note in beforeEach).
-    await pageManager.apiCleanup.cleanupPipelines(["e2e_automate"]).catch(() => {});
+    await pageManager.apiCleanup.cleanupPipelines([sourceStream]).catch(() => {});
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
@@ -152,8 +172,8 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
     await pageManager.pipelinesPage.selectLogs();
     await pageManager.pipelinesPage.enterStreamName("e2e");
-    await pageManager.pipelinesPage.enterStreamName("e2e_automate");
-    await pageManager.pipelinesPage.selectStreamOption("e2e_automate");
+    await pageManager.pipelinesPage.enterStreamName(sourceStream);
+    await pageManager.pipelinesPage.selectStreamOption(sourceStream);
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(2000);
 
@@ -187,7 +207,7 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
 
     // Add destination node (use same naming as other tests for consistency)
     await pageManager.pipelinesPage.selectAndDragSecondStream();
-    await pageManager.pipelinesPage.fillDestinationStreamName("destination_node");
+    await pageManager.pipelinesPage.fillDestinationStreamName(destStream);
     await pageManager.pipelinesPage.clickInputNodeStreamSave();
     await page.waitForTimeout(2000);
 
@@ -204,7 +224,7 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
 
     // Cleanup - navigate to pipeline list and delete
     try {
-      await pageManager.pipelinesPage.exploreStreamAndNavigateToPipeline('destination_node');
+      await pageManager.pipelinesPage.exploreStreamAndNavigateToPipeline(destStream);
       await pageManager.pipelinesPage.searchPipeline(pipelineName);
       await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
       testLogger.info('Pipeline cleanup completed');
@@ -216,8 +236,11 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
   });
 
   test("should add source, condition & destination node and then delete the pipeline", async ({ page }) => {
+    const sourceStream = `e2e_automate2${streamSuffix}`;
+    const destFill = `destination-node${streamSuffix}`;
+    const destStream = `destination_node${streamSuffix}`;
     // Free only this test's own source stream (see note in beforeEach).
-    await pageManager.apiCleanup.cleanupPipelines(["e2e_automate2"]).catch(() => {});
+    await pageManager.apiCleanup.cleanupPipelines([sourceStream]).catch(() => {});
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
@@ -226,8 +249,8 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
     await pageManager.pipelinesPage.selectLogs();
 
     await pageManager.pipelinesPage.enterStreamName("e2e");
-    await pageManager.pipelinesPage.enterStreamName("e2e_automate2");
-    await pageManager.pipelinesPage.selectStreamOption("e2e_automate2");
+    await pageManager.pipelinesPage.enterStreamName(sourceStream);
+    await pageManager.pipelinesPage.selectStreamOption(sourceStream);
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(2000);
 
@@ -251,7 +274,7 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
 
     // Drag and drop output stream instead of hover-click
     await pageManager.pipelinesPage.selectAndDragSecondStream();
-    await pageManager.pipelinesPage.fillDestinationStreamName("destination-node");
+    await pageManager.pipelinesPage.fillDestinationStreamName(destFill);
     await pageManager.pipelinesPage.clickInputNodeStreamSave();
 
     // Wait for dialog to close and connect nodes via condition
@@ -263,7 +286,7 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
     await pageManager.pipelinesPage.savePipeline();
 
     // Navigate to pipeline list via stream exploration
-    await pageManager.pipelinesPage.exploreStreamAndNavigateToPipeline('destination_node');
+    await pageManager.pipelinesPage.exploreStreamAndNavigateToPipeline(destStream);
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.searchPipeline(pipelineName);
     await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
