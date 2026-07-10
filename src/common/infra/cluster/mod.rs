@@ -101,9 +101,11 @@ pub async fn update_local_node(node: &Node) -> Result<()> {
     }
 
     match cfg.common.cluster_coordinator.as_str().into() {
-        MetaStore::Nats => nats::update_local_node(node).await,
-        _ => nats::update_local_node(node).await,
+        MetaStore::Nats => nats::update_local_node(node).await?,
+        _ => nats::update_local_node(node).await?,
     }
+    add_node_to_cache(node.clone()).await;
+    Ok(())
 }
 
 pub async fn set_unschedulable() -> Result<()> {
@@ -117,10 +119,21 @@ pub async fn set_unschedulable() -> Result<()> {
 
 pub async fn set_schedulable() -> Result<()> {
     let node_id = LOCAL_NODE.uuid.clone();
-    if let Some(mut node) = get_node_by_uuid(&node_id).await {
-        node.scheduled = true;
-        update_local_node(&node).await?;
-    };
+    let mut node = None;
+    for _ in 0..10 {
+      if let Some(n) = get_node_by_uuid(&node_id).await {
+          node = Some(n);
+          break;
+      }
+      tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    }
+    let mut node = node.unwrap_or_else(|| {
+        let mut n = LOCAL_NODE.clone();
+        n.status = NodeStatus::Online;
+        n
+    });
+    node.scheduled = true;
+    update_local_node(&node).await?;
     Ok(())
 }
 
