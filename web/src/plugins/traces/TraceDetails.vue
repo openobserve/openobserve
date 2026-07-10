@@ -29,8 +29,164 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <div v-if="showHeader" class="trace-combined-header-wrapper card-container border-b border-border-default">
-        <!-- New Modern Header -->
+        <!-- Standalone (routed) header: shared AppPageHeader -->
+        <AppPageHeader
+          v-if="mode === 'standalone'"
+          :title="traceTree[0]?.operationName || t('traces.loadingTrace')"
+          :back="
+            showBackButton
+              ? {
+                  onClick: handleBackOrClose,
+                  dataTest: 'trace-details-back-btn',
+                }
+              : undefined
+          "
+        >
+          <template #title>
+            <span
+              data-test="trace-details-operation-name"
+              :title="traceTree[0]?.operationName"
+            >
+              {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
+              <OTooltip :content="traceTree[0]?.operationName" />
+            </span>
+          </template>
+
+          <template #subtitle>
+            <div
+              class="flex items-center space-x-2 text-[0.6875rem] text-(--o2-text-secondary) whitespace-nowrap"
+            >
+              <span>{{
+                formatTimestamp(traceStartTime, store.state.timezone)
+              }}</span>
+              <div class="bg-(--o2-text-3) py-0 w-px h-4" />
+              <span class="mr-1">
+                {{ t("traces.traceId") }}:
+                <span
+                  data-test="trace-details-trace-id"
+                  class="text-(--o2-text-primary) font-mono"
+                  :title="effectiveTraceId"
+                >
+                  {{ effectiveTraceId }}
+                </span>
+              </span>
+
+              <!-- Copy Trace ID Button -->
+              <OIcon
+                data-test="trace-details-copy-trace-id-btn"
+                name="content-copy"
+                size="xs"
+                class="cursor-pointer hover:text-(--o2-text-primary)"
+                :title="t('traces.copyTraceId')"
+                @click="copyTraceId"
+              />
+
+              <!-- Session ID (LLM traces) -->
+              <template v-if="sessionId">
+                <div class="bg-(--o2-text-3) py-0 w-px h-4" />
+                <span class="mr-1">
+                  Session ID:
+                  <span
+                    data-test="trace-details-session-id"
+                    class="text-(--o2-text-primary) font-mono"
+                    :title="sessionId"
+                  >
+                    {{ sessionId }}
+                  </span>
+                </span>
+                <OIcon
+                  data-test="trace-details-copy-session-id-btn"
+                  name="content-copy"
+                  size="xs"
+                  class="cursor-pointer hover:text-(--o2-text-primary)"
+                  title="Copy Session ID"
+                  @click="copySessionId"
+                />
+              </template>
+
+              <div class="bg-(--o2-text-3) py-0 w-px h-4" />
+              <!-- Span Count Badge -->
+              <span class="inline-flex">
+                <OTag
+                  type="logsResultChip"
+                  value="neutral"
+                  data-test="trace-details-spans-count"
+                >
+                  <span data-test="span-count-text">
+                    {{ formatLargeNumber(effectiveSpanList.length) }}
+                    {{ t("traces.spansLabel") }}
+                  </span>
+                </OTag>
+                <OTooltip
+                  :content="
+                    effectiveSpanList.length + ' ' + t('traces.spansLabel')
+                  "
+                />
+              </span>
+
+              <div class="bg-(--o2-text-3) py-0 w-px h-4" />
+
+              <!-- Error Count Badge -->
+              <span class="inline-flex">
+                <OTag
+                  type="logsResultChip"
+                  value="error"
+                  data-test="trace-details-error-spans-count"
+                >
+                  <span
+                    >{{ formatLargeNumber(errorSpansCount) }}
+                    {{ t("traces.errorsLabel") }}</span
+                  >
+                </OTag>
+                <OTooltip
+                  :content="errorSpansCount + ' ' + t('traces.errorsLabel')"
+                />
+              </span>
+            </div>
+          </template>
+
+          <template #actions>
+            <!-- Apply filters button -->
+            <OButton
+              v-if="areFiltersAdded"
+              data-test="trace-details-apply-filters-btn-right"
+              variant="outline"
+              size="xs"
+              @click="openFilterPopover"
+            >
+              <template #icon-left
+                ><OIcon name="filter-alt" size="xs"
+              /></template>
+              <span class="text-[0.75rem]">{{ t("traces.viewFilters") }}</span>
+              <OTooltip :content="t('traces.reviewAndApplyFilters')" />
+            </OButton>
+
+            <!-- Share button -->
+            <share-button
+              v-if="showShareButton"
+              data-test="trace-details-share-link-btn"
+              :url="traceDetailsShareURL"
+              variant="outline"
+              size="icon-xs"
+            />
+
+            <!-- Close button -->
+            <OButton
+              v-if="showCloseButton"
+              data-test="trace-details-close-btn"
+              variant="ghost"
+              size="icon-xs"
+              @click="handleBackOrClose"
+            >
+              <OIcon name="close" size="sm" />
+              <OTooltip :content="t('common.cancel')" />
+            </OButton>
+          </template>
+        </AppPageHeader>
+
+        <!-- Embedded (logs) header: existing inline header, kept as-is -->
         <header
+          v-else
           class="h-auto py-[0.125rem] flex! items-center justify-between bg-[var(--o2-surface)] pl-1"
         >
           <div class="flex items-center space-x-4 w-fit!">
@@ -803,6 +959,7 @@ import {
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import ShareButton from "@/components/common/ShareButton.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import useTraces from "@/composables/useTraces";
 import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
@@ -967,6 +1124,7 @@ export default defineComponent({
   },
   components: {
     ShareButton,
+    AppPageHeader,
     OTag,
     TraceDetailsSidebar,
     TraceTree,
@@ -1525,6 +1683,8 @@ export default defineComponent({
     const resetTraceDetails = () => {
       searchObj.data.traceDetails.showSpanDetails = false;
       searchObj.data.traceDetails.selectedSpanId = "";
+      // Selection is being cleared — cancel any live scroll targeting it.
+      traceTreeRef.value?.cancelScroll?.();
       searchObj.data.traceDetails.selectedTrace = {
         trace_id: "",
         trace_start_time: 0,
@@ -1589,6 +1749,8 @@ export default defineComponent({
       showTraceDetails.value = false;
       searchObj.data.traceDetails.showSpanDetails = false;
       searchObj.data.traceDetails.selectedSpanId = "";
+      // Cancel any scroll left over from a previous trace before (re)loading.
+      traceTreeRef.value?.cancelScroll?.();
 
       // If embedded mode with span list provided, skip fetching
       if (props.mode === "embedded" && props.spanListProp.length > 0) {
@@ -2290,6 +2452,9 @@ export default defineComponent({
       hoveredSpanId.value = "";
       searchObj.data.traceDetails.showSpanDetails = false;
       searchObj.data.traceDetails.selectedSpanId = null;
+      // Stop any pending/in-flight programmatic scroll so the closed span no
+      // longer snaps back into view while the user scrolls the tree.
+      traceTreeRef.value?.cancelScroll?.();
     };
     const toggleSpanCollapse = (spanId: number | string) => {
       collapseMapping.value[spanId] = !collapseMapping.value[spanId];

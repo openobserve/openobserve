@@ -13,6 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// Shared, stable spy so call assertions survive the virtualizer computed being
+// re-evaluated on every read (the mock recreates its object each access).
+const { mockScrollToIndex } = vi.hoisted(() => ({
+  mockScrollToIndex: vi.fn(),
+}));
+
 // Mock @tanstack/vue-virtual BEFORE any imports so the virtualizer returns
 // synthetic virtual rows even when scrollContainer is null (as in jsdom).
 vi.mock("@tanstack/vue-virtual", () => ({
@@ -22,7 +28,6 @@ vi.mock("@tanstack/vue-virtual", () => ({
       const options = optionsComputed.value;
       const count = options.count;
       const estimateSize = options.estimateSize?.() ?? 30;
-      const scrollToIndex = vi.fn();
       const items = Array.from({ length: count }, (_, i) => ({
         key: i,
         index: i,
@@ -34,7 +39,8 @@ vi.mock("@tanstack/vue-virtual", () => ({
       return {
         getVirtualItems: () => items,
         getTotalSize: () => count * estimateSize,
-        scrollToIndex,
+        scrollToIndex: mockScrollToIndex,
+        currentScrollToIndex: null,
       };
     });
   }),
@@ -597,6 +603,61 @@ describe("TraceTree", () => {
 
         // scrollToSpan returns early when spanIndex === -1
         expect(() => wrapper.vm.scrollToMatch()).not.toThrow();
+      });
+    });
+
+    describe("cancelScroll function", () => {
+      const validSpanId = "d9603ec7f76eb499";
+
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("should expose cancelScroll", () => {
+        expect(wrapper.vm.cancelScroll).toBeTypeOf("function");
+      });
+
+      it("should clear a pending scroll so scrollToIndex never fires", () => {
+        wrapper.vm.scrollToSpan(validSpanId, 300);
+        wrapper.vm.cancelScroll();
+        vi.advanceTimersByTime(300);
+
+        expect(mockScrollToIndex).not.toHaveBeenCalled();
+      });
+
+      it("should let a pending scroll fire when not cancelled", () => {
+        wrapper.vm.scrollToSpan(validSpanId, 300);
+        vi.advanceTimersByTime(300);
+
+        expect(mockScrollToIndex).toHaveBeenCalledTimes(1);
+      });
+
+      it("should supersede an earlier pending scroll with the latest one", () => {
+        wrapper.vm.scrollToSpan(validSpanId, 300);
+        wrapper.vm.scrollToSpan(validSpanId, 300);
+        vi.advanceTimersByTime(300);
+
+        // The first timeout was cleared by the second call.
+        expect(mockScrollToIndex).toHaveBeenCalledTimes(1);
+      });
+
+      it("should not throw when nothing is pending", () => {
+        expect(() => wrapper.vm.cancelScroll()).not.toThrow();
+      });
+
+      it("should drop a pending scroll on unmount", () => {
+        wrapper.vm.scrollToSpan(validSpanId, 300);
+        wrapper.unmount();
+        vi.advanceTimersByTime(300);
+
+        expect(mockScrollToIndex).not.toHaveBeenCalled();
+
+        // Re-mount so the suite-level afterEach unmounts a live wrapper.
+        wrapper = mountTraceTree();
       });
     });
   });

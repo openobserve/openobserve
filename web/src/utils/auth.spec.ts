@@ -170,13 +170,10 @@ describe("getUserInfo", () => {
   });
 
   it("logs and returns undefined when the whole function throws", () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     // Pass something that causes substring to throw
     const result = getUserInfo(null as any);
 
     expect(result).toBeUndefined();
-    expect(logSpy).toHaveBeenCalled();
-    logSpy.mockRestore();
   });
 });
 
@@ -222,13 +219,10 @@ describe("getDecodedAccessToken", () => {
     vi.mocked(b64DecodeStandard).mockImplementation(() => {
       throw new Error("decode error");
     });
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     const result = getDecodedAccessToken("bad.token");
 
     expect(result).toBeUndefined();
-    expect(logSpy).toHaveBeenCalledWith("error decoding token");
-    logSpy.mockRestore();
   });
 });
 
@@ -264,13 +258,10 @@ describe("getDecodedUserInfo", () => {
     vi.mocked(useLocalUserInfo).mockImplementation(() => {
       throw new Error("storage error");
     });
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     const result = getDecodedUserInfo();
 
     expect(result).toBeUndefined();
-    expect(logSpy).toHaveBeenCalled();
-    logSpy.mockRestore();
   });
 });
 

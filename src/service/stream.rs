@@ -20,6 +20,10 @@ use axum::{
     response::{IntoResponse, Response as HttpResponse},
 };
 use chrono::{TimeZone, Timelike, Utc};
+// Reserved self-reporting stream guards are a Cloud-only concern (Cloud manages
+// these streams for billing); OSS / self-hosted must not block user streams.
+#[cfg(feature = "cloud")]
+use config::meta::self_reporting::usage::is_reserved_self_reporting_stream;
 use config::{
     ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config,
     is_local_disk_storage,
@@ -243,6 +247,24 @@ pub async fn create_stream(
     stream_type: StreamType,
     mut stream: StreamCreate,
 ) -> Result<HttpResponse, Error> {
+    // Reserved self-reporting streams (usage/stats/triggers/errors/...) are
+    // managed internally by Cloud and must not be user-created — doing so would
+    // corrupt billing/usage accounting. The internal self-reporting job creates
+    // its schema directly (not via create_stream), so blocking here is safe.
+    // Cloud-only: OSS / self-hosted may legitimately use these stream names.
+    #[cfg(feature = "cloud")]
+    if is_reserved_self_reporting_stream(stream_name) {
+        return Ok((
+            http::StatusCode::BAD_REQUEST,
+            [(ERROR_HEADER, "stream name is reserved")],
+            Json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST,
+                format!("stream name '{stream_name}' is reserved and cannot be created"),
+            )),
+        )
+            .into_response());
+    }
+
     // check if the stream already exists
     let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
@@ -949,6 +971,23 @@ pub async fn delete_stream(
     stream_type: StreamType,
     del_related_feature_resources: bool,
 ) -> Result<HttpResponse, Error> {
+    // Reserved self-reporting streams (usage/stats/triggers/errors/...) are
+    // managed internally by Cloud and must not be user-deleted — retention/
+    // compaction uses a separate internal path, so blocking this user-facing
+    // delete is safe and preserves billing/usage accounting. Cloud-only.
+    #[cfg(feature = "cloud")]
+    if is_reserved_self_reporting_stream(stream_name) {
+        return Ok((
+            http::StatusCode::BAD_REQUEST,
+            [(ERROR_HEADER, "stream name is reserved")],
+            Json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST,
+                format!("stream '{stream_name}' is reserved and cannot be deleted"),
+            )),
+        )
+            .into_response());
+    }
+
     let schema = infra::schema::get_versions(org_id, stream_name, stream_type, None)
         .await
         .unwrap();

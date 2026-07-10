@@ -213,10 +213,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="testString"
                   data-test="add-regex-test-string-input"
                   class="regex-test-string-input"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'dark-mode-regex-test-string-input'
-                      : 'light-mode-regex-test-string-input bg-white! border-l! border-l-[#e6e6e6]! border-r! border-r-[#e6e6e6]! border-b! border-b-[#e6e6e6]!'"
                   tabindex="0"
                   style="width: 100%; resize: none"
                   placeholder="Eg. 1234567890"
@@ -243,10 +239,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :readonly="true"
                   data-test="add-regex-output-string-input"
                   class="regex-test-string-input"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'dark-mode-regex-test-string-input'
-                      : 'light-mode-regex-test-string-input bg-white! border-l! border-l-[#e6e6e6]! border-r! border-r-[#e6e6e6]! border-b! border-b-[#e6e6e6]!'"
                   tabindex="0"
                   style="width: 100%; resize: none"
                   placeholder="Output String"
@@ -254,12 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   v-else
-                  class="flex flex-col items-center justify-center h-[111px]"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'bg-(--o2-primary-background)! border-l-2! border-r-2! border-b-2! border-(--o2-primary-background)!'
-                      : 'bg-white! border-l! border-r! border-b! border-[#e6e6e6]!'
-                  "
+                  class="flex flex-col items-center justify-center h-[111px] rounded-md border border-input-border bg-input-bg"
                 >
                   <div v-if="!testLoading && outputStringValue.length === 0">
                     <OIcon
@@ -640,10 +627,12 @@ export default defineComponent({
   padding-left: 0.5rem !important;
 }
 
-.light-mode-regex-test-string-input .monaco-editor-background {
-  background-color: #ffffff !important;
-}
-.dark-mode-regex-test-string-input .monaco-editor-background {
-  background-color: var(--o2-primary-background) !important;
+/* The section header strips (Write Pattern / Input string / Output) are flat
+   full-width bars. Square the textareas' own border box so each field reads as
+   one connected unit under its strip instead of a detached rounded box. */
+.regex-pattern-input .rounded-md.border,
+.regex-test-string-input .rounded-md.border {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
 }
 </style>

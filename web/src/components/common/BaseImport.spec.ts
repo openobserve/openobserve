@@ -325,16 +325,18 @@ describe("BaseImport.vue", () => {
       expect(style.height).toBe("100%");
     });
 
-    it("outputContainerStyle uses editorHeights.outputContainer", () => {
-      wrapper = createWrapper({
-        editorHeights: {
-          outputContainer: "500px",
-          urlEditor: "300px",
-          fileEditor: "300px",
-          errorReport: "200px",
-        },
-      });
-      expect((wrapper.vm as any).outputContainerStyle.height).toBe("500px");
+    it("output editor container fills its pane via flex instead of a fixed height", () => {
+      wrapper = createWrapper();
+      const outputEditor = wrapper.find(
+        '[data-test="dashboard-import-output-editor"]',
+      );
+      expect(outputEditor.exists()).toBe(true);
+      // The pane fills the splitter height with flex (no brittle calc(100vh-Npx)).
+      const classes = outputEditor.classes();
+      expect(classes).toContain("h-full");
+      expect(classes).toContain("flex");
+      expect(classes).toContain("flex-col");
+      expect(outputEditor.attributes("style") || "").not.toContain("calc(");
     });
   });
 

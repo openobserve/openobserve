@@ -8307,19 +8307,26 @@ export class LogsPage {
         // Poll up to 2000ms for the Vue watcher chain to update the Monaco editor.
         // The watcher is async (reads buildDashboardPanelData, awaits onBuildQueryGenerated,
         // then Vue re-renders the editor prop) — a fixed 600ms was too short under CI load.
-        await this.page.waitForFunction((selector) => {
-            const host = document.querySelector(selector);
-            if (!host) return false;
-            const editors = window.monaco?.editor?.getEditors?.() ?? [];
-            for (const ed of editors) {
-                const node = ed.getDomNode?.();
-                if (node && host.contains(node)) {
-                    const val = (ed.getValue() || '').toLowerCase().trim();
-                    return val.includes('select') && val.includes('from');
+        // Only the Build tab has this watcher; on the main logs tab it returns early and the
+        // editor never auto-populates, so waiting there just burns the full 2s before the
+        // fallback below runs anyway. Skip straight to the fallback in that case.
+        const onBuildTab = await this.page.locator(this.buildQueryPage)
+            .isVisible({ timeout: 500 }).catch(() => false);
+        if (onBuildTab) {
+            await this.page.waitForFunction((selector) => {
+                const host = document.querySelector(selector);
+                if (!host) return false;
+                const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                for (const ed of editors) {
+                    const node = ed.getDomNode?.();
+                    if (node && host.contains(node)) {
+                        const val = (ed.getValue() || '').toLowerCase().trim();
+                        return val.includes('select') && val.includes('from');
+                    }
                 }
-            }
-            return false;
-        }, this.queryEditor, { timeout: 2000, polling: 100 }).catch(() => {});
+                return false;
+            }, this.queryEditor, { timeout: 2000, polling: 100 }).catch(() => {});
+        }
 
         // Check if the editor was updated (build tab watcher fired).
         // In the main logs tab the watcher returns early, so the editor stays in FTS mode.
@@ -8339,8 +8346,21 @@ export class LogsPage {
                 // now falls back to model.setValue() which bypasses the readOnly restriction.
                 await this.setQueryEditorContent(sql);
             }
-            // Allow Vue reactivity and CodeQueryEditor props.query watcher to propagate
-            await this.page.waitForTimeout(500);
+            // Wait for the CodeQueryEditor props.query watcher to actually apply the value
+            // to Monaco instead of sleeping a fixed 500ms — deterministic and usually <300ms.
+            await this.page.waitForFunction((selector) => {
+                const host = document.querySelector(selector);
+                if (!host) return false;
+                const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                for (const ed of editors) {
+                    const node = ed.getDomNode?.();
+                    if (node && host.contains(node)) {
+                        const val = (ed.getValue() || '').toLowerCase().trim();
+                        return val.includes('select') && val.includes('from');
+                    }
+                }
+                return false;
+            }, this.queryEditor, { timeout: 3000, polling: 100 }).catch(() => {});
         }
         testLogger.info('enableSqlModeIfNeeded: SQL mode enabled');
     }
@@ -8361,7 +8381,22 @@ export class LogsPage {
         // watcher which calls onBuildQueryGenerated() → extractWhereClause() (async) →
         // searchObj.data.query = whereClause → QueryEditor prop watcher → Monaco setValue.
         await this._setSqlModeViaVue(false);
-        await this.page.waitForTimeout(600);
+        // Wait for the watcher chain to strip the SELECT from the editor instead of a fixed
+        // 600ms sleep — resolves as soon as the editor updates, falls through on timeout to
+        // the isStillSQL fallback below (same recovery path as before).
+        await this.page.waitForFunction((selector) => {
+            const host = document.querySelector(selector);
+            if (!host) return true;
+            const editors = window.monaco?.editor?.getEditors?.() ?? [];
+            for (const ed of editors) {
+                const node = ed.getDomNode?.();
+                if (node && host.contains(node)) {
+                    const val = (ed.getValue() || '').toLowerCase().trim();
+                    return !(val.includes('select') && val.includes('from'));
+                }
+            }
+            return true;
+        }, this.queryEditor, { timeout: 2000, polling: 100 }).catch(() => {});
 
         // Verify the editor was updated. The Vue watcher chain is async and involves an
         // SQL-parser dynamic import, so it can exceed 600ms on first load or under CI load.
@@ -8383,7 +8418,21 @@ export class LogsPage {
                 // silently on read-only editors in the build tab's auto mode).
                 await this.setQueryEditorContent('').catch(() => {});
             }
-            await this.page.waitForTimeout(500);
+            // Wait for the editor to actually reflect the cleared query instead of a
+            // fixed 500ms sleep — deterministic, resolves as soon as propagation lands.
+            await this.page.waitForFunction((selector) => {
+                const host = document.querySelector(selector);
+                if (!host) return true;
+                const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                for (const ed of editors) {
+                    const node = ed.getDomNode?.();
+                    if (node && host.contains(node)) {
+                        const val = (ed.getValue() || '').toLowerCase().trim();
+                        return !(val.includes('select') && val.includes('from'));
+                    }
+                }
+                return true;
+            }, this.queryEditor, { timeout: 2000, polling: 100 }).catch(() => {});
         }
         testLogger.info('disableSqlModeIfNeeded: SQL mode disabled');
     }
@@ -9461,6 +9510,16 @@ export class LogsPage {
         // for the Monaco editor inside [data-test="logs-search-bar-query-editor"] to have
         // non-empty content — this confirms that onBuildQueryGenerated() has been called and
         // queries[0].query is ready for any Auto→Custom mode switch.
+        //
+        // With SQL mode OFF the editor holds only the WHERE clause and is often legitimately
+        // empty, so the wait below would always burn its full 10s timeout before the catch
+        // fires. Read sqlMode from Vue state and skip Phase 3 on an explicit `false`; if the
+        // state is unreachable (null) fall through to the wait as before.
+        const sqlModeOn = await this._mutateSearchObj((searchObj) => searchObj.meta.sqlMode === true);
+        if (sqlModeOn === false) {
+            testLogger.info('Build tab loaded (SQL mode off — query editor population not expected)');
+            return true;
+        }
         try {
             await this.page.waitForFunction(
                 (editorSelector) => {

@@ -69,6 +69,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("metrics.runQuery") }}
             </OButton>
+            <OTableColumnToggle
+              :columns="tableColumns"
+              :column-visibility="columnVisibility"
+              @update:column-visibility="setColumnVisibility"
+            />
+            <!-- Refresh button -->
+            <OButton
+              variant="outline"
+              size="icon-toolbar"
+              icon-left="refresh"
+              :loading="isLoadingIssues"
+              data-test="rum-app-errors-refresh-btn"
+              class="shrink-0"
+              @click="runQuery"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="rumErrorsRefresh" />
+            </OButton>
           </div><!-- end controls -->
         </div><!-- end flex row -->
       </div><!-- end card-container -->
@@ -134,6 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTable
             :data="visibleIssues"
             :columns="tableColumns"
+            :column-visibility="columnVisibility"
             :loading="!!isLoading.length || isLoadingIssues"
             row-key="_rowKey"
             pagination="none"
@@ -229,6 +247,8 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
@@ -258,6 +278,9 @@ import {
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import NoData from "@/components/shared/grid/NoData.vue";
 
 const QueryEditor = defineAsyncComponent(
@@ -411,12 +434,17 @@ const errorEditorHeight = computed(() => {
   return 'h-[5rem]!'; // 3+ lines, capped at 5rem (approx 3 lines)
 });
 
+const { columnVisibility, setColumnVisibility } = useExternalColumnToggle(
+  "rum-error-tracking-list",
+);
+
 const tableColumns = [
   {
     id: "issue",
     header: t("rum.issueColumn"),
     accessorKey: "error_message",
     sortable: false,
+    hideable: true,
     // autoWidth: the issue cell absorbs leftover width and truncates long
     // messages instead of expanding the table into a horizontal scrollbar.
     meta: { align: "left", autoWidth: true },
@@ -426,6 +454,7 @@ const tableColumns = [
     header: t("rum.trendColumn"),
     accessorKey: "events",
     sortable: false,
+    hideable: true,
     size: 170,
     meta: { align: "left" },
   },
@@ -434,6 +463,7 @@ const tableColumns = [
     header: t("rum.events"),
     accessorKey: "events",
     sortable: true,
+    hideable: true,
     size: COL.count,
     meta: { align: "right" },
   },
@@ -442,6 +472,7 @@ const tableColumns = [
     header: t("rum.usersColumn"),
     accessorKey: "users_affected",
     sortable: true,
+    hideable: true,
     size: COL.count,
     meta: { align: "right" },
   },
@@ -450,6 +481,7 @@ const tableColumns = [
     header: t("rum.seenColumn"),
     accessorKey: "zo_sql_timestamp",
     sortable: true,
+    hideable: true,
     size: 150,
     meta: { align: "left" },
   },
@@ -458,6 +490,7 @@ const tableColumns = [
     header: t("rum.statusColumn"),
     accessorKey: "status",
     sortable: true,
+    hideable: true,
     size: COL.status,
     meta: { align: "left" },
   },
@@ -675,6 +708,10 @@ function updateUrlQueryParams() {
   query["org_identifier"] = store.state.selectedOrganization.identifier;
   router.push({ query });
 }
+
+useShortcuts([
+  { id: "rumErrorsRefresh", handler: () => { if (!isInputFocused()) runQuery(); } },
+]);
 </script>
 <style>
 .sessions_page .index-table :hover::-webkit-scrollbar,
