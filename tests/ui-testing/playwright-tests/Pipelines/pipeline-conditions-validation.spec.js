@@ -10,7 +10,9 @@ test.describe.configure({ mode: "parallel" });
 
 test.use({
   contextOptions: {
-    slowMo: 1000
+    // slowMo adds ~1s before every action; off by default (Phase 3 runtime).
+    // Opt back in with SLOW_MO_TESTS=true if a deployed env needs the pacing.
+    slowMo: process.env.SLOW_MO_TESTS === 'true' ? 1000 : 0
   }
 });
 
