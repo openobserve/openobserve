@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="col-span-7">
                   <OInput
-                    v-model="formData.chunkPeriodMinutes"
+                    v-model.number="formData.chunkPeriodMinutes"
                     type="number"
                     :placeholder="String(scheduleFrequency || 60)"
                     :error="!!chunkPeriodError"
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="col-span-7">
                   <OInput
-                    v-model="formData.delayBetweenChunks"
+                    v-model.number="formData.delayBetweenChunks"
                     type="number"
                     placeholder="5"
                     :error="!!delayBetweenError"

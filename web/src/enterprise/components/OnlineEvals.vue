@@ -1127,6 +1127,10 @@ function exportScoreConfigBulk(ids: string[]) {
 function syncFromRoute() {
   // Route is the source of truth — reset everything first.
   formPage.value = null;
+  // The import wizard renders off local `importingEntity` (it isn't route-
+  // driven), so it must be torn down here too — otherwise it stays stranded on
+  // screen when the user navigates to another AI section.
+  importingEntity.value = null;
   dialog.value = { open: false, mode: "create", row: null };
   scorerTypeDialog.value = false;
   viewRow.value = null;

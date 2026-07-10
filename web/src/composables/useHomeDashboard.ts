@@ -74,6 +74,12 @@ export function useHomeDashboard() {
     try {
       await settings.deleteOrgSetting(org, SETTING_KEY);
     } catch (e: any) {
+      // A 404 means the setting is already gone — this is the desired end state,
+      // not a failure. The backend now clears home_dashboard itself when the
+      // pinned dashboard is deleted, so the client's delete can race and find it
+      // already absent. Treat "already cleared" as success: keep the optimistic
+      // null, don't revert, don't toast. Only real errors revert.
+      if (e?.response?.status === 404) return;
       homeDashboard.value = prev; // revert
       toast({ variant: "error", message: errMessage(e, "remove") });
     }

@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTooltip content="Size of each processing chunk in minutes. Default: 60" />
                 </div>
                 <OInput
-                  v-model="formData.chunkPeriodMinutes"
+                  v-model.number="formData.chunkPeriodMinutes"
                   type="number"
                   placeholder="60"
                   :error="!!chunkPeriodError"
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTooltip content="Delay between processing chunks in seconds. Default: 5" />
                 </div>
                 <OInput
-                  v-model="formData.delayBetweenChunks"
+                  v-model.number="formData.delayBetweenChunks"
                   type="number"
                   placeholder="5"
                   :error="!!delayBetweenError"

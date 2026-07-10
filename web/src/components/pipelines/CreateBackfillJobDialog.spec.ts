@@ -540,6 +540,39 @@ describe("CreateBackfillJobDialog – createBackfillJobRequest", () => {
     );
   });
 
+  it("sends chunk_period_minutes / delay as numbers (not strings) when typed via OInput", async () => {
+    vi.mocked(backfillService.createBackfillJob).mockResolvedValue({
+      job_id: "new-job-id",
+      message: "created",
+    });
+    const wrapper = createWrapper();
+    (wrapper.vm as any).formData.startTimeMicros = 1_700_000_000_000_000;
+    (wrapper.vm as any).formData.endTimeMicros = 1_700_003_600_000_000;
+
+    // Drive the real OInput (type="number" emits a string; v-model.number coerces)
+    await wrapper
+      .find('[data-test="chunk-period-input-field"]')
+      .setValue("120");
+    await wrapper
+      .find('[data-test="delay-between-chunks-input-field"]')
+      .setValue("15");
+    await nextTick();
+
+    // The v-model.number modifier must have coerced the emitted strings to numbers
+    expect((wrapper.vm as any).formData.chunkPeriodMinutes).toBe(120);
+    expect((wrapper.vm as any).formData.delayBetweenChunks).toBe(15);
+
+    await (wrapper.vm as any).createBackfillJobRequest();
+    await flushPromises();
+
+    const payload = vi.mocked(backfillService.createBackfillJob).mock.calls[0][0]
+      .data as Record<string, unknown>;
+    expect(payload.chunk_period_minutes).toBe(120);
+    expect(payload.delay_between_chunks_secs).toBe(15);
+    expect(typeof payload.chunk_period_minutes).toBe("number");
+    expect(typeof payload.delay_between_chunks_secs).toBe("number");
+  });
+
   it("emits 'success' with job_id on successful creation", async () => {
     vi.mocked(backfillService.createBackfillJob).mockResolvedValue({
       job_id: "new-job-id",
