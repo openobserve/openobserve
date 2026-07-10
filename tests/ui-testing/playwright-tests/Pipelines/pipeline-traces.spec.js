@@ -30,7 +30,10 @@ const authFile = path.join(__dirname, '../utils/auth/user.json');
 test.use({
   storageState: authFile,
   contextOptions: {
-    slowMo: 1000
+    // slowMo adds a fixed delay before EVERY action (~1s × dozens of actions per
+    // test). Off by default; opt back in with SLOW_MO_TESTS=true if a deployed env
+    // needs the pacing. (Phase 3 runtime experiment — metrics/traces only for now.)
+    slowMo: process.env.SLOW_MO_TESTS === 'true' ? 1000 : 0
   }
 });
 
