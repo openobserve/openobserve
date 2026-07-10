@@ -16,6 +16,17 @@
 import config from "@/aws-exports";
 import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccountsList.vue";
 import { routeGuard } from "@/utils/zincutils";
+import store from "@/stores";
+
+// Synthetics routes are gated on the backend /config flag `synthetics_enabled`
+// (enterprise O2_SYNTHETICS_ENABLED). Direct URL access redirects home when off.
+const syntheticsRouteGuard = (to: any, from: any, next: any) => {
+  if (store.state.zoConfig?.synthetics_enabled !== true) {
+    next("/");
+    return;
+  }
+  routeGuard(to, from, next);
+};
 
 const IdentityAccessManagement = () =>
   import("@/views/IdentityAccessManagement.vue");
@@ -121,7 +132,7 @@ const useEnterpriseRoutes = () => {
       component: () => import("@/views/SyntheticMonitoring.vue"),
       meta: { title: "Synthetic Monitoring" },
       beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
+        syntheticsRouteGuard(to, from, next);
       },
     });
 
@@ -132,7 +143,7 @@ const useEnterpriseRoutes = () => {
         component: () => import("@/views/synthetics/CreateBrowserTest.vue"),
         meta: { title: "New Browser Check" },
         beforeEnter(to: any, from: any, next: any) {
-          routeGuard(to, from, next);
+          syntheticsRouteGuard(to, from, next);
         },
       },
       {
@@ -141,7 +152,7 @@ const useEnterpriseRoutes = () => {
         component: () => import("@/views/synthetics/MonitorResults.vue"),
         meta: { title: "Monitor Results" },
         beforeEnter(to: any, from: any, next: any) {
-          routeGuard(to, from, next);
+          syntheticsRouteGuard(to, from, next);
         },
       },
       {
@@ -150,7 +161,7 @@ const useEnterpriseRoutes = () => {
         component: () => import("@/views/synthetics/RunDetail.vue"),
         meta: { title: "Run Detail" },
         beforeEnter(to: any, from: any, next: any) {
-          routeGuard(to, from, next);
+          syntheticsRouteGuard(to, from, next);
         },
       },
       {
@@ -159,7 +170,7 @@ const useEnterpriseRoutes = () => {
         component: () => import("@/views/synthetics/BrowserCheckDetail.vue"),
         meta: { title: "Browser Check" },
         beforeEnter(to: any, from: any, next: any) {
-          routeGuard(to, from, next);
+          syntheticsRouteGuard(to, from, next);
         },
       },
     );

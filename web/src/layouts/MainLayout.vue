@@ -349,6 +349,16 @@ export default defineComponent({
       );
     });
 
+    // Backend `/config` flag `synthetics_enabled` — controlled by enterprise
+    // `O2_SYNTHETICS_ENABLED`. Reactive so the menu picks it up regardless of
+    // whether the config response arrived before or after mount.
+    const isSyntheticsEnabled = computed(() => {
+      return (
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        Boolean(store.state.zoConfig?.synthetics_enabled)
+      );
+    });
+
     const orgOptions = ref([{ label: Number, value: String }]);
     let slackURL = "https://short.openobserve.ai/community";
     if (
@@ -615,10 +625,15 @@ export default defineComponent({
     watch(isOnlineEvalsEnabled, () => updateAIObservabilityMenu(), { immediate: false });
 
     const updateSyntheticMenu = () => {
-      if (config.isCloud !== "true" && config.isEnterprise !== "true") return;
+      const existingIndex = linksList.value.findIndex(
+        (l: any) => l.name === "synthetic",
+      );
 
-      const exists = linksList.value.some((l: any) => l.name === "synthetic");
-      if (exists) return;
+      if (!isSyntheticsEnabled.value) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
+      }
+      if (existingIndex !== -1) return;
 
       const incidentIndex = linksList.value.findIndex(
         (l: any) => l.name === "incidentList",
@@ -640,6 +655,11 @@ export default defineComponent({
         name: "synthetic",
       });
     };
+
+    // Keep the menu in sync if /config resolves after mount.
+    watch(isSyntheticsEnabled, () => updateSyntheticMenu(), {
+      immediate: false,
+    });
 
     const filterMenus = () => {
       updateIncidentsMenu();
