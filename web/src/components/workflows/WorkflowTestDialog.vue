@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("workflow.test.runFrom") }}
         </OText>
         <OSelect
-          v-model="workflowObj.testRun.fromNode"
+          v-model="runFrom"
           :options="runFromOptions"
           data-test="workflow-test-run-from"
         />
@@ -133,8 +133,23 @@ onMounted(() => {
   }
 });
 
+// Display-only sentinel for the "Beginning" option. OSelect treats "" as
+// no-selection (blank trigger) and its null option round-trips awkwardly through
+// Reka — so the select uses this non-empty value, and the `runFrom` proxy below
+// maps it to/from the real `fromNode = ""`. The sentinel never leaves this file.
+const RUN_FROM_BEGINNING = "__beginning__";
+
+// v-model proxy for the Run-From select: "" (beginning) shows as the sentinel;
+// picking the sentinel writes "" back to fromNode.
+const runFrom = computed<string>({
+  get: () => workflowObj.testRun.fromNode || RUN_FROM_BEGINNING,
+  set: (v) => {
+    workflowObj.testRun.fromNode = v === RUN_FROM_BEGINNING ? "" : v;
+  },
+});
+
 const runFromOptions = computed(() => [
-  { label: t("workflow.test.runFromBeginning"), value: "" },
+  { label: t("workflow.test.runFromBeginning"), value: RUN_FROM_BEGINNING },
   ...nodes.value
     .filter((n) => n.data?.node_type !== "workflow_trigger")
     .map((n) => ({

@@ -211,6 +211,10 @@ const defaultObject = {
   testRun: {
     show: false,
     input: "",
+    // "" = run from the beginning (trigger); a node id runs from that node down.
+    // Kept as "" (falsy) so consumers just check `!fromNode`. The Run-From select
+    // maps "" to a display sentinel locally (see WorkflowTestDialog) — the
+    // sentinel never lands here or on the API payload.
     fromNode: "",
     result: <any>null,
     progress: <any>null,
