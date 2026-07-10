@@ -215,6 +215,23 @@ const useSyntheticsRecorder = () => {
     return steps
   }
 
+  /** Synchronous fire-and-forget stop. Captures current steps, sends the stop
+   *  command without awaiting the response, and cleans up locally. Safe to call
+   *  from onBeforeUnmount / beforeunload where awaiting is not possible. */
+  function stopAndForget(): BrowserStep[] {
+    const steps = [...liveSteps.value]
+    sendCommand({ action: 'stopRecording' }) // fire-and-forget
+    isRecording.value = false
+    teardownPort()
+    liveSteps.value = []
+    return steps
+  }
+
+  /** Synchronous fire-and-forget stop for replay. Safe for lifecycle hooks. */
+  function stopReplayAndForget(): void {
+    sendCommand({ action: 'stopReplay' }) // fire-and-forget
+  }
+
   /** Abandon the current recording without persisting any steps. */
   function cancelRecording() {
     // Null the callback so onDisconnect doesn't commit discarded steps.
@@ -313,6 +330,8 @@ const useSyntheticsRecorder = () => {
     detectExtension,
     startRecording,
     stopRecording,
+    stopAndForget,
+    stopReplayAndForget,
     cancelRecording,
     setOnExternalStop,
     replay,

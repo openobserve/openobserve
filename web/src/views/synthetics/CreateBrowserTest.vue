@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import { computed, onMounted, ref } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { useStore } from 'vuex'
 import type { BrowserCheck, SyntheticsLocation, SyntheticsDevice, SyntheticsFolder } from '@/types/synthetics'
 import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
@@ -174,6 +174,7 @@ const check = ref<BrowserCheck>({
 
 function commitGate() {
   check.value = { ...check.value, url: startUrl.value, name: checkName.value }
+  isDirty.value = true
 }
 
 async function onRecordClick() {
@@ -214,6 +215,73 @@ function onNeedExtensionSetup() {
 const isSaving = ref(false)
 const apiPayload = computed(() => buildCreateBrowserTestPayload(check.value))
 
+// ── Unsaved changes guard ───────────────────────────────────────────────────
+const isDirty = ref(false)
+const showUnsavedDialog = ref(false)
+let pendingLeavePath: string | null = null
+let forceLeave = false
+
+watch(() => check.value.journey.length, (len) => {
+  if (len > 0) isDirty.value = true
+})
+
+function onConfigureUpdate(val: BrowserCheck) {
+  check.value = val
+  isDirty.value = true
+}
+
+function stopActiveExtension() {
+  const journey = journeyRef.value
+  // BrowserJourney owns the recorder instance — check and stop via exposed methods
+  if (journey?.stopActiveRecording()) {
+    /* recording was stopped */
+  }
+  if (recorder.replayPhase.value === 'running') {
+    recorder.stopReplayAndForget()
+  }
+}
+
+function onConfirmLeave() {
+  stopActiveExtension()
+  showUnsavedDialog.value = false
+  forceLeave = true
+  if (pendingLeavePath) {
+    router.push(pendingLeavePath)
+    pendingLeavePath = null
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('beforeunload', beforeUnloadHandler)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', beforeUnloadHandler)
+})
+
+onBeforeRouteLeave((to, from, next) => {
+  if (forceLeave) {
+    forceLeave = false
+    next()
+    return
+  }
+  if (!isDirty.value) {
+    next()
+    return
+  }
+  // Cancel the route; show a Vue dialog instead
+  next(false)
+  pendingLeavePath = to.fullPath
+  showUnsavedDialog.value = true
+})
+
+function beforeUnloadHandler(e: BeforeUnloadEvent) {
+  if (!isDirty.value) return
+  // Sync stop the extension before the page goes away
+  stopActiveExtension()
+  e.preventDefault()
+}
+
 async function saveCheck() {
   isSaving.value = true
   const dismiss = toast({ variant: 'loading', message: 'Saving check…', timeout: 0 })
@@ -223,12 +291,14 @@ async function saveCheck() {
       await syntheticsService.update(org, editId.value, apiPayload.value, check.value.folder)
       dismiss()
       toast({ variant: 'success', message: 'Check updated successfully.' })
+      isDirty.value = false
       router.push({ name: 'synthetic', query: { folder: check.value.folder } })
     } else {
       const res = await syntheticsService.create(org, apiPayload.value, check.value.folder)
       const savedId = res.data?.id ?? crypto.randomUUID()
       dismiss()
       toast({ variant: 'success', message: 'Check saved successfully.' })
+      isDirty.value = false
       router.push({ name: 'synthetic', query: { folder: check.value.folder } })
     }
   } catch (err: any) {
@@ -536,7 +606,7 @@ function onClearResults() {
           :done="false"
         >
           <CheckConfigure
-            v-model:check="check"
+            :check="check"
             check-type="browser"
             :locations="locations"
             :browsers="browsers"
@@ -545,6 +615,7 @@ function onClearResults() {
             :folders="folders"
             class="border-t! border-border-default! w-full!"
             @refresh:destinations="fetchDestinations"
+            @update:check="onConfigureUpdate"
           />
         </OStep>
       </OStepper>
@@ -593,6 +664,20 @@ function onClearResults() {
           </OButton>
         </template>
       </div>
+
+      <!-- Unsaved changes dialog (route leave) -->
+      <ODialog
+        v-model:open="showUnsavedDialog"
+        size="sm"
+        title="Unsaved changes"
+        primary-button-label="Leave"
+        secondary-button-label="Stay"
+        data-test="synthetics-create-unsaved-dialog"
+        @click:primary="onConfirmLeave"
+        @click:secondary="showUnsavedDialog = false"
+      >
+        <p class="py-2">You have unsaved changes. Are you sure you want to leave?</p>
+      </ODialog>
 
       <!-- Bulk delete confirmation dialog — moved from BrowserJourney -->
       <ODialog

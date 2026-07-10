@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { computed, onMounted, onBeforeUnmount, onUnmounted, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useStore } from 'vuex'
 import type { BrowserCheck, SyntheticsLocation, SyntheticsDevice, SyntheticsFolder } from '@/types/synthetics'
 import { buildCreateBrowserTestPayload, mapResponseToBrowserCheck } from '@/utils/synthetics/buildPayload'
@@ -59,6 +59,8 @@ onUnmounted(() => {
 
 // ── Remote data ───────────────────────────────────────────────────────────────
 
+const journeyRef = ref<InstanceType<typeof BrowserJourney>>()
+
 const check = ref<BrowserCheck>({
   id: checkId.value,
   name: '',
@@ -85,6 +87,7 @@ async function fetchCheck() {
     const org = store.state.selectedOrganization.identifier
     const res = await syntheticsService.get(org, checkId.value)
     check.value = mapResponseToBrowserCheck(res.data as Record<string, unknown>)
+    initialCheckSnapshot = JSON.stringify(check.value)
   } catch (err) {
     console.error('[synthetics] failed to load check', err)
     toast({ variant: 'error', message: 'Failed to load monitor.' })
@@ -132,6 +135,71 @@ async function fetchFolders() {
   }
 }
 
+// ── Unsaved changes guard ───────────────────────────────────────────────────
+const isDirty = ref(false)
+const showUnsavedDialog = ref(false)
+let pendingLeavePath: string | null = null
+let forceLeave = false
+/** Snapshot used to compare for dirty detection — set after initial load. */
+let initialCheckSnapshot: string | null = null
+
+watch(check, () => {
+  if (initialCheckSnapshot !== null && JSON.stringify(check.value) !== initialCheckSnapshot) {
+    isDirty.value = true
+  }
+}, { deep: true })
+
+function onConfigureUpdate(val: BrowserCheck) {
+  check.value = val
+  isDirty.value = true
+}
+
+function stopActiveExtension() {
+  const journey = journeyRef.value
+  if (journey?.stopActiveRecording()) {
+    /* recording was stopped */
+  }
+}
+
+function onConfirmLeave() {
+  stopActiveExtension()
+  showUnsavedDialog.value = false
+  forceLeave = true
+  if (pendingLeavePath) {
+    router.push(pendingLeavePath)
+    pendingLeavePath = null
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('beforeunload', beforeUnloadHandler)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', beforeUnloadHandler)
+})
+
+onBeforeRouteLeave((to, from, next) => {
+  if (forceLeave) {
+    forceLeave = false
+    next()
+    return
+  }
+  if (!isDirty.value) {
+    next()
+    return
+  }
+  next(false)
+  pendingLeavePath = to.fullPath
+  showUnsavedDialog.value = true
+})
+
+function beforeUnloadHandler(e: BeforeUnloadEvent) {
+  if (!isDirty.value) return
+  stopActiveExtension()
+  e.preventDefault()
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 
 const enabled = computed({
@@ -148,6 +216,8 @@ async function saveCheck() {
     await syntheticsService.update(org, checkId.value, payload, check.value.folder)
     dismiss()
     toast({ variant: 'success', message: 'Check updated successfully.' })
+    isDirty.value = false
+    initialCheckSnapshot = JSON.stringify(check.value)
     showSavedBanner.value = true
     scheduleBannerDismiss()
   } catch (err: any) {
@@ -219,6 +289,7 @@ async function saveCheck() {
     <OTabPanels :model-value="activeTab" class="flex-1 overflow-y-auto min-h-0">
       <OTabPanel name="journey" class="h-full">
         <BrowserJourney
+          ref="journeyRef"
           v-model="check.journey"
           :start-url="check.url"
           :extension-ready="true"
@@ -226,7 +297,7 @@ async function saveCheck() {
       </OTabPanel>
       <OTabPanel name="configure" class="h-full">
         <CheckConfigure
-          v-model:check="check"
+          :check="check"
           check-type="browser"
           :locations="locations"
           :browsers="browsers"
@@ -234,6 +305,7 @@ async function saveCheck() {
           :destinations="destinations"
           :folders="folders"
           @refresh:destinations="fetchDestinations"
+          @update:check="onConfigureUpdate"
         />
       </OTabPanel>
       <OTabPanel name="results" class="h-full">
@@ -261,5 +333,19 @@ async function saveCheck() {
         </OButton>
       </template>
     </div>
+
+    <!-- Unsaved changes dialog (route leave) -->
+    <ODialog
+      v-model:open="showUnsavedDialog"
+      size="sm"
+      title="Unsaved changes"
+      primary-button-label="Leave"
+      secondary-button-label="Stay"
+      data-test="synthetics-detail-unsaved-dialog"
+      @click:primary="onConfirmLeave"
+      @click:secondary="showUnsavedDialog = false"
+    >
+      <p class="py-2">You have unsaved changes. Are you sure you want to leave?</p>
+    </ODialog>
   </div>
 </template>

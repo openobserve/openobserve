@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { BrowserStep, ReplayPhase, StepReplayResult } from '@/types/synthetics'
 import type { StepDotState } from './BrowserJourneyStep.vue'
 import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
@@ -178,7 +178,7 @@ watch([selectedCount, isRecording], ([count, recording]) => {
 })
 
 // Expose selection state for the parent's sticky footer
-defineExpose({ selectedCount, isRecording, deleteSelectedSteps })
+defineExpose({ selectedCount, isRecording, deleteSelectedSteps, stopActiveRecording, stopActiveReplay })
 
 function startRecording() {
   recorder.startRecording(props.startUrl ?? '').catch((err) => {
@@ -204,19 +204,44 @@ function onRecordButtonClick() {
   }
 }
 
+/** Sync stop — called by parent's route guard before navigating away.
+ *  Commits captured recording steps so they aren't lost. Returns true if
+ *  anything was stopped. */
+function stopActiveRecording(): boolean {
+  if (!recorder.isRecording.value) return false
+  const steps = recorder.stopAndForget()
+  if (steps.length > 0) emit('update:modelValue', [...props.modelValue, ...steps])
+  return true
+}
+
+/** Sync stop for replay — called by parent's route guard. */
+function stopActiveReplay(): boolean {
+  if (!isReplayRunning.value) return false
+  recorder.stopReplayAndForget()
+  return true
+}
+
+/** Sync fire-and-forget on tab close — prevents orphaned extension tabs. */
+function handleBeforeUnload() {
+  if (recorder.isRecording.value) recorder.stopAndForget()
+  else if (isReplayRunning.value) recorder.stopReplayAndForget()
+}
+
 onMounted(() => {
   // Register the external-stop callback: the composable calls this synchronously
   // when recordingStopped arrives over the port, avoiding any async timing races.
   recorder.setOnExternalStop((steps: BrowserStep[]) => {
     emit('update:modelValue', [...props.modelValue, ...steps])
   })
+  window.addEventListener('beforeunload', handleBeforeUnload)
   if (props.autoRecord) {
     startRecording()
     emit('auto-record-consumed')
   }
 })
 
-onUnmounted(() => {
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', handleBeforeUnload)
   recorder.setOnExternalStop(null)
   recorder.cleanup()
 })
