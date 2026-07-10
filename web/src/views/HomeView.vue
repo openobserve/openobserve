@@ -224,8 +224,7 @@ export default defineComponent({
       removeHomePin();
       toast({
         variant: "error",
-        message:
-          "This dashboard is no longer available and was removed from Home.",
+        message: t("dashboard.homePinUnavailable"),
       });
     }
 

@@ -632,7 +632,7 @@ export default defineComponent({
           clearHomeDashboard(org);
           toast({
             variant: "error",
-            message: "This dashboard no longer exists and was removed from Home.",
+            message: t("dashboard.homePinNotFound"),
           });
           return;
         }
@@ -1117,8 +1117,8 @@ export default defineComponent({
           );
           showPositiveNotification(
             deletedWasHome
-              ? "Pinned dashboard was deleted, so its Home pin was removed."
-              : "Dashboard deleted successfully.",
+              ? t("dashboard.pinnedDeletedPinRemoved")
+              : t("dashboard.deletedSuccessfully"),
           );
           // The backend clears the home_dashboard setting on delete; re-read it
           // so the Home shortcut button / pin state updates immediately instead
