@@ -155,25 +155,26 @@ pub fn labels_to_exclude(
     actual_labels
 }
 
+/// Projects a series' labels onto the grouping set of the label modifier
+/// (`by(...)` keeps them, `without(...)` drops them, none drops all).
+fn projected_labels(modifier: &Option<LabelModifier>, labels: &Labels) -> Labels {
+    match modifier {
+        Some(LabelModifier::Include(include)) => labels_to_include(&include.labels, labels.clone()),
+        Some(LabelModifier::Exclude(exclude)) => labels_to_exclude(&exclude.labels, labels.clone()),
+        None => Labels::default(),
+    }
+}
+
 /// Groups series indices by their label signatures based on the label modifier
 pub(crate) fn group_series_by_labels(
     matrix: &[RangeValue],
     modifier: &Option<LabelModifier>,
 ) -> HashMap<u64, Vec<usize>> {
+    // the signature computation clones and filters every series' labels;
+    // fan it out
     let hashes: Vec<u64> = matrix
         .par_iter()
-        .map(|series| {
-            let grouped_labels = match modifier {
-                Some(LabelModifier::Include(labels)) => {
-                    labels_to_include(&labels.labels, series.labels.clone())
-                }
-                Some(LabelModifier::Exclude(labels)) => {
-                    labels_to_exclude(&labels.labels, series.labels.clone())
-                }
-                None => Labels::default(),
-            };
-            grouped_labels.signature()
-        })
+        .map(|series| projected_labels(modifier, &series.labels).signature())
         .collect();
 
     let mut groups: HashMap<u64, Vec<usize>> = HashMap::with_capacity(matrix.len());
@@ -230,53 +231,25 @@ where
         eval_timestamps.len()
     );
 
-    // Step 1: Compute label hash for each series once based on param
-    // This avoids recomputing the hash for every timestamp
+    // Step 1: Group series indices by their projected label signature
     let start1 = std::time::Instant::now();
-    let series_label_hashes: Vec<(u64, Labels)> = matrix
-        .par_iter()
-        .map(|rv| {
-            let grouped_labels = match param {
-                Some(LabelModifier::Include(labels)) => {
-                    labels_to_include(&labels.labels, rv.labels.clone())
-                }
-                Some(LabelModifier::Exclude(labels)) => {
-                    labels_to_exclude(&labels.labels, rv.labels.clone())
-                }
-                None => Labels::default(),
-            };
-            let hash = grouped_labels.signature();
-            (hash, grouped_labels)
-        })
-        .collect();
+    let groups = group_series_by_labels(&matrix, param);
 
     log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] eval_aggregate({func_name}) computed label hashes in {:?}",
+        "[trace_id: {trace_id}] [PromQL Timing] eval_aggregate({func_name}) grouped {} series into {} groups in {:?}",
+        matrix.len(),
+        groups.len(),
         start1.elapsed()
     );
 
-    // Step 2: Group series indices by their label hash
-    // Build index: label_hash -> Vec<series_idx>
-    let start2 = std::time::Instant::now();
-    let mut groups: HashMap<u64, Vec<usize>> = HashMap::new();
-    for (series_idx, (hash, _)) in series_label_hashes.iter().enumerate() {
-        groups.entry(*hash).or_default().push(series_idx);
-    }
-
-    log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] eval_aggregate({func_name}) built {} groups in {:?}",
-        groups.len(),
-        start2.elapsed()
-    );
-
-    // Step 3: Process each group in parallel
+    // Step 2: Process each group in parallel
     // For each group, aggregate all samples across timestamps
     let start3 = std::time::Instant::now();
     let results: Vec<RangeValue> = groups
         .par_iter()
         .map(|(_, series_indices)| {
             // Get the labels for this group (from the first series in the group)
-            let labels = series_label_hashes[series_indices[0]].1.clone();
+            let labels = projected_labels(param, &matrix[series_indices[0]].labels);
 
             let accumulate_chunk = |chunk: &[usize]| {
                 let mut acc = func.build();
@@ -334,7 +307,6 @@ where
     // ~1s at high cardinality; free them on the rayon pool instead.
     let start4 = std::time::Instant::now();
     matrix.into_par_iter().for_each(drop);
-    series_label_hashes.into_par_iter().for_each(drop);
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] eval_aggregate({func_name}) parallel drop took: {:?}",
         start4.elapsed()
