@@ -197,10 +197,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30 rounded-lg overflow-hidden"
               data-test="synthetics-run-detail-error-callout"
             >
-              <div class="flex items-start gap-3 p-[0.875rem]">
+              <div class="flex items-start gap-2 p-3">
                 <OIcon
                   name="error"
-                  class="text-[var(--o2-status-error-text)] shrink-0 text-[22px]"
+                  class="text-[var(--o2-status-error-text)] shrink-0"
+                  size="md"
                 />
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2 flex-wrap">
@@ -209,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ errorType }}
                     </span>
-                    <OBadge v-if="failedStepInfo" variant="error" size="sm">
+                    <OBadge v-if="failedStepInfo" variant="error" size="sm" clickable>
                       Step {{ failedStepInfo.step.id }}: {{ failedStepInfo.step.action }} failed
                     </OBadge>
                   </div>
@@ -220,6 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ failedStepInfo.summary }}
                   </p>
                   <OButton
+                    v-if="errorStack"
                     variant="outline-destructive"
                     size="xs"
                     class="mt-2"
@@ -248,6 +250,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </div>
               </div>
+            </div>
+            <div
+              v-else-if="steps.length > 0"
+              class="flex items-center gap-2 px-3 py-3 mb-2 rounded bg-[var(--color-badge-success-soft-bg)] border border-badge-success-ol-border/50"
+              role="status"
+              data-test="synthetics-run-detail-steps-passed-banner"
+            >
+              <OIcon
+                name="check-circle"
+                size="md"
+                class="text-[var(--color-timeline-dot-success)]"
+                aria-hidden="true"
+              />
+              <span
+                class="text-sm text-badge-success-ol-text font-semibold"
+              >
+                Run passed
+              </span>
             </div>
 
             <!-- Steps skeleton -->
@@ -313,23 +333,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     steps.length
                   }}</OBadge>
                   <span class="flex-1" />
-                  <OBadge
-                    v-if="isErrorRun"
-                    variant="error-soft"
-                    size="sm"
-                    data-test="synthetics-run-detail-error-step-badge"
-                  >
-                    Lambda Error
-                  </OBadge>
-                  <OBadge
-                    v-else-if="isFailed"
-                    variant="error"
-                    size="sm"
-                    dot
-                    data-test="synthetics-run-detail-error-step-badge"
-                  >
-                    {{ failedStepLabel }}
-                  </OBadge>
                 </OCardSection>
                 <OSeparator />
                 <OCardSection
@@ -357,45 +360,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         Lambda execution failed — check the error details above
                       </span>
                     </div>
-                  </div>
-                  <div
-                    v-else-if="isFailed"
-                    class="flex items-start gap-2 px-3 py-2 mb-2 rounded bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30"
-                    role="alert"
-                    data-test="synthetics-run-detail-steps-failed-banner"
-                  >
-                    <OIcon
-                      name="error"
-                      size="sm"
-                      class="mt-0.5 text-badge-error-ol-text"
-                      aria-hidden="true"
-                    />
-                    <div class="flex flex-col gap-0.5 flex-1 min-w-0">
-                      <span
-                        class="text-sm text-badge-error-ol-text font-semibold"
-                      >
-                        Run failed — {{ failedStepLabel || "execution error" }}
-                      </span>
-                    </div>
-                  </div>
-                  <div
-                    v-else-if="steps.length > 0"
-                    class="flex items-center gap-2 px-3 py-2 mb-2 rounded bg-[var(--color-badge-success-soft-bg)] border border-badge-success-ol-border/50"
-                    role="status"
-                    data-test="synthetics-run-detail-steps-passed-banner"
-                  >
-                    <OIcon
-                      name="check-circle"
-                      size="sm"
-                      class="text-[var(--color-timeline-dot-success)]"
-                      aria-hidden="true"
-                    />
-                    <span
-                      class="text-sm text-badge-success-ol-text font-semibold"
-                    >
-                      Run passed — {{ steps.length }}/{{ steps.length }} steps
-                      completed successfully
-                    </span>
                   </div>
                   <div
                     v-for="st in steps"
@@ -595,10 +559,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="text-xs font-semibold text-[var(--o2-text-heading)] flex-1"
                               >Error</span
                             >
-                            <span
-                              class="text-xs font-mono text-[var(--o2-text-secondary)]"
-                              >exit · {{ st.durStr }}</span
-                            >
                           </div>
                           <div class="px-3 py-3">
                             <pre
@@ -617,7 +577,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <div class="flex gap-2 mt-auto">
                           <OButton
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             data-test="synthetics-run-detail-download-step-btn"
                             aria-label="Download screenshot"

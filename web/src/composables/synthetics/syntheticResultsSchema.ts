@@ -388,8 +388,9 @@ export function mapRunDetail(
     execution_id: rawHit.execution_id,
   });
 
-  const rawSteps = parseJson(rawHit.last_attempt_steps);
   const rawRecordedSteps = parseJson(rawHit.recorded_steps);
+  const rawSteps = parseJson(rawHit.last_attempt_steps);
+  const rawStepsArr = Array.isArray(rawSteps) ? (rawSteps as any[]) : [];
 
   return {
     ...base,
@@ -397,16 +398,16 @@ export function mapRunDetail(
     triggerType: str(rawHit.trigger_type),
     monitorName: str(rawHit.synthetics_name),
     attempts: num(rawHit.attempt),
-    failedStep: rawHit.failed_step ? str(rawHit.failed_step) : null,
+    failedStep: rawHit.failed_step
+      ? str(rawHit.failed_step)
+      : (rawStepsArr.find((s: any) => s.status === "fail" || s.status === "failed")?.step_id ?? null),
     recordedSteps: Array.isArray(rawRecordedSteps)
       ? (rawRecordedSteps as RecordedStep[])
       : [],
-    lastAttemptSteps: Array.isArray(rawSteps)
-      ? (rawSteps as StepExecution[]).map((s) => ({
-          ...s,
-          status: s.status === "ok" || s.status === "passed" ? "ok" : "fail" as const,
-        }))
-      : [],
+    lastAttemptSteps: rawStepsArr.map((s: any) => ({
+        ...s,
+        status: s.status === "ok" || s.status === "passed" ? "ok" : "fail" as const,
+      })),
     retryHistory: [],
     network: null,
     webVitals: null,
