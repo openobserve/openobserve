@@ -10,6 +10,7 @@
 
 import { computed, ref } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const props = withDefaults(
   defineProps<{
@@ -31,12 +32,10 @@ const copied = ref(false);
 async function handleCopy(e: MouseEvent) {
   e.stopPropagation();
   if (text.value === null) return;
-  try {
-    await navigator.clipboard.writeText(text.value);
+  const success = await copyToClipboard(text.value, { silent: true });
+  if (success) {
     copied.value = true;
     setTimeout(() => (copied.value = false), 1200);
-  } catch {
-    /* clipboard unavailable — no-op */
   }
 }
 </script>

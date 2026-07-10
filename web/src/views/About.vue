@@ -336,6 +336,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard as copyText } from "@/utils/clipboard";
 
 export default defineComponent({
   name: "PageAbout",
@@ -395,9 +396,7 @@ export default defineComponent({
     });
 
     const copyToClipboard = (text: string) => {
-      navigator.clipboard.writeText(text).then(() => {
-        toast({ message: "Copied to clipboard", variant: "success" });
-      });
+      copyText(text, { successMessage: "Copied to clipboard" });
     };
 
     const navigateToLicense = () => {

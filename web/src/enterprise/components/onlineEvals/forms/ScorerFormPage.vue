@@ -675,6 +675,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard as copyClipboard } from "@/utils/clipboard";
 import onlineEvalsService, {
   type ExtraMetadataField,
   type Provider,
@@ -917,13 +918,15 @@ const copyButtonLabel = computed(() =>
 
 async function copySchemaToClipboard() {
   if (!schemaPreview.value) return;
-  try {
-    await navigator.clipboard.writeText(schemaPreview.value);
+  const success = await copyClipboard(schemaPreview.value, {
+    silent: true,
+  });
+  if (success) {
     schemaJustCopied.value = true;
     window.setTimeout(() => {
       schemaJustCopied.value = false;
     }, 1500);
-  } catch {
+  } else {
     toast({
       variant: "error",
       message: t("onlineEvals.scorer.extraFields.schemaCopyFailed"),

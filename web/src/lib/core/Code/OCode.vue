@@ -1,6 +1,7 @@
 ﻿<script setup lang="ts">
 import type { CodeProps, CodeSlots } from "./OCode.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { copyToClipboard } from "@/utils/clipboard";
 import { ref } from "vue";
 
 const props = withDefaults(defineProps<CodeProps>(), {
@@ -22,16 +23,13 @@ async function copy() {
   const text = codeRef.value?.textContent?.trim() ?? "";
   if (!text) return;
 
-  try {
-    await navigator.clipboard.writeText(text);
+  const success = await copyToClipboard(text, { silent: true });
+  if (success) {
     copied.value = true;
     if (copyTimer) clearTimeout(copyTimer);
     copyTimer = setTimeout(() => {
       copied.value = false;
     }, 2000);
-  } catch {
-    // Clipboard API unavailable (non-secure context) — fail silently.
-    // Never alert or throw; this is a convenience feature, not critical.
   }
 }
 </script>
