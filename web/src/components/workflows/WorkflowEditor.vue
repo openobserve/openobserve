@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="workflow-editor-test"
           @click="onTest"
         >
-          {{ t("workflow.test") }}
+          {{ t("workflow.test.button") }}
         </OButton>
         <OButton
           variant="outline"
@@ -127,6 +127,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          enter animation each time. -->
     <WorkflowNodeDrawer v-if="workflowObj.dialog.show" />
 
+    <!-- Test input popup — collects the sample payload + run-from and runs the
+         saved graph. Results render as ✓ / error badges on the canvas nodes. -->
+    <WorkflowTestDialog v-if="workflowObj.testRun.show" />
+
+    <!-- Save & Test prompt — Test runs the persisted workflow, so save first when
+         it's new or has unsaved edits. -->
+    <ConfirmDialog
+      v-model="saveTestConfirm"
+      :title="t('workflow.test.saveToTestTitle')"
+      :message="t('workflow.test.saveToTestBody')"
+      :ok-label="t('workflow.test.saveAndTest')"
+      @update:ok="confirmSaveAndTest"
+      @update:cancel="saveTestConfirm = false"
+    />
+
     <!-- shared node-delete confirmation (both the hover-delete and the drawer's
          Delete button funnel through workflowObj.deleteConfirm). -->
     <ConfirmDialog
@@ -154,6 +169,7 @@ import { getUUID } from "@/utils/zincutils";
 
 import WorkflowFlow from "@/plugins/workflows/WorkflowFlow.vue";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
+import WorkflowTestDialog from "./WorkflowTestDialog.vue";
 import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
 import NodePalette from "@/components/flow/NodePalette.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -385,8 +401,13 @@ const serializeNode = (node: any) => {
   return out;
 };
 
-const onSave = async () => {
-  if (saving.value || !validate()) return;
+// Persist (create or update) WITHOUT navigating — returns true on success.
+// Shared by the Save button (which then returns to the list) and Save & Test
+// (which then opens the Test drawer). On create it captures the new id so the
+// workflow is immediately editable/testable. Emits `saved` so the parent list
+// re-fetches (reaches WorkflowsList via its <router-view> slot binding).
+const persist = async (): Promise<boolean> => {
+  if (saving.value || !validate()) return false;
   saving.value = true;
   const org = orgId();
   const data = buildPayload();
@@ -399,28 +420,50 @@ const onSave = async () => {
       });
       toast({ message: t("workflow.updateSuccess"), variant: "success" });
     } else {
-      await workflowService.createWorkflow({
+      const res = await workflowService.createWorkflow({
         org_identifier: org,
         data,
       });
+      const newId = res.data?.id;
+      if (newId) {
+        workflowObj.currentSelectedWorkflow.id = newId;
+        workflowObj.isEditWorkflow = true;
+      }
       toast({ message: t("workflow.createSuccess"), variant: "success" });
     }
-    // Tell the parent list to re-fetch, then return to it (mirrors the pipeline
-    // editor). The emit reaches WorkflowsList via its <router-view> slot binding.
+    workflowObj.dirtyFlag = false;
     emit("saved");
-    goBack();
+    return true;
   } catch (e: any) {
     toast({
       message: e?.response?.data?.message || t("workflow.saveError"),
       variant: "error",
     });
+    return false;
   } finally {
     saving.value = false;
   }
 };
 
-// Test is a later slice (#14).
-const onTest = () => toast({ message: t("workflow.comingSoon"), variant: "info" });
+const onSave = async () => {
+  if (await persist()) goBack();
+};
+
+// Test runs the SAVED graph. If the workflow is new or has unsaved edits, prompt
+// to save first; otherwise open the Test drawer directly.
+const saveTestConfirm = ref(false);
+const onTest = () => {
+  const wf = workflowObj.currentSelectedWorkflow;
+  if (!wf.id || workflowObj.dirtyFlag) {
+    saveTestConfirm.value = true;
+    return;
+  }
+  workflowObj.testRun.show = true;
+};
+const confirmSaveAndTest = async () => {
+  saveTestConfirm.value = false;
+  if (await persist()) workflowObj.testRun.show = true;
+};
 
 onMounted(() => {
   const query = router.currentRoute.value.query;

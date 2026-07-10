@@ -201,6 +201,20 @@ const defaultObject = {
   // card and the drawer's Delete button) funnel through this so the ConfirmDialog
   // (rendered once in WorkflowEditor) can guard the removal.
   deleteConfirm: { show: false, nodeId: "" },
+  // Test run state. `show` toggles the small input popup (sample payload +
+  // run-from). `input`/`fromNode` persist across opens. `result` holds the last
+  // run outcome — `{ errors: {nodeId: NodeErrors}, ranNodeIds: string[] }` — read
+  // by each WorkflowNode to render its ✓ / error badge on the canvas. `progress`
+  // drives the staged reveal after a run — `{ order: string[], index: number }` —
+  // so nodes light up one-by-one down the graph instead of all at once (the API
+  // is a fast batch; the stagger makes the run feel live). Null when idle/settled.
+  testRun: {
+    show: false,
+    input: "",
+    fromNode: "",
+    result: <any>null,
+    progress: <any>null,
+  },
   currentSelectedWorkflow: <any>JSON.parse(JSON.stringify(defaultWorkflow)),
   workflowWithoutChange: <any>JSON.parse(JSON.stringify(defaultWorkflow)),
   nameError: false,
@@ -210,6 +224,87 @@ const defaultObject = {
 const workflowObj = reactive(Object.assign({}, defaultObject));
 
 export { workflowObj };
+
+// ── Test-result staged playback ─────────────────────────────────────────────
+// The Test API is a fast batch, so revealing every node's status at once feels
+// like nothing ran. Instead we walk the ran nodes in graph order and settle each
+// one after a short beat — a "running" spinner on the current step, ✓/✗ on the
+// ones behind it — so the run reads as flowing through the workflow.
+let playbackTimer: any = null;
+const PLAYBACK_STEP_MS = 450;
+
+export const stopTestPlayback = () => {
+  if (playbackTimer) {
+    clearTimeout(playbackTimer);
+    playbackTimer = null;
+  }
+  workflowObj.testRun.progress = null;
+};
+
+// Reveal order for the ran nodes. Workflows enforce one incoming edge per node
+// (see onConnect), so the graph is a TREE rooted at the trigger (or from_node) —
+// a plain BFS from the root visits every parent before its children, which is all
+// the reveal needs. (No topo sort: reconvergence, the only shape BFS gets wrong,
+// can't exist in a tree.)
+const orderedRunNodes = (ranNodeIds: string[]): string[] => {
+  const wf = workflowObj.currentSelectedWorkflow;
+  const ran = new Set(ranNodeIds);
+  const start =
+    workflowObj.testRun.fromNode ||
+    (wf.nodes || []).find(
+      (n: any) => n.data?.node_type === "workflow_trigger",
+    )?.id ||
+    ranNodeIds[0];
+
+  const children = new Map<string, string[]>();
+  for (const e of wf.edges || []) {
+    const src = e.source ?? e.sourceNode?.id;
+    const tgt = e.target ?? e.targetNode?.id;
+    if (!src || !tgt) continue;
+    if (!children.has(src)) children.set(src, []);
+    children.get(src)!.push(tgt);
+  }
+
+  const order: string[] = [];
+  const seen = new Set<string>();
+  const queue = start ? [start] : [];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    if (seen.has(cur)) continue;
+    seen.add(cur);
+    if (ran.has(cur)) order.push(cur);
+    for (const k of children.get(cur) ?? []) if (!seen.has(k)) queue.push(k);
+  }
+  // safety: anything the traversal didn't reach still resolves
+  for (const id of ranNodeIds) if (!seen.has(id)) order.push(id);
+  return order;
+};
+
+// Stash the result, then advance `progress.index` down the ordered nodes.
+export const startTestPlayback = (result: {
+  errors: Record<string, any>;
+  ranNodeIds: string[];
+  blockedNodeIds?: string[];
+}) => {
+  stopTestPlayback();
+  workflowObj.testRun.result = result;
+  const order = orderedRunNodes(result.ranNodeIds);
+  if (!order.length) return;
+  workflowObj.testRun.progress = { order, index: 0 };
+  const step = () => {
+    const p = workflowObj.testRun.progress;
+    if (!p) return;
+    if (p.index >= p.order.length - 1) {
+      workflowObj.testRun.progress = null; // last node settled → all badges final
+      playbackTimer = null;
+      return;
+    }
+    p.index += 1;
+    playbackTimer = setTimeout(step, PLAYBACK_STEP_MS);
+  };
+  // brief beat so the popup close settles before the first step lights up
+  playbackTimer = setTimeout(step, 300);
+};
 
 // Load a workflow (a list row or API result) into the shared editor state,
 // normalizing nodes/edges for VueFlow (type from node_type; edge styling). Mirrors
@@ -343,6 +438,9 @@ export default function useWorkflowCanvas() {
     wf.edges = wf.edges.filter(
       (e: any) => e.source !== nodeId && e.target !== nodeId,
     );
+    // The graph changed — prior Test badges (and any in-flight reveal) are stale.
+    stopTestPlayback();
+    workflowObj.testRun.result = null;
     if (workflowObj.currentSelectedNodeData?.id === nodeId) {
       workflowObj.currentSelectedNodeData = null;
       workflowObj.dialog.show = false;
@@ -512,6 +610,9 @@ export default function useWorkflowCanvas() {
     workflowObj.isEditNode = false;
     workflowObj.dialog.expand = false;
     workflowObj.dialog.show = false;
+    // The graph changed — prior Test badges (and any in-flight reveal) are stale.
+    stopTestPlayback();
+    workflowObj.testRun.result = null;
     if (workflowObj.isEditWorkflow) workflowObj.dirtyFlag = true;
   }
 
@@ -556,6 +657,14 @@ export default function useWorkflowCanvas() {
     workflowObj.dirtyFlag = false;
     workflowObj.nodesChange = false;
     workflowObj.edgesChange = false;
+    stopTestPlayback();
+    workflowObj.testRun = {
+      show: false,
+      input: "",
+      fromNode: "",
+      result: null,
+      progress: null,
+    };
   }
 
   return {
