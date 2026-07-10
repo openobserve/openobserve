@@ -155,6 +155,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import PinnedDashboardTab from "@/views/PinnedDashboardTab.vue";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageHome",
@@ -206,7 +207,9 @@ export default defineComponent({
       );
     }
 
-    function onPinnedUnavailable(_dashboardId: string) {
+    // Remove the pin and recover the active tab. Shared by the "dashboard is
+    // gone" path (onPinnedUnavailable) and the deliberate close (onCloseTab).
+    function removeHomePin() {
       const org = store.state.selectedOrganization?.identifier;
       clearHomeDashboard(org);
       // Active tab no longer exists in the recomputed set → fall back to first.
@@ -215,9 +218,20 @@ export default defineComponent({
       }
     }
 
+    // The pinned dashboard could not be loaded (deleted / inaccessible). Clear
+    // the pin and tell the user why — distinct from a deliberate close.
+    function onPinnedUnavailable(_dashboardId: string) {
+      removeHomePin();
+      toast({
+        variant: "error",
+        message: t("dashboard.homePinUnavailable"),
+      });
+    }
+
     function onCloseTab(id: string) {
       if (!id.startsWith("dash:")) return;
-      onPinnedUnavailable(parsePinnedTabId(id).dashboardId);
+      // Deliberate unpin — no error toast.
+      removeHomePin();
     }
 
     function loadTabOrder() {
@@ -270,6 +284,17 @@ export default defineComponent({
     );
 
     watch(activeHomeTab, (val) => localStorage.setItem(LS_ACTIVE_TAB_KEY, val));
+
+    // When the user opens the pinned dashboard tab, re-read the authoritative
+    // home_dashboard org setting so a snapshot that went stale on another system
+    // (e.g. the dashboard was moved to a different folder elsewhere) self-corrects
+    // before we render / navigate with its folderId.
+    watch(activeHomeTab, (val) => {
+      if (val.startsWith("dash:")) {
+        const org = store.state.selectedOrganization?.identifier;
+        if (org) useHomeDashboard().load(org);
+      }
+    });
 
     // Drag-to-reorder — OTabs reports the move (dragged id → target id + which
     // side of the target) and we apply it to our own ordered list, then persist.
