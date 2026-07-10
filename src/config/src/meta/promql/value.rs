@@ -238,41 +238,115 @@ impl Sample {
     }
 }
 
-/// Per-series samples in structure-of-arrays layout: parallel
-/// timestamp/value columns instead of an array of (timestamp, value)
-/// structs, so timestamp-only operations (window binary search, eval-set
-/// filtering) and value-only operations (aggregation, rate math) each touch
-/// half the memory. `Sample` remains the item type — it is `Copy`, so
-/// iteration materializes it on the fly for free.
-#[derive(Debug, Default, Clone)]
-pub struct Samples {
+/// One contiguous pair of sample columns shared by every series a scan
+/// partition produced. Series reference disjoint `[offset, offset+len)`
+/// ranges of it.
+#[derive(Debug, Default)]
+pub struct SampleColumns {
     pub timestamps: Vec<i64>,
     pub values: Vec<f64>,
 }
 
+/// Per-series samples in columnar layout. Either an owned pair of
+/// timestamp/value columns, or a borrowed range of a whole-partition
+/// [`SampleColumns`] buffer (the load path produces the latter: one
+/// allocation per partition instead of one per series). `Sample` remains the
+/// `Copy` item type, materialized on the fly by iteration; mutation on a
+/// shared range copies just that range out first.
+#[derive(Debug, Clone)]
+pub enum Samples {
+    Owned {
+        timestamps: Vec<i64>,
+        values: Vec<f64>,
+    },
+    Shared {
+        columns: Arc<SampleColumns>,
+        offset: usize,
+        len: usize,
+    },
+}
+
+impl Default for Samples {
+    fn default() -> Self {
+        Samples::Owned {
+            timestamps: Vec::new(),
+            values: Vec::new(),
+        }
+    }
+}
+
 impl Samples {
     pub fn with_capacity(capacity: usize) -> Self {
-        Self {
+        Samples::Owned {
             timestamps: Vec::with_capacity(capacity),
             values: Vec::with_capacity(capacity),
         }
     }
 
+    /// A series' view into a whole-partition column pair.
+    pub fn shared(columns: Arc<SampleColumns>, offset: usize, len: usize) -> Self {
+        Samples::Shared {
+            columns,
+            offset,
+            len,
+        }
+    }
+
+    pub fn timestamps(&self) -> &[i64] {
+        match self {
+            Samples::Owned { timestamps, .. } => timestamps,
+            Samples::Shared {
+                columns,
+                offset,
+                len,
+            } => &columns.timestamps[*offset..offset + len],
+        }
+    }
+
+    pub fn values(&self) -> &[f64] {
+        match self {
+            Samples::Owned { values, .. } => values,
+            Samples::Shared {
+                columns,
+                offset,
+                len,
+            } => &columns.values[*offset..offset + len],
+        }
+    }
+
+    /// Owned, mutable columns; a shared range is copied out first.
+    fn make_owned(&mut self) -> (&mut Vec<i64>, &mut Vec<f64>) {
+        if let Samples::Shared { .. } = self {
+            *self = Samples::Owned {
+                timestamps: self.timestamps().to_vec(),
+                values: self.values().to_vec(),
+            };
+        }
+        match self {
+            Samples::Owned { timestamps, values } => (timestamps, values),
+            Samples::Shared { .. } => unreachable!(),
+        }
+    }
+
     pub fn len(&self) -> usize {
-        self.timestamps.len()
+        match self {
+            Samples::Owned { timestamps, .. } => timestamps.len(),
+            Samples::Shared { len, .. } => *len,
+        }
     }
 
     pub fn is_empty(&self) -> bool {
-        self.timestamps.is_empty()
+        self.len() == 0
     }
 
     pub fn push(&mut self, sample: Sample) {
-        self.timestamps.push(sample.timestamp);
-        self.values.push(sample.value);
+        let (timestamps, values) = self.make_owned();
+        timestamps.push(sample.timestamp);
+        values.push(sample.value);
     }
 
     pub fn get(&self, index: usize) -> Sample {
-        Sample::new(self.timestamps[index], self.values[index])
+        Sample::new(self.timestamps()[index], self.values()[index])
     }
 
     pub fn first(&self) -> Option<Sample> {
@@ -284,50 +358,63 @@ impl Samples {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = Sample> + '_ {
-        self.timestamps
+        self.timestamps()
             .iter()
-            .zip(self.values.iter())
+            .zip(self.values().iter())
             .map(|(&timestamp, &value)| Sample { timestamp, value })
     }
 
     pub fn as_slice(&self) -> SamplesRef<'_> {
         SamplesRef {
-            timestamps: &self.timestamps,
-            values: &self.values,
+            timestamps: self.timestamps(),
+            values: self.values(),
         }
     }
 
     pub fn slice(&self, start: usize, end: usize) -> SamplesRef<'_> {
         SamplesRef {
-            timestamps: &self.timestamps[start..end],
-            values: &self.values[start..end],
+            timestamps: &self.timestamps()[start..end],
+            values: &self.values()[start..end],
         }
     }
 
     pub fn extend(&mut self, other: Samples) {
-        self.timestamps.extend(other.timestamps);
-        self.values.extend(other.values);
+        let (timestamps, values) = self.make_owned();
+        timestamps.extend_from_slice(other.timestamps());
+        values.extend_from_slice(other.values());
+    }
+
+    /// Shortens to `len` samples.
+    pub fn truncate(&mut self, new_len: usize) {
+        if new_len >= self.len() {
+            return;
+        }
+        match self {
+            Samples::Owned { timestamps, values } => {
+                timestamps.truncate(new_len);
+                values.truncate(new_len);
+            }
+            Samples::Shared { len, .. } => *len = new_len,
+        }
+    }
+
+    /// Adds `delta` to every timestamp (offset modifier evaluation).
+    pub fn shift_timestamps(&mut self, delta: i64) {
+        let (timestamps, _) = self.make_owned();
+        timestamps.iter_mut().for_each(|t| *t += delta);
     }
 
     /// Sorts both columns by timestamp. Data loaded from a single scan
     /// partition is usually already ordered, so check first.
     pub fn sort_by_timestamp(&mut self) {
-        if self.timestamps.is_sorted() {
+        if self.timestamps().is_sorted() {
             return;
         }
-        let mut indices: Vec<u32> = (0..self.len() as u32).collect();
-        indices.sort_unstable_by_key(|&i| self.timestamps[i as usize]);
-        self.timestamps = indices
-            .iter()
-            .map(|&i| self.timestamps[i as usize])
-            .collect();
-        self.values = indices.iter().map(|&i| self.values[i as usize]).collect();
-    }
-
-    /// Shortens both columns to `len` samples.
-    pub fn truncate(&mut self, len: usize) {
-        self.timestamps.truncate(len);
-        self.values.truncate(len);
+        let (timestamps, values) = self.make_owned();
+        let mut indices: Vec<u32> = (0..timestamps.len() as u32).collect();
+        indices.sort_unstable_by_key(|&i| timestamps[i as usize]);
+        *timestamps = indices.iter().map(|&i| timestamps[i as usize]).collect();
+        *values = indices.iter().map(|&i| values[i as usize]).collect();
     }
 
     /// Index of the first sample for which `pred` returns false, assuming
@@ -367,16 +454,11 @@ impl FromIterator<Sample> for Samples {
 
 impl IntoIterator for Samples {
     type Item = Sample;
-    type IntoIter = std::iter::Map<
-        std::iter::Zip<std::vec::IntoIter<i64>, std::vec::IntoIter<f64>>,
-        fn((i64, f64)) -> Sample,
-    >;
+    type IntoIter = std::vec::IntoIter<Sample>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.timestamps
-            .into_iter()
-            .zip(self.values)
-            .map(|(timestamp, value)| Sample { timestamp, value })
+        // materialize; only used on small result sets
+        self.iter().collect::<Vec<_>>().into_iter()
     }
 }
 
@@ -388,9 +470,9 @@ impl<'a> IntoIterator for &'a Samples {
     >;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.timestamps
+        self.timestamps()
             .iter()
-            .zip(self.values.iter())
+            .zip(self.values().iter())
             .map(|(&timestamp, &value)| Sample { timestamp, value })
     }
 }
@@ -675,7 +757,7 @@ pub struct RangeValue {
 impl RangeValue {
     /// Returns the values from the `samples` field as an array of f64
     pub fn get_sample_values(&self) -> Vec<f64> {
-        self.samples.values.clone()
+        self.samples.values().to_vec()
     }
 
     pub fn extend(&mut self, other: RangeValue) {

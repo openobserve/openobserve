@@ -22,7 +22,7 @@ use config::{
     TIMESTAMP_COL_NAME,
     meta::promql::{
         EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL,
-        value::{Exemplar, QueryContext, RangeValue, Sample, Samples},
+        value::{Exemplar, QueryContext, RangeValue, SampleColumns, Samples},
     },
     utils::{
         hash::{Sum64, gxhash},
@@ -50,7 +50,7 @@ use super::{
     utils::{apply_label_selector, apply_matchers},
 };
 
-type TokioResult = tokio::task::JoinHandle<Result<HashMap<u64, Samples>>>;
+type TokioResult = tokio::task::JoinHandle<Result<(Arc<SampleColumns>, Vec<(u64, u32, u32)>)>>;
 type TokioExemplarsResult = tokio::task::JoinHandle<Result<HashMap<u64, Vec<Arc<Exemplar>>>>>;
 
 // Constants for optimization thresholds
@@ -221,12 +221,20 @@ async fn load_samples_from_datafusion(
         );
     }
 
+    // Each partition holds complete series (hash-repartitioned). Instead of
+    // building one Vec per series, collect the partition's rows into three
+    // flat columns, sort once by (series hash, timestamp), and hand every
+    // series a (offset, len) range of the shared column pair — one
+    // allocation per partition instead of one per series, and the samples
+    // come out time-sorted for free.
     let streams = execute_stream_partitioned(plan, ctx)?;
     let mut tasks = Vec::new();
     for mut stream in streams {
         let hash_field_type = hash_field_type.clone();
-        let mut series: HashMap<u64, Samples> = HashMap::new();
         let task: TokioResult = tokio::task::spawn(async move {
+            let mut hashes: Vec<u64> = Vec::new();
+            let mut timestamps: Vec<i64> = Vec::new();
+            let mut values: Vec<f64> = Vec::new();
             loop {
                 match stream.try_next().await {
                     Ok(Some(batch)) => {
@@ -242,6 +250,8 @@ async fn load_samples_from_datafusion(
                             .as_any()
                             .downcast_ref::<Float64Array>()
                             .unwrap();
+                        timestamps.extend_from_slice(time_values.values());
+                        values.extend_from_slice(value_values.values());
 
                         if hash_field_type == DataType::UInt64 {
                             let hash_values = batch
@@ -250,12 +260,7 @@ async fn load_samples_from_datafusion(
                                 .as_any()
                                 .downcast_ref::<UInt64Array>()
                                 .unwrap();
-                            for i in 0..batch.num_rows() {
-                                let timestamp = time_values.value(i);
-                                let hash: u64 = hash_values.value(i);
-                                let entry = series.entry(hash).or_default();
-                                entry.push(Sample::new(timestamp, value_values.value(i)));
-                            }
+                            hashes.extend_from_slice(hash_values.values());
                         } else {
                             let hash_values = batch
                                 .column_by_name(HASH_LABEL)
@@ -263,12 +268,10 @@ async fn load_samples_from_datafusion(
                                 .as_any()
                                 .downcast_ref::<StringArray>()
                                 .unwrap();
-                            for i in 0..batch.num_rows() {
-                                let timestamp = time_values.value(i);
-                                let hash: u64 = gxhash::new().sum64(hash_values.value(i));
-                                let entry = series.entry(hash).or_default();
-                                entry.push(Sample::new(timestamp, value_values.value(i)));
-                            }
+                            hashes.extend(
+                                (0..batch.num_rows())
+                                    .map(|i| gxhash::new().sum64(hash_values.value(i))),
+                            );
                         }
                     }
                     Ok(None) => break,
@@ -278,23 +281,48 @@ async fn load_samples_from_datafusion(
                     }
                 }
             }
-            Ok(series)
+
+            // sort rows by (hash, timestamp) via an index permutation, then
+            // gather into the final columns and record each series' run
+            let mut indices: Vec<u32> = (0..hashes.len() as u32).collect();
+            indices.sort_unstable_by_key(|&i| (hashes[i as usize], timestamps[i as usize]));
+
+            let mut sorted_timestamps: Vec<i64> = Vec::with_capacity(indices.len());
+            let mut sorted_values: Vec<f64> = Vec::with_capacity(indices.len());
+            let mut runs: Vec<(u64, u32, u32)> = Vec::new();
+            for (pos, &i) in indices.iter().enumerate() {
+                let i = i as usize;
+                sorted_timestamps.push(timestamps[i]);
+                sorted_values.push(values[i]);
+                let hash = hashes[i];
+                match runs.last_mut() {
+                    Some((run_hash, _, run_len)) if *run_hash == hash => *run_len += 1,
+                    _ => runs.push((hash, pos as u32, 1)),
+                }
+            }
+
+            let columns = Arc::new(SampleColumns {
+                timestamps: sorted_timestamps,
+                values: sorted_values,
+            });
+            Ok((columns, runs))
         });
         tasks.push(task);
     }
 
-    // collect results
+    // partitions are hash-disjoint; each series is one run in one partition
     let mut metrics: HashMap<u64, RangeValue> = HashMap::new();
     for task in tasks {
-        let m = task
+        let (columns, runs) = task
             .await
             .map_err(|e| DataFusionError::Execution(e.to_string()))??;
-        for (hash, samples) in m {
+        metrics.reserve(runs.len());
+        for (hash, offset, len) in runs {
             metrics.insert(
                 hash,
                 RangeValue {
                     labels: vec![],
-                    samples,
+                    samples: Samples::shared(columns.clone(), offset as usize, len as usize),
                     exemplars: None,
                     time_window: None,
                 },

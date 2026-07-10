@@ -284,7 +284,7 @@ pub async fn set(
             let value_n = series.samples.len();
             let mut last_i = value_n;
             for i in (0..last_i).rev() {
-                if series.samples.timestamps[i] < max_ts {
+                if series.samples.timestamps()[i] < max_ts {
                     last_i = i;
                     break;
                 }

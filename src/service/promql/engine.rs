@@ -246,7 +246,7 @@ impl Engine {
                 // back to its representation.
                 let rhs = match rhs {
                     Value::Matrix(m) if m.len() == 1 && m[0].samples.len() == 1 => {
-                        Value::Float(m[0].samples.values[0])
+                        Value::Float(m[0].samples.values()[0])
                     }
                     _ => rhs,
                 };
@@ -499,10 +499,7 @@ impl Engine {
         let offset_modifier = get_offset_modifier(selector.offset);
         if offset_modifier != 0 {
             values.par_iter_mut().for_each(|rv| {
-                rv.samples
-                    .timestamps
-                    .iter_mut()
-                    .for_each(|t| *t += offset_modifier);
+                rv.samples.shift_timestamps(offset_modifier);
             });
         }
 

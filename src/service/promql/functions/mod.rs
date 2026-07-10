@@ -262,14 +262,9 @@ where
                 let window_end = eval_ts;
 
                 // Extract samples within this window using binary search
-                let start_index = metric
-                    .samples
-                    .timestamps
-                    .partition_point(|&t| t < window_start);
-                let end_index = metric
-                    .samples
-                    .timestamps
-                    .partition_point(|&t| t <= window_end);
+                let timestamps = metric.samples.timestamps();
+                let start_index = timestamps.partition_point(|&t| t < window_start);
+                let end_index = timestamps.partition_point(|&t| t <= window_end);
 
                 if start_index == end_index {
                     continue;
