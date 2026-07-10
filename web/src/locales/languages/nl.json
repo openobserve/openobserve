@@ -2585,13 +2585,33 @@
     "goTo": "Ga naar:",
     "selectLogsMode": "Selecteer de modus Logboeken:",
     "enterCustomQuery": "Voer een aangepaste zoekopdracht in:",
-    "enterUrl": "Voer de URL in:",
+    "sqlQueryRequired": "SQL-query is vereist",
+    "enterUrl": "Voer de URL in",
+    "variableNameRequired": "Variabelenaam is vereist.",
+    "variableNameInvalid": "Alleen letters, cijfers, koppeltekens en onderstrepingstekens zijn toegestaan",
+    "atLeastOneTabRequired": "Er is minstens één tabblad vereist.",
+    "atLeastOnePanelRequired": "Er is minstens één paneel vereist.",
+    "streamTypeRequired": "Streamtype is vereist.",
+    "streamIndexRequired": "Stream / index is vereist.",
+    "fieldRequired": "Veld is verplicht.",
+    "constantValueRequired": "Constante waarde is vereist.",
+    "operatorRequired": "Operator is vereist.",
+    "filterValueRequired": "Vereist",
+    "labelRequired": "Label is vereist.",
+    "optionValueRequired": "Veld is verplicht!",
+    "seriesValueRequired": "Reekswaarde is vereist",
+    "colorRequired": "Kleur is vereist",
+    "onlyHttpsUrlsAllowed": "Alleen HTTP(S)-URL's zijn toegestaan",
+    "urlRequired": "URL is vereist",
+    "folderRequired": "Map is vereist",
+    "dashboardRequired": "Dashboard is vereist",
+    "tabRequired": "Tabblad is vereist",
     "invalidUrl": "Ongeldige URL",
-    "selectFolderDrilldown": "Selecteer map *:",
+    "selectFolderDrilldown": "Selecteer map",
     "noFoldersAvailable": "Geen mappen beschikbaar",
-    "selectDashboardDrilldown": "Selecteer Dashboard *:",
+    "selectDashboardDrilldown": "Selecteer Dashboard",
     "noDashboardsAvailable": "Geen dashboards beschikbaar",
-    "selectTabDrilldown": "Selecteer Tab *:",
+    "selectTabDrilldown": "Selecteer Tab",
     "noTabAvailable": "Geen tabblad beschikbaar",
     "variables": "Variabelen:",
     "passAllCurrentVariables": "Geef alle huidige variabelen door:",
@@ -2657,7 +2677,8 @@
     "configSectionDrilldown": "Inzoomen",
     "configSectionComparison": "Vergelijking",
     "configSectionMarkLines": "Lijnen markeren",
-    "configSectionBackground": "Achtergrond"
+    "configSectionBackground": "Achtergrond",
+    "editTab": "Tabblad bewerken"
   },
   "panel": {
     "header": "Paneel",
@@ -2736,7 +2757,7 @@
     "enterCustomSql": "Voer uw aangepaste SQL-query in...",
     "back": "<< Terug",
     "sqlBuilder": "SQL Builder",
-    "promQL": "ProMQL",
+    "promQL": "PromQL",
     "latitude": "Breedtegraad",
     "longitude": "Lengtegraad",
     "weight": "Gewicht",
@@ -2744,7 +2765,12 @@
     "mapvalue": "Waarde",
     "source": "Bron",
     "target": "Doelwit",
-    "value": "Waarde"
+    "value": "Waarde",
+    "xAxisShort": "X-as",
+    "yAxisShort": "Y-as",
+    "rowFields": "Rijvelden",
+    "valueFields": "Waardevelden",
+    "noData": "Geen gegevens"
   },
   "home": {
     "streams": "Streams",
@@ -3925,6 +3951,8 @@
     "saveChanges": "Opslaan",
     "invalidDomain": "Voer een geldige domeinnaam in",
     "invalidEmail": "Voer een geldig e-mailadres in voor dit domein",
+    "domainRequired": "Domein is vereist",
+    "emailRequired": "E-mailadres is vereist",
     "domainAlreadyExists": "Dit domein is al toegevoegd",
     "domainAdded": "Domein succesvol toegevoegd",
     "confirmRemoveDomain": "Weet je zeker dat je het domein '{domain}' wilt verwijderen?",
@@ -3941,6 +3969,7 @@
     "pageSubtitle": "Instellingen voor uw toepassing aanpassen",
     "platformSettings": "Platform-instellingen",
     "scrapeIntervalRequired": "Schraapinterval is vereist",
+    "scrapeIntervalPositive": "Het schraapinterval moet een positief getal zijn",
     "scrapeIntervalDescription": "Het schraapinterval is de frequentie, in seconden, waarmee het bewakingssysteem statistieken verzamelt.",
     "maxSeriesPerQueryLabel": "Max. aantal reeksen per zoekopdracht",
     "maxSeriesPerQueryDescription": "Maximaal aantal series dat kan worden geretourneerd uit een enkele ProMQL-query. Helpt bij grote resultatensets te voorkomen dat de gebruikersinterface vastloopt. Laat dit veld leeg om de systeemstandaard te gebruiken (40.000).",
@@ -4242,6 +4271,51 @@
     "querySource": "Bron van de zoekopdracht"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "Diensten voor het zoeken",
+      "noStreamsDetected": "Er zijn geen streams gedetecteerd. Zorg ervoor dat de statistieken van servicegrafieken stream_name-labels bevatten.",
+      "streamOnlyInfo": "Service Graph maakt gebruik van stream-only architectuur zonder in-memory status",
+      "borderColor": "Kleur van de rand",
+      "borderColorMetric": "Fouten",
+      "nodeSize": "Knooppuntgrootte",
+      "nodeSizeMetric": "Verzoeken",
+      "sizeLow": "Laag",
+      "sizeHigh": "Hoog",
+      "status": {
+        "healthy": "Gezond",
+        "degraded": "Gedegradeerd",
+        "warning": "Waarschuwing",
+        "critical": "Kritiek"
+      },
+      "range": {
+        "healthy": "< 1%",
+        "degraded": "1 — 5%",
+        "warning": "5 — 10%",
+        "critical": "> 10%"
+      },
+      "entities": "entiteiten",
+      "distribution": "Distributie",
+      "total": "Totaal",
+      "showTypes": "Typen weergeven",
+      "typesFiltered": "Sommige soorten zijn verborgen. Open om te wijzigen wat er wordt weergegeven.",
+      "zoomIn": "Inzoomen",
+      "zoomOut": "Uitzoomen",
+      "fitToScreen": "Aanpassen aan het scherm",
+      "layout": "Indeling",
+      "types": "Typen",
+      "mode": {
+        "auto": "Auto",
+        "expanded": "Uitgebreid",
+        "collapsed": "Ingestort"
+      },
+      "kind": {
+        "service": "Diensten",
+        "database": "Datastores",
+        "queue": "Wachtrijen",
+        "external": "Extern",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "In volledige weergave openen",
     "viewLogs": "Logboeken bekijken",
     "viewRelated": "Gerelateerd bekijken",
@@ -4520,6 +4594,7 @@
     "servicesCatalog": {
       "tabLabel": "Servicecatalogus",
       "title": "Servicecatalogus",
+      "footerTitle": "Diensten",
       "filterPlaceholder": "Filteren op servicenaam...",
       "noServicesFound": "Er zijn geen services gevonden in de geselecteerde periode.",
       "loading": "Diensten aan het laden...",
@@ -4546,6 +4621,15 @@
       "servicesLabel": "services",
       "viewTraces": "Bekijk de sporen",
       "exportCsv": "CSV exporteren",
+      "types": {
+        "all": "Alles",
+        "service": "Diensten",
+        "datastore": "Datastores",
+        "queue": "Wachtrijen",
+        "external": "Extern",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{aantal} {status}",
       "legend": {
         "title": "Foutpercentage"
       }

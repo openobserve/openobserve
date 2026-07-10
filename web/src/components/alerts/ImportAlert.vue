@@ -19,13 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="baseImportRef"
     title="Import Alert"
     test-prefix="alert"
+    class="flex-1 min-h-0"
     :is-importing="isAlertImporting"
-    :editor-heights="{
-      urlEditor: 'calc(100vh - 285px)',
-      fileEditor: 'calc(100vh - 282px)',
-      outputContainer: 'calc(100vh - 110px)',
-      errorReport: 'calc(100vh - 192px)',
-    }"
     @back="router.back()"
     @cancel="router.back()"
     @import="importJson"
@@ -81,16 +76,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Output Section with Alert-specific Error Display -->
     <template #output-content>
-      <div class="w-full h-full border-l border-border-default" style="min-width: 400px;">
+      <div class="w-full h-full flex flex-col border-l border-border-default" style="min-width: 400px;">
       <div
         v-if="alertErrorsToDisplay.length > 0"
-        class="text-center text-xl font-semibold py-2"
+        class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0"
       >
         Error Validations
       </div>
-      <div v-else class="text-center text-xl font-semibold py-2">Output Messages</div>
-      <OSeparator class="mr-4 mt-4" />
-      <div class="error-report-container" style="height: calc(100vh - 192px) !important; overflow: auto; resize: none;">
+      <div v-else class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0">Output Messages</div>
+      <OSeparator class="mt-1 shrink-0" />
+      <div class="error-report-container flex-1 min-h-0">
         <!-- Alert Errors Section -->
         <div class="p-2.5 mb-2.5" v-if="alertErrorsToDisplay.length > 0">
           <div class="error-list">

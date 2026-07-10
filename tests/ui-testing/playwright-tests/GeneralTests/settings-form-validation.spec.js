@@ -295,24 +295,25 @@ test.describe("Settings ModelPricingEditor form validation", () => {
         testLogger.info('Navigated to Settings > Model Pricing');
     });
 
-    test("should disable save or show error when model pricing name is empty", {
+    test("should show error when model pricing name is empty", {
         tag: ['@domainFormValidation', '@P0', '@smoke']
     }, async ({ page }) => {
-        testLogger.info('Verifying save is disabled or error shown when model pricing name is empty');
+        testLogger.info('Verifying name error shown when model pricing name is empty');
 
-        // Clear the name field to trigger validation
+        // Clear the name field
         await pm.settingsFormValidation.clearModelPricingName();
 
-        const saveBtn   = pm.settingsFormValidation.getModelPricingSaveBtnLocator();
+        // Attempt save to trigger validation. The OForm validates submit-then-change,
+        // so the required-field error surfaces only after the first submit attempt
+        // (the Save button itself is never disabled by validity).
+        await pm.settingsFormValidation.clickModelPricingSave();
+
         const nameError = pm.settingsFormValidation.getModelPricingNameErrorLocator();
+        await nameError.waitFor({ state: 'visible', timeout: 5000 });
+        await expect(nameError).toBeVisible();
+        await expect(nameError).toContainText('Model name is required');
 
-        // Either the save button is disabled OR an error message is shown
-        const saveDisabled = await saveBtn.isDisabled().catch(() => false);
-        const errorVisible = await nameError.isVisible().catch(() => false);
-
-        expect(saveDisabled || errorVisible).toBe(true);
-
-        testLogger.info('Save button disabled or name error shown for empty model pricing name');
+        testLogger.info('Name error correctly shown when empty model pricing name');
     });
 
     test("should show pattern error when pattern is empty", {

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="rounded-md ingestionPage h-full flex flex-col" data-test="ingestion-page">
+  <div class="ingestionPage h-full flex flex-col" data-test="ingestion-page">
     <!-- Standard page header: title + icon. Search / token controls live in the
          toolbar row below. -->
     <!-- Standard page header: title + icon, with search / token controls and the

@@ -2585,13 +2585,33 @@
     "goTo": "Ir a:",
     "selectLogsMode": "Seleccione el modo de registros:",
     "enterCustomQuery": "Introduzca una consulta personalizada:",
-    "enterUrl": "Ingresa la URL:",
+    "sqlQueryRequired": "La consulta SQL es obligatoria",
+    "enterUrl": "Ingresa la URL",
+    "variableNameRequired": "El nombre de la variable es obligatorio.",
+    "variableNameInvalid": "Solo se permiten letras, números, guiones y guiones bajos",
+    "atLeastOneTabRequired": "Se requiere al menos una pestaña.",
+    "atLeastOnePanelRequired": "Se requiere al menos un panel.",
+    "streamTypeRequired": "El tipo de stream es obligatorio.",
+    "streamIndexRequired": "El stream / índice es obligatorio.",
+    "fieldRequired": "El campo es obligatorio.",
+    "constantValueRequired": "El valor constante es obligatorio.",
+    "operatorRequired": "El operador es obligatorio.",
+    "filterValueRequired": "Obligatorio",
+    "labelRequired": "La etiqueta es obligatoria.",
+    "optionValueRequired": "¡El campo es obligatorio!",
+    "seriesValueRequired": "El valor de la serie es obligatorio",
+    "colorRequired": "El color es obligatorio",
+    "onlyHttpsUrlsAllowed": "Solo se permiten URL HTTP(S)",
+    "urlRequired": "La URL es obligatoria",
+    "folderRequired": "La carpeta es obligatoria",
+    "dashboardRequired": "El panel de control es obligatorio",
+    "tabRequired": "La pestaña es obligatoria",
     "invalidUrl": "URL no válida",
-    "selectFolderDrilldown": "Seleccione la carpeta *:",
+    "selectFolderDrilldown": "Seleccione la carpeta",
     "noFoldersAvailable": "No hay carpetas disponibles",
-    "selectDashboardDrilldown": "Seleccione Tablero de mandos *:",
+    "selectDashboardDrilldown": "Seleccione Tablero de mandos",
     "noDashboardsAvailable": "No hay paneles disponibles",
-    "selectTabDrilldown": "Seleccione la pestaña*:",
+    "selectTabDrilldown": "Seleccione la pestaña",
     "noTabAvailable": "No hay ninguna pestaña disponible",
     "variables": "Variables:",
     "passAllCurrentVariables": "Pase todas las variables actuales:",
@@ -2657,7 +2677,8 @@
     "configSectionDrilldown": "Desglose",
     "configSectionComparison": "Comparación",
     "configSectionMarkLines": "Marcar líneas",
-    "configSectionBackground": "Antecedentes"
+    "configSectionBackground": "Antecedentes",
+    "editTab": "Editar pestaña"
   },
   "panel": {
     "header": "Panel",
@@ -2744,7 +2765,12 @@
     "mapvalue": "Valor",
     "source": "Fuente",
     "target": "Objetivo",
-    "value": "Valor"
+    "value": "Valor",
+    "xAxisShort": "Eje X",
+    "yAxisShort": "Eje Y",
+    "rowFields": "Campos de fila",
+    "valueFields": "Campos de valor",
+    "noData": "Sin datos"
   },
   "home": {
     "streams": "Transmisiones",
@@ -3925,6 +3951,8 @@
     "saveChanges": "Guardar",
     "invalidDomain": "Introduce un nombre de dominio válido",
     "invalidEmail": "Introduce una dirección de correo electrónico válida para este dominio",
+    "domainRequired": "Se requiere el dominio",
+    "emailRequired": "Se requiere el correo electrónico",
     "domainAlreadyExists": "Este dominio ya se ha agregado",
     "domainAdded": "El dominio se agregó correctamente",
     "confirmRemoveDomain": "¿Estás seguro de que quieres eliminar el dominio '{domain}'?",
@@ -3941,6 +3969,7 @@
     "pageSubtitle": "Ajusta la configuración de tu aplicación",
     "platformSettings": "Configuración de plataforma",
     "scrapeIntervalRequired": "Se requiere un intervalo de raspado",
+    "scrapeIntervalPositive": "El intervalo de raspado debe ser un número positivo",
     "scrapeIntervalDescription": "El intervalo de raspado es la frecuencia, en segundos, con la que el sistema de monitoreo recopila las métricas.",
     "maxSeriesPerQueryLabel": "Número máximo de series por consulta",
     "maxSeriesPerQueryDescription": "Número máximo de series que se pueden devolver desde una sola consulta de PromQL. Ayuda a evitar que la interfaz de usuario se bloquee con conjuntos de resultados grandes. Déjelo vacío para usar los valores predeterminados del sistema (40 000).",
@@ -4242,6 +4271,51 @@
     "querySource": "Fuente de consulta"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "Servicios de búsqueda",
+      "noStreamsDetected": "No se detectaron transmisiones. Asegúrese de que las métricas del gráfico de servicio incluyan etiquetas stream_name.",
+      "streamOnlyInfo": "Service Graph utiliza una arquitectura de solo flujo sin ningún estado en memoria",
+      "borderColor": "Color del borde",
+      "borderColorMetric": "Errores",
+      "nodeSize": "Tamaño del nodo",
+      "nodeSizeMetric": "Solicitudes",
+      "sizeLow": "Bajo",
+      "sizeHigh": "Alto",
+      "status": {
+        "healthy": "Saludable",
+        "degraded": "Degradado",
+        "warning": "Advertencia",
+        "critical": "Crítico"
+      },
+      "range": {
+        "healthy": "< 1%",
+        "degraded": "1 — 5%",
+        "warning": "5 — 10%",
+        "critical": "> 10%"
+      },
+      "entities": "entidades",
+      "distribution": "Distribución",
+      "total": "Total",
+      "showTypes": "Mostrar tipos",
+      "typesFiltered": "Algunos tipos están ocultos. Ábrelo para cambiar lo que se muestra.",
+      "zoomIn": "Ampliar",
+      "zoomOut": "Alejar",
+      "fitToScreen": "Ajustar a la pantalla",
+      "layout": "Disposición",
+      "types": "Tipos",
+      "mode": {
+        "auto": "Auto",
+        "expanded": "Expandido",
+        "collapsed": "Colapsado"
+      },
+      "kind": {
+        "service": "Servicios",
+        "database": "Almacenes de datos",
+        "queue": "Colas",
+        "external": "Externo",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "Abrir a la vista",
     "viewLogs": "Ver registros",
     "viewRelated": "Ver relacionado",
@@ -4520,6 +4594,7 @@
     "servicesCatalog": {
       "tabLabel": "Catálogo de servicios",
       "title": "Catálogo de servicios",
+      "footerTitle": "Servicios",
       "filterPlaceholder": "Filtrar por nombre de servicio...",
       "noServicesFound": "No se ha encontrado ningún servicio en el intervalo de tiempo seleccionado.",
       "loading": "Cargando servicios...",
@@ -4546,6 +4621,15 @@
       "servicesLabel": "servicios",
       "viewTraces": "Ver trazas",
       "exportCsv": "Exportar CSV",
+      "types": {
+        "all": "Todas",
+        "service": "Servicios",
+        "datastore": "Almacenes de datos",
+        "queue": "Colas",
+        "external": "Externo",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{contar} {estado}",
       "legend": {
         "title": "Tasa de errores"
       }

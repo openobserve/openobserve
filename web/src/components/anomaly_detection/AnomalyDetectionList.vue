@@ -18,6 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="w-full h-full">
     <!-- Toolbar: refresh -->
     <div class="flex items-center justify-end px-2 py-2 gap-2">
+      <OTableColumnToggle
+        :columns="columns"
+        :column-visibility="columnVisibility"
+        @update:column-visibility="setColumnVisibility"
+      />
       <OButton
         variant="outline"
         size="sm"
@@ -34,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="anomaly-detection-list-table"
       :data="displayConfigs"
       :columns="columns"
+      :column-visibility="columnVisibility"
       row-key="anomaly_id"
       :loading="loading"
       pagination="client"
@@ -242,6 +248,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -250,7 +258,7 @@ import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "AnomalyDetectionList",
-  components: { OTag, OButton, ODialog, OEmptyState, OIcon, OSpinner, OTable, OTimeCell, OTooltip },
+  components: { OTag, OButton, ODialog, OEmptyState, OIcon, OSpinner, OTable, OTableColumnToggle, OTimeCell, OTooltip },
 
   props: {
     org_identifier: {
@@ -278,16 +286,20 @@ export default defineComponent({
     const pendingCancelRow = ref<any>(null);
     const cancellingId = ref<string | null>(null);
 
+    const { columnVisibility, setColumnVisibility } = useExternalColumnToggle(
+      "alerts-anomaly-detection-list",
+    );
+
     const columns: OTableColumnDef[] = [
       { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
-      { id: "name", header: t("alerts.name"), accessorKey: "name", sortable: true, size: COL.name, meta: { align: "left", autoWidth: true } },
-      { id: "stream", header: "Stream", accessorKey: "stream_name", sortable: true, size: COL.streamName, meta: { align: "left" } },
-      { id: "status", header: "Status", accessorKey: "status", sortable: true, size: COL.status, meta: { align: "left" } },
-      { id: "detection_window", header: "Look back window", accessorKey: "detection_window_seconds", sortable: true, size: COL.duration, meta: { align: "left" } },
-      { id: "check_every", header: t("alerts.frequency"), accessorKey: "schedule_interval", sortable: true, size: COL.frequency, meta: { align: "left" } },
-      { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_detection_run", sortable: true, size: COL.date, meta: { align: "left" } },
-      { id: "last_anomaly_detected_at", header: t("alerts.lastSatisfied"), accessorKey: "last_anomaly_detected_at", sortable: true, size: COL.date, meta: { align: "left" } },
-      { id: "last_trained_at", header: "Last Trained At", accessorKey: "training_completed_at", sortable: true, size: COL.date, meta: { align: "left" } },
+      { id: "name", header: t("alerts.name"), accessorKey: "name", sortable: true, hideable: true, size: COL.name, meta: { align: "left", autoWidth: true } },
+      { id: "stream", header: "Stream", accessorKey: "stream_name", sortable: true, hideable: true, size: COL.streamName, meta: { align: "left" } },
+      { id: "status", header: "Status", accessorKey: "status", sortable: true, hideable: true, size: COL.status, meta: { align: "left" } },
+      { id: "detection_window", header: "Look back window", accessorKey: "detection_window_seconds", sortable: true, hideable: true, size: COL.duration, meta: { align: "left" } },
+      { id: "check_every", header: t("alerts.frequency"), accessorKey: "schedule_interval", sortable: true, hideable: true, size: COL.frequency, meta: { align: "left" } },
+      { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_detection_run", sortable: true, hideable: true, size: COL.date, meta: { align: "left" } },
+      { id: "last_anomaly_detected_at", header: t("alerts.lastSatisfied"), accessorKey: "last_anomaly_detected_at", sortable: true, hideable: true, size: COL.date, meta: { align: "left" } },
+      { id: "last_trained_at", header: "Last Trained At", accessorKey: "training_completed_at", sortable: true, hideable: true, size: COL.date, meta: { align: "left" } },
       { id: "actions", header: t("alerts.actions"), isAction: true, size: 140, meta: { align: "center" } },
     ];
 
@@ -430,6 +442,8 @@ export default defineComponent({
       configs,
       displayConfigs,
       columns,
+      columnVisibility,
+      setColumnVisibility,
       showDeleteDialog,
       pendingDeleteRow,
       deleting,
