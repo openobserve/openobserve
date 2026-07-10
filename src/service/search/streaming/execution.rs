@@ -66,8 +66,11 @@ pub async fn do_partitioned_search(
     is_multi_stream_search: bool,
 ) -> Result<(), infra::errors::Error> {
     // limit the search by max_query_range
+    // Enrichment tables have no retention and must be searched in full (the request spans
+    // [creation_time .. now]); clamping the range would drop older enrichment data, so skip it.
     let mut range_error = String::new();
-    if max_query_range > 0
+    if stream_type != StreamType::EnrichmentTables
+        && max_query_range > 0
         && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
     {
         req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
