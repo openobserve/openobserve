@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </OButton>
                   <pre
-                    v-if="stackOpen"
+                    v-if="stackOpen && errorStack"
                     class="mt-2 text-[11px] leading-[1.6] text-text-body bg-[var(--o2-code-bg)] rounded-md p-[10px_12px] overflow-auto whitespace-pre-wrap font-mono"
                     data-test="synthetics-run-detail-error-stack"
                     >{{ errorStack }}</pre
@@ -421,9 +421,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ st.name }}
                       </span>
 
+                      <OProgressBar
+                        :value="(st.duration / currentRun.duration) || 0"
+                        :variant="st.status === 'fail' ? 'danger' : 'default'"
+                        size="xs"
+                        class="w-20! shrink-0 h-2!"
+                      />
+
                       <!-- Duration -->
                       <span
-                        class="text-xs text-[var(--o2-text-secondary)] shrink-0 font-mono tabular-nums"
+                        class="text-xs text-[var(--o2-text-secondary)] shrink-0 font-mono tabular-nums w-10 ml-2"
                       >
                         {{ st.durStr }}
                       </span>
@@ -674,6 +681,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import VideoPlayer from "@/components/rum/VideoPlayer.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
