@@ -147,19 +147,24 @@ pub(crate) fn group_series_by_labels(
     matrix: &[RangeValue],
     modifier: &Option<LabelModifier>,
 ) -> HashMap<u64, Vec<usize>> {
-    let mut groups: HashMap<u64, Vec<usize>> = HashMap::with_capacity(matrix.len());
+    let hashes: Vec<u64> = matrix
+        .par_iter()
+        .map(|series| {
+            let grouped_labels = match modifier {
+                Some(LabelModifier::Include(labels)) => {
+                    labels_to_include(&labels.labels, series.labels.clone())
+                }
+                Some(LabelModifier::Exclude(labels)) => {
+                    labels_to_exclude(&labels.labels, series.labels.clone())
+                }
+                None => Labels::default(),
+            };
+            grouped_labels.signature()
+        })
+        .collect();
 
-    for (idx, series) in matrix.iter().enumerate() {
-        let grouped_labels = match modifier {
-            Some(LabelModifier::Include(labels)) => {
-                labels_to_include(&labels.labels, series.labels.clone())
-            }
-            Some(LabelModifier::Exclude(labels)) => {
-                labels_to_exclude(&labels.labels, series.labels.clone())
-            }
-            None => Labels::default(),
-        };
-        let hash = grouped_labels.signature();
+    let mut groups: HashMap<u64, Vec<usize>> = HashMap::with_capacity(matrix.len());
+    for (idx, hash) in hashes.into_iter().enumerate() {
         groups.entry(hash).or_default().push(idx);
     }
 
@@ -213,7 +218,7 @@ where
     // This avoids recomputing the hash for every timestamp
     let start1 = std::time::Instant::now();
     let series_label_hashes: Vec<(u64, Labels)> = matrix
-        .iter()
+        .par_iter()
         .map(|rv| {
             let grouped_labels = match param {
                 Some(LabelModifier::Include(labels)) => {
