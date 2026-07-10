@@ -35,10 +35,6 @@ const useSyntheticsRecorder = () => {
   const isInstalled = ref(false)
   const isRecording = ref(false)
   const liveSteps = ref<BrowserStep[]>([])
-  // Steps captured when recording stops externally (port disconnect / recordingStopped).
-  // Snapshotted at the moment of the stop event so subsequent setActions([]) from
-  // extension cleanup cannot wipe them before the watcher in BrowserJourney commits.
-  const externalStopSteps = ref<BrowserStep[]>([])
   const currentUrl = ref('')
   const mode = ref<RecorderMode>('recording')
   const error = ref('')
@@ -49,6 +45,10 @@ const useSyntheticsRecorder = () => {
   const activeStepId = ref<string | null>(null)
 
   let port: ChromePort | null = null
+  // Synchronous callback invoked when recording stops externally (user closes the extension
+  // window without clicking "Stop"). BrowserJourney sets this to commit the steps immediately,
+  // avoiding the timing race inherent in watching a reactive ref across async boundaries.
+  let onExternalStop: ((steps: BrowserStep[]) => void) | null = null
 
   function getRuntime(): ChromeRuntime | null {
     if (typeof chrome === 'undefined' || !chrome.runtime) return null
@@ -112,8 +112,11 @@ const useSyntheticsRecorder = () => {
         isRecording.value = true
         break
       case 'recordingStopped':
-        // Snapshot steps NOW — before any cleanup setActions([]) the extension may send next.
-        externalStopSteps.value = [...liveSteps.value]
+        // Commit steps synchronously if a listener is registered (external stop).
+        // For explicit stopRecording(), the listener is temporarily nulled, so this is a no-op.
+        if (onExternalStop) {
+          onExternalStop([...liveSteps.value])
+        }
         isRecording.value = false
         break
       case 'setMode':
@@ -151,10 +154,11 @@ const useSyntheticsRecorder = () => {
       port.onMessage.addListener(handlePortMessage)
       port.onDisconnect.addListener(() => {
         port = null
-        // Only snapshot if recordingStopped hasn't already done so (which is authoritative).
-        // This covers the case where the port drops without a recordingStopped message.
-        if (isRecording.value && externalStopSteps.value.length === 0) {
-          externalStopSteps.value = [...liveSteps.value]
+        // If recording is still active (no recordingStopped received yet), commit via callback.
+        // This covers the case where the port drops without a recordingStopped message
+        // (e.g. the extension tab crashes or the window is closed).
+        if (onExternalStop && isRecording.value) {
+          onExternalStop([...liveSteps.value])
         }
         isRecording.value = false
       })
@@ -178,7 +182,6 @@ const useSyntheticsRecorder = () => {
   async function startRecording(targetUrl: string): Promise<void> {
     error.value = ''
     liveSteps.value = []
-    externalStopSteps.value = []
     currentUrl.value = targetUrl
     mode.value = 'recording'
 
@@ -199,18 +202,24 @@ const useSyntheticsRecorder = () => {
    * return the accumulated `liveSteps`.
    */
   async function stopRecording(): Promise<BrowserStep[]> {
+    // Null the external-stop callback so recordingStopped arriving during the await
+    // doesn't commit via the callback path — we handle the commit explicitly below.
+    const savedOnExternalStop = onExternalStop
+    onExternalStop = null
     await sendCommand<RecorderStopResponse>({ action: 'stopRecording' })
     const steps = [...liveSteps.value]
+    isRecording.value = false // set before teardown so onDisconnect's guard sees isRecording=false
     teardownPort()
-    isRecording.value = false
     liveSteps.value = []
+    onExternalStop = savedOnExternalStop
     return steps
   }
 
   /** Abandon the current recording without persisting any steps. */
   function cancelRecording() {
+    // Null the callback so onDisconnect doesn't commit discarded steps.
+    onExternalStop = null
     teardownPort()
-    externalStopSteps.value = []
     liveSteps.value = []
     isRecording.value = false
   }
@@ -278,6 +287,11 @@ const useSyntheticsRecorder = () => {
     return sendCommand({ action: 'setMode', mode: next })
   }
 
+  /** Register a callback for when recording stops externally (extension window closed). */
+  function setOnExternalStop(cb: ((steps: BrowserStep[]) => void) | null) {
+    onExternalStop = cb
+  }
+
   /** Release the port; call from the host component's onUnmounted. */
   function cleanup() {
     teardownPort()
@@ -288,7 +302,6 @@ const useSyntheticsRecorder = () => {
     isInstalled,
     isRecording,
     liveSteps,
-    externalStopSteps,
     currentUrl,
     mode,
     error,
@@ -301,6 +314,7 @@ const useSyntheticsRecorder = () => {
     startRecording,
     stopRecording,
     cancelRecording,
+    setOnExternalStop,
     replay,
     stopReplay,
     setMode,

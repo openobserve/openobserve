@@ -169,7 +169,6 @@ const multiSelectEnabled = computed(() =>
 const recorder = useSyntheticsRecorder()
 const isRecording = recorder.isRecording
 const capturedSteps = recorder.liveSteps
-const externalStopSteps = recorder.externalStopSteps
 const currentUrl = recorder.currentUrl
 const recordingError = recorder.error
 
@@ -206,26 +205,21 @@ function onRecordButtonClick() {
 }
 
 onMounted(() => {
+  // Register the external-stop callback: the composable calls this synchronously
+  // when recordingStopped arrives over the port, avoiding any async timing races.
+  recorder.setOnExternalStop((steps: BrowserStep[]) => {
+    emit('update:modelValue', [...props.modelValue, ...steps])
+  })
   if (props.autoRecord) {
     startRecording()
     emit('auto-record-consumed')
   }
 })
 
-// Justified watcher: auto-commit steps when the extension window is closed
-// externally (without clicking Stop & Review). Uses externalStopSteps, which is
-// snapshotted inside the composable at the exact moment recordingStopped /
-// port.onDisconnect fires — immune to subsequent setActions([]) cleanup messages
-// the extension may send after stopping. cancelRecording() clears the snapshot,
-// so this watcher is a no-op for explicit cancels.
-watch(isRecording, (nowRecording, wasRecording) => {
-  if (!nowRecording && wasRecording && externalStopSteps.value.length > 0) {
-    emit('update:modelValue', [...props.modelValue, ...externalStopSteps.value])
-    externalStopSteps.value = []
-  }
+onUnmounted(() => {
+  recorder.setOnExternalStop(null)
+  recorder.cleanup()
 })
-
-onUnmounted(() => recorder.cleanup())
 
 // ── Step list (single flat list — one journey, one start URL) ───────────────
 const filteredSteps = computed<{ step: BrowserStep; originalIndex: number }[]>(() => {
