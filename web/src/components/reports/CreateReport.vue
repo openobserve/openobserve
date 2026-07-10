@@ -137,14 +137,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      controls bind by their `dashboards[i].*` form name. Row
                      content + per-row report_type read come from the form via the
                      reactive `dashboardRows` mirror.
-                     NOTE: the key mirrors the pre-migration `folder + dashboard`
-                     (kept for parity). Field VALUES survive the resulting remount
-                     because they live in the form; a stable `index`/`uuid` key
-                     would avoid the remount churn but isn't required for
-                     correctness. -->
+                     KEY: index (stable for the single, non-reorderable row). A
+                     value-derived key (folder + dashboard) remounts the whole row
+                     whenever the folder/dashboard changes, and remounting wipes
+                     each field's TanStack error meta — so picking a folder used to
+                     clear the still-empty dashboard/tab validation with it. -->
                 <template
                   v-for="(dashboard, index) in dashboardRows"
-                  :key="dashboard.folder + dashboard.dashboard"
+                  :key="index"
                 >
                   <div
                     :data-test="`add-report-dashboard-${index}`"
@@ -1094,6 +1094,47 @@ const goToStep = async (fields: string[], next: number) => {
   if (await validateStepFields(fields)) step.value = next;
 };
 
+// Map a Zod issue path to its OForm field name so we can match issues to the
+// field that owns them: ["dashboards", 0, "folder"] → "dashboards[0].folder",
+// ["cron"] → "cron".
+const issuePathToName = (path: readonly (string | number)[]): string =>
+  path.reduce<string>(
+    (acc, seg) =>
+      typeof seg === "number"
+        ? `${acc}[${seg}]`
+        : acc
+          ? `${acc}.${seg}`
+          : String(seg),
+    "",
+  );
+
+// Clear a field's error the instant its value becomes valid — scoped to that one
+// field, never touching the others. Needed because Continue validates with
+// validateField("submit"), which does NOT flip the form into revalidate-on-change
+// mode, so OForm* editing would otherwise leave a stale error until the next Save
+// (e.g. a corrected cron kept showing its error). This ONLY clears — it never
+// adds errors — so editing one field can't surface validation on another (no
+// bleed to `name` or later-step fields).
+const formValuesRef = form.useStore((s: any) => s.values);
+watch(
+  formValuesRef,
+  () => {
+    const res = createReportSchema.safeParse(form.state.values);
+    const invalidNames = new Set(
+      res.success ? [] : res.error.issues.map((i) => issuePathToName(i.path)),
+    );
+    for (const name of Object.keys(form.state.fieldMeta ?? {})) {
+      const meta = form.getFieldMeta(name);
+      if (!meta) continue;
+      const hasError = (meta.errors?.length ?? 0) > 0;
+      if (hasError && !invalidNames.has(name)) {
+        form.setFieldMeta(name, { ...meta, errorMap: {} });
+      }
+    }
+  },
+  { deep: true },
+);
+
 const setInitialReportData = async () => {
   const queryParams = router.currentRoute.value.query;
 
@@ -1363,8 +1404,11 @@ const saveReport = async (value: CreateReportForm) => {
     scheduleTime = `${hours}:${minutes}`;
   }
 
-  // If the user has selected to schedule now, set the timezone to the current one.
-  if (value.selectedTimeTab === "scheduleNow") {
+  // Auto-fill the browser timezone only for a non-cron "Schedule Now": that mode
+  // hides the timezone field. Cron mode shows a required timezone select, so we
+  // honor the user's pick (value.timezone) — needed for the cron schedule to run
+  // in the chosen timezone rather than silently reverting to the browser's.
+  if (value.selectedTimeTab === "scheduleNow" && value.frequencyType !== "cron") {
     scheduleTimezone = timezone.value;
   }
 

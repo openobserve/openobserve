@@ -213,14 +213,16 @@ export const makeCreateReportSchema = (
         }
       }
 
-      // ── Timezone: required only when the Schedule Later tab is active. ────
-      // Pre-migration, the timezone check LOOKED unconditional but saveReport
-      // auto-filled the browser timezone before validating whenever the tab was
-      // "scheduleNow" — including cron mode, which hides the tab UI and leaves
-      // the default in place. So the check could only ever fire on the
-      // Schedule Later tab; requiring it in cron mode would block cron saves
-      // that succeed pre-migration (saveReport still auto-fills them).
-      if (val.selectedTimeTab === "scheduleLater") {
+      // ── Timezone: required on the Schedule Later tab AND in cron mode. ────
+      // Both modes surface an enabled, `required` timezone select the user is
+      // meant to fill (cron runs the schedule in that timezone — saveReport now
+      // honors the picked value instead of overriding it with the browser one).
+      // The other modes ("Schedule Now") hide the field and auto-fill the browser
+      // timezone at save, so they are not enforced here.
+      if (
+        val.selectedTimeTab === "scheduleLater" ||
+        val.frequencyType === "cron"
+      ) {
         if (!String(val.timezone ?? "").trim()) {
           addIssue(["timezone"], REQUIRED_MESSAGE);
         }

@@ -241,12 +241,12 @@ describe("CreateReport.schema", () => {
     });
   });
 
-  // ── timezone: required only when the Schedule Later tab is active ──────────
-  // Pre-migration parity: saveReport auto-fills the browser timezone before
-  // validating whenever the tab is "scheduleNow" — including cron mode, which
-  // hides the tab UI — so the requirement can only fire on Schedule Later.
+  // ── timezone: required on Schedule Later AND in cron mode ──────────────────
+  // Both surface an enabled, required timezone select the user must fill (cron
+  // runs its schedule in that timezone; saveReport honors the picked value). The
+  // hidden "Schedule Now" mode auto-fills the browser timezone at save instead.
   describe("timezone", () => {
-    it("is NOT required in cron mode (auto-filled at save, parity)", () => {
+    it("is required in cron mode", () => {
       expect(
         errorPaths({
           ...base(),
@@ -254,7 +254,7 @@ describe("CreateReport.schema", () => {
           cron: "0 0 12 * * ?",
           timezone: "",
         }),
-      ).not.toContain("timezone");
+      ).toContain("timezone");
     });
 
     it("is required when scheduling for later", () => {
