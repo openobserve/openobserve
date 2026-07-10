@@ -1115,7 +1115,11 @@ export default defineComponent({
               ? selectedDelete.value.folder_id
               : (activeFolderId.value ?? "default"),
           );
-          showPositiveNotification("Dashboard deleted successfully.");
+          showPositiveNotification(
+            deletedWasHome
+              ? "Pinned dashboard was deleted, so its Home pin was removed."
+              : "Dashboard deleted successfully.",
+          );
           // The backend clears the home_dashboard setting on delete; re-read it
           // so the Home shortcut button / pin state updates immediately instead
           // of lingering until the next navigation.
@@ -1340,6 +1344,13 @@ export default defineComponent({
           return;
         }
 
+        // Did this batch include the Home-pinned dashboard? Captured before the
+        // delete so we can refresh the pin state afterwards (the backend clears
+        // the home_dashboard setting when the pinned dashboard is deleted).
+        const bulkIncludedHome = selectedDashboardIds.value.some((id: string) =>
+          isHome(id),
+        );
+
         // Extract dashboard ids
         const payload = {
           ids: selectedDashboardIds.value,
@@ -1390,6 +1401,12 @@ export default defineComponent({
         selectedIds.value = [];
         // Refresh dashboards
         await getDashboards(store, activeFolderId.value);
+        // If the pinned dashboard was in the batch, re-read the (now cleared)
+        // home_dashboard setting so the Home shortcut/pin updates immediately.
+        if (bulkIncludedHome) {
+          const org = store.state.selectedOrganization?.identifier;
+          if (org) await useHomeDashboard().load(org);
+        }
       } catch (error: any) {
         dismiss();
         console.error("Error deleting dashboards:", error);
