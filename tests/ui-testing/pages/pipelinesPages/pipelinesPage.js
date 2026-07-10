@@ -360,9 +360,14 @@ export class PipelinesPage {
     // Methods from PipelinePage
     async openPipelineMenu() {
         await openNavFlyoutChild(this.page, 'pipeline');
-        await this.page.waitForTimeout(1000);
+        // pipelineTab.click() auto-waits for actionability, so the pre-click sleep
+        // was redundant. After the click, wait for the pipeline list page to render
+        // instead of a blind 2s — resolves in ~0.5-1s on the common path. Best-effort
+        // (.catch) so callers that immediately page.goto elsewhere aren't blocked.
         await this.pipelineTab.click();
-        await this.page.waitForTimeout(2000);
+        await this.page.locator('[data-test="pipeline-list-page"]')
+            .waitFor({ state: 'visible', timeout: 15000 })
+            .catch(() => {});
     }
 
     async addPipeline() {
@@ -432,9 +437,21 @@ export class PipelinesPage {
             },
             { sx: sourceX, sy: sourceY, tx: targetX, ty: targetY }
         );
-        // Wait for the input-node stream form dialog to render — `onDrop` sets
-        // pipelineObj.dialog.show=true which mounts add-stream-input-stream-routing-section.
-        await this.page.locator('[data-test="add-stream-input-stream-routing-section"]')
+        // Wait for whichever node form the drop opened to render:
+        //   Stream    -> add-stream-input-stream-routing-section (Stream.vue)
+        //   Query     -> add-stream-query-routing-section        (Query.vue)
+        //   Condition -> add-condition-section                   (Condition.vue)
+        //   Function  -> associate-function-drawer               (AssociateFunction.vue)
+        // Previously this waited only on the stream selector, so EVERY query/condition/
+        // function drag burned the full 10s timeout before the .catch(). Racing all four
+        // (`:visible` so .first() only considers the one open dialog) lets each drag
+        // resolve on its own form in ~1s.
+        await this.page.locator(
+            '[data-test="add-stream-input-stream-routing-section"]:visible, ' +
+            '[data-test="add-stream-query-routing-section"]:visible, ' +
+            '[data-test="add-condition-section"]:visible, ' +
+            '[data-test="associate-function-drawer"]:visible'
+        )
             .first()
             .waitFor({ state: 'visible', timeout: 10000 })
             .catch(() => {});
