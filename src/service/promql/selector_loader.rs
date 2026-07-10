@@ -283,14 +283,16 @@ async fn load_samples_from_datafusion(
         tasks.push(task);
     }
 
-    // collect results
+    // collect results; partitions are hash-disjoint so this is a pure move
+    let start = std::time::Instant::now();
     let mut metrics: HashMap<u64, RangeValue> = HashMap::new();
     for task in tasks {
         let m = task
             .await
             .map_err(|e| DataFusionError::Execution(e.to_string()))??;
-        for (hash, samples) in m {
-            metrics.insert(
+        metrics.reserve(m.len());
+        metrics.extend(m.into_iter().map(|(hash, samples)| {
+            (
                 hash,
                 RangeValue {
                     labels: vec![],
@@ -298,9 +300,14 @@ async fn load_samples_from_datafusion(
                     exemplars: None,
                     time_window: None,
                 },
-            );
-        }
+            )
+        }));
     }
+    log::info!(
+        "[trace_id: {trace_id}] merge partition series took: {:?}, series: {}",
+        start.elapsed(),
+        metrics.len(),
+    );
 
     Ok(metrics)
 }
@@ -402,14 +409,15 @@ async fn load_exemplars_from_datafusion(
         tasks.push(task);
     }
 
-    // collect results
+    // collect results; partitions are hash-disjoint so this is a pure move
     let mut metrics: HashMap<u64, RangeValue> = HashMap::new();
     for task in tasks {
         let m = task
             .await
             .map_err(|e| DataFusionError::Execution(e.to_string()))??;
-        for (hash, exemplars) in m {
-            metrics.insert(
+        metrics.reserve(m.len());
+        metrics.extend(m.into_iter().map(|(hash, exemplars)| {
+            (
                 hash,
                 RangeValue {
                     labels: vec![],
@@ -417,8 +425,8 @@ async fn load_exemplars_from_datafusion(
                     exemplars: Some(exemplars),
                     time_window: None,
                 },
-            );
-        }
+            )
+        }));
     }
 
     Ok(metrics)
