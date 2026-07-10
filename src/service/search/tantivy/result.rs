@@ -568,7 +568,7 @@ mod tests {
 
         // Test SimpleSelect display
         let result = TantivyMultiResult::SimpleSelect(12345);
-        assert_eq!(format!("{result}"), "simple_select row_nums: 12345");
+        assert_eq!(format!("{result}"), "select row_nums: 12345");
 
         // Test Histogram display
         let result = TantivyMultiResult::Histogram(vec![10, 20, 30]);
