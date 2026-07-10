@@ -1986,21 +1986,32 @@ describe("Schema Component Tests", () => {
       expect(wrapper.vm.getConfigIcon.length).toBeGreaterThan(0);
     });
 
-    it("should add and remove schema fields", async () => {
+    it("should add and remove schema fields via the form", async () => {
+      // Rows are owned by the child (StreamFieldInputs) through the form now —
+      // add/remove go through form.pushFieldValue / form.removeFieldValue, the
+      // same calls the child makes. The parent no longer exposes add/remove
+      // handlers.
       expect(wrapper.vm.newSchemaFields.length).toBe(0);
 
-      wrapper.vm.addSchemaField();
+      wrapper.vm.newSchemaFieldsForm.pushFieldValue("newSchemaFields", {
+        name: "",
+        type: "",
+        index_type: [],
+      });
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.newSchemaFields.length).toBe(1);
       expect(wrapper.vm.newSchemaFields[0].name).toBe("");
       expect(wrapper.vm.newSchemaFields[0].type).toBe("");
-      expect(wrapper.vm.formDirtyFlag).toBe(true);
 
-      wrapper.vm.addSchemaField();
+      wrapper.vm.newSchemaFieldsForm.pushFieldValue("newSchemaFields", {
+        name: "",
+        type: "",
+        index_type: [],
+      });
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.newSchemaFields.length).toBe(2);
 
-      wrapper.vm.removeSchemaField(wrapper.vm.newSchemaFields[0], 0);
+      wrapper.vm.newSchemaFieldsForm.removeFieldValue("newSchemaFields", 0);
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.newSchemaFields.length).toBe(1);
     });
@@ -2012,7 +2023,9 @@ describe("Schema Component Tests", () => {
       ]);
       await wrapper.vm.$nextTick();
 
-      wrapper.vm.removeSchemaField(wrapper.vm.newSchemaFields[0], 0);
+      // The child removes rows directly via the form; the parent's watch closes
+      // the dialog once the rows drain to empty (main's behavior, restored).
+      wrapper.vm.newSchemaFieldsForm.removeFieldValue("newSchemaFields", 0);
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.isDialogOpen).toBe(false);
@@ -3594,9 +3607,9 @@ describe("Schema Component Tests", () => {
     });
 
     it("should exercise onSubmit with non-empty newSchemaFields (maps)", async () => {
-      // Func 55, 56: newSchemaFields map callbacks in onSubmit. schema.vue does
-      // NOT validate rows (permissive schema), so a loose name with a dash is
-      // accepted and normalized at save — the pre-migration behavior.
+      // Func 55, 56: newSchemaFields map callbacks in onSubmit. The row gate
+      // validates the NORMALIZED name, so a dash is allowed — "test-field"
+      // normalizes to "test_field" (valid), passes the gate, and is saved.
       wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [
         { name: "test-field", type: "Utf8", index_type: [] },
       ]);
@@ -3610,6 +3623,92 @@ describe("Schema Component Tests", () => {
       expect(mockUpdateSettings).toHaveBeenCalled();
       // newSchemaFields should be reset after successful save
       expect(wrapper.vm.newSchemaFields).toEqual([]);
+    });
+
+    it("should block onSubmit when a field name has invalid characters", async () => {
+      // Option A gating: "!" survives normalization, so "user!id" fails the row
+      // schema. onSubmit reveals the inline error and does NOT save — the fix for
+      // the dropped inline feedback (invalid names no longer pass silently).
+      wrapper.vm.isDialogOpen = true;
+      wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [
+        { name: "user!id", type: "Utf8", index_type: [] },
+      ]);
+      await wrapper.vm.$nextTick();
+
+      mockUpdateSettings.mockClear();
+      mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
+
+      await wrapper.vm.onSubmit();
+      await flushPromises();
+
+      expect(mockUpdateSettings).not.toHaveBeenCalled();
+      // Rows are preserved (not reset) so the user can correct them.
+      expect(wrapper.vm.newSchemaFields.length).toBe(1);
+    });
+
+    it("should block onSubmit when a field has no data type", async () => {
+      // The data-type select is visible + required in the Add Field(s) card, so a
+      // row with a valid name but no type also blocks the save.
+      wrapper.vm.isDialogOpen = true;
+      wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [
+        { name: "valid_name", type: "", index_type: [] },
+      ]);
+      await wrapper.vm.$nextTick();
+
+      mockUpdateSettings.mockClear();
+      mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
+
+      await wrapper.vm.onSubmit();
+      await flushPromises();
+
+      expect(mockUpdateSettings).not.toHaveBeenCalled();
+      expect(wrapper.vm.newSchemaFields.length).toBe(1);
+    });
+
+    it("should save on Enter from a field-name input", async () => {
+      // Enter in the Add Field(s) name input triggers the settings save (the
+      // nested <form> otherwise swallows Enter with 2+ rows).
+      wrapper.vm.isDialogOpen = true;
+      wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [
+        { name: "valid_name", type: "Utf8", index_type: [] },
+      ]);
+      await wrapper.vm.$nextTick();
+
+      mockUpdateSettings.mockClear();
+      mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
+
+      await wrapper.vm.onAddFieldsKeyup({
+        key: "Enter",
+        target: { tagName: "INPUT", name: "newSchemaFields[0].name" },
+      });
+      await flushPromises();
+
+      expect(mockUpdateSettings).toHaveBeenCalled();
+    });
+
+    it("should NOT save on Enter from the data-type select (only the name input submits)", async () => {
+      wrapper.vm.isDialogOpen = true;
+      wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [
+        { name: "valid_name", type: "Utf8", index_type: [] },
+      ]);
+      await wrapper.vm.$nextTick();
+
+      mockUpdateSettings.mockClear();
+      mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
+
+      // Enter on the type field (dropdown) must not submit.
+      wrapper.vm.onAddFieldsKeyup({
+        key: "Enter",
+        target: { tagName: "INPUT", name: "newSchemaFields[0].type" },
+      });
+      // A non-Enter key on the name input must not submit either.
+      wrapper.vm.onAddFieldsKeyup({
+        key: "a",
+        target: { tagName: "INPUT", name: "newSchemaFields[0].name" },
+      });
+      await flushPromises();
+
+      expect(mockUpdateSettings).not.toHaveBeenCalled();
     });
 
     it("should exercise cross-links diff in onSubmit with modified links", async () => {

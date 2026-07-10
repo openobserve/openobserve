@@ -468,7 +468,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           margin-bottom: 2px;
                         "
                       >
-                        <OForm :form="newSchemaFieldsForm">
+                        <OForm
+                          :form="newSchemaFieldsForm"
+                          @keyup="onAddFieldsKeyup"
+                        >
                           <StreamFieldsInputs
                             form-field-name="newSchemaFields"
                             :showHeader="false"
@@ -987,7 +990,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
-import { schemaFieldsSchema } from "./Schema.schema";
+import { makeSchemaFieldsSchema } from "./Schema.schema";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
@@ -1084,7 +1087,7 @@ export default defineComponent({
     // the reactive `newSchemaFields` view below — single source of truth, no mirror.
     const newSchemaFieldsForm = useOForm<{ newSchemaFields: any[] }>({
       defaultValues: { newSchemaFields: [] },
-      schema: schemaFieldsSchema,
+      schema: makeSchemaFieldsSchema(t),
     });
     const newSchemaFields = newSchemaFieldsForm.useStore(
       (s: any) => s.values.newSchemaFields ?? [],
@@ -1102,6 +1105,18 @@ export default defineComponent({
       (indexData.value.schema || []).map((f: any) => f.name).sort(),
     );
     const isDialogOpen = ref(false);
+    // The child (StreamFieldInputs) owns row deletion now and no longer emits a
+    // @remove event, so the parent can't run "close the dialog when the last row
+    // is deleted" inline. Observe the row count instead: whenever the rows drain
+    // to empty while the dialog is open, close it (restores main's behavior).
+    watch(
+      () => newSchemaFields.value.length,
+      (len) => {
+        if (isDialogOpen.value && len === 0) {
+          isDialogOpen.value = false;
+        }
+      },
+    );
     const patternAssociations = ref([]);
     const redDaysList = ref([]);
     const resultTotal = ref<number>(0);
@@ -1569,10 +1584,20 @@ export default defineComponent({
     };
 
     const onSubmit = async () => {
-      // NOTE: schema.vue intentionally does NOT gate the save on the field rows
-      // (matches pre-migration behavior — it never validated them). The rows use
-      // a permissive schema (Schema.schema.ts) and field names are normalized
-      // below at save time, exactly as before.
+      // Gate the save on the "Add Field(s)" rows (parity with AddStream): when the
+      // dialog has rows, they must pass the schema (name required + valid chars
+      // after normalization, data type required) before we merge them into
+      // settings. handleSubmit() reveals the inline row errors (which are the
+      // user-facing feedback — no toast needed) and an invalid row blocks the
+      // save instead of silently pushing an invalid name (e.g. "user!id") into
+      // defined_schema_fields. Empty when the dialog is closed, so a normal
+      // settings save is unaffected.
+      if (newSchemaFields.value.length > 0) {
+        await newSchemaFieldsForm.handleSubmit();
+        if (!newSchemaFieldsForm.state.isValid) {
+          return;
+        }
+      }
       patternAssociations.value = ungroupPatternAssociations(
         patternAssociations.value,
       );
@@ -1812,6 +1837,25 @@ export default defineComponent({
         });
     };
 
+    // Enter inside the "Add Field(s)" card triggers the settings save (Update
+    // Settings), matching normal form behavior. Needed because the nested <OForm>
+    // renders a real <form> with no submit button inside it, so the browser never
+    // implicitly submits on Enter once there are 2+ text inputs (multiple rows).
+    // Scoped to the field-NAME input (matched by its form `name`) so Enter used to
+    // pick a Data Type option in the dropdown does NOT submit.
+    const onAddFieldsKeyup = (e: KeyboardEvent) => {
+      if (e.key !== "Enter") return;
+      const el = e.target as HTMLInputElement | null;
+      if (
+        el?.tagName === "INPUT" &&
+        /^newSchemaFields\[\d+\]\.name$/.test(el.name || "")
+      ) {
+        // Return the promise so the save is awaitable (the @keyup handler ignores
+        // the return value; tests await it).
+        return onSubmit();
+      }
+    };
+
     const showPartitionColumn = computed(() => {
       return (
         isCloud != "true" && modelValue.stream_type !== "enrichment_tables"
@@ -2020,21 +2064,11 @@ export default defineComponent({
       },
     ];
 
-    const addSchemaField = () => {
-      newSchemaFieldsForm.pushFieldValue("newSchemaFields", {
-        name: "",
-        type: "",
-        index_type: [],
-      });
-      formDirtyFlag.value = true;
-    };
-
-    const removeSchemaField = (_field: any, index: number) => {
-      newSchemaFieldsForm.removeFieldValue("newSchemaFields", index);
-      if ((newSchemaFieldsForm.state.values.newSchemaFields ?? []).length === 0) {
-        isDialogOpen.value = false;
-      }
-    };
+    // NOTE: adding/removing "Add Field(s)" rows is owned by the child
+    // (StreamFieldInputs) via form.pushFieldValue / form.removeFieldValue. The
+    // parent seeds the first row in openDialog and closes the dialog when the
+    // rows drain to empty via the watch above — so no add/remove handlers live
+    // here anymore.
 
     const scrollToAddFields = () => {
       const el = document.getElementById("schema-add-fields-section");
@@ -2645,10 +2679,9 @@ export default defineComponent({
       rowsPerPage,
       filterField,
       columns,
-      addSchemaField,
-      removeSchemaField,
       newSchemaFields,
       newSchemaFieldsForm,
+      onAddFieldsKeyup,
       scrollToAddFields,
       tabs,
       activeTab,
