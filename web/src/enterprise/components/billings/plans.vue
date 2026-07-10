@@ -16,12 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="rounded-md px-4 pt-3" style="min-height: inherit; overflow: auto">
-    <div v-if="!isChildOrg" class="flex justify-between items-center">
-      <div>
-        <h1 class="text-2xl font-bold leading-9 text-(--o2-text-heading) mt-0 mr-0 mb-2 ml-0 block">{{ t("billing.title") }}</h1>
-        <p class="text-base font-semibold leading-[1.375rem] text-(--o2-text-secondary) m-0 block">{{ t("billing.subtitle") }}</p>
-      </div>
-    </div>
+    <!-- Page title is supplied by the parent Billing.vue AppPageHeader; no local title here. -->
     <!-- Managed billing empty state for child orgs -->
     <div
       v-if="isChildOrg"

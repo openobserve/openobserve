@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md flex flex-col h-full p-0">
+  <div class="flex flex-col h-full p-0">
 
     <div v-if="!showDestinationEditor && !showImportDestination" class="flex flex-col h-full">
       <AppPageHeader
@@ -92,9 +92,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('alert_destinations.search')"
             />
           </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="alert-destinations-list-refresh-btn"
+              @click="getDestinations"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="alertDestinationsRefresh" />
+            </OButton>
+          </template>
 
           <template #bottom="{ totalRows }">
-            <span class="o2-table-footer-title text-primary">
+            <span class="o2-table-footer-title">
               {{ totalRows.toLocaleString() }} {{ t('alert_destinations.header') }}
             </span>
             <OButton
@@ -220,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @get:destinations="getDestinations"
       />
     </div>
-    <div v-else>
+    <div v-else class="flex-1 min-h-0">
       <ImportDestination
         :destinations="destinations"
         :templates="templates"
@@ -275,6 +287,7 @@ import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 import OTag from '@/lib/core/Badge/OTag.vue';
@@ -301,6 +314,7 @@ export default defineComponent({
     ConfirmDialog,
     ImportDestination,
     OButton,
+    OTooltip,
     OSearchInput,
     OCheckbox,
     OTag,

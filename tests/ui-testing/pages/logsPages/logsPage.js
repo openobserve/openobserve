@@ -228,6 +228,8 @@ export class LogsPage {
         this.visualizeToggle = '[data-test="logs-visualize-toggle"]';
         this.patternsToggle = '[data-test="logs-patterns-toggle"]';
         this.buildQueryPage = '[data-test="logs-build-query-page"]';
+        this.viewModeDropdownBtn = '[data-test="logs-view-mode-dropdown-btn"]';
+        this.dashboardMenuItem = '[data-test="menu-link-\\/dashboards-item"]';
 
         // Query type selector (Auto/Custom mode)
         this.builderQueryType = '[data-test="dashboard-builder-query-type"]';
@@ -1016,6 +1018,10 @@ export class LogsPage {
         testLogger.info(`Adding stream to selection: ${streamName}`);
         // Open the OSelect popover via the trigger button (same pattern as
         // selectStream), then fill the ListboxFilter search input.
+        // IMPORTANT: The stream selector uses rowClickSingleSelect=true — clicking
+        // the option row REPLACES the selection. To ADD a stream to the existing
+        // selection we must click the CHECKBOX (data-select-checkbox) within the
+        // option, not the option row itself.
         const trigger = this.page.locator(this.indexDropDownTrigger).first();
         const popover = this.page.locator(this.indexDropDownPopover);
         const search = this.page.locator(this.indexDropDownSearch);
@@ -1031,14 +1037,23 @@ export class LogsPage {
             await search.press('Backspace').catch(() => {});
             await search.fill(streamName);
         }
-        await this.page.waitForTimeout(1000);
         const option = this.page.locator(
             `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`,
         );
-        if (await option.first().isVisible({ timeout: 5000 }).catch(() => false)) {
+        await option.first().waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+        // Click the checkbox to ADD to the multi-selection (not replace it).
+        const streamCheckbox = option.first().locator('[data-select-checkbox]');
+        await streamCheckbox.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
+        if (await streamCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await streamCheckbox.click();
+            testLogger.info(`Added ${streamName} to stream selection via checkbox`);
+        } else if (await option.first().isVisible({ timeout: 3000 }).catch(() => false)) {
             await option.first().click();
-            testLogger.info(`Selected additional stream: ${streamName}`);
+            testLogger.info(`Added ${streamName} to stream selection (row click fallback)`);
         }
+        // Close the popover after selection
+        await popover.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.keyboard.press('Escape').catch(() => {});
     }
 
     async expectTimestampColumnVisible() {
@@ -1209,6 +1224,39 @@ export class LogsPage {
             ? expectedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
             : `.*${expectedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`;
         await expect(this.page).toHaveURL(new RegExp(urlPattern));
+    }
+
+    /**
+     * Apply query (click refresh) and wait for the _search API response.
+     * 
+     * First waits for the refresh button to become enabled (not disabled),
+     * then clicks it and concurrently waits for the /_search response.
+     * This replaces the inline `applyQueryButton` helper that previously
+     * lived in specs — no raw selectors leak into the spec layer.
+     */
+    async applyQueryAndWaitForSearchResponse() {
+        // Wait for the refresh button to be enabled before clicking.
+        await this.page.waitForFunction(
+            (sel) => {
+                const el = document.querySelector(sel);
+                return el && !el.disabled;
+            },
+            this.queryButton,
+            { timeout: 15000 }
+        ).catch(() => {
+            testLogger.warn('Refresh button did not become enabled within 15 s — proceeding with click anyway');
+        });
+        // Click refresh and wait for the search API response concurrently.
+        await Promise.all([
+            this.page.waitForResponse(
+                resp => resp.url().includes('/_search') && resp.status() === 200,
+                { timeout: 60000 }
+            ).catch(() => {
+                testLogger.warn('No /_search response received within 60 s');
+            }),
+            this.page.locator(this.queryButton).click(),
+        ]);
+        testLogger.info('Query applied and search response received');
     }
 
     async clearAndRunQuery() {
@@ -8910,6 +8958,119 @@ export class LogsPage {
         await this.page.locator(this.visualizeToggle).click();
         await this.page.waitForTimeout(500);
         testLogger.info('Clicked Visualize tab toggle');
+    }
+
+    // ===== LOGS VISUALIZE PERSISTENCE — SIDEBAR NAVIGATION =====
+
+    /**
+     * Click the Dashboard sidebar menu item to navigate away from Logs.
+     */
+    async clickMenuLinkDashboardItem() {
+        await this.page.locator(this.dashboardMenuItem).click();
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        testLogger.info('Clicked Dashboard sidebar menu item');
+    }
+
+    // ===== LOGS VISUALIZE PERSISTENCE — EXPECT METHODS =====
+
+    /**
+     * Expect the Logs search result area (table) to be visible.
+     */
+    async expectLogsSearchResultVisible() {
+        await expect(this.page.locator(this.resultText)).toBeVisible({ timeout: 15000 });
+        testLogger.info('Logs search result is visible');
+    }
+
+    /**
+     * Expect the Logs search result area to NOT be visible.
+     */
+    async expectLogsSearchResultNotVisible() {
+        await expect(this.page.locator(this.resultText)).toBeHidden({ timeout: 10000 });
+        testLogger.info('Logs search result is NOT visible');
+    }
+
+    /**
+     * Expect the Build query page to be visible.
+     */
+    async expectBuildQueryPageVisible() {
+        await expect(this.page.locator(this.buildQueryPage)).toBeVisible({ timeout: 15000 });
+        testLogger.info('Build query page is visible');
+    }
+
+    /**
+     * Expect the Build query page to NOT be visible.
+     */
+    async expectBuildQueryPageNotVisible() {
+        await expect(this.page.locator(this.buildQueryPage)).toBeHidden({ timeout: 10000 });
+        testLogger.info('Build query page is NOT visible');
+    }
+
+    /**
+     * Expect Visualize tab content to be visible.
+     * The Visualize tab can show a chart renderer, a dashboard panel table, or a no-data
+     * message — any of these means the Visualize tab has loaded.
+     */
+    async expectVisualizeTabContentVisible() {
+        const chart = this.page.locator(this.chartRenderer);
+        const panel = this.page.locator(this.dashboardPanelTable);
+        const noData = this.page.locator(this.noDataMessage);
+        const anyVisible = Promise.any([
+            chart.waitFor({ state: 'visible', timeout: 30000 }).then(() => 'chart'),
+            panel.waitFor({ state: 'visible', timeout: 30000 }).then(() => 'panel'),
+            noData.waitFor({ state: 'visible', timeout: 30000 }).then(() => 'noData'),
+        ]);
+        const result = await anyVisible;
+        testLogger.info(`Visualize tab content visible: ${result}`);
+    }
+
+    /**
+     * Expect the Visualize toggle to be in a disabled state.
+     */
+    async expectVisualizeToggleDisabled() {
+        const toggle = this.page.locator(this.visualizeToggle);
+        await expect(toggle).toBeVisible({ timeout: 10000 });
+        const isDisabled = await toggle.isDisabled().catch(() => false);
+        const hasAriaDisabled = await toggle.getAttribute('aria-disabled').catch(() => null);
+        const hasDataDisabled = await toggle.getAttribute('data-disabled').catch(() => null);
+        expect(isDisabled || hasAriaDisabled === 'true' || hasDataDisabled === '').toBeTruthy();
+        testLogger.info('Visualize toggle is disabled');
+    }
+
+    /**
+     * Expect the view-mode dropdown button to NOT be visible (wide viewport).
+     */
+    async expectViewModeDropdownNotVisible() {
+        await expect(this.page.locator(this.viewModeDropdownBtn)).toBeHidden({ timeout: 5000 });
+        testLogger.info('View mode dropdown is NOT visible (wide viewport)');
+    }
+
+    /**
+     * Expect all three toggle-group buttons to be visible (wide viewport).
+     */
+    async expectAllToggleButtonsVisible() {
+        await expect(this.page.locator(this.logsToggle)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(this.visualizeToggle)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(this.buildToggle)).toBeVisible({ timeout: 10000 });
+        testLogger.info('All toggle-group buttons are visible');
+    }
+
+    /**
+     * Expect the stream selector trigger to contain the given text.
+     */
+    async expectStreamSelectorContainsText(text) {
+        const trigger = this.page.locator(this.indexDropDownTrigger).first();
+        await expect(trigger).toBeVisible({ timeout: 10000 });
+        await expect(trigger).toContainText(text, { timeout: 10000 });
+        testLogger.info(`Stream selector contains text: "${text}"`);
+    }
+
+    /**
+     * Expect the live-mode refresh-interval button to be visible,
+     * indicating that live mode / auto-run is currently enabled.
+     */
+    async expectLiveModeStatusVisible() {
+        await expect(this.page.locator(this.liveModeToggleBtn)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Live mode refresh-interval button is visible');
     }
 
     /**

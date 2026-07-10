@@ -17,101 +17,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="alert-history-page"
-    class="p-0 flex"
+    class="w-full h-full flex flex-col min-h-0"
   >
-    <div class="w-full h-full px-2.5 pt-[0.325rem]">
-      <div class="card-container mb-2.5">
-        <div
-          class="flex justify-between w-full h-17 px-2 py-3"
+    <AppPageHeader
+      :title="t('alerts.history')"
+      :back="{ onClick: goBack, dataTest: 'alert-history-back-btn' }"
+      class="shrink-0 px-4 border-b border-border-default"
+    >
+      <template #title>
+        <span data-test="alerts-history-title">{{ t("alerts.history") }}</span>
+      </template>
+      <template #actions>
+        <DateTime
+          ref="dateTimeRef"
+          auto-apply
+          :default-type="dateTimeType"
+          :default-absolute-time="{
+            startTime: absoluteTime.startTime,
+            endTime: absoluteTime.endTime,
+          }"
+          :default-relative-time="relativeTime"
+          data-test="alert-history-date-picker"
+          @on:date-change="updateDateTime"
+        />
+        <OSelect
+          v-model="selectedAlert"
+          :options="filteredAlertOptions"
+          labelKey="label"
+          valueKey="value"
+          @update:model-value="onAlertSelected"
+          :placeholder="t(`alerts.searcHistory`) || 'Select or search alert...'"
+          data-test="alert-history-search-select"
+          class="o2-search-input min-w-62.5"
+          clearable
+          @clear="clearSearch"
         >
-          <div class="flex items-center">
-            <OButton
-              padding="xs"
-              variant="outline"
-              size="icon-sm"
-              icon-left="arrow-back-ios-new"
-              @click="goBack"
-              data-test="alert-history-back-btn"
+          <template #icon-left>
+            <OIcon
+              class="o2-search-input-icon"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-search-input-icon-dark'
+                  : 'o2-search-input-icon-light'
+              "
+              name="search" size="sm"
             />
-            <div
-              class="text-xl tracking-[0.005em] font-semibold ml-2"
-              data-test="alerts-history-title"
-            >
-              {{ t(`alerts.history`) }}
+          </template>
+          <template #empty>
+            <div class="px-3 py-2 text-muted-foreground">
+              No alerts found
             </div>
-          </div>
-          <div class="flex ml-auto items-center">
-            <div class="mr-2">
-              <DateTime
-                ref="dateTimeRef"
-                auto-apply
-                :default-type="dateTimeType"
-                :default-absolute-time="{
-                  startTime: absoluteTime.startTime,
-                  endTime: absoluteTime.endTime,
-                }"
-                :default-relative-time="relativeTime"
-                data-test="alert-history-date-picker"
-                @on:date-change="updateDateTime"
-              />
-            </div>
-            <OSelect
-              v-model="selectedAlert"
-              :options="filteredAlertOptions"
-              labelKey="label"
-              valueKey="value"
-              @update:model-value="onAlertSelected"
-              :placeholder="t(`alerts.searcHistory`) || 'Select or search alert...'"
-              data-test="alert-history-search-select"
-              class="o2-search-input mr-2"
-              style="min-width: 250px"
-              clearable
-              @clear="clearSearch"
-            >
-              <template #icon-left>
-                <OIcon
-                  class="o2-search-input-icon"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'o2-search-input-icon-dark'
-                      : 'o2-search-input-icon-light'
-                  "
-                  name="search" size="sm"
-                />
-              </template>
-              <template #empty>
-                <div class="px-3 py-2 text-muted-foreground">
-                  No alerts found
-                </div>
-              </template>
-            </OSelect>
-            <OButton
-              variant="ghost"
-              icon-left="search"
-              size="icon-sm"
-              @click="manualSearch"
-              data-test="alert-history-manual-search-btn"
-              :disabled="loading"
-              class="mr-2"
-            >
-              <OTooltip :content="t('common.search') || 'Search'" />
-            </OButton>
-            <OButton
-              variant="ghost"
-              size="icon-sm"
-              icon-left="refresh"
-              @click="refreshData"
-              data-test="alert-history-refresh-btn"
-              :loading="loading"
-            >
-              <OTooltip :content="t('common.refresh') || 'Refresh'" />
-            </OButton>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="w-full h-full px-2.5">
-      <div class="alert-history-table card-container h-[calc(100vh-130px)]">
+          </template>
+        </OSelect>
+        <OButton
+          variant="ghost"
+          icon-left="search"
+          size="icon-sm"
+          @click="manualSearch"
+          data-test="alert-history-manual-search-btn"
+          :disabled="loading"
+        >
+          <OTooltip :content="t('common.search') || 'Search'" />
+        </OButton>
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="refresh"
+          @click="refreshData"
+          data-test="alert-history-refresh-btn"
+          :loading="loading"
+        >
+          <OTooltip :content="t('common.refresh') || 'Refresh'" />
+        </OButton>
+      </template>
+    </AppPageHeader>
+    <div class="flex-1 min-h-0 px-2.5 pt-2">
+      <div class="alert-history-table card-container h-full">
         <OTable
           data-test="alert-history-table"
           :data="rows"
@@ -478,6 +459,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from '@/lib/core/Button/OButton.vue';

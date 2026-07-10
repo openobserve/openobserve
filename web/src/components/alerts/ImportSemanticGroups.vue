@@ -21,10 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     test-prefix="semantic-groups"
     :is-importing="isImporting"
     :show-splitter="false"
-    :editor-heights="{
-      urlEditor: 'calc(100vh - 286px)',
-      fileEditor: 'calc(100vh - 308px)',
-    }"
+    container-class=""
+    container-style="height: calc(100vh - var(--navbar-height));"
     @back="handleBack"
     @cancel="handleBack"
     @import="handleImport"
@@ -32,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Full-width content for diff view -->
     <template #full-width-content>
-      <div class="w-full p-2 h-[calc(100vh-140px)] flex flex-col overflow-hidden">
+      <div class="w-full p-2 h-full flex-1 min-h-0 flex flex-col overflow-hidden">
         <!-- Compact Header with File Upload -->
         <div class="card-container p-2 mb-2">
           <div class="flex items-center">

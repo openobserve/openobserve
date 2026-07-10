@@ -45,6 +45,19 @@
           />
         </template>
 
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="score-config-list-refresh-btn"
+            @click="emit('refresh')"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="scoreConfigsRefresh" />
+          </OButton>
+        </template>
+
         <template #empty>
           <div class="flex items-center justify-center py-8">
             <OEmptyState
@@ -88,7 +101,7 @@
         </template>
 
         <template #bottom="{ totalRows }">
-          <span class="o2-table-footer-title text-primary">
+          <span class="o2-table-footer-title">
             {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scoreConfig.listTitle") }}
           </span>
           <OButton
@@ -143,6 +156,9 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -176,6 +192,7 @@ const emit = defineEmits<{
   (e: "open-library"): void;
   (e: "export", row: ScoreConfig): void;
   (e: "export-bulk", ids: string[]): void;
+  (e: "refresh"): void;
 }>();
 
 const { t } = useI18n();
@@ -376,4 +393,8 @@ function dtypeChipClass(dataType: string): string {
   if (dataType === 'boolean') return 'bg-[color-mix(in_srgb,var(--o2-status-success-text)_14%,transparent)] text-(--o2-status-success-text)';
   return '';
 }
+
+useShortcuts([
+  { id: "scoreConfigsRefresh", handler: () => { if (!isInputFocused()) emit("refresh"); } },
+]);
 </script>

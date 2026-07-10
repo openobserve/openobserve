@@ -340,14 +340,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex w-full justify-between items-center py-1"
               >
                 <div
-                  class="o2-table-footer-title flex items-center gap-2 shrink-0"
+                  class="o2-table-footer-title flex items-center shrink-0"
                 >
-                  <span class="text-text-primary">{{
-                    resultTotal || 0
-                  }}</span>
-                  <span class="text-text-secondary">{{
-                    t("dashboard.header")
-                  }}</span>
+                  {{ resultTotal || 0 }} {{ t("dashboard.header") }}
                 </div>
                 <div
                   v-if="selectedIds.length > 0"
@@ -618,14 +613,37 @@ export default defineComponent({
 
     const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } =
       useHomeDashboard();
-    const openHomeDashboard = () => {
+    const openHomeDashboard = async () => {
       if (!homeDashboard.value) return;
+      const org = store.state.selectedOrganization?.identifier;
+      const dashId = homeDashboard.value.dashboardId;
+      const folder = homeDashboard.value.folderId || "default";
+      try {
+        // Confirm the pinned dashboard still resolves before navigating. The GET
+        // is folder-agnostic on the backend, so this both validates existence and
+        // lets the re-synced folder drive the route. A deleted dashboard throws /
+        // returns an empty object — clear the pin instead of routing to a 404.
+        const dash = await getDashboard(store, dashId, folder);
+        if (!dash || typeof dash !== "object" || !(dash as any).title) {
+          throw { response: { status: 404 } };
+        }
+      } catch (e: any) {
+        if (e?.response?.status === 404) {
+          clearHomeDashboard(org);
+          toast({
+            variant: "error",
+            message: t("dashboard.homePinNotFound"),
+          });
+          return;
+        }
+        // Non-404 (e.g. transient error): fall through and attempt navigation.
+      }
       router.push({
         path: "/dashboards/view",
         query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: homeDashboard.value.dashboardId,
-          folder: homeDashboard.value.folderId || "default",
+          org_identifier: org,
+          dashboard: dashId,
+          folder: homeDashboard.value?.folderId || "default",
         },
       });
     };
@@ -669,6 +687,11 @@ export default defineComponent({
     };
     onMounted(() => {
       onDashboardEvent(handleAiDashboardEvent);
+      // Re-read the authoritative home_dashboard setting so the shortcut button
+      // navigates to the pinned dashboard's CURRENT folder even if it was moved
+      // on another system since this tab last loaded.
+      const org = store.state.selectedOrganization?.identifier;
+      if (org) useHomeDashboard().load(org);
     });
     onUnmounted(() => {
       offDashboardEvent(handleAiDashboardEvent);
@@ -1080,6 +1103,9 @@ export default defineComponent({
 
     const deleteDashboard = async () => {
       if (selectedDelete.value) {
+        // Capture before the row reference is cleared — used below to drop a
+        // stale Home pin that pointed at the just-deleted dashboard.
+        const deletedWasHome = isHome(selectedDelete.value.id);
         try {
           //delete dashboard by id and folder id
           await deleteDashboardById(
@@ -1089,7 +1115,18 @@ export default defineComponent({
               ? selectedDelete.value.folder_id
               : (activeFolderId.value ?? "default"),
           );
-          showPositiveNotification("Dashboard deleted successfully.");
+          showPositiveNotification(
+            deletedWasHome
+              ? t("dashboard.pinnedDeletedPinRemoved")
+              : t("dashboard.deletedSuccessfully"),
+          );
+          // The backend clears the home_dashboard setting on delete; re-read it
+          // so the Home shortcut button / pin state updates immediately instead
+          // of lingering until the next navigation.
+          if (deletedWasHome) {
+            const org = store.state.selectedOrganization?.identifier;
+            if (org) useHomeDashboard().load(org);
+          }
         } catch (err) {
           showErrorNotification(err?.message ?? "Dashboard deletion failed", {
           });
@@ -1307,6 +1344,13 @@ export default defineComponent({
           return;
         }
 
+        // Did this batch include the Home-pinned dashboard? Captured before the
+        // delete so we can refresh the pin state afterwards (the backend clears
+        // the home_dashboard setting when the pinned dashboard is deleted).
+        const bulkIncludedHome = selectedDashboardIds.value.some((id: string) =>
+          isHome(id),
+        );
+
         // Extract dashboard ids
         const payload = {
           ids: selectedDashboardIds.value,
@@ -1357,6 +1401,12 @@ export default defineComponent({
         selectedIds.value = [];
         // Refresh dashboards
         await getDashboards(store, activeFolderId.value);
+        // If the pinned dashboard was in the batch, re-read the (now cleared)
+        // home_dashboard setting so the Home shortcut/pin updates immediately.
+        if (bulkIncludedHome) {
+          const org = store.state.selectedOrganization?.identifier;
+          if (org) await useHomeDashboard().load(org);
+        }
       } catch (error: any) {
         dismiss();
         console.error("Error deleting dashboards:", error);
