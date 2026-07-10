@@ -102,7 +102,7 @@ pub trait AggFunc: Sync {
 /// }
 /// let results = acc.evaluate();
 /// ```
-pub trait Accumulate: Sync {
+pub trait Accumulate: Send + Sync {
     /// Adds a sample to this accumulator.
     ///
     /// This method is called for each sample that should be included in the aggregation.
@@ -113,6 +113,19 @@ pub trait Accumulate: Sync {
     ///
     /// * `sample` - The sample to accumulate, containing a timestamp and value
     fn accumulate(&mut self, sample: &Sample);
+
+    /// Folds another accumulator of the same type into this one, as if all of
+    /// its samples had been accumulated here. Lets a large group be
+    /// aggregated in parallel chunks whose partials are merged at the end.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `other` is a different accumulator type.
+    fn merge(&mut self, other: Box<dyn Accumulate>);
+
+    /// Upcast used by [`Self::merge`] implementations to downcast `other` to
+    /// their own concrete type.
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any>;
 
     /// Computes and returns the final aggregated results.
     ///
@@ -170,6 +183,9 @@ pub(crate) fn group_series_by_labels(
 
     groups
 }
+
+/// Series per parallel partial-aggregation chunk when a single group is large.
+const AGG_PARALLEL_CHUNK: usize = 32768;
 
 /// Processes Matrix input for range queries using the AggFunc trait pattern
 pub(crate) fn eval_aggregate<F>(
@@ -262,16 +278,36 @@ where
             // Get the labels for this group (from the first series in the group)
             let labels = series_label_hashes[series_indices[0]].1.clone();
 
-            let mut acc = func.build();
-            // Aggregate samples from all series in this group
-            for &series_idx in series_indices {
-                for sample in &matrix[series_idx].samples {
-                    // Only include timestamps that are in eval_timestamps
-                    if eval_timestamps.contains(&sample.timestamp) {
-                        acc.accumulate(sample);
+            let accumulate_chunk = |chunk: &[usize]| {
+                let mut acc = func.build();
+                for &series_idx in chunk {
+                    for sample in &matrix[series_idx].samples {
+                        // Only include timestamps that are in eval_timestamps
+                        if eval_timestamps.contains(&sample.timestamp) {
+                            acc.accumulate(sample);
+                        }
                     }
                 }
-            }
+                acc
+            };
+
+            // A huge group (e.g. `sum(...)` without a modifier puts every
+            // series in one group) would otherwise aggregate on one thread;
+            // fold it in parallel chunks and merge the partials.
+            let acc = if series_indices.len() >= 2 * AGG_PARALLEL_CHUNK {
+                series_indices
+                    .par_chunks(AGG_PARALLEL_CHUNK)
+                    .map(accumulate_chunk)
+                    .reduce(
+                        || func.build(),
+                        |mut a, b| {
+                            a.merge(b);
+                            a
+                        },
+                    )
+            } else {
+                accumulate_chunk(series_indices)
+            };
 
             // Evaluate the aggregated results
             let mut samples = acc.evaluate();
@@ -331,6 +367,48 @@ mod tests {
         assert!(result.iter().any(|l| l.name == "instance"));
         assert!(result.iter().any(|l| l.name == "job"));
         assert!(!result.iter().any(|l| l.name == "__name__"));
+    }
+
+    #[test]
+    fn test_accumulate_merge_matches_sequential() {
+        use super::{avg::Avg, count::Count, group::Group, max::Max, min::Min, sum::Sum};
+
+        // Integer values keep float addition exact regardless of order.
+        let part_a = [(1000, 3.0), (2000, 5.0), (1000, 7.0)];
+        let part_b = [(2000, 11.0), (3000, 2.0), (1000, 4.0)];
+
+        let funcs: Vec<Box<dyn AggFunc>> = vec![
+            Box::new(Sum),
+            Box::new(Count),
+            Box::new(Min),
+            Box::new(Max),
+            Box::new(Avg),
+            Box::new(Group),
+        ];
+        for func in funcs {
+            let mut sequential = func.build();
+            let mut acc_a = func.build();
+            let mut acc_b = func.build();
+            for &(ts, v) in part_a.iter() {
+                sequential.accumulate(&Sample::new(ts, v));
+                acc_a.accumulate(&Sample::new(ts, v));
+            }
+            for &(ts, v) in part_b.iter() {
+                sequential.accumulate(&Sample::new(ts, v));
+                acc_b.accumulate(&Sample::new(ts, v));
+            }
+            acc_a.merge(acc_b);
+
+            let mut expected = sequential.evaluate();
+            let mut merged = acc_a.evaluate();
+            expected.sort_by_key(|s| s.timestamp);
+            merged.sort_by_key(|s| s.timestamp);
+            assert_eq!(expected.len(), merged.len(), "{}", func.name());
+            for (e, m) in expected.iter().zip(merged.iter()) {
+                assert_eq!(e.timestamp, m.timestamp, "{}", func.name());
+                assert_eq!(e.value, m.value, "{}", func.name());
+            }
+        }
     }
 
     #[test]

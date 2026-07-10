@@ -67,6 +67,17 @@ impl Accumulate for SumAccumulate {
         *entry += sample.value;
     }
 
+    fn merge(&mut self, other: Box<dyn Accumulate>) {
+        let other = other.into_any().downcast::<Self>().expect("same type");
+        for (timestamp, value) in other.sum {
+            *self.sum.entry(timestamp).or_insert(0.0) += value;
+        }
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
+    }
+
     fn evaluate(self: Box<Self>) -> Vec<Sample> {
         self.sum
             .into_iter()

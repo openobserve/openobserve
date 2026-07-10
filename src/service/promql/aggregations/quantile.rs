@@ -95,6 +95,17 @@ impl Accumulate for QuantileAccumulate {
         entry.push(sample.value);
     }
 
+    fn merge(&mut self, other: Box<dyn Accumulate>) {
+        let other = other.into_any().downcast::<Self>().expect("same type");
+        for (timestamp, values) in other.values {
+            self.values.entry(timestamp).or_default().extend(values);
+        }
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
+    }
+
     fn evaluate(self: Box<Self>) -> Vec<Sample> {
         self.values
             .into_iter()
