@@ -23,7 +23,7 @@ import { describe, it, expect } from "vitest";
 import { defineComponent } from "vue";
 import { z } from "zod";
 import StreamFieldInputs from "./StreamFieldInputs.vue";
-import { streamFieldRowSchema } from "./StreamFieldInputs.schema";
+import { makeStreamFieldRowSchema } from "./StreamFieldInputs.schema";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -33,7 +33,7 @@ import { createStore } from "vuex";
 import i18n from "@/locales";
 
 const harnessSchema = z.object({
-  fields: z.array(streamFieldRowSchema).default([]),
+  fields: z.array(makeStreamFieldRowSchema(i18n.global.t)).default([]),
 });
 
 const store = createStore({ state: { theme: "dark" } });
@@ -269,14 +269,14 @@ describe("StreamFieldInputs (form-mode)", () => {
       await flushPromises();
 
       // Nothing validates before the first submit.
-      expect(wrapper.text()).not.toContain("Field name is required");
+      expect(wrapper.text()).not.toContain("Field is required!");
 
       await getForm(wrapper).handleSubmit();
       await flushPromises();
 
       expect(getForm(wrapper).state.isValid).toBe(false);
-      expect(wrapper.text()).toContain("Field name is required");
-      expect(wrapper.text()).toContain("Data type is required");
+      expect(wrapper.text()).toContain("Field is required!");
+      expect(wrapper.text()).toContain("Data Type is required!");
     });
 
     it("rejects a row name with disallowed characters", async () => {
@@ -289,6 +289,25 @@ describe("StreamFieldInputs (form-mode)", () => {
       await flushPromises();
 
       expect(getForm(wrapper).state.isValid).toBe(false);
+    });
+
+    // Regression: a schema `.trim()` would let a surrounding space PASS (the
+    // regex judges the trimmed copy) while OForm saves the RAW row value. The
+    // schema validates the RAW value (no `.trim()`), so " my_field " is rejected
+    // by the character rule — mirroring `main` and the scalar `name` fix.
+    it("rejects a row name with surrounding whitespace", async () => {
+      const wrapper = makeHarness([
+        { uuid: "1", name: " my_field ", type: "Utf8", index_type: [] },
+      ]);
+      await flushPromises();
+
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      expect(getForm(wrapper).state.isValid).toBe(false);
+      expect(wrapper.text()).toContain(
+        "Use alphanumeric characters, underscore and colon only.",
+      );
     });
 
     it("passes when every row has a valid name + type", async () => {

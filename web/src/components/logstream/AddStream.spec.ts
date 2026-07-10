@@ -354,10 +354,10 @@ describe("AddStream", () => {
       await flushPromises();
 
       // Nothing validates before the first submit.
-      expect(wrapper.text()).not.toContain("Field is required!");
+      expect(wrapper.text()).not.toContain("Stream name is required");
 
       await submit(wrapper);
-      expect(wrapper.text()).toContain("Field is required!");
+      expect(wrapper.text()).toContain("Stream name is required");
     });
 
     it("creates the stream when name + type are valid", async () => {

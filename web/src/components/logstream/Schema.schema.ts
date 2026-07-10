@@ -9,7 +9,7 @@
 // and just normalized field names at save time. To preserve that exact behavior
 // (the save is NOT blocked; loose/empty names are accepted and normalized), this
 // row schema carries NO required/regex rules. (AddStream, which DID enforce its
-// rows before, keeps the strict `streamFieldRowSchema` instead.)
+// rows before, keeps the strict `makeStreamFieldRowSchema(t)` instead.)
 
 import { z } from "zod";
 

@@ -190,6 +190,7 @@ const store = useStore();
 // stream-type half of the condition is read from the form in superRefine.
 const addStreamSchema = makeAddStreamSchema(
   !!(store.state.zoConfig.data_retention_days || false),
+  t,
 );
 
 // Rule ③ OWNER pattern: this component OWNS <OForm> and must read form state

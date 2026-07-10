@@ -6,25 +6,28 @@
 // exception until OForm gains first-class field-array support), so it is NOT
 // modelled here.
 //
-// Restored from the Quasar BEFORE baseline (complete-quasar-validation-inventory):
-//   • name              → `!!v.trim() || 'Field is required!'` (required) plus the
-//                         live `/^[a-zA-Z0-9_:]+$/` character rule. Encoded WITHOUT
-//                         a schema `.trim()` (see the field note below): the regex
+// Restored from the Quasar BEFORE baseline (complete-quasar-validation-inventory),
+// with the required messages now i18n-driven (pass useI18n's `t`) to match every
+// other schema in this migration AND PR #13077's AddStream.vue keys:
+//   • name              → required (`logStream.streamNameRequired`) plus the live
+//                         `/^[a-zA-Z0-9_:]+$/` character rule. Encoded WITHOUT a
+//                         schema `.trim()` (see the field note below): the regex
 //                         rejects any whitespace on the RAW value, matching `main`,
 //                         which rejected — never silently stripped — dirty names.
-//   • stream_type       → `!!v || 'Field is required!'` (required).
-//   • dataRetentionDays → `v > 0 || 'Field is required!'` (numeric > 0), but
-//                         ONLY when the retention field is actually shown
-//                         (data_retention_days configured AND not an
-//                         enrichment_tables stream) — encoded conditionally in
-//                         superRefine, since `showDataRetention` also depends on
-//                         org config the schema can't read.
+//   • stream_type       → required (`logStream.streamTypeRequired`).
+//   • dataRetentionDays → numeric > 0 (`logStream.dataRetentionMin` — a 0/negative
+//                         value IS entered but rejected, so "required" would be
+//                         misleading; state the actual rule), but ONLY when the
+//                         retention field is actually shown (data_retention_days
+//                         configured AND not an enrichment_tables stream) — encoded
+//                         conditionally in superRefine, since `showDataRetention`
+//                         also depends on org config the schema can't read.
 //
 // Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
 // this file only describes WHAT is valid.
 
 import { z } from "zod";
-import { streamFieldRowSchema } from "./StreamFieldInputs.schema";
+import { makeStreamFieldRowSchema } from "./StreamFieldInputs.schema";
 
 // Allowed characters mirror the backend `format_stream_name` regex
 // (src/config/src/utils/schema.rs): alphanumeric, underscore and colon only.
@@ -38,8 +41,13 @@ export const streamNameHelpText =
  * @param retentionEnabled whether the org has `data_retention_days` configured
  *   (the org-config half of `showDataRetention`). The stream-type half
  *   (`!== 'enrichment_tables'`) is read from the form value in superRefine.
+ * @param t useI18n's `t`, so required messages resolve from the shared
+ *   `logStream.*` keys (also used by PR #13077's AddStream.vue).
  */
-export const makeAddStreamSchema = (retentionEnabled: boolean) =>
+export const makeAddStreamSchema = (
+  retentionEnabled: boolean,
+  t: (_key: string) => string,
+) =>
   z
     .object({
       // NO schema `.trim()`: OForm/TanStack uses the schema to VALIDATE but saves
@@ -50,9 +58,9 @@ export const makeAddStreamSchema = (retentionEnabled: boolean) =>
       // rejects ANY whitespace (leading/trailing/only), exactly as `main` did.
       name: z
         .string()
-        .min(1, "Field is required!")
+        .min(1, t("logStream.streamNameRequired"))
         .regex(streamNameRegex, streamNameHelpText),
-      stream_type: z.string().min(1, "Field is required!"),
+      stream_type: z.string().min(1, t("logStream.streamTypeRequired")),
       // number <input> can emit a string — coerce. The "> 0" rule is
       // conditional (see superRefine) so a hidden retention field never blocks.
       dataRetentionDays: z.coerce.number().optional(),
@@ -60,9 +68,10 @@ export const makeAddStreamSchema = (retentionEnabled: boolean) =>
       // control; kept optional so it round-trips cleanly through the form.
       index_type: z.array(z.any()).optional().default([]),
       // Dynamic "Add Field" rows, now owned by the form (StreamFieldInputs is
-      // form-mode). Each row is validated by streamFieldRowSchema; an empty draft
-      // row therefore blocks submit with per-row errors.
-      fields: z.array(streamFieldRowSchema).default([]),
+      // form-mode). Each row is validated by the row schema (built with the same
+      // `t` so its messages are i18n-driven too); an empty draft row therefore
+      // blocks submit with per-row errors.
+      fields: z.array(makeStreamFieldRowSchema(t)).default([]),
     })
     .superRefine((val, ctx) => {
       if (retentionEnabled && val.stream_type !== "enrichment_tables") {
@@ -70,7 +79,7 @@ export const makeAddStreamSchema = (retentionEnabled: boolean) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["dataRetentionDays"],
-            message: "Field is required!",
+            message: t("logStream.dataRetentionMin"),
           });
         }
       }
