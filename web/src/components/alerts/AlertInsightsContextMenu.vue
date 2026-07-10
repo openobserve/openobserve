@@ -16,53 +16,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="context-menu tw:fixed tw:z-9999 tw:min-w-55 tw:overflow-hidden tw:bg-white tw:border tw:border-(--o2-border) tw:rounded-md tw:shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
-    :class="store.state.theme === 'dark' ? 'dark-theme tw:bg-[#2d2d2d] tw:border-[#444] tw:shadow-[0_4px_12px_rgba(0,0,0,0.4)]' : 'light-theme'"
+    class="context-menu fixed z-9999 min-w-55 overflow-hidden bg-white border border-(--o2-border) rounded-md shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
+    :class="store.state.theme === 'dark' ? 'dark-theme bg-[#2d2d2d] border-[#444] shadow-[0_4px_12px_rgba(0,0,0,0.4)]' : 'light-theme'"
     :style="{ top: `${y}px`, left: `${x}px` }"
     @click.stop
     data-test="alert-insights-context-menu"
   >
-    <div class="menu-header tw:px-4 tw:py-2 tw:text-xs tw:font-semibold tw:bg-[#f5f5f5] tw:text-[#666]" :class="store.state.theme === 'dark' ? 'tw:bg-[#1e1e1e] tw:text-[#aaa]' : ''">
+    <div class="menu-header px-4 py-2 text-xs font-semibold bg-[#f5f5f5] text-[#666]" :class="store.state.theme === 'dark' ? 'bg-[#1e1e1e] text-[#aaa]' : ''">
       {{ isAlertNameContext ? value : panelTitle }}
     </div>
     <OSeparator />
 
     <!-- Alert-specific actions (shown for Dedup and similar panels) -->
     <template v-if="isAlertNameContext">
-      <div class="menu-section tw:py-1 tw:px-0">
+      <div class="menu-section py-1 px-0">
         <div
-          class="menu-item tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm"
+          class="menu-item flex items-center py-2 px-4 cursor-pointer [transition:background-color_0.2s] text-sm"
           @click="configureDedupForAlert"
           data-test="context-menu-configure-dedup"
         >
-          <OIcon name="tune" size="sm" class="tw:mr-2" />
+          <OIcon name="tune" size="sm" class="mr-2" />
           <span>Configure Dedup</span>
         </div>
         <div
-          class="menu-item tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm"
+          class="menu-item flex items-center py-2 px-4 cursor-pointer [transition:background-color_0.2s] text-sm"
           @click="editAlert"
           data-test="context-menu-edit-alert"
         >
-          <OIcon name="edit" size="sm" class="tw:mr-2" />
+          <OIcon name="edit" size="sm" class="mr-2" />
           <span>Edit Alert</span>
         </div>
         <div
-          class="menu-item tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm"
+          class="menu-item flex items-center py-2 px-4 cursor-pointer [transition:background-color_0.2s] text-sm"
           @click="viewAlertHistory"
           data-test="context-menu-view-history"
         >
-          <OIcon name="history" size="sm" class="tw:mr-2" />
+          <OIcon name="history" size="sm" class="mr-2" />
           <span>View Alert History</span>
         </div>
       </div>
       <OSeparator />
-      <div class="menu-section tw:py-1 tw:px-0">
+      <div class="menu-section py-1 px-0">
         <div
-          class="menu-item tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm"
+          class="menu-item flex items-center py-2 px-4 cursor-pointer [transition:background-color_0.2s] text-sm"
           @click="$emit('close')"
           data-test="context-menu-cancel"
         >
-          <OIcon name="close" size="sm" class="tw:mr-2" />
+          <OIcon name="close" size="sm" class="mr-2" />
           <span>Cancel</span>
         </div>
       </div>

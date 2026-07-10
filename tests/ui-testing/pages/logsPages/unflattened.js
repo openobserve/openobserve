@@ -243,10 +243,15 @@ class UnflattenedPage {
         await this.page
             .locator('[data-test="logs-search-result-detail-dialog"][data-state="open"]')
             .waitFor({ state: 'visible', timeout: 10000 });
-        // JSON content renders asynchronously after the drawer opens.
-        // Hard wait gives Vue time to populate the field list before callers
-        // probe for specific keys like _o2_id.
-        await this.page.waitForTimeout(3000);
+        // JSON content renders asynchronously after the drawer opens. Wait for the
+        // first detail key to actually render instead of a fixed 3s sleep — the keys
+        // appearing IS the signal callers need before probing for _o2_id, and the
+        // fixed sleep made findRowWithO2Id's 15-row scan cost ~1.5 minutes per
+        // attempt (the dominant share of the 5-minute-timeout flake on CI).
+        await this.allLogDetailKeys
+            .first()
+            .waitFor({ state: 'visible', timeout: 10000 })
+            .catch(() => {});
     }
 
     /**
@@ -314,7 +319,11 @@ class UnflattenedPage {
      */
     async waitForO2IdQueryable({ streamName = 'e2e_automate', timeout = 90000, pollInterval = 2000 } = {}) {
         const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
-        const baseUrl = (process.env.ZO_BASE_URL || '').replace(/\/$/, '');
+        // Prefer INGESTION_URL like waitForStreamAvailable does: on CI both point at the
+        // same server, but in local setups ZO_BASE_URL can be a frontend dev server that
+        // does not serve /api/* (it returns an HTML hint page with HTTP 200, which made
+        // this gate silently poll uselessly for its entire budget).
+        const baseUrl = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || '').replace(/\/$/, '');
         const orgId = getOrgIdentifier();
         const headers = getAuthHeaders();
         const deadline = Date.now() + timeout;
@@ -342,8 +351,14 @@ class UnflattenedPage {
                     }
                 );
                 if (resp.ok()) {
-                    const body = await resp.json().catch(() => ({}));
-                    const hits = Array.isArray(body.hits) ? body.hits : [];
+                    const body = await resp.json().catch(() => null);
+                    if (body === null) {
+                        // HTTP 200 but not JSON — almost certainly the wrong endpoint
+                        // (e.g. a frontend dev server). Surface it instead of silently
+                        // burning the whole gate budget.
+                        console.warn('waitForO2IdQueryable: response OK but not JSON — wrong endpoint? (will retry)');
+                    }
+                    const hits = Array.isArray(body?.hits) ? body.hits : [];
                     if (hits.some((h) => h && Object.prototype.hasOwnProperty.call(h, '_o2_id'))) {
                         return true;
                     }

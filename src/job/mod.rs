@@ -613,11 +613,62 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(service_graph::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(incidents::run());
-    // Register anomaly detection callbacks on every node.  The HTTP handlers
-    // for /retrain and /trigger can land on any node (querier, ingester, etc.),
-    // not just the alert_manager, so all nodes need the callbacks available.
+    // Register enterprise callbacks on every node. HTTP/background work can land on
+    // querier, ingester, or alert_manager nodes, so callbacks must be available everywhere.
     #[cfg(feature = "enterprise")]
     {
+        o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_score_writer(
+            |org_id, records| {
+                Box::pin(async move {
+                    if records.is_empty() {
+                        return Ok(());
+                    }
+
+                    crate::service::self_reporting::ensure_llm_scores_stream_initialized(&org_id)
+                        .await
+                        .map_err(|e| anyhow::anyhow!(e))?;
+
+                    let req = proto::cluster_rpc::IngestionRequest {
+                        org_id: org_id.clone(),
+                        stream_name: config::meta::self_reporting::llm_scores::LLM_SCORES_STREAM
+                            .to_string(),
+                        stream_type: config::meta::stream::StreamType::Logs.to_string(),
+                        data: Some(proto::cluster_rpc::IngestionData::from(records)),
+                        ingestion_type: Some(proto::cluster_rpc::IngestionType::Json.into()),
+                        metadata: None,
+                    };
+
+                    match crate::service::ingestion::ingestion_service::ingest(req).await {
+                        Ok(resp) if resp.status_code == 200 => Ok(()),
+                        Ok(resp) => Err(anyhow::anyhow!(
+                            "_llm_scores ingestion failed with status {}: {}",
+                            resp.status_code,
+                            resp.message
+                        )),
+                        Err(e) => Err(anyhow::anyhow!(e)),
+                    }
+                })
+            },
+        );
+
+        o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_evaluator_trace_exporter(
+            |org_id, traces, node_idx| {
+                Box::pin(async move {
+                    if let Err(e) = crate::service::self_reporting::ensure_evaluator_stream_initialized(&org_id).await {
+                        log::warn!(
+                            "[Pipeline]: LLM evaluation node {node_idx} failed to ensure _evaluator stream initialized for {org_id}: {e}"
+                        );
+                    }
+                    crate::service::llm_evaluations::evaluator_trace_exporter::EvaluatorTraceExporter::export(
+                        &org_id,
+                        traces,
+                        node_idx,
+                    )
+                    .await;
+                })
+            },
+        );
+
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_query_executor(
             |org_id, sql, start, end, cfg_id, stream_type| {
                 Box::pin(async move {
@@ -751,7 +802,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(alert_grouping::process_expired_batches());
     tokio::task::spawn(file_downloader::run());
     // Note: Service discovery extraction runs automatically during parquet file processing
-    // See src/job/files/parquet.rs:queue_services_from_parquet for implementation
+    // See src/job/files/parquet.rs:queue_services_from_data_file for implementation
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(
         "service_streams_batch_processor",

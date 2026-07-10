@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex wrap tw:justify-start tw:items-center"
+    class="flex wrap justify-start items-center"
     :class="[
-      defocusSpan ? 'tw:opacity-30' : '',
-      store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white',
+      defocusSpan ? 'opacity-30' : '',
+      store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white',
     ]"
     :style="{
       zIndex: 2,
@@ -28,8 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="span-block-container"
   >
     <div
-      class="tw:flex tw:justify-between tw:items-end tw:cursor-pointer span-block relative-position"
-      :class="[store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white']"
+      class="flex justify-between items-end cursor-pointer span-block relative-position"
+      :class="[store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white']"
       :style="{
         height: spanDimensions.height + 'px',
         width: '100%',
@@ -45,8 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           width: '100%',
           overflow: 'hidden',
         }"
-        class="tw:cursor-pointer tw:flex tw:items-center tw:flex-nowrap position-relative"
-        :class="defocusSpan ? 'tw:opacity-30' : ''"
+        class="cursor-pointer flex items-center flex-nowrap position-relative"
+        :class="defocusSpan ? 'opacity-30' : ''"
         @click="selectSpan(span.spanId)"
         data-test="span-block-select-trigger"
       >
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             left: leftPosition + '%',
             position: 'relative',
           }"
-          class="tw:flex tw:justify-start tw:items-center tw:flex-nowrap"
+          class="flex justify-start items-center flex-nowrap"
           ref="spanMarkerRef"
           data-test="span-marker"
         >
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             transition: 'all 0.5s ease',
             zIndex: 1,
           }"
-          class="tw:text-xs tw:flex tw:items-center"
+          class="text-xs flex items-center"
           data-test="span-block-duration"
         >
           <div>
@@ -105,7 +105,6 @@ import { getImageURL, formatTimeWithSuffix } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { b64EncodeStandard } from "@/utils/zincutils";
-import { useRouter } from "vue-router";
 
 export default defineComponent({
   name: "SpanBlock",
@@ -158,7 +157,6 @@ export default defineComponent({
     });
 
     const durationStyle = ref({});
-    const router = useRouter();
     const { t } = useI18n();
 
     const leftPosition = ref(0);
@@ -189,21 +187,12 @@ export default defineComponent({
 
     onMounted(async () => {
       durationStyle.value = getDurationStyle();
-      const params = router.currentRoute.value.query;
-      const spanId = Array.isArray(params.span_id)
-        ? params.span_id[0]
-        : params.span_id; // Ensure it's a single string
 
-      if (spanId) {
-        const element = document.getElementById(spanId);
-        if (element) {
-          element.scrollIntoView({
-            behavior: "smooth", // Smooth scrolling
-            block: "center", // Attempt to align the element at the center of the screen
-            inline: "nearest", // Keep horizontal alignment as close as possible
-          });
-        }
-      }
+      // NOTE: do NOT scroll the pre-selected span into view here. Rows are
+      // virtualized, so a SpanBlock remounts every time it scrolls into the
+      // viewport — doing scrollIntoView on each mount snapped the view back to
+      // the URL's span_id and fought the user's scroll. Centering the
+      // pre-selected span is owned by TraceTree (virtualizer scrollToIndex).
 
       if (spanBlock.value) {
         _resizeObserver = new ResizeObserver(() => {

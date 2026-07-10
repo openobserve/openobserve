@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="eval-template-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
+    class="flex flex-col h-full min-h-0"
   >
     <!-- Standard section header: title + section tabs + actions. -->
     <AppPageHeader
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       icon="fact-check"
       :subtitle="'Reusable scoring templates for LLM evaluations'"
       tabs-below
-      class="tw:shrink-0 tw:px-4"
+      class="shrink-0 px-4"
     >
       <template #title>
         <span data-test="eval-template-list-title">{{ t("evalTemplate.header") }}</span>
@@ -34,14 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <PipelineSectionTabs />
       </template>
       <template #actions>
-        <OButton
-          data-test="eval-template-list-refresh-btn"
-          variant="outline"
-          size="sm"
-          @click="loadTemplates"
-        >
-          {{ t('common.refresh') }}
-        </OButton>
         <OButton
           data-test="eval-template-list-add-btn"
           variant="primary"
@@ -54,8 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </AppPageHeader>
 
     <!-- Table area -->
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+    <div class="w-full flex-1 min-h-0 overflow-hidden">
+      <div class="card-container h-full">
         <OTable
           :frame="false"
           data-test="eval-template-list-table"
@@ -75,17 +67,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :persist-columns="true"
           table-id="pipelines-evaluation-templates"
           width="100%"
-          class="tw:w-full tw:h-full"
+          class="w-full h-full"
         >
           <template #toolbar>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+            <div class="flex items-center gap-2 w-full">
               <OSearchInput
                 data-test="eval-template-list-search-input"
                 v-model="filterQuery"
-                class="tw:flex-1"
+                class="flex-1"
                 :placeholder="t('evalTemplate.search')"
               />
             </div>
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="isLoading"
+              data-test="eval-template-list-refresh-btn"
+              @click="loadTemplates"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="evalTemplatesRefresh" />
+            </OButton>
           </template>
           <!-- Version column -->
           <template #cell-version="{ row }">
@@ -94,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Actions column -->
           <template #cell-actions="{ row }">
-            <div class="tw:flex tw:items-center tw:justify-center actions-container">
+            <div class="flex items-center justify-center actions-container">
               <OButton
                 :data-test="`eval-template-list-${row.name}-edit-btn`"
                 data-row-action="edit"
@@ -131,10 +135,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Pagination footer -->
           <template #bottom="bottomProps">
             <div
-              class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2"
+              class="flex items-center justify-between w-full py-2"
             >
               <div
-                class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4"
+                class="flex items-center o2-table-footer-title mr-4"
               >
                 {{ bottomProps.totalRows }} {{ t("evalTemplate.header") }}
               </div>
@@ -188,9 +192,12 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { evalTemplateService } from "@/services/eval-template.service";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 interface Template {
   id: string;
@@ -405,5 +412,9 @@ const bulkDeleteTemplates = async () => {
 onBeforeMount(async () => {
   await loadTemplates();
 });
+
+useShortcuts([
+  { id: "evalTemplatesRefresh", handler: () => { if (!isInputFocused()) loadTemplates(); } },
+]);
 </script>
 

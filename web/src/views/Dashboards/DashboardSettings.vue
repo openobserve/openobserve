@@ -23,15 +23,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
   <div
     data-test="dashboard-settings-main-container"
-    class="tw:p-0"
-    :class="store.state.theme == 'dark' ? 'dark-mode tw:bg-surface-panel' : 'tw:bg-white'"
-    style="min-height: inherit"
+    class="p-0"
+    :class="store.state.theme == 'dark' ? 'dark-mode bg-surface-panel' : 'bg-white'"
+    style="min-height: inherit; height: 100%"
   >
 
     <OSplitter
       v-model="splitterModel"
       unit="px"
-      style="height: calc(100vh - 65px)"
+      style="height: 100%"
       disabled
     >
       <template v-slot:before>
@@ -44,41 +44,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="generalSettings"
               icon="settings"
               :label="t('dashboard.generalSettings')"
-              class="tw:justify-start tw:py-0 tw:capitalize"
+              class="justify-start py-0 capitalize"
               data-test="dashboard-settings-general-tab"
             />
             <OTab
               name="variableSettings"
               icon="data-array"
               :label="t('dashboard.variableSettings')"
-              class="tw:justify-start tw:py-0 tw:capitalize"
+              class="justify-start py-0 capitalize"
               data-test="dashboard-settings-variable-tab"
             />
             <OTab
               name="tabSettings"
               icon="tab"
               :label="t('dashboard.tabSettings')"
-              class="tw:justify-start tw:py-0 tw:capitalize"
+              class="justify-start py-0 capitalize"
               data-test="dashboard-settings-tab-tab"
             />
           </OTabs>
         </div>
       </template>
       <template v-slot:after>
-        <div class="scroll">
+        <div class="scroll settings-content-scroll">
           <OTabPanels
             v-model="activeTab"
             animated
           >
-            <OTabPanel name="generalSettings" class="tw:!p-0" data-test="general-tab-panels-default">
+            <OTabPanel name="generalSettings" class="!p-0" data-test="general-tab-panels-default">
               <GeneralSettings @save="refreshRequired" @close="$emit('close')" />
             </OTabPanel>
 
-            <OTabPanel name="variableSettings" class="tw:!p-0" data-test="variable-tab-panels-default">
+            <OTabPanel name="variableSettings" class="!p-0" data-test="variable-tab-panels-default">
               <VariableSettings @save="refreshRequired" />
             </OTabPanel>
 
-            <OTabPanel name="tabSettings" class="tw:!p-0" data-test="tab-tab-panels-default">
+            <OTabPanel name="tabSettings" class="!p-0" data-test="tab-tab-panels-default">
               <TabsSettings @refresh="refreshRequired" />
             </OTabPanel>
           </OTabPanels>
@@ -167,5 +167,14 @@ export default defineComponent({
 
 .o-splitter__separator {
   display: none !important;
+}
+
+/* Let the settings tab content fill the splitter's full height so panels with a
+   sticky footer (e.g. Add Variable) can pin it to the bottom instead of leaving
+   dead space when the form is shorter than the drawer. */
+.settings-content-scroll,
+.settings-content-scroll > .o-tab-panels,
+.settings-content-scroll > .o-tab-panels > .o-tab-panel {
+  height: 100%;
 }
 </style>

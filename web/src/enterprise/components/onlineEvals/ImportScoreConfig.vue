@@ -18,30 +18,30 @@ the Free Software Foundation, either version 3 of the License, or
     @import="importJson"
   >
     <template #output-content>
-      <div class="tw:w-full" style="min-width: 380px">
+      <div class="w-full h-full flex flex-col" style="min-width: 380px">
         <div
           v-if="errors.length"
-          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
+          class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0"
           data-test="score-config-import-errors-title"
         >
           {{ t("onlineEvals.scoreConfig.import.errors.title") }}
         </div>
         <div
           v-else
-          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
+          class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0"
           data-test="score-config-import-output-title"
         >
           {{ t("onlineEvals.scoreConfig.import.outputMessages") }}
         </div>
-        <OSeparator class="tw:mx-4 tw:mt-4" />
+        <OSeparator class="mt-1 shrink-0" />
 
-        <div class="tw:overflow-auto">
-          <div v-if="errors.length" class="tw:p-2.5 tw:mb-2.5">
+        <div class="flex-1 min-h-0 overflow-auto">
+          <div v-if="errors.length" class="p-2.5 mb-2.5">
             <div class="error-list">
               <div
                 v-for="(err, errIdx) in errors"
                 :key="`${err.itemIndex}-${err.field}-${errIdx}`"
-                class="tw:py-1.25 tw:text-sm"
+                class="py-1.25 text-sm"
                 :data-test="`score-config-import-error-${err.itemIndex}-${err.field}`"
               >
                 <span
@@ -50,7 +50,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="score-config-import-name-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 320px">
                     <OInput
                       :data-test="`score-config-import-name-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
@@ -66,7 +66,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="score-config-import-name-conflict-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 320px">
                     <OInput
                       :data-test="`score-config-import-rename-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
@@ -82,7 +82,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="score-config-import-datatype-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 320px">
                     <OSelect
                       :data-test="`score-config-import-datatype-select-${err.itemIndex}`"
                       v-model="dataTypeFixers[err.itemIndex]"
@@ -99,7 +99,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="score-config-import-numeric-range-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1 tw:flex tw:gap-2" style="width: 320px">
+                  <div class="mt-1 flex gap-2" style="width: 320px">
                     <OInput
                       :data-test="`score-config-import-min-input-${err.itemIndex}`"
                       v-model="numericRangeFixers[err.itemIndex].min"
@@ -123,7 +123,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="score-config-import-categories-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 320px">
                     <OInput
                       :data-test="`score-config-import-categories-input-${err.itemIndex}`"
                       v-model="categoriesFixers[err.itemIndex]"
@@ -139,8 +139,8 @@ the Free Software Foundation, either version 3 of the License, or
             </div>
           </div>
 
-          <div v-if="creators.length" class="tw:p-2.5 tw:mb-2.5">
-            <div class="tw:text-base tw:mb-2.5 tw:uppercase text-primary" data-test="score-config-import-creation-title">
+          <div v-if="creators.length" class="p-2.5 mb-2.5">
+            <div class="text-base mb-2.5 uppercase text-primary" data-test="score-config-import-creation-title">
               {{ t("onlineEvals.scoreConfig.import.creation") }}
             </div>
             <div
@@ -151,14 +151,14 @@ the Free Software Foundation, either version 3 of the License, or
             >
               <div
                 :class="{
-                  'tw:font-bold tw:py-1.25 tw:px-0 tw:text-sm': true,
+                  'font-bold py-1.25 px-0 text-sm': true,
                   'text-green': c.status === 'success',
                   'text-red': c.status === 'error',
                   'text-secondary': c.status === 'exists',
                 }"
                 :data-test="`score-config-import-creation-${i}-message`"
               >
-                <pre class="tw:whitespace-pre-wrap tw:font-[inherit] tw:m-0">{{ c.message }}</pre>
+                <pre class="whitespace-pre-wrap font-[inherit] m-0">{{ c.message }}</pre>
               </div>
             </div>
           </div>

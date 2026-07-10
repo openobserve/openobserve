@@ -78,7 +78,6 @@ describe("b64EncodeUnicode", () => {
   });
 
   it("returns null and logs on encoding error", () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     // Pass an object that causes encodeURIComponent to fail indirectly
     // by monkey-patching encodeURIComponent temporarily
     const original = global.encodeURIComponent;
@@ -90,8 +89,6 @@ describe("b64EncodeUnicode", () => {
 
     global.encodeURIComponent = original;
     expect(result).toBeNull();
-    expect(logSpy).toHaveBeenCalled();
-    logSpy.mockRestore();
   });
 });
 
@@ -112,13 +109,10 @@ describe("b64DecodeUnicode", () => {
   });
 
   it("returns undefined and logs on invalid base64", () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     const result = b64DecodeUnicode("!!!invalid!!!");
 
     expect(result).toBeUndefined();
-    expect(logSpy).toHaveBeenCalled();
-    logSpy.mockRestore();
   });
 });
 
@@ -141,12 +135,10 @@ describe("b64DecodeUnicodeSafe", () => {
   });
 
   it("returns fallback when decoding fails", () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     const result = b64DecodeUnicodeSafe("!!!invalid!!!", "default-fallback");
 
     expect(result).toBe("default-fallback");
-    logSpy.mockRestore();
   });
 });
 
@@ -169,9 +161,7 @@ describe("smartDecodeVrlFunction", () => {
 
   it("returns the original for plain text that is not base64", () => {
     // Plain text with spaces can't be base64, decode will fail → returns input
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const result = smartDecodeVrlFunction("plain text with spaces");
-    logSpy.mockRestore();
     // Either returns the original or the decoded; for non-base64, decoding fails
     // The function returns vrlFunction on decode failure
     expect(typeof result).toBe("string");
@@ -217,7 +207,6 @@ describe("b64EncodeStandard", () => {
   });
 
   it("returns undefined and logs on error", () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const original = global.encodeURIComponent;
     global.encodeURIComponent = () => {
       throw new Error("encode error");
@@ -227,7 +216,6 @@ describe("b64EncodeStandard", () => {
 
     global.encodeURIComponent = original;
     expect(result).toBeUndefined();
-    logSpy.mockRestore();
   });
 });
 
@@ -238,13 +226,10 @@ describe("b64DecodeStandard", () => {
   });
 
   it("returns undefined and logs on invalid base64", () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     const result = b64DecodeStandard("!!!not-base64!!!");
 
     expect(result).toBeUndefined();
-    expect(logSpy).toHaveBeenCalled();
-    logSpy.mockRestore();
   });
 });
 

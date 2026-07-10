@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
+  <div class="flex flex-col h-full p-0">
 
-    <div v-if="!showDestinationEditor && !showImportDestination" class="tw:flex tw:flex-col tw:h-full">
+    <div v-if="!showDestinationEditor && !showImportDestination" class="flex flex-col h-full">
       <AppPageHeader
         :title="t('alert_destinations.header')"
         icon="location-on"
         subtitle="Where triggered alerts are delivered"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="shrink-0 px-4 border-b border-border-default"
       >
         <template #title>
           <span data-test="alert-destinations-list-title">{{
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t(`alert_destinations.add`) }}</OButton>
         </template>
       </AppPageHeader>
-      <div class="card-container tw:flex-1 tw:min-h-0">
+      <div class="card-container flex-1 min-h-0">
         <OTable
           data-test="alert-destinations-list-table"
           :data="visibleRows"
@@ -88,13 +88,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSearchInput
               v-model="filterQuery"
               data-test="destination-list-search-input"
-              class="tw:flex-1"
+              class="flex-1"
               :placeholder="t('alert_destinations.search')"
             />
           </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="alert-destinations-list-refresh-btn"
+              @click="getDestinations"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="alertDestinationsRefresh" />
+            </OButton>
+          </template>
 
           <template #bottom="{ totalRows }">
-            <span class="o2-table-footer-title tw:text-primary">
+            <span class="o2-table-footer-title">
               {{ totalRows.toLocaleString() }} {{ t('alert_destinations.header') }}
             </span>
             <OButton
@@ -116,19 +128,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="hero"
               preset="no-alert-destinations"
               :filtered="!!filterQuery"
-              :hide-action="!filterQuery"
-              @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+              :actions="[
+                { id: 'create', icon: 'add', titleKey: 'emptyState.noAlertDestinations.action', descriptionKey: 'emptyState.noAlertDestinations.actionDesc' },
+                { id: 'import', icon: 'upload-file', titleKey: 'emptyState.noAlertDestinations.import', descriptionKey: 'emptyState.noAlertDestinations.importDesc' },
+              ]"
+              @action="(id) => id === 'clear-filters' ? (filterQuery = '') : id === 'import' ? importDestination() : (templates.length && editDestination(null))"
             />
           </template>
 
           <template #cell-template="{ row }">
             <div
               v-if="row.template"
-              class="tw:flex tw:items-center tw:gap-2 tw:min-w-0"
+              class="flex items-center gap-2 min-w-0"
               :data-test="`destination-template-${row.name}`"
             >
               <span
-                class="tw:truncate tw:min-w-0"
+                class="truncate min-w-0"
                 :title="row.template"
               >{{ row.template }}</span>
               <OTag
@@ -136,14 +151,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`destination-template-default-badge-${row.name}`"
                 type="templateDefaultFlag"
                 value="default"
-                class="tw:flex-shrink-0"
+                class="flex-shrink-0"
               />
             </div>
-            <span v-else class="tw:text-text-primary">—</span>
+            <span v-else class="text-text-primary">—</span>
           </template>
 
           <template #cell-type="{ row }">
-            <div class="tw:flex tw:items-center tw:gap-2">
+            <div class="flex items-center gap-2">
               <template v-if="getPrebuiltTypeName(row)">
                 <OTag
                   :data-test="`destination-type-badge-${getPrebuiltTypeName(row)?.toLowerCase()}`"
@@ -172,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-actions="{ row }">
-            <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
+            <div class="flex items-center gap-1 justify-center">
               <OButton
                 data-test="destination-export"
                 data-row-action="export"
@@ -217,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @get:destinations="getDestinations"
       />
     </div>
-    <div v-else>
+    <div v-else class="flex-1 min-h-0">
       <ImportDestination
         :destinations="destinations"
         :templates="templates"
@@ -272,6 +287,7 @@ import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 import OTag from '@/lib/core/Badge/OTag.vue';
@@ -298,6 +314,7 @@ export default defineComponent({
     ConfirmDialog,
     ImportDestination,
     OButton,
+    OTooltip,
     OSearchInput,
     OCheckbox,
     OTag,

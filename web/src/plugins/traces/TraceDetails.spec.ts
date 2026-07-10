@@ -471,6 +471,22 @@ describe("TraceDetails", () => {
       expect(wrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe(null);
     });
 
+    it("should cancel any in-flight span scroll when sidebar closes", () => {
+      const cancelScroll = vi.fn();
+      wrapper.vm.traceTreeRef = { cancelScroll };
+
+      wrapper.vm.closeSidebar();
+
+      expect(cancelScroll).toHaveBeenCalledTimes(1);
+      expect(wrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe(null);
+    });
+
+    it("should not throw on close when the trace tree ref is absent", () => {
+      wrapper.vm.traceTreeRef = null;
+
+      expect(() => wrapper.vm.closeSidebar()).not.toThrow();
+    });
+
     it("should render trace tree component", () => {
       const traceTree = wrapper.find('[data-test="trace-details-tree"]');
       expect(traceTree.exists()).toBe(true);
@@ -741,7 +757,7 @@ describe("TraceDetails", () => {
           '[data-test="trace-details-trace-id"]',
         );
         if (traceId.exists()) {
-          expect(traceId.classes()).toContain("tw:cursor-pointer");
+          expect(traceId.classes()).toContain("cursor-pointer");
         }
       });
 

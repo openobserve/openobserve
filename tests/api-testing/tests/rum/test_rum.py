@@ -125,6 +125,78 @@ def test_rum_data_ingest_with_invalid_token_returns_403(client: OpenObserveClien
         f"invalid token should yield 403, got {resp.status_code}: {resp.text}"
 
 
+def test_rum_data_ingest_with_no_token_is_rejected(client: OpenObserveClient):
+    """POST /rum/v1/{org}/rum with NO token param is rejected (no anonymous writes)."""
+    rum_url = f"{client.base_url}rum/v1/{ORG_ID}/rum"
+    payload = {**RUM_DATA_TEMPLATE, "type": f"pytest-{uuid.uuid4()}"}
+
+    resp = requests.post(rum_url, json=payload, timeout=10)
+    assert resp.status_code in (400, 401, 403), \
+        f"anonymous RUM ingestion should be rejected, got {resp.status_code}: {resp.text}"
+
+
+def test_rum_logs_ingest_with_no_token_is_rejected(client: OpenObserveClient):
+    """POST /rum/v1/{org}/logs with NO token param is rejected (no anonymous writes)."""
+    logs_url = f"{client.base_url}rum/v1/{ORG_ID}/logs"
+    payload = {**RUM_LOG_TEMPLATE, "message": f"pytest-{uuid.uuid4()}"}
+
+    resp = requests.post(logs_url, json=payload, timeout=10)
+    assert resp.status_code in (400, 401, 403), \
+        f"anonymous RUM log ingestion should be rejected, got {resp.status_code}: {resp.text}"
+
+
+def test_rum_search_for_nonexistent_service_returns_empty(client: OpenObserveClient):
+    """Querying _rumdata for a service that never ingested returns empty hits, not an error.
+
+    Precondition: the _rumdata stream must exist. Searching a stream that was
+    never created returns 400 (unknown table), not empty hits — so we first
+    ingest one valid RUM data record to create the stream + `service` column,
+    wait until it is queryable, then assert that a service value which was
+    never ingested yields empty results.
+    """
+    # Step 1: fetch a valid rum token
+    token_resp = client.get("rumtoken")
+    assert token_resp.status_code == 200, token_resp.text
+    rum_token = token_resp.json()["data"]["rum_token"]
+
+    # Step 2: ingest one valid RUM data record so _rumdata exists with a `service` column
+    rum_url = f"{client.base_url}rum/v1/{ORG_ID}/rum"
+    resp_ingest = requests.post(
+        rum_url,
+        params=_rum_ingest_params(rum_token),
+        json={**RUM_DATA_TEMPLATE, "type": f"pytest-{uuid.uuid4()}"},
+        headers={"X-Forwarded-For": "182.70.14.246"},
+        timeout=10,
+    )
+    assert resp_ingest.status_code == 200, \
+        f"rum data ingest failed: {resp_ingest.status_code} {resp_ingest.text}"
+
+    # Step 3: wait until the _rumdata stream schema is registered and queryable
+    def _stream_queryable() -> bool:
+        resp = client.search.sql(
+            'SELECT service FROM "_rumdata"',
+            minutes=60,
+            size=1,
+            raise_for_status=False,
+        )
+        return resp.status_code == 200
+
+    wait_until(
+        _stream_queryable,
+        timeout=30,
+        interval=1.0,
+        msg="_rumdata stream not queryable after ingesting a RUM data record",
+    )
+
+    # Step 4: a service value that was never ingested yields empty hits, not an error
+    hits = client.search.hits(
+        f"SELECT * FROM \"_rumdata\" WHERE service = 'service-that-does-not-exist-{uuid.uuid4()}'",
+        minutes=60,
+        size=5,
+    )
+    assert hits == [], f"expected no hits for a non-existent service, got {hits!r}"
+
+
 # ----- happy path: get token, ingest log, verify via search -----
 
 

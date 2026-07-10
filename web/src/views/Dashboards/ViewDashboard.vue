@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div :key="store.state.selectedOrganization.identifier" class="tw:h-full">
+  <div :key="store.state.selectedOrganization.identifier" class="h-full">
     <div
       ref="fullscreenDiv"
       :class="[
@@ -25,16 +25,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           fullscreen: isFullscreen,
           'print-mode-container': store.state.printMode,
         },
-        store.state.printMode === true ? 'tw:pb-6' : '',
+        store.state.printMode === true ? 'pb-6' : '',
       ]"
-      class="tw:h-full"
+      class="h-full"
     >
       <PageLayout
         :main-panel="false"
         :header-class="
           isFullscreen || store.state.printMode === true
-            ? 'stickyHeader fullscreenHeader tw:bg-surface-panel'
-            : 'tw:shrink-0'
+            ? 'stickyHeader fullscreenHeader bg-surface-panel'
+            : 'shrink-0'
         "
       >
         <template #header>
@@ -49,12 +49,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? { label: t('dashboard.header'), onClick: goBackToDashboardList, dataTest: 'dashboard-back-btn' }
                 : undefined
             "
-            class="tw:px-4 tw:border-b tw:border-border-default"
+            class="px-4 border-b border-border-default"
           >
           <template #title>
             <span data-test="dashboard-name-title">{{ currentDashboardData.data?.title }}</span>
           </template>
           <template #actions>
+            <!-- Primary place to set this dashboard as the org-wide home
+                 dashboard: labeled so the action is discoverable (a bare
+                 pushpin icon read as cryptic). Collapses to filled-pin +
+                 "Home dashboard" once set. -->
+            <OButton
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              :variant="isHome(dashboardId) ? 'secondary' : 'outline'"
+              size="sm-toolbar"
+              :class="
+                isHome(dashboardId)
+                  ? 'text-primary border border-button-outline-border'
+                  : ''
+              "
+              @click="toggleHomeDashboard"
+              data-test="dashboard-view-set-home-btn"
+              :icon-left="isHome(dashboardId) ? 'keep' : 'keep-outline'"
+            >
+              {{
+                isHome(dashboardId)
+                  ? t("dashboard.isHomeDashboard")
+                  : t("dashboard.setAsHome")
+              }}
+            </OButton>
+            <OTooltip
+              v-if="!isFullscreen && store.state.printMode !== true"
+              :content="
+                isHome(dashboardId)
+                  ? t('dashboard.removeFromHome')
+                  : t('dashboard.setAsHomeDesc')
+              "
+            />
             <OButton
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
@@ -67,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="t('panel.add')" shortcut-id="dashboardAddPanel" />
             </OButton>
             <!-- <DateTimePicker 
-            class="tw:ml-2"
+            class="ml-2"
             ref="refDateTime"
             v-model="selectedDate"
           /> -->
@@ -89,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="selectedDate"
               v-show="store.state.printMode === false"
               ref="dateTimePicker"
-              class="dashboard-icons tw:h-[30px] tw:[transition:all_0.2s_ease]"
+              class="dashboard-icons h-[30px] [transition:all_0.2s_ease]"
               size="sm"
               v-model="selectedDate"
               :initialTimezone="initialTimezone"
@@ -104,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state?.zoConfig?.min_auto_refresh_interval || 5
               "
               @trigger="refreshData"
-              class="dashboard-icons hideOnPrintMode tw:h-[30px] tw:[transition:all_0.2s_ease]"
+              class="dashboard-icons hideOnPrintMode h-[30px] [transition:all_0.2s_ease]"
               size="sm"
             />
             <OButton
@@ -213,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <RenderDashboardCharts
         :frame="false"
-        :class="store.state.printMode ? '' : 'tw:flex-1 tw:min-h-0'"
+        :class="store.state.printMode ? '' : 'flex-1 min-h-0'"
         :key="
           currentDashboardData.data?.dashboardId + '-' + dashboardRemountKey
         "
@@ -325,6 +357,7 @@ import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import useNotifications from "@/composables/useNotifications";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import reports from "@/services/reports";
 import destination from "@/services/alert_destination.js";
 import config from "@/aws-exports";
@@ -430,6 +463,25 @@ export default defineComponent({
     const dashboardId = computed(() => route.query.dashboard);
 
     const folderId = computed(() => route.query.folder);
+
+    // Set/remove this dashboard as the single org-wide home dashboard, shared
+    // reactive state with the dashboard list and HomeView via the composable.
+    const { isHome, setHomeDashboard, clearHomeDashboard } =
+      useHomeDashboard();
+    const toggleHomeDashboard = () => {
+      const id = dashboardId.value as string | undefined;
+      if (!id) return;
+      const org = store.state.selectedOrganization?.identifier;
+      if (isHome(id)) {
+        clearHomeDashboard(org);
+      } else {
+        setHomeDashboard(org, {
+          dashboardId: id,
+          folderId: (folderId.value as string) ?? "default",
+          label: currentDashboardData.data?.title ?? "Dashboard",
+        });
+      }
+    };
 
     const tabId = computed(() => route.query.tab);
 
@@ -1882,6 +1934,8 @@ export default defineComponent({
       isFullscreen,
       goBackToDashboardList,
       addPanelData,
+      toggleHomeDashboard,
+      isHome,
       t,
       getDashboard,
       store,

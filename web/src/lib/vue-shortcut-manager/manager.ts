@@ -252,15 +252,17 @@ export class ShortcutManager {
   }
 
   /**
-   * Returns true when the shortcut key string contains at least one modifier
-   * (ctrl, meta, alt, shift). Pure single-letter keys have no modifier.
+   * Returns true when the shortcut key string contains a command modifier
+   * (ctrl, meta, alt). `shift` is intentionally excluded: on most keyboards it
+   * only produces a printable character (e.g. `shift+?` → "?"), so a shift-only
+   * combo behaves like a plain key and must still be suppressed while the user
+   * is typing in an input. Pure single-letter keys have no modifier.
    */
   private static hasModifier(key: string): boolean {
     return (
-      key.startsWith("ctrl+") ||
-      key.startsWith("meta+") ||
-      key.startsWith("alt+") ||
-      key.startsWith("shift+")
+      key.includes("ctrl+") ||
+      key.includes("meta+") ||
+      key.includes("alt+")
     );
   }
 
@@ -270,8 +272,15 @@ export class ShortcutManager {
   ): void {
     // Guard: never intercept single-letter shortcuts while the user is typing
     // in an input/textarea/contenteditable. Modifier-key shortcuts (Ctrl+S,
-    // ⌘+Enter, etc.) are always allowed through regardless of focus.
-    if (!ShortcutManager.hasModifier(shortcut.key) && isInputFocused()) {
+    // ⌘+Enter, etc.) are always allowed through regardless of focus, and a
+    // shortcut can opt out with `allowInInput` (e.g. Escape closing a panel).
+    // The event's composed target (not document.activeElement) is checked so
+    // inputs inside shadow DOM are detected too.
+    if (
+      !shortcut.allowInInput &&
+      !ShortcutManager.hasModifier(shortcut.key) &&
+      isInputFocused(e.composedPath?.()[0] ?? e.target)
+    ) {
       return;
     }
 
@@ -289,7 +298,7 @@ export class ShortcutManager {
       if (!el || document.activeElement !== el) return;
     }
 
-    if (this.options.preventDefault) e.preventDefault();
+    if (this.options.preventDefault && e.key !== "Escape") e.preventDefault();
     if (this.options.stopPropagation) e.stopPropagation();
     shortcut.handler();
   }

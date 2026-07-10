@@ -29,13 +29,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onConfirm"
   >
     <div>
-      <p class="tw:text-sm">{{ message }}</p>
-      <div class="tw:flex tw:items-center tw:gap-2">
+      <p class="text-sm">{{ message }}</p>
+      <div class="flex items-center gap-2">
         <OSelect
           label="Select Tab"
           v-model="selectedMoveTabId"
           :options="moveTabOptions"
-          class="tw:flex-1"
+          class="flex-1"
           data-test="dashboard-tab-move-select"
           label-position="inside"
         />

@@ -27,22 +27,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- x axis container -->
     <div
       style="display: flex; flex-direction: row; width: 100%"
-      class="tw:pl-3"
+      class="pl-3"
       v-if="dashboardPanelData.data.type != 'metric'"
     >
       <div style="flex: 1">
         <div style="display: flex; flex-direction: row">
-          <div class="layout-name tw:whitespace-nowrap tw:min-w-32.5 tw:flex tw:items-center">
+          <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
             {{ currentXLabel }}
-            <OIcon name="info-outline" size="sm" class="tw:ml-1" />
+            <OIcon name="info-outline" size="sm" class="ml-1" />
               <OTooltip :content="xAxisHint" />
           </div>
-          <span class="layout-separator tw:flex tw:items-center tw:mx-0.5">:</span>
+          <span class="layout-separator flex items-center mx-0.5">:</span>
           <div
-            class="axis-container droppable scroll tw:flex tw:flex-1 tw:w-full tw:text-center tw:flex-wrap tw:border-2 tw:border-dashed tw:border-transparent"
+            class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
             :class="{
-              'tw:bg-[rgba(0,0,0,0.042)] tw:[border-style:dotted] tw:border-white': dashboardPanelData.meta.dragAndDrop.dragging,
-              'tw:transition-all tw:duration-200 tw:bg-[var(--color-field-list-row-hover-bg)]':
+              'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
+              'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
                 dashboardPanelData.meta.dragAndDrop.dragging &&
                 dashboardPanelData.meta.dragAndDrop.currentDragArea == 'x',
             }"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-x-layout"
           >
             <div
-              class="tw:flex tw:mr-2 tw:my-1"
+              class="flex mr-2 my-1"
               v-for="(itemX, index) in dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.x"
@@ -73,13 +73,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     index &&
                   dashboardPanelData.meta.dragAndDrop.currentDragArea == 'x'
                 "
-                class="dragItem tw:bg-(--o2-theme-color) tw:w-5 tw:h-full tw:rounded-md tw:opacity-70"
+                class="dragItem bg-(--o2-theme-color) w-5 h-full rounded-md opacity-70"
                 data-test="dashboard-query-builder-drag-item"
               >
                 &nbsp;
               </div>
               <OButtonGroup
-                class="axis-field tw:overflow-hidden tw:[--tw-divide-color:rgba(255,255,255,0.25)]"
+                class="axis-field overflow-hidden [--tw-divide-color:rgba(255,255,255,0.25)]"
                 radius="sm"
                 :draggable="true"
                 @dragstart="onFieldDragStart($event, itemX, 'x', index)"
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="outline"
                   size="icon-chip"
-                  class="tw:cursor-grab"
+                  class="cursor-grab"
                   :data-test="`dashboard-x-item-${itemX?.alias}-drag`"
                 >
                   <template #icon-left>
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <div
                     :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
-                    class="field-function-menu-popup dashboard-query-builder-dropdown tw:p-2"
+                    class="field-function-menu-popup dashboard-query-builder-dropdown p-2"
                     :style="{
                       width:
                         dashboardPanelData.data.queries[
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButtonGroup>
             </div>
             <div
-              class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
+              class="text-xs text-weight-bold text-center py-1"
               v-if="
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 align-items: center;
               "
             >
-              <div class="tw:mt-1">{{ xAxisHint }}</div>
+              <div class="mt-1">{{ xAxisHint }}</div>
             </div>
           </div>
         </div>
@@ -184,16 +184,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'stacked'
         "
       >
-        <div style="display: flex; flex-direction: row" class="tw:pl-3 tw:h-full">
+        <div style="display: flex; flex-direction: row" class="pl-3 h-full">
           <!-- Separator between X and Breakdown/Pivot -->
-          <OSeparator vertical class="tw:mr-4" />
-          <div class="layout-name tw:whitespace-nowrap tw:min-w-32.5 tw:flex tw:items-center" style="min-width: 0 !important">
+          <OSeparator vertical class="mr-4" />
+          <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center" style="min-width: 0 !important">
             {{
               dashboardPanelData.data.type == "table"
                 ? t("panel.pivotField")
                 : t("panel.breakdown")
             }}
-            <OIcon name="info-outline" size="sm" class="tw:ml-1" />
+            <OIcon name="info-outline" size="sm" class="ml-1" />
               <OTooltip side="top" align="center">
                 <template #content>
                   <span v-if="dashboardPanelData.data.type == 'table'">{{
@@ -210,12 +210,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </OTooltip>
           </div>
-          <span class="layout-separator tw:flex tw:items-center tw:mx-0.5">:</span>
+          <span class="layout-separator flex items-center mx-0.5">:</span>
           <div
-            class="axis-container droppable scroll tw:flex tw:flex-1 tw:w-full tw:text-center tw:flex-wrap tw:border-2 tw:border-dashed tw:border-transparent"
+            class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
             :class="{
-              'tw:bg-[rgba(0,0,0,0.042)] tw:[border-style:dotted] tw:border-white': dashboardPanelData.meta.dragAndDrop.dragging,
-              'tw:transition-all tw:duration-200 tw:bg-[var(--color-field-list-row-hover-bg)]':
+              'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
+              'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
                 dashboardPanelData.meta.dragAndDrop.dragging &&
                 dashboardPanelData.meta.dragAndDrop.currentDragArea ==
                   'breakdown',
@@ -235,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-b-layout"
           >
             <div
-              class="tw:flex tw:mr-2 tw:my-1"
+              class="flex mr-2 my-1"
               v-for="(itemB, index) in dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.breakdown"
@@ -248,13 +248,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dashboardPanelData.meta.dragAndDrop.currentDragArea ==
                     'breakdown'
                 "
-                class="dragItem tw:bg-(--o2-theme-color) tw:w-5 tw:h-full tw:rounded-md tw:opacity-70"
+                class="dragItem bg-(--o2-theme-color) w-5 h-full rounded-md opacity-70"
                 data-test="dashboard-query-builder-drag-item"
               >
                 &nbsp;
               </div>
               <OButtonGroup
-                class="axis-field tw:overflow-hidden tw:[--tw-divide-color:rgba(255,255,255,0.25)]"
+                class="axis-field overflow-hidden [--tw-divide-color:rgba(255,255,255,0.25)]"
                 radius="sm"
                 :draggable="true"
                 @dragstart="onFieldDragStart($event, itemB, 'breakdown', index)"
@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="outline"
                   size="icon-chip"
-                  class="tw:cursor-grab"
+                  class="cursor-grab"
                   :data-test="`dashboard-b-item-${itemB?.alias}-drag`"
                 >
                   <template #icon-left>
@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <div
                     :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
-                    class="field-function-menu-popup dashboard-query-builder-dropdown tw:p-2"
+                    class="field-function-menu-popup dashboard-query-builder-dropdown p-2"
                     :style="{
                       width:
                         dashboardPanelData.data.queries[
@@ -326,7 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButtonGroup>
             </div>
             <div
-              class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
+              class="text-xs text-weight-bold text-center py-1"
               v-if="
                 !dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
@@ -339,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 align-items: center;
               "
             >
-              <div class="tw:mt-1">{{ bAxisHint }}</div>
+              <div class="mt-1">{{ bAxisHint }}</div>
             </div>
           </div>
         </div>
@@ -347,18 +347,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator />
     <!-- y axis container -->
-    <div style="display: flex; flex-direction: row" class="tw:pl-3">
-      <div class="layout-name tw:whitespace-nowrap tw:min-w-32.5 tw:flex tw:items-center">
+    <div style="display: flex; flex-direction: row" class="pl-3">
+      <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
         {{ currentYLabel }}
-        <OIcon name="info-outline" size="sm" class="tw:ml-1" />
+        <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="yAxisHint" />
       </div>
-      <span class="layout-separator tw:flex tw:items-center tw:mx-0.5">:</span>
+      <span class="layout-separator flex items-center mx-0.5">:</span>
       <div
-        class="axis-container droppable scroll tw:flex tw:flex-1 tw:w-full tw:text-center tw:flex-wrap tw:border-2 tw:border-dashed tw:border-transparent"
+        class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
         :class="{
-          'tw:bg-[rgba(0,0,0,0.042)] tw:[border-style:dotted] tw:border-white': dashboardPanelData.meta.dragAndDrop.dragging,
-          'tw:transition-all tw:duration-200 tw:bg-[var(--color-field-list-row-hover-bg)]':
+          'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
+          'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'y',
         }"
@@ -377,7 +377,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-y-layout"
       >
         <div
-          class="tw:flex tw:mr-2 tw:my-1"
+          class="flex mr-2 my-1"
           v-for="(itemY, index) in dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields?.y"
@@ -388,13 +388,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.meta.dragAndDrop.targetDragIndex == index &&
               dashboardPanelData.meta.dragAndDrop.currentDragArea == 'y'
             "
-            class="dragItem tw:bg-(--o2-theme-color) tw:w-5 tw:h-full tw:rounded-md tw:opacity-70"
+            class="dragItem bg-(--o2-theme-color) w-5 h-full rounded-md opacity-70"
             data-test="dashboard-query-builder-drag-item"
           >
             &nbsp;
           </div>
           <OButtonGroup
-            class="axis-field tw:overflow-hidden tw:[--tw-divide-color:rgba(255,255,255,0.25)]"
+            class="axis-field overflow-hidden [--tw-divide-color:rgba(255,255,255,0.25)]"
             radius="sm"
             :draggable="true"
             @dragstart="onFieldDragStart($event, itemY, 'y', index)"
@@ -404,7 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="outline"
               size="icon-chip"
-              class="tw:cursor-grab"
+              class="cursor-grab"
               :data-test="`dashboard-y-item-${itemY?.alias}-drag`"
             >
               <template #icon-left>
@@ -426,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <div
                 :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
-                class="field-function-menu-popup dashboard-query-builder-dropdown tw:p-2"
+                class="field-function-menu-popup dashboard-query-builder-dropdown p-2"
                 :style="{
                   width:
                     dashboardPanelData.data.queries[
@@ -470,7 +470,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButtonGroup>
         </div>
         <div
-          class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
+          class="text-xs text-weight-bold text-center py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -483,7 +483,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             align-items: center;
           "
         >
-          <div class="tw:mt-1">{{ yAxisHint }}</div>
+          <div class="mt-1">{{ yAxisHint }}</div>
         </div>
       </div>
     </div>
@@ -491,20 +491,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- z axis container -->
     <span v-if="dashboardPanelData.data.type === 'heatmap'">
-      <div style="display: flex; flex-direction: row" class="tw:pl-3">
-        <div class="layout-name tw:whitespace-nowrap tw:min-w-32.5 tw:flex tw:items-center">
+      <div style="display: flex; flex-direction: row" class="pl-3">
+        <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
           {{
             dashboardPanelData.data.type == "heatmap" ? t("panel.zAxis") : ""
           }}
-          <OIcon name="info-outline" size="sm" class="tw:ml-1" />
+          <OIcon name="info-outline" size="sm" class="ml-1" />
             <OTooltip :content="zAxisHint" />
         </div>
-        <span class="layout-separator tw:flex tw:items-center tw:mx-0.5">:</span>
+        <span class="layout-separator flex items-center mx-0.5">:</span>
         <div
-          class="axis-container droppable scroll tw:flex tw:flex-1 tw:w-full tw:text-center tw:flex-wrap tw:border-2 tw:border-dashed tw:border-transparent"
+          class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
           :class="{
-            'tw:bg-[rgba(0,0,0,0.042)] tw:[border-style:dotted] tw:border-white': dashboardPanelData.meta.dragAndDrop.dragging,
-            'tw:transition-all tw:duration-200 tw:bg-[var(--color-field-list-row-hover-bg)]':
+            'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
+            'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
               dashboardPanelData.meta.dragAndDrop.dragging &&
               dashboardPanelData.meta.dragAndDrop.currentDragArea == 'z',
           }"
@@ -523,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-z-layout"
         >
           <div
-            class="tw:flex tw:mr-2 tw:my-1"
+            class="flex mr-2 my-1"
             v-for="(itemZ, index) in dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.z"
@@ -534,13 +534,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dashboardPanelData.meta.dragAndDrop.targetDragIndex == index &&
                 dashboardPanelData.meta.dragAndDrop.currentDragArea == 'z'
               "
-              class="dragItem tw:bg-(--o2-theme-color) tw:w-5 tw:h-full tw:rounded-md tw:opacity-70"
+              class="dragItem bg-(--o2-theme-color) w-5 h-full rounded-md opacity-70"
               data-test="dashboard-query-builder-drag-item"
             >
               &nbsp;
             </div>
             <OButtonGroup
-              class="axis-field tw:overflow-hidden tw:[--tw-divide-color:rgba(255,255,255,0.25)]"
+              class="axis-field overflow-hidden [--tw-divide-color:rgba(255,255,255,0.25)]"
               radius="sm"
               :draggable="true"
               @dragstart="onFieldDragStart($event, itemZ, 'z', index)"
@@ -550,7 +550,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="outline"
                 size="icon-chip"
-                class="tw:cursor-grab"
+                class="cursor-grab"
                 :data-test="`dashboard-z-item-${itemZ?.alias}-drag`"
               >
                 <template #icon-left>
@@ -572,7 +572,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <div
                   :data-test="`dashboard-z-item-${itemZ?.alias}-menu`"
-                  class="field-function-menu-popup dashboard-query-builder-dropdown tw:p-2"
+                  class="field-function-menu-popup dashboard-query-builder-dropdown p-2"
                   :style="{
                     width:
                       dashboardPanelData.data.queries[
@@ -612,7 +612,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButtonGroup>
           </div>
           <div
-            class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
+            class="text-xs text-weight-bold text-center py-1"
             v-if="
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
@@ -625,7 +625,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               align-items: center;
             "
           >
-            <div class="tw:mt-1">{{ zAxisHint }}</div>
+            <div class="mt-1">{{ zAxisHint }}</div>
           </div>
         </div>
       </div>
@@ -763,12 +763,33 @@ export default defineComponent({
       cleanupDraggingFields,
       selectedStreamFieldsBasedOnUserDefinedSchema,
       fetchPromQLLabels,
-      currentXLabel,
-      currentYLabel,
       isPivotMode,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     const { parsePromQlQuery } = usePromqlSuggestions();
+
+    // Translated axis labels. The composable's currentXLabel/currentYLabel return
+    // hardcoded English; recompute them here through t() so they respect the
+    // active locale (mirrors the composable's type/pivot branching).
+    const currentXLabel = computed(() => {
+      if (dashboardPanelData.data.type == "table") {
+        return isPivotMode.value ? t("panel.rowFields") : t("panel.firstColumn");
+      }
+      return dashboardPanelData.data.type == "h-bar"
+        ? t("panel.yAxisShort")
+        : t("panel.xAxisShort");
+    });
+
+    const currentYLabel = computed(() => {
+      if (dashboardPanelData.data.type == "table") {
+        return isPivotMode.value
+          ? t("panel.valueFields")
+          : t("panel.otherColumn");
+      }
+      return dashboardPanelData.data.type == "h-bar"
+        ? t("panel.xAxisShort")
+        : t("panel.yAxisShort");
+    });
 
     // Initialize treatAsNonTimestamp for existing fields (only for table charts)
     const initializeTreatAsNonTimestamp = () => {

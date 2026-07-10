@@ -4,6 +4,7 @@ import { LoginPage } from '../generalPages/loginPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
 import { openNavFlyoutChild } from '../commonActions.js';
+import { openOSelectDropdown } from '../alertsPages/oselectHelpers.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -303,7 +304,10 @@ export class LogsPage {
         // ===== QUERY EDITOR EXPAND/COLLAPSE SELECTORS =====
         this.queryEditorFullScreenBtn = '[data-test="logs-query-editor-full_screen-btn"]';
         this.queryEditorContainer = '.query-editor-container';
-        this.expandOnFocusClass = '.editor-fullscreen';
+        // Fullscreen state is exposed via a stable data attribute on the container
+        // (the old `.editor-fullscreen` scoped class was removed in PR #12764 in
+        // favour of inline utility classes bound to `isFocused`).
+        this.expandOnFocusClass = '[data-fullscreen="true"]';
 
         // ===== LOG DETAIL SIDEBAR SELECTORS (Bug #9724) =====
         this.logDetailDialogBox = '[data-test="log-detail-dialog"]';
@@ -404,8 +408,10 @@ export class LogsPage {
         this.patternCardIncludeBtn = (index) => `[data-test="pattern-card-${index}-include-btn"]`;
         this.patternCardExcludeBtn = (index) => `[data-test="pattern-card-${index}-exclude-btn"]`;
         this.patternCardDetailsIcon = (index) => `[data-test="pattern-card-${index}"]`;
-        this.patternCardWildcardChips = (index) => `[data-test="pattern-card-${index}-template"] .wildcard-chip`;
-        this.wildcardChip = '.wildcard-chip';
+        // The pattern-template wildcard chip carries a data-test hook (the `.wildcard-chip`
+        // scoped class was dropped when the chip moved from a class to the OTag component).
+        this.patternCardWildcardChips = (index) => `[data-test="pattern-card-${index}-template"] [data-test="pattern-card-wildcard-chip"]`;
+        this.wildcardChip = '[data-test="pattern-card-wildcard-chip"]';
         // Pattern details dialog (ODrawer — PatternDetailsDialog.vue)
         this.closePatternDialog = '[data-test="pattern-details-dialog"] [data-test="o-drawer-close-btn"]';
         this.patternDetailPreviousBtn = '[data-test="pattern-detail-previous-btn"]';
@@ -4392,9 +4398,9 @@ export class LogsPage {
     }
 
     async isQueryEditorExpanded() {
-        // editor-fullscreen is added to the container itself, not a child element.
-        // Use a combined selector (.query-editor-container.editor-fullscreen) instead of
-        // container.locator('.editor-fullscreen') which would search descendants only.
+        // Fullscreen state is reflected by data-fullscreen="true" on the container itself.
+        // Use a combined selector (.query-editor-container[data-fullscreen="true"]) so we
+        // match the container node, not a descendant.
         return await this.page.locator(`${this.queryEditorContainer}${this.expandOnFocusClass}`).count() > 0;
     }
 
@@ -4932,12 +4938,22 @@ export class LogsPage {
     }
 
     async clickCustomDownloadRangeSelect() {
-        return await this.page.locator(this.customDownloadRangeSelect).click();
+        // OSelect (reka-ui popover): clicking the root wrapper can open-then-close the
+        // listbox on a single click, which continuously re-mounts the options and makes
+        // the subsequent option click flake with "element was detached from the DOM".
+        // openOSelectDropdown clicks the inner -trigger until aria-expanded="true" so the
+        // listbox is stably open before we pick an option.
+        await openOSelectDropdown(this.page, this.page.locator(this.customDownloadRangeSelect));
     }
 
     async selectCustomDownloadRange(range) {
         // OSelect option data-test contract: `${parent}-option` shared + `data-test-value="<value>"`.
-        return await this.page.locator(this.customDownloadRangeOption(range)).click();
+        // The reka listbox virtualises/re-renders its items, so the option node can detach
+        // between resolve and click. Poll the click until it lands (option gone / selected).
+        const option = this.page.locator(this.customDownloadRangeOption(range));
+        await expect(async () => {
+            await option.click({ timeout: 3000 });
+        }).toPass({ timeout: 15000, intervals: [500] });
     }
 
     async clickCustomDownloadFileTypeJson() {
@@ -8243,19 +8259,26 @@ export class LogsPage {
         // Poll up to 2000ms for the Vue watcher chain to update the Monaco editor.
         // The watcher is async (reads buildDashboardPanelData, awaits onBuildQueryGenerated,
         // then Vue re-renders the editor prop) — a fixed 600ms was too short under CI load.
-        await this.page.waitForFunction((selector) => {
-            const host = document.querySelector(selector);
-            if (!host) return false;
-            const editors = window.monaco?.editor?.getEditors?.() ?? [];
-            for (const ed of editors) {
-                const node = ed.getDomNode?.();
-                if (node && host.contains(node)) {
-                    const val = (ed.getValue() || '').toLowerCase().trim();
-                    return val.includes('select') && val.includes('from');
+        // Only the Build tab has this watcher; on the main logs tab it returns early and the
+        // editor never auto-populates, so waiting there just burns the full 2s before the
+        // fallback below runs anyway. Skip straight to the fallback in that case.
+        const onBuildTab = await this.page.locator(this.buildQueryPage)
+            .isVisible({ timeout: 500 }).catch(() => false);
+        if (onBuildTab) {
+            await this.page.waitForFunction((selector) => {
+                const host = document.querySelector(selector);
+                if (!host) return false;
+                const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                for (const ed of editors) {
+                    const node = ed.getDomNode?.();
+                    if (node && host.contains(node)) {
+                        const val = (ed.getValue() || '').toLowerCase().trim();
+                        return val.includes('select') && val.includes('from');
+                    }
                 }
-            }
-            return false;
-        }, this.queryEditor, { timeout: 2000, polling: 100 }).catch(() => {});
+                return false;
+            }, this.queryEditor, { timeout: 2000, polling: 100 }).catch(() => {});
+        }
 
         // Check if the editor was updated (build tab watcher fired).
         // In the main logs tab the watcher returns early, so the editor stays in FTS mode.
@@ -8275,8 +8298,21 @@ export class LogsPage {
                 // now falls back to model.setValue() which bypasses the readOnly restriction.
                 await this.setQueryEditorContent(sql);
             }
-            // Allow Vue reactivity and CodeQueryEditor props.query watcher to propagate
-            await this.page.waitForTimeout(500);
+            // Wait for the CodeQueryEditor props.query watcher to actually apply the value
+            // to Monaco instead of sleeping a fixed 500ms — deterministic and usually <300ms.
+            await this.page.waitForFunction((selector) => {
+                const host = document.querySelector(selector);
+                if (!host) return false;
+                const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                for (const ed of editors) {
+                    const node = ed.getDomNode?.();
+                    if (node && host.contains(node)) {
+                        const val = (ed.getValue() || '').toLowerCase().trim();
+                        return val.includes('select') && val.includes('from');
+                    }
+                }
+                return false;
+            }, this.queryEditor, { timeout: 3000, polling: 100 }).catch(() => {});
         }
         testLogger.info('enableSqlModeIfNeeded: SQL mode enabled');
     }
@@ -8297,7 +8333,22 @@ export class LogsPage {
         // watcher which calls onBuildQueryGenerated() → extractWhereClause() (async) →
         // searchObj.data.query = whereClause → QueryEditor prop watcher → Monaco setValue.
         await this._setSqlModeViaVue(false);
-        await this.page.waitForTimeout(600);
+        // Wait for the watcher chain to strip the SELECT from the editor instead of a fixed
+        // 600ms sleep — resolves as soon as the editor updates, falls through on timeout to
+        // the isStillSQL fallback below (same recovery path as before).
+        await this.page.waitForFunction((selector) => {
+            const host = document.querySelector(selector);
+            if (!host) return true;
+            const editors = window.monaco?.editor?.getEditors?.() ?? [];
+            for (const ed of editors) {
+                const node = ed.getDomNode?.();
+                if (node && host.contains(node)) {
+                    const val = (ed.getValue() || '').toLowerCase().trim();
+                    return !(val.includes('select') && val.includes('from'));
+                }
+            }
+            return true;
+        }, this.queryEditor, { timeout: 2000, polling: 100 }).catch(() => {});
 
         // Verify the editor was updated. The Vue watcher chain is async and involves an
         // SQL-parser dynamic import, so it can exceed 600ms on first load or under CI load.
@@ -8319,7 +8370,21 @@ export class LogsPage {
                 // silently on read-only editors in the build tab's auto mode).
                 await this.setQueryEditorContent('').catch(() => {});
             }
-            await this.page.waitForTimeout(500);
+            // Wait for the editor to actually reflect the cleared query instead of a
+            // fixed 500ms sleep — deterministic, resolves as soon as propagation lands.
+            await this.page.waitForFunction((selector) => {
+                const host = document.querySelector(selector);
+                if (!host) return true;
+                const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                for (const ed of editors) {
+                    const node = ed.getDomNode?.();
+                    if (node && host.contains(node)) {
+                        const val = (ed.getValue() || '').toLowerCase().trim();
+                        return !(val.includes('select') && val.includes('from'));
+                    }
+                }
+                return true;
+            }, this.queryEditor, { timeout: 2000, polling: 100 }).catch(() => {});
         }
         testLogger.info('disableSqlModeIfNeeded: SQL mode disabled');
     }
@@ -8724,7 +8789,7 @@ export class LogsPage {
      */
     async inspectPatternCardDOM(index = 0) {
         const patternElements = await this.page.locator('tbody tr').nth(index).evaluate(el => {
-            const styledElements = el.querySelectorAll('[style*="background"], [class*="chip"], [class*="token"], [class*="highlight"], span[class*="tw:"], code');
+            const styledElements = el.querySelectorAll('[style*="background"], [class*="chip"], [class*="token"], [class*="highlight"], code');
             return {
                 totalElements: styledElements.length,
                 classes: Array.from(styledElements).slice(0, 5).map(e => e.className).filter(c => c),
@@ -9284,6 +9349,16 @@ export class LogsPage {
         // for the Monaco editor inside [data-test="logs-search-bar-query-editor"] to have
         // non-empty content — this confirms that onBuildQueryGenerated() has been called and
         // queries[0].query is ready for any Auto→Custom mode switch.
+        //
+        // With SQL mode OFF the editor holds only the WHERE clause and is often legitimately
+        // empty, so the wait below would always burn its full 10s timeout before the catch
+        // fires. Read sqlMode from Vue state and skip Phase 3 on an explicit `false`; if the
+        // state is unreachable (null) fall through to the wait as before.
+        const sqlModeOn = await this._mutateSearchObj((searchObj) => searchObj.meta.sqlMode === true);
+        if (sqlModeOn === false) {
+            testLogger.info('Build tab loaded (SQL mode off — query editor population not expected)');
+            return true;
+        }
         try {
             await this.page.waitForFunction(
                 (editorSelector) => {
@@ -9352,7 +9427,7 @@ export class LogsPage {
             if (isVisible) {
                 const parent = chartItem.locator('..');
                 // Prefer data-selected attribute (ChartSelection.vue exposes it on the <li>).
-                // Fall back to legacy bg-grey-3/5 (Quasar) and tw:bg-gray-200/400 (Tailwind).
+                // Fall back to legacy bg-grey-3/5 (Quasar) and bg-gray-200/400 (Tailwind).
                 const dataSelected = await parent.getAttribute('data-selected');
                 if (dataSelected === 'true') {
                     testLogger.info(`Current chart type detected: ${chartType}`);
@@ -9363,8 +9438,8 @@ export class LogsPage {
                     if (
                         parentClassList.includes('bg-grey-3') ||
                         parentClassList.includes('bg-grey-5') ||
-                        parentClassList.includes('tw:bg-gray-200') ||
-                        parentClassList.includes('tw:bg-gray-400')
+                        parentClassList.includes('bg-gray-200') ||
+                        parentClassList.includes('bg-gray-400')
                     ) {
                         testLogger.info(`Current chart type detected: ${chartType}`);
                         return chartType;
@@ -9397,8 +9472,8 @@ export class LogsPage {
                         (dataSelected === null && (
                             classes.includes('bg-grey-3') ||
                             classes.includes('bg-grey-5') ||
-                            classes.includes('tw:bg-gray-200') ||
-                            classes.includes('tw:bg-gray-400')
+                            classes.includes('bg-gray-200') ||
+                            classes.includes('bg-gray-400')
                         ));
                     if (matchesSelected) {
                         // Found selected item - extract chart type from child data-test attribute

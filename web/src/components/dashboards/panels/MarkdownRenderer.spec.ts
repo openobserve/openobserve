@@ -271,10 +271,10 @@ describe("MarkdownRenderer", () => {
       wrapper = createWrapper();
       
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
-      expect(rendererElement.classes()).toContain('tw:prose');
-      expect(rendererElement.classes()).toContain('tw:prose-sm');
-      expect(rendererElement.classes()).toContain('tw:max-w-none');
-      expect(rendererElement.classes()).not.toContain('tw:prose-invert');
+      expect(rendererElement.classes()).toContain('prose');
+      expect(rendererElement.classes()).toContain('prose-sm');
+      expect(rendererElement.classes()).toContain('max-w-none');
+      expect(rendererElement.classes()).not.toContain('prose-invert');
     });
 
     it("should apply dark theme classes when theme is dark", () => {
@@ -291,8 +291,8 @@ describe("MarkdownRenderer", () => {
       });
       
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
-      expect(rendererElement.classes()).toContain('tw:prose');
-      expect(rendererElement.classes()).toContain('tw:prose-invert');
+      expect(rendererElement.classes()).toContain('prose');
+      expect(rendererElement.classes()).toContain('prose-invert');
     });
 
     it("should toggle theme classes when theme changes", async () => {
@@ -300,7 +300,7 @@ describe("MarkdownRenderer", () => {
       wrapper = createWrapper();
       
       let rendererElement = wrapper.find('[data-test="markdown-renderer"]');
-      expect(rendererElement.classes()).not.toContain('tw:prose-invert');
+      expect(rendererElement.classes()).not.toContain('prose-invert');
       
       // Unmount and recreate with dark theme to test the toggle effect
       wrapper.unmount();
@@ -317,7 +317,7 @@ describe("MarkdownRenderer", () => {
       });
       
       rendererElement = wrapper.find('[data-test="markdown-renderer"]');
-      expect(rendererElement.classes()).toContain('tw:prose-invert');
+      expect(rendererElement.classes()).toContain('prose-invert');
     });
 
     it("should maintain theme classes with content updates", async () => {
@@ -338,7 +338,7 @@ describe("MarkdownRenderer", () => {
       await wrapper.setProps({ markdownContent: "# Updated content" });
       
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
-      expect(rendererElement.classes()).toContain('tw:prose-invert');
+      expect(rendererElement.classes()).toContain('prose-invert');
       expect(rendererElement.html()).toContain("Updated content");
     });
   });
@@ -427,16 +427,19 @@ describe("MarkdownRenderer", () => {
       expect(container.attributes('style')).toContain('width: 100%');
       expect(container.attributes('style')).toContain('height: 100%');
       expect(container.attributes('style')).toContain('overflow: auto');
-      expect(container.attributes('style')).toContain('padding: 1%');
+      // default padding lives on the content div via tailwind utilities
+      expect(wrapper.find('[data-test="markdown-renderer"]').classes()).toEqual(
+        expect.arrayContaining(['px-2', 'py-1']),
+      );
     });
 
     it("should maintain responsive design classes", () => {
       wrapper = createWrapper();
       
       const rendererElement = wrapper.find('[data-test="markdown-renderer"]');
-      expect(rendererElement.classes()).toContain('tw:prose');
-      expect(rendererElement.classes()).toContain('tw:prose-sm');
-      expect(rendererElement.classes()).toContain('tw:max-w-none');
+      expect(rendererElement.classes()).toContain('prose');
+      expect(rendererElement.classes()).toContain('prose-sm');
+      expect(rendererElement.classes()).toContain('max-w-none');
     });
 
     it("should handle overflow content properly", () => {

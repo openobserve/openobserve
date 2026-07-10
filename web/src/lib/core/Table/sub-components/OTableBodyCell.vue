@@ -57,13 +57,13 @@ const align = computed(() => meta.value?.align ?? "left");
 // Record-name column → weight 500 (HANDOFF §8.2). Metadata columns stay 400.
 // Only the default-rendered text path uses this; custom cells style their own.
 const defaultTextClass = computed(() => [
-  "tw:text-text-primary",
+  "text-text-primary",
 ]);
 
 const alignClass = computed(() => {
-  if (align.value === "center") return "tw:text-center";
-  if (align.value === "right") return "tw:text-right";
-  return "tw:text-left";
+  if (align.value === "center") return "text-center";
+  if (align.value === "right") return "text-right";
+  return "text-left";
 });
 
 const isAction = computed(() => meta.value?.isAction ?? false);
@@ -71,11 +71,11 @@ const isAction = computed(() => meta.value?.isAction ?? false);
 const slotAlignClass = computed(() => {
   // Action cells shrink to their content (inline-flex, no w-full) so the
   // column can be measured and sized to the buttons with no dead space.
-  if (isAction.value) return "tw:inline-flex tw:items-center";
+  if (isAction.value) return "inline-flex items-center";
   // `min-w-0` lets the inner truncation wrapper actually shrink.
-  if (align.value === "center") return "tw:flex tw:items-center tw:justify-center tw:w-full tw:min-w-0";
-  if (align.value === "right") return "tw:flex tw:items-center tw:justify-end tw:w-full tw:min-w-0";
-  return "tw:flex tw:items-center tw:w-full tw:min-w-0";
+  if (align.value === "center") return "flex items-center justify-center w-full min-w-0";
+  if (align.value === "right") return "flex items-center justify-end w-full min-w-0";
+  return "flex items-center w-full min-w-0";
 });
 
 const isPinned = computed(() => props.cell.column.getIsPinned?.() ?? false);
@@ -154,7 +154,7 @@ const highlightedHtml = computed(() => {
   return raw ? sanitize(raw) : null;
 });
 
-// ── Tree mode: tw:inline chevron + indent for the designated tree column ──
+// ── Tree mode: inline chevron + indent for the designated tree column ──
 const treeCtx = inject(OTableTreeContextKey, null);
 const isTreeColumn = computed(
   () =>
@@ -203,25 +203,25 @@ function handleClick() {
       // the default text wrapper) still inherit the theme-aware primary color
       // instead of falling back to a grey inherited value in dark mode. Inner
       // links/badges override this with their own color.
-      'tw:text-text-primary',
-      meta?.spacer ? 'tw:px-0 tw:align-middle' : (meta?.compactPadding ? 'tw:px-1 tw:align-middle' : 'tw:px-2 tw:align-middle'),
-      bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '',
+      'text-text-primary',
+      meta?.spacer ? 'px-0 align-middle' : (meta?.compactPadding ? 'px-1 align-middle' : 'px-2 align-middle'),
+      bordered ? 'border-b border-[var(--color-table-row-divider)]' : '',
       alignClass,
-      isAction ? 'tw:w-0 tw:whitespace-nowrap' : '',
+      isAction ? 'w-0 whitespace-nowrap' : '',
        isPinned
         ? (rowSelected
-            ? 'tw:bg-[var(--color-table-row-selected-bg)] tw:group-hover/row:bg-table-row-hover-bg tw:transition-colors tw:duration-150'
-            : 'tw:bg-[var(--color-table-cell-bg)] tw:group-hover/row:bg-[var(--color-table-row-hover-bg)] tw:transition-colors tw:duration-150')
+            ? 'bg-[var(--color-table-row-selected-bg)] group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
+            : 'bg-[var(--color-table-cell-bg)] group-hover/row:bg-[var(--color-table-row-hover-bg)] transition-colors duration-150')
         : '',
       wrap
-        ? 'tw:break-words tw:whitespace-normal'
+        ? 'break-words whitespace-normal'
         : horizontalScroll?.value
-          ? 'tw:whitespace-nowrap'
+          ? 'whitespace-nowrap'
           : isAction
-            ? 'tw:whitespace-nowrap tw:overflow-hidden'
-            : 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis',
+            ? 'whitespace-nowrap overflow-hidden'
+            : 'whitespace-nowrap overflow-hidden text-ellipsis',
       meta?.cellClass ?? '',
-      isTreeColumn ? 'tw:relative' : '',
+      isTreeColumn ? 'relative' : '',
       isTreeColumn && treeMeta?.isParent && treeMeta?.isExpanded ? 'o2-tree-parent-expanded' : '',
       isTreeColumn && treeMeta && (treeMeta.parentId !== null) ? 'o2-tree-child' : '',
       isTreeColumn && treeMeta?.isLastChild ? 'o2-tree-last-child' : '',
@@ -241,17 +241,17 @@ function handleClick() {
     <!-- Tree-mode wrapper: indent + chevron + cell content -->
     <div
       v-if="isTreeColumn"
-      class="tw:flex tw:items-center tw:gap-1 tw:min-w-0"
+      class="flex items-center gap-1 min-w-0"
       :style="{ paddingLeft: `${treeIndentPx}px` }"
     >
       <span
         v-if="treeMeta?.hasChildren || (treeMeta && treeMeta.parentId !== null)"
-        class="tw:inline-flex tw:items-center tw:justify-center tw:w-[18px] tw:h-[18px] tw:shrink-0"
+        class="inline-flex items-center justify-center w-[18px] h-[18px] shrink-0"
       >
         <button
           v-if="treeMeta?.hasChildren"
           type="button"
-          class="tw:inline-flex tw:items-center tw:justify-center tw:w-[18px] tw:h-[18px] tw:p-0 tw:bg-transparent tw:border-0 tw:rounded tw:cursor-pointer tw:text-(--color-text-secondary,#6b7280) tw:hover:bg-(--color-table-row-hover-bg,rgba(0,0,0,0.05)) tw:hover:text-(--color-text-primary)"
+          class="inline-flex items-center justify-center w-[18px] h-[18px] p-0 bg-transparent border-0 rounded cursor-pointer text-(--color-text-secondary,#6b7280) hover:bg-(--color-table-row-hover-bg,rgba(0,0,0,0.05)) hover:text-(--color-text-primary)"
           :data-test="`o2-table-tree-toggle-${cell.column.id}`"
           :aria-expanded="treeMeta?.isExpanded ? 'true' : 'false'"
           @click="onTreeToggle"
@@ -263,13 +263,13 @@ function handleClick() {
         </button>
         <span
           v-else
-          class="tw:w-[7px] tw:h-[7px] tw:bg-(--q-primary,#6366f1) tw:opacity-75 tw:rounded-[1px] tw:shadow-[0_0_0_2px_var(--color-table-cell-bg,#fff)] tw:z-3 tw:relative"
+          class="w-[7px] h-[7px] bg-(--q-primary,#6366f1) opacity-75 rounded-[1px] shadow-[0_0_0_2px_var(--color-table-cell-bg,#fff)] z-3 relative"
           aria-hidden="true"
         />
       </span>
-      <div class="tw:flex-1 tw:min-w-0">
+      <div class="flex-1 min-w-0">
         <div v-if="$slots.default" :class="slotAlignClass">
-          <div v-if="!isAction" class="tw:truncate tw:min-w-0 tw:flex-1"><slot /></div>
+          <div v-if="!isAction" class="truncate min-w-0 flex-1"><slot /></div>
           <slot v-else />
         </div>
         <FlexRender
@@ -291,7 +291,7 @@ function handleClick() {
     <template v-else>
       <div v-if="$slots.default" :class="slotAlignClass">
         <!-- Non-action slot content truncates with an ellipsis by default. -->
-        <div v-if="!isAction" class="tw:truncate tw:min-w-0 tw:flex-1"><slot /></div>
+        <div v-if="!isAction" class="truncate min-w-0 flex-1"><slot /></div>
         <slot v-else />
       </div>
       <!-- Custom cell render via TanStack FlexRender -->
@@ -317,7 +317,7 @@ function handleClick() {
       v-if="enableCellCopy && !$slots.default"
       type="button"
       :data-test="`o2-table-cell-copy-${cell.column.id}`"
-      class="tw:absolute tw:right-1 tw:opacity-0 tw:group-hover:opacity-100 tw:bg-[var(--color-surface-base)] tw:border tw:border-[var(--color-border-default)] tw:rounded tw:cursor-pointer tw:p-0.5 tw:text-[var(--color-text-muted)] tw:hover:text-[var(--color-text-primary)] tw:leading-none tw:transition-opacity"
+      class="absolute right-1 opacity-0 group-hover:opacity-100 bg-[var(--color-surface-base)] border border-[var(--color-border-default)] rounded cursor-pointer p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] leading-none transition-opacity"
       :title="copied ? 'Copied!' : 'Copy'"
       @click="handleCopy"
     >

@@ -15,9 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full">
+  <div class="w-full h-full">
     <!-- Toolbar: refresh -->
-    <div class="tw:flex tw:items-center tw:justify-end tw:px-2 tw:py-2 tw:gap-2">
+    <div class="flex items-center justify-end px-2 py-2 gap-2">
+      <OTableColumnToggle
+        :columns="columns"
+        :column-visibility="columnVisibility"
+        @update:column-visibility="setColumnVisibility"
+      />
       <OButton
         variant="outline"
         size="sm"
@@ -34,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="anomaly-detection-list-table"
       :data="displayConfigs"
       :columns="columns"
+      :column-visibility="columnVisibility"
       row-key="anomaly_id"
       :loading="loading"
       pagination="client"
@@ -42,11 +48,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       filter-mode="client"
       :default-columns="false"
       :show-global-filter="false"
-      class="tw:h-full"
+      class="h-full"
     >
       <!-- Status column -->
       <template #cell-status="{ row }">
-        <div class="tw:flex tw:items-center tw:gap-2">
+        <div class="flex items-center gap-2">
           <OTag
             type="anomalyStatus"
             :value="row.enabled ? row.status : 'disabled'"
@@ -56,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSpinner
               v-if="row.status === 'training'"
               size="xs"
-              class="tw:ml-1"
+              class="ml-1"
             />
           </OTag>
           <OTooltip v-if="row.status === 'failed'" :content="row.last_error || t('alerts.anomalyStatus.failed')" />
@@ -68,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="row.detection_window_seconds">
           {{ formatSeconds(row.detection_window_seconds) }}
         </span>
-        <span v-else class="tw:text-text-primary">—</span>
+        <span v-else class="text-text-primary">—</span>
       </template>
 
       <!-- Last Triggered At column -->
@@ -88,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Actions column -->
       <template #cell-actions="{ row }">
-        <div class="tw:flex tw:items-center tw:justify-center tw:gap-1">
+        <div class="flex items-center justify-center gap-1">
           <!-- Edit -->
           <OButton
           icon-left="edit"
@@ -98,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-row-action="edit"
           @click="editConfig(row)"
           />
-          <!-- Pause / Resume — tw:hidden while training or failed -->
+          <!-- Pause / Resume — hidden while training or failed -->
           <OButton
             v-if="row.status !== 'training' && row.status !== 'failed'"
           :icon-left="row.enabled ? 'pause' : 'play-arrow'"
@@ -203,14 +209,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Error detail for failed state -->
       <template v-if="pendingRetrainRow?.status === 'failed' && pendingRetrainRow?.last_error">
-        <div class="tw:text-sm tw:mb-2">
+        <div class="text-sm mb-2">
           Training failed for <strong>{{ pendingRetrainRow?.name }}</strong> with the following error:
         </div>
         <pre
-          class="tw:text-xs tw:whitespace-pre-wrap tw:break-all tw:rounded tw:p-2 tw:mb-2"
+          class="text-xs whitespace-pre-wrap break-all rounded p-2 mb-2"
           style="background: rgba(0,0,0,0.06); max-height: 120px; overflow-y: auto"
         >{{ pendingRetrainRow.last_error }}</pre>
-        <div class="tw:text-sm">Fix the issue above, then retry training.</div>
+        <div class="text-sm">Fix the issue above, then retry training.</div>
       </template>
       <template v-else-if="pendingRetrainRow?.status === 'failed'">
         <p>Training failed for <strong>{{ pendingRetrainRow?.name }}</strong>. Retry training now?</p>
@@ -221,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <strong>{{ pendingRetrainRow?.name }}</strong>?
           The existing model will be replaced once training completes.
         </p>
-        <div v-if="pendingRetrainRow?.training_completed_at" class="tw:text-xs tw:text-gray-400">
+        <div v-if="pendingRetrainRow?.training_completed_at" class="text-xs text-gray-400">
           Last trained: {{ formatTimestamp(pendingRetrainRow.training_completed_at) }}
         </div>
       </template>
@@ -242,6 +248,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -250,7 +258,7 @@ import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "AnomalyDetectionList",
-  components: { OTag, OButton, ODialog, OEmptyState, OIcon, OSpinner, OTable, OTimeCell, OTooltip },
+  components: { OTag, OButton, ODialog, OEmptyState, OIcon, OSpinner, OTable, OTableColumnToggle, OTimeCell, OTooltip },
 
   props: {
     org_identifier: {
@@ -278,16 +286,20 @@ export default defineComponent({
     const pendingCancelRow = ref<any>(null);
     const cancellingId = ref<string | null>(null);
 
+    const { columnVisibility, setColumnVisibility } = useExternalColumnToggle(
+      "alerts-anomaly-detection-list",
+    );
+
     const columns: OTableColumnDef[] = [
       { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
-      { id: "name", header: t("alerts.name"), accessorKey: "name", sortable: true, size: COL.name, meta: { align: "left", autoWidth: true } },
-      { id: "stream", header: "Stream", accessorKey: "stream_name", sortable: true, size: COL.streamName, meta: { align: "left" } },
-      { id: "status", header: "Status", accessorKey: "status", sortable: true, size: COL.status, meta: { align: "left" } },
-      { id: "detection_window", header: "Look back window", accessorKey: "detection_window_seconds", sortable: true, size: COL.duration, meta: { align: "left" } },
-      { id: "check_every", header: t("alerts.frequency"), accessorKey: "schedule_interval", sortable: true, size: COL.frequency, meta: { align: "left" } },
-      { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_detection_run", sortable: true, size: COL.date, meta: { align: "left" } },
-      { id: "last_anomaly_detected_at", header: t("alerts.lastSatisfied"), accessorKey: "last_anomaly_detected_at", sortable: true, size: COL.date, meta: { align: "left" } },
-      { id: "last_trained_at", header: "Last Trained At", accessorKey: "training_completed_at", sortable: true, size: COL.date, meta: { align: "left" } },
+      { id: "name", header: t("alerts.name"), accessorKey: "name", sortable: true, hideable: true, size: COL.name, meta: { align: "left", autoWidth: true } },
+      { id: "stream", header: "Stream", accessorKey: "stream_name", sortable: true, hideable: true, size: COL.streamName, meta: { align: "left" } },
+      { id: "status", header: "Status", accessorKey: "status", sortable: true, hideable: true, size: COL.status, meta: { align: "left" } },
+      { id: "detection_window", header: "Look back window", accessorKey: "detection_window_seconds", sortable: true, hideable: true, size: COL.duration, meta: { align: "left" } },
+      { id: "check_every", header: t("alerts.frequency"), accessorKey: "schedule_interval", sortable: true, hideable: true, size: COL.frequency, meta: { align: "left" } },
+      { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_detection_run", sortable: true, hideable: true, size: COL.date, meta: { align: "left" } },
+      { id: "last_anomaly_detected_at", header: t("alerts.lastSatisfied"), accessorKey: "last_anomaly_detected_at", sortable: true, hideable: true, size: COL.date, meta: { align: "left" } },
+      { id: "last_trained_at", header: "Last Trained At", accessorKey: "training_completed_at", sortable: true, hideable: true, size: COL.date, meta: { align: "left" } },
       { id: "actions", header: t("alerts.actions"), isAction: true, size: 140, meta: { align: "center" } },
     ];
 
@@ -430,6 +442,8 @@ export default defineComponent({
       configs,
       displayConfigs,
       columns,
+      columnVisibility,
+      setColumnVisibility,
       showDeleteDialog,
       pendingDeleteRow,
       deleting,

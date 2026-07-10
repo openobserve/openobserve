@@ -1,13 +1,13 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:px-3 tw:bg-surface-panel tw:border-r tw:border-border-default">
-    <div class="tw:flex tw:items-center tw:justify-between tw:shrink-0 tw:my-3">
-      <span class="tw:text-base tw:font-bold">{{ t("panel.fields") }}</span>
+  <div class="w-full h-full flex flex-col px-3 bg-surface-panel border-r border-border-default">
+    <div class="flex items-center justify-between shrink-0 my-3">
+      <span class="text-base font-bold">{{ t("panel.fields") }}</span>
       <OButton
         variant="outline"
         size="icon-xs-sq"
-        class="tw:rotate-90"
+        class="rotate-90"
         icon-left="unfold-less"
         :title="t('panel.collapseFields')"
         data-test="panel-field-list-collapse-btn"
@@ -16,7 +16,7 @@
     </div>
     <OFieldList
       ref="fieldListRef"
-      class="tw:flex-1 tw:min-h-0"
+      class="flex-1 min-h-0"
       :fields="flattenGroupedFields"
       :search="dashboardPanelData.meta.stream.filterField"
       :search-placeholder="t('search.searchField')"
@@ -41,7 +41,7 @@
             :label="t('dashboard.selectStreamType')"
             :options="streamTypeOptions"
             data-test="index-dropdown-stream_type"
-            class="tw:mb-1"
+            class="mb-1"
             label-position="inside"
             :disabled="dashboardPanelDataPageKey === 'logs'"
             @update:model-value="onStreamTypeChange"
@@ -70,7 +70,7 @@
               <OIcon
                 size="sm"
                 :name="metricsIconMapping[selectedMetricTypeIcon || '']"
-                class="tw:mb-0.5"
+                class="mb-0.5"
               />
             </template>
           </OSelect>
@@ -79,10 +79,10 @@
       <!-- Group header -->
       <template #group-header="{ row }">
         <div
-          class="tw:h-7! tw:w-full tw:flex tw:justify-between tw:items-center tw:rounded tw:font-semibold tw:pl-2 tw:pr-1 tw:text-xs tw:cursor-default tw:select-none tw:bg-(--o2-section-header-bg) tw:text-(--o2-text-secondary)"
+          class="h-7! w-full flex justify-between items-center rounded font-semibold pl-2 pr-1 text-xs cursor-default select-none bg-(--o2-section-header-bg) text-(--o2-text-secondary)"
           :title="row.groupName"
         >
-          <div class="tw:flex-1 tw:min-w-0">{{ row.groupName }}</div>
+          <div class="flex-1 min-w-0">{{ row.groupName }}</div>
         </div>
       </template>
 
@@ -94,7 +94,7 @@
             name="drag-indicator"
             size="sm"
             :class="[
-              'o-field-list__drag-icon tw:text-field-list-drag-icon',
+              'o-field-list__drag-icon text-field-list-drag-icon',
               isDragEnabled
                 ? 'o-field-list__drag-icon--enabled'
                 : 'o-field-list__drag-icon--disabled',
@@ -109,7 +109,7 @@
             <!-- Standard chart actions -->
             <div
               v-if="showStandardActions(row, index)"
-              class="tw:flex tw:items-center tw:gap-0.5"
+              class="flex items-center gap-0.5"
             >
               <OButton
                 variant="ghost-neutral"
@@ -191,7 +191,7 @@
         <!-- Geomap actions -->
         <div
           v-if="showGeomapActions(row, index)"
-          class="tw:flex tw:items-center tw:gap-0.5"
+          class="flex items-center gap-0.5"
         >
           <OButton
             variant="ghost-neutral"
@@ -255,7 +255,7 @@
         <!-- Maps actions -->
         <div
           v-if="showMapsActions(row, index)"
-          class="tw:flex tw:items-center tw:gap-0.5"
+          class="flex items-center gap-0.5"
         >
           <OButton
             variant="ghost-neutral"
@@ -296,7 +296,7 @@
         <!-- Sankey actions -->
         <div
           v-if="showSankeyActions(row, index)"
-          class="tw:flex tw:items-center tw:gap-0.5"
+          class="flex items-center gap-0.5"
         >
           <OButton
             variant="ghost-neutral"
@@ -362,17 +362,17 @@
 
       <!-- Loading state -->
       <template #loading>
-        <div class="tw:flex tw:flex-col">
+        <div class="flex flex-col">
           <div
             v-for="i in 6"
             :key="i"
-            class="tw:flex tw:items-center tw:gap-2 tw:py-[0.25rem]"
+            class="flex items-center gap-2 py-[0.25rem]"
           >
             <OSkeleton
               type="rect"
-              class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:flex-shrink-0"
+              class="w-[0.875rem] h-[0.875rem] rounded-sm flex-shrink-0"
             />
-            <OSkeleton type="text" class="tw:flex-1" />
+            <OSkeleton type="text" class="flex-1" />
           </div>
         </div>
       </template>
@@ -380,10 +380,10 @@
       <!-- Empty state -->
       <template #empty>
         <div
-          class="tw:text-center tw:py-[0.725rem] tw:flex tw:items-center tw:justify-center"
+          class="text-center py-[0.725rem] flex items-center justify-center"
         >
           <OIcon name="info" size="xs" />
-          <span class="tw:pl-[0.375rem]">{{ t("search.noFieldFound") }}</span>
+          <span class="pl-[0.375rem]">{{ t("search.noFieldFound") }}</span>
         </div>
       </template>
 
@@ -392,7 +392,7 @@
       <template #after-list="bottomProps">
         <div
           v-if="bottomProps.totalPages > 1"
-          class="field-list-pagination tw:flex tw:items-center tw:justify-center tw:gap-1 tw:py-1"
+          class="field-list-pagination flex items-center justify-center gap-1 py-1"
           data-test="field-list-pagination"
         >
           <OTooltip

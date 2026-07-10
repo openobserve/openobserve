@@ -16,7 +16,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   applyMetricChart,
-  METRIC_COPY_BTN_RESERVE_PX,
+  calculateMetricFontSize,
+  METRIC_COPY_BTN_SLOT_PX,
+  METRIC_MIN_FONT_PX,
 } from "@/utils/dashboard/sql/charts/convertSQLMetricChart";
 import { calculateOptimalFontSize } from "@/utils/dashboard/chartDimensionUtils";
 
@@ -117,14 +119,40 @@ describe("applyMetricChart", () => {
       });
     });
 
-    it("reserves the copy-button width when fitting the font size", () => {
+    it("reserves the copy-button slot on both sides and caps by height when fitting the font size", () => {
       const ctx = makeMockContext();
       applyMetricChart(ctx);
-      // layout font size is computed against width minus the button reserve.
+      // layout font size is computed against width minus the button slot on
+      // each side (the value is centered, so free width splits evenly),
+      // capped by the panel height so the value also fits vertically.
       expect(calculateOptimalFontSize).toHaveBeenCalledWith(
         "100",
-        800 - METRIC_COPY_BTN_RESERVE_PX,
+        800 - 2 * METRIC_COPY_BTN_SLOT_PX,
+        400,
       );
+    });
+
+    it("floors the metric font size at the readable minimum", () => {
+      vi.mocked(calculateOptimalFontSize).mockReturnValueOnce(3);
+      // narrow-but-tall cell: width fit says 3px, floor lifts it to 12px
+      expect(calculateMetricFontSize("311688.00", 74, 267)).toBe(
+        METRIC_MIN_FONT_PX,
+      );
+    });
+
+    it("does not floor beyond what the cell height allows", () => {
+      vi.mocked(calculateOptimalFontSize).mockReturnValueOnce(3);
+      // 10px-tall cell: the floor is limited by the height cap (10 / 1.2 = 8)
+      expect(calculateMetricFontSize("311688.00", 74, 10)).toBe(8);
+    });
+
+    it("does not floor beyond what the full cell width fits (no clipped digits)", () => {
+      // slot-reserved fit says 3px; the full-width fit only allows 9px, so
+      // the 12px floor is capped at 9px instead of clipping the value
+      vi.mocked(calculateOptimalFontSize)
+        .mockReturnValueOnce(3)
+        .mockReturnValueOnce(9);
+      expect(calculateMetricFontSize("311688.00", 60, 267)).toBe(9);
     });
 
     it("omits _metricLayout when the panel ref is unavailable", () => {

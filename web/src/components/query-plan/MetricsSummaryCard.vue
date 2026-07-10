@@ -17,38 +17,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OCard
     data-test="metrics-summary-card"
-    class="tw:bg-transparent tw:shadow-none"
+    class="bg-transparent shadow-none"
   >
     <OCardSection role="body">
-      <div class="tw:text-sm tw:font-medium text-weight-bold tw:mb-3">{{ t("search.executionSummary") }}</div>
-      <div class="tw:grid tw:[grid-template-columns:repeat(auto-fit,minmax(11.25rem,1fr))] tw:gap-4">
-        <div data-test="metrics-summary-card-item" class="tw:flex tw:items-center tw:gap-3 tw:p-[0.875rem_1rem] tw:rounded-lg tw:bg-[var(--o2-card-bg)] tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:transition-[border-color,box-shadow] tw:duration-200 tw:hover:border-[var(--o2-primary-color)] tw:hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
-          <div data-test="metrics-summary-card-icon" class="tw:shrink-0 tw:text-[var(--o2-text-secondary)]">
+      <div class="text-sm font-medium text-weight-bold mb-3">{{ t("search.executionSummary") }}</div>
+      <div class="grid [grid-template-columns:repeat(auto-fit,minmax(11.25rem,1fr))] gap-4">
+        <div data-test="metrics-summary-card-item" class="flex items-center gap-3 p-[0.875rem_1rem] rounded-lg bg-[var(--o2-card-bg)] border border-solid border-[var(--o2-border-color)] transition-[border-color,box-shadow] duration-200 hover:border-[var(--o2-primary-color)] hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
+          <div data-test="metrics-summary-card-icon" class="shrink-0 text-[var(--o2-text-secondary)]">
             <OIcon name="schedule" size="md" />
           </div>
-          <div class="tw:flex-1 tw:min-w-0">
-            <div data-test="metrics-summary-card-label" class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-[0.04em] tw:text-[var(--o2-text-label)] tw:mb-1">{{ t("search.totalTime") }}</div>
-            <div data-test="metrics-summary-card-value" class="tw:text-xl tw:font-bold tw:text-[var(--o2-primary-color)] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ metrics.totalTime }}</div>
+          <div class="flex-1 min-w-0">
+            <div data-test="metrics-summary-card-label" class="text-xs font-semibold uppercase tracking-[0.04em] text-[var(--o2-text-label)] mb-1">{{ t("search.totalTime") }}</div>
+            <div data-test="metrics-summary-card-value" class="text-xl font-bold text-[var(--o2-primary-color)] whitespace-nowrap overflow-hidden text-ellipsis">{{ metrics.totalTime }}</div>
           </div>
         </div>
 
-        <div data-test="metrics-summary-card-item" class="tw:flex tw:items-center tw:gap-3 tw:p-[0.875rem_1rem] tw:rounded-lg tw:bg-[var(--o2-card-bg)] tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:transition-[border-color,box-shadow] tw:duration-200 tw:hover:border-[var(--o2-primary-color)] tw:hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
-          <div data-test="metrics-summary-card-icon" class="tw:shrink-0 tw:text-[var(--o2-text-secondary)]">
+        <div data-test="metrics-summary-card-item" class="flex items-center gap-3 p-[0.875rem_1rem] rounded-lg bg-[var(--o2-card-bg)] border border-solid border-[var(--o2-border-color)] transition-[border-color,box-shadow] duration-200 hover:border-[var(--o2-primary-color)] hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
+          <div data-test="metrics-summary-card-icon" class="shrink-0 text-[var(--o2-text-secondary)]">
             <OIcon name="format-list-numbered" size="md" />
           </div>
-          <div class="tw:flex-1 tw:min-w-0">
-            <div data-test="metrics-summary-card-label" class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-[0.04em] tw:text-[var(--o2-text-label)] tw:mb-1">{{ t("search.totalRows") }}</div>
-            <div data-test="metrics-summary-card-value" class="tw:text-xl tw:font-bold tw:text-[var(--o2-primary-color)] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ metrics.totalRows }}</div>
+          <div class="flex-1 min-w-0">
+            <div data-test="metrics-summary-card-label" class="text-xs font-semibold uppercase tracking-[0.04em] text-[var(--o2-text-label)] mb-1">{{ t("search.totalRows") }}</div>
+            <div data-test="metrics-summary-card-value" class="text-xl font-bold text-[var(--o2-primary-color)] whitespace-nowrap overflow-hidden text-ellipsis">{{ metrics.totalRows }}</div>
           </div>
         </div>
 
-        <div data-test="metrics-summary-card-item" class="tw:flex tw:items-center tw:gap-3 tw:p-[0.875rem_1rem] tw:rounded-lg tw:bg-[var(--o2-card-bg)] tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:transition-[border-color,box-shadow] tw:duration-200 tw:hover:border-[var(--o2-primary-color)] tw:hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
-          <div data-test="metrics-summary-card-icon" class="tw:shrink-0 tw:text-[var(--o2-text-secondary)]">
+        <div data-test="metrics-summary-card-item" class="flex items-center gap-3 p-[0.875rem_1rem] rounded-lg bg-[var(--o2-card-bg)] border border-solid border-[var(--o2-border-color)] transition-[border-color,box-shadow] duration-200 hover:border-[var(--o2-primary-color)] hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
+          <div data-test="metrics-summary-card-icon" class="shrink-0 text-[var(--o2-text-secondary)]">
             <OIcon name="memory" size="md" />
           </div>
-          <div class="tw:flex-1 tw:min-w-0">
-            <div data-test="metrics-summary-card-label" class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-[0.04em] tw:text-[var(--o2-text-label)] tw:mb-1">{{ t("search.peakMemory") }}</div>
-            <div data-test="metrics-summary-card-value" class="tw:text-xl tw:font-bold tw:text-[var(--o2-primary-color)] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ metrics.peakMemory }}</div>
+          <div class="flex-1 min-w-0">
+            <div data-test="metrics-summary-card-label" class="text-xs font-semibold uppercase tracking-[0.04em] text-[var(--o2-text-label)] mb-1">{{ t("search.peakMemory") }}</div>
+            <div data-test="metrics-summary-card-value" class="text-xl font-bold text-[var(--o2-primary-color)] whitespace-nowrap overflow-hidden text-ellipsis">{{ metrics.peakMemory }}</div>
           </div>
         </div>
       </div>

@@ -15,24 +15,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:mt-4">
-    <div class="tw:text-base tw:font-bold tw:mb-2 tw:ml-1">{{ t("rum.sessionReplay") }}</div>
-    <div class="tw:flex">
-      <template v-for="(value, tag) in getSessionTags" :key="tag.tag">
-        <ErrorTag :tag="{ key: tag, value }" />
-      </template>
+  <section
+    class="mt-4 rounded-lg border border-border-default p-3"
+    data-test="error-session-replay-card"
+  >
+    <div class="flex items-center justify-between gap-2">
+      <div class="min-w-0">
+        <h4>{{ t("rum.sessionReplay") }}</h4>
+        <small data-test="error-session-replay-hint">{{
+          t("rum.replayAtFailureHint")
+        }}</small>
+        <div class="flex mt-1.5">
+          <template v-for="(value, tag) in getSessionTags" :key="tag">
+            <ErrorTag :tag="{ key: tag, value }" />
+          </template>
+        </div>
+      </div>
+      <OButton
+        variant="primary"
+        size="sm-action"
+        class="shrink-0"
+        icon-left="play-circle"
+        :disabled="!error.session_id"
+        :title="t('rum.viewSessionReplay')"
+        data-test="error-session-replay-play-btn"
+        @click="playSessionReplay"
+      >
+        {{ t("rum.playSessionReplay") }}
+      </OButton>
     </div>
-    <OButton
-      variant="primary"
-      size="sm-action"
-      class="tw:mt-2.5"
-      icon-left="play-circle"
-      :title="t('rum.viewSessionReplay')"
-      @click="playSessionReplay"
-    >
-      {{ t("rum.playSessionReplay") }}
-    </OButton>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -40,7 +52,7 @@ import { computed } from "vue";
 import ErrorTag from "./ErrorTag.vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const { t } = useI18n();
 
@@ -69,6 +81,9 @@ const playSessionReplay = () => {
     query: {
       start_time: props.error._timestamp,
       end_time: props.error._timestamp,
+      // SessionViewer auto-seeks to event_time (milliseconds) — opens the
+      // replay at the moment of failure instead of the session start.
+      event_time: Math.floor(props.error._timestamp / 1000),
     },
   });
 };

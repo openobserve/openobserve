@@ -15,42 +15,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="player-container tw:h-full tw:p-2 tw:flex tw:flex-col">
+  <div class="player-container h-full p-2 flex flex-col">
     <div
       v-if="isLoading"
-      class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:w-full tw:flex-1 tw:min-h-0"
+      class="pb-4 flex items-center justify-center text-center w-full flex-1 min-h-0"
     >
       <div>
         <OSpinner
           size="md"
-          class="tw:mx-auto tw:block"
+          class="mx-auto block"
           data-test="video-player-loading-indicator"
         />
-        <div class="tw:text-center tw:w-full">
+        <div class="text-center w-full">
           {{ t("rum.loadingSessions") }}
         </div>
       </div>
     </div>
     <div
       ref="playerContainerRef"
-      class="tw:flex tw:items-center tw:justify-center tw:flex-1 tw:min-h-0"
+      class="flex items-center justify-center flex-1 min-h-0"
     >
       <div
         ref="playerRef"
         id="player"
-        class="player tw:h-full tw:flex tw:items-center tw:cursor-pointer"
+        class="player h-full flex items-center cursor-pointer"
         @click="togglePlay"
       />
     </div>
-    <div class="tw:w-full tw:p-2 tw:pt-3 controls-container">
+    <div class="w-full p-2 pt-3 controls-container">
       <div
         ref="playbackBarRef"
         data-test="video-player-playback-bar"
-        class="tw:w-full tw:h-[0.3125rem] tw:bg-[#ebebeb] tw:mt-2 tw:mb-3 tw:relative tw:cursor-pointer"
+        class="w-full h-[0.3125rem] bg-[#ebebeb] mt-2 mb-3 relative cursor-pointer"
         @click="handlePlaybackBarClick"
       >
         <div
-          class="tw:bg-(--o2-primary-btn-bg)! tw:absolute"
+          class="bg-(--o2-primary-btn-bg)! absolute"
           :style="{
             width: playerState.progressWidth + 'px',
             left: 0,
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
         />
         <div
-          class="tw:bg-(--o2-primary-btn-bg)! tw:absolute"
+          class="bg-(--o2-primary-btn-bg)! absolute"
           :style="{
             width: '2px',
             left: playerState.progressWidth - 2 + 'px',
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="event in events as any[]"
           :key="event.id"
           data-test="video-player-event-marker"
-          class="tw:absolute tw:cursor-pointer"
+          class="absolute cursor-pointer"
           :class="getEventMarkerClass(event)"
           :style="{
             width:
@@ -93,13 +93,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="getEventTooltip(event)"
         />
       </div>
-      <div class="controls tw:flex tw:justify-between tw:items-center">
-        <div class="tw:flex tw:items-center">
+      <div class="controls flex justify-between items-center">
+        <div class="flex items-center">
           <div>
             <OIcon
               name="replay-10"
               size="md"
-              class="tw:mr-2 tw:cursor-pointer tw:text-[var(--o2-icon-color-dark)] tw:hover:text-[var(--o2-primary-btn-bg)]"
+              class="mr-2 cursor-pointer text-[var(--o2-icon-color-dark)] hover:text-[var(--o2-primary-btn-bg)]"
               @click="skipTo('backward')"
             />
             <OIcon
@@ -109,25 +109,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'play-circle-filled'
               "
               size="lg"
-              class="tw:cursor-pointer tw:text-[var(--o2-icon-color-dark)] tw:hover:text-[var(--o2-primary-btn-bg)]"
+              class="cursor-pointer text-[var(--o2-icon-color-dark)] hover:text-[var(--o2-primary-btn-bg)]"
               @click="togglePlay"
             />
             <OIcon
               name="forward-10"
               size="md"
-              class="tw:ml-2 tw:cursor-pointer tw:text-[var(--o2-icon-color-dark)] tw:hover:text-[var(--o2-primary-btn-bg)]"
+              class="ml-2 cursor-pointer text-[var(--o2-icon-color-dark)] hover:text-[var(--o2-primary-btn-bg)]"
               @click="skipTo('forward')"
             />
           </div>
-          <div class="tw:flex tw:ml-4 tw:items-center">
+          <div class="flex ml-4 items-center">
             <div>{{ playerState.time }}</div>
-            <div class="tw:px-1">/</div>
+            <div class="px-1">/</div>
             <div>{{ playerState.duration }}</div>
           </div>
         </div>
-        <div class="tw:flex tw:items-center">
+        <div class="flex items-center">
           <OSwitch
-            class="tw:mr-3 tw:whitespace-nowrap"
+            class="mr-3 whitespace-nowrap"
             v-model="playerState.skipInactivity"
             :label="t('rum.skipInactivity')"
             @update:model-value="toggleSkipInactive"
@@ -163,6 +163,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { createRecordConverter } from "@/utils/rum/sessionReplayChangeFormat";
 const props = defineProps({
   events: {
     type: Array,
@@ -332,9 +333,20 @@ const setupSession = async () => {
   session.value = [];
   if (!props.segments.length) return;
 
+  // The SDK v7 serialization emits session-replay snapshots in the compact "Change"
+  // format (FullSnapshot type 2 with format:1 and data:Change[], plus Change records of
+  // type 12). @openobserve/rrweb-player only understands the classic rrweb format, so we
+  // convert here. A single converter instance threads node-id / string-table state across
+  // all records in order (it resets itself on each full snapshot, mirroring the SDK).
+  const recordConverter = createRecordConverter();
+
   props.segments.forEach((segment: any) => {
+    const convertedRecords: any[] = [];
     segment.records.forEach((record: any) => {
-      let segCopy = cloneDeep(record);
+      convertedRecords.push(...recordConverter.convert(cloneDeep(record)));
+    });
+    convertedRecords.forEach((record: any) => {
+      let segCopy = record;
       if (segCopy.type === 8) {
         const seg = {
           ...segCopy,
@@ -477,12 +489,12 @@ const updatePlayerState = () => {
 
 const getEventMarkerClass = (event: any) => {
   if (event.frustration_types && event.frustration_types.length > 0) {
-    return "tw:bg-[#fb923c]! tw:shadow-[0_0_4px_rgba(251,146,60,0.6)]";
+    return "bg-[#fb923c]! shadow-[0_0_4px_rgba(251,146,60,0.6)]";
   }
   if (event.type === "error") {
-    return "tw:bg-[#ef4444]!";
+    return "bg-[#ef4444]!";
   }
-  return "tw:bg-[#14b8a6]!";
+  return "bg-[#14b8a6]!";
 };
 
 const getEventTooltip = (event: any) => {

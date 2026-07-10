@@ -1,10 +1,10 @@
 <template>
   <div
     data-test="loading-container"
-    class="tw:h-[100vh] tw:flex tw:flex-col tw:items-center tw:justify-center"
+    class="h-[100vh] flex flex-col items-center justify-center"
   >
     <OSpinner size="lg" data-test="spinner" />
-    <div data-test="message" class="tw:text-base tw:text-[#666]">Redirecting...</div>
+    <div data-test="message" class="text-base text-[#666]">Redirecting...</div>
   </div>
 </template>
 

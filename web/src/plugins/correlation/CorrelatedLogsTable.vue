@@ -16,19 +16,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="correlated-logs-table tw:flex tw:flex-col tw:h-full tw:w-full"
+    class="correlated-logs-table flex flex-col h-full w-full"
     :class="themeClass"
     data-test="correlated-logs-table"
   >
     <!-- Header with Inline Filters -->
     <div
       v-if="!props.hideDimensionFilters"
-      class="correlation-controls tw:p-0 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)]"
+      class="correlation-controls p-0 border-b border-solid border-[var(--o2-border-color)] bg-[var(--o2-card-bg)]"
     >
       <!-- Dimension Filters Bar with Pending/Apply Pattern -->
       <template v-if="!isLoading || hasResults">
-        <div class="tw:flex tw:items-center tw:justify-between tw:gap-3">
-          <div class="tw:flex-1">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex-1">
             <DimensionFiltersBar
               :dimensions="pendingFilters"
               :unstable-dimension-keys="unstableDimensionKeys"
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon"
-            :class="{ 'tw:text-white! tw:bg-[var(--o2-theme-color)]!': wrapTableCells }"
+            :class="{ 'text-white! bg-[var(--o2-theme-color)]!': wrapTableCells }"
             data-test="correlated-logs-table-wrap-content-btn"
             @click="wrapTableCells = !wrapTableCells"
           >
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
 
           <!-- Column Visibility Dropdown -->
-          <div class="tw:pr-4">
+          <div class="pr-4">
             <ODropdown
               side="bottom"
               align="end"
@@ -72,15 +72,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-if="true">
                     <OIcon name="view-column"
 size="sm"
-class="tw:mr-1" />
+class="mr-1" />
                     {{ t('search.showHideColumns') }}
                   </template>
                 </OButton>
               </template>
-              <div class="column-visibility-list tw:min-w-62.5 tw:max-h-100 tw:overflow-y-auto">
+              <div class="column-visibility-list min-w-62.5 max-h-100 overflow-y-auto">
                 <!-- Select All / Deselect All -->
                 <ODropdownItem
-                  class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                  class="border-b border-solid border-[var(--o2-border-color)]"
                   data-test="select-all-columns"
                   @select="(e) => { e.preventDefault(); toggleSelectAll(); }"
                 >
@@ -93,7 +93,7 @@ class="tw:mr-1" />
                       />
                     </span>
                   </template>
-                  <span class="tw:font-semibold">
+                  <span class="font-semibold">
                     {{ areAllColumnsSelected ? t('common.deselectAll') : t('common.selectAll') }}
                   </span>
                 </ODropdownItem>
@@ -120,12 +120,12 @@ class="tw:mr-1" />
                       />
                     </span>
                   </template>
-                  <span class="tw:flex-1">{{ field }}</span>
+                  <span class="flex-1">{{ field }}</span>
                   <template #icon-right>
                     <OIcon
                       name="drag-indicator"
                       size="xs"
-                      class="drag-handle tw:cursor-move"
+                      class="drag-handle cursor-move"
                     />
                   </template>
                 </ODropdownItem>
@@ -136,15 +136,15 @@ class="tw:mr-1" />
       </template>
 
       <!-- Show skeleton while loading -->
-      <div v-else class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap tw:p-3">
-        <OSkeleton class="tw:w-[200px] tw:h-8" />
-        <OSkeleton class="tw:w-[200px] tw:h-8" />
-        <OSkeleton class="tw:w-[200px] tw:h-8" />
+      <div v-else class="flex items-center gap-3 flex-wrap p-3">
+        <OSkeleton class="w-[200px] h-8" />
+        <OSkeleton class="w-[200px] h-8" />
+        <OSkeleton class="w-[200px] h-8" />
       </div>
 
       <!-- Results Summary Row -->
-      <!-- <div class="tw:p-3 tw:pt-2">
-        <div class="tw:text-xs tw:opacity-70" data-test="results-summary">
+      <!-- <div class="p-3 pt-2">
+        <div class="text-xs opacity-70" data-test="results-summary">
           <template v-if="hasResults && !isLoading">
             {{
               t("correlation.logs.resultsCount", {
@@ -156,7 +156,7 @@ class="tw:mr-1" />
           </template>
           <OSkeleton
             v-else-if="isLoading"
-            class="tw:w-[200px] tw:h-[14px]"
+            class="w-[200px] h-[14px]"
           />
         </div>
       </div> -->
@@ -173,8 +173,8 @@ class="tw:mr-1" />
         <OButton
           variant="ghost"
           size="icon"
-          class="tw:h-5!"
-          :class="{ 'tw:text-white! tw:bg-[var(--o2-theme-color)]! tw:hover:opacity-80': wrapTableCells }"
+          class="h-5!"
+          :class="{ 'text-white! bg-[var(--o2-theme-color)]! hover:opacity-80': wrapTableCells }"
           data-test="correlated-logs-table-wrap-content-btn"
           @click="wrapTableCells = !wrapTableCells"
         >
@@ -185,103 +185,105 @@ class="tw:mr-1" />
     </CorrelationEventHeader>
 
     <!-- Main Content Area -->
-    <div class="tw:flex-1 tw:overflow-hidden tw:relative">
+    <div class="flex-1 overflow-hidden relative">
       <!-- Logs Table or Skeleton -->
-      <div class="tw:h-full tw:w-full tw:overflow-auto logs-table-container">
-        <!-- Actual Table (when data is loaded) -->
-        <TenstackTable
-          v-if="hasResults"
-          :key="`page-${currentPage}`"
-          :rows="pagedResults"
-          :columns="tableColumns"
-          :wrap="wrapTableCells"
-          :loading="isLoading"
-          :err-msg="''"
-          :function-error-msg="''"
-          :expanded-rows="expandedRows"
-          :highlight-timestamp="-1"
-          :default-columns="showingDefaultColumns"
-          :jsonpreview-stream-name="jsonPreviewStreamName"
-          :highlight-query="highlightQuery"
-          :selected-stream-fts-keys="ftsFields"
-          :selected-stream-fields="selectedFields"
-          :hide-search-term-actions="hideSearchTermActions"
-          :hide-view-related-button="hideViewRelatedButton"
-          class="tw:overflow-y-auto!"
-          @click:dataRow="handleRowClick"
-          @copy="handleCopy"
-          @sendToAiChat="handleSendToAiChat"
-          @addSearchTerm="handleAddSearchTerm"
-          @addFieldToTable="handleAddFieldToTable"
-          @closeColumn="handleCloseColumn"
-          @update:columnOrder="handleColumnOrderChange"
-          @expandRow="handleExpandRow"
-          @view-trace="handleViewTrace"
-          @show-correlation="handleNestedCorrelation"
-          data-test="logs-tenstack-table"
-        />
+      <div class="flex flex-col h-full">
+        <div class="flex-1 w-full overflow-auto logs-table-container">
+          <!-- Actual Table (when data is loaded) -->
+          <TenstackTable
+            v-if="hasResults"
+            :key="`page-${currentPage}`"
+            :rows="pagedResults"
+            :columns="tableColumns"
+            :wrap="wrapTableCells"
+            :loading="isLoading"
+            :err-msg="''"
+            :function-error-msg="''"
+            :expanded-rows="expandedRows"
+            :highlight-timestamp="-1"
+            :default-columns="showingDefaultColumns"
+            :jsonpreview-stream-name="jsonPreviewStreamName"
+            :highlight-query="highlightQuery"
+            :selected-stream-fts-keys="ftsFields"
+            :selected-stream-fields="selectedFields"
+            :hide-search-term-actions="hideSearchTermActions"
+            :hide-view-related-button="hideViewRelatedButton"
+            class="overflow-y-auto!"
+            @click:dataRow="handleRowClick"
+            @copy="handleCopy"
+            @sendToAiChat="handleSendToAiChat"
+            @addSearchTerm="handleAddSearchTerm"
+            @addFieldToTable="handleAddFieldToTable"
+            @closeColumn="handleCloseColumn"
+            @update:columnOrder="handleColumnOrderChange"
+            @expandRow="handleExpandRow"
+            @view-trace="handleViewTrace"
+            @show-correlation="handleNestedCorrelation"
+            data-test="logs-tenstack-table"
+          />
 
-        <!-- Table Skeleton (initial load) -->
-        <div
-          v-else-if="isLoading && !hasError"
-          class="tw:h-full tw:flex tw:flex-col tw:items-center tw:justify-center"
-          data-test="table-skeleton"
-        >
-          <!-- Loading indicator -->
+          <!-- Table Skeleton (initial load) -->
           <div
-            class="tw:flex tw:items-center tw:justify-center tw:gap-3"
+            v-else-if="isLoading && !hasError"
+            class="h-full flex flex-col items-center justify-center"
+            data-test="table-skeleton"
           >
-            <OSpinner size="sm" />
-            <span class="tw:text-sm tw:opacity-70">
-              {{ t("correlation.logs.loading") }}
-            </span>
+            <!-- Loading indicator -->
+            <div
+              class="flex items-center justify-center gap-3"
+            >
+              <OSpinner size="sm" />
+              <span class="text-sm opacity-70">
+                {{ t("correlation.logs.loading") }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Error State -->
+          <div
+            v-else-if="hasError"
+            class="flex flex-col items-center justify-center h-full py-20"
+            data-test="error-state"
+          >
+            <p
+              class="text-base opacity-70 max-w-md text-center"
+            >
+              {{ error || t("correlation.logs.errorDetails") }}
+            </p>
+          </div>
+
+          <!-- Empty State -->
+          <div
+            v-else-if="isEmpty"
+            class="flex flex-col items-center justify-center h-full py-20"
+            data-test="empty-state"
+          >
+            <p class="text-base font-medium mb-2 opacity-90">
+              {{ t("correlation.logs.noData") }}
+            </p>
+            <p class="text-sm opacity-70 mb-4">
+              {{ t("correlation.logs.noDataDetails") }}
+            </p>
           </div>
         </div>
 
-        <!-- Error State -->
+        <!-- Pagination bar -->
         <div
-          v-else-if="hasError"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-          data-test="error-state"
+          v-if="hasResults && totalPages > 1"
+          class="flex items-center justify-between px-4 py-2 border-t border-solid border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] text-xs shrink-0"
+          data-test="correlated-logs-pagination"
         >
-          <p
-            class="tw:text-base tw:opacity-70 tw:max-w-md tw:text-center"
-          >
-            {{ error || t("correlation.logs.errorDetails") }}
-          </p>
+          <span class="opacity-60">
+            {{ (currentPage - 1) * displayPageSize + 1 }}–{{ Math.min(currentPage * displayPageSize, searchResults.length) }} of {{ searchResults.length }}
+          </span>
+          <OPagination
+            :model-value="currentPage"
+            :max="totalPages"
+            :max-pages="5"
+            data-test="correlated-logs-pagination-control"
+            @update:model-value="goToPage"
+          />
         </div>
-
-        <!-- Empty State -->
-        <div
-          v-else-if="isEmpty"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-          data-test="empty-state"
-        >
-          <p class="tw:text-base tw:font-medium tw:mb-2 tw:opacity-90">
-            {{ t("correlation.logs.noData") }}
-          </p>
-          <p class="tw:text-sm tw:opacity-70 tw:mb-4">
-            {{ t("correlation.logs.noDataDetails") }}
-          </p>
-        </div>
-      </div>
-
-      <!-- Pagination bar -->
-      <div
-        v-if="hasResults && totalPages > 1"
-        class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-2 tw:border-t tw:border-solid tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:text-xs tw:shrink-0"
-        data-test="correlated-logs-pagination"
-      >
-        <span class="tw:opacity-60">
-          {{ (currentPage - 1) * displayPageSize + 1 }}–{{ Math.min(currentPage * displayPageSize, searchResults.length) }} of {{ searchResults.length }}
-        </span>
-        <OPagination
-          :model-value="currentPage"
-          :max="totalPages"
-          :max-pages="5"
-          data-test="correlated-logs-pagination-control"
-          @update:model-value="goToPage"
-        />
       </div>
     </div>
   </div>
@@ -748,7 +750,7 @@ watch(defaultLogFields, (keyFields) => {
   initializeVisibleColumns(availableFields.value);
 });
 
-// Filter out tw:hidden columns, respecting custom order
+// Filter out hidden columns, respecting custom order
 const visibleFields = computed(() => {
   return orderedFields.value.filter((field) =>
     visibleColumns.value.has(field),
@@ -1015,7 +1017,6 @@ const handleResetFilters = () => {
 };
 
 const handleRowClick = (row: any) => {
-  console.log("[CorrelatedLogsTable] Row clicked:", row);
 };
 
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
@@ -1035,11 +1036,6 @@ const handleAddSearchTerm = (
   fieldValue: string | number | boolean,
   action: string,
 ) => {
-  console.log("[CorrelatedLogsTable] Add search term:", {
-    field,
-    fieldValue,
-    action,
-  });
   emit("addSearchTerm", field, fieldValue, action);
 };
 
@@ -1118,7 +1114,6 @@ const handleColumnOrderChange = (newOrder: string[]) => {
   const newOrderStr = JSON.stringify(newOrder);
 
   if (currentOrder === newOrderStr) {
-    console.log("[CorrelatedLogsTable] Order unchanged, skipping update");
     return;
   }
 
@@ -1211,7 +1206,6 @@ const handleViewTrace = (log: any) => {
 
 const handleNestedCorrelation = (row: any) => {
   // Nested correlation is disabled (as per hideViewRelatedButton prop)
-  console.log("[CorrelatedLogsTable] Nested correlation disabled");
 };
 
 // Lifecycle
@@ -1229,7 +1223,6 @@ onBeforeUnmount(() => {
 watch(
   () => props.timeRange,
   (newRange) => {
-    console.log("[CorrelatedLogsTable] Time range changed:", newRange);
   },
   { deep: true },
 );
@@ -1377,14 +1370,14 @@ const unifiedChips = computed<DimensionChip[]>(() =>
     padding: 0.5rem;
   }
 
-  .tw\:flex-wrap {
+  .flex-wrap {
     flex-direction: column;
     align-items: flex-start !important;
   }
 
   // Adjust skeleton for mobile
   [data-test="table-skeleton"] {
-    .tw\:flex {
+    .flex {
       flex-direction: column;
     }
   }

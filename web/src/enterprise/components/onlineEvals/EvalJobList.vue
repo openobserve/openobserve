@@ -20,13 +20,13 @@
         :persist-columns="true"
         table-id="eval-job-list"
         width="100%"
-        class="tw:w-full tw:h-full"
+        class="w-full h-full"
         @row-click="(row: any) => $emit('view', row)"
       >
         <template #toolbar>
           <OSearchInput
             :model-value="search"
-            class="tw:flex-1 tw:min-w-0"
+            class="flex-1 min-w-0"
             :placeholder="t('onlineEvals.job.searchPlaceholder')"
             data-test="eval-job-list-search-input"
             clearable
@@ -38,13 +38,26 @@
             :placeholder="t('onlineEvals.job.allStatuses')"
             size="md"
             width="sm"
-            class="tw:shrink-0"
+            class="shrink-0"
             data-test="eval-job-list-status-filter"
           />
         </template>
 
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="eval-job-list-refresh-btn"
+            @click="emit('refresh')"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="evalJobsRefresh" />
+          </OButton>
+        </template>
+
         <template #empty>
-          <div class="tw:flex tw:items-center tw:justify-center tw:py-8">
+          <div class="flex items-center justify-center py-8">
             <OEmptyState
               size="hero"
               preset="no-eval-jobs"
@@ -64,11 +77,11 @@
         </template>
 
         <template #cell-stream="{ row }">
-          <span class="tw:font-mono tw:text-xs">{{ row.stream }}</span>
+          <span class="font-mono text-xs">{{ row.stream }}</span>
         </template>
 
         <template #cell-scorers="{ row }">
-          <span class="tw:font-mono tw:text-xs">{{ scorerCountText(row) }}</span>
+          <span class="font-mono text-xs">{{ scorerCountText(row) }}</span>
         </template>
 
         <template #cell-created="{ row }">
@@ -76,7 +89,7 @@
         </template>
 
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:items-center actions-container">
+          <div class="flex items-center actions-container">
             <OButton
               v-if="canActivate(row.status)"
               :data-test="`eval-job-list-${row.name}-activate-btn`"
@@ -126,6 +139,9 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -157,6 +173,7 @@ const emit = defineEmits<{
   (e: "delete", row: EvalJob): void;
   (e: "activate", row: EvalJob): void;
   (e: "pause", row: EvalJob): void;
+  (e: "refresh"): void;
 }>();
 
 function canActivate(status: EvalJobStatus): boolean {
@@ -292,4 +309,8 @@ function formatDateShort(value: number) {
   if (!value) return "—";
   return formatDate(value, "YYYY-MM-DD HH:mm:ss");
 }
+
+useShortcuts([
+  { id: "evalJobsRefresh", handler: () => { if (!isInputFocused()) emit("refresh"); } },
+]);
 </script>

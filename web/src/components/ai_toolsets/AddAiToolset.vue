@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
+  <div class="p-0" style="min-height: inherit">
     <!-- Header -->
     <AppPageHeader
       :title="isEditing ? t('aiToolset.update') : t('aiToolset.add')"
@@ -23,20 +23,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         onClick: () => $emit('cancel:hideform'),
         dataTest: 'ai-toolset-back-btn',
       }"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     />
 
     <div
       style="height: calc(100vh - 120px); overflow: auto"
     >
-      <div class="tw:max-w-2xl tw:mx-4 tw:mt-4">
+      <div class="max-w-2xl mx-4 mt-4">
         <!-- Name -->
-        <div class="o2-input tw:mb-4">
+        <div class="o2-input mb-4">
           <OInput
             data-test="ai-toolset-name-input"
             v-model="form.name"
             :label="t('aiToolset.name') + ' *'"
-            class="showLabelOnTop tw:w-full"
+            class="showLabelOnTop w-full"
             :readonly="isEditing"
             :disabled="isEditing"
             :error="!!nameError"
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Kind -->
-        <div class="o2-input tw:mb-4">
+        <div class="o2-input mb-4">
           <OSelect
             data-test="ai-toolset-kind-select"
             v-model="form.kind"
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="kindOptions"
             labelKey="label"
             valueKey="value"
-            class="showLabelOnTop tw:w-full"
+            class="showLabelOnTop w-full"
             :disabled="isEditing"
             :error="!!kindError"
             :error-message="kindError"
@@ -63,64 +63,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Description -->
-        <div class="o2-input tw:mb-4">
+        <div class="o2-input mb-4">
           <OTextarea
             data-test="ai-toolset-description-input"
             v-model="form.description"
             :label="t('aiToolset.description')"
-            class="showLabelOnTop tw:w-full"
+            class="showLabelOnTop w-full"
           />
         </div>
 
         <!-- MCP fields -->
         <template v-if="form.kind === 'mcp'">
-          <div class="tw:text-base tw:font-medium tw:font-semibold tw:mb-3">
+          <div class="text-base font-medium font-semibold mb-3">
             {{ t("aiToolset.mcpConfig") }}
           </div>
-          <div class="o2-input tw:mb-4">
+          <div class="o2-input mb-4">
             <OInput
               data-test="ai-toolset-mcp-url"
               v-model="mcpData.url"
               :label="t('aiToolset.mcpUrl') + ' *'"
-              class="showLabelOnTop tw:w-full"
+              class="showLabelOnTop w-full"
               placeholder="https://api.example.com/mcp/"
               :error="!!mcpUrlError"
               :error-message="mcpUrlError"
               @update:model-value="mcpUrlError = ''"
             />
           </div>
-          <div class="o2-input tw:mb-4">
+          <div class="o2-input mb-4">
             <OInput
               data-test="ai-toolset-mcp-timeout"
               v-model.number="mcpData.timeout_seconds"
               :label="t('aiToolset.timeoutSeconds')"
-              class="showLabelOnTop tw:w-full"
+              class="showLabelOnTop w-full"
               type="number"
               min="1"
             />
           </div>
           <!-- Headers -->
-          <div class="tw:mb-2 tw:text-sm tw:font-medium">{{ t("aiToolset.headers") }}</div>
+          <div class="mb-2 text-sm font-medium">{{ t("aiToolset.headers") }}</div>
           <div
             v-for="(header, idx) in mcpHeaders"
             :key="idx"
-            class="tw:flex tw:items-end tw:gap-2 tw:mb-2"
+            class="flex items-end gap-2 mb-2"
           >
             <OInput
               v-model="header.key"
               :label="t('aiToolset.headerKey')"
-              class="o2-input tw:flex-1"
+              class="o2-input flex-1"
             />
             <OInput
               v-model="header.value"
               :label="t('aiToolset.headerValue')"
-              class="o2-input tw:flex-1"
+              class="o2-input flex-1"
               :type="header.visible ? 'text' : 'password'"
             >
               <template #icon-right>
                 <OIcon
                   :name="header.visible ? 'visibility-off' : 'visibility'" size="sm"
-                  class="tw:cursor-pointer"
+                  class="cursor-pointer"
                   @click="header.visible = !header.visible"
                 />
               </template>
@@ -133,19 +133,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="delete" size="xs" />
             </OButton>
           </div>
-          <OButton variant="outline" size="sm" class="tw:mb-4" @click="addHeader" icon-left="add">
+          <OButton variant="outline" size="sm" class="mb-4" @click="addHeader" icon-left="add">
             {{ t("aiToolset.addHeader") }}
           </OButton>
         </template>
 
         <!-- CLI fields -->
         <template v-if="form.kind === 'cli'">
-          <div class="tw:flex tw:items-center tw:gap-3 tw:mb-4">
-            <div class="tw:text-base tw:font-medium tw:font-semibold">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="text-base font-medium font-semibold">
               {{ t("aiToolset.cliConfig") }}
             </div>
-            <div class="tw:flex tw:items-center tw:gap-1">
-              <span class="tw:text-xs tw:text-gray-400"
+            <div class="flex items-center gap-1">
+              <span class="text-xs text-gray-400"
                 >{{ t("aiToolset.presets") }}:</span
               >
               <OTag
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="cliPreset"
                 :value="preset.id"
                 clickable
-                class="tw:cursor-pointer"
+                class="cursor-pointer"
                 :data-test="`cli-preset-${preset.id}`"
                 @click="applyPreset(preset)"
               >
@@ -162,75 +162,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTag>
             </div>
           </div>
-          <div class="o2-input tw:mb-4">
+          <div class="o2-input mb-4">
             <OInput
               data-test="ai-toolset-cli-command"
               v-model="cliData.command"
               :label="t('aiToolset.cliCommand') + ' *'"
-              class="showLabelOnTop tw:w-full"
+              class="showLabelOnTop w-full"
               placeholder="kubectl"
               :error="!!cliCommandError"
               :error-message="cliCommandError"
               @update:model-value="cliCommandError = ''"
             />
           </div>
-          <div class="o2-input tw:mb-4">
+          <div class="o2-input mb-4">
             <OInput
               v-model="cliData.allowed_subcommands_raw"
               :label="t('aiToolset.allowedSubcommands')"
               :helpText="t('aiToolset.subcommandsHint')"
-              class="showLabelOnTop tw:w-full"
+              class="showLabelOnTop w-full"
               placeholder="get, describe, logs"
             />
           </div>
-          <div class="tw:flex tw:gap-4 tw:mb-4">
-            <div class="o2-input tw:flex-1">
+          <div class="flex gap-4 mb-4">
+            <div class="o2-input flex-1">
               <OInput
                 v-model.number="cliData.timeout_seconds"
                 :label="t('aiToolset.timeoutSeconds')"
-                class="showLabelOnTop tw:w-full"
+                class="showLabelOnTop w-full"
                 type="number"
                 min="1"
               />
             </div>
-            <div class="o2-input tw:flex-1">
+            <div class="o2-input flex-1">
               <OInput
                 v-model.number="cliData.max_output_bytes"
                 :label="t('aiToolset.maxOutputBytes')"
-                class="showLabelOnTop tw:w-full"
+                class="showLabelOnTop w-full"
                 type="number"
                 min="1"
               />
             </div>
           </div>
-          <div class="tw:mb-4">
+          <div class="mb-4">
             <OSwitch
               v-model="cliData.requires_confirmation"
               :label="t('aiToolset.requiresConfirmation')"
             />
           </div>
           <!-- Env vars -->
-          <div class="tw:mb-2 tw:text-sm tw:font-medium">{{ t("aiToolset.envVars") }}</div>
+          <div class="mb-2 text-sm font-medium">{{ t("aiToolset.envVars") }}</div>
           <div
             v-for="(env, idx) in cliEnvVars"
             :key="'env-' + idx"
-            class="tw:flex tw:items-end tw:gap-2 tw:mb-2"
+            class="flex items-end gap-2 mb-2"
           >
             <OInput
               v-model="env.key"
               :label="t('aiToolset.envKey')"
-              class="o2-input tw:flex-1"
+              class="o2-input flex-1"
             />
             <OInput
               v-model="env.value"
               :label="t('aiToolset.envValue')"
-              class="o2-input tw:flex-1"
+              class="o2-input flex-1"
               :type="env.visible ? 'text' : 'password'"
             >
               <template #icon-right>
                 <OIcon
                   :name="env.visible ? 'visibility-off' : 'visibility'" size="sm"
-                  class="tw:cursor-pointer"
+                  class="cursor-pointer"
                   @click="env.visible = !env.visible"
                 />
               </template>
@@ -243,25 +243,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="delete" size="xs" />
             </OButton>
           </div>
-          <OButton variant="outline" size="sm" class="tw:mb-4" @click="addEnvVar" icon-left="add">
+          <OButton variant="outline" size="sm" class="mb-4" @click="addEnvVar" icon-left="add">
             {{ t("aiToolset.addEnvVar") }}
           </OButton>
 
           <!-- Credential files -->
-          <div class="tw:mb-2 tw:text-sm tw:font-medium">
+          <div class="mb-2 text-sm font-medium">
             {{ t("aiToolset.credentialFiles") }}
           </div>
           <div
             v-for="(cred, idx) in cliCredFiles"
             :key="'cred-' + idx"
-            class="tw:mb-4"
+            class="mb-4"
           >
-            <div class="tw:flex tw:items-center tw:gap-2 tw:mb-1">
+            <div class="flex items-center gap-2 mb-1">
               <OInput
                 v-model="cred.key"
                 :label="t('aiToolset.credEnvVar')"
                 helpText="e.g. KUBECONFIG"
-                class="o2-input tw:w-48"
+                class="o2-input w-48"
               />
               <OButton
                 variant="ghost-destructive"
@@ -272,12 +272,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="delete" size="xs" />
               </OButton>
             </div>
-            <div class="tw:text-xs tw:text-gray-500 tw:mb-1">
+            <div class="text-xs text-gray-500 mb-1">
               {{ t("aiToolset.credContentHint") }}
             </div>
             <query-editor
               :editor-id="`cred-file-editor-${idx}`"
-              class="tw:w-full tw:min-h-50! tw:rounded-[5px] tw:border tw:border-(--o2-border-color) tw:resize-y tw:overflow-auto"
+              class="w-full min-h-50! rounded-[5px] border border-(--o2-border-color) resize-y overflow-auto"
               language="yaml"
               v-model:query="cred.value"
             />
@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="outline"
             size="sm"
-            class="tw:mb-4"
+            class="mb-4"
             @click="addCredFile"
             icon-left="add"
           >
@@ -295,22 +295,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Skill fields -->
         <template v-if="form.kind === 'skill'">
-          <div class="tw:text-base tw:font-medium tw:font-semibold tw:mb-2">
+          <div class="text-base font-medium font-semibold mb-2">
             {{ t("aiToolset.skillConfig") }}
           </div>
-          <div class="tw:mb-1 tw:text-xs tw:text-gray-400">
+          <div class="mb-1 text-xs text-gray-400">
             {{ t("aiToolset.skillContent") }} *
           </div>
           <query-editor
             data-test="ai-toolset-skill-content"
             editor-id="skill-content-editor"
-            class="tw:w-full tw:min-h-100! tw:rounded-[5px] tw:border tw:border-(--o2-border-color) tw:resize-y tw:overflow-auto tw:mb-3"
+            class="w-full min-h-100! rounded-[5px] border border-(--o2-border-color) resize-y overflow-auto mb-3"
             language="markdown"
             v-model:query="skillData.content"
           />
           <div
             v-if="skillContentError"
-            class="tw:text-red-500 tw:text-xs tw:mt-[-12px] tw:mb-4"
+            class="text-red-500 text-xs mt-[-12px] mb-4"
           >
             {{ t("aiToolset.skillContentRequired") }}
           </div>
@@ -319,8 +319,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Footer -->
       <div
-        class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-3 tw:border-t tw:border-border-default tw:sticky tw:bottom-0"
-        :class="store.state.theme === 'dark' ? 'tw:bg-(--o2-primary-background)' : 'tw:bg-white'"
+        class="flex items-center gap-2 px-4 py-3 border-t border-border-default sticky bottom-0"
+        :class="store.state.theme === 'dark' ? 'bg-(--o2-primary-background)' : 'bg-white'"
       >
         <OButton
           data-test="ai-toolset-save-btn"
