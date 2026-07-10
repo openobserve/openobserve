@@ -1458,8 +1458,6 @@ async fn selector_load_data_from_datafusion(
         } else {
             missing_hashes.iter().copied().collect()
         };
-        // hashes whose labels were extracted in this scan (dedup)
-        let mut labeled_set: HashSet<u64> = HashSet::new();
         // Each missing series has a row at its own max timestamp, so scanning
         // those timestamps yields at least one label row per missing series.
         let series_timestamps = missing_hashes
@@ -1519,7 +1517,14 @@ async fn selector_load_data_from_datafusion(
                 .await?
         };
 
-        for batch in series {
+        // Extract labels from the scanned batches in parallel. A transient
+        // sharded map dedups rows of the same series across batches; races
+        // are harmless because a series' labels are identical on every row.
+        const EXTRACT_SHARDS: u64 = 32;
+        let extracted: Vec<parking_lot::Mutex<HashMap<u64, Labels>>> = (0..EXTRACT_SHARDS)
+            .map(|_| parking_lot::Mutex::new(HashMap::new()))
+            .collect();
+        series.par_iter().for_each(|batch| {
             let columns = batch.columns();
             let schema = batch.schema();
             let fields = schema.fields();
@@ -1536,13 +1541,14 @@ async fn selector_load_data_from_datafusion(
                     }
                 })
                 .collect::<Vec<(_, _)>>();
-            let mut attach_row_labels = |hash: u64, i: usize| {
-                if (!all_missing && !missing_set.contains(&hash)) || labeled_set.contains(&hash) {
+            let extract_row_labels = |hash: u64, i: usize| {
+                if !all_missing && !missing_set.contains(&hash) {
                     return;
                 }
-                let Some(range_val) = metrics.get_mut(&hash) else {
+                let shard = &extracted[(hash % EXTRACT_SHARDS) as usize];
+                if shard.lock().contains_key(&hash) {
                     return;
-                };
+                }
                 let mut labels = Vec::with_capacity(cols.len());
                 for (name, value) in cols.iter() {
                     if value.is_null(i) {
@@ -1553,11 +1559,7 @@ async fn selector_load_data_from_datafusion(
                         value: value.value(i).to_string(),
                     }));
                 }
-                labeled_set.insert(hash);
-                if cache_enabled {
-                    label_cache.put(ctx_fp, hash, labels.clone());
-                }
-                range_val.labels = maybe_prepend_hash_label(labels, hash, query_ctx.query_data);
+                shard.lock().insert(hash, labels);
             };
             if hash_field_type == &DataType::UInt64 {
                 let hash_values = batch
@@ -1567,7 +1569,7 @@ async fn selector_load_data_from_datafusion(
                     .downcast_ref::<UInt64Array>()
                     .unwrap();
                 for i in 0..batch.num_rows() {
-                    attach_row_labels(hash_values.value(i), i);
+                    extract_row_labels(hash_values.value(i), i);
                 }
             } else {
                 let hash_values = batch
@@ -1577,10 +1579,31 @@ async fn selector_load_data_from_datafusion(
                     .downcast_ref::<StringArray>()
                     .unwrap();
                 for i in 0..batch.num_rows() {
-                    attach_row_labels(gxhash::new().sum64(hash_values.value(i)), i);
+                    extract_row_labels(gxhash::new().sum64(hash_values.value(i)), i);
                 }
             }
-        }
+        });
+
+        // attach the extracted labels (and fill the cache) in parallel
+        metrics
+            .iter_mut()
+            .collect::<Vec<_>>()
+            .into_par_iter()
+            .for_each(|(hash, range_val)| {
+                if !range_val.labels.is_empty() {
+                    return; // already attached from the cache
+                }
+                let Some(labels) = extracted[(*hash % EXTRACT_SHARDS) as usize]
+                    .lock()
+                    .remove(hash)
+                else {
+                    return;
+                };
+                if cache_enabled {
+                    label_cache.put(ctx_fp, *hash, labels.clone());
+                }
+                range_val.labels = maybe_prepend_hash_label(labels, *hash, query_ctx.query_data);
+            });
     }
 
     log::info!(
