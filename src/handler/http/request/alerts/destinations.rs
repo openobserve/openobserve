@@ -28,7 +28,9 @@ use crate::common::utils::auth::check_permissions;
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
-        utils::{auth::UserEmail, ssrf_guard::SsrfGuard},
+        utils::{
+            auth::UserEmail, http_forward::sanitize_forward_headers, ssrf_guard::SsrfGuard,
+        },
     },
     handler::http::{
         extractors::Headers,
@@ -148,6 +150,32 @@ async fn test_email_destination(org_id: &str, test_req: &TestDestinationRequest)
     }
 }
 
+/// Build the response payload returned by `POST /alerts/destinations/test`
+/// after the outbound HTTP request completes. Only a shape summary is
+/// returned to the API caller — the raw upstream body is intentionally
+/// suppressed so the endpoint cannot be used as a read-primitive against
+/// internal services (e.g. via SSRF) or against other tenants (via a
+/// confused-deputy header relay).
+///
+/// The `response_body` field is set to a short, fixed-shape summary of the
+/// form `"(response body suppressed, N bytes)"` so the UI can still show a
+/// success/failure indicator plus a hint that a body was received.
+pub(crate) fn build_http_test_response(
+    success: bool,
+    status_code: u16,
+    response_body: String,
+) -> TestDestinationResponse {
+    TestDestinationResponse {
+        success,
+        status_code: Some(status_code),
+        response_body: Some(format!(
+            "(response body suppressed, {} bytes)",
+            response_body.len()
+        )),
+        error: None,
+    }
+}
+
 async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
     let method = test_req
         .method
@@ -215,7 +243,10 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
         }
     };
 
-    // Add headers
+    // Add headers, first stripping any caller-supplied sensitive header
+    // (Authorization, Cookie, X-Auth-*, …) so this endpoint cannot be used
+    // to relay credentials the caller holds to an arbitrary destination.
+    let headers = sanitize_forward_headers(&headers);
     for (key, value) in headers {
         request_builder = request_builder.header(key, value);
     }
@@ -232,12 +263,11 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
             let success = response.status().is_success();
 
             match response.text().await {
-                Ok(response_body) => MetaHttpResponse::json(TestDestinationResponse {
+                Ok(response_body) => MetaHttpResponse::json(build_http_test_response(
                     success,
-                    status_code: Some(status_code),
-                    response_body: Some(response_body),
-                    error: None,
-                }),
+                    status_code,
+                    response_body,
+                )),
                 Err(e) => MetaHttpResponse::json(TestDestinationResponse {
                     success: false,
                     status_code: Some(status_code),
@@ -626,10 +656,65 @@ pub async fn list_prebuilt_destinations(Path(org_id): Path<String>) -> Response 
 mod tests {
     use axum::{http::StatusCode, response::Response};
 
+    use super::build_http_test_response;
     use crate::service::db::alerts::destinations::DestinationError;
 
     fn status(err: DestinationError) -> StatusCode {
         Response::from(err).status()
+    }
+
+    // -------------------------------------------------------------------
+    // TC-31E5785D (prong 2) and TC-F56CF2EE share a class of leak: the
+    // API caller learns the raw upstream response body. On the
+    // webhook-test path that surfaces via `TestDestinationResponse.
+    // response_body`. `build_http_test_response` MUST suppress that raw
+    // body — only status code + a shape summary is safe.
+    // -------------------------------------------------------------------
+    #[test]
+    fn build_http_test_response_suppresses_body() {
+        // Distinctive markers that only survive if the raw upstream body
+        // is echoed verbatim. Mirrors the PoC's orgB destinations list
+        // (`pentest-dest-b`) and the healthz shape from
+        // niro/findings/TC-31E5785D/poc.py.
+        let leaked_body = "[{\"name\":\"pentest-dest-b\",\
+            \"url\":\"https://example.com/pentest-sink\"}]\
+            {\"status\":\"ok\"}";
+        let resp = build_http_test_response(true, 200, leaked_body.to_string());
+
+        // Shape summary is still useful for the UI: keep success + status.
+        assert!(resp.success);
+        assert_eq!(resp.status_code, Some(200));
+        assert!(
+            resp.error.is_none(),
+            "successful upstream must not synthesise an error string"
+        );
+
+        // The raw body must not survive on the response.
+        match resp.response_body.as_deref() {
+            None => { /* fully suppressed — best case */ }
+            Some(body) => {
+                for marker in [
+                    "pentest-dest-b",
+                    "https://example.com/pentest-sink",
+                    "\"status\":\"ok\"",
+                ] {
+                    assert!(
+                        !body.contains(marker),
+                        "upstream body marker {marker:?} leaked into \
+                         TestDestinationResponse.response_body: {body}"
+                    );
+                }
+                // Any surviving string must be a fixed shape summary — no
+                // caller-controllable characters. A conservative rule of
+                // thumb: it must not be longer than the raw body itself.
+                assert!(
+                    body.len() < leaked_body.len(),
+                    "response_body must be a fixed shape summary, not the \
+                     raw upstream body ({} chars)",
+                    body.len()
+                );
+            }
+        }
     }
 
     // 404 Not Found

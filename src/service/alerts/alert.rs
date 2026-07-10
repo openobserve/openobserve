@@ -1283,10 +1283,19 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
         HTTPType::GET => client.get(url),
     };
 
-    // Add additional headers if any from destination description
+    // Add additional headers from destination description, first stripping
+    // any caller-supplied sensitive header (Authorization, Cookie, X-Auth-*,
+    // …) so the alert-trigger path cannot relay credentials the caller
+    // holds to an arbitrary destination.
     let mut has_context_type = false;
-    if let Some(headers) = &endpoint.headers {
-        for (key, value) in headers.iter() {
+    if let Some(raw_headers) = &endpoint.headers {
+        for (key, value) in raw_headers.iter() {
+            // Skip caller-supplied sensitive headers (Authorization, Cookie,
+            // X-Auth-*, …) so a compromised destination configuration
+            // cannot relay credentials it holds to an arbitrary URL.
+            if crate::common::utils::http_forward::is_sensitive_forward_header(key) {
+                continue;
+            }
             if !key.is_empty() && !value.is_empty() {
                 if key.to_lowercase().trim() == "content-type" {
                     has_context_type = true;
@@ -1315,10 +1324,18 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
         log::error!(
             "Alert http notification failed with status: {resp_status}, body: {resp_body}, payload: {msg}"
         );
+        // Return only a status-code error to the API caller. The raw
+        // upstream body may contain third-party HTML, cross-tenant data
+        // reached via a compromised destination, or secrets that leaked
+        // out of an internal service — none of which is safe to reflect
+        // to the caller who authored the trigger. The full body is still
+        // captured in the log::error! above for operator diagnostics.
         return Err(anyhow::anyhow!(
-            "sent error status: {}, err: {}",
-            resp_status,
-            resp_body
+            "{}",
+            crate::common::utils::http_forward::format_upstream_error(
+                resp_status,
+                &resp_body,
+            )
         ));
     }
 

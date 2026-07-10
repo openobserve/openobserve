@@ -16,6 +16,7 @@
 pub mod auth;
 pub mod functions;
 pub mod http;
+pub mod http_forward;
 pub mod js;
 pub mod jwt;
 pub mod redirect_response;
