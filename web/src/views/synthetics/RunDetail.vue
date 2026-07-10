@@ -209,14 +209,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ errorType }}
                     </span>
-                    <OBadge v-if="failedStepLabel" variant="error" size="sm">
-                      {{ failedStepLabel }}
+                    <OBadge v-if="failedStepInfo" variant="error" size="sm">
+                      Step {{ failedStepInfo.step.id }}: {{ failedStepInfo.step.action }} failed
                     </OBadge>
                   </div>
                   <p
+                    v-if="failedStepInfo?.summary"
                     class="text-[12.5px] leading-[1.6] text-text-body mt-1.5 mb-0"
                   >
-                    {{ errorReason }}
+                    {{ failedStepInfo.summary }}
                   </p>
                   <OButton
                     variant="outline-destructive"
@@ -486,61 +487,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OButton>
                     </div>
 
-                    <!-- Inline error card for failed steps -->
-                    <div
-                      v-if="st.status === 'fail' && st.error"
-                      class="mx-6 mb-2 border border-badge-error-ol-border/30 rounded-lg overflow-hidden"
-                      :data-test="`synthetics-run-detail-step-error-card-${st.id}`"
-                    >
-                      <div
-                        class="flex items-center gap-2 px-3 py-2 bg-[var(--color-badge-error-soft-bg)]"
-                      >
-                        <OIcon
-                          name="error"
-                          size="sm"
-                          class="text-[var(--o2-status-error)]"
-                          aria-hidden="true"
-                        />
-                        <span
-                          class="text-xs font-semibold text-[var(--o2-text-heading)] flex-1"
-                          >Error</span
-                        >
-                        <span
-                          class="text-xs font-mono text-[var(--o2-text-secondary)]"
-                          >exit · {{ st.durStr }}</span
-                        >
-                      </div>
-                      <div class="px-3 py-3">
-                        <p class="text-[12.5px] text-[var(--o2-text-body)] m-0">
-                          {{ st.error }}
-                        </p>
-                      </div>
-                    </div>
-
-                    <!-- Expanded content -->
+                    <!-- Expanded content (auto-expanded for failed steps) -->
                     <div v-if="isExpanded(st.id)" class="flex gap-4 p-3">
                       <!-- Screenshot preview 280px -->
-                      <div class="w-[280px] shrink-0">
+                      <div class="w-[30%] shrink-0">
                         <div
                           class="rounded border border-[var(--o2-border-color)] overflow-hidden"
                         >
-                          <div
-                            class="flex items-center gap-1 px-[8px] py-1 bg-surface-subtle border-b border-[var(--o2-border-color)]"
-                          >
-                            <span
-                              class="w-1.5 h-1.5 rounded-full bg-[var(--o2-grey-300)]"
-                            />
-                            <span
-                              class="w-1.5 h-1.5 rounded-full bg-[var(--o2-grey-300)]"
-                            />
-                            <span
-                              class="w-1.5 h-1.5 rounded-full bg-[var(--o2-grey-300)]"
-                            />
-                            <span
-                              class="font-mono text-[10px] text-text-secondary ml-1 truncate"
-                              >{{ st.detail }}</span
-                            >
-                          </div>
                           <div
                             class="aspect-[16/10] flex items-center justify-center overflow-hidden"
                             :class="
@@ -588,7 +541,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
 
-                      <!-- KV metadata + actions -->
+                      <!-- Details (right panel): error + KV metadata + actions -->
                       <div class="flex-1 flex flex-col gap-2">
                         <dl
                           class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs"
@@ -622,6 +575,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </dt>
                           <dd class="text-text-heading">{{ st.durStr }}</dd>
                         </dl>
+
+                        <!-- Error section (failed steps only) -->
+                        <div
+                          v-if="st.status === 'fail' && st.error"
+                          class="rounded-lg border border-badge-error-ol-border/30 overflow-hidden"
+                          :data-test="`synthetics-run-detail-step-error-card-${st.id}`"
+                        >
+                          <div
+                            class="flex items-center gap-2 px-3 py-2 bg-[var(--color-badge-error-soft-bg)]"
+                          >
+                            <OIcon
+                              name="error"
+                              size="sm"
+                              class="text-[var(--o2-status-error)]"
+                              aria-hidden="true"
+                            />
+                            <span
+                              class="text-xs font-semibold text-[var(--o2-text-heading)] flex-1"
+                              >Error</span
+                            >
+                            <span
+                              class="text-xs font-mono text-[var(--o2-text-secondary)]"
+                              >exit · {{ st.durStr }}</span
+                            >
+                          </div>
+                          <div class="px-3 py-3">
+                            <pre
+                              class="text-[12.5px] text-[var(--o2-text-body)] m-0 whitespace-pre-wrap font-mono leading-relaxed"
+                              :class="{ 'max-h-[96px] overflow-hidden': !expandedStepErrors.has(st.id) && (st.error?.length ?? 0) > 200 }"
+                            >{{ st.error }}</pre>
+                            <button
+                              v-if="(st.error?.length ?? 0) > 200"
+                              class="text-xs font-semibold text-[var(--o2-text-link)] mt-1.5 hover:underline cursor-pointer"
+                              @click="toggleStepError(st.id)"
+                            >
+                              {{ expandedStepErrors.has(st.id) ? 'Show less' : 'Show full error' }}
+                            </button>
+                          </div>
+                        </div>
+
                         <div class="flex gap-2 mt-auto">
                           <OButton
                             variant="ghost"
@@ -810,6 +803,7 @@ function actionIcon(action: string): string {
 // ── StepRow — display model for step rows ──────────────────────────────────
 interface StepRow {
   id: number;
+  stepId: string;
   action: string;
   name: string;
   detail: string;
@@ -839,6 +833,7 @@ function buildSteps(detail: SyntheticRunDetail | null): StepRow[] {
     const isFail = ex.status === "fail";
     return {
       id: idx + 1,
+      stepId: ex.step_id,
       action: recorded?.action ?? "step",
       name:
         recorded?.name ||
@@ -1055,6 +1050,40 @@ const steps = computed<StepRow[]>(() => {
   return [];
 });
 
+/** Collapsible step error state (show-more / show-less for long Playwright logs). */
+const expandedStepErrors = ref(new Set<number>());
+function toggleStepError(id: number) {
+  const next = new Set(expandedStepErrors.value);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  expandedStepErrors.value = next;
+}
+
+/** Failed step info for the error banner — matched from detail.failedStep. */
+const failedStepInfo = computed(() => {
+  const detail = synthetics.runDetail.value;
+  if (!detail?.failedStep || !steps.value.length) return null;
+  const step = steps.value.find((s) => s.stepId === detail.failedStep);
+  if (!step) return null;
+  return {
+    step,
+    summary: step.error ? step.error.split('\n')[0] : '',
+  };
+});
+
+/** Auto-expand any failed steps when the run data loads. */
+watch(steps, (newSteps) => {
+  const next = new Set(expandedStepIds.value);
+  let changed = false;
+  for (const st of newSteps) {
+    if (st.status === 'fail' && !next.has(st.id)) {
+      next.add(st.id);
+      changed = true;
+    }
+  }
+  if (changed) expandedStepIds.value = next;
+});
+
 const statusBadgeVariant = computed(() =>
   isErrorRun.value ? "error-soft" : isFailed.value ? "error" : "success",
 );
@@ -1066,9 +1095,7 @@ const statusLabel = computed(() =>
 );
 
 const errorType = computed(() => currentRun.value.errorType ?? "");
-const errorReason = computed(() => currentRun.value.errorReason ?? "");
 const errorStack = computed(() => currentRun.value.errorStack ?? "");
-const failedStepLabel = computed(() => currentRun.value.failedStepLabel ?? "");
 
 const infoChips = computed(() => [
   { label: "Duration", value: fmtDur(currentRun.value.duration), icon: "" },

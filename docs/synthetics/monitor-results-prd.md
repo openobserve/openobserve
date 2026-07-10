@@ -63,6 +63,7 @@ Stream field mapping:
 - `attempts` field drives Retry Rate (attempts > 1 = retried)
 - `execution_id` → `executionId` — disambiguates engine×device×location combos for the same logical run
 - `last_attempt_steps` JSON uses snake_case keys (`step_id`, `duration_ms`, `screenshot_key`, `error`) — the `StepExecution` type field names match the raw stream data (no camelCase mapping)
+- **Step status normalization**: `mapRunDetail()` normalizes step statuses via `.map()` — `"ok"`/`"passed"` → `"ok"`, everything else → `"fail"`. This matches `parseSteps()` behavior used by the drawer components. Without this normalization, the raw stream value `"failed"` never matches `ex.status === "fail"` in `buildSteps()`, causing all steps to render as passed.
 
 ### Composable: useSyntheticResults
 
@@ -105,12 +106,62 @@ RunDetail is embedded in an ODrawer that opens from the left side at **80% width
 - On drawer open, `?run=<runId>&exec=<executionId>` is written to the query params
 - On drawer close, these params are cleared
 - On page mount, if the query params are present, the drawer auto-opens (supports refresh and URL sharing)
-- The title is shown via the ODrawer's `:title` prop, with a status badge in the `#header-right` slot
 
 **Implementation:**
 - `ODrawer` from `@/lib/overlay/Drawer/ODrawer.vue` — `v-model:open`, `side="right"`, `width=80`
 - `RunDetail` wrapped inside the drawer with `drawer-mode` prop set
 - Status badge in `#header-right` slot, updated via `@update-status` emit from RunDetail
+
+### Run Detail Header
+
+**Route mode** — AppPageHeader with:
+- **Title**: "Run Details" (no execution ID shown)
+- **Title-trail**: Status badge (Passed/Failed/Error), URL badge (if present), timestamp label
+- **Actions**: Open Playwright Trace button, Rerun button, prev/next navigation buttons
+
+**Drawer mode** — ODrawer's built-in title bar:
+- **Title**: "Run Details" (via `:title` prop)
+- **Header-right slot**: Status badge only (updated via `@update-status` emit)
+
+### Info Chips (RunDetail Summary Tab)
+
+Six individual cards matching the KPI card pattern from MonitorRuns (`card-container`, `bg-[var(--o2-card-bg)]`, border). Each chip is a standalone card in a `grid grid-cols-5` layout:
+
+1. **Duration** — `fmtDur(currentRun.duration)` (monospace)
+2. **URL** — target URL from recorded steps, or "—" fallback. Icon: `link` when present.
+3. **Browser** — Chromium/Firefox/WebKit with branded SVG icon (via `img:` prefix)
+4. **Device** — computer/tablet/smartphone icon
+5. **Location** — AWS region name with cloud provider SVG icon
+
+### Error Status Handling
+
+The `synthetics_results` stream returns distinct status values that drive different UI states:
+
+| Status | Meaning | Badge | Steps Banner | Error Callout |
+|--------|---------|-------|-------------|---------------|
+| `"passed"` | All steps completed | Success (green check) | "Run passed — N/N steps completed" | Hidden |
+| `"failed"` | Browser ran but a step failed | Error (red cancel) | "Run failed — {failedStepLabel}" | Shown with error type + stack trace |
+| `"error"` | Infra failure (Lambda, credentials, etc.) | Error-soft (soft red error icon) | "Lambda execution failed — check the error details above" | Shown with error type + stack trace |
+
+**Error callout styling** matches BrowserJourney.vue:
+- Background: `var(--color-badge-error-soft-bg)`
+- Border: `border-badge-error-ol-border/30`
+- Icon/text: `var(--o2-status-error-text)` for heading, `text-badge-error-ol-text` for banner text
+- Badge shows step number + action name (e.g. "Step 8: click failed") instead of just the step ID
+- Body text shows the error summary (first line of the Playwright error) rather than the full multiline log
+- "View full error & stack trace" uses OButton (variant `outline-destructive`, size `xs`) — expands to show the full Playwright call log with preserved formatting
+
+**Steps section** is hidden (`v-if="steps.length > 0"`) when there are no steps to display — for `"error"` runs with empty `last_attempt_steps`, only the info chips + error callout render.
+
+### Loading Skeletons
+
+During data fetch (`synthetics.loading === true`), RunDetail shows OSkeleton placeholders instead of blank/zero values:
+
+- **Info chips skeleton**: 4 cards in `grid grid-cols-4`, each with `OSkeleton type="text"` for label (h-3 w-16) and value (h-5 w-24). Wrapped in `<template v-if="loading">`.
+- **Steps skeleton**: Full card with header skeleton (`OSkeleton type="text" h-4 w-14`) + `OSeparator` + 4 step rows. Each row: `OSkeleton type="rect"` for thumbnail (h-12 w-18), `type="circle"` for step number, `type="text"` for step name, `type="text"` for duration.
+- **Transition**: `v-if="loading"` for skeletons, `v-else` for real content. Once `runDetail` is populated, skeletons disappear and real chips/steps render.
+- **Import**: `OSkeleton` from `@/lib/feedback/Skeleton/OSkeleton.vue`.
+- **Composable**: `const loading = computed(() => synthetics.loading.value)` aliases the existing `loading` ref from `useSyntheticResults`.
 
 ### Status Timeline Design
 
@@ -146,11 +197,12 @@ Follows `BrowserJourneyStep.vue` conventions:
 - **Step name fallback**: Displays `name → selector → url → truncated step_id` when earlier fields are absent.
 - **Action icons**: Uses kebab-case icon names matching OIcon's validated icon set (`open-in-browser`, `ads-click`, `keyboard`, `touch-app`, etc.) — sourced from `BrowserJourneyStep.vue`.
 - **Status circles**: Colored step number circles — green (`--color-badge-success-soft-bg/text`) for pass, red (`--color-badge-error-soft-bg/text`) for fail.
-- **Error card**: Inline card below failed step rows showing error icon, "Error" label, `exit · duration`, and the error message body. Replaces the old per-step error line in the KV section.
+- **Error card**: Error section is rendered inside the expanded details panel (right side), not as a standalone inline card. Shows error icon, "Error" label, `exit · duration`, and the Playwright error in a `<pre>` with `whitespace-pre-wrap font-mono`. Long errors (>200 chars) collapse with "Show full error"/"Show less" toggle.
 - **Card container**: `rounded border bg-[--o2-card-bg] mb-1`.
 - **Compact row**: Step status circle, action icon chip (primary-50 bg), action label badge, step name, duration monospace, expand/collapse chevron.
 - **Multi-expand**: `expandedStepIds: Set<number>` — multiple steps expandable simultaneously.
-- **Expanded content**: 280px screenshot preview (left) + KV metadata (action/selector/url/duration rows) + download button (right).
+- **Auto-expand failed steps**: A `watch(steps)` auto-adds failed steps to `expandedStepIds` when data loads.
+- **Expanded content**: 30%-width screenshot preview (no grey details header bar) + right panel with KV metadata (Action/Selector/URL/Duration), error section (for failed steps), and download button.
 - **Session replay card**: Hidden entirely (via `v-if`) when `hasReplay` is false — no "No replay" placeholder. The steps timeline fills the full width.
 
 ### Card Styling

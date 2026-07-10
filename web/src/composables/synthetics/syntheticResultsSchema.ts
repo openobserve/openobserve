@@ -402,7 +402,10 @@ export function mapRunDetail(
       ? (rawRecordedSteps as RecordedStep[])
       : [],
     lastAttemptSteps: Array.isArray(rawSteps)
-      ? (rawSteps as StepExecution[])
+      ? (rawSteps as StepExecution[]).map((s) => ({
+          ...s,
+          status: s.status === "ok" || s.status === "passed" ? "ok" : "fail" as const,
+        }))
       : [],
     retryHistory: [],
     network: null,
