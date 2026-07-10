@@ -594,10 +594,14 @@ describe("CreateBackfillJobDialog – createBackfillJobRequest", () => {
       message: "created",
     });
     const wrapper = createWrapper();
-    (wrapper.vm as any).formData.startTimeMicros = 1_700_000_000_000_000;
-    (wrapper.vm as any).formData.endTimeMicros = 1_700_003_600_000_000;
+    // OForm-owned state (no more `formData`): seed the range via the form and
+    // keep delete_before_backfill off so submit goes straight to createBackfillJobRequest.
+    setRange(wrapper, validRange());
+    setField(wrapper, "deleteBeforeBackfill", false);
 
-    // Drive the real OInput (type="number" emits a string; v-model.number coerces)
+    // Drive the real OInput. OFormInput binds OInput without a `.number` modifier,
+    // so a type="number" field stores the RAW STRING; the number coercion happens
+    // in createBackfillJobRequest (Number(...)) when building the payload.
     await wrapper
       .find('[data-test="chunk-period-input-field"]')
       .setValue("120");
@@ -606,11 +610,12 @@ describe("CreateBackfillJobDialog – createBackfillJobRequest", () => {
       .setValue("15");
     await nextTick();
 
-    // The v-model.number modifier must have coerced the emitted strings to numbers
-    expect((wrapper.vm as any).formData.chunkPeriodMinutes).toBe(120);
-    expect((wrapper.vm as any).formData.delayBetweenChunks).toBe(15);
+    // Form state holds the emitted strings (documents the coercion boundary).
+    expect(formVals(wrapper).chunkPeriodMinutes).toBe("120");
+    expect(formVals(wrapper).delayBetweenChunks).toBe("15");
 
-    await (wrapper.vm as any).createBackfillJobRequest();
+    // Submit through the real form so onSubmit -> createBackfillJobRequest(value) runs.
+    await submitForm(wrapper);
     await flushPromises();
 
     const payload = vi.mocked(backfillService.createBackfillJob).mock.calls[0][0]
