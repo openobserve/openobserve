@@ -15,29 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col w-full h-full px-2.5 bg-(--q-background)">
+  <div class="w-full h-full flex flex-col min-h-0 px-2.5 bg-(--q-background)">
     <!-- Top Header Bar -->
-    <div class="header-bar shrink-0 card-container flex items-center justify-between py-[0.675rem] h-16 px-[0.675rem] mb-[0.675rem] border-b border-[var(--o2-border-color)]">
-      <div class="flex items-center gap-3">
-        <div
-          data-test="add-alert-back-btn"
-          class="flex justify-center items-center mr-3 cursor-pointer"
-          style="
-            border: 1.5px solid;
-            border-radius: 50%;
-            width: 22px;
-            height: 22px; 
-          "
-          title="Go Back"
-          @click="navigateBack()"
-        >
-          <OIcon name="arrow-back-ios-new" size="xs" />
-        </div>
-        <div>
-          <div class="text-xl font-semibold text-weight-medium">Upload Source Maps</div>
-        </div>
-      </div>
-    </div>
+    <AppPageHeader
+      title="Upload Source Maps"
+      :back="{ onClick: navigateBack, dataTest: 'add-alert-back-btn' }"
+      class="px-4 border-b border-border-default"
+    />
 
     <OForm
       id="upload-source-maps-form"
@@ -121,6 +105,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import SourceMapDropzone from "./SourceMapDropzone.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   makeUploadSourceMapsSchema,

@@ -2153,6 +2153,10 @@
     "isHomeDashboard": "Home dashboard",
     "openHomeDashboard": "View pinned dashboard",
     "pinnedOnHome": "Pinned dashboard on home page",
+    "deletedSuccessfully": "Dashboard deleted successfully.",
+    "pinnedDeletedPinRemoved": "Pinned dashboard was deleted, so its Home pin was removed.",
+    "homePinNotFound": "This dashboard no longer exists and was removed from Home.",
+    "homePinUnavailable": "This dashboard is no longer available and was removed from Home.",
     "setAsHomeDesc": "Show this dashboard on the home page for everyone in the org",
     "moreActions": "More actions",
     "save": "Save",
@@ -2977,6 +2981,9 @@
     "enterpriseNote": "High volume needs? Let's talk scale! Contact us for tailored solutions.",
     "contactSupport": "Contact Support",
     "totalUsage": "Total Usage",
+    "usageTrends": {
+      "dailyUsage": "Daily usage"
+    },
     "aiCredits": "AI Credits",
     "aiModeFree": "Free",
     "aiModePayAsYouGo": "Pay as you go",

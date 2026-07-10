@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="rounded-md p-0" style="min-height: inherit">
+  <div class="p-0" style="min-height: inherit">
     <!-- Header -->
     <AppPageHeader
       :title="isEditing ? t('aiToolset.update') : t('aiToolset.add')"

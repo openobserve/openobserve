@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="rounded-md p-0" style="min-height: inherit; height: calc(100vh - 88px);">
+  <div class="p-0" style="min-height: inherit; height: calc(100vh - 88px);">
     <div v-if="!showAddDialog">
       <!-- Standard section header: title + actions only. Search moved into the
            table toolbar below. -->

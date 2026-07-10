@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center justify-between w-full py-2"
             >
               <div
-                class="flex items-center font-bold text-[14px] mr-4"
+                class="flex items-center o2-table-footer-title mr-4"
               >
                 {{ bottomProps.totalRows }} {{ t("evalTemplate.header") }}
               </div>

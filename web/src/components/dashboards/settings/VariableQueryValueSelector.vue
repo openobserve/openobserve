@@ -270,7 +270,9 @@ export default defineComponent({
 
       selectedValue.value = newValue;
       emit("update:modelValue", newValue);
-      await closePopUpWhenValueIsSet();
+      if (!props.variableItem.multiSelect) {
+        await closePopUpWhenValueIsSet();
+      }
     };
 
     const onUpdateValue = async (val: any) => {
