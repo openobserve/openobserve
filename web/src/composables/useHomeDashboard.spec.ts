@@ -115,6 +115,20 @@ describe("useHomeDashboard", () => {
     expect(homeDashboard.value).toEqual(D); // restored
   });
 
+  it("clearHomeDashboard treats a 404 as already-cleared (no revert, no toast)", async () => {
+    // The backend clears home_dashboard itself when the pinned dashboard is
+    // deleted, so the client's delete can race and 404. That is the desired end
+    // state — keep the optimistic null, do not revert, do not toast.
+    const { clearHomeDashboard, homeDashboard } = useHomeDashboard();
+    homeDashboard.value = D;
+    (settings.deleteOrgSetting as any).mockRejectedValue({
+      response: { status: 404 },
+    });
+    await clearHomeDashboard("org1");
+    expect(homeDashboard.value).toBeNull(); // stays cleared
+    expect(toast).not.toHaveBeenCalled();
+  });
+
   it("isHome reflects the current value", () => {
     const { isHome, homeDashboard } = useHomeDashboard();
     homeDashboard.value = D;

@@ -1103,6 +1103,9 @@ export default defineComponent({
 
     const deleteDashboard = async () => {
       if (selectedDelete.value) {
+        // Capture before the row reference is cleared — used below to drop a
+        // stale Home pin that pointed at the just-deleted dashboard.
+        const deletedWasHome = isHome(selectedDelete.value.id);
         try {
           //delete dashboard by id and folder id
           await deleteDashboardById(
@@ -1113,6 +1116,13 @@ export default defineComponent({
               : (activeFolderId.value ?? "default"),
           );
           showPositiveNotification("Dashboard deleted successfully.");
+          // The backend clears the home_dashboard setting on delete; re-read it
+          // so the Home shortcut button / pin state updates immediately instead
+          // of lingering until the next navigation.
+          if (deletedWasHome) {
+            const org = store.state.selectedOrganization?.identifier;
+            if (org) useHomeDashboard().load(org);
+          }
         } catch (err) {
           showErrorNotification(err?.message ?? "Dashboard deletion failed", {
           });
