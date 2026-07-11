@@ -164,6 +164,9 @@ pub fn linear_regression(samples: &[Sample], intercept_time: i64) -> Option<(f64
 
 pub fn kahan_sum_increment(increment: f64, sum: f64, c: f64) -> (f64, f64) {
     let updated_sum = sum + increment;
+    if updated_sum.is_infinite() {
+        return (updated_sum, 0.0);
+    }
     let y = if sum.abs() >= increment.abs() {
         (sum - updated_sum) + increment
     } else {
