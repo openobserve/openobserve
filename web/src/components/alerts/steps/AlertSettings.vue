@@ -103,38 +103,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>{{ t("alerts.destination") }} *</span>
             </div>
             <div class="tw:flex tw:flex-col">
-              <div class="tw:flex tw:items-center">
-                <OSelect
-                  v-model="localDestinations"
-                  :options="formattedDestinations"
-                  data-test="alert-destinations-select"
-                  multiple
-                  class="tw:min-w-[180px] tw:max-w-[300px]"
-                  @update:model-value="emitDestinationsUpdate"
-                >
-                  <template #empty>{{
-                    t("alerts.alertSettings.noDestinationsAvailable")
-                  }}</template>
-                </OSelect>
-                <OButton
-                  data-test="alert-settings-refresh-destinations-btn"
-                  class="tw:ml-1"
-                  variant="ghost"
-                  size="icon-circle-sm"
-                  :title="t('alerts.alertSettings.refreshDestinations')"
-                  @click="$emit('refresh:destinations')"
-                >
-                  <OIcon name="refresh" size="sm" />
-                </OButton>
-                <OButton
-                  data-test="create-destination-btn"
-                  variant="outline"
-                  size="sm"
-                  class="tw:ml-2"
-                  @click="routeToCreateDestination"
-                  >{{ t("alerts.alertSettings.addNewDestination") }}</OButton
-                >
-              </div>
+              <AlertTargetsSelect
+                :destinations="localDestinations"
+                :workflows="localWorkflows"
+                :destination-options="formattedDestinations"
+                :workflow-options="workflowOptions"
+                :is-enterprise="isEnterprise"
+                @update:destinations="onTargetsDestinations"
+                @update:workflows="onTargetsWorkflows"
+                @refresh="refreshTargets"
+                @create-destination="routeToCreateDestination"
+                @create-workflow="routeToCreateWorkflow"
+              />
               <div
                 v-if="
                   destinationsTouched &&
@@ -145,56 +125,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
-              </div>
-            </div>
-          </div>
-
-          <!-- Workflows (enterprise-only; optional — at least one of destination
-               or workflow). Hidden in OSS, so behavior there is unchanged. -->
-          <div v-if="isEnterprise" class="tw:flex tw:items-start tw:pb-4 tw:mb-4">
-            <div
-              style="width: 190px; height: 28px"
-              class="tw:flex tw:items-center tw:font-semibold"
-            >
-              <span>{{ t("alerts.workflows.label") }}</span>
-              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
-              <OTooltip
-                :content="t('alerts.workflows.tooltip')"
-                side="right"
-              />
-            </div>
-            <div class="tw:flex tw:flex-col">
-              <div class="tw:flex tw:items-center">
-                <OSelect
-                  v-model="localWorkflows"
-                  :options="workflowOptions"
-                  data-test="alert-workflows-select"
-                  multiple
-                  class="tw:min-w-[180px] tw:max-w-[300px]"
-                  @update:model-value="emitWorkflowsUpdate"
-                >
-                  <template #empty>{{
-                    t("alerts.workflows.noneAvailable")
-                  }}</template>
-                </OSelect>
-                <OButton
-                  data-test="alert-settings-refresh-workflows-btn"
-                  class="tw:ml-1"
-                  variant="ghost"
-                  size="icon-circle-sm"
-                  :title="t('alerts.workflows.refresh')"
-                  @click="fetchWorkflows"
-                >
-                  <OIcon name="refresh" size="sm" />
-                </OButton>
-                <OButton
-                  data-test="create-workflow-btn"
-                  variant="outline"
-                  size="sm"
-                  class="tw:ml-2"
-                  @click="routeToCreateWorkflow"
-                  >{{ t("alerts.workflows.create") }}</OButton
-                >
               </div>
             </div>
           </div>
@@ -333,43 +263,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
             </div>
             <div>
-              <div class="tw:flex tw:items-center">
-                <OSelect
-                  ref="destinationsFieldRef"
-                  v-model="localDestinations"
-                  :options="formattedDestinations"
-                  data-test="alert-destinations-select"
-                  multiple
-                  :error="destinationError"
-                  class="tw:min-w-[180px] tw:max-w-[300px]"
-                  @update:model-value="
-                    destinationError = false;
-                    emitDestinationsUpdate();
-                  "
-                >
-                  <template #empty>{{
-                    t("alerts.alertSettings.noDestinationsAvailable")
-                  }}</template>
-                </OSelect>
-                <OButton
-                  data-test="alert-settings-refresh-destinations-btn"
-                  class="tw:ml-1"
-                  variant="ghost"
-                  size="icon-circle-sm"
-                  :title="t('alerts.alertSettings.refreshDestinations')"
-                  @click="$emit('refresh:destinations')"
-                >
-                  <OIcon name="refresh" size="sm" />
-                </OButton>
-                <OButton
-                  data-test="create-destination-btn"
-                  variant="outline"
-                  size="sm"
-                  class="tw:ml-2"
-                  @click="routeToCreateDestination"
-                  >{{ t("alerts.alertSettings.addNewDestination") }}</OButton
-                >
-              </div>
+              <AlertTargetsSelect
+                ref="destinationsFieldRef"
+                :destinations="localDestinations"
+                :workflows="localWorkflows"
+                :destination-options="formattedDestinations"
+                :workflow-options="workflowOptions"
+                :is-enterprise="isEnterprise"
+                :error="destinationError"
+                @update:destinations="onTargetsDestinations"
+                @update:workflows="onTargetsWorkflows"
+                @refresh="refreshTargets"
+                @create-destination="routeToCreateDestination"
+                @create-workflow="routeToCreateWorkflow"
+              />
               <div
                 v-if="
                   destinationsTouched &&
@@ -380,56 +287,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
-              </div>
-            </div>
-          </div>
-
-          <!-- Workflows (enterprise-only; optional — at least one of destination
-               or workflow). Hidden in OSS, so behavior there is unchanged. -->
-          <div v-if="isEnterprise" class="tw:flex tw:items-start tw:pb-4 tw:mb-4">
-            <div
-              style="width: 190px; height: 28px"
-              class="tw:flex tw:items-center tw:font-semibold"
-            >
-              <span>{{ t("alerts.workflows.label") }}</span>
-              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
-              <OTooltip
-                :content="t('alerts.workflows.tooltip')"
-                side="right"
-              />
-            </div>
-            <div class="tw:flex tw:flex-col">
-              <div class="tw:flex tw:items-center">
-                <OSelect
-                  v-model="localWorkflows"
-                  :options="workflowOptions"
-                  data-test="alert-workflows-select"
-                  multiple
-                  class="tw:min-w-[180px] tw:max-w-[300px]"
-                  @update:model-value="emitWorkflowsUpdate"
-                >
-                  <template #empty>{{
-                    t("alerts.workflows.noneAvailable")
-                  }}</template>
-                </OSelect>
-                <OButton
-                  data-test="alert-settings-refresh-workflows-btn"
-                  class="tw:ml-1"
-                  variant="ghost"
-                  size="icon-circle-sm"
-                  :title="t('alerts.workflows.refresh')"
-                  @click="fetchWorkflows"
-                >
-                  <OIcon name="refresh" size="sm" />
-                </OButton>
-                <OButton
-                  data-test="create-workflow-btn"
-                  variant="outline"
-                  size="sm"
-                  class="tw:ml-2"
-                  @click="routeToCreateWorkflow"
-                  >{{ t("alerts.workflows.create") }}</OButton
-                >
               </div>
             </div>
           </div>
@@ -484,10 +341,11 @@ import {
   convertMinutesToCron,
 } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import AlertTargetsSelect from "@/components/alerts/AlertTargetsSelect.vue";
 
 export default defineComponent({
   name: "Step3AlertConditions",
-  components: { OButton, OInput, OSelect, OSwitch, OTooltip, OIcon },
+  components: { OButton, OInput, OSelect, OSwitch, OTooltip, OIcon, AlertTargetsSelect },
   props: {
     formData: {
       type: Object as PropType<any>,
@@ -888,6 +746,24 @@ export default defineComponent({
       emit("update:workflows", localWorkflows.value);
     };
 
+    // Combined AlertTargetsSelect handlers. The child splits the tagged selection
+    // into the two arrays and emits them separately; we mirror each into its local
+    // model and reuse the existing emit helpers so payload/validation are unchanged.
+    const onTargetsDestinations = (value: string[]) => {
+      localDestinations.value = value;
+      destinationError.value = false;
+      emitDestinationsUpdate();
+    };
+    const onTargetsWorkflows = (value: string[]) => {
+      localWorkflows.value = value;
+      emitWorkflowsUpdate();
+    };
+    // The combined field's single refresh reloads both lists.
+    const refreshTargets = () => {
+      emit("refresh:destinations");
+      fetchWorkflows();
+    };
+
     const routeToCreateWorkflow = () => {
       const url = router.resolve({
         name: "createWorkflow",
@@ -1137,6 +1013,9 @@ export default defineComponent({
       routeToCreateDestination,
       emitWorkflowsUpdate,
       routeToCreateWorkflow,
+      onTargetsDestinations,
+      onTargetsWorkflows,
+      refreshTargets,
       handlePeriodChange,
       // Timezone
       browserTimezone,
