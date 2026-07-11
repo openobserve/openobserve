@@ -331,15 +331,6 @@ const columns = computed(() => [
     meta: { align: "left" },
   },
   {
-    id: "steps",
-    header: t("workflow.steps"),
-    accessorKey: "steps",
-    sortable: true,
-    resizable: true,
-    hideable: true,
-    meta: { align: "left" },
-  },
-  {
     id: "updated_at",
     header: t("workflow.updated"),
     accessorKey: "updated_at_display",
@@ -370,7 +361,6 @@ const getWorkflows = async () => {
       ...wf,
       "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
       trigger: triggerLabel(wf),
-      steps: (wf.nodes || []).length,
       updated_at_display: formatTs(wf.updated_at),
     }));
   } catch (error) {
