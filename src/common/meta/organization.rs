@@ -387,24 +387,18 @@ fn default_enable_streaming_search() -> bool {
     false
 }
 
-/// Default for `usage_stream_enabled`. In **cloud** builds, when self-reporting
-/// to the org's own usage stream is turned on globally
-/// (`ZO_USAGE_REPORT_TO_OWN_ORG`), orgs opt in by default so their `usage`
-/// stream is populated and the daily Usage Trends view works out of the box.
-/// Users can still toggle it off per org, which persists an explicit `false`
-/// and falls back to the billing-API (cycle-total) view.
+/// Default for `usage_stream_enabled`. Own-org usage reporting is **OFF by
+/// default** in every build — an org opts in explicitly, which persists a
+/// `true` and populates its own `usage` stream so the daily chart works; an
+/// absent setting means the per-org `usage` stream is not written and the
+/// Usage tab shows only the billing-API cards plus an "Enable usage reporting"
+/// CTA.
 ///
-/// In OSS and self-hosted enterprise builds — or when the global flag is off —
-/// the default stays `false` (nothing writes per-org usage streams by default).
+/// The global `ZO_USAGE_REPORT_TO_OWN_ORG` remains the deploy-wide master
+/// switch for whether per-org self-reporting is available at all; it no longer
+/// flips the per-org default.
 fn default_usage_stream_enabled() -> bool {
-    #[cfg(feature = "cloud")]
-    {
-        config::get_config().common.usage_report_to_own_org
-    }
-    #[cfg(not(feature = "cloud"))]
-    {
-        false
-    }
+    false
 }
 
 #[cfg(feature = "enterprise")]
@@ -1404,6 +1398,25 @@ mod tests {
     #[cfg(not(feature = "cloud"))]
     #[test]
     fn test_usage_stream_enabled_defaults_off_when_not_cloud() {
+        assert!(!default_usage_stream_enabled());
+        assert!(!OrganizationSetting::default().usage_stream_enabled);
+
+        // A stored setting missing the field falls back to the (false) default.
+        let json = r#"{
+            "scrape_interval": 15,
+            "trace_id_field_name": "trace_id",
+            "span_id_field_name": "span_id"
+        }"#;
+        let parsed: OrganizationSetting = serde_json::from_str(json).unwrap();
+        assert!(!parsed.usage_stream_enabled);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn test_usage_stream_enabled_defaults_off_in_cloud() {
+        // Own-org usage reporting is OFF by default on cloud; orgs opt in
+        // explicitly. The global ZO_USAGE_REPORT_TO_OWN_ORG stays the master
+        // switch but no longer flips the per-org default.
         assert!(!default_usage_stream_enabled());
         assert!(!OrganizationSetting::default().usage_stream_enabled);
 

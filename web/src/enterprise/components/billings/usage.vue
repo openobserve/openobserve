@@ -162,9 +162,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :folderId="''"
             searchType="dashboards"
             :allowAnnotationsAPI="false"
+            @error="onChartError"
           />
+          <!-- Until the org reports any usage its `usage` stream doesn't exist,
+               so the search errors. Show the illustrated empty state OVER the
+               chart; it clears itself once data lands and the error resets. -->
+          <div
+            v-if="usageStreamMissing"
+            data-test="usage-waiting-for-data"
+            class="usage-daily-chart__waiting absolute inset-0 bg-(--o2-card-bg)"
+          >
+            <OEmptyState
+              size="block"
+              illustration="wave-bars"
+              :title="t('billing.usageTrends.waitingTitle')"
+              :description="t('billing.usageTrends.waitingForData')"
+            />
+          </div>
         </div>
       </div>
+
+      <!-- Reporting OFF → illustrated empty state inviting the user to enable
+           usage reporting so the daily chart can populate. Uses the app-wide
+           OEmptyState primitive with the animated bar-chart illustration. -->
+      <OEmptyState
+        v-else
+        data-test="usage-enable-cta"
+        class="mt-4 border border-(--o2-border-color) rounded-lg bg-(--o2-card-bg)"
+        size="block"
+        illustration="wave-bars"
+        :title="t('billing.usageTrends.enableTitle')"
+        :description="t('billing.usageTrends.enableSubtitle')"
+        :action-label="t('billing.usageTrends.enableButton')"
+        action-icon="check"
+        @action="showEnableConfirm = true"
+      />
+
+      <!-- Confirm before enabling — turning this on starts writing the org's
+           own usage stream, so we ask first. -->
+      <ConfirmDialog
+        v-model="showEnableConfirm"
+        data-test="usage-enable-confirm"
+        :title="t('billing.usageTrends.enableConfirmTitle')"
+        :message="t('billing.usageTrends.enableConfirmMessage')"
+        :ok-label="t('billing.usageTrends.enableButton')"
+        @update:ok="onConfirmEnable"
+        @update:cancel="showEnableConfirm = false"
+      />
     </div>
   </template>
   <script lang="ts">
@@ -172,6 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { useStore } from "vuex";
   import { useI18n } from "vue-i18n";
   import BillingService from "@/services/billings";
+  import organizations from "@/services/organizations";
   import { convertBillingData } from "@/utils/billing/convertBillingData";
 import router from "@/router";
 import { useRouter } from "vue-router";
@@ -180,6 +225,8 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
 
   let currentDate = new Date(); // Get the current date and time
@@ -196,6 +243,8 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
       CustomChartRenderer,
       PanelSchemaRenderer,
       OSpinner,
+      OEmptyState,
+      ConfirmDialog,
     },
     setup() {
       const { t } = useI18n();
@@ -244,6 +293,50 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
             ?.usage_stream_enabled,
       );
 
+      const enablingUsage = ref(false);
+      // Controls the "are you sure?" dialog shown before we enable reporting.
+      const showEnableConfirm = ref(false);
+
+      // Persist an explicit opt-in. Merge with the current settings so we don't
+      // clobber other org-parameter fields, then update the store so
+      // usageStreamEnabled recomputes and the chart block replaces this CTA.
+      const enableUsageReporting = async () => {
+        if (enablingUsage.value) return;
+        enablingUsage.value = true;
+        const orgId = store.state.selectedOrganization.identifier;
+        const currentSettings =
+          store.state?.organizationData?.organizationSettings ?? {};
+        // Build the merged object once so the POST and the store update can
+        // never drift apart.
+        const updatedSettings = {
+          ...currentSettings,
+          usage_stream_enabled: true,
+        };
+        try {
+          await organizations.post_organization_settings(orgId, updatedSettings);
+          store.dispatch("setOrganizationSettings", updatedSettings);
+          toast({
+            variant: "success",
+            message: t("billing.usageTrends.enablePending"),
+            timeout: 5000,
+          });
+        } catch (e: any) {
+          toast({
+            variant: "error",
+            message: e?.message ?? "Failed to enable usage reporting",
+            timeout: 5000,
+          });
+        } finally {
+          enablingUsage.value = false;
+        }
+      };
+
+      // Confirm-dialog OK handler: close the dialog, then run the enable flow.
+      const onConfirmEnable = () => {
+        showEnableConfirm.value = false;
+        enableUsageReporting();
+      };
+
       // The date-range picker lives in the Billing toolbar (next to GB/MB) and
       // shares its resolved window (microseconds) here via inject. `key` bumps
       // on every change. Defaults to the last 7 days until the picker resolves.
@@ -286,6 +379,20 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
         const dt = usageDataType.value === "mb" ? "mb" : "gb";
         return buildUsageCombinedLinePanelSchema({ orgId, dataType: dt });
       });
+
+      // The org's `usage` stream doesn't exist until it has reported some usage,
+      // so the chart's first search fails with "stream not found: usage". We
+      // catch that here and show the illustrated empty state OVER the chart
+      // (the chart stays mounted underneath). When usage finally lands the
+      // search succeeds, the error clears, and the overlay goes away.
+      const usageStreamMissing = ref(false);
+      const onChartError = (err: any) => {
+        const msg = (err?.message ?? "").toString().toLowerCase();
+        usageStreamMissing.value =
+          !!err?.message &&
+          msg.includes("stream not found") &&
+          msg.includes("usage");
+      };
       // ---------------------------------------------------------------------
 
       onMounted(async () => {
@@ -1028,9 +1135,15 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
         aiIcon,
         selectedMember,
         usageStreamEnabled,
+        enablingUsage,
+        enableUsageReporting,
+        showEnableConfirm,
+        onConfirmEnable,
         dailyTimeObj,
         combinedSchema,
         dailyChartKey,
+        usageStreamMissing,
+        onChartError,
       };
     },
   });
@@ -1053,5 +1166,13 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
 .usage-daily-chart__renderer {
   height: 100%;
   width: 100%;
+}
+/* "Waiting for usage data" overlay sits over the (still-mounted) chart until
+   the org's usage stream exists and the search stops erroring. */
+.usage-daily-chart__waiting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
 }
 </style>

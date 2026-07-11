@@ -70,5 +70,16 @@ describe("usageDailyPanelSchema", () => {
       const mb = buildUsageCombinedLinePanelSchema({ orgId: "o", dataType: "mb" });
       expect(mb.config.unit_custom).toBe("MB");
     });
+
+    it("silences the renderer's own error text (no custom message)", () => {
+      // error handling ON + no custom_error_message => both of the renderer's
+      // error blocks are suppressed, so usage.vue can overlay its own graphic.
+      const schema = buildUsageCombinedLinePanelSchema({
+        orgId: "o",
+        dataType: "gb",
+      });
+      expect(schema.error_config.custom_error_handeling).toBe(true);
+      expect(schema.error_config.custom_error_message).toBeUndefined();
+    });
   });
 });
