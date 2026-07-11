@@ -322,6 +322,16 @@ const columns = computed(() => [
     meta: { align: "left", flex: true },
   },
   {
+    id: "description",
+    header: t("common.description"),
+    accessorKey: "description",
+    sortable: true,
+    resizable: true,
+    hideable: true,
+    size: COL.description,
+    meta: { align: "left" },
+  },
+  {
     id: "trigger",
     header: t("workflow.trigger"),
     accessorKey: "trigger",

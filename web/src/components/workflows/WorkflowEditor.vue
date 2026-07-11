@@ -46,15 +46,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            gated to the create route). Enable/disable status isn't shown here —
            it's managed from the list, same as pipelines. -->
       <template v-if="!workflowObj.isEditWorkflow" #title-trail>
-        <div class="tw:w-64 tw:shrink-0">
-          <OInput
-            v-model="workflowObj.currentSelectedWorkflow.name"
-            data-test="workflow-editor-name"
-            hide-bottom-space
-            :placeholder="t('workflow.namePlaceholder')"
-            :error="workflowObj.nameError"
-            @update:model-value="workflowObj.nameError = false"
-          />
+        <div class="tw:flex tw:items-center tw:gap-2">
+          <div class="tw:w-56 tw:shrink-0">
+            <OInput
+              v-model="workflowObj.currentSelectedWorkflow.name"
+              data-test="workflow-editor-name"
+              hide-bottom-space
+              :placeholder="t('workflow.namePlaceholder')"
+              :error="workflowObj.nameError"
+              @update:model-value="workflowObj.nameError = false"
+            />
+          </div>
+          <div class="tw:w-72 tw:shrink-0">
+            <OInput
+              v-model="workflowObj.currentSelectedWorkflow.description"
+              data-test="workflow-editor-description"
+              hide-bottom-space
+              :placeholder="t('workflow.descriptionPlaceholder')"
+            />
+          </div>
         </div>
       </template>
 
