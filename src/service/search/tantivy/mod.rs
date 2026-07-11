@@ -18,8 +18,9 @@ mod partition;
 mod pruner;
 mod result;
 pub mod search;
+mod warm;
 
-use std::{collections::HashSet, ops::Bound, sync::Arc};
+use std::{ops::Bound, sync::Arc};
 
 use arrow::{
     buffer::{BooleanBuffer, MutableBuffer},
@@ -46,14 +47,11 @@ pub use result::{TantivyMultiResult, TantivyMultiResultBuilder};
 pub use search::TantivyResult;
 use tantivy::{
     Directory, ReloadPolicy, Term,
-    query::{BooleanQuery, Occur, Query, RangeQuery},
-    schema::Field,
+    query::{BooleanQuery, Occur, RangeQuery},
 };
 use tantivy_utils::puffin_directory::{
-    PROP_ROW_GROUP_SIZE,
-    caching_directory::CachingDirectory,
-    footer_cache::FooterCache,
-    reader::{PuffinDirReader, warm_up_terms},
+    PROP_ROW_GROUP_SIZE, caching_directory::CachingDirectory, footer_cache::FooterCache,
+    reader::PuffinDirReader,
 };
 use tokio::sync::Semaphore;
 use tokio_stream::StreamExt as _;
@@ -61,6 +59,7 @@ use tokio_stream::StreamExt as _;
 use self::{
     cache::{self as tantivy_result_cache, CacheEntry},
     partition::partition_tantivy_files,
+    warm::WarmPlan,
 };
 use crate::service::search::{
     grpc::{QueryParams, calc_target_partitions, storage::cache_files},
@@ -485,52 +484,15 @@ async fn search_tantivy_index(
         ]));
     }
 
-    let need_all_term_fields = condition
-        .need_all_term_fields()
-        .into_iter()
-        .chain(get_simple_distinct_field(&idx_optimize_rule))
-        .filter_map(|filed| tantivy_schema.get_field(&filed).ok())
-        .collect::<HashSet<_>>();
-
-    // warm up the terms in the query
-    let mut warm_terms: HashMap<Field, HashMap<Term, bool>> = HashMap::new();
-    query.query_terms(&mut |term, need_position| {
-        let field = term.field();
-        let entry = warm_terms.entry(field).or_default();
-        entry.insert(term.clone(), need_position);
-    });
-
-    let mut need_fast_field = HashSet::new();
-    if let Some(rule) = &idx_optimize_rule {
-        match rule {
-            IndexOptimizeMode::SimpleHistogram(..) => {
-                need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
-            }
-            IndexOptimizeMode::SimpleMultiHistogram(.., name) => {
-                need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
-                need_fast_field.insert(name.clone());
-            }
-            IndexOptimizeMode::SimpleTopN(fields, ..) => {
-                for field in fields {
-                    need_fast_field.insert(field.clone());
-                }
-            }
-            IndexOptimizeMode::SimpleSelect(..) if !has_skipped_conditions => {
-                need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
-            }
-            _ => {}
-        }
-    }
-    if !file_in_range {
-        need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
-    }
-
-    warm_up_terms(
-        searcher.segment_reader(0),
-        &warm_terms,
-        need_all_term_fields,
-        need_fast_field,
+    WarmPlan::build(
+        &condition,
+        query.as_ref(),
+        &idx_optimize_rule,
+        &tantivy_schema,
+        file_in_range,
+        has_skipped_conditions,
     )
+    .execute(searcher.segment_reader(0))
     .await?;
 
     // search the index
@@ -681,15 +643,6 @@ fn selection_from_row_ids(num_rows: usize, row_ids: impl Iterator<Item = u32>) -
     BooleanBuffer::new(buffer.into(), 0, num_rows)
 }
 
-/// if simple distinct without filter, we need to warm up the field
-fn get_simple_distinct_field(idx_optimize_rule: &Option<IndexOptimizeMode>) -> Vec<String> {
-    if let Some(IndexOptimizeMode::SimpleDistinct(field, ..)) = idx_optimize_rule {
-        vec![field.to_string()]
-    } else {
-        vec![]
-    }
-}
-
 fn get_cache_entry(tantivy_result: TantivyResult) -> CacheEntry {
     match tantivy_result {
         TantivyResult::RowIdsSelection {
@@ -731,6 +684,8 @@ fn generate_cache_key(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use arrow::buffer::BooleanBuffer;
     use config::{TIMESTAMP_COL_NAME, meta::stream::FileMeta};
 
@@ -786,33 +741,6 @@ mod tests {
         );
         let histogram = searcher.search(&all_query, &histogram_collector).unwrap();
         assert_eq!(histogram, vec![1, 1, 0, 1]);
-    }
-
-    #[test]
-    fn test_get_simple_distinct_field_none() {
-        let idx_optimize_rule = None;
-        let result = get_simple_distinct_field(&idx_optimize_rule);
-        assert_eq!(result, Vec::<String>::new());
-    }
-
-    #[test]
-    fn test_get_simple_distinct_field_simple_distinct() {
-        let idx_optimize_rule = Some(
-            config::meta::inverted_index::IndexOptimizeMode::SimpleDistinct(
-                "test_field".to_string(),
-                100,
-                false,
-            ),
-        );
-        let result = get_simple_distinct_field(&idx_optimize_rule);
-        assert_eq!(result, vec!["test_field".to_string()]);
-    }
-
-    #[test]
-    fn test_get_simple_distinct_field_other_mode() {
-        let idx_optimize_rule = Some(config::meta::inverted_index::IndexOptimizeMode::SimpleCount);
-        let result = get_simple_distinct_field(&idx_optimize_rule);
-        assert_eq!(result, Vec::<String>::new());
     }
 
     #[test]
