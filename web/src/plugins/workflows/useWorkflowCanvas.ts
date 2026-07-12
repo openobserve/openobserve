@@ -250,25 +250,35 @@ export const stopTestPlayback = () => {
 // a plain BFS from the root visits every parent before its children, which is all
 // the reveal needs. (No topo sort: reconvergence, the only shape BFS gets wrong,
 // can't exist in a tree.)
-const orderedRunNodes = (ranNodeIds: string[]): string[] => {
-  const wf = workflowObj.currentSelectedWorkflow;
-  const ran = new Set(ranNodeIds);
-  const start =
-    workflowObj.testRun.fromNode ||
-    (wf.nodes || []).find(
-      (n: any) => n.data?.node_type === "workflow_trigger",
-    )?.id ||
-    ranNodeIds[0];
-
+// ── Shared graph helpers (used by the reveal here + the Test dialog) ─────────
+// Children adjacency map from edges (handles both {source,target} and
+// {sourceNode,targetNode} edge shapes).
+export const buildChildrenMap = (edges: any[]): Map<string, string[]> => {
   const children = new Map<string, string[]>();
-  for (const e of wf.edges || []) {
+  for (const e of edges || []) {
     const src = e.source ?? e.sourceNode?.id;
     const tgt = e.target ?? e.targetNode?.id;
     if (!src || !tgt) continue;
     if (!children.has(src)) children.set(src, []);
     children.get(src)!.push(tgt);
   }
+  return children;
+};
 
+// All node ids in BFS (flow) order from `startId` (default: the trigger).
+// Workflows enforce one incoming edge per node → the graph is a TREE, so BFS
+// visits every parent before its children (no topo sort needed). Nodes not
+// reached from the start are appended so nothing silently drops.
+export const flowOrderedNodeIds = (
+  nodes: any[],
+  edges: any[],
+  startId?: string,
+): string[] => {
+  const children = buildChildrenMap(edges);
+  const start =
+    startId ||
+    (nodes || []).find((n: any) => n.data?.node_type === "workflow_trigger")
+      ?.id;
   const order: string[] = [];
   const seen = new Set<string>();
   const queue = start ? [start] : [];
@@ -276,12 +286,45 @@ const orderedRunNodes = (ranNodeIds: string[]): string[] => {
     const cur = queue.shift()!;
     if (seen.has(cur)) continue;
     seen.add(cur);
-    if (ran.has(cur)) order.push(cur);
+    order.push(cur);
     for (const k of children.get(cur) ?? []) if (!seen.has(k)) queue.push(k);
   }
-  // safety: anything the traversal didn't reach still resolves
-  for (const id of ranNodeIds) if (!seen.has(id)) order.push(id);
+  for (const n of nodes || []) if (!seen.has(n.id)) order.push(n.id);
   return order;
+};
+
+// `startIds` + everything downstream of them.
+export const reachableFrom = (
+  edges: any[],
+  startIds: string[],
+): Set<string> => {
+  const children = buildChildrenMap(edges);
+  const reached = new Set<string>(startIds);
+  const queue = [...startIds];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    for (const k of children.get(cur) ?? [])
+      if (!reached.has(k)) {
+        reached.add(k);
+        queue.push(k);
+      }
+  }
+  return reached;
+};
+
+// Reveal order = the flow order (from the run's start node) filtered to the
+// nodes that actually ran.
+const orderedRunNodes = (ranNodeIds: string[]): string[] => {
+  const wf = workflowObj.currentSelectedWorkflow;
+  const ran = new Set(ranNodeIds);
+  const ordered = flowOrderedNodeIds(
+    wf.nodes || [],
+    wf.edges || [],
+    workflowObj.testRun.fromNode || undefined,
+  ).filter((id) => ran.has(id));
+  // safety: any ran id the traversal didn't cover still resolves
+  for (const id of ranNodeIds) if (!ordered.includes(id)) ordered.push(id);
+  return ordered;
 };
 
 // Stash the result, then advance `progress.index` down the ordered nodes.

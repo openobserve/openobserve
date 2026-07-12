@@ -33,6 +33,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @mouseenter="handleNodeHover"
     @mouseleave="handleNodeLeave"
   >
+    <!-- Condition rule preview under the title (same formatter as the pipeline
+         condition node), so two conditions are distinguishable on the canvas. -->
+    <template v-if="conditionPreview" #body>
+      <div class="wf-node-subtitle" :title="conditionPreview">
+        {{ conditionPreview }}
+      </div>
+    </template>
+
     <!-- hover actions (delete) — trigger is fixed -->
     <template #actions>
       <div
@@ -157,6 +165,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
 import useWorkflowCanvas, { nodeMeta, workflowObj } from "./useWorkflowCanvas";
 import { workflowNodeImage } from "./nodeIcons";
+import { getTruncatedConditions } from "@/utils/conditionPreview";
 
 const props = defineProps<{
   id: string;
@@ -206,6 +215,13 @@ const errorCount = computed<number>(() => {
 });
 const showButtons = ref(false);
 const meta = computed(() => nodeMeta(props.data?.node_type));
+
+// Condition rule preview shown under the node title (condition nodes only).
+const conditionPreview = computed(() =>
+  props.data?.node_type === "condition"
+    ? getTruncatedConditions(props.data?.conditions, 28)
+    : "",
+);
 // Icon for this node type: the pipeline node image as an "img:<url>" string
 // (rendered by OIcon exactly like pipeline canvas nodes), or the OIcon glyph name.
 const nodeIcon = computed(() => {
@@ -252,6 +268,18 @@ const onClick = () => editNode(props.id);
 </script>
 
 <style scoped>
+/* Condition rule preview under the node title. */
+.wf-node-subtitle {
+  max-width: 200px;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--o2-color-text-secondary, #8a94a6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Test result badge — corner circle on the node (the VueFlow node wrapper is the
    positioned ancestor). Green tick = passed, red = errored (hover for messages). */
 .wf-test-badge {

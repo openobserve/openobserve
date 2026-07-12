@@ -22,6 +22,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
+import { getTruncatedConditions as getTruncatedConditionsUtil } from "@/utils/conditionPreview";
 
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -226,128 +227,9 @@ const functionInfo = (data) => {
   return pipelineObj.functions[data.name] || null;
 };
 
-const getTruncatedConditions = (conditionData) => {
-  // Handle null/undefined
-  if (!conditionData) return "";
-
-  // Build preview string recursively
-  const buildPreviewString = (node) => {
-    if (!node) return "";
-
-    // V2 Format: Group
-    if (
-      node.filterType === "group" &&
-      node.conditions &&
-      Array.isArray(node.conditions)
-    ) {
-      if (node.conditions.length === 0) return "";
-
-      const parts = [];
-      node.conditions.forEach((item, index) => {
-        let conditionStr = "";
-
-        if (item.filterType === "group") {
-          // Nested group
-          const nestedPreview = buildPreviewString(item);
-          if (nestedPreview) {
-            conditionStr = `(${nestedPreview})`;
-          }
-        } else if (item.filterType === "condition") {
-          // Condition
-          const column = item.column || "field";
-          const operator = item.operator || "=";
-          const value =
-            item.value !== undefined && item.value !== null && item.value !== ""
-              ? `'${item.value}'`
-              : "''";
-          conditionStr = `${column} ${operator} ${value}`;
-        }
-
-        // Add logical operator before condition (except for first)
-        if (index > 0 && item.logicalOperator) {
-          parts.push(`${item.logicalOperator.toLowerCase()} ${conditionStr}`);
-        } else {
-          parts.push(conditionStr);
-        }
-      });
-
-      return parts.join(" ");
-    }
-
-    // V1 Backend Format: OR node
-    if (node.or && Array.isArray(node.or)) {
-      const parts = node.or
-        .map((item) => {
-          const nested = buildPreviewString(item);
-          return nested ? `(${nested})` : "";
-        })
-        .filter(Boolean);
-      return parts.join(" or ");
-    }
-
-    // V1 Backend Format: AND node
-    if (node.and && Array.isArray(node.and)) {
-      const parts = node.and
-        .map((item) => {
-          const nested = buildPreviewString(item);
-          return nested ? `(${nested})` : "";
-        })
-        .filter(Boolean);
-      return parts.join(" and ");
-    }
-
-    // V1 Backend Format: NOT node
-    if (node.not) {
-      const nested = buildPreviewString(node.not);
-      return nested ? `not (${nested})` : "";
-    }
-
-    // V1 Frontend Format: items array
-    if (node.items && Array.isArray(node.items)) {
-      const operator = node.label?.toLowerCase() || "and";
-      const parts = node.items
-        .map((item) => buildPreviewString(item))
-        .filter(Boolean);
-      return parts.join(` ${operator} `);
-    }
-
-    // Single condition
-    if (node.column && node.operator) {
-      const column = node.column || "field";
-      const operator = node.operator || "=";
-      const value =
-        node.value !== undefined && node.value !== null && node.value !== ""
-          ? `'${node.value}'`
-          : "''";
-      return `${column} ${operator} ${value}`;
-    }
-
-    // V0 Format: Array
-    if (Array.isArray(node)) {
-      const parts = node
-        .filter((c) => c.column && c.operator)
-        .map((c) => {
-          const column = c.column || "field";
-          const operator = c.operator || "=";
-          const value =
-            c.value !== undefined && c.value !== null && c.value !== ""
-              ? `'${c.value}'`
-              : "''";
-          return `${column} ${operator} ${value}`;
-        });
-      return parts.join(" and ");
-    }
-
-    return "";
-  };
-
-  const previewText = buildPreviewString(conditionData);
-
-  // Truncate to 20 characters
-  return previewText.length > 20
-    ? previewText.substring(0, 20) + "..."
-    : previewText;
-};
+// Condition preview reuses the shared util (also used by workflow nodes).
+const getTruncatedConditions = (conditionData) =>
+  getTruncatedConditionsUtil(conditionData);
 
 const confirmDialogMeta = ref({
   show: false,

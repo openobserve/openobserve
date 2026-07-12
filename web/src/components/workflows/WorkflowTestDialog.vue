@@ -105,8 +105,11 @@ import {
   workflowObj,
   nodeMeta,
   startTestPlayback,
+  flowOrderedNodeIds,
+  reachableFrom,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import { buildTestSampleText } from "@/plugins/workflows/testSample";
+import { getTruncatedConditions } from "@/utils/conditionPreview";
 import workflowService from "@/services/workflows";
 
 const { t } = useI18n();
@@ -148,68 +151,69 @@ const runFrom = computed<string>({
   },
 });
 
-const runFromOptions = computed(() => [
-  { label: t("workflow.test.runFromBeginning"), value: RUN_FROM_BEGINNING },
-  ...nodes.value
-    .filter((n) => n.data?.node_type !== "workflow_trigger")
-    .map((n) => ({
-      label: t(nodeMeta(n.data?.node_type)?.titleKey || n.data?.node_type),
-      value: n.id,
-    })),
-]);
+// A node's configured detail, so two same-type nodes are distinguishable:
+// Function -> its VRL function name, Destination -> its destination name,
+// Condition -> a preview of its rule (same formatter the canvas card uses).
+const nodeDetail = (n: any): string => {
+  const type = n.data?.node_type;
+  if (type === "function") return n.data?.name || "";
+  if (type === "destination") return n.data?.destination_id || "";
+  if (type === "condition")
+    return getTruncatedConditions(n.data?.conditions, 40);
+  return "";
+};
+
+// Nodes in graph (flow) order so the dropdown matches the canvas top-to-bottom
+// instead of raw insertion order (shared BFS helper — same one the reveal uses).
+const nodesInFlowOrder = (): any[] => {
+  const byId = new Map<string, any>(nodes.value.map((n) => [n.id, n]));
+  return flowOrderedNodeIds(nodes.value, edges.value)
+    .map((id) => byId.get(id))
+    .filter(Boolean);
+};
+
+const runFromOptions = computed(() => {
+  const steps = nodesInFlowOrder().filter(
+    (n) => n.data?.node_type !== "workflow_trigger",
+  );
+  // Per-type totals so we only number when a type repeats.
+  const totals: Record<string, number> = {};
+  for (const n of steps) {
+    const type = n.data?.node_type;
+    totals[type] = (totals[type] || 0) + 1;
+  }
+  const seen: Record<string, number> = {};
+  const opts = steps.map((n) => {
+    const type = n.data?.node_type;
+    seen[type] = (seen[type] || 0) + 1;
+    const base = t(nodeMeta(type)?.titleKey || type);
+    const numbered = totals[type] > 1 ? `${base} ${seen[type]}` : base;
+    const detail = nodeDetail(n);
+    return { label: detail ? `${numbered} · ${detail}` : numbered, value: n.id };
+  });
+  return [
+    { label: t("workflow.test.runFromBeginning"), value: RUN_FROM_BEGINNING },
+    ...opts,
+  ];
+});
 
 // Nodes that actually run for the chosen from_node (it + everything downstream).
 const runningNodeIds = (): string[] => {
   const from = workflowObj.testRun.fromNode;
   if (!from) return nodes.value.map((n) => n.id);
-  const adjacency = new Map<string, string[]>();
-  for (const e of edges.value) {
-    const src = e.source ?? e.sourceNode?.id;
-    const tgt = e.target ?? e.targetNode?.id;
-    if (!src || !tgt) continue;
-    if (!adjacency.has(src)) adjacency.set(src, []);
-    adjacency.get(src)!.push(tgt);
-  }
-  const reachable = new Set<string>([from]);
-  const queue = [from];
-  while (queue.length) {
-    const cur = queue.shift()!;
-    for (const next of adjacency.get(cur) || []) {
-      if (!reachable.has(next)) {
-        reachable.add(next);
-        queue.push(next);
-      }
-    }
-  }
-  return [...reachable];
+  return [...reachableFrom(edges.value, [from])];
 };
 
 // Nodes downstream of an errored node. Since the backend reports only errors
 // (no per-node success/processed count), we can't confirm these actually passed
 // — records may not have reached them — so they must NOT show a ✓. They render a
-// neutral "not verified" badge instead.
+// neutral "not verified" badge instead. (Strictly downstream — exclude the
+// error nodes themselves, which show their own error badge.)
 const downstreamOfErrors = (errorIds: string[]): string[] => {
   if (!errorIds.length) return [];
-  const adjacency = new Map<string, string[]>();
-  for (const e of edges.value) {
-    const src = e.source ?? e.sourceNode?.id;
-    const tgt = e.target ?? e.targetNode?.id;
-    if (!src || !tgt) continue;
-    if (!adjacency.has(src)) adjacency.set(src, []);
-    adjacency.get(src)!.push(tgt);
-  }
-  const blocked = new Set<string>();
-  const queue = [...errorIds];
-  while (queue.length) {
-    const cur = queue.shift()!;
-    for (const next of adjacency.get(cur) || []) {
-      if (!blocked.has(next)) {
-        blocked.add(next);
-        queue.push(next);
-      }
-    }
-  }
-  return [...blocked];
+  const set = reachableFrom(edges.value, errorIds);
+  for (const id of errorIds) set.delete(id);
+  return [...set];
 };
 
 const parsedInputs = computed<unknown[] | null>(() => {
