@@ -34,6 +34,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { detectCycle } from "@/composables/flow/detectCycle";
 import { makeEdge } from "@/composables/flow/makeEdge";
+import { getTruncatedConditions } from "@/utils/conditionPreview";
 
 export type WorkflowNodeCategory = "trigger" | "logic" | "action";
 
@@ -111,6 +112,18 @@ export const nodeMeta = (nodeType: string): WorkflowNodeMeta | undefined =>
 // Node types offered by the hover-`+` StepMenu (everything but the trigger,
 // which is fixed and can only be the first node).
 export const ADDABLE_NODE_TYPES = ["condition", "function", "destination"];
+
+// A node's configured detail, shown as a subtitle on the canvas card and used as
+// the differentiator in the Test "Run From" dropdown. Function -> VRL function
+// name, Destination -> destination name, Condition -> its rule preview (same
+// formatter the pipeline condition node uses).
+export const nodeConfigDetail = (data: any, maxLen = 28): string => {
+  const type = data?.node_type;
+  if (type === "function") return data?.name || "";
+  if (type === "destination") return data?.destination_id || "";
+  if (type === "condition") return getTruncatedConditions(data?.conditions, maxLen);
+  return "";
+};
 
 // Trigger kinds the user chooses from when creating a workflow. `key` maps to
 // the future backend WorkflowTriggerKind (B1). Only Alert Fired is enabled in

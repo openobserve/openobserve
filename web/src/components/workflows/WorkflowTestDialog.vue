@@ -107,9 +107,9 @@ import {
   startTestPlayback,
   flowOrderedNodeIds,
   reachableFrom,
+  nodeConfigDetail,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import { buildTestSampleText } from "@/plugins/workflows/testSample";
-import { getTruncatedConditions } from "@/utils/conditionPreview";
 import workflowService from "@/services/workflows";
 
 const { t } = useI18n();
@@ -151,17 +151,9 @@ const runFrom = computed<string>({
   },
 });
 
-// A node's configured detail, so two same-type nodes are distinguishable:
-// Function -> its VRL function name, Destination -> its destination name,
-// Condition -> a preview of its rule (same formatter the canvas card uses).
-const nodeDetail = (n: any): string => {
-  const type = n.data?.node_type;
-  if (type === "function") return n.data?.name || "";
-  if (type === "destination") return n.data?.destination_id || "";
-  if (type === "condition")
-    return getTruncatedConditions(n.data?.conditions, 40);
-  return "";
-};
+// A node's configured detail, so two same-type nodes are distinguishable
+// (shared helper — same detail the canvas card shows).
+const nodeDetail = (n: any): string => nodeConfigDetail(n.data, 40);
 
 // Nodes in graph (flow) order so the dropdown matches the canvas top-to-bottom
 // instead of raw insertion order (shared BFS helper — same one the reveal uses).
