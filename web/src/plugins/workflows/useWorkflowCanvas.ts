@@ -35,6 +35,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { detectCycle } from "@/composables/flow/detectCycle";
 import { makeEdge } from "@/composables/flow/makeEdge";
 import { getTruncatedConditions } from "@/utils/conditionPreview";
+import workflowService from "@/services/workflows";
 
 export type WorkflowNodeCategory = "trigger" | "logic" | "action";
 
@@ -231,6 +232,8 @@ const defaultObject = {
     fromNode: "",
     result: <any>null,
     progress: <any>null,
+    // Per-node Input/Output result drawer (opened by clicking a node's badge).
+    resultDrawer: { show: false, nodeId: "" },
   },
   currentSelectedWorkflow: <any>JSON.parse(JSON.stringify(defaultWorkflow)),
   workflowWithoutChange: <any>JSON.parse(JSON.stringify(defaultWorkflow)),
@@ -340,11 +343,62 @@ const orderedRunNodes = (ranNodeIds: string[]): string[] => {
   return ordered;
 };
 
+// Nodes downstream of (but not including) the errored nodes — they can't be
+// confirmed as passed (records may not have reached them), so they show a
+// neutral "not verified" badge rather than a ✓.
+const downstreamOfErrorNodes = (errorIds: string[]): string[] => {
+  if (!errorIds.length) return [];
+  const set = reachableFrom(
+    workflowObj.currentSelectedWorkflow.edges || [],
+    errorIds,
+  );
+  for (const id of errorIds) set.delete(id);
+  return [...set];
+};
+
+// Run the workflow Test (from the Test dialog or a node's Replay button) and
+// kick off the staged reveal. Shared so both entry points behave identically.
+// `nodeIo` is the backend's per-node input/output when present (drives the
+// Input/Output drawer); today the backend returns errors only, so the drawer
+// derives error-node input from `errors` until that field ships.
+export const executeTestRun = async (opts: {
+  orgId: string;
+  inputs: any[];
+  fromNode?: string;
+}): Promise<{ ok: boolean; error?: string }> => {
+  const wf = workflowObj.currentSelectedWorkflow;
+  try {
+    const res = await workflowService.testWorkflow({
+      org_identifier: opts.orgId,
+      id: wf.id,
+      inputs: opts.inputs,
+      from_node: opts.fromNode || undefined,
+    });
+    const errors = res.data?.errors || {};
+    const nodeIo = res.data?.node_io || {};
+    const ranNodeIds = opts.fromNode
+      ? [...reachableFrom(wf.edges || [], [opts.fromNode])]
+      : (wf.nodes || []).map((n: any) => n.id);
+    startTestPlayback({
+      errors,
+      ranNodeIds,
+      blockedNodeIds: downstreamOfErrorNodes(Object.keys(errors)),
+      nodeIo,
+      input: opts.inputs,
+    });
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e?.response?.data?.message };
+  }
+};
+
 // Stash the result, then advance `progress.index` down the ordered nodes.
 export const startTestPlayback = (result: {
   errors: Record<string, any>;
   ranNodeIds: string[];
   blockedNodeIds?: string[];
+  nodeIo?: Record<string, any>;
+  input?: any[];
 }) => {
   stopTestPlayback();
   workflowObj.testRun.result = result;
@@ -724,6 +778,7 @@ export default function useWorkflowCanvas() {
       fromNode: "",
       result: null,
       progress: null,
+      resultDrawer: { show: false, nodeId: "" },
     };
   }
 

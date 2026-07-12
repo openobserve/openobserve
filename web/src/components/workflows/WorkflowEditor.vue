@@ -141,6 +141,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          saved graph. Results render as ✓ / error badges on the canvas nodes. -->
     <WorkflowTestDialog v-if="workflowObj.testRun.show" />
 
+    <!-- Per-step Input/Output result drawer — opened by clicking a node's badge
+         after a run; also hosts the Replay-from-here button. -->
+    <WorkflowStepResultDrawer v-if="workflowObj.testRun.resultDrawer.show" />
+
     <!-- Link-to-alerts prompt — shown once, right after a workflow is created, so
          the user can attach it to existing alerts without leaving for the alert
          screen. Either action (Link / Skip) returns to the list. -->
@@ -191,6 +195,7 @@ import { getUUID } from "@/utils/zincutils";
 import WorkflowFlow from "@/plugins/workflows/WorkflowFlow.vue";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
 import WorkflowTestDialog from "./WorkflowTestDialog.vue";
+import WorkflowStepResultDrawer from "./WorkflowStepResultDrawer.vue";
 import WorkflowLinkAlertsDialog from "./WorkflowLinkAlertsDialog.vue";
 import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
 import NodePalette from "@/components/flow/NodePalette.vue";

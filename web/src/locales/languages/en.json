@@ -1723,7 +1723,22 @@
       "runError": "Unable to run the test.",
       "saveToTestTitle": "Save & Test",
       "saveToTestBody": "Testing runs the saved version of this workflow. Save your changes first?",
-      "saveAndTest": "Save & Test"
+      "saveAndTest": "Save & Test",
+      "stepResult": {
+        "title": "Step Result",
+        "viewHint": "Click To View Input / Output",
+        "input": "Input",
+        "output": "Output",
+        "noInput": "No Input Captured For This Step.",
+        "noOutput": "No Output Captured For This Step.",
+        "replay": "Replay From Here",
+        "replayHint": "Replay re-runs the workflow from this step using its input.",
+        "status": {
+          "ok": "Passed",
+          "error": "Errored",
+          "skipped": "Not Verified"
+        }
+      }
     },
     "linkAlerts": {
       "title": "Link Workflow To Alerts",

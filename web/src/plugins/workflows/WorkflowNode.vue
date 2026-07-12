@@ -72,8 +72,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-else-if="testStatus === 'ok'"
-        class="wf-test-badge wf-test-ok wf-test-pop"
+        class="wf-test-badge wf-test-ok wf-test-pop wf-test-clickable nodrag"
         :data-test="`workflow-node-${data?.node_type}-test-ok`"
+        :title="t('workflow.test.stepResult.viewHint')"
+        @pointerdown.stop
+        @click.stop="openResult"
       >
         <OIcon name="check" size="xs" />
       </div>
@@ -98,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="wf-test-badge wf-test-error wf-test-pop nodrag"
         :data-test="`workflow-node-${data?.node_type}-test-error`"
         @pointerdown.stop
-        @click.stop
+        @click.stop="openResult"
       >
         <OIcon name="error" size="xs" />
         <span v-if="errorCount > 1" class="wf-test-count">{{ errorCount }}</span>
@@ -270,6 +273,11 @@ const pluses = computed(() => {
 });
 
 const onClick = () => editNode(props.id);
+
+// Open the per-node Input/Output result drawer (from the ✓ / error badge).
+const openResult = () => {
+  workflowObj.testRun.resultDrawer = { show: true, nodeId: props.id };
+};
 </script>
 
 <style scoped>
@@ -335,6 +343,13 @@ const onClick = () => editNode(props.id);
 .wf-test-ok {
   background: #22c55e;
   color: #fff;
+}
+.wf-test-clickable {
+  cursor: pointer;
+  transition: transform 0.14s ease;
+}
+.wf-test-clickable:hover {
+  transform: scale(1.12);
 }
 .wf-test-skipped {
   background: #9ca3af;

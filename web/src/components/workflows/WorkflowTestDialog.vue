@@ -104,13 +104,11 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   workflowObj,
   nodeMeta,
-  startTestPlayback,
+  executeTestRun,
   flowOrderedNodeIds,
-  reachableFrom,
   nodeConfigDetail,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import { buildTestSampleText } from "@/plugins/workflows/testSample";
-import workflowService from "@/services/workflows";
 
 const { t } = useI18n();
 const store = useStore();
@@ -189,25 +187,6 @@ const runFromOptions = computed(() => {
   ];
 });
 
-// Nodes that actually run for the chosen from_node (it + everything downstream).
-const runningNodeIds = (): string[] => {
-  const from = workflowObj.testRun.fromNode;
-  if (!from) return nodes.value.map((n) => n.id);
-  return [...reachableFrom(edges.value, [from])];
-};
-
-// Nodes downstream of an errored node. Since the backend reports only errors
-// (no per-node success/processed count), we can't confirm these actually passed
-// — records may not have reached them — so they must NOT show a ✓. They render a
-// neutral "not verified" badge instead. (Strictly downstream — exclude the
-// error nodes themselves, which show their own error badge.)
-const downstreamOfErrors = (errorIds: string[]): string[] => {
-  if (!errorIds.length) return [];
-  const set = reachableFrom(edges.value, errorIds);
-  for (const id of errorIds) set.delete(id);
-  return [...set];
-};
-
 const parsedInputs = computed<unknown[] | null>(() => {
   try {
     const v = JSON.parse(workflowObj.testRun.input);
@@ -224,31 +203,20 @@ const orgId = () => store.state.selectedOrganization.identifier as string;
 const run = async () => {
   if (!canRun.value || !parsedInputs.value) return;
   running.value = true;
-  try {
-    const res = await workflowService.testWorkflow({
-      org_identifier: orgId(),
-      id: workflowObj.currentSelectedWorkflow.id,
-      inputs: parsedInputs.value,
-      from_node: workflowObj.testRun.fromNode || undefined,
-    });
-    // Close the popup and play the staged reveal on the canvas (nodes light up
-    // one-by-one down the graph, so the run reads as flowing through it).
-    workflowObj.testRun.show = false;
-    const errors = res.data?.errors || {};
-    startTestPlayback({
-      errors,
-      ranNodeIds: runningNodeIds(),
-      // Downstream of an error → "not verified", not a ✓ (see helper above).
-      blockedNodeIds: downstreamOfErrors(Object.keys(errors)),
-    });
-  } catch (e: any) {
+  // Shared runner: hits the test endpoint, then plays the staged reveal on the
+  // canvas (nodes light up one-by-one down the graph). Replay reuses the same.
+  const r = await executeTestRun({
+    orgId: orgId(),
+    inputs: parsedInputs.value,
+    fromNode: workflowObj.testRun.fromNode || undefined,
+  });
+  running.value = false;
+  if (r.ok) workflowObj.testRun.show = false;
+  else
     toast({
-      message: e?.response?.data?.message || t("workflow.test.runError"),
+      message: r.error || t("workflow.test.runError"),
       variant: "error",
     });
-  } finally {
-    running.value = false;
-  }
 };
 
 const resetSample = () => {
