@@ -1630,7 +1630,7 @@ pub struct Limit {
         help = "Timeout for querier query, default equal to query_timeout"
     )]
     pub query_querier_timeout: u64,
-    #[env_config(name = "ZO_QUERY_DEFAULT_LIMIT", default = 1000)]
+    #[env_config(name = "ZO_QUERY_DEFAULT_LIMIT", default = 10000)]
     pub query_default_limit: i64,
     #[env_config(name = "ZO_QUERY_VALUES_DEFAULT_NUM", default = 10)]
     pub query_values_default_num: i64,
@@ -3301,7 +3301,7 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.query_partition_max_num = 100;
     }
     if cfg.limit.query_default_limit == 0 {
-        cfg.limit.query_default_limit = 1000;
+        cfg.limit.query_default_limit = 10000;
     }
 
     if cfg.limit.inverted_index_footer_cache_max_size == 0 {
