@@ -119,18 +119,18 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { useI18n } from "vue-i18n";
-import { QueryBuilderLabelFilter } from "@/components/promql/types";
+import { PromqlLabelMatcher } from "@/components/promql/types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
 const props = defineProps<{
-  labels: QueryBuilderLabelFilter[];
+  labels: PromqlLabelMatcher[];
   metric?: string;
   dashboardData?: any; // Dashboard data containing variables
   dashboardPanelData?: any;
 }>();
 
 const emit = defineEmits<{
-  "update:labels": [value: QueryBuilderLabelFilter[]];
+  "update:labels": [value: PromqlLabelMatcher[]];
 }>();
 
 const { t } = useI18n();
@@ -163,7 +163,7 @@ const availableLabelOptions = computed(() => {
   );
 });
 
-const computedLabel = (label: QueryBuilderLabelFilter): string => {
+const computedLabel = (label: PromqlLabelMatcher): string => {
   if (!label.label) {
     return "Select label";
   }
@@ -191,7 +191,7 @@ watch(
 );
 
 const addLabel = () => {
-  const newLabels: QueryBuilderLabelFilter[] = [
+  const newLabels: PromqlLabelMatcher[] = [
     ...props.labels,
     {
       label: "",

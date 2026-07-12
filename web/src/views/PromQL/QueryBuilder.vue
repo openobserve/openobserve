@@ -91,8 +91,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { PromVisualQuery } from "@/components/promql/types";
-import { promQueryModeller } from "@/components/promql/operations/queryModeller";
+import { PromqlBuilderQuery } from "@/components/promql/types";
+import { promqlRenderer } from "@/components/promql/operations/queryModeller";
 import MetricSelector from "@/components/promql/components/MetricSelector.vue";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
 import OperationsList from "@/components/promql/components/OperationsList.vue";
@@ -106,7 +106,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 
 
 // State
-const visualQuery = ref<PromVisualQuery>({
+const visualQuery = ref<PromqlBuilderQuery>({
   metric: "",
   labels: [],
   operations: [],
@@ -126,7 +126,7 @@ const generatedQuery = computed(() => {
   if (!visualQuery.value.metric && visualQuery.value.labels.length === 0) {
     return "";
   }
-  return promQueryModeller.renderQuery(visualQuery.value);
+  return promqlRenderer.renderQuery(visualQuery.value);
 });
 
 // Methods

@@ -21,6 +21,10 @@ import {
 } from "./metricsParamRegistry";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import type { ParamDescriptor } from "@/utils/url/deepLinkParams";
+import {
+  METRICS_EDITOR_PARAM_KEYS,
+  hasMetricsEditorParams,
+} from "@/utils/metrics/metricsEditorParams";
 
 const byKey = (key: string) =>
   METRICS_PARAMS.find((d) => d.key === key) as ParamDescriptor;
@@ -133,5 +137,35 @@ describe("metricsParamRegistry · query descriptor", () => {
   });
   it("reads query from the per-query intent", () => {
     expect(d.read?.({ query: "up" })).toBe("up");
+  });
+});
+
+describe("metricsEditorParams stays in sync with the registry", () => {
+  it("covers every registry key and alias", () => {
+    // The router guard cannot import METRICS_PARAMS (that would pull the Vuex
+    // store into the router's module graph), so it uses a standalone key list.
+    // If a param is added to the registry and not to that list, a deep link
+    // carrying it would land on the explorer instead of the editor.
+    const registryKeys = METRICS_PARAMS.flatMap((p: any) => [
+      p.key,
+      ...(p.aliases ?? []),
+    ]);
+
+    for (const key of registryKeys) {
+      expect(METRICS_EDITOR_PARAM_KEYS).toContain(key);
+    }
+  });
+
+  it("detects the whole-panel blob and indexed per-query params", () => {
+    expect(hasMetricsEditorParams({ metrics_data: "abc" })).toBe(true);
+    expect(hasMetricsEditorParams({ stream_name: "cpu" })).toBe(true);
+    // perQuery params are indexed; a multi-query shared link must still be
+    // recognized as an editor deep link.
+    expect(hasMetricsEditorParams({ "query.1": "x" })).toBe(true);
+    expect(hasMetricsEditorParams({ org_identifier: "o", period: "15m" })).toBe(
+      false,
+    );
+    expect(hasMetricsEditorParams({})).toBe(false);
+    expect(hasMetricsEditorParams(undefined)).toBe(false);
   });
 });

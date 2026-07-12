@@ -55,6 +55,25 @@ export default mergeConfig(
       include: ["src/**/*.spec.{ts,js,vue}"],
       root: fileURLToPath(new URL('.', import.meta.url)),
       setupFiles: ['src/test/unit/helpers/setupTests.ts'],
+      // The suite must not depend on WHERE it runs.
+      //
+      // Much of what we format is local-time by design — a "last triggered at"
+      // column is meant to read in the user's own timezone — so those tests can
+      // only assert anything against a known one. They were written against UTC,
+      // which CI happens to run in, so they passed there and failed on every
+      // developer machine west of Greenwich: three of them asserted a UTC
+      // calendar date for an instant that lands on the previous day in
+      // America/Los_Angeles (`2023-01-01` vs `2022-12-31T16:00:00-08`).
+      //
+      // Pinned unconditionally rather than deferring to the developer's TZ: an
+      // ambient timezone is what made the result depend on the machine in the
+      // first place. Behaviour in another zone is tested by PASSING that zone to
+      // the function (they all take one — `getUTCTimestampFromZonedTimestamp(ts,
+      // "America/New_York")`), which asserts the real contract instead of the
+      // ambient one.
+      env: {
+        TZ: 'UTC',
+      },
       server: {
         deps: {
           inline: ["monaco-editor", "vitest-canvas-mock", "@openobserve/browser-rum", "@openobserve/browser-logs"],

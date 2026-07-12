@@ -1,0 +1,607 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <div
+    ref="root"
+    class="group relative flex flex-col h-full overflow-hidden border border-border-default rounded-md px-3 py-2 bg-surface-panel hover:border-primary focus-within:border-primary"
+    role="group"
+    :aria-label="`${card.name}. ${badgeLabel}.`"
+    :data-test="`metrics-explorer-card-${card.name}`"
+  >
+    <!-- Deliberately NOT a button. Making the whole card clickable meant any
+         attempt to select the metric name — or drag across the help text —
+         navigated away to the editor instead. The open-in-editor icon is the
+         only affordance that navigates, so this is a plain container and its
+         text stays selectable. Still fully keyboard reachable: the action bar
+         reveals on `focus-within`, so tabbing lands on Refresh / Configure /
+         Pin / Open. -->
+    <!-- The header gets its own tinted band, so the title reads as panel chrome
+         rather than as the top of the chart. Full-bleed via
+         negative margins (the card carries px-3 py-2); the root's
+         `overflow-hidden` clips the band to the card's rounded corners, so it
+         needs no radius of its own.
+
+         Identical in both views: rows view is grid view with a single, wider
+         column, not a different card. -->
+    <div
+      class="relative flex items-center gap-2 min-w-0 -mx-3 -mt-2 mb-1 px-3 py-1 bg-surface-subtle border-b border-border-subtle"
+    >
+      <!-- The name gets the full header width; the type badge sits in the
+           footer, where it cannot truncate the name it describes. -->
+      <div class="flex items-center gap-1.5 min-w-0">
+        <!-- Semibold: the name is the one thing on the card the eye scans for, and
+             at 12px monospace on a subtle header it was the same weight as the
+             footer's metadata. -->
+        <span
+          class="font-mono font-semibold text-xs overflow-hidden text-ellipsis whitespace-nowrap text-text-primary"
+          :title="card.name"
+          >{{ card.name }}</span
+        >
+      </div>
+
+      <!-- Visible on focus as well as hover: a hover-only affordance is not
+           keyboard reachable. Touch devices have no hover, so it stays visible
+           there too.
+
+           Absolutely positioned ON PURPOSE. `invisible` is visibility:hidden,
+           which still reserves the box — in flow, these buttons were stealing
+           ~120px from the metric name and truncating it even on cards with
+           plenty of room. Out of flow, the name gets the full width and the
+           actions overlay it only while they are actually shown. -->
+      <!-- The bar paints its own background so it can overlay the metric name;
+           that background must match the band it sits on, or it shows as a patch
+           of the wrong shade.
+
+           Anchored to the BAND (which is `relative`) with `inset-y-0`, so it is
+           exactly as tall as the band by construction. A fixed `h-6` + `top-1`
+           was 28px against a ~25px band, and the extra 3px hung over the chart.
+           Anchoring means the two cannot drift apart if the band's padding ever
+           changes. -->
+      <div
+        class="absolute inset-y-0 right-2 z-10 flex items-center gap-0.5 rounded pl-2 bg-surface-subtle invisible group-hover:visible group-focus-within:visible [@media(hover:none)]:visible"
+      >
+        <!-- OTooltip goes INSIDE the button, not around it: nested, it binds
+             its own hover listeners to its parent element. That is what the
+             rest of the app does (583 of 590 usages) and it reads more cleanly
+             on an OButton than a wrapper would. Wrapping also works — it did
+             not until the `open` prop default was fixed in OTooltip.vue, which
+             is worth knowing if you are reading an older comment of mine that
+             blamed OButton. -->
+
+        <!-- The help text is a full sentence and never fit on the card; a
+             truncated half-sentence is worse than none. It lives here instead,
+             where it can be read in full. -->
+        <OButton
+          v-if="card.help"
+          variant="ghost"
+          size="icon"
+          icon-left="info-outline"
+          :aria-label="`About ${card.name}: ${card.help}`"
+          :data-test="`metrics-explorer-card-help-${card.name}`"
+          @click.stop
+        >
+          <OTooltip :content="card.help" max-width="360px" />
+        </OButton>
+
+        <OButton
+          v-if="!card.unsupported"
+          variant="ghost"
+          size="icon"
+          icon-left="refresh"
+          :loading="preview?.status === 'loading'"
+          :aria-label="`Refresh ${card.name}`"
+          :data-test="`metrics-explorer-card-refresh-${card.name}`"
+          @click="$emit('refresh', card)"
+        >
+          <OTooltip content="Refresh this metric" />
+        </OButton>
+
+        <OButton
+          v-if="card.configurable"
+          variant="ghost"
+          size="icon"
+          icon-left="settings"
+          :aria-label="`Configure function for ${card.name}`"
+          :data-test="`metrics-explorer-card-fn-${card.name}`"
+          @click="$emit('configure', card)"
+        >
+          <OTooltip content="Configure function" />
+        </OButton>
+
+        <OButton
+          variant="ghost"
+          size="icon"
+          :icon-left="isFavorite ? 'favorite' : 'favorite-border'"
+          :aria-label="
+            isFavorite
+              ? `Remove ${card.name} from favorites`
+              : `Add ${card.name} to favorites`
+          "
+          :aria-pressed="String(isFavorite)"
+          :data-test="`metrics-explorer-card-favorite-${card.name}`"
+          @click="$emit('toggle-favorite', card)"
+        >
+          <OTooltip
+            :content="isFavorite ? 'Remove from favorites' : 'Add to favorites'"
+          />
+        </OButton>
+
+        <!-- The drill-in. An icon rather than a "Select" label: the word said
+             nothing about where it led, and it was the one text button in a bar
+             of icons. `ghost-primary` keeps it tinted, so it still reads as the
+             primary action among the ghost icons beside it.
+
+             Deliberately the ONLY thing that navigates. The chart is not a click
+             target and the card is not a button — making them so is what used to
+             swallow any attempt to select the metric name. -->
+        <OButton
+          variant="ghost-primary"
+          size="icon"
+          icon-left="open-in-new"
+          :aria-label="`Open ${card.name} in the editor`"
+          :data-test="`metrics-explorer-card-select-${card.name}`"
+          @click="$emit('select', card)"
+        >
+          <OTooltip content="Open in editor" />
+        </OButton>
+      </div>
+    </div>
+
+    <div class="relative mt-1 flex-1 min-h-0">
+      <!-- Unsupported: a placeholder rather than a wrong chart. The open-in-
+           editor icon still works, so the metric stays explorable. -->
+      <div
+        v-if="card.unsupported"
+        class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] opacity-65 text-text-secondary"
+        :data-test="`metrics-explorer-card-unsupported-${card.name}`"
+      >
+        <OIcon name="help-outline" size="sm" />
+        <span>Unsupported type (v1)</span>
+      </div>
+
+      <!-- Understood, but the chosen variant is not something a card can draw —
+           an info metric's label table renders through a component the card does
+           not use. Previously this was a silent no-preview, so the card sat on
+           the loading skeleton below forever and read as a chart that had failed
+           to load. The drill-in works: the editor renders the table properly. -->
+      <div
+        v-else-if="preview?.status === 'unavailable'"
+        class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] opacity-65 text-text-secondary"
+        :data-test="`metrics-explorer-card-nopreview-${card.name}`"
+      >
+        <OIcon name="table-chart" size="sm" />
+        <span>No preview — open in editor</span>
+      </div>
+
+      <div
+        v-else-if="preview?.status === 'error'"
+        class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] opacity-65 text-text-secondary"
+        :data-test="`metrics-explorer-card-error-${card.name}`"
+      >
+        <!-- The backend's message is the only thing that distinguishes a
+             timeout from a bad query from a permissions failure, so it has to
+             be reachable. It is often a paragraph, though — far more than a
+             card this size can hold — so it lives on hover.
+
+             OTooltip is nested as the FIRST child, which (having no preceding
+             sibling) binds its hover listeners to this whole parent — the icon
+             AND the label — so the hover target is a readable block rather than
+             a 16px dot. -->
+        <span
+          class="inline-flex flex-col items-center gap-1.5 cursor-help"
+          :aria-label="`${card.name} query failed: ${preview.error}`"
+          :data-test="`metrics-explorer-card-error-tip-${card.name}`"
+        >
+          <OTooltip
+            :content="errorTooltip"
+            content-class="whitespace-pre-line"
+            max-width="360px"
+            :delay="200"
+          />
+          <OIcon name="error-outline" size="sm" class="text-red-500" />
+          <span>Query failed</span>
+        </span>
+
+        <div class="flex items-center gap-1">
+          <OButton
+            variant="ghost-primary"
+            size="xs"
+            :data-test="`metrics-explorer-card-retry-${card.name}`"
+            @click.stop="$emit('refresh', card)"
+          >
+            Retry
+          </OButton>
+
+          <!-- A tooltip cannot be selected, so the trace id in it can only be
+               retyped by hand. This is how it leaves the page. -->
+          <OButton
+            variant="ghost"
+            size="xs"
+            :aria-label="`Copy the error details for ${card.name}`"
+            :data-test="`metrics-explorer-card-copy-error-${card.name}`"
+            @click.stop="copyErrorReport"
+          >
+            Copy details
+            <OTooltip
+              :content="errorReport"
+              content-class="whitespace-pre-line"
+              max-width="360px"
+              :delay="400"
+            />
+          </OButton>
+        </div>
+      </div>
+
+      <div
+        v-else-if="preview?.status === 'loading' && !preview.results.length"
+        class="h-full"
+        :data-test="`metrics-explorer-card-skeleton-${card.name}`"
+      >
+        <OSkeleton type="rect" animation="wave" class="h-full w-full" />
+      </div>
+
+      <div
+        v-else-if="isEmpty"
+        class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] opacity-65 rounded text-text-secondary bg-[repeating-linear-gradient(45deg,rgba(128,128,128,0.08),rgba(128,128,128,0.08)_6px,transparent_6px,transparent_12px)]"
+        :data-test="`metrics-explorer-card-nodata-${card.name}`"
+      >
+        No data
+      </div>
+
+      <MetricCardChart
+        v-else-if="preview?.results?.length"
+        :results="preview.results"
+        :queries="queries"
+        :chart-type="preview.chartType"
+        :unit="o2Unit.unit"
+        :unit-custom="o2Unit.unitCustom"
+        :bucket-unit="bucketO2Unit.unit"
+        :bucket-unit-custom="bucketO2Unit.unitCustom"
+        :color="color"
+      />
+
+      <div v-else class="h-full">
+        <OSkeleton type="rect" animation="none" class="h-full w-full" />
+      </div>
+
+      <!-- The chart is real, but it came from a re-query. Say so rather than
+           silently showing data the plain query did not produce. -->
+      <div
+        v-if="preview?.nanGuardApplied"
+        class="absolute top-0.5 left-0.5 opacity-60"
+        :data-test="`metrics-explorer-card-nan-guard-${card.name}`"
+      >
+        <span class="inline-flex cursor-help">
+          <OTooltip
+            content="Re-queried with a NaN guard: this metric's values are small enough that the plain aggregation underflowed."
+            max-width="360px"
+            :delay="200"
+          />
+          <OIcon name="info-outline" size="xs" />
+        </span>
+      </div>
+
+      <!-- A refresh that fails on top of a good result keeps the old chart up,
+           so this badge is the ONLY place its error can be read. -->
+      <div
+        v-if="preview?.stale"
+        class="absolute top-0.5 right-0.5 opacity-60"
+        :data-test="`metrics-explorer-card-stale-${card.name}`"
+      >
+        <!-- No room for a Copy button beside a live chart, so the badge itself
+             is the button: hover to read the failure, click to take it. -->
+        <button
+          type="button"
+          class="inline-flex cursor-pointer"
+          :aria-label="`Copy the failed-refresh details for ${card.name}`"
+          :data-test="`metrics-explorer-card-stale-copy-${card.name}`"
+          @click.stop="copyErrorReport"
+        >
+          <OTooltip
+            :content="staleTooltip"
+            content-class="whitespace-pre-line"
+            max-width="360px"
+            :delay="200"
+          />
+          <OIcon name="sync-problem" size="xs" />
+        </button>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between gap-2 text-[10px] mt-0.5">
+      <!-- The function actually in effect, so a ⚙ override is visible on the
+           card rather than silently identical to the default. -->
+      <span class="opacity-70 text-text-secondary truncate">{{
+        preview?.footerLabel || card.footerLabel
+      }}</span>
+
+      <div class="flex items-center gap-1.5 flex-none">
+        <!-- Cached data fetched for a differently-sized window. Same warning the
+             dashboards raise on a panel. -->
+        <span
+          v-if="preview?.cachedDataDiffersFromTimeRange"
+          class="inline-flex text-amber-500 cursor-help"
+          :data-test="`metrics-explorer-card-cached-differs-${card.name}`"
+        >
+          <OTooltip
+            content="The data shown is cached and is different from the selected time range."
+            max-width="360px"
+            :delay="200"
+          />
+          <OIcon name="running-with-errors" size="xs" />
+        </span>
+
+        <!-- Last Refreshed, exactly as a dashboard panel reports it: a card
+             restored from cache says how old its data really is, instead of
+             passing it off as live. -->
+        <span
+          v-if="preview?.lastTriggeredAt"
+          class="inline-flex items-center opacity-70 text-text-secondary whitespace-nowrap"
+          :data-test="`metrics-explorer-card-last-refreshed-${card.name}`"
+        >
+          <span class="mr-0.5">🕑</span>
+          <RelativeTime
+            :timestamp="preview.lastTriggeredAt"
+            full-time-prefix="Last Refreshed At: "
+          />
+        </span>
+
+        <span class="opacity-70 text-text-secondary">{{ unitLabel }}</span>
+        <!-- Badge text is never the sole carrier of meaning — the footer
+             function label sits right beside it. -->
+        <span
+          class="text-[10px] font-semibold px-1.5 py-px rounded-lg leading-none"
+          :style="{ color: badge.color, background: badge.background }"
+          :data-test="`metrics-explorer-card-badge-${card.name}`"
+          >{{ badgeLabel }}</span
+        >
+      </div>
+    </div>
+  </div>
+</template>
+
+<script lang="ts">
+import {
+  computed,
+  defineComponent,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  type PropType,
+} from "vue";
+import { useStore } from "vuex";
+import MetricCardChart from "./MetricCardChart.vue";
+import RelativeTime from "@/components/common/RelativeTime.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { copyToClipboard } from "@/utils/clipboard";
+import {
+  BADGE_LABELS,
+  getBadgeStyle,
+  cardColorForIndex,
+} from "@/utils/metrics/metricPalette";
+import { toO2Unit } from "@/utils/metrics/metricDefaults";
+import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
+import {
+  hasSamples,
+  type CardPreview,
+} from "@/composables/metrics/useMetricsExplorerGrid";
+
+/** Human-facing unit text for the card footer. */
+const UNIT_LABELS: Record<string, string> = {
+  seconds: "s",
+  milliseconds: "ms",
+  microseconds: "µs",
+  nanoseconds: "ns",
+  bytes: "bytes",
+  "bytes-per-sec": "bytes/s",
+  "count-per-sec": "c/s",
+  "ms-per-sec": "ms/s",
+  "us-per-sec": "µs/s",
+  "ns-per-sec": "ns/s",
+  bits: "bits",
+  "bits-per-sec": "bits/s",
+  percent: "%",
+  "percent-1": "%",
+  celsius: "°C",
+  volts: "V",
+  amperes: "A",
+  joules: "J",
+  watts: "W",
+  short: "",
+  none: "",
+};
+
+export default defineComponent({
+  name: "MetricCard",
+  components: {
+    MetricCardChart,
+    RelativeTime,
+    OButton,
+    OIcon,
+    OSkeleton,
+    OTooltip,
+  },
+  props: {
+    card: { type: Object as PropType<MetricCardModel>, required: true },
+    preview: {
+      type: Object as PropType<CardPreview | undefined>,
+      default: undefined,
+    },
+    queries: { type: Array as PropType<any[]>, default: () => [] },
+    /** Position in the FULL filtered+sorted set, so colours are scroll-stable. */
+    index: { type: Number, required: true },
+    isFavorite: { type: Boolean, default: false },
+  },
+  emits: [
+    "select",
+    "configure",
+    "toggle-favorite",
+    "visible",
+    "hidden",
+    // "refresh", not "retry". Both the header button and the no-data card's
+    // retry button emit `refresh` (the parent listens for `@refresh` and calls
+    // `grid.refreshCard`) — "retry" was declared here and emitted nowhere, while
+    // the event the component actually fires went undeclared. Undeclared emits
+    // fall through to $attrs and get bound to the root ELEMENT as a DOM
+    // listener, which is how a component ends up with a handler that silently
+    // never fires the day someone renames the event to something a DOM element
+    // also emits.
+    "refresh",
+  ],
+  setup(props, { emit }) {
+    const store = useStore();
+    const root = ref<HTMLElement | null>(null);
+    const isDark = computed(() => store.state.theme === "dark");
+
+    const color = computed(() => cardColorForIndex(props.index, isDark.value));
+    const badge = computed(() =>
+      getBadgeStyle(props.card.typeFilterBucket, isDark.value),
+    );
+    const badgeLabel = computed(
+      () => BADGE_LABELS[props.card.typeFilterBucket] ?? "Other",
+    );
+
+    const o2Unit = computed(() =>
+      toO2Unit(props.preview?.unit ?? props.card.unit),
+    );
+    const bucketO2Unit = computed(() =>
+      props.preview?.bucketUnit
+        ? toO2Unit(props.preview.bucketUnit)
+        : { unit: null, unitCustom: null },
+    );
+    const unitLabel = computed(
+      () => UNIT_LABELS[props.preview?.unit ?? props.card.unit] ?? "",
+    );
+
+    /**
+     * The failure, in full: the message, then the backend's internal cause and
+     * the trace id.
+     *
+     * The last two are noise to someone reading a chart and the first two things
+     * asked for when they report the failure, so they go below the message
+     * rather than into it. One preformatted string rather than a rich slot —
+     * OTooltip renders its content in a portal that only mounts while open, so a
+     * slot's contents cannot be asserted in a test, and this must not regress
+     * quietly again.
+     */
+    const errorTooltip = computed(() => {
+      const preview = props.preview;
+      if (!preview?.error) return "";
+      return [
+        preview.error,
+        preview.errorDetail,
+        preview.errorTraceId ? `Trace ID: ${preview.errorTraceId}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+    });
+
+    /** As above, but a stale card still shows its old chart, so it says so. */
+    const staleTooltip = computed(() => {
+      const failure = errorTooltip.value;
+      const preamble = "Refresh failed — showing the last successful result.";
+      const body = failure ? `${preamble}\n\n${failure}` : preamble;
+      return `${body}\n\nClick to copy the details.`;
+    });
+
+    /**
+     * The failure as something you can paste into a bug report.
+     *
+     * A tooltip cannot be selected — it closes the moment the pointer leaves the
+     * icon — so reading the trace id off one and retyping it is the worst part
+     * of reporting a broken panel. The query goes in too: the user never typed
+     * it, so the card is the only thing that knows what actually ran.
+     */
+    const errorReport = computed(() => {
+      const preview = props.preview;
+      if (!preview?.error) return "";
+      return [
+        `Metric: ${props.card.name}`,
+        ...(preview.errorQueries?.length
+          ? [`Query: ${preview.errorQueries.join("\n       ")}`]
+          : []),
+        `Error: ${preview.error}`,
+        preview.errorDetail ? `Cause: ${preview.errorDetail}` : "",
+        preview.errorTraceId ? `Trace ID: ${preview.errorTraceId}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+    });
+
+    const copyErrorReport = () =>
+      copyToClipboard(errorReport.value, {
+        successMessage: "Error details copied",
+      });
+
+    /**
+     * The card stays visible in the grid even with no data, so users still learn
+     * the metric exists.
+     */
+    const isEmpty = computed(() => {
+      const preview = props.preview;
+      if (!preview || preview.status !== "done") return false;
+      return !preview.results.some(hasSamples);
+    });
+
+    // Lazy queries: only cards in (or within one viewport of) the scroll window
+    // fetch anything.
+    let observer: IntersectionObserver | null = null;
+    onMounted(() => {
+      if (!root.value || typeof IntersectionObserver === "undefined") {
+        emit("visible", props.card);
+        return;
+      }
+      observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            emit(entry.isIntersecting ? "visible" : "hidden", props.card);
+          }
+        },
+        { rootMargin: "100% 0px" },
+      );
+      observer.observe(root.value);
+    });
+
+    onBeforeUnmount(() => {
+      observer?.disconnect();
+      observer = null;
+      // The virtualizer unmounts rows as they scroll out, and an IntersectionObserver
+      // fires no final event on disconnect. Without this the parent would keep the
+      // card in its on-screen set forever and re-query it on every refresh.
+      emit("hidden", props.card);
+    });
+
+    return {
+      root,
+      color,
+      badge,
+      badgeLabel,
+      o2Unit,
+      bucketO2Unit,
+      unitLabel,
+      errorTooltip,
+      staleTooltip,
+      errorReport,
+      copyErrorReport,
+      isEmpty,
+    };
+  },
+});
+</script>

@@ -228,7 +228,7 @@ test.describe('CrossLink dialog form validation', () => {
         await pm.crossLinkPage.clickAddCrossLink();
         await pm.crossLinkPage.waitForDialog();
 
-        await pm.crossLinkPage.fillCrossLinkUrl('https://grafana.example.com/explore?query={{field_value}}');
+        await pm.crossLinkPage.fillCrossLinkUrl('https://openobserve.example.com/web/logs?query={{field_value}}');
 
         // Primary button remains disabled until name is also filled
         await expect(
@@ -247,7 +247,7 @@ test.describe('CrossLink dialog form validation', () => {
         await pm.crossLinkPage.waitForDialog();
 
         await pm.crossLinkPage.fillCrossLinkName('test_cross_link_fv_enabled');
-        await pm.crossLinkPage.fillCrossLinkUrl('https://grafana.example.com/explore?query={{field_value}}');
+        await pm.crossLinkPage.fillCrossLinkUrl('https://openobserve.example.com/web/logs?query={{field_value}}');
 
         await expect(
             pm.crossLinkPage.getCrossLinkSaveBtnLocator()
@@ -262,7 +262,7 @@ test.describe('CrossLink dialog form validation', () => {
         testLogger.info('Testing successful cross-link creation');
 
         const linkName = 'fv_cross_link_001';
-        const linkUrl  = 'https://grafana.example.com/explore?query={{field_value}}';
+        const linkUrl  = 'https://openobserve.example.com/web/logs?query={{field_value}}';
         const field    = 'log_level';
 
         await pm.crossLinkPage.clickAddCrossLink();
