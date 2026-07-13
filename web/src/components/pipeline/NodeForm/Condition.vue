@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="tw:w-full tw:rounded-lg tw:px-3 stream-routing-container">
         <div
-          class="showLabelOnTop tw:font-bold text-h7"
+          class="showLabelOnTop text-h7"
           data-test="add-condition-query-input-title"
         >
           <ConditionBuilder
