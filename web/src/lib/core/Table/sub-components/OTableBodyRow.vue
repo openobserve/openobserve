@@ -338,7 +338,7 @@ function onRowBlur() {
       class="o2-table-drag-handle"
       data-test="o2-table-row-drag-handle"
     >
-      <OIcon name="drag-indicator" size="xs" class="text-text-secondary cursor-grab opacity-30 group-hover/row:opacity-100 transition-opacity" />
+      <OIcon name="drag-indicator" size="xs" class="text-text-secondary cursor-grab transition-opacity" />
     </td>
 
     <!-- Data cells -->
