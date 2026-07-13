@@ -104,6 +104,17 @@ describe("convertLogData.ts", () => {
       expect(options.tooltip).not.toHaveProperty("formatter_test");
     });
 
+    it("renders tooltip on body so it overflows the short histogram strip", () => {
+      const { options } = convertLogData([1640995200000], [10], {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "UTC",
+        itemStyle: null,
+      });
+      expect(options.tooltip.appendToBody).toBe(true);
+      expect(options.tooltip.confine).toBe(false);
+    });
+
     it("sets xAxis type to time", () => {
       const { options } = convertLogData([1640995200000], [10], {
         title: "",
