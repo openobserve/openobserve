@@ -35,9 +35,41 @@ const EXCLUDE_LABELS: [&str; 8] = [
     "_all",
 ];
 
+/// The value policy for every metric record we write.
+///
+/// Mirrors the remote-write path (see `prom.rs`): infinities clamp to the f64
+/// bounds, NaN means "no observation" and the record is dropped. A NaN written
+/// through serde_json becomes `Value::Null`, an all-null column is never inferred
+/// into the schema, and the resulting stream cannot be read by PromQL at all --
+/// while still costing full ingest and storage.
+pub fn metric_value(v: f64) -> Option<config::utils::json::Value> {
+    if v.is_nan() {
+        return None;
+    }
+    let v = if v == f64::INFINITY || v > f64::MAX {
+        f64::MAX
+    } else if v == f64::NEG_INFINITY || v < f64::MIN {
+        f64::MIN
+    } else {
+        v
+    };
+    Some(config::utils::json::json!(v))
+}
+
 pub fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
     let metadata = schema.metadata.get(METADATA_LABEL)?;
-    let metadata: Metadata = config::utils::json::from_str(metadata).unwrap();
+    let mut metadata: Metadata = config::utils::json::from_str(metadata).ok()?;
+
+    // Historical schemas carry a JSON-quoted family name: the OTLP writer used to build it
+    // with `Value::to_string()`, which yields the serialised JSON (`"name"`, quotes included)
+    // rather than the string content. The stored bytes are not rewritten -- we decline to
+    // serve the quotes. Until those schemas age out, this is what makes the family join work.
+    metadata.metric_family_name = metadata
+        .metric_family_name
+        .trim()
+        .trim_matches('"')
+        .to_string();
+
     Some(metadata)
 }
 
@@ -122,5 +154,75 @@ mod tests {
         let labels = get_exclude_labels();
         assert!(labels.contains(&"_timestamp"));
         assert!(labels.contains(&"_all"));
+    }
+
+    #[test]
+    fn test_metric_value_drops_nan() {
+        assert!(metric_value(f64::NAN).is_none());
+    }
+
+    #[test]
+    fn test_metric_value_clamps_infinities() {
+        assert_eq!(
+            metric_value(f64::INFINITY).unwrap().as_f64().unwrap(),
+            f64::MAX
+        );
+        assert_eq!(
+            metric_value(f64::NEG_INFINITY).unwrap().as_f64().unwrap(),
+            f64::MIN
+        );
+    }
+
+    #[test]
+    fn test_metric_value_passes_finite_values_through() {
+        assert_eq!(metric_value(0.0).unwrap(), json::json!(0.0));
+        assert_eq!(metric_value(-1.5).unwrap(), json::json!(-1.5));
+        assert_eq!(metric_value(f64::MAX).unwrap().as_f64().unwrap(), f64::MAX);
+    }
+
+    fn schema_with_metadata(blob: &str) -> Schema {
+        Schema::empty().with_metadata(
+            [(METADATA_LABEL.to_string(), blob.to_string())]
+                .into_iter()
+                .collect(),
+        )
+    }
+
+    /// The historical shape: the OTLP writer built the family name with `Value::to_string()`,
+    /// so 2,694 of 3,349 streams on a real cluster carry it JSON-quoted. The stored bytes are
+    /// left alone; the read path declines to serve the quotes.
+    #[test]
+    fn test_get_prom_metadata_from_schema_unquotes_stored_family_name() {
+        let schema = schema_with_metadata(
+            r#"{"metric_type":"Histogram","metric_family_name":"\"foo\"","help":"h","unit":"s"}"#,
+        );
+        let metadata = get_prom_metadata_from_schema(&schema).unwrap();
+
+        assert_eq!(metadata.metric_family_name, "foo");
+        assert_eq!(metadata.help, "h");
+    }
+
+    #[test]
+    fn test_get_prom_metadata_from_schema_leaves_clean_family_name_alone() {
+        let schema = schema_with_metadata(
+            r#"{"metric_type":"Histogram","metric_family_name":"foo","help":"h","unit":"s"}"#,
+        );
+
+        assert_eq!(
+            get_prom_metadata_from_schema(&schema)
+                .unwrap()
+                .metric_family_name,
+            "foo"
+        );
+    }
+
+    #[test]
+    fn test_get_prom_metadata_from_schema_malformed_blob_is_none_not_panic() {
+        assert!(get_prom_metadata_from_schema(&schema_with_metadata("not json")).is_none());
+    }
+
+    #[test]
+    fn test_get_prom_metadata_from_schema_absent_metadata_is_none() {
+        assert!(get_prom_metadata_from_schema(&Schema::empty()).is_none());
     }
 }

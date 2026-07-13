@@ -836,14 +836,10 @@ pub(crate) async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<R
 //
 // [supports]: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
 fn get_metadata_object(schema: &Schema) -> Option<MetadataObject> {
-    schema.metadata.get(METADATA_LABEL).map(|s| {
-        serde_json::from_str::<Metadata>(s)
-            .unwrap_or_else(|error| {
-                tracing::error!(%error, input = ?s, "failed to parse metadata");
-                panic!("BUG: failed to parse {METADATA_LABEL}")
-            })
-            .into()
-    })
+    // delegate rather than parse the blob a second time: the shared reader is where the
+    // family name of a historically-quoted schema gets normalised, and a duplicate parse
+    // here would serve the quotes and drift from `/streams`
+    super::get_prom_metadata_from_schema(schema).map(Into::into)
 }
 
 pub(crate) async fn get_series(
@@ -1223,6 +1219,50 @@ mod tests {
     };
 
     use super::*;
+
+    fn schema_with_metadata(blob: &str) -> Schema {
+        Schema::empty().with_metadata(
+            [(METADATA_LABEL.to_string(), blob.to_string())]
+                .into_iter()
+                .collect(),
+        )
+    }
+
+    /// `/api/v1/metadata` must read the blob through the shared reader, not parse it a second
+    /// time -- that is where a historically JSON-quoted family name gets normalised, and a
+    /// private parse here would drift from what `/streams` serves.
+    #[test]
+    fn test_get_metadata_object_delegates_to_shared_reader() {
+        let schema = schema_with_metadata(
+            r#"{"metric_type":"Histogram","metric_family_name":"\"foo\"","help":"h","unit":"s"}"#,
+        );
+
+        let served = serde_json::to_value(get_metadata_object(&schema).unwrap()).unwrap();
+        assert_eq!(served["type"], "histogram");
+        assert_eq!(served["help"], "h");
+        assert_eq!(served["unit"], "s");
+
+        // and the shared reader -- the one both this endpoint and `/streams` now go through --
+        // serves the family name without the stored quotes
+        assert_eq!(
+            super::super::get_prom_metadata_from_schema(&schema)
+                .unwrap()
+                .metric_family_name,
+            "foo"
+        );
+    }
+
+    /// A single corrupt schema entry used to take the process down here: this reader had its
+    /// own `panic!("BUG: failed to parse ...")`.
+    #[test]
+    fn test_get_metadata_object_malformed_blob_is_none_not_panic() {
+        assert!(get_metadata_object(&schema_with_metadata("not json")).is_none());
+    }
+
+    #[test]
+    fn test_get_metadata_object_absent_metadata_is_none() {
+        assert!(get_metadata_object(&Schema::empty()).is_none());
+    }
 
     fn selector_with_name(name: &str) -> VectorSelector {
         VectorSelector {
