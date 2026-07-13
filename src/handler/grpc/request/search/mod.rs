@@ -39,7 +39,7 @@ use {
     std::str::FromStr,
 };
 
-use crate::{handler::grpc::MetadataMap, service::search as SearchService};
+use crate::{common::meta::grpc::MetadataMap, service::search as SearchService};
 
 #[derive(Clone, Debug)]
 #[cfg(feature = "enterprise")]

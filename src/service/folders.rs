@@ -330,20 +330,16 @@ async fn permitted_folders(
     };
 
     // Get the list of folders that the user has `GET` permission on.
-    let mut folder_list = crate::handler::http::auth::validator::list_objects_for_user(
-        org_id,
-        user_id,
-        "GET",
-        folder_ofga_model,
-    )
-    .await
-    .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;
+    let mut folder_list =
+        crate::service::authz::list_objects_for_user(org_id, user_id, "GET", folder_ofga_model)
+            .await
+            .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;
 
     // In some cases, there might not be direct `GET` permission on the folder.
     // So, we need to check if the user has `GET` permission on any of the dashboards
     // inside the folder.
 
-    let permitted_dashboards = crate::handler::http::auth::validator::list_objects_for_user(
+    let permitted_dashboards = crate::service::authz::list_objects_for_user(
         org_id,
         user_id,
         "GET_INDIVIDUAL_FROM_ROLE",

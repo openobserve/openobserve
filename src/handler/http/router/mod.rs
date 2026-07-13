@@ -62,7 +62,7 @@ pub mod middlewares;
 pub mod openapi;
 pub mod ui;
 
-pub const ERROR_HEADER: &str = "X-Error-Message";
+pub use crate::common::meta::http::ERROR_HEADER;
 
 /// Custom header name for O2 Assistant session tracking (UUID v7)
 pub const X_O2_ASSISTANT_SESSION_ID: header::HeaderName =

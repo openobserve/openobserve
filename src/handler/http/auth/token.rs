@@ -28,8 +28,7 @@ pub async fn token_validator(
     req_data: &RequestData,
     auth_info: &AuthExtractor,
 ) -> Result<AuthValidationResult, AuthError> {
-    use super::validator::check_permissions;
-    use crate::common::utils::auth::V2_API_PREFIX;
+    use crate::{common::utils::auth::V2_API_PREFIX, service::authz::check_permissions};
 
     let user;
     let keys = get_dex_jwks().await;
@@ -206,27 +205,6 @@ pub async fn token_validator(
             }
         }
         Err(err) => Err(AuthError::Unauthorized(err.to_string())),
-    }
-}
-
-#[cfg(feature = "enterprise")]
-pub async fn get_user_name_from_token(auth_str: &str) -> Option<String> {
-    let keys = get_dex_jwks().await;
-    match jwt::verify_decode_token(
-        auth_str.strip_prefix("Bearer").unwrap().trim(),
-        &keys,
-        &get_dex_config().client_id,
-        false,
-        true,
-    ) {
-        Ok(res) => {
-            if res.0.is_valid {
-                Some(res.0.user_email)
-            } else {
-                None
-            }
-        }
-        Err(_) => None,
     }
 }
 
