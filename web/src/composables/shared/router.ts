@@ -160,7 +160,7 @@ const useRoutes = () => {
       },
     },
     {
-      // The zero-query browse grid, behind `config.showMetricsExplorer`.
+      // The zero-query browse grid.
       //
       // Back-compat: a `/metrics` URL carrying editor-specific params (the
       // `metrics_data` blob, or anything in METRICS_PARAMS) is a deep link
@@ -175,9 +175,7 @@ const useRoutes = () => {
         title: "Metrics",
       },
       beforeEnter(to: any, from: any, next: any) {
-        const explorerEnabled = config.showMetricsExplorer !== "false";
-
-        if (!explorerEnabled || hasMetricsEditorParams(to.query)) {
+        if (hasMetricsEditorParams(to.query)) {
           routeGuard(to, from, () =>
             next({
               name: "metricsEditor",

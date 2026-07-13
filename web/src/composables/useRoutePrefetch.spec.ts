@@ -16,19 +16,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { nextTick } from "vue";
 
-// Which metrics chunk the prefetch actually warmed. The point of the route is
-// that this is NOT a constant: /metrics renders the explorer, unless the org has
-// turned it off, in which case the router sends it to the editor.
-const flag = vi.hoisted(() => ({ value: "true" }));
-
-vi.mock("@/aws-exports", () => ({
-  default: {
-    get showMetricsExplorer() {
-      return flag.value;
-    },
-  },
-}));
-
 // Mock all lazy-loaded view/plugin modules so no real filesystem imports happen.
 vi.mock("@/views/HomeView.vue", () => ({ default: {} }));
 vi.mock("@/plugins/logs/Index.vue", () => ({ default: {} }));
@@ -48,7 +35,7 @@ vi.mock("@/components/reports/ReportList.vue", () => ({ default: {} }));
 vi.mock("@/components/actionScripts/ActionScripts.vue", () => ({ default: {} }));
 vi.mock("@/components/settings/index.vue", () => ({ default: {} }));
 
-import useRoutePrefetch, { metricsChunk } from "./useRoutePrefetch";
+import useRoutePrefetch from "./useRoutePrefetch";
 
 describe("useRoutePrefetch", () => {
   let composable: ReturnType<typeof useRoutePrefetch>;
@@ -57,32 +44,6 @@ describe("useRoutePrefetch", () => {
     vi.clearAllMocks();
     // Fresh instance per test — prefetchedRoutes starts empty.
     composable = useRoutePrefetch();
-  });
-
-  describe("/metrics warms whatever /metrics will actually render", () => {
-    /**
-     * The chunk the loader RESOLVES TO, which is the only thing about a prefetch
-     * that can be wrong. (Counting mock-factory side-effects cannot work here:
-     * vitest evaluates a mocked module's factory once and caches it, so the
-     * second scenario in a file would observe nothing at all.)
-     */
-    const chunkFor = async (showExplorer: string) => {
-      flag.value = showExplorer;
-      const mod: any = await metricsChunk();
-      return mod.default.chunk;
-    };
-
-    it("warms the explorer when the flag is on", async () => {
-      expect(await chunkFor("true")).toBe("explorer");
-    });
-
-    it("warms the EDITOR when the flag is off, because that is where /metrics goes", async () => {
-      // With `showMetricsExplorer` off, the router redirects /metrics straight to
-      // the editor (shared/router.ts). Hardcoding the explorer here paid for a
-      // module the click never uses and left the one it does use cold — the exact
-      // bug the previous comment claimed to have fixed, just inverted.
-      expect(await chunkFor("false")).toBe("editor");
-    });
   });
 
   describe("prefetchRoute", () => {

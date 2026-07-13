@@ -13,35 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import config from "@/aws-exports";
 import { ref } from "vue";
 
 /**
  * Composable for prefetching route modules on hover
  * This improves perceived performance by loading route components before navigation
  */
-/**
- * Whatever /metrics is going to RENDER — which is not a constant.
- *
- * The explorer took over /metrics when the zero-query grid landed and the panel
- * editor moved to /metrics/editor, so prefetching the editor was warming a chunk
- * the click does not use. But the explorer is behind `config.showMetricsExplorer`,
- * and with the flag off the router sends /metrics straight back to the editor — so
- * hardcoding the explorer merely inverts the same bug for the org that turned it
- * off: pay for a module the click never uses, leave the one it does use cold.
- *
- * The condition is the router's own (`showMetricsExplorer !== "false"`, see
- * shared/router.ts), so the two cannot answer this question differently.
- *
- * Exported because it IS the decision, not an implementation detail — which chunk
- * this resolves to is the only thing about a prefetch that can be wrong, and a
- * mocked module's factory runs once, so nothing else about it is observable.
- */
-export const metricsChunk = () =>
-  config.showMetricsExplorer !== "false"
-    ? import("@/plugins/metrics/explorer/MetricsExplorer.vue")
-    : import("@/plugins/metrics/Index.vue");
-
 export default function useRoutePrefetch() {
   // Track which routes have already been prefetched to avoid redundant loads
   const prefetchedRoutes = ref<Set<string>>(new Set());
@@ -58,7 +35,8 @@ export default function useRoutePrefetch() {
         import("@/plugins/logs/SearchResult.vue"),
       ]);
     },
-    "/metrics": metricsChunk,
+    // /metrics renders the explorer; the panel editor lives at /metrics/editor.
+    "/metrics": () => import("@/plugins/metrics/explorer/MetricsExplorer.vue"),
     "/traces": () => import("@/plugins/traces/Index.vue"),
     "/rum": () => import("@/views/RUM/RealUserMonitoring.vue"),
     "/dashboards": () => import("@/views/Dashboards/Dashboards.vue"),

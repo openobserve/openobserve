@@ -22,16 +22,6 @@ function readLLMUIFlag(): "true" | "false" {
     : "true";
 }
 
-// The zero-query Metrics Explorer at /metrics. Enabled by default; set the env
-// var to "false" to land on the panel editor instead, exactly as before.
-// Rolling back is a flag flip — `/metrics/editor` stays registered in both
-// states, so editor bookmarks made while the flag was on keep working.
-function readMetricsExplorerFlag(): "true" | "false" {
-  return String(import.meta.env.VITE_OPENOBSERVE_METRICS_EXPLORER) === "false"
-    ? "false"
-    : "true";
-}
-
 const config = {
   aws_mobile_analytics_app_id: "ab7e9321f83c45a8967ff3b9bd90e83a",
   aws_mobile_analytics_app_region: "us-west-2",
@@ -65,10 +55,6 @@ const config = {
   // default; set the env var to "false" to hide. Consumers use the
   // existing string check `config.showLLMUI !== 'false'`.
   showLLMUI: readLLMUIFlag(),
-  // Master switch for the Metrics Explorer browse grid at /metrics.
-  // Controlled at build time by `VITE_OPENOBSERVE_METRICS_EXPLORER`. Enabled by
-  // default; set to "false" to keep /metrics on the panel editor.
-  showMetricsExplorer: readMetricsExplorerFlag(),
 };
 
 export default config;
