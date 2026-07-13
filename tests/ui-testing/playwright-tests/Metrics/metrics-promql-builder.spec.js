@@ -18,6 +18,15 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await pm.metricsPage.gotoMetricsPage();
     // Wait for the stream selector to be visible — deterministic ready signal
     await pm.metricsBuilderPage.streamSelectorInput.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+
+    // The editor seeds the auto-selected metric's default query, and in Builder
+    // mode the seed brings its operations along (a gauge seeds `avg(metric{})`,
+    // a counter `sum(rate(metric{}[5m]))`) — see utils/dashboard/promqlSeed.ts.
+    // Every test below builds its query from scratch and asserts exact operation
+    // counts / query text, so start them from an empty operations list.
+    const seededOps = await pm.metricsBuilderPage.clearOperations();
+    expect(seededOps).toBe(0);
+
     testLogger.info('Test setup completed - navigated to metrics page');
     return pm;
   }
