@@ -68,24 +68,24 @@ use crate::{
 mod grpc_server;
 use grpc_server::Searcher;
 
-pub(crate) mod bloom_pruner;
-pub(crate) mod cache;
+pub mod bloom_pruner;
+pub mod cache;
 #[cfg(feature = "enterprise")]
-pub(crate) mod cardinality;
-pub(crate) mod cluster;
-pub(crate) mod datafusion;
-pub(crate) mod grpc;
-pub(crate) mod grpc_search;
-pub(crate) mod index;
-pub(crate) mod inspector;
-pub(crate) mod partition;
-pub(crate) mod sql;
-pub(crate) mod streaming;
+pub mod cardinality;
+pub mod cluster;
+pub mod datafusion;
+pub mod grpc;
+pub mod grpc_search;
+pub mod index;
+pub mod inspector;
+pub mod partition;
+pub mod sql;
+pub mod streaming;
 #[cfg(feature = "enterprise")]
-pub(crate) mod super_cluster;
-pub(crate) mod tantivy;
-pub(crate) mod utils;
-pub(crate) mod work_group;
+pub mod super_cluster;
+pub mod tantivy;
+pub mod utils;
+pub mod work_group;
 
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err

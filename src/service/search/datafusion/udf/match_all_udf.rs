@@ -24,10 +24,9 @@ use datafusion::{
 pub const MATCH_ALL_UDF_NAME: &str = "match_all";
 pub const FUZZY_MATCH_ALL_UDF_NAME: &str = "fuzzy_match_all";
 
-pub(crate) static MATCH_ALL_UDF: Lazy<ScalarUDF> =
-    Lazy::new(|| ScalarUDF::from(MatchAllUdf::new()));
+pub static MATCH_ALL_UDF: Lazy<ScalarUDF> = Lazy::new(|| ScalarUDF::from(MatchAllUdf::new()));
 
-pub(crate) static FUZZY_MATCH_ALL_UDF: Lazy<ScalarUDF> =
+pub static FUZZY_MATCH_ALL_UDF: Lazy<ScalarUDF> =
     Lazy::new(|| ScalarUDF::from(FuzzyMatchAllUdf::new()));
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]

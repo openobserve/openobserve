@@ -26,7 +26,7 @@ use datafusion::{
 pub const MATCH_ALL_HASH_UDF_NAME: &str = "match_all_hash";
 
 /// Implementation of match_all_hash
-pub(crate) static MATCH_ALL_HASH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+pub static MATCH_ALL_HASH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         MATCH_ALL_HASH_UDF_NAME,
         // expects one string argument

@@ -258,7 +258,7 @@ async fn write_vortex(
     }
 }
 
-pub(crate) fn append_metadata(
+pub fn append_metadata(
     writer: &mut AsyncArrowWriter<&mut Vec<u8>>,
     file_meta: &FileMeta,
 ) -> Result<()> {

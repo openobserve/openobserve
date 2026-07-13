@@ -41,35 +41,6 @@ use crate::{
     },
 };
 
-impl From<ReportError> for Response {
-    fn from(value: ReportError) -> Self {
-        match &value {
-            ReportError::SmtpNotEnabled => MetaHttpResponse::internal_error(value),
-            ReportError::ChromeNotEnabled => MetaHttpResponse::internal_error(value),
-            ReportError::ReportUsernamePasswordNotSet => MetaHttpResponse::bad_request(value),
-            ReportError::NameContainsOpenFgaUnsupportedCharacters => {
-                MetaHttpResponse::bad_request(value)
-            }
-            ReportError::NameIsEmpty => MetaHttpResponse::bad_request(value),
-            ReportError::NameContainsForwardSlash => MetaHttpResponse::bad_request(value),
-            ReportError::CreateReportNameAlreadyUsed => MetaHttpResponse::bad_request(value),
-            ReportError::ReportNotFound => MetaHttpResponse::not_found(value),
-            ReportError::NoDashboards => MetaHttpResponse::bad_request(value),
-            ReportError::InlineAttachmentTypeNotSupportedForPdf => {
-                MetaHttpResponse::bad_request(value)
-            }
-            ReportError::NoDashboardTabs => MetaHttpResponse::bad_request(value),
-            ReportError::NoDestinations => MetaHttpResponse::bad_request(value),
-            ReportError::DashboardTabNotFound => MetaHttpResponse::not_found(value),
-            ReportError::ParseCronError(e) => MetaHttpResponse::bad_request(e),
-            ReportError::DbError(e) => MetaHttpResponse::internal_error(e),
-            ReportError::SendReportError(e) => MetaHttpResponse::internal_error(e),
-            ReportError::CreateDefaultFolderError => MetaHttpResponse::internal_error(value),
-            ReportError::FolderNotFound => MetaHttpResponse::not_found(value),
-        }
-    }
-}
-
 #[derive(Debug, serde::Serialize, Deserialize, utoipa::ToSchema)]
 pub struct MoveReportsRequestBody {
     pub report_ids: Vec<String>,

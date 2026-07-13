@@ -57,7 +57,7 @@ impl QueryPlanner for OpenobserveQueryPlanner {
 
 /// A physical planner that convert a `DeduplicationLogicalNode` into `DeduplicationExec`,
 #[derive(Debug)]
-pub(crate) struct DeduplicationExecPlanner {}
+pub struct DeduplicationExecPlanner {}
 
 impl DeduplicationExecPlanner {
     pub fn new() -> Self {

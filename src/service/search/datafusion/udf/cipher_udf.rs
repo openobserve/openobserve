@@ -35,14 +35,14 @@ use serde_json::Value;
 use crate::cipher::registry::REGISTRY;
 
 /// The name of the decrypt UDF given to DataFusion.
-pub(crate) const DECRYPT_UDF_NAME: &str = "decrypt_path";
+pub const DECRYPT_UDF_NAME: &str = "decrypt_path";
 /// The name of the decrypt UDF given to DataFusion.
-pub(crate) const ENCRYPT_UDF_NAME: &str = "encrypt";
+pub const ENCRYPT_UDF_NAME: &str = "encrypt";
 /// The name of the decrypt_slow UDF given to DataFusion.
-pub(crate) const DECRYPT_SLOW_UDF_NAME: &str = "decrypt";
+pub const DECRYPT_SLOW_UDF_NAME: &str = "decrypt";
 
 /// implementation of decrypt
-pub(crate) static DECRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+pub static DECRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         DECRYPT_UDF_NAME,
         // expects three arguments : field, key_name and path
@@ -55,7 +55,7 @@ pub(crate) static DECRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
 });
 
 /// implementation of encrypt
-pub(crate) static ENCRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+pub static ENCRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         ENCRYPT_UDF_NAME,
         // expects three arguments : field, key_name and path
@@ -68,7 +68,7 @@ pub(crate) static ENCRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
 });
 
 /// implementation of decrypt_slow
-pub(crate) static DECRYPT_SLOW_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+pub static DECRYPT_SLOW_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         DECRYPT_SLOW_UDF_NAME,
         // expects three arguments : field, key_name and path

@@ -30,11 +30,10 @@ use datafusion::{
 };
 
 /// Implementation of str_match
-pub(crate) static STR_MATCH_UDF: Lazy<ScalarUDF> =
-    Lazy::new(|| ScalarUDF::from(StrMatchUdf::new()));
+pub static STR_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| ScalarUDF::from(StrMatchUdf::new()));
 
 /// Implementation of str_match_ignore_case
-pub(crate) static STR_MATCH_IGNORE_CASE_UDF: Lazy<ScalarUDF> =
+pub static STR_MATCH_IGNORE_CASE_UDF: Lazy<ScalarUDF> =
     Lazy::new(|| ScalarUDF::from(StrMatchIgnoreCaseUdf::new()));
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]

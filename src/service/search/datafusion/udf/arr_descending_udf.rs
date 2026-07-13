@@ -35,7 +35,7 @@ use datafusion::{
 pub const ARR_DESCENDING_UDF_NAME: &str = "arr_descending";
 
 /// Implementation of arr_descending
-pub(crate) static ARR_DESCENDING_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+pub static ARR_DESCENDING_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         ARR_DESCENDING_UDF_NAME,
         // expects three string

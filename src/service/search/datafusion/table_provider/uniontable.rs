@@ -26,7 +26,7 @@ use datafusion::{
 };
 
 #[derive(Debug)]
-pub(crate) struct NewUnionTable {
+pub struct NewUnionTable {
     schema: SchemaRef,
     tables: Vec<Arc<dyn TableProvider>>,
 }

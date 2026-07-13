@@ -30,7 +30,7 @@ use datafusion::{
 pub const ARR_COUNT_UDF_NAME: &str = "arrcount";
 
 /// Implementation of arrcount
-pub(crate) static ARR_COUNT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+pub static ARR_COUNT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         ARR_COUNT_UDF_NAME,
         // expects two string - the field and the delimiter

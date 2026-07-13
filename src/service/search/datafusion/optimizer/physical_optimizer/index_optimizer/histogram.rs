@@ -53,7 +53,7 @@ use crate::service::search::datafusion::optimizer::physical_optimizer::{
 ///             FilterExec: _timestamp@0 >= 17296550822151 AND _timestamp@0 < 172965508891538700
 ///               CooperativeExec
 ///                 NewEmptyExec: name="default", projection=["_timestamp"],
-pub(crate) fn is_simple_histogram(plan: Arc<dyn ExecutionPlan>, time_range: (i64, i64)) -> Option<IndexOptimizeMode> {
+pub fn is_simple_histogram(plan: Arc<dyn ExecutionPlan>, time_range: (i64, i64)) -> Option<IndexOptimizeMode> {
     let mut visitor = SimpleHistogramVisitor::new(time_range);
     let _ = plan.visit(&mut visitor);
     if let Some((min_value, bucket_width, num_buckets, ts_offset)) = visitor.simple_histogram {
@@ -197,7 +197,7 @@ fn get_timestamp_offset(expr: &Arc<dyn PhysicalExpr>) -> Option<i64> {
 ///       RepartitionExec: partitioning=Hash([histogram(_timestamp)@0, level@1], 12), input_partitions=12
 ///         AggregateExec: mode=Partial, gby=[date_bin(...) as ts, level@1 as level], aggr=[count(Int64(1))]
 ///           ...
-pub(crate) fn is_simple_multi_histogram(
+pub fn is_simple_multi_histogram(
     plan: Arc<dyn ExecutionPlan>,
     time_range: (i64, i64),
     index_fields: HashSet<String>,

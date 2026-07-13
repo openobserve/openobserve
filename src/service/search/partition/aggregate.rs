@@ -39,7 +39,7 @@ use {
 
 /// Determine whether a streaming aggregate query should be used for the given SQL query.
 #[cfg(feature = "enterprise")]
-pub(crate) fn is_streaming_aggregate(sql: &str, ts_column: Option<&str>) -> bool {
+pub fn is_streaming_aggregate(sql: &str, ts_column: Option<&str>) -> bool {
     let feature_query_streaming_aggs = config::get_config().common.feature_query_streaming_aggs;
     let mut is_cachable_aggs = is_simple_aggregate_query(sql).unwrap_or(false);
 
@@ -53,7 +53,7 @@ pub(crate) fn is_streaming_aggregate(sql: &str, ts_column: Option<&str>) -> bool
 }
 
 #[cfg(not(feature = "enterprise"))]
-pub(crate) fn is_streaming_aggregate(_sql: &str, _ts_column: Option<&str>) -> bool {
+pub fn is_streaming_aggregate(_sql: &str, _ts_column: Option<&str>) -> bool {
     false
 }
 
@@ -62,7 +62,7 @@ pub(crate) fn is_streaming_aggregate(_sql: &str, _ts_column: Option<&str>) -> bo
 ///
 /// Returns `(streaming_aggs, streaming_id, partition_strategy)`.
 #[cfg(feature = "enterprise")]
-pub(crate) async fn prepare_streaming_aggregate(
+pub async fn prepare_streaming_aggregate(
     trace_id: &str,
     req: &SearchPartitionRequest,
     ctx: &PartitionSqlContext,

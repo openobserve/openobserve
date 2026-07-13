@@ -345,7 +345,7 @@ fn wrap_partial_reduce(
 // with a PartialReduce AggregateExec. `input` can be either the original partial
 // aggregate itself or another plan producing that aggregate's partial-output
 // schema, such as a RemoteScanExec on a super-cluster region leader.
-pub(crate) fn wrap_partial_reduce_for_aggregate(
+pub fn wrap_partial_reduce_for_aggregate(
     partial_reduce_enabled: bool,
     agg: &AggregateExec,
     input: Arc<dyn ExecutionPlan>,

@@ -763,7 +763,7 @@ pub async fn remote_write(
     Ok(())
 }
 
-pub(crate) async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<ResponseMetadata> {
+pub async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<ResponseMetadata> {
     if req.limit == Some(0) {
         return Ok(hashbrown::HashMap::new());
     }
@@ -846,7 +846,7 @@ fn get_metadata_object(schema: &Schema) -> Option<MetadataObject> {
     })
 }
 
-pub(crate) async fn get_series(
+pub async fn get_series(
     org_id: &str,
     selector: Option<parser::VectorSelector>,
     start: i64,
@@ -946,7 +946,7 @@ pub(crate) async fn get_series(
     Ok(series)
 }
 
-pub(crate) async fn get_labels(
+pub async fn get_labels(
     org_id: &str,
     selector: Option<parser::VectorSelector>,
     start: i64,
@@ -983,7 +983,7 @@ pub(crate) async fn get_labels(
     Ok(label_names)
 }
 
-pub(crate) async fn get_label_values(
+pub async fn get_label_values(
     org_id: &str,
     label_name: String,
     selector: Option<parser::VectorSelector>,
@@ -1124,7 +1124,7 @@ pub(crate) async fn get_label_values(
     Ok(label_values)
 }
 
-pub(crate) fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
+pub fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
     match &selector.name {
         Some(name) => {
             // `match[]` argument contains a metric name, e.g.

@@ -87,7 +87,7 @@ pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
 /// - General PATCH normalization: PATCH → PUT (treat as update)
 #[cfg(any(feature = "enterprise", test))]
 #[allow(dead_code)]
-pub(crate) fn resolve_write_method(method: &str, path_columns: &[&str]) -> String {
+pub fn resolve_write_method(method: &str, path_columns: &[&str]) -> String {
     let url_len = path_columns.len();
     let mut resolved = method.to_string();
 
@@ -147,7 +147,7 @@ pub fn is_ofga_unsupported(name: &str) -> bool {
 }
 
 #[cfg(feature = "enterprise")]
-pub(crate) fn is_ofga_object_visible(
+pub fn is_ofga_object_visible(
     org_id: &str,
     object_type: &str,
     object_id: &str,
@@ -159,7 +159,7 @@ pub(crate) fn is_ofga_object_visible(
     })
 }
 
-pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
+pub fn get_hash(pass: &str, salt: &str) -> String {
     let key = format!("{pass}{salt}");
     let hash = PASSWORD_HASH.get(&key);
     match hash {
@@ -172,7 +172,7 @@ pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
     }
 }
 
-pub(crate) fn is_root_user(user_id: &str) -> bool {
+pub fn is_root_user(user_id: &str) -> bool {
     match ORG_USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
         Some(user) => user.role.eq(&UserRole::Root),
         None => false,

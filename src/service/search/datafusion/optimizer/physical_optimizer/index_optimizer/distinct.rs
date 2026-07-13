@@ -50,7 +50,7 @@ use crate::service::search::datafusion::optimizer::physical_optimizer::{
 ///                 FilterExec: _timestamp@0 >= 17296550822151 AND _timestamp@0 < 172965508891538700, projection=[kubernetes_namespace_name@1]
 ///                   CooperativeExec
 ///                     NewEmptyExec: name="default", projection=["_timestamp", "kubernetes_namespace_name"]
-pub(crate) fn is_simple_distinct(plan: Arc<dyn ExecutionPlan>, index_fields: HashSet<String>) -> Option<IndexOptimizeMode> {
+pub fn is_simple_distinct(plan: Arc<dyn ExecutionPlan>, index_fields: HashSet<String>) -> Option<IndexOptimizeMode> {
     let mut visitor = SimpleDistinctVisitor::new(index_fields);
     let _ = plan.visit(&mut visitor);
     if let Some((field, fetch, ascend)) = visitor.simple_distinct {

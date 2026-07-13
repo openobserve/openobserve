@@ -63,18 +63,6 @@ pub struct TestDestinationResponse {
     pub error: Option<String>,
 }
 
-impl From<DestinationError> for Response {
-    fn from(value: DestinationError) -> Self {
-        match &value {
-            DestinationError::UsedByAlert(_) => MetaHttpResponse::conflict(value),
-            DestinationError::UsedByPipeline(_) => MetaHttpResponse::conflict(value),
-            DestinationError::InfraError(err) => MetaHttpResponse::internal_error(err),
-            DestinationError::NotFound => MetaHttpResponse::not_found(value),
-            other_err => MetaHttpResponse::bad_request(other_err),
-        }
-    }
-}
-
 /// TestDestination
 #[utoipa::path(
     post,

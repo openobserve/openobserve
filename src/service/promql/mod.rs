@@ -45,10 +45,10 @@ mod utils;
 pub use engine::Engine;
 pub use exec::PromqlContext;
 
-pub(crate) const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
-pub(crate) const MINIMAL_INTERVAL: Duration = Duration::from_secs(1); // 1s
-pub(crate) const MAX_DATA_POINTS: i64 = 256; // Width of panel: window.innerWidth / 4
-pub(crate) const DEFAULT_MAX_POINTS_PER_SERIES: usize = 30000; // Maximum number of points per series
+pub const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
+pub const MINIMAL_INTERVAL: Duration = Duration::from_secs(1); // 1s
+pub const MAX_DATA_POINTS: i64 = 256; // Width of panel: window.innerWidth / 4
+pub const DEFAULT_MAX_POINTS_PER_SERIES: usize = 30000; // Maximum number of points per series
 const DEFAULT_STEP: Duration = Duration::from_secs(15); // default step in seconds
 const MIN_TIMESERIES_POINTS_FOR_TIME_ROUNDING: i64 = 10; // Adjust this value as needed
 
@@ -78,16 +78,51 @@ pub struct MetricsQueryRequest {
     pub clusters: Vec<String>,
 }
 
+impl From<MetricsQueryRequest> for proto::cluster_rpc::MetricsQueryRequest {
+    fn from(req: MetricsQueryRequest) -> Self {
+        let query = proto::cluster_rpc::MetricsQueryStmt {
+            query: req.query,
+            start: req.start,
+            end: req.end,
+            step: req.step,
+            query_exemplars: req.query_exemplars,
+            query_data: false,
+            label_selector: vec![],
+        };
+        let trace_id = config::ider::generate_trace_id();
+        Self {
+            job: Some(proto::cluster_rpc::Job {
+                trace_id: trace_id.clone(),
+                job: trace_id[..7].to_string(),
+                stage: 0,
+                partition: 0,
+            }),
+            org_id: String::new(),
+            need_wal: false,
+            query: Some(query),
+            use_cache: req.use_cache.unwrap_or(true),
+            timeout: 0,
+            search_event_type: req
+                .search_type
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+            regions: req.regions,
+            clusters: req.clusters,
+            is_super_cluster: false,
+        }
+    }
+}
+
 /// Converts `t` to the number of microseconds elapsed since the beginning of
 /// the Unix epoch.
-pub(crate) fn micros_since_epoch(t: SystemTime) -> i64 {
+pub fn micros_since_epoch(t: SystemTime) -> i64 {
     micros(
         t.duration_since(UNIX_EPOCH)
             .expect("BUG: {t} is earlier than Unix epoch"),
     )
 }
 
-pub(crate) fn micros(t: Duration) -> i64 {
+pub fn micros(t: Duration) -> i64 {
     t.as_micros()
         .try_into()
         .expect("BUG: time value is too large to fit in i64")

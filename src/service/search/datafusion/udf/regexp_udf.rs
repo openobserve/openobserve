@@ -37,7 +37,7 @@ use datafusion::{
 };
 
 /// Implementation of regexp_match
-pub(crate) static REGEX_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+pub static REGEX_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         super::REGEX_MATCH_UDF_NAME,
         // takes two arguments: regex, pattern
@@ -49,7 +49,7 @@ pub(crate) static REGEX_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
 });
 
 /// Implementation of regexp_not_match
-pub(crate) static REGEX_NOT_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+pub static REGEX_NOT_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         super::REGEX_NOT_MATCH_UDF_NAME,
         // takes two arguments: regex, pattern
@@ -61,7 +61,7 @@ pub(crate) static REGEX_NOT_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
 });
 
 /// Implementation of regexp_match_to_fields
-pub(crate) static REGEXP_MATCH_TO_FIELDS_UDF: Lazy<ScalarUDF> =
+pub static REGEXP_MATCH_TO_FIELDS_UDF: Lazy<ScalarUDF> =
     Lazy::new(|| ScalarUDF::from(RegxpMatchToFields::new()));
 
 /// Given a column containing string values and a single regex pattern,

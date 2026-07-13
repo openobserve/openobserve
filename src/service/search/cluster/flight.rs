@@ -563,10 +563,7 @@ pub async fn partition_file_list(
     Ok(partition_file_list)
 }
 
-pub(crate) fn partition_file_by_nums(
-    file_id_list: Vec<FileId>,
-    querier_num: usize,
-) -> Vec<Vec<i64>> {
+pub fn partition_file_by_nums(file_id_list: Vec<FileId>, querier_num: usize) -> Vec<Vec<i64>> {
     let file_distribute = distribute(file_id_list.len(), querier_num);
 
     let mut partitions = vec![Vec::new(); querier_num];
@@ -593,10 +590,7 @@ fn distribute(total: usize, n: usize) -> Vec<usize> {
     buckets
 }
 
-pub(crate) fn partition_file_by_bytes(
-    file_id_list: Vec<FileId>,
-    querier_num: usize,
-) -> Vec<Vec<i64>> {
+pub fn partition_file_by_bytes(file_id_list: Vec<FileId>, querier_num: usize) -> Vec<Vec<i64>> {
     let mut partitions = vec![Vec::new(); querier_num];
     let sum_original_size = file_id_list.iter().map(|fk| fk.original_size).sum::<i64>();
     let avg_size = sum_original_size / querier_num as i64;
@@ -615,7 +609,7 @@ pub(crate) fn partition_file_by_bytes(
     partitions
 }
 
-pub(crate) async fn partition_file_by_hash(
+pub async fn partition_file_by_hash(
     file_id_list: Vec<FileId>,
     nodes: &[Node],
     group: Option<RoleGroup>,

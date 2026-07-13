@@ -38,7 +38,7 @@ use crate::service::search::datafusion::optimizer::physical_optimizer::{
 ///     FilterExec: _timestamp@0 >= 175256100000000 AND _timestamp@0 < 17525610000000000
 ///       CooperativeExec
 ///         NewEmptyExec: name="default",
-pub(crate) fn is_simple_select(plan: Arc<dyn ExecutionPlan>) -> Option<IndexOptimizeMode> {
+pub fn is_simple_select(plan: Arc<dyn ExecutionPlan>) -> Option<IndexOptimizeMode> {
     let mut visitor = SimpleSelectVisitor::new();
     let _ = plan.visit(&mut visitor);
     if let Some((limit, ascend)) = visitor.is_simple_select {

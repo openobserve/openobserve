@@ -39,7 +39,7 @@ pub fn is_complex_plan(node: &Arc<dyn ExecutionPlan>) -> bool {
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
+pub mod tests {
     use std::sync::Arc;
 
     use datafusion::{
@@ -77,9 +77,7 @@ pub(crate) mod tests {
     }
 
     // get the first final aggregate plan from bottom to top
-    pub(crate) fn get_partial_aggregate_plan(
-        plan: Arc<dyn ExecutionPlan>,
-    ) -> Option<AggregateExec> {
+    pub fn get_partial_aggregate_plan(plan: Arc<dyn ExecutionPlan>) -> Option<AggregateExec> {
         let mut visitor = AggregateVisitor::new();
         let _ = plan.visit(&mut visitor);
         let data = visitor.get_data();
@@ -124,7 +122,7 @@ pub(crate) mod tests {
         }
     }
 
-    pub(crate) fn get_remote_scan(plan: Arc<dyn ExecutionPlan>) -> Vec<Arc<RemoteScanExec>> {
+    pub fn get_remote_scan(plan: Arc<dyn ExecutionPlan>) -> Vec<Arc<RemoteScanExec>> {
         let mut visitor = RemoteScanVisitor::new();
         let _ = plan.visit(&mut visitor);
         visitor.get_data()

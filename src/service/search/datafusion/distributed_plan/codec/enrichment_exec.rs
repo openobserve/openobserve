@@ -27,7 +27,7 @@ use proto::cluster_rpc;
 
 use crate::service::search::datafusion::distributed_plan::enrichment_exec::EnrichmentExec;
 
-pub(crate) fn try_decode(
+pub fn try_decode(
     node: cluster_rpc::EnrichmentExecNode,
     _inputs: &[Arc<dyn ExecutionPlan>],
     _registry: &dyn FunctionRegistry,
@@ -41,7 +41,7 @@ pub(crate) fn try_decode(
     )))
 }
 
-pub(crate) fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
+pub fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
     let Some(node) = node.downcast_ref::<EnrichmentExec>() else {
         return internal_err!("Not supported");
     };

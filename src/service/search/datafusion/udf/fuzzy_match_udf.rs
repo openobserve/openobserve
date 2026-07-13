@@ -35,7 +35,7 @@ use datafusion::{
 };
 
 /// Implementation of fuzzy_match
-pub(crate) static FUZZY_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+pub static FUZZY_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         super::FUZZY_MATCH_UDF_NAME,
         // expects two string

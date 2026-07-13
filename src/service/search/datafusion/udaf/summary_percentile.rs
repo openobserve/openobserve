@@ -58,7 +58,7 @@ const SUMMARY_PERCENTILE: &str = "summary_percentile";
 ///     summary_percentile(f3, total_count, 0.5) as f3_median
 /// FROM summary_percentile
 #[derive(Debug, Hash, Eq, PartialEq)]
-pub(crate) struct SummaryPercentile(Signature);
+pub struct SummaryPercentile(Signature);
 
 impl SummaryPercentile {
     pub fn new() -> Self {

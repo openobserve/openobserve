@@ -33,7 +33,7 @@ use datafusion::{
 pub const ARR_ZIP_UDF_NAME: &str = "arrzip";
 
 /// Implementation of arrzip UDF
-pub(crate) static ARR_ZIP_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+pub static ARR_ZIP_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         ARR_ZIP_UDF_NAME,
         // expects three string - field1, field2 and the delim

@@ -25,7 +25,7 @@ use super::sql_context::PartitionSqlContext;
 /// "stream") determines which subset of online querier nodes are used, so
 /// only the selected nodes' CPU cores are summed. On community edition, all
 /// online querier nodes are summed.
-pub(crate) async fn estimated_secs(
+pub async fn estimated_secs(
     trace_id: &str,
     _ctx: &PartitionSqlContext,
     role_group: Option<RoleGroup>,

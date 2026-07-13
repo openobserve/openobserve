@@ -31,7 +31,7 @@ use datafusion::{
 pub const TO_ARR_STRING_UDF_NAME: &str = "to_array_string";
 
 /// Implementation of to_array_string
-pub(crate) static TO_ARR_STRING: Lazy<ScalarUDF> = Lazy::new(|| {
+pub static TO_ARR_STRING: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         TO_ARR_STRING_UDF_NAME,
         // takes one argument: the field

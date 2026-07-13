@@ -51,7 +51,7 @@ use crate::service::search::datafusion::optimizer::physical_optimizer::{
 ///                   FilterExec: _timestamp@0 >= 175256100000000 AND _timestamp@0 < 17525610000000000, projection=[kubernetes_namespace_name@1]
 ///                     CooperativeExec
 ///                       NewEmptyExec: name="default", projection=["_timestamp", "kubernetes_namespace_name"]
-pub(crate) fn is_simple_topn(plan: Arc<dyn ExecutionPlan>, index_fields: HashSet<String>) -> Option<IndexOptimizeMode> {
+pub fn is_simple_topn(plan: Arc<dyn ExecutionPlan>, index_fields: HashSet<String>) -> Option<IndexOptimizeMode> {
     let mut visitor = SimpleTopnVisitor::new(index_fields);
     let _ = plan.visit(&mut visitor);
     match visitor.simple_topn {

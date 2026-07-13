@@ -15,48 +15,48 @@
 
 use config::{meta::function::ZoFunction, utils::json};
 
-pub(crate) mod arr_descending_udf;
-pub(crate) mod arrcount_udf;
-pub(crate) mod arrindex_udf;
-pub(crate) mod arrjoin_udf;
-pub(crate) mod arrsort_udf;
-pub(crate) mod arrzip_udf;
-pub(crate) mod cast_to_arr_udf;
-pub(crate) mod cast_to_timestamp_udf;
+pub mod arr_descending_udf;
+pub mod arrcount_udf;
+pub mod arrindex_udf;
+pub mod arrjoin_udf;
+pub mod arrsort_udf;
+pub mod arrzip_udf;
+pub mod cast_to_arr_udf;
+pub mod cast_to_timestamp_udf;
 #[cfg(feature = "enterprise")]
-pub(crate) mod cipher_udf;
-pub(crate) mod date_format_udf;
-pub(crate) mod fuzzy_match_udf;
-pub(crate) mod histogram_udf;
-pub(crate) mod match_all_hash_udf;
-pub(crate) mod match_all_udf;
-pub(crate) mod regexp_matches_udf;
-pub(crate) mod regexp_udf;
-pub(crate) mod spath_udf;
-pub(crate) mod str_match_udf;
-pub(crate) mod string_to_array_v2_udf;
-pub(crate) mod time_range_udf;
-pub(crate) mod to_arr_string_udf;
-pub(crate) mod transform_udf;
+pub mod cipher_udf;
+pub mod date_format_udf;
+pub mod fuzzy_match_udf;
+pub mod histogram_udf;
+pub mod match_all_hash_udf;
+pub mod match_all_udf;
+pub mod regexp_matches_udf;
+pub mod regexp_udf;
+pub mod spath_udf;
+pub mod str_match_udf;
+pub mod string_to_array_v2_udf;
+pub mod time_range_udf;
+pub mod to_arr_string_udf;
+pub mod transform_udf;
 
 /// The name of the str_match UDF given to DataFusion.
-pub(crate) const STR_MATCH_UDF_NAME: &str = "str_match";
+pub const STR_MATCH_UDF_NAME: &str = "str_match";
 /// The name of the str_match_ignore_case UDF given to DataFusion.
-pub(crate) const STR_MATCH_UDF_IGNORE_CASE_NAME: &str = "str_match_ignore_case";
+pub const STR_MATCH_UDF_IGNORE_CASE_NAME: &str = "str_match_ignore_case";
 /// The name of the match_field UDF given to DataFusion.
-pub(crate) const MATCH_FIELD_UDF_NAME: &str = "match_field";
+pub const MATCH_FIELD_UDF_NAME: &str = "match_field";
 /// The name of the match_field_ignore_case UDF given to DataFusion.
-pub(crate) const MATCH_FIELD_IGNORE_CASE_UDF_NAME: &str = "match_field_ignore_case";
+pub const MATCH_FIELD_IGNORE_CASE_UDF_NAME: &str = "match_field_ignore_case";
 /// The name of the fuzzy_match UDF given to DataFusion.
-pub(crate) const FUZZY_MATCH_UDF_NAME: &str = "fuzzy_match";
+pub const FUZZY_MATCH_UDF_NAME: &str = "fuzzy_match";
 /// The name of the regex_match UDF given to DataFusion.
-pub(crate) const REGEX_MATCH_UDF_NAME: &str = "re_match";
+pub const REGEX_MATCH_UDF_NAME: &str = "re_match";
 /// The name of the not_regex_match UDF given to DataFusion.
-pub(crate) const REGEX_NOT_MATCH_UDF_NAME: &str = "re_not_match";
+pub const REGEX_NOT_MATCH_UDF_NAME: &str = "re_not_match";
 /// The name of the regex_matches UDF given to DataFusion.
-pub(crate) const REGEX_MATCHES_UDF_NAME: &str = "re_matches";
+pub const REGEX_MATCHES_UDF_NAME: &str = "re_matches";
 
-pub(crate) const DEFAULT_FUNCTIONS: [ZoFunction; 11] = [
+pub const DEFAULT_FUNCTIONS: [ZoFunction; 11] = [
     ZoFunction {
         name: "match_all",
         text: "match_all('v')",

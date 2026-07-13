@@ -769,7 +769,7 @@ enum DeletionCriteria {
 ///    10:00-11:00 Cache1: 10:00-10:30 (duration: 30min, overlap: 30min) = (30/30)*100 = 100%
 ///    Cache2: 10:15-11:15 (duration: 60min, overlap: 45min) = (45/60)*100 = 75% Chooses Cache1
 ///    because 100% of its duration is useful for the query
-pub(crate) fn select_cache_meta(
+pub fn select_cache_meta(
     meta: &ResultCacheMeta,
     req: &CacheQueryRequest,
     strategy: &ResultCacheSelectionStrategy,

@@ -31,7 +31,7 @@ use datafusion::{
 pub const CAST_TO_ARR_UDF_NAME: &str = "cast_to_arr";
 
 /// Implementation of cast_to_arr
-pub(crate) static CAST_TO_ARR_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+pub static CAST_TO_ARR_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         CAST_TO_ARR_UDF_NAME,
         // takes one argument: the field

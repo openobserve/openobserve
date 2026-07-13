@@ -28,7 +28,7 @@ use regex::Regex;
 use crate::service::search::datafusion::udf::REGEX_MATCHES_UDF_NAME;
 
 /// Implementation of regexp_matches
-pub(crate) static REGEX_MATCHES_UDF: Lazy<ScalarUDF> =
+pub static REGEX_MATCHES_UDF: Lazy<ScalarUDF> =
     Lazy::new(|| ScalarUDF::from(RegexpMatchesFunc::default()));
 
 /// # `re_matches` User-Defined Function (UDF)

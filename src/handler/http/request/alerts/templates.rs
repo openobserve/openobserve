@@ -30,24 +30,6 @@ use crate::{
     service::{alerts::templates, db::alerts::templates::TemplateError},
 };
 
-impl From<TemplateError> for Response {
-    fn from(value: TemplateError) -> Self {
-        match value {
-            TemplateError::InfraError(e) => {
-                MetaHttpResponse::internal_error(TemplateError::InfraError(e))
-            }
-            TemplateError::NotFound => MetaHttpResponse::not_found(TemplateError::NotFound),
-            TemplateError::DeleteWithDestination(e) => {
-                MetaHttpResponse::conflict(TemplateError::DeleteWithDestination(e))
-            }
-            TemplateError::PrebuiltReadOnly(name) => {
-                MetaHttpResponse::forbidden(TemplateError::PrebuiltReadOnly(name))
-            }
-            other_err => MetaHttpResponse::bad_request(other_err),
-        }
-    }
-}
-
 /// CreateTemplate
 #[utoipa::path(
     post,

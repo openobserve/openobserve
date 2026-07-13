@@ -32,7 +32,7 @@ use super::{datafusion::exec::TableBuilder, index::IndexCondition};
 pub mod flight;
 pub mod storage;
 pub mod wal;
-pub(crate) use super::tantivy::cache as tantivy_result_cache;
+pub use super::tantivy::cache as tantivy_result_cache;
 
 pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats, HashSet<u64>)>;
 
@@ -59,7 +59,7 @@ pub fn calc_target_partitions(cpu_num: usize, query_thread_num: usize, cached_ra
 /// - Files completely within the query time range: no timestamp filter applied
 /// - Files partially overlapping with the query time range: timestamp filter applied
 #[allow(clippy::too_many_arguments)]
-pub(crate) async fn create_tables_from_files<F>(
+pub async fn create_tables_from_files<F>(
     files: Vec<FileKey>,
     session: config::meta::search::Session,
     query: Arc<QueryParams>,

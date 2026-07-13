@@ -67,7 +67,7 @@ use crate::service::search::{
     index::IndexCondition,
 };
 
-pub(crate) const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
+pub const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 
 pub fn create_session_config(
     sorted_by_time: bool,

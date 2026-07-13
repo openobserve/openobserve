@@ -26,7 +26,7 @@ use o2_enterprise::enterprise::search::datafusion::distributed_plan::tmp_exec::T
 use prost::Message;
 use proto::cluster_rpc;
 
-pub(crate) fn try_decode(
+pub fn try_decode(
     node: cluster_rpc::TmpExecNode,
     _inputs: &[Arc<dyn ExecutionPlan>],
     _registry: &dyn FunctionRegistry,
@@ -41,7 +41,7 @@ pub(crate) fn try_decode(
     )))
 }
 
-pub(crate) fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
+pub fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
     let Some(node) = node.downcast_ref::<TmpExec>() else {
         return internal_err!("Not supported");
     };

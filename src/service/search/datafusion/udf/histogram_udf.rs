@@ -23,8 +23,7 @@ use datafusion::{
 
 pub const HISTOGRAM_UDF_NAME: &str = "histogram";
 
-pub(crate) static HISTOGRAM_UDF: Lazy<ScalarUDF> =
-    Lazy::new(|| ScalarUDF::from(HistogramUdf::new()));
+pub static HISTOGRAM_UDF: Lazy<ScalarUDF> = Lazy::new(|| ScalarUDF::from(HistogramUdf::new()));
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 struct HistogramUdf {

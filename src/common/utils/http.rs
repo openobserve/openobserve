@@ -29,12 +29,12 @@ use opentelemetry::{global, propagation::Extractor, trace::TraceContextExt};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[inline(always)]
-pub(crate) fn get_stream_type_from_request(query: &HashMap<String, String>) -> Option<StreamType> {
+pub fn get_stream_type_from_request(query: &HashMap<String, String>) -> Option<StreamType> {
     query.get("type").map(|s| StreamType::from(s.as_str()))
 }
 
 #[inline(always)]
-pub(crate) fn get_ts_from_request_with_key(
+pub fn get_ts_from_request_with_key(
     query: &HashMap<String, String>,
     key: &str,
 ) -> Result<i64, String> {
@@ -47,14 +47,12 @@ pub(crate) fn get_ts_from_request_with_key(
 }
 
 #[inline(always)]
-pub(crate) fn get_fallback_order_by_col_from_request(
-    query: &HashMap<String, String>,
-) -> Option<String> {
+pub fn get_fallback_order_by_col_from_request(query: &HashMap<String, String>) -> Option<String> {
     query.get("fallback_order_by_col").map(|s| s.to_string())
 }
 
 #[inline(always)]
-pub(crate) fn get_search_type_from_request(
+pub fn get_search_type_from_request(
     query: &HashMap<String, String>,
 ) -> Result<Option<SearchEventType>, Error> {
     query
@@ -65,7 +63,7 @@ pub(crate) fn get_search_type_from_request(
 }
 
 #[inline(always)]
-pub(crate) fn get_search_event_context_from_request(
+pub fn get_search_event_context_from_request(
     search_event_type: &SearchEventType,
     query: &HashMap<String, String>,
 ) -> Option<SearchEventContext> {
@@ -92,7 +90,7 @@ fn get_key_as_bool(query: &HashMap<String, String>, key: &str) -> bool {
 }
 
 #[inline(always)]
-pub(crate) fn get_use_cache_from_request(query: &HashMap<String, String>) -> bool {
+pub fn get_use_cache_from_request(query: &HashMap<String, String>) -> bool {
     if !default_use_cache() {
         return false;
     }
@@ -103,28 +101,28 @@ pub(crate) fn get_use_cache_from_request(query: &HashMap<String, String>) -> boo
 }
 
 #[inline(always)]
-pub(crate) fn get_is_ui_histogram_from_request(query: &HashMap<String, String>) -> bool {
+pub fn get_is_ui_histogram_from_request(query: &HashMap<String, String>) -> bool {
     get_key_as_bool(query, "is_ui_histogram")
 }
 
 #[inline(always)]
-pub(crate) fn get_is_multi_stream_search_from_request(query: &HashMap<String, String>) -> bool {
+pub fn get_is_multi_stream_search_from_request(query: &HashMap<String, String>) -> bool {
     get_key_as_bool(query, "is_multi_stream_search")
 }
 
 #[inline(always)]
-pub(crate) fn get_clear_cache_from_request(query: &HashMap<String, String>) -> bool {
+pub fn get_clear_cache_from_request(query: &HashMap<String, String>) -> bool {
     get_key_as_bool(query, "clear_cache")
 }
 
 #[inline(always)]
 #[cfg(feature = "enterprise")]
-pub(crate) fn get_extract_patterns_from_request(query: &HashMap<String, String>) -> bool {
+pub fn get_extract_patterns_from_request(query: &HashMap<String, String>) -> bool {
     get_key_as_bool(query, "patterns")
 }
 
 #[inline(always)]
-pub(crate) fn get_folder(query: &HashMap<String, String>) -> String {
+pub fn get_folder(query: &HashMap<String, String>) -> String {
     match query.get("folder") {
         Some(s) => s.to_string(),
         None => config::meta::folder::DEFAULT_FOLDER.to_owned(),
@@ -132,7 +130,7 @@ pub(crate) fn get_folder(query: &HashMap<String, String>) -> String {
 }
 
 #[inline(always)]
-pub(crate) fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> String {
+pub fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> String {
     let cfg = config::get_config();
 
     // Check for x-openobserve-trace-id header first (from browser SDK for RUM correlation)
@@ -262,9 +260,7 @@ pub fn get_work_group(work_group_set: Vec<Option<String>>) -> Option<String> {
 }
 
 #[inline(always)]
-pub(crate) fn get_dashboard_info_from_request(
-    query: &HashMap<String, String>,
-) -> Option<DashboardInfo> {
+pub fn get_dashboard_info_from_request(query: &HashMap<String, String>) -> Option<DashboardInfo> {
     let run_id = query.get("run_id").map(|s| s.to_string())?;
     let panel_id = query.get("panel_id").map(|s| s.to_string())?;
     let panel_name = query.get("panel_name").map(|s| s.to_string())?;

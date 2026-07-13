@@ -33,7 +33,7 @@ use datafusion::{
 pub const SPATH_UDF_NAME: &str = "spath";
 
 /// Implementation of arrjoin
-pub(crate) static SPATH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+pub static SPATH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         SPATH_UDF_NAME,
         // expects two string - the field and the delimiter

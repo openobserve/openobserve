@@ -29,7 +29,7 @@ use datafusion::{
 pub const STRING_TO_ARRAY_V2_UDF_NAME: &str = "string_to_array_v2";
 
 /// Implementation of string_to_array_v2
-pub(crate) static STRING_TO_ARRAY_V2_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+pub static STRING_TO_ARRAY_V2_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         STRING_TO_ARRAY_V2_UDF_NAME,
         // takes two arguments: regex, pattern

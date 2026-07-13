@@ -35,7 +35,7 @@ use datafusion::{
 pub const ARR_SORT_UDF_NAME: &str = "arrsort";
 
 /// Implementation of arrsort
-pub(crate) static ARR_SORT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+pub static ARR_SORT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         ARR_SORT_UDF_NAME,
         // expects one string - the array field

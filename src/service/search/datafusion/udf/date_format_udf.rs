@@ -36,7 +36,7 @@ use datafusion::{
 pub const DATE_FORMAT_UDF_NAME: &str = "date_format";
 
 /// Implementation of date_format
-pub(crate) static DATE_FORMAT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+pub static DATE_FORMAT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         DATE_FORMAT_UDF_NAME,
         // expects three string

@@ -35,7 +35,7 @@ use datafusion::{
 pub const TIME_RANGE_UDF_NAME: &str = "time_range";
 
 /// Implementation of time_range
-pub(crate) static TIME_RANGE_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+pub static TIME_RANGE_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         TIME_RANGE_UDF_NAME,
         // expects three string

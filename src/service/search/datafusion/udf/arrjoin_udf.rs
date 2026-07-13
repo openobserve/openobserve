@@ -33,7 +33,7 @@ use datafusion::{
 pub const ARR_JOIN_UDF_NAME: &str = "arrjoin";
 
 /// Implementation of arrjoin
-pub(crate) static ARR_JOIN_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+pub static ARR_JOIN_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         ARR_JOIN_UDF_NAME,
         // expects two string - the field and the delimiter

@@ -35,7 +35,7 @@ use crate::service::search::{
 };
 
 #[derive(Debug)]
-pub(crate) struct NewMemTable {
+pub struct NewMemTable {
     mem_table: MemTable,
     diff_rules: HashMap<String, DataType>,
     sorted_by_time: bool,

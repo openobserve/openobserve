@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub(crate) mod aggregate;
-pub(crate) mod cpu_cores;
-pub(crate) mod histogram;
-pub(crate) mod regular_partition;
-pub(crate) mod settings;
-pub(crate) mod sql_context;
-pub(crate) mod stream_files;
+pub mod aggregate;
+pub mod cpu_cores;
+pub mod histogram;
+pub mod regular_partition;
+pub mod settings;
+pub mod sql_context;
+pub mod stream_files;
 
 use config::get_config;
 

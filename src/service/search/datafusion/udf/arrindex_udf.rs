@@ -36,7 +36,7 @@ use datafusion::{
 pub const ARR_INDEX_UDF_NAME: &str = "arrindex";
 
 /// Implementation of arrindex
-pub(crate) static ARR_INDEX_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+pub static ARR_INDEX_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         ARR_INDEX_UDF_NAME,
         // expects a string (the array field) and two integers - start index and end index
