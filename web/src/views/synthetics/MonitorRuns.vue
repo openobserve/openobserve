@@ -55,12 +55,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="mx-auto py-2 pb-[1.75rem] flex flex-col gap-2"
           >
-            <!-- Skeleton (while loading or before first data arrives) -->
-            <template v-if="loading || !hasLoadedOnce">
+            <!-- Status Timeline — gated on runs query -->
+            <template v-if="runsLoading || !runsHasLoadedOnce">
               <div class="px-2">
-              <MonitorRunsSkeleton />
+                <div
+                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                >
+                  <div
+                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+                  >
+                    <SkeletonBox width="100px" height="14px" rounded />
+                    <span class="flex-1" />
+                    <SkeletonBox width="45px" height="12px" rounded />
+                    <SkeletonBox width="50px" height="12px" rounded />
+                    <SkeletonBox width="45px" height="12px" rounded />
+                  </div>
+                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="flex flex-col gap-1 py-2 px-[0.875rem]">
+                    <div class="flex items-center gap-1">
+                      <div class="w-5 h-5 shrink-0" />
+                      <div class="flex-1 h-[26px] rounded flex gap-0.5 items-stretch">
+                        <div
+                          v-for="n in 26"
+                          :key="n"
+                          class="flex-1 h-full rounded-[2px]"
+                          style="background: var(--o2-border-color); opacity: 0.4"
+                        />
+                      </div>
+                      <div class="w-5 h-5 shrink-0" />
+                    </div>
+                    <div class="flex justify-between">
+                      <SkeletonBox width="60px" height="10px" rounded />
+                      <SkeletonBox width="80px" height="10px" rounded />
+                      <SkeletonBox width="60px" height="10px" rounded />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <template v-else>
+              <div class="px-2">
+              <MonitorStatusTimeline
+                :segments="timelineSegments"
+                :fail-count="timelineFailCount"
+                :pass-count="timelinePassCount"
+                :mixed-count="timelineMixedCount"
+                :start-label="timelineStartLabel"
+                :end-label="timelineEndLabel"
+              />
+              </div>
+            </template>
 
-              <!-- Charts skeleton -->
+            <!-- KPI Cards — gated on KPI + last-run queries -->
+            <template v-if="kpiLoading || !kpiHasLoadedOnce">
+              <div class="px-2">
+                <div class="grid grid-cols-5 gap-[0.625rem]">
+                  <div
+                    v-for="n in 5"
+                    :key="n"
+                    class="card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-2 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
+                  >
+                    <SkeletonBox width="60%" height="11px" rounded />
+                    <SkeletonBox width="55%" height="22px" rounded />
+                  </div>
+                </div>
+              </div>
+            </template>
+            <template v-else>
+              <div class="px-2">
+              <div class="grid grid-cols-5 gap-[0.625rem]">
+                <div
+                  v-for="card in kpiCards"
+                  :key="card.key"
+                  class="card-container rounded-lg flex flex-col px-2 pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+                  :data-test="`monitor-runs-kpi-${card.key}`"
+                >
+                  <div class="flex flex-col gap-[0.25rem]">
+                    <div
+                      class="kpi-label text-[0.7rem] font-semibold text-[var(--o2-text-muted)]"
+                    >
+                      {{ card.label }}
+                      <span v-if="card.unit"> ({{ card.unit }}) </span>
+                    </div>
+                    <div class="flex items-baseline gap-[0.2rem]">
+                      <span
+                        class="text-[1.4rem] font-bold leading-none text-[var(--o2-text-primary)]"
+                        :class="card.valueClass"
+                      >
+                        {{ card.value }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              </div>
+            </template>
+
+            <!-- Charts — gated on histogram query -->
+            <template v-if="histogramLoading || !histogramHasLoadedOnce">
+              <div class="px-2">
               <div class="grid grid-cols-2 gap-2">
                 <div
                   class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
@@ -93,88 +186,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-
-              <!-- Breakdown skeleton -->
-              <div class="grid grid-cols-3 gap-2">
-                <div
-                  v-for="n in 3"
-                  :key="n"
-                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
-                >
-                  <div
-                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
-                  >
-                    <SkeletonBox
-                      width="16px"
-                      height="16px"
-                      :custom-radius="'4px'"
-                    />
-                    <SkeletonBox width="110px" height="14px" rounded />
-                  </div>
-                  <div class="border-t border-[var(--o2-border-color)]" />
-                  <div class="px-2 py-[0.5rem] flex flex-col">
-                    <div
-                      v-for="row in 3"
-                      :key="row"
-                      class="flex items-center gap-3 py-[9px] border-b border-[var(--o2-border-color)] last:border-b-0"
-                    >
-                      <SkeletonBox
-                        width="16px"
-                        height="16px"
-                        :custom-radius="'4px'"
-                      />
-                      <SkeletonBox width="70px" height="12px" rounded />
-                      <div
-                        class="flex-1 h-1.5 rounded-full"
-                        style="background: var(--o2-border-color); opacity: 0.3"
-                      />
-                      <SkeletonBox width="36px" height="12px" rounded />
-                    </div>
-                  </div>
-                </div>
-              </div>
               </div>
             </template>
-
-            <!-- Real content (once loaded at least once) -->
             <template v-else>
-              <div class="px-2 flex flex-col gap-2">
-              <MonitorStatusTimeline
-                :segments="timelineSegments"
-                :fail-count="timelineFailCount"
-                :pass-count="timelinePassCount"
-                :mixed-count="timelineMixedCount"
-                :start-label="timelineStartLabel"
-                :end-label="timelineEndLabel"
-              />
-
-              <div class="grid grid-cols-5 gap-[0.625rem]">
-                <div
-                  v-for="card in kpiCards"
-                  :key="card.key"
-                  class="card-container rounded-lg flex flex-col px-2 pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
-                  :data-test="`monitor-runs-kpi-${card.key}`"
-                >
-                  <div class="flex flex-col gap-[0.25rem]">
-                    <div
-                      class="kpi-label text-[0.7rem] font-semibold text-[var(--o2-text-muted)]"
-                    >
-                      {{ card.label }}
-                      <span v-if="card.unit"> ({{ card.unit }}) </span>
-                    </div>
-                    <div class="flex items-baseline gap-[0.2rem]">
-                      <span
-                        class="text-[1.4rem] font-bold leading-none text-[var(--o2-text-primary)]"
-                        :class="card.valueClass"
-                      >
-                        {{ card.value }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Charts row -->
+              <div class="px-2">
               <div class="grid grid-cols-2 gap-2">
                 <div
                   class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
@@ -221,8 +236,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
+              </div>
+            </template>
 
-              <!-- Breakdown cards -->
+            <!-- Breakdown Cards — gated on runs query -->
+            <template v-if="runsLoading || !runsHasLoadedOnce">
+              <div class="px-2">
+              <div class="grid grid-cols-3 gap-2">
+                <div
+                  v-for="n in 3"
+                  :key="n"
+                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                >
+                  <div
+                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
+                  >
+                    <SkeletonBox
+                      width="16px"
+                      height="16px"
+                      :custom-radius="'4px'"
+                    />
+                    <SkeletonBox width="110px" height="14px" rounded />
+                  </div>
+                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="px-2 py-[0.5rem] flex flex-col">
+                    <div
+                      v-for="row in 3"
+                      :key="row"
+                      class="flex items-center gap-3 py-[9px] border-b border-[var(--o2-border-color)] last:border-b-0"
+                    >
+                      <SkeletonBox
+                        width="16px"
+                        height="16px"
+                        :custom-radius="'4px'"
+                      />
+                      <SkeletonBox width="70px" height="12px" rounded />
+                      <div
+                        class="flex-1 h-1.5 rounded-full"
+                        style="background: var(--o2-border-color); opacity: 0.3"
+                      />
+                      <SkeletonBox width="36px" height="12px" rounded />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              </div>
+            </template>
+            <template v-else>
+              <div class="px-2">
               <div class="grid grid-cols-3 gap-2">
                 <div
                   class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
@@ -468,7 +529,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTable
                 :columns="runColumns"
                 :data="visibleRuns"
-                :loading="loading"
+                :loading="runsLoading"
                 pagination="client"
                 :page-size="10"
                 :page-size-options="[10, 20, 25, 50]"
@@ -574,7 +635,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Empty state -->
             <div class="px-2">
               <OEmptyState
-                v-if="visibleRuns.length === 0 && !loading"
+                v-if="visibleRuns.length === 0 && !runsLoading"
                 preset="no-results"
                 size="sm"
                 data-test="monitor-runs-empty"
@@ -868,7 +929,6 @@ import gcpSvgUrl from "@/assets/images/ingestion/gcp.svg";
 import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
 import firefoxSvgUrl from "@/assets/images/synthetics/firefox.svg";
 import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";
-import MonitorRunsSkeleton from "@/views/synthetics/MonitorRunsSkeleton.vue";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 
 defineOptions({ name: "SyntheticMonitorRuns" });
@@ -890,8 +950,12 @@ const props = withDefaults(defineProps<Props>(), {
 
 // ── Synthetic results composable ──────────────────────────────────────────
 const synthetics = useSyntheticResults();
-const loading = computed(() => synthetics.loading.value);
-const hasLoadedOnce = computed(() => synthetics.hasLoadedOnce.value);
+const kpiLoading = computed(() => synthetics.kpiLoading.value);
+const histogramLoading = computed(() => synthetics.histogramLoading.value);
+const runsLoading = computed(() => synthetics.runsLoading.value);
+const kpiHasLoadedOnce = computed(() => synthetics.kpiHasLoadedOnce.value);
+const histogramHasLoadedOnce = computed(() => synthetics.histogramHasLoadedOnce.value);
+const runsHasLoadedOnce = computed(() => synthetics.runsHasLoadedOnce.value);
 
 // ── Seeded random (deterministic mock data) ──────────────────────────────
 function seedRand(seed: number) {
@@ -1238,7 +1302,7 @@ function toMockRun(r: SyntheticRun, idx: number): MockRun {
 
 // ── Runs: use live data when available, fall back to mock data ──────────
 const allRuns = computed<MockRun[]>(() => {
-  if (synthetics.hasLoadedOnce.value) {
+  if (runsHasLoadedOnce.value) {
     return synthetics.runs.value.map(toMockRun);
   }
   const tr = timeRangeMicros.value;
@@ -2035,7 +2099,7 @@ function resetFilters() {
 function openRun(row: { id: number }) {
   // When data comes from the composable, use the real run_id
   const idx = allRuns.value.findIndex((r) => r.id === row.id);
-  if (idx >= 0 && synthetics.hasLoadedOnce.value) {
+  if (idx >= 0 && runsHasLoadedOnce.value) {
     const realRun = synthetics.runs.value[idx];
     if (realRun?.runId && realRun?.executionId) {
       emit("open-run", realRun.runId, realRun.executionId);

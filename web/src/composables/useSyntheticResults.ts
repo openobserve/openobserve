@@ -57,6 +57,16 @@ export function useSyntheticResults() {
   const error = ref<string | null>(null);
   const hasLoadedOnce = ref(false);
 
+  // Per-query loading signals — each section of the UI gates its own
+  // skeleton independently, so fast queries (KPI, histogram) render
+  // while the slow runs-list query is still in flight.
+  const kpiLoading = ref(false);
+  const histogramLoading = ref(false);
+  const runsLoading = ref(false);
+  const kpiHasLoadedOnce = ref(false);
+  const histogramHasLoadedOnce = ref(false);
+  const runsHasLoadedOnce = ref(false);
+
   async function fetchAll(
     monitorId: string,
     startTime: number,
@@ -64,20 +74,51 @@ export function useSyntheticResults() {
   ): Promise<void> {
     if (!monitorId || !startTime || !endTime) return;
     loading.value = true;
+    kpiLoading.value = true;
+    histogramLoading.value = true;
+    runsLoading.value = true;
     error.value = null;
     try {
       const safe = (p: Promise<any[]>) => p.catch(() => [] as any[]);
       const interval = bucketInterval(endTime - startTime);
-      const [kpiRows, lastRunRows, histogramRows, runsRows] = await Promise.all([
+
+      // Group 1: KPI + last-run — both feed KPI cards. Resolves
+      // independently so the KPI section renders as soon as these
+      // fast queries complete, without waiting for the runs list.
+      const kpiPromise = Promise.all([
         safe(executeQuery(buildKpiSql(monitorId), startTime, endTime, "logs")),
         safe(executeQuery(buildLastRunSql(monitorId), startTime, endTime, "logs")),
-        safe(executeQuery(buildHistogramSql(monitorId, interval), startTime, endTime, "logs")),
-        safe(executeQuery(buildRunsSql(monitorId, 500), startTime, endTime, "logs")),
-      ]);
+      ]).then(([kpiRows, lastRunRows]) => {
+        kpi.value = mapKpi(kpiRows[0] ?? null, lastRunRows[0] ?? null);
+      }).finally(() => {
+        kpiLoading.value = false;
+        kpiHasLoadedOnce.value = true;
+      });
 
-      kpi.value = mapKpi(kpiRows[0] ?? null, lastRunRows[0] ?? null);
-      buckets.value = mapHistogram(histogramRows, startTime, endTime);
-      runs.value = runsRows.map(mapRun);
+      // Group 2: Histogram — feeds response-time and errors charts.
+      const histogramPromise = safe(
+        executeQuery(buildHistogramSql(monitorId, interval), startTime, endTime, "logs"),
+      ).then((histogramRows) => {
+        buckets.value = mapHistogram(histogramRows, startTime, endTime);
+      }).finally(() => {
+        histogramLoading.value = false;
+        histogramHasLoadedOnce.value = true;
+      });
+
+      // Group 3: Runs list — feeds timeline, breakdown cards, table,
+      // steps tab, and errors tab. Typically the slowest query.
+      const runsPromise = safe(
+        executeQuery(buildRunsSql(monitorId, 500), startTime, endTime, "logs"),
+      ).then((runsRows) => {
+        runs.value = runsRows.map(mapRun);
+      }).finally(() => {
+        runsLoading.value = false;
+        runsHasLoadedOnce.value = true;
+      });
+
+      // Wait for all to settle so callers that await fetchAll still
+      // get a meaningful completion signal.
+      await Promise.all([kpiPromise, histogramPromise, runsPromise]);
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : "Failed to load results";
       kpi.value = { ...EMPTY_KPI };
@@ -126,6 +167,12 @@ export function useSyntheticResults() {
     loading,
     error,
     hasLoadedOnce,
+    kpiLoading,
+    histogramLoading,
+    runsLoading,
+    kpiHasLoadedOnce,
+    histogramHasLoadedOnce,
+    runsHasLoadedOnce,
     fetchAll,
     fetchRun,
     cancelAll,
