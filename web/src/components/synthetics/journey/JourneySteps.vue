@@ -234,6 +234,7 @@ function handleUpdateExpanded(ids: string[]) {
     :bordered="true"
     :default-columns="false"
     :fill-height="false"
+    :expand-on-row-click="true"
     @row-reorder="handleRowReorder"
     @update:selected-ids="handleUpdateSelected"
     @update:expanded-ids="handleUpdateExpanded"

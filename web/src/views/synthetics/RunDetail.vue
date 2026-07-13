@@ -143,12 +143,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ════════════ SUMMARY ════════════ -->
         <OTabPanel name="summary" data-test="synthetics-run-detail-summary-tab">
           <div
-            class="mx-auto px-2 py-[0.875rem] pb-[1.75rem] flex flex-col gap-[0.875rem]"
+            class="py-[0.875rem] pb-[1.75rem] flex flex-col gap-[0.875rem]"
           >
             <!-- Info chips skeleton -->
             <template v-if="loading">
               <div
-                class="grid grid-cols-5 gap-[0.625rem]"
+                class="grid grid-cols-5 gap-[0.625rem] px-2"
                 data-test="synthetics-run-detail-info-skeleton"
               >
                 <div
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Info chips -->
             <template v-else>
               <div
-                class="grid grid-cols-5 gap-[0.625rem]"
+                class="grid grid-cols-5 gap-[0.625rem] px-2"
                 data-test="synthetics-run-detail-info-bar"
               >
                 <div
