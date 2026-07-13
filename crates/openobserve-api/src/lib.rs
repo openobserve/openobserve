@@ -7,7 +7,7 @@
 
 #[cfg(feature = "enterprise")]
 pub use openobserve_core::cipher;
-pub use openobserve_core::{common, job, service};
+pub use openobserve_core::{common, service};
 
 #[path = "../../../src/handler/mod.rs"]
 pub mod handler;

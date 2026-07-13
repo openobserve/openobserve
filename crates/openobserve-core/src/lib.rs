@@ -9,8 +9,6 @@
 pub mod cipher;
 #[path = "../../../src/common/mod.rs"]
 pub mod common;
-#[path = "../../../src/job/mod.rs"]
-pub mod job;
 #[path = "../../../src/service/mod.rs"]
 pub mod service;
 

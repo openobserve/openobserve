@@ -23,10 +23,10 @@ publish = false
 
 [features]
 default = []
-enterprise = ["openobserve-api/enterprise", "openobserve-core/enterprise"]
-vectorscan = ["openobserve-api/vectorscan", "openobserve-core/vectorscan"]
-cloud = ["openobserve-api/cloud", "openobserve-core/cloud"]
-vortex = ["config/vortex", "openobserve-api/vortex", "openobserve-core/vortex"]
+enterprise = ["openobserve-api/enterprise", "openobserve-core/enterprise", "openobserve-jobs/enterprise"]
+vectorscan = ["openobserve-api/vectorscan", "openobserve-core/vectorscan", "openobserve-jobs/vectorscan"]
+cloud = ["openobserve-api/cloud", "openobserve-core/cloud", "openobserve-jobs/cloud"]
+vortex = ["config/vortex", "openobserve-api/vortex", "openobserve-core/vortex", "openobserve-jobs/vortex"]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = [
@@ -225,6 +225,7 @@ async-stream.workspace = true
 sourcemap = "9.3.2"
 openobserve-core = { path = "crates/openobserve-core" }
 openobserve-api = { path = "crates/openobserve-api" }
+openobserve-jobs = { path = "crates/openobserve-jobs" }
 
 [dev-dependencies]
 expect-test.workspace = true
@@ -237,6 +238,7 @@ rcgen = "0.14.4"
 members = [
     "crates/openobserve-api",
     "crates/openobserve-core",
+    "crates/openobserve-jobs",
     "src/config",
     "src/infra",
     "src/ingester",

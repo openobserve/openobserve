@@ -1,5 +1,5 @@
 [package]
-name = "openobserve-core"
+name = "openobserve-jobs"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,11 +10,12 @@ path = "src/lib.rs"
 
 [features]
 default = []
-enterprise = []
-cloud = []
-vectorscan = []
-vortex = ["config/vortex"]
+enterprise = ["openobserve-core/enterprise"]
+cloud = ["openobserve-core/cloud"]
+vectorscan = ["openobserve-core/vectorscan"]
+vortex = ["config/vortex", "openobserve-core/vortex"]
 profiling = [
+    "openobserve-core/profiling",
     "dep:tikv-jemalloc-ctl",
     "dep:tikv-jemalloc-sys",
     "dep:jemalloc_pprof",
@@ -22,6 +23,7 @@ profiling = [
 ]
 
 [dependencies]
+openobserve-core = { path = "../openobserve-core" }
 axum.workspace = true
 axum-extra.workspace = true
 axum-server.workspace = true

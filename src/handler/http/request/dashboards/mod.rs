@@ -34,10 +34,7 @@ use crate::{
         },
         request::{BulkDeleteRequest, BulkDeleteResponse},
     },
-    service::{
-        dashboards::{self, DashboardError},
-        db::dashboards as dashboards_db,
-    },
+    service::{dashboards, db::dashboards as dashboards_db},
 };
 
 pub mod reports;

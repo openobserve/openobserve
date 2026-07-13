@@ -27,7 +27,7 @@ use crate::{
         models::destinations::Template,
         request::{BulkDeleteRequest, BulkDeleteResponse},
     },
-    service::{alerts::templates, db::alerts::templates::TemplateError},
+    service::alerts::templates,
 };
 
 /// CreateTemplate

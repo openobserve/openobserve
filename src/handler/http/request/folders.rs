@@ -22,7 +22,7 @@ use crate::{
         CreateFolderRequestBody, CreateFolderResponseBody, FolderType, GetFolderResponseBody,
         ListFoldersResponseBody, UpdateFolderRequestBody,
     },
-    service::folders::{self, FolderError},
+    service::folders,
 };
 #[cfg(feature = "enterprise")]
 use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};

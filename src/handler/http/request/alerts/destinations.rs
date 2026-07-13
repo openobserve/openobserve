@@ -35,7 +35,7 @@ use crate::{
         models::destinations::{Destination, DestinationType},
         request::{BulkDeleteRequest, BulkDeleteResponse},
     },
-    service::{alerts::destinations, db::alerts::destinations::DestinationError},
+    service::alerts::destinations,
 };
 
 #[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]

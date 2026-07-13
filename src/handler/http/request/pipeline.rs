@@ -31,7 +31,7 @@ use crate::{
         models::pipelines::{PipelineBulkEnableRequest, PipelineBulkEnableResponse, PipelineList},
         request::{BulkDeleteRequest, BulkDeleteResponse},
     },
-    service::{db::pipeline::PipelineError, pipeline},
+    service::pipeline,
 };
 
 /// CreatePipeline
