@@ -92,6 +92,9 @@ module.exports = defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
+        // Local headed debugging (PW_HEADED=true) uses installed Chrome because
+        // the bundled chromium-1155 crashes headed on macOS. CI leaves it unset.
+        ...(process.env.PW_HEADED === 'true' ? { channel: 'chrome' } : {}),
         viewport: { width: 1500, height: 1024 },
         permissions: ['clipboard-read', 'clipboard-write'],
         // Reuse auth state from global setup (Dex email login)
