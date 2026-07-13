@@ -254,6 +254,8 @@ where
             let range = time_window.range;
             let range_micros = micros(range);
             let mut result_samples = Vec::with_capacity(timestamps.len());
+            let mut start_index = 0;
+            let mut end_index = 0;
 
             // For each eval timestamp, compute the function value
             for &eval_ts in &timestamps {
@@ -261,14 +263,13 @@ where
                 let window_start = eval_ts - range_micros;
                 let window_end = eval_ts;
 
-                // Extract samples within this window using binary search
-                let start_index = metric
-                    .samples
-                    .partition_point(|s| s.timestamp < window_start);
-                let end_index = metric
-                    .samples
-                    .partition_point(|s| s.timestamp <= window_end);
-                let window_samples = &metric.samples[start_index..end_index];
+                let window_samples = advance_sample_window(
+                    &metric.samples,
+                    window_start,
+                    window_end,
+                    &mut start_index,
+                    &mut end_index,
+                );
 
                 if window_samples.is_empty() {
                     continue;
@@ -300,6 +301,29 @@ where
     Ok(Value::Matrix(results))
 }
 
+/// Advance two indices through sorted samples for monotonically increasing
+/// evaluation windows. This preserves the inclusive `[window_start,
+/// window_end]` bounds previously implemented with two `partition_point`
+/// calls per window.
+fn advance_sample_window<'a>(
+    samples: &'a [Sample],
+    window_start: i64,
+    window_end: i64,
+    start_index: &mut usize,
+    end_index: &mut usize,
+) -> &'a [Sample] {
+    while *start_index < samples.len() && samples[*start_index].timestamp < window_start {
+        *start_index += 1;
+    }
+    if *end_index < *start_index {
+        *end_index = *start_index;
+    }
+    while *end_index < samples.len() && samples[*end_index].timestamp <= window_end {
+        *end_index += 1;
+    }
+    &samples[*start_index..*end_index]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -328,5 +352,98 @@ mod tests {
         assert!(KEEP_METRIC_NAME_FUNC.contains("last_over_time"));
         assert!(!KEEP_METRIC_NAME_FUNC.contains("rate"));
         assert!(!KEEP_METRIC_NAME_FUNC.contains("avg_over_time"));
+    }
+
+    #[test]
+    fn test_advance_sample_window_matches_partition_points() {
+        let samples = vec![
+            Sample::new(0, 0.0),
+            Sample::new(5, 1.0),
+            Sample::new(5, 2.0),
+            Sample::new(10, 3.0),
+            Sample::new(20, 4.0),
+        ];
+        // Monotonic windows cover inclusive boundaries, overlap, a gap with no
+        // samples, and recovery after the gap.
+        let windows = [(-5, 0), (0, 5), (4, 10), (11, 15), (15, 20)];
+        let mut start_index = 0;
+        let mut end_index = 0;
+
+        for (window_start, window_end) in windows {
+            let expected_start = samples.partition_point(|s| s.timestamp < window_start);
+            let expected_end = samples.partition_point(|s| s.timestamp <= window_end);
+            let expected = &samples[expected_start..expected_end];
+            let actual = advance_sample_window(
+                &samples,
+                window_start,
+                window_end,
+                &mut start_index,
+                &mut end_index,
+            );
+
+            assert_eq!(
+                actual
+                    .iter()
+                    .map(|sample| (sample.timestamp, sample.value))
+                    .collect::<Vec<_>>(),
+                expected
+                    .iter()
+                    .map(|sample| (sample.timestamp, sample.value))
+                    .collect::<Vec<_>>()
+            );
+        }
+    }
+
+    #[test]
+    fn test_advance_sample_window_handles_empty_samples() {
+        let mut start_index = 0;
+        let mut end_index = 0;
+        assert!(advance_sample_window(&[], 0, 10, &mut start_index, &mut end_index).is_empty());
+    }
+
+    #[test]
+    fn test_advance_sample_window_matches_reference_across_generated_windows() {
+        for sample_step in [1_i64, 3, 11] {
+            let mut samples = Vec::new();
+            for i in 0..30 {
+                let timestamp = i * sample_step;
+                samples.push(Sample::new(timestamp, i as f64));
+                if i % 5 == 0 {
+                    samples.push(Sample::new(timestamp, -(i as f64)));
+                }
+            }
+
+            for range in [0_i64, 1, 7, 23] {
+                for eval_step in [1_i64, 4, 13] {
+                    let mut start_index = 0;
+                    let mut end_index = 0;
+                    for window_end in (0_i64..100).step_by(eval_step as usize) {
+                        let window_start = window_end - range;
+                        let expected_start =
+                            samples.partition_point(|sample| sample.timestamp < window_start);
+                        let expected_end =
+                            samples.partition_point(|sample| sample.timestamp <= window_end);
+                        let actual = advance_sample_window(
+                            &samples,
+                            window_start,
+                            window_end,
+                            &mut start_index,
+                            &mut end_index,
+                        );
+
+                        assert_eq!(
+                            actual
+                                .iter()
+                                .map(|sample| (sample.timestamp, sample.value))
+                                .collect::<Vec<_>>(),
+                            samples[expected_start..expected_end]
+                                .iter()
+                                .map(|sample| (sample.timestamp, sample.value))
+                                .collect::<Vec<_>>()
+                        );
+                    }
+                }
+            }
+        }
     }
 }
