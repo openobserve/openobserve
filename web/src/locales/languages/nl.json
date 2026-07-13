@@ -484,6 +484,10 @@
   },
   "validation": {
     "required": "Dit veld is verplicht",
+    "fieldRequired": "Veld is verplicht!",
+    "alphanumeric": "Invoer moet alfanumeriek zijn",
+    "organizationNameRequired": "Organisatienaam is verplicht",
+    "selectOrganization": "Selecteer een organisatie",
     "invalidFormat": "Ongeldig formaat",
     "mustBeGreaterThan": "Moet groter zijn dan {value}",
     "mustBeLessThan": "Moet kleiner zijn dan {value}"
@@ -882,6 +886,12 @@
     "webVitals": "Vitalen voor het web",
     "errors": "Fouten",
     "api": "API",
+    "uploadSourceMapsForm": {
+      "serviceRequired": "Service is vereist",
+      "versionRequired": "Versie is vereist",
+      "fileRequired": "Selecteer een ZIP-bestand om te uploaden",
+      "fileTypeZip": "Alleen ZIP-bestanden zijn toegestaan"
+    },
     "emptyState": {
       "title": "Bewaak uw gebruikers met Real User Monitoring",
       "description": "RUM houdt echte gebruikersinteracties bij, zoals het laden van pagina's, fouten, API-aanroepen en herhalingen van sessies, zodat u precies kunt zien hoe gebruikers uw toepassing ervaren.",
@@ -3013,6 +3023,7 @@
       "inviteTitle": "Een organisatie uitnodigen",
       "inviteOrgIdLabel": "Identificatie van de organisatie",
       "inviteOrgIdPlaceholder": "Voer de identificatiecode van de organisatie in",
+      "inviteOrgIdRequired": "Identificatie van de organisatie is vereist",
       "sendInvite": "Uitnodiging verzenden",
       "inviteSent": "Uitnodiging succesvol verzonden",
       "inviteSameOrg": "Een organisatie kan zichzelf niet uitnodigen",

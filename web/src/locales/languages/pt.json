@@ -484,6 +484,10 @@
   },
   "validation": {
     "required": "Este campo é obrigatório",
+    "fieldRequired": "O campo é obrigatório!",
+    "alphanumeric": "A entrada deve ser alfanumérica",
+    "organizationNameRequired": "O nome da organização é obrigatório",
+    "selectOrganization": "Selecione uma organização",
     "invalidFormat": "Formato inválido",
     "mustBeGreaterThan": "Deve ser maior que {value}",
     "mustBeLessThan": "Deve ser menor que {value}"
@@ -882,6 +886,12 @@
     "webVitals": "Dados vitais da Web",
     "errors": "Erros",
     "api": "API",
+    "uploadSourceMapsForm": {
+      "serviceRequired": "O serviço é obrigatório",
+      "versionRequired": "A versão é obrigatória",
+      "fileRequired": "Selecione um arquivo ZIP para fazer upload",
+      "fileTypeZip": "Somente arquivos ZIP são permitidos"
+    },
     "emptyState": {
       "title": "Monitore seus usuários com o monitoramento real de usuários",
       "description": "O RUM rastreia interações reais do usuário — carregamentos de páginas, erros, chamadas de API e repetições de sessões — para que você possa ver exatamente como os usuários experimentam seu aplicativo.",
@@ -3013,6 +3023,7 @@
       "inviteTitle": "Convide uma organização",
       "inviteOrgIdLabel": "Identificador da organização",
       "inviteOrgIdPlaceholder": "Insira o identificador da organização",
+      "inviteOrgIdRequired": "O identificador da organização é obrigatório",
       "sendInvite": "Enviar convite",
       "inviteSent": "Convite enviado com sucesso",
       "inviteSameOrg": "Uma organização não pode se convidar",

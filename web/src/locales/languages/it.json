@@ -484,6 +484,10 @@
   },
   "validation": {
     "required": "Questo campo è obbligatorio",
+    "fieldRequired": "Il campo è obbligatorio!",
+    "alphanumeric": "L'input deve essere alfanumerico",
+    "organizationNameRequired": "Il nome dell'organizzazione è obbligatorio",
+    "selectOrganization": "Seleziona un'organizzazione",
     "invalidFormat": "Formato non valido",
     "mustBeGreaterThan": "Deve essere maggiore di {value}",
     "mustBeLessThan": "Deve essere inferiore a {value}"
@@ -882,6 +886,12 @@
     "webVitals": "Web Vitals",
     "errors": "Errori",
     "api": "API",
+    "uploadSourceMapsForm": {
+      "serviceRequired": "Il servizio è obbligatorio",
+      "versionRequired": "La versione è obbligatoria",
+      "fileRequired": "Seleziona un file ZIP da caricare",
+      "fileTypeZip": "Sono consentiti solo file ZIP"
+    },
     "emptyState": {
       "title": "Monitora i tuoi utenti con Real User Monitoring",
       "description": "RUM tiene traccia delle interazioni degli utenti reali (caricamento delle pagine, errori, chiamate API e replay delle sessioni) in modo da poter vedere esattamente come gli utenti percepiscono la tua applicazione.",
@@ -3013,6 +3023,7 @@
       "inviteTitle": "Invita un'organizzazione",
       "inviteOrgIdLabel": "Identificatore dell'organizzazione",
       "inviteOrgIdPlaceholder": "Inserisci l'identificativo dell'organizzazione",
+      "inviteOrgIdRequired": "L'identificatore dell'organizzazione è obbligatorio",
       "sendInvite": "Invia invito",
       "inviteSent": "Invito inviato con successo",
       "inviteSameOrg": "Un'organizzazione non può invitare se stessa",

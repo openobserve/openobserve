@@ -484,6 +484,10 @@
   },
   "validation": {
     "required": "このフィールドは必須です",
+    "fieldRequired": "フィールドは必須です！",
+    "alphanumeric": "入力は英数字である必要があります",
+    "organizationNameRequired": "組織名は必須です",
+    "selectOrganization": "組織を選択してください",
     "invalidFormat": "形式が無効です",
     "mustBeGreaterThan": "{value} より大きくなければなりません",
     "mustBeLessThan": "{value} より小さくなければなりません"
@@ -882,6 +886,12 @@
     "webVitals": "Webバイタル",
     "errors": "エラー",
     "api": "API",
+    "uploadSourceMapsForm": {
+      "serviceRequired": "サービスが必要です",
+      "versionRequired": "バージョンが必要です",
+      "fileRequired": "アップロードするZIPファイルを選択してください",
+      "fileTypeZip": "ZIPファイルのみ許可されています"
+    },
     "emptyState": {
       "title": "リアルユーザーモニタリングでユーザーを監視する",
       "description": "RUM は実際のユーザーインタラクション (ページの読み込み、エラー、API 呼び出し、セッションリプレイ) を追跡するので、ユーザーがアプリケーションをどのように体験しているかを正確に把握できます。",
@@ -3013,6 +3023,7 @@
       "inviteTitle": "組織を招待する",
       "inviteOrgIdLabel": "組織識別子",
       "inviteOrgIdPlaceholder": "組織識別子の入力",
+      "inviteOrgIdRequired": "組織識別子が必要です",
       "sendInvite": "招待を送信",
       "inviteSent": "招待状は正常に送信されました",
       "inviteSameOrg": "組織は自らを招待できない",

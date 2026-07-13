@@ -484,6 +484,10 @@
   },
   "validation": {
     "required": "Bu alan zorunludur",
+    "fieldRequired": "Alan zorunludur!",
+    "alphanumeric": "Girdi alfasayısal olmalıdır",
+    "organizationNameRequired": "Kuruluş adı zorunludur",
+    "selectOrganization": "Lütfen bir kuruluş seçin",
     "invalidFormat": "Geçersiz biçim",
     "mustBeGreaterThan": "{value} 'den büyük olmalıdır",
     "mustBeLessThan": "{value} 'den küçük olmalıdır"
@@ -882,6 +886,12 @@
     "webVitals": "Web Hayati Değerler",
     "errors": "Hatalar",
     "api": "API",
+    "uploadSourceMapsForm": {
+      "serviceRequired": "Hizmet gereklidir",
+      "versionRequired": "Versiyon gereklidir",
+      "fileRequired": "Lütfen yüklenecek bir ZIP dosyası seçin",
+      "fileTypeZip": "Yalnızca ZIP dosyalarına izin verilir"
+    },
     "emptyState": {
       "title": "Gerçek Kullanıcı İzleme ile kullanıcılarınızı izleyin",
       "description": "RUM, gerçek kullanıcı etkileşimlerini (sayfa yükleri, hatalar, API çağrıları ve oturum tekrarları) izler, böylece kullanıcıların uygulamanızı tam olarak nasıl deneyimlediğini görebilirsiniz.",
@@ -3013,6 +3023,7 @@
       "inviteTitle": "Bir Organizasyonu Davet Edin",
       "inviteOrgIdLabel": "Organizasyon Tanımlayıcısı",
       "inviteOrgIdPlaceholder": "Kuruluş Kimliğini Girin",
+      "inviteOrgIdRequired": "Organizasyon Tanımlayıcısı gereklidir",
       "sendInvite": "Davet Gönder",
       "inviteSent": "Davet Başarıyla Gönderildi",
       "inviteSameOrg": "Bir kuruluş kendini davet edemez",
