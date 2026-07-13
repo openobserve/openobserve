@@ -407,10 +407,10 @@ async fn list_models<C: ConnectionTrait>(
         .apply_filters(params)
         .order_by_asc(Column::Name);
 
-    if let (Some(page_size), Some(page)) = (params.page_size, params.page) {
-        if page_size > 0 {
-            return q.paginate(conn, page_size).fetch_page(page).await;
-        }
+    if let (Some(page_size), Some(page)) = (params.page_size, params.page)
+        && page_size > 0
+    {
+        return q.paginate(conn, page_size).fetch_page(page).await;
     }
     q.all(conn).await
 }

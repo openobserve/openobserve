@@ -208,6 +208,9 @@ enum Folders {
     Id,
 }
 
+// SyntheticsType must keep its name — DeriveIden derives the column name
+// "synthetics_type" from the variant.
+#[allow(clippy::enum_variant_names)]
 #[derive(DeriveIden)]
 enum Synthetics {
     Table,
