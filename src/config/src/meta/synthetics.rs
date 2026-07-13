@@ -600,6 +600,507 @@ fn capture_off() -> String {
     "off".to_string()
 }
 
+// ── Payload validation ────────────────────────────────────────────────────────
+
+/// Step actions the browser probe knows how to execute — must stay in sync with
+/// `buildStepCode` in browser-probe/src/runner.ts. The probe silently no-ops
+/// unknown actions (they "pass" without doing anything), so rejecting them here
+/// is the only guard. "scroll" is recorder-emitted but currently a probe no-op.
+const KNOWN_STEP_ACTIONS: &[&str] = &[
+    "navigate",
+    "click",
+    "fill",
+    "type",
+    "select",
+    "check",
+    "uncheck",
+    "keydown",
+    "press",
+    "hover",
+    "scroll",
+    "wait",
+    "waitFor",
+    "assert",
+    "screenshot",
+    "upload",
+    "setInputFiles",
+];
+
+/// Actions that require a non-empty `selector`.
+const SELECTOR_ACTIONS: &[&str] = &[
+    "click",
+    "fill",
+    "type",
+    "select",
+    "check",
+    "uncheck",
+    "hover",
+    "upload",
+    "setInputFiles",
+];
+
+const MAX_STEPS: usize = 50;
+const MAX_STEPS_JSON_BYTES: usize = 100_000;
+const MAX_TAGS: usize = 20;
+const MAX_VARIABLES: usize = 50;
+const MAX_BROWSER_DEVICE_COMBOS: usize = 12;
+/// Minimum schedule interval (seconds) for protocol monitors (http/tcp/ping/…).
+/// Ping-style checks legitimately run at 1s granularity.
+/// NOTE: the scheduler ticks every 5s, so sub-5s intervals fire at tick
+/// resolution — allowed here, but effective cadence is bounded by the tick.
+const MIN_INTERVAL_SECS: i64 = 1;
+/// Minimum schedule interval (seconds) for browser monitors — each fire costs
+/// one Lambda invocation per location per browser×device combo.
+const MIN_BROWSER_INTERVAL_SECS: i64 = 60;
+
+fn validate_http_url(field: &str, value: &str) -> Result<(), String> {
+    let parsed =
+        url::Url::parse(value).map_err(|e| format!("{field}: invalid URL '{value}': {e}"))?;
+    if parsed.scheme() != "http" && parsed.scheme() != "https" {
+        return Err(format!(
+            "{field}: URL scheme must be http or https, got '{}'",
+            parsed.scheme()
+        ));
+    }
+    if parsed.host_str().is_none_or(str::is_empty) {
+        return Err(format!("{field}: URL has no host"));
+    }
+    Ok(())
+}
+
+fn validate_host_target(target: &str) -> Result<(), String> {
+    if target.trim().is_empty() {
+        return Err("target: must not be empty".to_string());
+    }
+    if target.contains("://") {
+        return Err(format!(
+            "target: expected host or host:port, got a URL '{target}'"
+        ));
+    }
+    if target.chars().any(char::is_whitespace) {
+        return Err(format!("target: must not contain whitespace: '{target}'"));
+    }
+    Ok(())
+}
+
+/// Membership check with the same normalisation the create path applies to
+/// locations (bare region → "aws-" prefix).
+fn location_allowed(loc: &str, allowed: &[String]) -> bool {
+    allowed.iter().any(|a| a == loc)
+        || (!loc.contains('-')
+            || !["aws-", "gcp-", "azure-"]
+                .iter()
+                .any(|p| loc.starts_with(p)))
+            && allowed.iter().any(|a| a == &format!("aws-{loc}"))
+}
+
+impl Synthetic {
+    /// Validates a create/update payload. `allowed_*` come from the deployment's
+    /// synthetics capabilities (env-configured locations, browsers, devices) —
+    /// pass empty slices to skip the corresponding membership check.
+    ///
+    /// Returns the first problem found as `Err(message)`; messages are safe to
+    /// return verbatim in a 400 response.
+    /// `is_create`: the `start` freshness check only applies on create — edits
+    /// round-trip the monitor's original start date, which is legitimately in
+    /// the past for any monitor older than the grace window.
+    pub fn validate(
+        &self,
+        allowed_locations: &[String],
+        allowed_browsers: &[String],
+        allowed_devices: &[String],
+        is_create: bool,
+    ) -> Result<(), String> {
+        // ── name / description / tags ──────────────────────────────────────
+        if self.name.trim().is_empty() {
+            return Err("name: must not be empty".to_string());
+        }
+        if self.name.len() > 256 {
+            return Err(format!("name: too long ({} > 256 chars)", self.name.len()));
+        }
+        if self.description.len() > 4096 {
+            return Err(format!(
+                "description: too long ({} > 4096 chars)",
+                self.description.len()
+            ));
+        }
+        if self.tags.len() > MAX_TAGS {
+            return Err(format!("tags: too many ({} > {MAX_TAGS})", self.tags.len()));
+        }
+        for tag in &self.tags {
+            if tag.trim().is_empty() {
+                return Err("tags: empty tag not allowed".to_string());
+            }
+            if tag.len() > 64 {
+                return Err(format!("tags: tag too long ({} > 64 chars)", tag.len()));
+            }
+        }
+
+        // ── target ─────────────────────────────────────────────────────────
+        match self.monitor_type {
+            SyntheticType::Http | SyntheticType::Api | SyntheticType::Browser => {
+                validate_http_url("target", &self.target)?
+            }
+            _ => validate_host_target(&self.target)?,
+        }
+
+        // ── frequency ──────────────────────────────────────────────────────
+        if self.tz_offset < -720 || self.tz_offset > 840 {
+            return Err(format!(
+                "tz_offset: out of range ({} not in -720..=840 minutes)",
+                self.tz_offset
+            ));
+        }
+        match self.frequency.frequency_type {
+            SyntheticFrequencyType::Cron => {
+                use std::str::FromStr;
+                if self.frequency.cron.trim().is_empty() {
+                    return Err("frequency.cron: must not be empty for cron type".to_string());
+                }
+                cron::Schedule::from_str(&self.frequency.cron).map_err(|e| {
+                    format!(
+                        "frequency.cron: invalid expression '{}': {e}",
+                        self.frequency.cron
+                    )
+                })?;
+            }
+            _ => {
+                if self.frequency.interval < 1 {
+                    return Err(format!(
+                        "frequency.interval: must be >= 1, got {}",
+                        self.frequency.interval
+                    ));
+                }
+                let min_secs = if self.monitor_type == SyntheticType::Browser {
+                    MIN_BROWSER_INTERVAL_SECS
+                } else {
+                    MIN_INTERVAL_SECS
+                };
+                if self.frequency.interval_secs() < min_secs {
+                    return Err(format!(
+                        "frequency: interval too short ({}s < {min_secs}s minimum for {:?} monitors)",
+                        self.frequency.interval_secs(),
+                        self.monitor_type
+                    ));
+                }
+            }
+        }
+
+        // ── locations ──────────────────────────────────────────────────────
+        if self.locations.is_empty() {
+            return Err("locations: at least one location is required".to_string());
+        }
+        let mut seen_locations = std::collections::HashSet::new();
+        for loc in &self.locations {
+            if !seen_locations.insert(loc.as_str()) {
+                return Err(format!("locations: duplicate location '{loc}'"));
+            }
+            if !allowed_locations.is_empty() && !location_allowed(loc, allowed_locations) {
+                return Err(format!(
+                    "locations: unknown location '{loc}' (allowed: {})",
+                    allowed_locations.join(", ")
+                ));
+            }
+        }
+
+        // ── retry / alert settings ─────────────────────────────────────────
+        if !(0..=3).contains(&self.retries) {
+            return Err(format!("retries: must be 0..=3, got {}", self.retries));
+        }
+        if !(0..=300).contains(&self.wait_before_retry_secs) {
+            return Err(format!(
+                "wait_before_retry_secs: must be 0..=300, got {}",
+                self.wait_before_retry_secs
+            ));
+        }
+        if !(1..=100).contains(&self.alert_if_fails) {
+            return Err(format!(
+                "alert_if_fails: must be 1..=100, got {}",
+                self.alert_if_fails
+            ));
+        }
+        if !(0..=1440).contains(&self.cooldown_mins) {
+            return Err(format!(
+                "cooldown_mins: must be 0..=1440, got {}",
+                self.cooldown_mins
+            ));
+        }
+        for dest in &self.destinations {
+            if dest.trim().is_empty() {
+                return Err("destinations: empty destination name not allowed".to_string());
+            }
+        }
+
+        // ── variables ──────────────────────────────────────────────────────
+        if self.variables.len() > MAX_VARIABLES {
+            return Err(format!(
+                "variables: too many ({} > {MAX_VARIABLES})",
+                self.variables.len()
+            ));
+        }
+        let mut seen_vars = std::collections::HashSet::new();
+        for v in &self.variables {
+            let valid_name = !v.name.is_empty()
+                && v.name
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+                && v.name
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_');
+            if !valid_name {
+                return Err(format!(
+                    "variables: invalid name '{}' (must match [A-Za-z_][A-Za-z0-9_]*)",
+                    v.name
+                ));
+            }
+            if !seen_vars.insert(v.name.as_str()) {
+                return Err(format!("variables: duplicate name '{}'", v.name));
+            }
+        }
+
+        // ── auth / cookies ─────────────────────────────────────────────────
+        match &self.auth {
+            Some(SyntheticAuth::Basic { username, .. }) if username.trim().is_empty() => {
+                return Err("auth.username: must not be empty for basic auth".to_string());
+            }
+            Some(SyntheticAuth::Bearer { token }) if token.trim().is_empty() => {
+                return Err("auth.token: must not be empty for bearer auth".to_string());
+            }
+            Some(SyntheticAuth::Secret { secret_name }) if secret_name.trim().is_empty() => {
+                return Err("auth.secret_name: must not be empty for secret auth".to_string());
+            }
+            _ => {}
+        }
+        for cookie in &self.cookies {
+            if cookie.name.trim().is_empty() {
+                return Err("cookies: cookie name must not be empty".to_string());
+            }
+            if cookie.domain.trim().is_empty() {
+                return Err(format!(
+                    "cookies: domain must not be empty (cookie '{}')",
+                    cookie.name
+                ));
+            }
+        }
+
+        // ── start ("schedule later") — create only ─────────────────────────
+        // The UI also sets start for "Schedule Now", truncated to the current
+        // minute — allow a 15-minute grace window for that plus clock skew.
+        // Skipped on update: edits round-trip the original (old) start date.
+        if is_create
+            && let Some(start) = self.start
+            && start < crate::utils::time::now_micros() - 15 * 60 * 1_000_000
+        {
+            return Err("start: must not be in the past".to_string());
+        }
+
+        // ── type-specific config ───────────────────────────────────────────
+        self.validate_config(allowed_browsers, allowed_devices)
+    }
+
+    /// Parses `config` into the struct matching `monitor_type` and validates it.
+    fn validate_config(
+        &self,
+        allowed_browsers: &[String],
+        allowed_devices: &[String],
+    ) -> Result<(), String> {
+        match self.monitor_type {
+            SyntheticType::Browser => {
+                let cfg: BrowserConfig = serde_json::from_value(self.config.clone())
+                    .map_err(|e| format!("config: not a valid browser config: {e}"))?;
+                validate_browser_config(&cfg, &self.frequency, allowed_browsers, allowed_devices)
+            }
+            SyntheticType::Http | SyntheticType::Api => {
+                let cfg: HttpConfig = serde_json::from_value(self.config.clone())
+                    .map_err(|e| format!("config: not a valid http config: {e}"))?;
+                const METHODS: &[&str] =
+                    &["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
+                if !METHODS.contains(&cfg.method.to_uppercase().as_str()) {
+                    return Err(format!(
+                        "config.method: unknown HTTP method '{}'",
+                        cfg.method
+                    ));
+                }
+                Ok(())
+            }
+            SyntheticType::Tcp => serde_json::from_value::<TcpConfig>(self.config.clone())
+                .map(|_| ())
+                .map_err(|e| format!("config: not a valid tcp config: {e}")),
+            SyntheticType::Tls => serde_json::from_value::<TlsConfig>(self.config.clone())
+                .map(|_| ())
+                .map_err(|e| format!("config: not a valid tls config: {e}")),
+            SyntheticType::Ping => serde_json::from_value::<PingConfig>(self.config.clone())
+                .map(|_| ())
+                .map_err(|e| format!("config: not a valid ping config: {e}")),
+            SyntheticType::Dns => serde_json::from_value::<DnsConfig>(self.config.clone())
+                .map(|_| ())
+                .map_err(|e| format!("config: not a valid dns config: {e}")),
+            SyntheticType::Ssh => serde_json::from_value::<SshConfig>(self.config.clone())
+                .map(|_| ())
+                .map_err(|e| format!("config: not a valid ssh config: {e}")),
+        }
+    }
+}
+
+fn validate_browser_config(
+    cfg: &BrowserConfig,
+    frequency: &SyntheticFrequency,
+    allowed_browsers: &[String],
+    allowed_devices: &[String],
+) -> Result<(), String> {
+    // ── steps ──────────────────────────────────────────────────────────────
+    if cfg.steps.is_empty() {
+        return Err("config.steps: at least one step is required".to_string());
+    }
+    if cfg.steps.len() > MAX_STEPS {
+        return Err(format!(
+            "config.steps: too many steps ({} > {MAX_STEPS})",
+            cfg.steps.len()
+        ));
+    }
+    let steps_bytes = serde_json::to_string(&cfg.steps)
+        .map(|s| s.len())
+        .unwrap_or(0);
+    if steps_bytes > MAX_STEPS_JSON_BYTES {
+        return Err(format!(
+            "config.steps: serialized steps too large ({steps_bytes} > {MAX_STEPS_JSON_BYTES} bytes)"
+        ));
+    }
+
+    let mut seen_ids = std::collections::HashSet::new();
+    for (i, step) in cfg.steps.iter().enumerate() {
+        let action = step
+            .get("action")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| format!("config.steps[{i}]: missing 'action'"))?;
+        if !KNOWN_STEP_ACTIONS.contains(&action) {
+            return Err(format!(
+                "config.steps[{i}]: unknown action '{action}' (known: {})",
+                KNOWN_STEP_ACTIONS.join(", ")
+            ));
+        }
+
+        // The probe opens about:blank and never auto-navigates — a journey
+        // whose first step isn't a navigate runs against a blank page.
+        if i == 0 && action != "navigate" {
+            return Err(format!(
+                "config.steps[0]: first step must be 'navigate', got '{action}'"
+            ));
+        }
+
+        if let Some(id) = step.get("id").and_then(|v| v.as_str()) {
+            if id.is_empty() {
+                return Err(format!("config.steps[{i}]: 'id' must not be empty"));
+            }
+            if !seen_ids.insert(id.to_string()) {
+                return Err(format!("config.steps[{i}]: duplicate step id '{id}'"));
+            }
+        } else {
+            return Err(format!("config.steps[{i}]: missing 'id'"));
+        }
+
+        if action == "navigate" {
+            let step_url = step
+                .get("url")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| format!("config.steps[{i}]: navigate step missing 'url'"))?;
+            validate_http_url(&format!("config.steps[{i}].url"), step_url)?;
+        }
+        if SELECTOR_ACTIONS.contains(&action) {
+            let selector = step.get("selector").and_then(|v| v.as_str()).unwrap_or("");
+            if selector.is_empty() {
+                return Err(format!(
+                    "config.steps[{i}]: '{action}' step requires a non-empty 'selector'"
+                ));
+            }
+        }
+        if (action == "type" || action == "fill")
+            && step.get("value").and_then(|v| v.as_str()).is_none()
+        {
+            return Err(format!(
+                "config.steps[{i}]: '{action}' step requires a 'value'"
+            ));
+        }
+        if let Some(timeout) = step.get("timeout_ms").and_then(|v| v.as_u64())
+            && !(100..=60_000).contains(&timeout)
+        {
+            return Err(format!(
+                "config.steps[{i}].timeout_ms: must be 100..=60000, got {timeout}"
+            ));
+        }
+    }
+
+    // ── browser × device combos ────────────────────────────────────────────
+    if cfg.browser_devices.is_empty() {
+        return Err(
+            "config.browser_devices: at least one browser+device combo is required".to_string(),
+        );
+    }
+    if cfg.browser_devices.len() > MAX_BROWSER_DEVICE_COMBOS {
+        return Err(format!(
+            "config.browser_devices: too many combos ({} > {MAX_BROWSER_DEVICE_COMBOS})",
+            cfg.browser_devices.len()
+        ));
+    }
+    let mut seen_combos = std::collections::HashSet::new();
+    for bd in &cfg.browser_devices {
+        if !seen_combos.insert((bd.browser.as_str(), bd.device.as_str())) {
+            return Err(format!(
+                "config.browser_devices: duplicate combo '{}/{}'",
+                bd.browser, bd.device
+            ));
+        }
+        if !allowed_browsers.is_empty() && !allowed_browsers.contains(&bd.browser) {
+            return Err(format!(
+                "config.browser_devices: unknown browser '{}' (allowed: {})",
+                bd.browser,
+                allowed_browsers.join(", ")
+            ));
+        }
+        if !allowed_devices.is_empty() && !allowed_devices.contains(&bd.device) {
+            return Err(format!(
+                "config.browser_devices: unknown device '{}' (allowed: {})",
+                bd.device,
+                allowed_devices.join(", ")
+            ));
+        }
+    }
+
+    // ── timeout vs schedule ────────────────────────────────────────────────
+    if !(5_000..=300_000).contains(&cfg.timeout_ms) {
+        return Err(format!(
+            "config.timeout_ms: must be 5000..=300000, got {}",
+            cfg.timeout_ms
+        ));
+    }
+    let interval_secs = frequency.interval_secs();
+    if interval_secs > 0 && i64::from(cfg.timeout_ms) >= interval_secs * 1000 {
+        return Err(format!(
+            "config.timeout_ms: run timeout ({}ms) must be shorter than the schedule interval ({}s)",
+            cfg.timeout_ms, interval_secs
+        ));
+    }
+
+    // ── capture modes ──────────────────────────────────────────────────────
+    if let Some(capture) = &cfg.capture {
+        const MODES: &[&str] = &["always", "on-fail", "on_fail", "off"];
+        for (field, value) in [
+            ("screenshot", &capture.screenshot),
+            ("trace", &capture.trace),
+            ("video", &capture.video),
+        ] {
+            if !MODES.contains(&value.as_str()) {
+                return Err(format!(
+                    "config.capture.{field}: must be one of always|on-fail|off, got '{value}'"
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -722,5 +1223,229 @@ mod tests {
         let json = serde_json::to_value(&auth).unwrap();
         assert_eq!(json["type"], "basic");
         assert_eq!(json["username"], "user");
+    }
+
+    // ── validate() ──────────────────────────────────────────────────────────
+
+    fn valid_browser_synthetic() -> Synthetic {
+        Synthetic {
+            name: "login flow".to_string(),
+            monitor_type: SyntheticType::Browser,
+            target: "https://example.com".to_string(),
+            frequency: SyntheticFrequency {
+                frequency_type: SyntheticFrequencyType::Minutes,
+                interval: 5,
+                cron: String::new(),
+                timezone: None,
+            },
+            locations: vec!["aws-us-east-1".to_string()],
+            enabled: true,
+            alert_if_fails: 1,
+            wait_before_retry_secs: 5,
+            config: serde_json::json!({
+                "steps": [
+                    { "id": "s1", "action": "navigate", "url": "https://example.com" },
+                    { "id": "s2", "action": "click", "selector": "#login" }
+                ],
+                "browser_devices": [ { "browser": "chromium", "device": "desktop" } ],
+                "timeout_ms": 30000
+            }),
+            ..Default::default()
+        }
+    }
+
+    fn allowed() -> (Vec<String>, Vec<String>, Vec<String>) {
+        (
+            vec!["aws-us-east-1".to_string(), "aws-us-west-1".to_string()],
+            vec!["chromium".to_string(), "firefox".to_string()],
+            vec!["desktop".to_string(), "mobile".to_string()],
+        )
+    }
+
+    #[test]
+    fn test_validate_ok() {
+        let (locs, brs, devs) = allowed();
+        assert!(
+            valid_browser_synthetic()
+                .validate(&locs, &brs, &devs, true)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn test_validate_empty_name() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.name = "  ".to_string();
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.starts_with("name:"), "{err}");
+    }
+
+    #[test]
+    fn test_validate_bad_target_url() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.target = "not a url".to_string();
+        assert!(
+            s.validate(&locs, &brs, &devs, true)
+                .unwrap_err()
+                .starts_with("target:")
+        );
+    }
+
+    #[test]
+    fn test_validate_empty_steps() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.config = serde_json::json!({
+            "steps": [],
+            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
+        });
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("at least one step"), "{err}");
+    }
+
+    #[test]
+    fn test_validate_first_step_must_navigate() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.config = serde_json::json!({
+            "steps": [ { "id": "s1", "action": "click", "selector": "#x" } ],
+            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ],
+            "timeout_ms": 30000
+        });
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("first step must be 'navigate'"), "{err}");
+    }
+
+    #[test]
+    fn test_validate_unknown_browser() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.config = serde_json::json!({
+            "steps": [ { "id": "s1", "action": "navigate", "url": "https://example.com" } ],
+            "browser_devices": [ { "browser": "safari", "device": "desktop" } ],
+            "timeout_ms": 30000
+        });
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("unknown browser 'safari'"), "{err}");
+    }
+
+    #[test]
+    fn test_validate_unknown_location() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.locations = vec!["mars-north-1".to_string()];
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("unknown location"), "{err}");
+    }
+
+    #[test]
+    fn test_validate_bare_region_location_allowed() {
+        // create path normalizes "us-east-1" → "aws-us-east-1"; membership
+        // check must accept the bare form too.
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.locations = vec!["us-east-1".to_string()];
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
+    fn test_validate_empty_locations() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.locations = vec![];
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("at least one location"), "{err}");
+    }
+
+    #[test]
+    fn test_validate_invalid_cron() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.frequency = SyntheticFrequency {
+            frequency_type: SyntheticFrequencyType::Cron,
+            interval: 0,
+            cron: "not a cron".to_string(),
+            timezone: None,
+        };
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.starts_with("frequency.cron:"), "{err}");
+    }
+
+    #[test]
+    fn test_validate_browser_interval_floor() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.frequency.frequency_type = SyntheticFrequencyType::Seconds;
+        s.frequency.interval = 30; // < 60s browser floor
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("interval too short"), "{err}");
+    }
+
+    #[test]
+    fn test_validate_timeout_exceeds_interval() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.frequency.frequency_type = SyntheticFrequencyType::Minutes;
+        s.frequency.interval = 1; // 60s
+        s.config["timeout_ms"] = serde_json::json!(120_000);
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("shorter than the schedule interval"), "{err}");
+    }
+
+    #[test]
+    fn test_validate_bad_variable_name() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.variables = vec![SyntheticVariable {
+            name: "1BAD".to_string(),
+            value: "x".to_string(),
+            secure: false,
+            example: String::new(),
+        }];
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("invalid name '1BAD'"), "{err}");
+    }
+
+    #[test]
+    fn test_validate_retries_out_of_range() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.retries = 99;
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.starts_with("retries:"), "{err}");
+    }
+
+    #[test]
+    fn test_validate_config_shape_mismatch() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.monitor_type = SyntheticType::Tcp;
+        s.target = "example.com:443".to_string();
+        // browser-shaped config on a tcp monitor → port missing → shape error
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("not a valid tcp config"), "{err}");
+    }
+
+    #[test]
+    fn test_validate_stale_start_rejected_on_create_allowed_on_update() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.start = Some(crate::utils::time::now_micros() - 3600 * 1_000_000); // 1h ago
+        // Create: rejected.
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.starts_with("start:"), "{err}");
+        // Update: edits round-trip the original start — must pass.
+        assert!(s.validate(&locs, &brs, &devs, false).is_ok());
+    }
+
+    #[test]
+    fn test_validate_http_ok() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.monitor_type = SyntheticType::Http;
+        s.config = serde_json::json!({ "method": "GET" });
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
     }
 }

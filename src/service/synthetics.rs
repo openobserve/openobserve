@@ -39,17 +39,20 @@ pub struct CheckNotification {
 
 /// Fires once per run (when all jobs have completed) for non-passing runs.
 /// Passing runs are suppressed — operators want alerts, not confirmations.
+///
+/// The message body is built per destination type: Slack-compatible JSON for
+/// HTTP webhooks, an HTML card for email, plain text for SNS.
 #[cfg(feature = "enterprise")]
 pub async fn notify_check_result(n: CheckNotification) {
     if n.status == "passed" || n.status == "up" {
         return;
     }
 
-    use config::meta::destinations::Module;
+    use config::meta::destinations::{DestinationType, Module};
 
     for dest_name in &n.destinations {
         match crate::service::alerts::destinations::get_with_template(&n.org_id, dest_name).await {
-            Ok((dest, tpl)) => {
+            Ok((dest, _tpl)) => {
                 let Module::Alert {
                     destination_type, ..
                 } = &dest.module
@@ -57,12 +60,17 @@ pub async fn notify_check_result(n: CheckNotification) {
                     continue;
                 };
 
-                let _ = tpl;
-                let msg = build_notification_payload(&n);
+                let msg = match destination_type {
+                    DestinationType::Email(_) => build_email_html(&n),
+                    DestinationType::Sns(_) => build_plain_text(&n),
+                    DestinationType::Http(_) => build_slack_json(&n),
+                };
 
                 let subject = format!(
-                    "[OpenObserve Synthetics] {} is {}",
-                    n.monitor_name, n.status
+                    "[OpenObserve Synthetics] {} {} is {}",
+                    status_emoji(&n.status),
+                    n.monitor_name,
+                    n.status.to_uppercase()
                 );
                 if let Err(e) = crate::service::alerts::alert::dispatch_notification(
                     destination_type,
@@ -85,41 +93,135 @@ pub async fn notify_check_result(n: CheckNotification) {
 }
 
 #[cfg(feature = "enterprise")]
-fn build_notification_payload(n: &CheckNotification) -> String {
-    let status_emoji = match n.status.as_str() {
+fn status_emoji(status: &str) -> &'static str {
+    match status {
         "failed" | "down" => "🔴",
         "warning" => "🟡",
         "error" => "⚠️",
         _ => "🔴",
-    };
+    }
+}
 
+/// What the status means, in operator language — differs per status.
+#[cfg(feature = "enterprise")]
+fn status_headline(n: &CheckNotification) -> String {
+    match n.status.as_str() {
+        "warning" => format!("{} passed only after retries (flaky)", n.monitor_name),
+        "error" => format!(
+            "{} could not be checked — probe infrastructure error",
+            n.monitor_name
+        ),
+        _ => format!("{} is failing", n.monitor_name),
+    }
+}
+
+/// Deep link to the monitor's results page in the UI.
+#[cfg(feature = "enterprise")]
+fn run_url(n: &CheckNotification) -> String {
+    let cfg = config::get_config();
+    let web_url = cfg.common.web_url.trim_end_matches('/');
+    let base_uri = &cfg.common.base_uri;
+    format!(
+        "{web_url}{base_uri}/web/synthetic/{}/results?org_identifier={}",
+        n.monitor_id, n.org_id
+    )
+}
+
+/// Slack-compatible webhook payload (also renders fine in Teams/Discord-style
+/// webhooks that accept a `text` field).
+#[cfg(feature = "enterprise")]
+fn build_slack_json(n: &CheckNotification) -> String {
     let checked_secs = n.checked_at / 1_000_000;
-    let locations_line = if n.job_count > 1 {
-        format!("*Locations checked:* {}\n", n.job_count)
-    } else {
-        String::new()
-    };
-    let error_line = match &n.error {
-        Some(e) if !e.is_empty() => format!("*Error:* {e}\n"),
-        _ => String::new(),
-    };
+    let mut lines = vec![
+        format!("{} *{}*", status_emoji(&n.status), status_headline(n)),
+        String::new(),
+        format!("*Monitor:* {} ({})", n.monitor_name, n.monitor_type),
+        format!("*Target:* {}", n.target),
+        format!(
+            "*Locations checked:* {}",
+            if n.job_count > 0 { n.job_count } else { 1 }
+        ),
+    ];
+    if let Some(e) = n.error.as_deref().filter(|e| !e.is_empty()) {
+        lines.push(format!("*Error:* ```{e}```"));
+    }
+    lines.push(format!(
+        "*Time:* <!date^{checked_secs}^{{date_time_secs}}|{checked_secs}>"
+    ));
+    lines.push(format!("<{}|View run details →>", run_url(n)));
 
-    let text = format!(
-        "{status_emoji} *{monitor_name}* is *{status}*\n\
-         *Type:* {monitor_type}\n\
-         *Target:* {target}\n\
-         {locations_line}\
-         {error_line}\
-         *Run ID:* `{run_id}`\n\
-         *Monitor ID:* `{monitor_id}`\n\
-         *Time:* <!date^{checked_secs}^{{date_time}}|{checked_secs}>",
-        monitor_name = n.monitor_name,
-        status = n.status,
-        monitor_type = n.monitor_type,
-        target = n.target,
-        run_id = n.run_id,
-        monitor_id = n.monitor_id,
-    );
+    serde_json::json!({ "text": lines.join("\n") }).to_string()
+}
 
-    serde_json::json!({ "text": text }).to_string()
+/// Plain text — SNS fans out to SMS/lambda/etc. where markup is noise.
+#[cfg(feature = "enterprise")]
+fn build_plain_text(n: &CheckNotification) -> String {
+    let mut lines = vec![
+        status_headline(n),
+        format!("Monitor: {} ({})", n.monitor_name, n.monitor_type),
+        format!("Target: {}", n.target),
+        format!("Status: {}", n.status),
+        format!(
+            "Locations checked: {}",
+            if n.job_count > 0 { n.job_count } else { 1 }
+        ),
+    ];
+    if let Some(e) = n.error.as_deref().filter(|e| !e.is_empty()) {
+        lines.push(format!("Error: {e}"));
+    }
+    lines.push(format!("Run details: {}", run_url(n)));
+    lines.join("\n")
+}
+
+/// HTML card for email destinations (lettre sends it as the HTML alternative).
+#[cfg(feature = "enterprise")]
+fn build_email_html(n: &CheckNotification) -> String {
+    let color = match n.status.as_str() {
+        "warning" => "#b58105",
+        "error" => "#b45309",
+        _ => "#c62828",
+    };
+    let error_row = match n.error.as_deref().filter(|e| !e.is_empty()) {
+        Some(e) => format!(
+            r#"<tr><td style="padding:6px 12px;color:#666;">Error</td>
+                <td style="padding:6px 12px;"><code>{}</code></td></tr>"#,
+            html_escape(e)
+        ),
+        None => String::new(),
+    };
+    format!(
+        r#"<div style="font-family:sans-serif;max-width:560px;">
+  <h2 style="color:{color};margin-bottom:4px;">{emoji} {headline}</h2>
+  <table style="border-collapse:collapse;background:#f7f7f7;border-radius:6px;width:100%;">
+    <tr><td style="padding:6px 12px;color:#666;width:140px;">Monitor</td>
+        <td style="padding:6px 12px;">{name} ({mtype})</td></tr>
+    <tr><td style="padding:6px 12px;color:#666;">Target</td>
+        <td style="padding:6px 12px;">{target}</td></tr>
+    <tr><td style="padding:6px 12px;color:#666;">Status</td>
+        <td style="padding:6px 12px;font-weight:bold;color:{color};">{status}</td></tr>
+    <tr><td style="padding:6px 12px;color:#666;">Locations checked</td>
+        <td style="padding:6px 12px;">{jobs}</td></tr>
+    {error_row}
+  </table>
+  <p style="margin-top:12px;">
+    <a href="{url}" style="background:{color};color:#fff;padding:8px 16px;border-radius:4px;text-decoration:none;">View run details</a>
+  </p>
+</div>"#,
+        emoji = status_emoji(&n.status),
+        headline = html_escape(&status_headline(n)),
+        name = html_escape(&n.monitor_name),
+        mtype = html_escape(&n.monitor_type),
+        target = html_escape(&n.target),
+        status = n.status.to_uppercase(),
+        jobs = if n.job_count > 0 { n.job_count } else { 1 },
+        url = run_url(n),
+    )
+}
+
+#[cfg(feature = "enterprise")]
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }

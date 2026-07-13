@@ -394,8 +394,12 @@ pub async fn create_synthetic(
         {
             Ok(monitor) => MetaHttpResponse::json(monitor),
             Err(e) => {
+                let msg = e.to_string();
+                if msg.starts_with("validation: ") {
+                    return MetaHttpResponse::bad_request(msg);
+                }
                 tracing::error!("[synthetics] create_synthetic: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
                     .into_response()
             }
         }
@@ -513,6 +517,9 @@ pub async fn update_synthetic(
             Ok(monitor) => MetaHttpResponse::json(monitor),
             Err(e) => {
                 let msg = e.to_string();
+                if msg.starts_with("validation: ") {
+                    return MetaHttpResponse::bad_request(msg);
+                }
                 if msg.contains("not found") {
                     return MetaHttpResponse::not_found(msg);
                 }
