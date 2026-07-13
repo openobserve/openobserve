@@ -1246,8 +1246,9 @@ pub async fn refresh_token_with_dex(
             }
 
             // Blocklist: a refresh must not resurrect a blocked user. Decode the freshly minted
-            // access token; if the identity is blocked, deny WITHOUT minting a session and clear the
-            // auth cookie, so the FE's 401 → /dex_refresh → retry loop terminates at the login page.
+            // access token; if the identity is blocked, deny WITHOUT minting a session and clear
+            // the auth cookie, so the FE's 401 → /dex_refresh → retry loop terminates
+            // at the login page.
             {
                 let keys = get_dex_jwks().await;
                 let refreshed_email = verify_decode_token(
