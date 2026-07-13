@@ -18,33 +18,37 @@
 
 // ── Notifications ─────────────────────────────────────────────────────────────
 
+/// Everything needed to notify destinations about a completed run.
+/// Owned values so the whole struct can move into a spawned task.
+#[cfg(feature = "enterprise")]
+pub struct CheckNotification {
+    pub org_id: String,
+    pub monitor_name: String,
+    pub monitor_id: String,
+    pub monitor_type: String,
+    pub target: String,
+    pub destinations: Vec<String>,
+    pub run_id: String,
+    /// Aggregate run status: "passed"|"warning"|"failed"|"error".
+    pub status: String,
+    /// Number of locations that were checked in this run.
+    pub job_count: i64,
+    pub error: Option<String>,
+    pub checked_at: i64,
+}
+
 /// Fires once per run (when all jobs have completed) for non-passing runs.
 /// Passing runs are suppressed — operators want alerts, not confirmations.
-///
-/// `status` is the aggregate run status: "passed"|"warning"|"failed"|"error".
-/// `job_count` = number of locations that were checked in this run.
 #[cfg(feature = "enterprise")]
-pub async fn notify_check_result(
-    org_id: &str,
-    monitor_name: &str,
-    monitor_id: &str,
-    monitor_type: &str,
-    target: &str,
-    destinations: &[String],
-    run_id: &str,
-    status: &str,
-    job_count: i64,
-    error: Option<&str>,
-    checked_at: i64,
-) {
-    if status == "passed" || status == "up" {
+pub async fn notify_check_result(n: CheckNotification) {
+    if n.status == "passed" || n.status == "up" {
         return;
     }
 
     use config::meta::destinations::Module;
 
-    for dest_name in destinations {
-        match crate::service::alerts::destinations::get_with_template(org_id, dest_name).await {
+    for dest_name in &n.destinations {
+        match crate::service::alerts::destinations::get_with_template(&n.org_id, dest_name).await {
             Ok((dest, tpl)) => {
                 let Module::Alert {
                     destination_type, ..
@@ -54,19 +58,12 @@ pub async fn notify_check_result(
                 };
 
                 let _ = tpl;
-                let msg = build_notification_payload(
-                    monitor_name,
-                    monitor_id,
-                    monitor_type,
-                    target,
-                    run_id,
-                    status,
-                    job_count,
-                    error,
-                    checked_at,
-                );
+                let msg = build_notification_payload(&n);
 
-                let subject = format!("[OpenObserve Synthetics] {monitor_name} is {status}");
+                let subject = format!(
+                    "[OpenObserve Synthetics] {} is {}",
+                    n.monitor_name, n.status
+                );
                 if let Err(e) = crate::service::alerts::alert::dispatch_notification(
                     destination_type,
                     &subject,
@@ -74,42 +71,35 @@ pub async fn notify_check_result(
                 )
                 .await
                 {
-                    log::error!("[synthetics] notify dest={dest_name} monitor={monitor_id}: {e}");
+                    log::error!(
+                        "[synthetics] notify dest={dest_name} monitor={}: {e}",
+                        n.monitor_id
+                    );
                 }
             }
             Err(e) => {
-                log::error!("[synthetics] load dest={dest_name} org={org_id}: {e}");
+                log::error!("[synthetics] load dest={dest_name} org={}: {e}", n.org_id);
             }
         }
     }
 }
 
 #[cfg(feature = "enterprise")]
-fn build_notification_payload(
-    monitor_name: &str,
-    monitor_id: &str,
-    monitor_type: &str,
-    target: &str,
-    run_id: &str,
-    status: &str,
-    job_count: i64,
-    error: Option<&str>,
-    checked_at: i64,
-) -> String {
-    let status_emoji = match status {
+fn build_notification_payload(n: &CheckNotification) -> String {
+    let status_emoji = match n.status.as_str() {
         "failed" | "down" => "🔴",
         "warning" => "🟡",
         "error" => "⚠️",
         _ => "🔴",
     };
 
-    let checked_secs = checked_at / 1_000_000;
-    let locations_line = if job_count > 1 {
-        format!("*Locations checked:* {job_count}\n")
+    let checked_secs = n.checked_at / 1_000_000;
+    let locations_line = if n.job_count > 1 {
+        format!("*Locations checked:* {}\n", n.job_count)
     } else {
         String::new()
     };
-    let error_line = match error {
+    let error_line = match &n.error {
         Some(e) if !e.is_empty() => format!("*Error:* {e}\n"),
         _ => String::new(),
     };
@@ -122,7 +112,13 @@ fn build_notification_payload(
          {error_line}\
          *Run ID:* `{run_id}`\n\
          *Monitor ID:* `{monitor_id}`\n\
-         *Time:* <!date^{checked_secs}^{{date_time}}|{checked_secs}>"
+         *Time:* <!date^{checked_secs}^{{date_time}}|{checked_secs}>",
+        monitor_name = n.monitor_name,
+        status = n.status,
+        monitor_type = n.monitor_type,
+        target = n.target,
+        run_id = n.run_id,
+        monitor_id = n.monitor_id,
     );
 
     serde_json::json!({ "text": text }).to_string()

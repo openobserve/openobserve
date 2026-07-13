@@ -300,7 +300,7 @@ pub async fn job_upload(
         Some(k) => k.clone(),
         None => return MetaHttpResponse::bad_request("missing key param"),
     };
-    match infra::storage::put("default", &key, body.into()).await {
+    match infra::storage::put("default", &key, body).await {
         Ok(_) => MetaHttpResponse::ok("uploaded"),
         Err(e) => {
             tracing::error!("[synthetics] job_upload: {e}");
@@ -956,30 +956,21 @@ pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
 
                 // Notify once per run, not once per job ack.
                 if resp.run_complete && !resp.destinations.is_empty() {
-                    let org_id = resp.org_id.clone();
-                    let monitor_name = resp.synthetics_name.clone();
-                    let monitor_id = resp.synthetics_id.clone();
-                    let monitor_type = resp.monitor_type.clone();
-                    let target = resp.target.clone();
-                    let destinations = resp.destinations.clone();
-                    let run_id = resp.run_id.clone();
-                    let run_status = resp.run_status.clone().unwrap_or_else(|| status.clone());
-                    let job_count = resp.job_count as i64;
+                    let notification = crate::service::synthetics::CheckNotification {
+                        org_id: resp.org_id.clone(),
+                        monitor_name: resp.synthetics_name.clone(),
+                        monitor_id: resp.synthetics_id.clone(),
+                        monitor_type: resp.monitor_type.clone(),
+                        target: resp.target.clone(),
+                        destinations: resp.destinations.clone(),
+                        run_id: resp.run_id.clone(),
+                        status: resp.run_status.clone().unwrap_or_else(|| status.clone()),
+                        job_count: resp.job_count as i64,
+                        error: error.clone(),
+                        checked_at,
+                    };
                     tokio::spawn(async move {
-                        crate::service::synthetics::notify_check_result(
-                            &org_id,
-                            &monitor_name,
-                            &monitor_id,
-                            &monitor_type,
-                            &target,
-                            &destinations,
-                            &run_id,
-                            &run_status,
-                            job_count,
-                            error.as_deref(),
-                            checked_at,
-                        )
-                        .await;
+                        crate::service::synthetics::notify_check_result(notification).await;
                     });
                 }
                 MetaHttpResponse::json(resp)
