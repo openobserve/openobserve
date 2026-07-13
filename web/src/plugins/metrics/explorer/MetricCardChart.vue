@@ -45,6 +45,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import * as echarts from "echarts/core";
+import { toZonedTime } from "date-fns-tz";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
 import { CARD_AREA_FILL_OPACITY } from "@/utils/metrics/metricPalette";
@@ -63,6 +64,15 @@ export default defineComponent({
     bucketUnitCustom: { type: String, default: null },
     color: { type: String, required: true },
     height: { type: String, default: "100%" },
+    /**
+     * The window these results were queried for, in MICROSECONDS — the same unit
+     * the grid holds it in. Without it the time axis is whatever ECharts infers
+     * from the data, which is not the window the user picked. See `pinTimeAxis`.
+     */
+    timeRange: {
+      type: Object as PropType<{ start_time: number; end_time: number }>,
+      default: null,
+    },
   },
   emits: ["error"],
   setup(props, { emit }) {
@@ -136,6 +146,48 @@ export default defineComponent({
       },
     });
 
+    /**
+     * Pins the time axis to the window the data was QUERIED for.
+     *
+     * `convertPromQLData` sets `xAxis.min`/`max` only while a panel is streaming;
+     * a settled chart is left to ECharts, which scales the axis to the data it was
+     * given. On a dashboard that is close enough, because a panel-sized query
+     * comes back with points spread across the whole range. A card is not: a
+     * sparsely-scraped metric can come back with a handful of points, or ONE — and
+     * ECharts, asked to lay out a time axis around a single timestamp, invents a
+     * span of its own, which it rounds out to about two days. So a card whose
+     * picker said "Past 3 Hours" drew an axis two days wide, and the chart
+     * disagreed with the control that produced it.
+     *
+     * The window is the truth here and we already know it, so we state it rather
+     * than letting the axis be inferred from however much data happened to come
+     * back. Charts also stay comparable across the grid — every card spans the
+     * same window, so a spike at the same x is the same moment.
+     *
+     * Not applied to the heatmap: its x-axis is categorical (one column per
+     * bucket), so a time min/max means nothing there.
+     */
+    const pinTimeAxis = (options: any) => {
+      const range = props.timeRange;
+      if (!range?.start_time || !range?.end_time) return;
+      if (props.chartType === "heatmap") return;
+
+      const axis = options.xAxis;
+      if (!axis || Array.isArray(axis) || axis.type !== "time") return;
+
+      // µs to ms, then into the same coordinate space the converter puts the
+      // series timestamps in — a zoned Date, or a zoneless ISO string for UTC.
+      const toAxisValue = (microseconds: number) => {
+        const ms = microseconds / 1000;
+        return store.state.timezone !== "UTC"
+          ? toZonedTime(ms, store.state.timezone)
+          : new Date(ms).toISOString().slice(0, -1);
+      };
+
+      axis.min = toAxisValue(range.start_time);
+      axis.max = toAxisValue(range.end_time);
+    };
+
     const render = async () => {
       if (!props.results?.length) {
         chartData.value = { options: null };
@@ -195,6 +247,8 @@ export default defineComponent({
               ...axisLabel,
             };
           }
+
+          pinTimeAxis(options);
 
           if (props.chartType === "heatmap") {
             // Keep the colour bar — without it the cells are just colours with
@@ -309,6 +363,7 @@ export default defineComponent({
         props.unitCustom,
         props.bucketUnit,
         props.bucketUnitCustom,
+        props.timeRange,
       ],
       render,
       { immediate: true, deep: false },

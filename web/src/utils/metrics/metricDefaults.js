@@ -491,6 +491,49 @@ const RATE_FREE_KINDS = [
 ];
 
 /**
+ * Does this card kind's default query wrap its selector in `rate()`?
+ *
+ * The counter, classic-histogram, mean-pair and exponential-histogram kinds all
+ * do. It matters because an empty result means something DIFFERENT for them: see
+ * `buildPresenceQuery`.
+ *
+ * @param {string} cardKind one of CARD_KIND
+ * @returns {boolean}
+ */
+export function isRateBasedKind(cardKind) {
+  return !RATE_FREE_KINDS.includes(cardKind);
+}
+
+/**
+ * "Does this stream carry ANY sample in the window?" — the question a rate-based
+ * card cannot answer about itself.
+ *
+ * `rate()` needs TWO samples inside its window to compute a delta. One sample
+ * yields nothing, and so does a scrape interval longer than the window. So a
+ * rate-based card can come back completely empty while its metric is sitting
+ * right there in the selected range, fully ingested — and treating that empty
+ * result as "this metric has no data" hides the card behind the "With data"
+ * filter, whose contract is *"only metrics with data in the selected time
+ * range"*. The metric then vanishes from the product: a Prometheus histogram is
+ * hit hardest, because its base stream is a metadata-only phantom that carries
+ * no series of its own (see `isPhantomBase`), so once `X_bucket`, `X_sum` and
+ * `X_count` are each hidden as "empty", the whole histogram renders NO card at
+ * all and its data is unreachable from the UI.
+ *
+ * `count()` rather than the bare selector: presence is a yes/no question, and a
+ * raw selector on a high-cardinality metric would drag every series over the
+ * wire to answer it. `count()` collapses that to one number per step and is
+ * empty only when the window truly holds nothing.
+ *
+ * @param {string} streamName
+ * @param {Array<{label: string, value: string, operator?: string}>} [filters]
+ * @returns {string} PromQL
+ */
+export function buildPresenceQuery(streamName, filters) {
+  return `count(${buildSelector(streamName, filters)})`;
+}
+
+/**
  * Guards a selector against NaN samples.
  *
  * A float64 sample can be NaN, and NaN propagates: one NaN anywhere in an

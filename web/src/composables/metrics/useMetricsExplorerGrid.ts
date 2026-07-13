@@ -42,10 +42,12 @@ import {
   type SuffixGroup,
 } from "@/utils/metrics/prefixGrouping";
 import {
+  buildPresenceQuery,
   computeRateWindow,
   computeStepSeconds,
   DEFAULT_SCRAPE_INTERVAL_SECONDS,
   getMetricDefaults,
+  isRateBasedKind,
   resolveVariant,
 } from "@/utils/metrics/metricDefaults";
 import {
@@ -106,6 +108,18 @@ export interface CardPreview {
   stale: boolean;
   /** The first query came back all-NaN; this is the guarded re-query's result. */
   nanGuardApplied: boolean;
+  /**
+   * The metric HAS samples in the window, but its rate-based default query could
+   * not produce a single point from them — `rate()` needs two samples inside its
+   * window, and there are not two to be had (a one-off scrape, or a scrape
+   * interval longer than the window).
+   *
+   * Emphatically NOT "no data": the card stays visible and says what is actually
+   * wrong, instead of being hidden as empty and taking a real, ingested metric
+   * out of the UI with it. Survives the persisted cache, because the restore path
+   * decides emptiness too. See `buildPresenceQuery`.
+   */
+  sparse: boolean;
   /**
    * When the data was actually fetched (ms). Survives the persisted cache, so a
    * card restored from it reports the true age of what it shows — the same
@@ -1098,6 +1112,55 @@ export function useMetricsExplorerGrid() {
       ),
     );
 
+  /**
+   * Does the metric carry ANY sample in the window, whatever its card's
+   * aggregation made of them?
+   *
+   * Asked only when a RATE-BASED card came back with nothing. An empty `avg()` is
+   * proof the metric is empty; an empty `rate()` is not — `rate()` needs two
+   * samples inside its window to compute a delta, so a metric scraped once, or
+   * scraped less often than the window is wide, yields nothing from a query whose
+   * data is sitting right there in the range. Hiding that card as "no data" is
+   * how a fully-ingested Prometheus histogram ends up rendering no card at all
+   * (its base is a metadata-only phantom, and `_bucket`/`_sum`/`_count` are each
+   * rate-based), which puts real data beyond reach of the UI.
+   *
+   * Probes the streams the EFFECTIVE variant reads, not the card's own name: a
+   * mean pair divides `X_sum` by `X_count`, and an ExponentialHistogram card
+   * reads `X_count` rather than itself. Those are the streams whose samples the
+   * empty result is a statement about.
+   *
+   * Costs one extra query per empty rate card, and only for cards the stream list
+   * already says have been written to — so the long tail of registered-but-empty
+   * metrics the "With data" filter exists to hide is still answered for free, from
+   * `doc_num`, and never probed.
+   */
+  const hasSamplesInWindow = async (
+    card: MetricCard,
+    step: number,
+    opts?: { skipCache?: boolean; priority?: number },
+  ): Promise<boolean> => {
+    const probes = operandStreamsOfVariant(card).map((stream) => ({
+      expr: buildPresenceQuery(stream, labelFilters.value),
+    }));
+    if (!probes.length) return false;
+
+    try {
+      const probed = await runQueries(
+        probes,
+        step,
+        card.name,
+        opts?.priority ?? PRIORITY.VISIBLE,
+        !!opts?.skipCache,
+      );
+      return probed.some(hasSamples);
+    } catch {
+      // A probe that failed proves nothing either way. Fall back to what the
+      // card's own query said, which is the behaviour without this check at all.
+      return false;
+    }
+  };
+
   /* -------------------------------------------------- persistent card cache */
 
   const cacheFor = (card: MetricCard) =>
@@ -1172,11 +1235,19 @@ export function useMetricsExplorerGrid() {
       bucketUnit: defaults.bucketUnit,
       stale: false,
       nanGuardApplied: !!cached.value.nanGuardApplied,
+      // Persisted, because this path decides emptiness too — and it fires no
+      // query, so it has no way to re-derive it. Without it a sparse card would
+      // paint fine on the live path and then vanish from the grid on the next
+      // visit, when the cache answered instead.
+      sparse: !!cached.value.sparse,
       lastTriggeredAt: cached.value.lastTriggeredAt ?? cached.timestamp ?? null,
       cachedDataDiffersFromTimeRange: differs,
       footerLabel: resolved.footerLabel,
     };
-    markEmptiness(card.name, !(cached.value.results ?? []).some(hasSamples));
+    markEmptiness(
+      card.name,
+      !(cached.value.results ?? []).some(hasSamples) && !cached.value.sparse,
+    );
     rememberPreview(card.name);
     return true;
   };
@@ -1193,6 +1264,7 @@ export function useMetricsExplorerGrid() {
         {
           results: preview.results,
           nanGuardApplied: preview.nanGuardApplied,
+          sparse: preview.sparse,
           lastTriggeredAt: preview.lastTriggeredAt,
         },
         {
@@ -1241,6 +1313,7 @@ export function useMetricsExplorerGrid() {
         bucketUnit: defaults.bucketUnit,
         stale: false,
         nanGuardApplied: false,
+        sparse: false,
         lastTriggeredAt: null,
         cachedDataDiffersFromTimeRange: false,
         footerLabel: resolved.footerLabel,
@@ -1274,6 +1347,7 @@ export function useMetricsExplorerGrid() {
       bucketUnit: defaults.bucketUnit,
       stale: false,
       nanGuardApplied: false,
+      sparse: false,
       lastTriggeredAt: existing?.lastTriggeredAt ?? null,
       cachedDataDiffersFromTimeRange: false,
       footerLabel: resolved.footerLabel,
@@ -1316,6 +1390,17 @@ export function useMetricsExplorerGrid() {
         }
       }
 
+      // Empty, and the card's default query is one `rate()` cannot answer with:
+      // ask the metric itself whether it has any samples in the window before
+      // calling it empty and hiding it. Gated on `card.hasData` so the long tail
+      // of registered-but-never-written metrics — the ones the "With data" filter
+      // is FOR — is settled from the stream list without a second query.
+      const sparse =
+        !results.some(hasSamples) &&
+        isRateBasedKind(defaults.cardKind) &&
+        card.hasData &&
+        (await hasSamplesInWindow(card, step, opts));
+
       // The response outlived the state that asked for it: a bulk clear empties
       // the map and cancels what is in flight, but a request that had ALREADY
       // resolved is past the point of cancelling and would write the old org's
@@ -1331,13 +1416,14 @@ export function useMetricsExplorerGrid() {
         bucketUnit: defaults.bucketUnit,
         stale: false,
         nanGuardApplied,
+        sparse,
         // Stamped on the real fetch, and persisted — this is what lets a
         // cache-restored card tell the user how old its data actually is.
         lastTriggeredAt: Date.now(),
         cachedDataDiffersFromTimeRange: false,
         footerLabel: resolved.footerLabel,
       };
-      markEmptiness(card.name, !results.some(hasSamples));
+      markEmptiness(card.name, !results.some(hasSamples) && !sparse);
       rememberPreview(card.name);
       persistToCache(card, previews.value[card.name], resolved.queries, step);
     } catch (error: any) {
@@ -1378,6 +1464,7 @@ export function useMetricsExplorerGrid() {
         // rather than blanking a chart the user was reading.
         stale: previous.length > 0,
         nanGuardApplied: existing?.nanGuardApplied ?? false,
+        sparse: existing?.sparse ?? false,
         lastTriggeredAt: existing?.lastTriggeredAt ?? null,
         cachedDataDiffersFromTimeRange:
           existing?.cachedDataDiffersFromTimeRange ?? false,

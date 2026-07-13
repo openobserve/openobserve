@@ -3913,6 +3913,8 @@
         "copyErrorAria": "Copy the error details for {name}",
         "errorCopied": "Error details copied",
         "nanGuard": "Re-queried with a NaN guard: this metric's values are small enough that the plain aggregation underflowed.",
+        "sparse": "Too few samples for a rate",
+        "sparseHint": "This metric has data in the selected time range, but a rate needs at least two samples within its window. Widen the time range, or scrape the metric more often.",
         "staleCopyAria": "Copy the failed-refresh details for {name}",
         "stalePreamble": "Refresh failed — showing the last successful result.",
         "staleClickToCopy": "Click to copy the details.",

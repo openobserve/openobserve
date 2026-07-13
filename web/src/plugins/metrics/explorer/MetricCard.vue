@@ -281,6 +281,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSkeleton type="rect" animation="wave" class="h-full w-full" />
       </div>
 
+      <!-- Has data, but `rate()` could not make a point out of it — fewer than two
+           samples in its window. Deliberately NOT the "No data" tile: the metric
+           is populated, and saying otherwise is what used to hide it from the grid
+           entirely. The hint carries the actual remedy, which is the user's to
+           choose (a wider range, or a shorter scrape interval). -->
+      <div
+        v-else-if="isSparse"
+        class="flex flex-col items-center justify-center gap-1.5 h-full px-2 text-[11px] opacity-65 rounded text-text-secondary bg-[repeating-linear-gradient(45deg,rgba(128,128,128,0.08),rgba(128,128,128,0.08)_6px,transparent_6px,transparent_12px)]"
+        :data-test="`metrics-explorer-card-sparse-${card.name}`"
+      >
+        <span class="inline-flex flex-col items-center gap-1.5 cursor-help">
+          <OTooltip
+            :content="t('metrics.explorer.card.sparseHint')"
+            content-class="whitespace-pre-line"
+            max-width="320px"
+            :delay="200"
+          />
+          <OIcon name="scatter-plot" size="sm" />
+          <span class="text-center">{{ t("metrics.explorer.card.sparse") }}</span>
+        </span>
+      </div>
+
       <div
         v-else-if="isEmpty"
         class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] opacity-65 rounded text-text-secondary bg-[repeating-linear-gradient(45deg,rgba(128,128,128,0.08),rgba(128,128,128,0.08)_6px,transparent_6px,transparent_12px)]"
@@ -299,6 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :bucket-unit="bucketO2Unit.unit"
         :bucket-unit-custom="bucketO2Unit.unitCustom"
         :color="color"
+        :time-range="timeRange"
       />
 
       <div v-else class="h-full">
@@ -478,6 +501,11 @@ export default defineComponent({
     /** Position in the FULL filtered+sorted set, so colours are scroll-stable. */
     index: { type: Number, required: true },
     isFavorite: { type: Boolean, default: false },
+    /** The queried window (µs). Handed to the chart so its axis says the truth. */
+    timeRange: {
+      type: Object as PropType<{ start_time: number; end_time: number }>,
+      default: null,
+    },
   },
   emits: [
     "select",
@@ -591,6 +619,13 @@ export default defineComponent({
       return !preview.results.some(hasSamples);
     });
 
+    /**
+     * Empty, but only because `rate()` had too few samples to work with — the
+     * metric itself carries data in this window (the grid probed for it). A
+     * strictly narrower case than `isEmpty`, and the template tests it first.
+     */
+    const isSparse = computed(() => !!props.preview?.sparse && isEmpty.value);
+
     // Lazy queries: only cards in (or within one viewport of) the scroll window
     // fetch anything.
     let observer: IntersectionObserver | null = null;
@@ -633,6 +668,7 @@ export default defineComponent({
       errorReport,
       copyErrorReport,
       isEmpty,
+      isSparse,
     };
   },
 });

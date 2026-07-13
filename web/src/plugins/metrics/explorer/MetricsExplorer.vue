@@ -357,6 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :queries="queriesFor(card)"
               :index="row.index * columns + offset"
               :is-favorite="grid.favorites.value.includes(card.name)"
+              :time-range="grid.timeRange.value"
               @visible="onCardVisible"
               @hidden="onCardHidden"
               @refresh="grid.refreshCard"

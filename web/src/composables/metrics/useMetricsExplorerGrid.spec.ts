@@ -159,6 +159,29 @@ const NO_SERIES = { resultType: "matrix", result: [] };
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
+/**
+ * Lands every query ONE preview fires — not just the round in flight when it is
+ * first awaited.
+ *
+ * A rate-based card asks a second question before it will call itself empty: its
+ * first result coming back with no samples does not prove the metric is empty,
+ * because `rate()` yields nothing when fewer than two samples fall inside its
+ * window. So it follows up with a presence probe (`buildPresenceQuery`) — and a
+ * test that answers only the first round leaves the preview awaiting a probe
+ * nobody ever replies to.
+ *
+ * Every round gets the same `result`, so answering with `NO_SERIES` still means
+ * "this metric is genuinely empty" — the probe comes back empty too.
+ */
+const landPreview = async (preview: Promise<any>, result: any) => {
+  for (let round = 0; round < 5; round++) {
+    await flush();
+    if (!inFlight.length) break;
+    inFlight.splice(0, inFlight.length).forEach((q) => q.complete(result));
+  }
+  await preview;
+};
+
 const HOUR_US = 3_600_000_000;
 const NOW_US = 1_700_000_000_000_000;
 
@@ -190,10 +213,10 @@ describe("useMetricsExplorerGrid", () => {
       // reason anyone widens a window.
       const grid = await setup();
 
-      const preview = grid.requestPreview(cardNamed(grid, "idle_metric_total"));
-      await flush();
-      inFlight.forEach((q) => q.complete(NO_SERIES));
-      await preview;
+      await landPreview(
+        grid.requestPreview(cardNamed(grid, "idle_metric_total")),
+        NO_SERIES,
+      );
 
       expect(grid.emptyHiddenCount.value).toBe(1);
       expect(grid.sortedCards.value.map((c: any) => c.name)).not.toContain(
@@ -217,10 +240,10 @@ describe("useMetricsExplorerGrid", () => {
       // user's cursor once a minute.
       const grid = await setup();
 
-      const preview = grid.requestPreview(cardNamed(grid, "idle_metric_total"));
-      await flush();
-      inFlight.forEach((q) => q.complete(NO_SERIES));
-      await preview;
+      await landPreview(
+        grid.requestPreview(cardNamed(grid, "idle_metric_total")),
+        NO_SERIES,
+      );
 
       grid.setTimeRange(
         { start_time: NOW_US - HOUR_US + 5_000_000, end_time: NOW_US + 5_000_000 },
@@ -555,11 +578,8 @@ describe("useMetricsExplorerGrid", () => {
       // Every card on the page comes back empty — the worst case.
       const page = [...grid.pagedCards.value];
       for (const card of page) {
-        const p = grid.requestPreview(card);
-        await flush();
-        inFlight.forEach((q) => q.complete(NO_SERIES));
+        await landPreview(grid.requestPreview(card), NO_SERIES);
         inFlight.length = 0;
-        await p;
       }
 
       // The page is now EMPTY (all 30 hidden) — it must not have refilled itself
@@ -796,10 +816,7 @@ describe("useMetricsExplorerGrid", () => {
 
     /** Query `name` and answer with nothing, so it is known empty and hidden. */
     const hideAsEmpty = async (grid: any, name: string) => {
-      const preview = grid.requestPreview(cardNamed(grid, name));
-      await flush();
-      inFlight.forEach((q) => q.complete(NO_SERIES));
-      await preview;
+      await landPreview(grid.requestPreview(cardNamed(grid, name)), NO_SERIES);
       inFlight.length = 0;
       expect(names(grid)).not.toContain(name);
     };
@@ -868,6 +885,153 @@ describe("useMetricsExplorerGrid", () => {
       expect(inFlight).toHaveLength(0);
     });
   });
+  describe("an empty rate() is not proof of an empty metric", () => {
+    const names = (grid: any) =>
+      grid.sortedCards.value.map((c: any) => c.name);
+
+    /** Answers each round of one preview's queries with a different result. */
+    const landRounds = async (preview: Promise<any>, ...rounds: any[]) => {
+      for (const result of rounds) {
+        await flush();
+        inFlight.splice(0, inFlight.length).forEach((q) => q.complete(result));
+      }
+      await flush();
+      await preview;
+    };
+
+    it("keeps a populated metric whose rate() came back empty, and says why", async () => {
+      // The reported bug. `rate()` needs TWO samples inside its window to compute
+      // a delta, so a metric scraped once — or scraped less often than the window
+      // is wide — yields NOTHING from a rate-based card while its samples sit
+      // right there in the selected range. That empty result was taken as proof
+      // the metric was empty, and the "With data" filter (whose contract is
+      // literally "only metrics with data in the selected time range") hid it.
+      const grid = await setup();
+
+      // Round 1: the card's own `sum(rate(...))` — empty.
+      // Round 2: the presence probe — the metric is right there.
+      await landRounds(
+        grid.requestPreview(cardNamed(grid, "lat_seconds_count")),
+        NO_SERIES,
+        SERIES,
+      );
+
+      expect(names(grid)).toContain("lat_seconds_count");
+      expect(grid.emptyHiddenCount.value).toBe(0);
+      // Not "No data": the card says what is actually wrong with it.
+      expect(grid.previews.value["lat_seconds_count"].sparse).toBe(true);
+    });
+
+    it("so a histogram with real data never renders NO card at all", async () => {
+      // The failure this all adds up to. A Prometheus histogram's base stream is
+      // a metadata-only phantom that carries no series of its own, so it is
+      // suppressed and never becomes a card. Every card the histogram HAS is one
+      // of its rate-based components — so once each was hidden as "empty", the
+      // whole histogram vanished from the product and its data was unreachable.
+      const grid = await setup();
+
+      expect(grid.cards.value.map((c: any) => c.name)).not.toContain(
+        "lat_seconds",
+      ); // the phantom base: correctly suppressed, so the components are all there is
+
+      for (const member of ["lat_seconds_bucket", "lat_seconds_count"]) {
+        await landRounds(
+          grid.requestPreview(cardNamed(grid, member)),
+          NO_SERIES,
+          SERIES,
+        );
+      }
+
+      expect(names(grid)).toEqual(
+        expect.arrayContaining(["lat_seconds_bucket", "lat_seconds_count"]),
+      );
+    });
+
+    it("probes for presence, not for a rate", async () => {
+      const grid = await setup();
+      const preview = grid.requestPreview(cardNamed(grid, "lat_seconds_count"));
+
+      await flush();
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(NO_SERIES));
+      await flush();
+
+      // A yes/no question, asked of the stream the card actually reads — and
+      // asked WITHOUT `rate()`, which is the whole point.
+      expect(inFlight.map((q) => q.query)).toEqual([
+        'count({__name__="lat_seconds_count"})',
+      ]);
+
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
+      await preview;
+    });
+
+    it("still hides a metric the probe agrees is empty", async () => {
+      // The filter has to keep doing its job: an idle counter is still an idle
+      // counter, and the grid must not fill up with no-data panels.
+      const grid = await setup();
+
+      await landRounds(
+        grid.requestPreview(cardNamed(grid, "idle_metric_total")),
+        NO_SERIES,
+        NO_SERIES,
+      );
+
+      expect(names(grid)).not.toContain("idle_metric_total");
+      expect(grid.previews.value["idle_metric_total"].sparse).toBe(false);
+    });
+
+    it("never probes a metric that has never been written to", async () => {
+      // The long tail the "With data" filter EXISTS for. `doc_num` already
+      // settles those from the stream list, for free — buying a second query per
+      // card to re-confirm what we were just told would double the cost of
+      // exactly the case the filter is an optimisation for.
+      getStreamsMock.mockResolvedValue({
+        list: [
+          {
+            name: "never_written_total",
+            stream_type: "metrics",
+            metrics_meta: {
+              metric_type: "Counter",
+              metric_family_name: "never_written_total",
+              help: "",
+              unit: "",
+            },
+            stats: { doc_num: 0 },
+          },
+        ],
+      });
+      const grid = useMetricsExplorerGrid();
+      grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
+      await grid.loadStreams();
+
+      const preview = grid.requestPreview(
+        cardNamed(grid, "never_written_total"),
+      );
+      await flush();
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(NO_SERIES));
+      await flush();
+
+      expect(inFlight).toHaveLength(0); // no probe
+      await preview;
+      expect(names(grid)).not.toContain("never_written_total");
+    });
+
+    it("never probes a rate-free card, whose empty result IS conclusive", async () => {
+      // `avg()` over a populated gauge cannot come back empty. If it did, the
+      // metric really has nothing in the window, and there is nothing to ask.
+      const grid = await setup();
+
+      const preview = grid.requestPreview(cardNamed(grid, "cpu_temperature"));
+      await flush();
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(NO_SERIES));
+      await flush();
+
+      expect(inFlight).toHaveLength(0);
+      await preview;
+      expect(names(grid)).not.toContain("cpu_temperature");
+    });
+  });
+
   describe("label eligibility must follow the EFFECTIVE variant", () => {
     it("re-checks operands when a ⚙ override changes which stream is queried", async () => {
       // The PromQL engine silently IGNORES a matcher on a stream that lacks the
