@@ -238,12 +238,9 @@ pub async fn handle_otlp_request(
                 };
 
                 // A metric that yields no records -- every data point NaN, no data points at all,
-                // or an undecodable type -- gets nothing: no schema, no metadata entry, and no
-                // entry in stream_executable_pipelines. That last one matters: the pipeline loop
-                // at the end of this function expects every registered stream to have buffered
-                // inputs and logs a BUG if it does not, so a stream registered here and then
-                // dropped would log one on every export request. Hence the per-stream lookups
-                // below run only once we know we have something to write.
+                // or an undecodable type -- gets nothing at all: no schema, no metadata entry,
+                // no stream. The per-stream lookups below therefore run only once we know there
+                // is something to write.
                 if records.is_empty() {
                     continue;
                 }
@@ -277,14 +274,6 @@ pub async fn handle_otlp_request(
                 )
                 .await;
                 // End get stream alert
-
-                // get stream pipeline
-                if !stream_executable_pipelines.contains_key(&metric_name) {
-                    let pipeline_params =
-                        crate::service::ingestion::get_stream_executable_pipelines(&stream_param)
-                            .await;
-                    stream_executable_pipelines.insert(metric_name.clone(), pipeline_params);
-                }
 
                 // get user defined schema
                 crate::service::ingestion::get_uds_and_original_data_streams(
@@ -362,17 +351,6 @@ pub async fn handle_otlp_request(
                         .await;
                         // End get stream alert
 
-                        // get stream pipeline
-                        if !stream_executable_pipelines.contains_key(&local_metric_name) {
-                            let pipeline_params =
-                                crate::service::ingestion::get_stream_executable_pipelines(
-                                    &stream_param,
-                                )
-                                .await;
-                            stream_executable_pipelines
-                                .insert(local_metric_name.clone(), pipeline_params);
-                        }
-
                         crate::service::ingestion::get_uds_and_original_data_streams(
                             std::slice::from_ref(&stream_param),
                             &mut user_defined_schema_map,
@@ -380,6 +358,24 @@ pub async fn handle_otlp_request(
                             &mut streams_need_all_values_map,
                         )
                         .await;
+                    }
+
+                    // get stream pipeline -- for the stream this record actually lands in, which
+                    // is not always the metric's own name: a histogram's rows all carry a
+                    // `_count` / `_sum` / `_bucket` name and none carry the base. Registering the
+                    // base here anyway would leave a stream in stream_executable_pipelines with
+                    // no buffered inputs, and the loop at the end of this function reports that
+                    // as a bug on every export request.
+                    if !stream_executable_pipelines.contains_key(&local_metric_name) {
+                        let stream_param =
+                            StreamParams::new(org_id, &local_metric_name, StreamType::Metrics);
+                        let pipeline_params =
+                            crate::service::ingestion::get_stream_executable_pipelines(
+                                &stream_param,
+                            )
+                            .await;
+                        stream_executable_pipelines
+                            .insert(local_metric_name.clone(), pipeline_params);
                     }
 
                     // ready to be buffered for downstream processing

@@ -829,9 +829,10 @@ pub(crate) async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<R
 //
 // [supports]: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
 fn get_metadata_object(schema: &Schema) -> Option<MetadataObject> {
-    // delegate rather than parse the blob a second time: the shared reader is where the
-    // family name of a historically-quoted schema gets normalised, and a duplicate parse
-    // here would serve the quotes and drift from `/streams`
+    // delegate rather than parse the blob a second time. The duplicate parse this replaces had
+    // its own `panic!("BUG: failed to parse ...")`, so one corrupt schema entry took the process
+    // down; and a second parser is a second thing to keep in step with the shared reader, which
+    // is where a historically JSON-quoted family name gets normalised.
     super::get_prom_metadata_from_schema(schema).map(Into::into)
 }
 
@@ -972,16 +973,20 @@ pub(crate) async fn get_labels(
     Ok(label_names)
 }
 
-/// The stats that say whether a metric family has data in a time range.
+/// The stats that say whether a metric family has data in a time range -- i.e. whether the
+/// metric should be offered as a name at all.
 ///
-/// A histogram or summary keeps no rows in its base stream -- that stream holds only the family
-/// metadata -- so its liveness has to be read from a member. `_count` is the member to read: it
-/// is a `u64` on every data point and so is always written, whereas `_sum` is optional in OTLP
-/// and is not recorded at all when the source reports it as NaN. Keying on `_sum` would hide an
-/// entire family whose sum happens to be NaN while its buckets ingested normally.
+/// A family is stored as one stream per member, and its base stream is mostly a metadata holder:
+/// a histogram writes every row to `_count` / `_sum` / `_bucket` and nothing to the base at all,
+/// so reading the base's stats would hide every histogram in the org. Members are therefore
+/// tried in turn, and the first one with rows answers for the family:
 ///
-/// `_sum` is kept as a fallback for a family that somehow has no `_count` stats -- a source that
-/// ships only sums, or a `_count` whose stats have not been computed yet.
+/// - `_count` first: it is a `u64` on every data point, so it is always written. `_sum` is not --
+///   it is optional in OTLP and, since a NaN is no longer recorded, a source that reports its sum
+///   as NaN writes no `_sum` stream at all. Keying on `_sum` alone would hide the whole family
+///   while its buckets ingested normally.
+/// - then `_sum`, for a family whose `_count` has no stats.
+/// - then the base stream itself, which for a *summary* is where the quantile rows live.
 fn family_stats(
     org_id: &str,
     stream_name: &str,
@@ -989,18 +994,23 @@ fn family_stats(
     stream_type: StreamType,
 ) -> StreamStats {
     let is_family = metadata.is_some_and(|m| {
-        m.metric_type == MetricType::Histogram || m.metric_type == MetricType::Summary
+        matches!(
+            m.metric_type,
+            MetricType::Histogram | MetricType::ExponentialHistogram | MetricType::Summary
+        )
     });
     if !is_family {
         return stats::get_stream_stats(org_id, stream_name, stream_type);
     }
 
-    let count = stats::get_stream_stats(org_id, &format!("{stream_name}_count"), stream_type);
-    if count.doc_num > 0 {
-        count
-    } else {
-        stats::get_stream_stats(org_id, &format!("{stream_name}_sum"), stream_type)
+    let base = stats::get_stream_stats(org_id, stream_name, stream_type);
+    for member in [format!("{stream_name}_count"), format!("{stream_name}_sum")] {
+        let stats = stats::get_stream_stats(org_id, &member, stream_type);
+        if stats.doc_num > 0 {
+            return stats;
+        }
     }
+    base
 }
 
 pub(crate) async fn get_label_values(
@@ -1298,6 +1308,41 @@ mod tests {
 
         assert_eq!(stats.doc_num, 100);
         assert!(stats.time_range_intersects(1, 6_000));
+    }
+
+    /// An exponential histogram writes `_count` / `_sum` / `_bucket` like any other histogram and
+    /// nothing to its base stream, so it has to be treated as a family too -- read the base and
+    /// it looks empty, and the metric never appears in the picker.
+    #[test]
+    fn test_family_stats_treats_exponential_histogram_as_a_family() {
+        let org = "test_family_stats_exp_hist";
+        seed_stats(org, "http_request_duration_seconds_count", 100, 5_000);
+
+        let stats = family_stats(
+            org,
+            "http_request_duration_seconds",
+            Some(&family_metadata(MetricType::ExponentialHistogram)),
+            StreamType::Metrics,
+        );
+
+        assert_eq!(stats.doc_num, 100);
+    }
+
+    /// A summary's quantile rows keep the base metric name -- they are not renamed the way
+    /// `_count` and `_sum` are -- so the base stream is the last place worth looking.
+    #[test]
+    fn test_family_stats_falls_back_to_the_base_stream() {
+        let org = "test_family_stats_base";
+        seed_stats(org, "request_latency", 25, 5_000);
+
+        let stats = family_stats(
+            org,
+            "request_latency",
+            Some(&family_metadata(MetricType::Summary)),
+            StreamType::Metrics,
+        );
+
+        assert_eq!(stats.doc_num, 25);
     }
 
     /// The fallback: a family with no `_count` stats still resolves rather than disappearing.

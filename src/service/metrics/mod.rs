@@ -43,7 +43,9 @@ const EXCLUDE_LABELS: [&str; 8] = [
 /// never be read by PromQL while still costing full ingest, storage and replication.
 /// Infinities clamp to the f64 bounds.
 ///
-/// Both ingestion paths go through here: remote-write (`prom.rs`) and OTLP (`otlp.rs`).
+/// Both ingestion paths that can carry a non-finite value go through here: remote-write
+/// (`prom.rs`) and OTLP (`otlp.rs`). The JSON path (`json.rs`) does not need it -- JSON has no
+/// NaN or infinity literal, and it already rejects a value that is not a number.
 pub fn sanitize_metric_value(v: f64) -> Option<f64> {
     if v.is_nan() {
         return None;
