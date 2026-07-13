@@ -233,9 +233,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="border border-(--o2-border-color) rounded-lg overflow-hidden">
               <table class="w-full border-collapse">
                 <tbody>
-                  <tr class="border-b border-(--o2-border-color) last:border-b-0">
-                    <td class="w-2/5 font-semibold text-sm text-(--o2-text-secondary) py-2.5 px-3.5 border-r border-(--o2-border-color) whitespace-nowrap bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.lincese_id_lbl") }}</td>
-                    <td class="text-sm text-(--o2-text-body) py-2.5 px-3.5 font-mono">
+                  <tr class="border-b border-(--color-table-row-divider) last:border-b-0">
+                    <td class="w-2/5 font-semibold text-sm text-(--color-table-header-text) py-2.5 px-3.5 border-r border-(--color-table-row-divider) whitespace-nowrap bg-[var(--color-table-header-bg)]">{{ t("about.lincese_id_lbl") }}</td>
+                    <td class="text-sm text-(--color-text-body) py-2.5 px-3.5 font-mono">
                       <div class="flex items-center gap-1.5">
                         <span>{{ licenseData.license.license_id }}</span>
                         <button
@@ -248,9 +248,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </td>
                   </tr>
-                  <tr class="border-b border-(--o2-border-color) last:border-b-0">
-                    <td class="w-2/5 font-semibold text-sm text-(--o2-text-secondary) py-2.5 px-3.5 border-r border-(--o2-border-color) whitespace-nowrap bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.status_lbl") }}</td>
-                    <td class="text-sm text-(--o2-text-body) py-2.5 px-3.5">
+                  <tr class="border-b border-(--color-table-row-divider) last:border-b-0">
+                    <td class="w-2/5 font-semibold text-sm text-(--color-table-header-text) py-2.5 px-3.5 border-r border-(--color-table-row-divider) whitespace-nowrap bg-[var(--color-table-header-bg)]">{{ t("about.status_lbl") }}</td>
+                    <td class="text-sm text-(--color-text-body) py-2.5 px-3.5">
                       <span
                         class="inline-block w-2 h-2 rounded-full mr-1.5 align-middle"
                         :class="licenseData?.expired ? 'bg-(--o2-negative)' : 'bg-(--o2-positive)'"
@@ -260,17 +260,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                     </td>
                   </tr>
-                  <tr class="border-b border-(--o2-border-color) last:border-b-0">
-                    <td class="w-2/5 font-semibold text-sm text-(--o2-text-secondary) py-2.5 px-3.5 border-r border-(--o2-border-color) whitespace-nowrap bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">Edition</td>
-                    <td class="text-sm text-(--o2-text-body) py-2.5 px-3.5">{{ t("about.value_license_enterprise") }}</td>
+                  <tr class="border-b border-(--color-table-row-divider) last:border-b-0">
+                    <td class="w-2/5 font-semibold text-sm text-(--color-table-header-text) py-2.5 px-3.5 border-r border-(--color-table-row-divider) whitespace-nowrap bg-[var(--color-table-header-bg)]">Edition</td>
+                    <td class="text-sm text-(--color-text-body) py-2.5 px-3.5">{{ t("about.value_license_enterprise") }}</td>
                   </tr>
-                  <tr class="border-b border-(--o2-border-color) last:border-b-0">
-                    <td class="w-2/5 font-semibold text-sm text-(--o2-text-secondary) py-2.5 px-3.5 border-r border-(--o2-border-color) whitespace-nowrap bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.create_at_lbl") }}</td>
-                    <td class="text-sm text-(--o2-text-body) py-2.5 px-3.5">{{ formatLicenseDate(licenseData.license.created_at) }}</td>
+                  <tr class="border-b border-(--color-table-row-divider) last:border-b-0">
+                    <td class="w-2/5 font-semibold text-sm text-(--color-table-header-text) py-2.5 px-3.5 border-r border-(--color-table-row-divider) whitespace-nowrap bg-[var(--color-table-header-bg)]">{{ t("about.create_at_lbl") }}</td>
+                    <td class="text-sm text-(--color-text-body) py-2.5 px-3.5">{{ formatLicenseDate(licenseData.license.created_at) }}</td>
                   </tr>
-                  <tr class="border-b border-(--o2-border-color) last:border-b-0">
-                    <td class="w-2/5 font-semibold text-sm text-(--o2-text-secondary) py-2.5 px-3.5 border-r border-(--o2-border-color) whitespace-nowrap bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.expires_at_lbl") }}</td>
-                    <td class="text-sm text-(--o2-text-body) py-2.5 px-3.5">{{ formatLicenseDate(licenseData.license.expires_at) }}</td>
+                  <tr class="border-b border-(--color-table-row-divider) last:border-b-0">
+                    <td class="w-2/5 font-semibold text-sm text-(--color-table-header-text) py-2.5 px-3.5 border-r border-(--color-table-row-divider) whitespace-nowrap bg-[var(--color-table-header-bg)]">{{ t("about.expires_at_lbl") }}</td>
+                    <td class="text-sm text-(--color-text-body) py-2.5 px-3.5">{{ formatLicenseDate(licenseData.license.expires_at) }}</td>
                   </tr>
                 </tbody>
               </table>
