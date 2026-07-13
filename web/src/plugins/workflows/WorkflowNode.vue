@@ -24,7 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <FlowNodeCard
     :icon="nodeIcon"
-    :label="nodeLabel"
     :io-type="meta?.ioType || 'default'"
     :has-input="meta?.ioType !== 'input'"
     :has-output="meta?.ioType !== 'output'"
@@ -33,6 +32,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @mouseenter="handleNodeHover"
     @mouseleave="handleNodeLeave"
   >
+    <!-- Per-type body — rendered via #body (typography is inherited from
+         FlowNodeCard) so it stays identical to the pipeline custom node:
+         Function shows a bold [RAF]/[RBF] tag, everything else shows its
+         config-detail line. -->
+    <template #body>
+      <div v-if="isConfiguredFunction" class="tw:flex tw:gap-1">
+        {{ data.name }} -
+        <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
+      </div>
+      <div v-else class="tw:whitespace-nowrap">{{ nodeLabel }}</div>
+    </template>
+
     <!-- hover actions (delete) — trigger is fixed -->
     <template #actions>
       <div
@@ -211,20 +222,22 @@ const errorCount = computed<number>(() => {
 const showButtons = ref(false);
 const meta = computed(() => nodeMeta(props.data?.node_type));
 
+// A configured function node renders its own bold "name - [RAF]/[RBF]" body
+// (see #body) to match the pipeline custom node. Everything else — including a
+// not-yet-configured function — uses the plain `nodeLabel` line below.
+const isConfiguredFunction = computed(
+  () => props.data?.node_type === "function" && !!props.data?.name,
+);
+
 // Node label — the config detail IS the label (icon conveys the type), matching
-// the pipeline custom node exactly: Function -> "name - [RAF]/[RBF]", Condition
-// -> rule preview, Destination -> destination name. Falls back to the type title
-// for the trigger and any not-yet-configured node.
+// the pipeline custom node exactly: Condition -> rule preview, Destination ->
+// destination name. Falls back to the type title for the trigger and any
+// not-yet-configured node.
 const nodeLabel = computed(() => {
   const data = props.data;
   const type = data?.node_type;
   const fallback = meta.value ? t(meta.value.titleKey) : type;
   if (type === "workflow_trigger") return fallback;
-  if (type === "function") {
-    return data?.name
-      ? `${data.name} - ${data.after_flatten ? "[RAF]" : "[RBF]"}`
-      : fallback;
-  }
   return nodeConfigDetail(data, 28) || fallback;
 });
 // Icon for this node type: the pipeline node image as an "img:<url>" string

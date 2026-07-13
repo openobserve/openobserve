@@ -17,17 +17,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   Shared node card for the flow canvases (Pipelines + Workflows). PRESENTATIONAL
   only — no composable/singleton coupling. It renders the card frame
-  (icon | separator | label + optional body) and the input/output handles;
-  everything interaction-specific (click, hover actions, hover-`+`, per-type
-  body) is supplied by the wrapping module via native events + slots.
+  (icon | separator | body) and the input/output handles; everything
+  interaction-specific (click, hover actions, hover-`+`, per-type body content)
+  is supplied by the wrapping module via native events + slots.
 
-    icon / image  — glyph: an OIcon `icon` name, or an `image` URL (image wins)
-    label         — node title
+    icon          — glyph: an OIcon `icon` name, or an "img:<url>" string
+                    (OIcon renders both, so a URL renders as an image)
     ioType        — input | default | output (drives handle colour class)
     hasInput / hasOutput — whether to render the target / source handle
     inputPosition / outputPosition — handle sides (default top / bottom)
 
-  Slots: #body (under the title), #actions (hover buttons), #footer (hover-`+`).
+  Slots: #body (the node's label/content), #actions (hover buttons),
+  #footer (hover-`+`). The shared node typography (15px / bold / left) lives on
+  the body container, so wrappers supply content — not styling — and both
+  canvases render identically.
   Native @click / @mouseenter / @mouseleave fall through to the root element.
 
   Card background/border colour comes from the VueFlow node wrapper
@@ -54,15 +57,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OSeparator vertical class="tw:mr-2" />
 
-    <div class="flow-node__container">
-      <!-- Simple title when `label` is set (Workflows). Modules with richer,
-           per-type content (Pipelines) leave `label` empty and use #body. -->
-      <div
-        v-if="label"
-        class="flow-node__title tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!"
-      >
-        {{ label }}
-      </div>
+    <!-- Shared node typography (15px / bold / left) lives here so every #body
+         slot inherits it — wrappers supply content, not styling. -->
+    <div
+      class="flow-node__container tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!"
+    >
       <slot name="body" />
     </div>
 
@@ -91,7 +90,6 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 const props = withDefaults(
   defineProps<{
     icon?: string;
-    label?: string;
     ioType?: string;
     hasInput?: boolean;
     hasOutput?: boolean;
@@ -102,7 +100,6 @@ const props = withDefaults(
   }>(),
   {
     icon: "help",
-    label: "",
     ioType: "default",
     hasInput: true,
     hasOutput: true,
@@ -131,9 +128,5 @@ const handleClass = computed(
 .flow-node__container {
   text-align: left;
   min-width: 0;
-}
-.flow-node__title {
-  text-align: left;
-  white-space: nowrap;
 }
 </style>
