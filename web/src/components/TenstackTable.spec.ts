@@ -690,11 +690,15 @@ describe("TenstackTable", () => {
       expect(resizers.length).toBeGreaterThan(0);
     });
 
-    it("should give the resizer an always-visible border-color background", () => {
+    it("should give the resizer an always-visible border-color line", () => {
       wrapper = mountTable();
       const resizer = wrapper.find(".resizer");
       expect(resizer.exists()).toBe(true);
-      expect(resizer.classes()).toContain("bg-[var(--o2-border-color)]!");
+      // The visible divider is now a short inner line (matches the OTable
+      // column separator): a child element painted with the border token.
+      const line = resizer.find("div");
+      expect(line.exists()).toBe(true);
+      expect(line.classes()).toContain("bg-[var(--color-border-default)]");
     });
 
     it("should not carry a transparent background class on the resizer", () => {
