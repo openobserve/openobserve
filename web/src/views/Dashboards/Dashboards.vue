@@ -402,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="addDashboardRef"
               @close="showAddDashboardDialog = false"
               @updated="updateDashboardList"
-              :activeFolderId="activeFolderId"
+              :activeFolderId="activeFolderId ?? undefined"
             />
           </ODialog>
 
@@ -592,7 +592,7 @@ export default defineComponent({
     const orgData: any = ref(store.state.selectedOrganization);
     const confirmDeleteDialog = ref<boolean>(false);
     const selectedDelete = ref(null);
-    const activeFolderId = ref(null);
+    const activeFolderId = ref<string | null>(null);
     const isFolderEditMode = ref(false);
     const selectedFolderDelete = ref(null);
     const selectedFolderToEdit = ref(null);
@@ -800,7 +800,7 @@ export default defineComponent({
           (it: any) => it.folderId === route.query.folder,
         )
       ) {
-        activeFolderId.value = route.query.folder;
+        activeFolderId.value = route.query.folder as string;
       } else {
         activeFolderId.value = "default";
       }
@@ -814,7 +814,9 @@ export default defineComponent({
         selectedIds.value = [];
         // skip the skeleton for already-cached folders so we don't flash it
         loading.value =
-          !store.state.organizationData.allDashboardList[activeFolderId.value];
+          !store.state.organizationData.allDashboardList[
+            activeFolderId.value ?? ""
+          ];
         try {
           const response = await getAllDashboardsByFolderId(
             store,
@@ -1075,7 +1077,7 @@ export default defineComponent({
       if (!searchAcrossFolders.value || searchQuery.value == "") {
         const dashboardList = toRaw(
           store.state.organizationData?.allDashboardList[
-            activeFolderId.value
+            activeFolderId.value ?? ""
           ] ?? [],
         );
         return dashboardList.map((board: any, index) =>
@@ -1094,7 +1096,7 @@ export default defineComponent({
     const resultTotal = computed(function () {
       if (!searchAcrossFolders.value || searchQuery.value == "") {
         return store.state.organizationData?.allDashboardList[
-          activeFolderId.value
+          activeFolderId.value ?? ""
         ]?.length;
       } else {
         return filteredResults.value.length;
@@ -1359,7 +1361,7 @@ export default defineComponent({
         const response = await dashboardService.bulkDelete(
           store.state.selectedOrganization.identifier,
           payload,
-          activeFolderId.value,
+          activeFolderId.value ?? undefined,
         );
 
         dismiss();

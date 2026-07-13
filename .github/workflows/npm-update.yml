@@ -76,8 +76,8 @@ jobs:
         if: steps.check_updates.outputs.has_updates == 'true'
         run: |
           cd web
-          echo "Running type check..."
-          npm run type-check
+          echo "Running type check (baseline gate — fails only on NEW type errors)..."
+          npm run type-check:ci
 
       - name: Run unit tests
         if: steps.check_updates.outputs.has_updates == 'true'

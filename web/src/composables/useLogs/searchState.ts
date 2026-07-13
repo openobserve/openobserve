@@ -50,15 +50,26 @@ export interface StreamData {
   removeFilterField: string;
   functions: any[];
   streamType: string;
+  interestingFieldList: any[];
+  selectedInterestingStreamFields: any[];
+  userDefinedSchema: any[];
+  missingStreamMultiStreamFilter: any[];
+  expandGroupRows: Record<string, boolean>;
+  expandGroupRowsFieldCount: Record<string, number>;
+  interestingExpandedGroupRows: Record<string, boolean>;
+  interestingExpandedGroupRowsFieldCount: Record<string, number>;
 }
 
 export interface ResultGrid {
   currentPage: number;
+  columns: any[];
+  colSizes: any;
 }
 
 export interface SearchAroundData {
   indexTimestamp: number;
   size: number;
+  histogramHide: any;
 }
 
 export interface SearchObjectData {
@@ -82,6 +93,24 @@ export interface SearchObjectData {
   crossLinks: { stream_links: any[]; org_links: any[] };
   crossLinkQuery: string;
   sqlSyntaxErrorRanges: Array<{ startLine: number; endLine: number; column?: number; error: string }>;
+  datetime: any;
+  hasSearchDataTimestampField: boolean;
+  actions: any;
+  actionId: any;
+  customDownloadQueryObj: any;
+  filterErrMsg: any;
+  functionError: any;
+  histogramInterval: any;
+  histogramQuery: any;
+  isOperationCancelled: any;
+  lastHistogramTraceId: any;
+  lastSearchTraceId: any;
+  missingStreamMessage: any;
+  originalDataCache: any;
+  searchRequestTraceIds: any;
+  selectedTransform: any;
+  tempFunctionLoading: any;
+  tempFunctionName: any;
 }
 
 export interface SearchObject {
@@ -94,6 +123,12 @@ export interface SearchObject {
   // Streaming progress (0-100) for the results table and histogram bars
   loadingProgressPercentage: number;
   loadingHistogramProgressPercentage: number;
+  loadingStream: boolean;
+  loading: any;
+  loadingCounter: any;
+  loadingHistogram: any;
+  loadingSavedView: any;
+  shouldIgnoreWatcher: any;
 }
 
 // Main search object containing all search state

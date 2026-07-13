@@ -1236,7 +1236,7 @@ export const useStreamFields = () => {
         ) {
           sizes =
             searchObj.data.resultGrid.colSizes[
-              searchObj.data.stream.selectedStream
+              String(searchObj.data.stream.selectedStream)
             ];
         }
 

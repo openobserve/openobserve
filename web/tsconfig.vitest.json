@@ -1,6 +1,14 @@
 {
   "extends": "./tsconfig.app.json",
-  "include": ["src/**/*.spec.{ts,js}", "vitest.config.*"],
+  "include": [
+    "env.d.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.vue",
+    "src/**/*.js",
+    "src/**/*.jsx",
+    "vitest.config.*"
+  ],
   "exclude": ["node_modules", "dist"],
   "compilerOptions": {
     "allowJs": true,
@@ -21,7 +29,8 @@
     "baseUrl": ".",
     "downlevelIteration": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "vuex": ["./node_modules/vuex/types/index.d.ts"]
     }
   }
 }

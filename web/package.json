@@ -21,7 +21,10 @@
     "build-only": "vite build",
     "build-only-alpha1": "vite build --mode=alpha1",
     "build-only-cloud-prod": "vite build --mode=production",
-    "type-check": "vue-tsc --noEmit -p tsconfig.vitest.json --composite false",
+    "type-check": "node scripts/type-check.mjs",
+    "type-check:canary": "node scripts/type-check-canary.mjs",
+    "type-check:ci": "node scripts/type-check-baseline.mjs",
+    "type-check:baseline": "node scripts/type-check-baseline.mjs --update",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
     "lint:ci": "eslint \"src/**/*.vue\" --no-fix"
   },

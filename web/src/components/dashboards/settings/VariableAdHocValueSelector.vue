@@ -121,6 +121,7 @@ export default defineComponent({
       adhocVariables,
       removeField,
       updateModelValueOfSelect,
+      emitValue,
       store,
     };
   },

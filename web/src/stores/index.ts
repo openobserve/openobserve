@@ -121,10 +121,10 @@ export default createStore({
     },
     // GitHub dashboard gallery cache
     githubDashboardGallery: {
-      dashboards: [],
-      lastFetched: null,
+      dashboards: [] as any[],
+      lastFetched: null as number | null,
       cacheExpiry: 10 * 60 * 1000, // 10 minutes in milliseconds
-      dashboardJsonCache: {}, // Cache for individual dashboard JSON content: { folderPath/fileName: jsonContent }
+      dashboardJsonCache: {} as Record<string, any>, // Cache for individual dashboard JSON content: { folderPath/fileName: jsonContent }
     },
     // Temporary theme colors for live preview in General Settings
     // These colors are stored here (instead of component state) so they persist
@@ -134,9 +134,9 @@ export default createStore({
     // - Cleared when user clicks "Save" (saved permanently to localStorage & backend)
     // - Prevents other watchers/observers from overriding the preview color
     tempThemeColors: {
-      light: null,  // Hex color string (e.g., "#FF0000") or null
-      dark: null,   // Hex color string (e.g., "#0000FF") or null
-    },
+      light: null, // Hex color string (e.g., "#FF0000") or null
+      dark: null, // Hex color string (e.g., "#0000FF") or null
+    } as { light: string | null; dark: string | null },
     // Share URL state for Safari-compatible clipboard copy
     // Polling mechanism checks this value and copies when available
     pendingShortURL: null,
@@ -315,7 +315,10 @@ export default createStore({
      * @param payload - { mode: 'light' | 'dark', color: '#hexcolor' }
      * Example: { mode: 'light', color: '#FF0000' }
      */
-    setTempThemeColor(state, payload) {
+    setTempThemeColor(
+      state,
+      payload: { mode: "light" | "dark"; color: string | null },
+    ) {
       state.tempThemeColors[payload.mode] = payload.color;
     },
     /**

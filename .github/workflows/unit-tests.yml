@@ -162,6 +162,14 @@ jobs:
         working-directory: web
         run: npm ci
 
+      - name: Typecheck canary — prove the checker can still fail
+        working-directory: web
+        run: npm run type-check:canary
+
+      - name: Typecheck gate — no new type errors vs baseline
+        working-directory: web
+        run: npm run type-check:ci
+
       - name: Run frontend unit tests with coverage and check thresholds
         working-directory: web
         run: ./coverage.sh check

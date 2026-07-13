@@ -782,10 +782,10 @@ export default defineComponent({
     handleColumnSizesUpdate(newColSizes: any) {
       const prevColSizes =
         this.searchObj.data.resultGrid?.colSizes[
-          this.searchObj.data.stream.selectedStream
+          String(this.searchObj.data.stream.selectedStream)
         ]?.[0] || {};
       this.searchObj.data.resultGrid.colSizes[
-        this.searchObj.data.stream.selectedStream
+        String(this.searchObj.data.stream.selectedStream)
       ] = [
         {
           ...prevColSizes,

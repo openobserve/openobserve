@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.vitest.json",
+  "include": ["scripts/canary/type-error.ts"]
+}
