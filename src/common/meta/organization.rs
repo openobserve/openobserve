@@ -25,6 +25,15 @@ pub const CUSTOM: &str = "custom";
 pub const USER_DEFAULT: &str = "user_default";
 pub const THRESHOLD: i64 = 9383939382;
 
+/// Status of an organization — used to gate ingestion and query while deletion is
+/// in progress. Cached in `common::infra::config::ORG_STATUS_CACHE`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OrgStatus {
+    Active,
+    PendingDeletion,
+    Deleting,
+}
+
 use config::meta::{cluster::Node, self_reporting::usage};
 
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
@@ -179,6 +188,14 @@ pub struct AllOrgListDetails {
     #[serde(default)]
     pub billing_provider: String,
     pub org_storage_enabled: bool,
+    /// Org lifecycle status, e.g. "active" or "deleting". Drives the _meta
+    /// "View deletion progress" affordance in the UI.
+    #[serde(default)]
+    pub status: String,
+    #[serde(default)]
+    pub deleted_at: Option<i64>,
+    #[serde(default)]
+    pub grace_period_days: Option<i64>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -779,6 +796,9 @@ mod tests {
             contract_end_date: None,
             billing_provider: String::new(),
             org_storage_enabled: false,
+            status: "active".to_string(),
+            deleted_at: None,
+            grace_period_days: None,
         };
 
         assert_eq!(details.plan, 0);
@@ -828,6 +848,9 @@ mod tests {
             contract_end_date: None,
             billing_provider: String::new(),
             org_storage_enabled: false,
+            status: "active".to_string(),
+            deleted_at: None,
+            grace_period_days: None,
         };
 
         let details2 = AllOrgListDetails {
@@ -842,6 +865,9 @@ mod tests {
             contract_end_date: None,
             billing_provider: String::new(),
             org_storage_enabled: true,
+            status: "active".to_string(),
+            deleted_at: None,
+            grace_period_days: None,
         };
 
         let response = AllOrganizationResponse {
@@ -911,6 +937,9 @@ mod tests {
             contract_end_date: Some(1893456000000000),
             billing_provider: "no_op".to_string(),
             org_storage_enabled: true,
+            status: "active".to_string(),
+            deleted_at: None,
+            grace_period_days: None,
         };
 
         let v = serde_json::to_value(&with_contract).unwrap();
@@ -930,6 +959,9 @@ mod tests {
             contract_end_date: None,
             billing_provider: String::new(),
             org_storage_enabled: true,
+            status: "active".to_string(),
+            deleted_at: None,
+            grace_period_days: None,
         };
 
         let v = serde_json::to_value(&without_contract).unwrap();
