@@ -253,7 +253,7 @@ export class PipelinesPage {
         this.reorderBtn = page.locator('[data-test="alert-conditions-reorder-btn"]');
         this.addConditionCancelBtn = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-secondary-btn"]');
         this.addConditionDeleteBtn = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-neutral-btn"]');
-        this.scheduledAlertTabs = page.locator('[data-test="scheduled-alert-tabs"]');
+        this.scheduledAlertTabs = page.locator('[data-test="scheduled-pipeline-tabs"]');
         this.nestedGroups = page.locator('.el-border');
         this.operatorLabels = page.locator('span.tw\\:lowercase');
         this.firstConditionLabel = page.locator('[data-test="add-condition-section"]').getByText('if', { exact: true }).first();
