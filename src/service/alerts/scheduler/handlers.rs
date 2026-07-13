@@ -2809,8 +2809,21 @@ async fn handle_backfill_triggers(
         }
     };
 
-    // 5. Handle deletion phase if required
-    if config.delete_before_backfill {
+    // 5. Handle deletion phase if required.
+    //
+    // Pre-deletion only applies to local destination streams; there is nothing to delete in a
+    // remote destination. Creation-time validation already rejects delete_before_backfill for
+    // remote pipelines, so an empty local-stream list here means the pipeline was edited to a
+    // remote-only destination after this backfill job was created. Skip deletion in that case and
+    // proceed straight to backfilling the remote destination.
+    let deletion_requested = config.delete_before_backfill && !destination_streams.is_empty();
+    if config.delete_before_backfill && destination_streams.is_empty() {
+        log::warn!(
+            "[BACKFILL trace_id {trace_id}] [job_id: {}] delete_before_backfill is enabled but the pipeline has no local destination streams (remote-only); skipping deletion — data in remote destinations cannot be pre-deleted.",
+            job_id
+        );
+    }
+    if deletion_requested {
         match &backfill_job.deletion_status {
             DeletionStatus::NotRequired => {
                 // Not required, proceed to backfill
@@ -3625,23 +3638,38 @@ async fn handle_backfill_triggers(
     Ok(())
 }
 
-/// Helper function to get destination streams from pipeline
+/// Helper function to get the local destination streams from a pipeline.
+///
+/// Returns only local `Stream` destinations. Remote (`RemoteStream`) destinations are routed to
+/// the remote WAL inside `ExecutablePipeline::process_batch` and never need to be ingested here,
+/// so they are intentionally excluded from the returned list. A remote-only pipeline therefore
+/// returns an empty vec (not an error) — it is still a valid backfill target. An error is only
+/// returned when the pipeline has no destination leaf of either kind.
 fn get_destination_stream_from_pipeline(
     pipeline: &config::meta::pipeline::Pipeline,
 ) -> Result<Vec<StreamParams>, anyhow::Error> {
     let mut destination_streams = Vec::new();
+    let mut has_remote_destination = false;
 
     for node in &pipeline.nodes {
-        if let NodeData::Stream(stream_params) = &node.data {
-            // Destination stream node (not the query source node)
-            let node_id = node.get_node_id();
-            if !matches!(node_id.as_str(), "source" | "query") {
-                destination_streams.push(stream_params.clone());
+        match &node.data {
+            NodeData::Stream(stream_params) => {
+                // Destination stream node (not the query source node)
+                let node_id = node.get_node_id();
+                if !matches!(node_id.as_str(), "source" | "query") {
+                    destination_streams.push(stream_params.clone());
+                }
             }
+            NodeData::RemoteStream(_) => {
+                // Remote destinations are handled inside process_batch; just note their presence
+                // so a remote-only pipeline is not rejected as having "no destinations".
+                has_remote_destination = true;
+            }
+            _ => {}
         }
     }
 
-    if destination_streams.is_empty() {
+    if destination_streams.is_empty() && !has_remote_destination {
         Err(anyhow::anyhow!("No destination streams found in pipeline"))
     } else {
         Ok(destination_streams)
@@ -4323,5 +4351,105 @@ mod tests {
 
         let result = get_destination_stream_from_pipeline(&pipeline);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_destination_stream_remote_only_returns_empty_ok() {
+        use config::meta::{
+            pipeline::{
+                Pipeline,
+                components::{Node, PipelineSource},
+            },
+            stream::RemoteStreamParams,
+        };
+
+        let source_node = Node::new(
+            "source".to_string(),
+            NodeData::Stream(StreamParams::new("org", "input-stream", StreamType::Logs)),
+            0.0,
+            0.0,
+            "input".to_string(),
+        );
+        let remote_node = Node::new(
+            "remote-1".to_string(),
+            NodeData::RemoteStream(RemoteStreamParams {
+                org_id: "org".into(),
+                destination_name: "my-remote".into(),
+            }),
+            100.0,
+            0.0,
+            "output".to_string(),
+        );
+        let pipeline = Pipeline {
+            id: "p4".to_string(),
+            version: 0,
+            enabled: true,
+            org: "org".to_string(),
+            name: "test".to_string(),
+            description: String::new(),
+            source: PipelineSource::default(),
+            nodes: vec![source_node, remote_node],
+            edges: vec![],
+            kind: config::meta::pipeline::PipelineKind::User,
+        };
+
+        // Remote-only pipeline: no local streams to ingest, but it is a valid backfill target,
+        // so the function returns an empty list rather than an error.
+        let result = get_destination_stream_from_pipeline(&pipeline).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_get_destination_stream_mixed_returns_only_local() {
+        use config::meta::{
+            pipeline::{
+                Pipeline,
+                components::{Node, PipelineSource},
+            },
+            stream::RemoteStreamParams,
+        };
+
+        let source_node = Node::new(
+            "source".to_string(),
+            NodeData::Stream(StreamParams::new("org", "input-stream", StreamType::Logs)),
+            0.0,
+            0.0,
+            "input".to_string(),
+        );
+        let local_node = Node::new(
+            "output-1".to_string(),
+            NodeData::Stream(StreamParams::new("org", "output-stream", StreamType::Logs)),
+            100.0,
+            0.0,
+            "output".to_string(),
+        );
+        let remote_node = Node::new(
+            "remote-1".to_string(),
+            NodeData::RemoteStream(RemoteStreamParams {
+                org_id: "org".into(),
+                destination_name: "my-remote".into(),
+            }),
+            200.0,
+            0.0,
+            "output".to_string(),
+        );
+        let pipeline = Pipeline {
+            id: "p5".to_string(),
+            version: 0,
+            enabled: true,
+            org: "org".to_string(),
+            name: "test".to_string(),
+            description: String::new(),
+            source: PipelineSource::default(),
+            nodes: vec![source_node, local_node, remote_node],
+            edges: vec![],
+            kind: config::meta::pipeline::PipelineKind::User,
+        };
+
+        // Mixed pipeline: only the local destination is returned; the remote destination is routed
+        // inside process_batch and excluded here.
+        let result = get_destination_stream_from_pipeline(&pipeline).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].stream_name.as_str(), "output-stream");
     }
 }
