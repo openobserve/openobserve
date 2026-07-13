@@ -5,7 +5,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const path = require('path');
 
-test.describe.configure({ mode: 'serial' });
+test.describe.configure({ mode: 'parallel' });
 
 test.use({
     contextOptions: {
@@ -203,7 +203,7 @@ test.describe(
         /** @type {PageManager} */
         let pm;
 
-        test.describe.configure({ mode: 'serial' });
+        test.describe.configure({ mode: 'parallel' });
 
         let nodeOpened = false;
 
@@ -266,7 +266,7 @@ test.describe(
         /** @type {PageManager} */
         let pm;
 
-        test.describe.configure({ mode: 'serial' });
+        test.describe.configure({ mode: 'parallel' });
 
         let nodeOpened = false;
 
@@ -341,7 +341,7 @@ test.describe(
         /** @type {PageManager} */
         let pm;
 
-        test.describe.configure({ mode: 'serial' });
+        test.describe.configure({ mode: 'parallel' });
 
         test.beforeEach(async ({ page }, testInfo) => {
             testLogger.testStart(testInfo.title, testInfo.file);
@@ -469,7 +469,7 @@ test.describe(
         /** @type {PageManager} */
         let pm;
 
-        test.describe.configure({ mode: 'serial' });
+        test.describe.configure({ mode: 'parallel' });
 
         let dialogOpened = false;
 
@@ -533,7 +533,7 @@ test.describe(
         /** @type {PageManager} */
         let pm;
 
-        test.describe.configure({ mode: 'serial' });
+        test.describe.configure({ mode: 'parallel' });
 
         test.beforeEach(async ({ page }, testInfo) => {
             testLogger.testStart(testInfo.title, testInfo.file);
