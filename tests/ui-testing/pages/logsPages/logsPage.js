@@ -179,7 +179,9 @@ export class LogsPage {
         this.recordsPerPageOption = value => `[data-test="logs-search-result-records-per-page-option"][data-test-value="${value}"]`;
         // OPagination per-page buttons forward parentDataTest as `${parent}-page-{n}` (OPagination.vue:98)
         this.resultPaginationPageBtn = pageNumber => `[data-test="logs-search-result-pagination-page-${pageNumber}"]`;
-        this.interestingFieldBtn = field => `[data-test="log-search-index-list-interesting-${field}-field-btn"]`;
+        // Post-UX-revamp: the field-row "interesting/add" toggle is now
+        // `...-add-<field>-field-btn` (was `...-interesting-<field>-field-btn`).
+        this.interestingFieldBtn = field => `[data-test="log-search-index-list-add-${field}-field-btn"]`;
         this.logsSearchBarFunctionDropdown = '[data-test="logs-search-bar-function-dropdown"]';
         this.logsSearchBarFunctionDropdownSave = '[data-test="logs-search-bar-function-dropdown"] button';
         this.logsSearchBarSaveTransformBtn = '[data-test="logs-search-bar-save-transform-btn"]';
@@ -4366,12 +4368,16 @@ export class LogsPage {
      */
     async ensureFieldIsInteresting(field) {
         const btnLocator = this.page.locator(this.interestingFieldBtn(field)).first();
+        // Post-revamp the add/interesting button is revealed on field-row hover,
+        // so wait for the ROW (always visible) then hover to expose the button.
+        const rowLocator = this.page.locator(`[data-test="logs-field-list-item-${field}"]`).first();
         const inputLocator = this.page.locator(this.logSearchIndexListFieldSearchInput);
 
         for (let attempt = 0; attempt < 5; attempt++) {
-            const visible = await btnLocator.waitFor({ state: 'visible', timeout: 8000 })
+            const rowVisible = await rowLocator.waitFor({ state: 'visible', timeout: 8000 })
                 .then(() => true).catch(() => false);
-            if (visible) {
+            if (rowVisible) {
+                await rowLocator.hover().catch(() => {});
                 const title = await btnLocator.getAttribute('title').catch(() => '');
                 if (title && title.toLowerCase().includes('remove')) {
                     // Already interesting — nothing to do.
@@ -4385,11 +4391,7 @@ export class LogsPage {
             await inputLocator.pressSequentially(field, { delay: 30 });
             await expect(inputLocator).toHaveValue(field, { timeout: 5000 }).catch(() => {});
         }
-        await btnLocator.waitFor({ state: 'visible', timeout: 8000 });
-        const title = await btnLocator.getAttribute('title').catch(() => '');
-        if (title && title.toLowerCase().includes('remove')) {
-            return;
-        }
+        await rowLocator.hover().catch(() => {});
         await btnLocator.click({ force: true });
     }
 
