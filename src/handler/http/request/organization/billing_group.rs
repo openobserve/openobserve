@@ -153,7 +153,7 @@ pub async fn invite(
     let user = user_email.user_id;
 
     if org_id == req.org_id {
-        return HttpResponse::bad_request(format!("a org cannot send invite to itself"));
+        return HttpResponse::bad_request("a org cannot send invite to itself".to_string());
     }
 
     let o2cfg = o2_enterprise::enterprise::common::config::get_config();
@@ -162,10 +162,10 @@ pub async fn invite(
         .cloud
         .billing_group_allowed_orgs
         .split(",")
-        .find(|v| *v == &org_id)
+        .find(|v| *v == org_id)
         .is_none()
     {
-        return HttpResponse::bad_request(format!("billing group is not enabled for this org"));
+        return HttpResponse::bad_request("billing group is not enabled for this org".to_string());
     }
 
     let org_info = crate::service::organization::get_org(&req.org_id).await;

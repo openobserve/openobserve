@@ -71,6 +71,20 @@ impl Accumulate for MaxAccumulate {
         }
     }
 
+    fn merge(&mut self, other: Box<dyn Accumulate>) {
+        let other = other.into_any().downcast::<Self>().expect("same type");
+        for (timestamp, value) in other.max {
+            let entry = self.max.entry(timestamp).or_insert(f64::NEG_INFINITY);
+            if value > *entry {
+                *entry = value;
+            }
+        }
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
+    }
+
     fn evaluate(self: Box<Self>) -> Vec<Sample> {
         self.max
             .into_iter()

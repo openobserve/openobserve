@@ -372,6 +372,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::org_users::watch());
     tokio::task::spawn(db::org_ingestion_tokens::watch());
     tokio::task::spawn(db::organization::watch());
+    tokio::task::spawn(db::org_status::watch());
+    if let Err(e) = db::org_status::load_from_db().await {
+        log::error!("Failed to load org status cache: {e}");
+    }
 
     #[cfg(feature = "cloud")]
     tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
@@ -426,6 +430,20 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // All nodes need org settings watch for consistent cache
     tokio::task::spawn(db::organization::org_settings_watch());
 
+    // Domain management (allow-list + blocklist) is enforced in the auth path —
+    // `validate_credentials`, `validate_credentials_ext`, `token_validator` and `process_token`
+    // — which runs on ALL node roles, including single-role routers. Initialize and watch its
+    // cache BEFORE the router early-return below so a router keeps the blocklist fresh;
+    // otherwise its cache would go stale and a newly-blocked user could keep
+    // authenticating/ingesting through that router.
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::domain_management::db::cache()
+            .await
+            .expect("domain management cache failed");
+        tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
+    }
+
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
@@ -464,8 +482,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::alerts::realtime_triggers::watch());
     tokio::task::spawn(db::alerts::alert::watch());
     // org_settings_watch already started above for all nodes including routers
-    #[cfg(feature = "enterprise")]
-    tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
     // Watch needed on queriers (UI APIs) and on whichever node role is the configured
     // processing node (ingester or compactor) so their local cache stays in sync with
     // coordinator events emitted by the flusher.
@@ -562,10 +578,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::alerts::alert::cache()
         .await
         .expect("alerts cache failed");
-    #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::domain_management::db::cache()
-        .await
-        .expect("domain management cache failed");
     // Warm the cache on queriers (UI APIs) and on whichever node role is the configured
     // processing node so that get_coverage_deficit returns accurate data from startup
     // rather than always returning (0, 0) until files happen to be processed.
@@ -896,6 +908,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());
+        // Org deletion is data-lifecycle work (object-store + file_list + DB teardown,
+        // via the same compact::retention path the compactor already uses), so both
+        // the cleanup worker and the grace-period promotion scheduler run on the
+        // compactor. Cluster coordination is unchanged: the worker holds a dist-lock
+        // to fetch tasks and a per-task CAS guards execution; the promotion sweep uses
+        // an atomic status CAS — so multiple compactors remain safe, just less
+        // contended. (The org_status cache watch loop stays on every node — see below.)
+        tokio::task::spawn(crate::service::org_cleanup::run());
+        tokio::task::spawn(crate::service::org_cleanup::run_promotion_scheduler());
     }
 
     // load metrics disk cache

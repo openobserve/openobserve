@@ -223,13 +223,16 @@ test.describe("Settings DomainManagement form validation", {
     }, async ({ page }) => {
         testLogger.info('Testing invalid domain format error');
 
-        // Fill an invalid domain (no TLD, contains spaces)
+        // Fill an invalid domain, then submit. The add-domain OForm validates on submit
+        // (submit-then-change), so the schema error surfaces after clicking Add — the button
+        // itself stays enabled by design.
         await pm.settingsFormValidation.fillNewDomain('not_a_domain');
-        // The Add Domain button should be disabled for invalid input
-        const addBtn = pm.settingsFormValidation.getAddDomainBtnLocator();
-        await expect(addBtn).toBeDisabled({ timeout: 3000 });
+        await pm.settingsFormValidation.clickAddDomainBtn();
 
-        testLogger.info('Add Domain button correctly disabled for invalid domain format');
+        const domainError = pm.settingsFormValidation.getDomainErrorLocator();
+        await expect(domainError).toBeVisible({ timeout: 5000 });
+
+        testLogger.info('Invalid domain format shows a validation error');
     });
 
     test("should show error for domain with invalid characters", {
@@ -238,10 +241,12 @@ test.describe("Settings DomainManagement form validation", {
         testLogger.info('Testing domain with invalid special characters');
 
         await pm.settingsFormValidation.fillNewDomain('domain with spaces.com');
-        const addBtn = pm.settingsFormValidation.getAddDomainBtnLocator();
-        await expect(addBtn).toBeDisabled({ timeout: 3000 });
+        await pm.settingsFormValidation.clickAddDomainBtn();
 
-        testLogger.info('Add Domain button disabled for domain with spaces');
+        const domainError = pm.settingsFormValidation.getDomainErrorLocator();
+        await expect(domainError).toBeVisible({ timeout: 5000 });
+
+        testLogger.info('Domain with spaces shows a validation error');
     });
 
     test("should enable add button and add domain when valid domain is entered", {
@@ -271,13 +276,15 @@ test.describe("Settings DomainManagement form validation", {
     test("should show required error when trying to add an empty domain", {
         tag: ['@settings-form-validation', '@P1', '@smoke']
     }, async ({ page }) => {
-        testLogger.info('Testing Add Domain button disabled state for empty input');
+        testLogger.info('Testing required error for empty domain input');
 
-        // Do not fill any domain value — button should be disabled
-        const addBtn = pm.settingsFormValidation.getAddDomainBtnLocator();
-        await expect(addBtn).toBeDisabled({ timeout: 3000 });
+        // Submit with no value — the OForm surfaces the "required" schema error on submit.
+        await pm.settingsFormValidation.clickAddDomainBtn();
 
-        testLogger.info('Add Domain button correctly disabled when domain input is empty');
+        const domainError = pm.settingsFormValidation.getDomainErrorLocator();
+        await expect(domainError).toBeVisible({ timeout: 5000 });
+
+        testLogger.info('Empty domain input shows a required validation error');
     });
 });
 

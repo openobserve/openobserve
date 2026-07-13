@@ -18,7 +18,10 @@ use datafusion::error::Result;
 use hashbrown::HashMap;
 use promql_parser::parser::LabelModifier;
 
-use crate::service::promql::aggregations::{Accumulate, AggFunc};
+use crate::service::promql::{
+    aggregations::{Accumulate, AggFunc},
+    common::kahan_sum_increment,
+};
 
 /// Aggregates Matrix input for range queries
 pub fn sum(param: &Option<LabelModifier>, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
@@ -50,7 +53,7 @@ impl AggFunc for Sum {
 }
 
 pub struct SumAccumulate {
-    sum: HashMap<i64, f64>,
+    sum: HashMap<i64, (f64, f64)>,
 }
 
 impl SumAccumulate {
@@ -63,14 +66,30 @@ impl SumAccumulate {
 
 impl Accumulate for SumAccumulate {
     fn accumulate(&mut self, sample: &Sample) {
-        let entry = self.sum.entry(sample.timestamp).or_insert(0.0);
-        *entry += sample.value;
+        let (sum, c) = self.sum.entry(sample.timestamp).or_insert((0.0, 0.0));
+        (*sum, *c) = kahan_sum_increment(sample.value, *sum, *c);
+    }
+
+    fn merge(&mut self, other: Box<dyn Accumulate>) {
+        let other = other.into_any().downcast::<Self>().expect("same type");
+        for (timestamp, (other_sum, other_c)) in other.sum {
+            let (sum, c) = self.sum.entry(timestamp).or_insert((0.0, 0.0));
+            // Fold the other partial's sum and compensation in as two
+            // separate compensated increments: a plain `c + other_c` add
+            // rounds residuals away before the main sums get to cancel.
+            (*sum, *c) = kahan_sum_increment(other_sum, *sum, *c);
+            (*sum, *c) = kahan_sum_increment(other_c, *sum, *c);
+        }
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
     }
 
     fn evaluate(self: Box<Self>) -> Vec<Sample> {
         self.sum
             .into_iter()
-            .map(|(timestamp, value)| Sample::new(timestamp, value))
+            .map(|(timestamp, (sum, c))| Sample::new(timestamp, sum + c))
             .collect()
     }
 }
