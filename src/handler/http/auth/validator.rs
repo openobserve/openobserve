@@ -972,6 +972,17 @@ pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResul
             Ok(_res) => {
                 // Get user from token to set user_id header
                 if let Some(user) = users::get_user_by_token(org_id_end_point[0], token).await {
+                    // System-wide blocklist — a blocked external SSO identity's RUM token must not
+                    // ingest. The rum_token is a separate credential (embedded in browser JS), so it
+                    // bypasses validate_credentials; check it here too. Native/internal untouched.
+                    #[cfg(feature = "enterprise")]
+                    if blocked_external(&user).await {
+                        log::warn!(
+                            "Blocked external identity attempted RUM ingest access: {}",
+                            user.email
+                        );
+                        return Err(AuthError::Unauthorized("Unauthorized Access".to_string()));
+                    }
                     Ok(AuthValidationResult {
                         user_email: user.email,
                         user_role: Some(user.role),
