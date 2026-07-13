@@ -29,7 +29,7 @@ use config::{
         promql::*,
         search::default_use_cache,
         self_reporting::usage::UsageType,
-        stream::{StreamParams, StreamPartition, StreamType},
+        stream::{StreamParams, StreamPartition, StreamStats, StreamType},
     },
     metrics,
     utils::{
@@ -972,6 +972,35 @@ pub(crate) async fn get_labels(
     Ok(label_names)
 }
 
+/// The stats that say whether a metric family has data in a time range.
+///
+/// A histogram or summary keeps no rows in its base stream -- that stream holds only the family
+/// metadata -- so its liveness has to be read from a member. `_count` is the member that is
+/// always written: it is a `u64` on every data point and so can never be dropped, whereas `_sum`
+/// is optional in OTLP and is not recorded at all when the source reports it as NaN. Keying on
+/// `_sum` would hide an entire family whose sum happens to be NaN while its buckets ingest
+/// normally. `_sum` stays as the fallback, for streams written before a `_count` existed.
+fn family_stats(
+    org_id: &str,
+    stream_name: &str,
+    metadata: Option<&Metadata>,
+    stream_type: StreamType,
+) -> StreamStats {
+    let is_family = metadata.is_some_and(|m| {
+        m.metric_type == MetricType::Histogram || m.metric_type == MetricType::Summary
+    });
+    if !is_family {
+        return stats::get_stream_stats(org_id, stream_name, stream_type);
+    }
+
+    let count = stats::get_stream_stats(org_id, &format!("{stream_name}_count"), stream_type);
+    if count.doc_num > 0 {
+        count
+    } else {
+        stats::get_stream_stats(org_id, &format!("{stream_name}_sum"), stream_type)
+    }
+}
+
 pub(crate) async fn get_label_values(
     org_id: &str,
     label_name: String,
@@ -998,37 +1027,12 @@ pub(crate) async fn get_label_values(
                 // not it.
                 continue;
             }
-            let stats = match super::get_prom_metadata_from_schema(&schema.schema) {
-                None => stats::get_stream_stats(org_id, &schema.stream_name, stream_type),
-                Some(metadata) => {
-                    if metadata.metric_type == MetricType::Histogram
-                        || metadata.metric_type == MetricType::Summary
-                    {
-                        // the base stream of a histogram/summary holds only metadata, so the
-                        // family's liveness has to come from a member stream. `_count` is the
-                        // one that is always there: it is a u64 on every data point, whereas
-                        // `_sum` is optional in OTLP and is not recorded at all when the source
-                        // reports it as NaN. Fall back to `_sum` for anything that predates a
-                        // `_count` stream.
-                        let count = stats::get_stream_stats(
-                            org_id,
-                            &format!("{}_count", schema.stream_name),
-                            stream_type,
-                        );
-                        if count.doc_num > 0 {
-                            count
-                        } else {
-                            stats::get_stream_stats(
-                                org_id,
-                                &format!("{}_sum", schema.stream_name),
-                                stream_type,
-                            )
-                        }
-                    } else {
-                        stats::get_stream_stats(org_id, &schema.stream_name, stream_type)
-                    }
-                }
-            };
+            let stats = family_stats(
+                org_id,
+                &schema.stream_name,
+                super::get_prom_metadata_from_schema(&schema.schema).as_ref(),
+                stream_type,
+            );
             if stats.time_range_intersects(start, end) {
                 label_values.push(schema.stream_name)
             }
@@ -1236,16 +1240,102 @@ mod tests {
         )
     }
 
+    /// Note `MetadataObject` carries only type/help/unit -- the family name is dropped on the
+    /// way out -- so `/api/v1/metadata` cannot be asserted to serve an unquoted family name.
+    /// What the endpoint gets from delegating is the shared reader's parse, asserted below.
     #[test]
     fn test_get_metadata_object_serves_type_help_unit() {
         let schema = schema_with_metadata(
-            r#"{"metric_type":"Histogram","metric_family_name":"\"foo\"","help":"h","unit":"s"}"#,
+            r#"{"metric_type":"Histogram","metric_family_name":"foo","help":"h","unit":"s"}"#,
         );
 
         let served = serde_json::to_value(get_metadata_object(&schema).unwrap()).unwrap();
         assert_eq!(served["type"], "histogram");
         assert_eq!(served["help"], "h");
         assert_eq!(served["unit"], "s");
+    }
+
+    fn family_metadata(metric_type: MetricType) -> Metadata {
+        Metadata {
+            metric_type,
+            metric_family_name: "http_request_duration_seconds".to_string(),
+            help: String::new(),
+            unit: String::new(),
+        }
+    }
+
+    fn seed_stats(org_id: &str, stream_name: &str, doc_num: i64, doc_time_max: i64) {
+        stats::set_stream_stats(
+            org_id,
+            stream_name,
+            StreamType::Metrics,
+            StreamStats {
+                doc_num,
+                doc_time_min: 1,
+                doc_time_max,
+                ..Default::default()
+            },
+        );
+    }
+
+    /// The regression this guards: dropping NaN records means a histogram whose sum is always
+    /// NaN writes no `_sum` stream at all. Keyed on `_sum`, the whole family would disappear
+    /// from the metric picker while its buckets were still ingesting.
+    #[test]
+    fn test_family_stats_prefers_count_over_sum() {
+        let org = "test_family_stats_count";
+        seed_stats(org, "http_request_duration_seconds_count", 100, 5_000);
+        // no `_sum` stream at all: its sum is NaN on every data point
+
+        let stats = family_stats(
+            org,
+            "http_request_duration_seconds",
+            Some(&family_metadata(MetricType::Histogram)),
+            StreamType::Metrics,
+        );
+
+        assert_eq!(stats.doc_num, 100);
+        assert!(stats.time_range_intersects(1, 6_000));
+    }
+
+    #[test]
+    fn test_family_stats_falls_back_to_sum_when_count_is_empty() {
+        let org = "test_family_stats_sum";
+        seed_stats(org, "http_request_duration_seconds_sum", 50, 5_000);
+
+        let stats = family_stats(
+            org,
+            "http_request_duration_seconds",
+            Some(&family_metadata(MetricType::Summary)),
+            StreamType::Metrics,
+        );
+
+        assert_eq!(stats.doc_num, 50);
+    }
+
+    /// A gauge or counter keeps its own rows, so it is its own liveness signal.
+    #[test]
+    fn test_family_stats_uses_the_stream_itself_for_non_families() {
+        let org = "test_family_stats_gauge";
+        seed_stats(org, "http_request_duration_seconds", 7, 5_000);
+        seed_stats(org, "http_request_duration_seconds_count", 999, 5_000);
+
+        let stats = family_stats(
+            org,
+            "http_request_duration_seconds",
+            Some(&family_metadata(MetricType::Gauge)),
+            StreamType::Metrics,
+        );
+        assert_eq!(stats.doc_num, 7);
+
+        // and with no metadata at all
+        let stats = family_stats(
+            org,
+            "http_request_duration_seconds",
+            None,
+            StreamType::Metrics,
+        );
+        assert_eq!(stats.doc_num, 7);
     }
 
     /// This endpoint used to parse the blob itself, with its own

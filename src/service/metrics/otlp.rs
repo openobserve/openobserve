@@ -188,52 +188,6 @@ pub async fn handle_otlp_request(
         for scope_metric in &resource_metric.scope_metrics {
             for metric in &scope_metric.metrics {
                 let metric_name = format_stream_name(metric.name.to_string());
-                // check for schema
-                let schema_exists = stream_schema_exists(
-                    org_id,
-                    &metric_name,
-                    StreamType::Metrics,
-                    &mut metric_schema_map,
-                )
-                .await;
-
-                // get partition keys
-                if !stream_partitioning_map.contains_key(&metric_name) {
-                    let partition_det = crate::service::ingestion::get_stream_partition_keys(
-                        org_id,
-                        &StreamType::Metrics,
-                        &metric_name,
-                    )
-                    .await;
-                    stream_partitioning_map
-                        .insert(metric_name.clone().to_owned(), partition_det.clone());
-                }
-
-                // Start get stream alerts
-                let stream_param = StreamParams::new(org_id, &metric_name, StreamType::Metrics);
-                crate::service::ingestion::get_stream_alerts(
-                    std::slice::from_ref(&stream_param),
-                    &mut stream_alerts_map,
-                )
-                .await;
-                // End get stream alert
-
-                // get stream pipeline
-                if !stream_executable_pipelines.contains_key(&metric_name) {
-                    let pipeline_params =
-                        crate::service::ingestion::get_stream_executable_pipelines(&stream_param)
-                            .await;
-                    stream_executable_pipelines.insert(metric_name.clone(), pipeline_params);
-                }
-
-                // get user defined schema
-                crate::service::ingestion::get_uds_and_original_data_streams(
-                    std::slice::from_ref(&stream_param),
-                    &mut user_defined_schema_map,
-                    &mut streams_need_original_map,
-                    &mut streams_need_all_values_map,
-                )
-                .await;
 
                 let mut rec = json::json!({});
                 if let Some(res) = &resource_metric.resource {
@@ -283,13 +237,63 @@ pub async fn handle_otlp_request(
                     }
                 };
 
-                // a metric that yields no records -- every data point NaN, no data points at
-                // all, or an undecodable type -- gets no stream: no schema, no metadata entry,
-                // and nothing buffered for a pipeline that is configured on this stream (the
-                // pipeline loop below treats a missing input buffer as a bug and logs it).
+                // A metric that yields no records -- every data point NaN, no data points at all,
+                // or an undecodable type -- gets nothing: no schema, no metadata entry, and no
+                // entry in stream_executable_pipelines. That last one matters: the pipeline loop
+                // at the end of this function expects every registered stream to have buffered
+                // inputs and logs a BUG if it does not, so a stream registered here and then
+                // dropped would log one on every export request. Hence the per-stream lookups
+                // below run only once we know we have something to write.
                 if records.is_empty() {
                     continue;
                 }
+
+                // check for schema
+                let schema_exists = stream_schema_exists(
+                    org_id,
+                    &metric_name,
+                    StreamType::Metrics,
+                    &mut metric_schema_map,
+                )
+                .await;
+
+                // get partition keys
+                if !stream_partitioning_map.contains_key(&metric_name) {
+                    let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                        org_id,
+                        &StreamType::Metrics,
+                        &metric_name,
+                    )
+                    .await;
+                    stream_partitioning_map
+                        .insert(metric_name.clone().to_owned(), partition_det.clone());
+                }
+
+                // Start get stream alerts
+                let stream_param = StreamParams::new(org_id, &metric_name, StreamType::Metrics);
+                crate::service::ingestion::get_stream_alerts(
+                    std::slice::from_ref(&stream_param),
+                    &mut stream_alerts_map,
+                )
+                .await;
+                // End get stream alert
+
+                // get stream pipeline
+                if !stream_executable_pipelines.contains_key(&metric_name) {
+                    let pipeline_params =
+                        crate::service::ingestion::get_stream_executable_pipelines(&stream_param)
+                            .await;
+                    stream_executable_pipelines.insert(metric_name.clone(), pipeline_params);
+                }
+
+                // get user defined schema
+                crate::service::ingestion::get_uds_and_original_data_streams(
+                    std::slice::from_ref(&stream_param),
+                    &mut user_defined_schema_map,
+                    &mut streams_need_original_map,
+                    &mut streams_need_all_values_map,
+                )
+                .await;
 
                 // update schema metadata
                 if !schema_exists.has_metrics_metadata {

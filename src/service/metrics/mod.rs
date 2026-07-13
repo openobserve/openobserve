@@ -48,11 +48,9 @@ pub fn sanitize_metric_value(v: f64) -> Option<f64> {
     if v.is_nan() {
         return None;
     }
-    // the `>`/`<` arms are unreachable for a finite f64 and are kept only so the two clamp
-    // sites stay textually identical. Simplify them in both, or in neither.
-    if v == f64::INFINITY || v > f64::MAX {
+    if v == f64::INFINITY {
         Some(f64::MAX)
-    } else if v == f64::NEG_INFINITY || v < f64::MIN {
+    } else if v == f64::NEG_INFINITY {
         Some(f64::MIN)
     } else {
         Some(v)
