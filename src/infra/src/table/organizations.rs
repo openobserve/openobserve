@@ -41,8 +41,10 @@ pub struct OrganizationRecord {
     pub identifier: String,
     pub org_name: String,
     pub org_type: OrganizationType,
+    pub status: String,
     pub created_at: i64,
     pub updated_at: i64,
+    pub deleted_at: Option<i64>,
     #[cfg(feature = "cloud")]
     pub trial_ends_at: i64,
 }
@@ -54,8 +56,10 @@ impl OrganizationRecord {
             identifier: identifier.to_string(),
             org_name: org_name.to_string(),
             org_type,
+            status: "active".to_string(),
             created_at: now,
             updated_at: now,
+            deleted_at: None,
             #[cfg(feature = "cloud")]
             trial_ends_at: now + day_micros(14),
         }
@@ -68,8 +72,10 @@ impl From<Model> for OrganizationRecord {
             identifier: model.identifier,
             org_name: model.org_name,
             org_type: model.org_type.into(),
+            status: model.status,
             created_at: model.created_at,
             updated_at: model.updated_at,
+            deleted_at: model.deleted_at,
             #[cfg(feature = "cloud")]
             trial_ends_at: model.trial_ends_at,
         }
@@ -127,8 +133,10 @@ pub async fn add(
         identifier: Set(org_id.to_string()),
         org_name: Set(org_name.to_string()),
         org_type: Set(org_type.into()),
+        status: Set("active".to_string()),
         created_at: Set(now),
         updated_at: Set(now),
+        deleted_at: Set(None),
         #[cfg(feature = "cloud")]
         trial_ends_at: Set(now + day_micros(15)),
     };
@@ -137,8 +145,10 @@ pub async fn add(
         identifier: org_id.to_string(),
         org_name: org_name.to_string(),
         org_type,
+        status: "active".to_string(),
         created_at: now,
         updated_at: now,
+        deleted_at: None,
         #[cfg(feature = "cloud")]
         trial_ends_at: now + day_micros(15),
     };
@@ -348,6 +358,74 @@ pub async fn batch_remove(org_ids: Vec<String>) -> Result<(), errors::Error> {
     Ok(())
 }
 
+pub async fn set_status(org_id: &str, status: &str) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let now = config::utils::time::now_micros();
+    Entity::update_many()
+        .col_expr(Column::Status, Expr::value(status))
+        .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::Identifier.eq(org_id))
+        .exec(client)
+        .await
+        .map_err(|e| errors::Error::Message(e.to_string()))?;
+    invalidate_cache(Some(org_id)).await;
+    Ok(())
+}
+
+/// CAS update: sets status to `new_status` only when current status is `expected_status`.
+/// Returns `true` if the row was updated (i.e. this caller won the race), `false` if another
+/// writer already changed the status.
+pub async fn set_status_if(
+    org_id: &str,
+    expected_status: &str,
+    new_status: &str,
+) -> Result<bool, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let now = config::utils::time::now_micros();
+    let result = Entity::update_many()
+        .col_expr(Column::Status, Expr::value(new_status))
+        .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::Identifier.eq(org_id))
+        .filter(Column::Status.eq(expected_status))
+        .exec(client)
+        .await
+        .map_err(|e| errors::Error::Message(e.to_string()))?;
+    if result.rows_affected > 0 {
+        invalidate_cache(Some(org_id)).await;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+/// CAS update that also sets `deleted_at` in the same statement. Sets status to
+/// `new_status` (and `deleted_at` to the given value) only when the current status
+/// is `expected_status`. Returns true if a row was updated.
+pub async fn set_status_if_with_deleted_at(
+    org_id: &str,
+    expected_status: &str,
+    new_status: &str,
+    deleted_at: Option<i64>,
+) -> Result<bool, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let now = config::utils::time::now_micros();
+    let result = Entity::update_many()
+        .col_expr(Column::Status, Expr::value(new_status))
+        .col_expr(Column::DeletedAt, Expr::value(deleted_at))
+        .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::Identifier.eq(org_id))
+        .filter(Column::Status.eq(expected_status))
+        .exec(client)
+        .await
+        .map_err(|e| errors::Error::Message(e.to_string()))?;
+    if result.rows_affected > 0 {
+        invalidate_cache(Some(org_id)).await;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
 pub async fn invalidate_cache(org_id: Option<&str>) {
     let mut cache = CACHE.write().await;
     if let Some(v) = org_id {
@@ -412,8 +490,10 @@ mod tests {
             identifier: "test-org".to_string(),
             org_name: "Test Org".to_string(),
             org_type: 0,
+            status: "active".to_string(),
             created_at: 1_000_000,
             updated_at: 2_000_000,
+            deleted_at: None,
         };
         let rec = OrganizationRecord::from(model);
         assert_eq!(rec.identifier, "test-org");
@@ -421,5 +501,22 @@ mod tests {
         assert_eq!(rec.org_type, OrganizationType::Default);
         assert_eq!(rec.created_at, 1_000_000);
         assert_eq!(rec.updated_at, 2_000_000);
+        assert!(rec.deleted_at.is_none());
+    }
+
+    #[test]
+    fn test_organization_record_has_deleted_at_field() {
+        let rec = OrganizationRecord {
+            identifier: "o".to_string(),
+            org_name: "o".to_string(),
+            org_type: OrganizationType::Default,
+            status: "active".to_string(),
+            created_at: 1,
+            updated_at: 2,
+            deleted_at: None,
+            #[cfg(feature = "cloud")]
+            trial_ends_at: 0,
+        };
+        assert!(rec.deleted_at.is_none());
     }
 }

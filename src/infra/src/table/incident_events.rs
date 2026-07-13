@@ -160,3 +160,14 @@ pub async fn record_alert(
     txn.commit().await?;
     Ok(())
 }
+
+/// Deletes all incident event entries belonging to the given org.
+pub async fn delete_by_org(org_id: &str) -> Result<(), sea_orm::DbErr> {
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    incident_events::Entity::delete_many()
+        .filter(incident_events::Column::OrgId.eq(org_id))
+        .exec(db)
+        .await?;
+    Ok(())
+}

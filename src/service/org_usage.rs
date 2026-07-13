@@ -40,22 +40,19 @@ pub async fn get_org_usage(
     {
         // if subscription is present, and stripe is provider , and range is cycle and subscription
         // id is present, we will try to get the cycle based usage
-        if let Some(b) = billings.first() {
-            if b.provider == MeteringProvider::Stripe
-                && let Some(id) = &b.subscription_id
-            {
-                pricing_map =
-                    o2_enterprise::enterprise::cloud::billings::get_pricing_map(id).await?;
-                if usage_range.unit == RangeUnit::Cycle {
-                    let sub =
-                        o2_enterprise::enterprise::cloud::billings::get_stripe_subscription(id)
-                            .await?;
+        if let Some(b) = billings.first()
+            && b.provider == MeteringProvider::Stripe
+            && let Some(id) = &b.subscription_id
+        {
+            pricing_map = o2_enterprise::enterprise::cloud::billings::get_pricing_map(id).await?;
+            if usage_range.unit == RangeUnit::Cycle {
+                let sub =
+                    o2_enterprise::enterprise::cloud::billings::get_stripe_subscription(id).await?;
 
-                    let end = sub.current_period_end;
-                    let diff = sub.current_period_end - sub.current_period_start;
-                    cycle_details = Some((end, diff));
-                    log::info!("using end {end} diff {diff} for org {org_id} for usage query")
-                }
+                let end = sub.current_period_end;
+                let diff = sub.current_period_end - sub.current_period_start;
+                cycle_details = Some((end, diff));
+                log::info!("using end {end} diff {diff} for org {org_id} for usage query")
             }
         }
     }

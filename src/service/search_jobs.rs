@@ -290,6 +290,51 @@ fn generate_result_path(
     )
 }
 
+/// Delete every S3 result file backing an org's search jobs. Used by org cleanup:
+/// the DB rows are removed by `search_jobs::delete_by_org`, but the result objects
+/// in storage (keyed by created_at/trace_id, not org) would otherwise be orphaned.
+/// Best-effort per job; a storage error on one job does not abort the rest.
+pub async fn delete_org_result_files(org_id: &str) -> Result<(), anyhow::Error> {
+    let jobs = list_status_by_org_id(org_id).await?;
+    for job in jobs.iter() {
+        let mut deleted_files = Vec::new();
+        if let Some(partition_num) = job.partition_num {
+            for i in 0..partition_num {
+                deleted_files.push(generate_result_path(job.created_at, &job.trace_id, Some(i)));
+            }
+        }
+        if let Some(result_path) = job.result_path.clone() {
+            deleted_files.push(result_path);
+        }
+        // Include old result paths from retries (same layout as delete_jobs).
+        if let Ok(job_result) = get_job_result(&job.id).await {
+            for result in job_result.iter() {
+                if let Some(result_path) = result.result_path.clone() {
+                    deleted_files.push(result_path);
+                }
+                if let Some(partition_num) = job.partition_num {
+                    for i in 0..partition_num {
+                        deleted_files.push(generate_result_path(
+                            job.created_at,
+                            &result.trace_id,
+                            Some(i),
+                        ));
+                    }
+                }
+            }
+        }
+        if !deleted_files.is_empty()
+            && let Err(e) = delete_result(deleted_files).await
+        {
+            log::warn!(
+                "[SEARCH JOB] delete_org_result_files org={org_id} job={} error: {e}",
+                job.id
+            );
+        }
+    }
+    Ok(())
+}
+
 pub async fn delete_jobs() -> Result<(), anyhow::Error> {
     // 1. get deleted jobs from database
     let jobs = get_deleted_jobs().await?;
