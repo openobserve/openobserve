@@ -340,7 +340,8 @@ const nodeTypes: any = [
     subtype: "function",
     io_type: "default",
     icon: "img:" + functionImage,
-    tooltip: "Function Node",
+    // Matches the workflow Function node subtitle (workflow.node.functionDesc).
+    tooltip: "Reshape the payload with a function",
     isSectionHeader: false,
   },
   {
@@ -348,7 +349,8 @@ const nodeTypes: any = [
     subtype: "condition",
     io_type: "default",
     icon: "img:" + conditionImage,
-    tooltip: "Condition Node",
+    // Matches the workflow Condition node subtitle (workflow.node.conditionDesc).
+    tooltip: "Branch on a rule",
     isSectionHeader: false,
   },
   {
