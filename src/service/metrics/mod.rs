@@ -169,6 +169,23 @@ mod tests {
         assert!(labels.contains(&"_all"));
     }
 
+    /// The policy itself. The remote-write path calls this one directly (it needs the f64
+    /// back), so it is asserted on its own and not only through `metric_value`.
+    #[test]
+    fn test_sanitize_metric_value() {
+        assert!(sanitize_metric_value(f64::NAN).is_none());
+        assert_eq!(sanitize_metric_value(f64::INFINITY), Some(f64::MAX));
+        assert_eq!(sanitize_metric_value(f64::NEG_INFINITY), Some(f64::MIN));
+        assert_eq!(sanitize_metric_value(0.0), Some(0.0));
+        assert_eq!(sanitize_metric_value(-1.5), Some(-1.5));
+        assert_eq!(sanitize_metric_value(f64::MAX), Some(f64::MAX));
+        assert_eq!(sanitize_metric_value(f64::MIN), Some(f64::MIN));
+        assert_eq!(
+            sanitize_metric_value(f64::MIN_POSITIVE),
+            Some(f64::MIN_POSITIVE)
+        );
+    }
+
     #[test]
     fn test_metric_value_drops_nan() {
         assert!(metric_value(f64::NAN).is_none());

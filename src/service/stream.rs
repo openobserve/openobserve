@@ -1832,6 +1832,29 @@ mod tests {
         assert_eq!(stream.stats, StreamStats::default());
     }
 
+    /// The `/streams` response is what the family join is built from, and it is served from the
+    /// stored schema -- which, for every metric ingested before the writer was fixed, holds a
+    /// JSON-quoted family name. The quotes must not reach the client.
+    #[test]
+    fn test_stream_res_metrics_family_name_served_unquoted_for_a_stored_quoted_schema() {
+        let schema = Schema::new(vec![Field::new("value", DataType::Float64, false)])
+            .with_metadata(
+                [(
+                    config::meta::promql::METADATA_LABEL.to_string(),
+                    r#"{"metric_type":"Histogram","metric_family_name":"\"http_requests\"","help":"h","unit":"s"}"#
+                        .to_string(),
+                )]
+                .into_iter()
+                .collect(),
+            );
+
+        let stream = stream_res("org1", "http_requests", StreamType::Metrics, schema, None);
+        let meta = stream.metrics_meta.unwrap();
+
+        assert_eq!(meta.metric_family_name, "http_requests");
+        assert_eq!(meta.metric_type, promql::MetricType::Histogram);
+    }
+
     #[test]
     fn test_stream_res_metrics_empty_type() {
         let schema = Schema::new(vec![Field::new("value", DataType::Float64, false)]);

@@ -975,11 +975,13 @@ pub(crate) async fn get_labels(
 /// The stats that say whether a metric family has data in a time range.
 ///
 /// A histogram or summary keeps no rows in its base stream -- that stream holds only the family
-/// metadata -- so its liveness has to be read from a member. `_count` is the member that is
-/// always written: it is a `u64` on every data point and so can never be dropped, whereas `_sum`
-/// is optional in OTLP and is not recorded at all when the source reports it as NaN. Keying on
-/// `_sum` would hide an entire family whose sum happens to be NaN while its buckets ingest
-/// normally. `_sum` stays as the fallback, for streams written before a `_count` existed.
+/// metadata -- so its liveness has to be read from a member. `_count` is the member to read: it
+/// is a `u64` on every data point and so is always written, whereas `_sum` is optional in OTLP
+/// and is not recorded at all when the source reports it as NaN. Keying on `_sum` would hide an
+/// entire family whose sum happens to be NaN while its buckets ingested normally.
+///
+/// `_sum` is kept as a fallback for a family that somehow has no `_count` stats -- a source that
+/// ships only sums, or a `_count` whose stats have not been computed yet.
 fn family_stats(
     org_id: &str,
     stream_name: &str,
@@ -1298,6 +1300,7 @@ mod tests {
         assert!(stats.time_range_intersects(1, 6_000));
     }
 
+    /// The fallback: a family with no `_count` stats still resolves rather than disappearing.
     #[test]
     fn test_family_stats_falls_back_to_sum_when_count_is_empty() {
         let org = "test_family_stats_sum";
