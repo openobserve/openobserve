@@ -48,6 +48,37 @@ export const STATUS_VALUES = {
   error: "error",
 } as const;
 
+// ── Device display helpers ─────────────────────────────────────────────────
+
+/**
+ * Canonical set of known device IDs and their display properties.
+ * When the backend adds new devices, add them here only.
+ */
+export const KNOWN_DEVICES: Record<
+  string,
+  { label: string; icon: string }
+> = {
+  laptop_large: { label: "Desktop", icon: "computer" },
+  tablet: { label: "Tablet", icon: "tablet" },
+  mobile_small: { label: "Mobile", icon: "smartphone" },
+};
+
+/**
+ * Resolve a device ID to its OIcon name.
+ * Falls back to "devices" for unknown IDs.
+ */
+export function deviceIconName(deviceId: string): string {
+  return KNOWN_DEVICES[deviceId]?.icon ?? "devices";
+}
+
+/**
+ * Resolve a device ID to its human-readable label.
+ * Preserves casing of the stored label; falls back to the raw ID.
+ */
+export function deviceLabel(deviceId: string): string {
+  return KNOWN_DEVICES[deviceId]?.label ?? deviceId;
+}
+
 // ── Typed UI models (stable regardless of stream schema) ─────────────────
 
 export type RunStatus = "passed" | "warning" | "failed" | "error";

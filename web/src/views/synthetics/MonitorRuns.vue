@@ -540,16 +540,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="inline-flex items-center gap-1 text-xs text-text-secondary"
                   >
                     <OIcon
-                      :name="
-                        (row as VisibleRun).device === 'Desktop'
-                          ? 'computer'
-                          : (row as VisibleRun).device === 'Tablet'
-                            ? 'tablet'
-                            : 'smartphone'
-                      "
+                      :name="deviceIconName((row as VisibleRun).device)"
                       size="xs"
                     />
-                    {{ (row as VisibleRun).device }}
+                    {{ deviceLabel((row as VisibleRun).device) }}
                   </span>
                 </template>
                 <template #cell-error="{ row }">
@@ -865,6 +859,10 @@ import MonitorStatusTimeline from "@/views/synthetics/MonitorStatusTimeline.vue"
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
 import type { SyntheticRun } from "@/composables/synthetics/syntheticResultsSchema";
+import {
+  deviceIconName,
+  deviceLabel,
+} from "@/composables/synthetics/syntheticResultsSchema";
 import awsSvgUrl from "@/assets/images/ingestion/aws.svg";
 import gcpSvgUrl from "@/assets/images/ingestion/gcp.svg";
 import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
@@ -1189,10 +1187,9 @@ const browserOptions = computed<SelectOption[]>(() => [
 const deviceOptions = computed<SelectOption[]>(() => [
   { label: "All devices", value: "all", icon: "devices" },
   ...uniqueValues("device").map((v) => ({
-    label: v,
+    label: deviceLabel(v),
     value: v,
-    icon:
-      v === "Desktop" ? "computer" : v === "Tablet" ? "tablet" : "smartphone",
+    icon: deviceIconName(v),
   })),
 ]);
 const locationOptions = computed<SelectOption[]>(() => [
@@ -1605,22 +1602,17 @@ const deviceBreakdown = computed<BreakdownItem[]>(() => {
     if (run.status === "pass") g.pass++;
     groups.set(key, g);
   }
-  const iconMap: Record<string, string> = {
-    Desktop: "computer",
-    Tablet: "tablet",
-    Mobile: "smartphone",
-  };
-  return Array.from(groups.entries()).map(([name, g]) => {
+  return Array.from(groups.entries()).map(([id, g]) => {
     const pct = g.total > 0 ? Math.round((g.pass / g.total) * 100) : 100;
     return {
-      name,
-      icon: iconMap[name] || "devices",
+      name: deviceLabel(id),
+      icon: deviceIconName(id),
       pct: pct + "%",
       barColor: "var(--o2-status-success-text)",
       textColor: "var(--o2-success-700)",
     };
   });
-});
+  });
 
 // ── Status filter options ────────────────────────────────────────────────
 const statusOptions = [
