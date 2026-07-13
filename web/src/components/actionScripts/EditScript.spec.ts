@@ -443,14 +443,15 @@ describe("EditScript", () => {
     it("advances to the next step on Continue", async () => {
       // Continue now gates on the step's own field: step 1's codeZip is required
       // on create, so a valid file must be present before the stepper advances.
-      // goToStep() is async (awaits schema validation), so flush after the click.
       setField(wrapper, "codeZip", new File(["code"], "script.zip"));
       await nextTick();
       await wrapper
         .find('[data-test="add-action-script-step1-continue-btn"]')
         .trigger("click");
-      await flushPromises();
-      expect(wrapper.vm.step).toBe(2);
+      // goToStep() awaits the form's async validator (TanStack onDynamicAsync),
+      // which settles on a macrotask. A single flushPromises() can resolve before
+      // that timer fires under a loaded event loop, so poll until it advances.
+      await vi.waitFor(() => expect(wrapper.vm.step).toBe(2));
     });
 
     it("reactively hides the Schedule step when type switches to 'service' (Rule ③)", async () => {
@@ -503,8 +504,10 @@ describe("EditScript", () => {
       await wrapper
         .find('[data-test="add-action-script-step3-continue-btn"]')
         .trigger("click");
-      await flushPromises();
-      expect(wrapper.vm.step).toBe(4);
+      // goToStep() awaits the form's async validator (TanStack onDynamicAsync),
+      // which settles on a macrotask. A single flushPromises() can resolve before
+      // that timer fires under a loaded event loop, so poll until it advances.
+      await vi.waitFor(() => expect(wrapper.vm.step).toBe(4));
     });
   });
 
