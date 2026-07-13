@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildPromqlSeed,
+  DEFAULT_NEW_PANEL_TYPE,
   isAutoSeededQuery,
   isUntouchedPanelType,
   seedOwnsChartType,
@@ -262,11 +263,23 @@ describe("regressions found in review", () => {
   });
 
   describe("seedOwnsChartType — may we change the panel's chart type?", () => {
-    it("yes on an empty/bare slot", () => {
-      expect(seedOwnsChartType("", "http_requests_total", COUNTER, opts)).toBe(true);
+    it("NO on an empty or bare slot — neither seed ever set a type, so the type is the user's", () => {
+      // `opts.chartType` is `line`: a type somebody chose. We only ever set a type
+      // alongside a real variant query, so an empty slot (or the bare fallback) next
+      // to a chosen type is evidence of the USER, not of us. Saying "yes" here is
+      // what turned an explicitly-chosen Table into a line chart the moment the panel
+      // was switched from SQL to PromQL — that switch clears the query.
+      expect(seedOwnsChartType("", "http_requests_total", COUNTER, opts)).toBe(false);
       expect(
         seedOwnsChartType("http_requests_total{}", "http_requests_total", COUNTER, opts),
-      ).toBe(true);
+      ).toBe(false);
+    });
+
+    it("yes on an empty slot when the panel type is still the new-panel default", () => {
+      // The fresh-panel case that the empty-slot "yes" above used to cover. It is a
+      // question about the TYPE, and `promqlSeedFor` asks it with isUntouchedPanelType.
+      expect(isUntouchedPanelType(DEFAULT_NEW_PANEL_TYPE)).toBe(true);
+      expect(isUntouchedPanelType("table")).toBe(false);
     });
 
     it("yes when the query and the chart type still agree — we authored both", () => {

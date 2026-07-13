@@ -247,6 +247,24 @@ describe("promqlSeedFor — which metric was the current query seeded for?", () 
     const panel = editorPanel("bar", "", "lat_seconds_bucket");
     expect(promqlSeedFor(panel, "lat_seconds_bucket").chartType).toBe("heatmap");
   });
+
+  it("leaves a chart type the user picked alone even though the toggle emptied the slot", () => {
+    // The panel editor's own order of events: pick Table, then pick the `metrics`
+    // stream type. That switches the panel to PromQL, and the switch CLEARS the
+    // query — so the seed meets a slot that is empty next to a type the user chose
+    // by hand. It used to read the empty slot as "we wrote this, so the type is
+    // ours too" and hand back `line`, silently turning the Table into a line chart
+    // (and taking the whole Table config section with it).
+    const panel = editorPanel("table", "", "lat_seconds_bucket");
+
+    const seed = promqlSeedFor(panel, "lat_seconds_bucket");
+
+    expect(seed.chartType).toBeNull();
+    // The QUERY is still seeded — only the type is off limits.
+    expect(seed.query).toBeTruthy();
+    // A contract that only makes sense on a heatmap must not ride along onto a table.
+    expect(seed.config.heatmap_mode).toBeUndefined();
+  });
 });
 
 describe("applyPromqlSeed and the Custom/Builder mode", () => {

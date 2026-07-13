@@ -281,9 +281,21 @@ export function seedOwnsChartType(
   opts: SeedOptions = {},
 ): boolean {
   const text = (query ?? "").trim();
-  if (!text) return true;
-  if (!metric) return false;
-  if (text === `${metric}{}`) return true;
+
+  // Having authored the QUERY is not having authored the TYPE, and it is the
+  // type being asked about here. The two seeds that leave a slot empty or
+  // holding a bare `metric{}` selector are precisely the ones that set no chart
+  // type at all (`bareSeed` carries `chartType: null`), so a non-default type
+  // sitting next to one cannot have come from us — it can only have been picked
+  // by the user, and answering `true` here overruled them: switching a panel
+  // from SQL to PromQL CLEARS the query, so a panel the user had explicitly made
+  // a Table met the next seed with an empty slot and came back a line chart.
+  //
+  // A panel nobody has shaped yet is still ours to type, but that is a question
+  // about the TYPE (`isUntouchedPanelType`), which the caller asks separately —
+  // not something an empty slot can answer.
+  if (!text || !metric) return false;
+  if (text === `${metric}{}`) return false;
 
   return (
     text ===
