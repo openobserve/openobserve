@@ -12,7 +12,7 @@ export default class DashboardDrilldownPage {
     this.logsButton = page.locator('[data-test="dashboard-drilldown-by-logs-btn"]');
     this.urlButton = page.locator('[data-test="dashboard-drilldown-by-url-btn"]');
     this.urlTextarea = page.locator('[data-test="dashboard-drilldown-url-textarea-field"]');
-    this.urlErrorMessage = page.locator('[data-test="dashboard-drilldown-url-error-message"]');
+    this.urlErrorMessage = page.locator('[data-test="dashboard-drilldown-url-textarea-error"]');
     this.newTabToggle = page.locator('[data-test="dashboard-drilldown-open-in-new-tab"]');
     this.folderSelect = page.locator('[data-test="dashboard-drilldown-folder-select"]');
     this.dashboardSelect = page.locator('[data-test="dashboard-drilldown-dashboard-select"]');

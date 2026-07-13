@@ -213,6 +213,13 @@ const filteredFields = computed(() => {
   } else {
     result = props.fields.filter((row) => {
       if (row.isGroup) {
+        // A grouped consumer (GroupedFieldList) that hides collapsed field rows
+        // stamps the header with `matchesSearch` so a collapsed-but-matching
+        // group keeps its header and stays re-expandable. Fall back to scanning
+        // the visible child rows when the flag is absent.
+        if (typeof (row as any).matchesSearch === "boolean") {
+          return (row as any).matchesSearch;
+        }
         return props.fields.some(
           (f) =>
             !f.isGroup &&

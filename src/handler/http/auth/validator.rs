@@ -222,6 +222,22 @@ pub async fn validate_token(token: &str, org_id: &str) -> Result<(), AuthError> 
     }
 }
 
+/// System-wide domain-management blocklist check.
+///
+/// Denies **external SSO identities** (users AND SSO/token service accounts) that are on the
+/// blocklist — covering UI/API session tokens, external static tokens, and passcode ingestion. The
+/// `is_external` short-circuit means native/internal principals (incl. root, which is internal)
+/// skip the cache lookup entirely. Kept as one helper so the validator call sites stay identical.
+#[cfg(feature = "enterprise")]
+async fn blocked_external(user: &config::meta::user::User) -> bool {
+    use o2_enterprise::enterprise::domain_management::{self, meta::AccessDecision};
+    user.is_external
+        && matches!(
+            domain_management::evaluate_cached(&user.email).await,
+            AccessDecision::Deny
+        )
+}
+
 pub async fn validate_credentials(
     user_id: &str,
     user_password: &str,
@@ -408,6 +424,17 @@ pub async fn validate_credentials(
         }
     }
     let user = user.unwrap();
+
+    // System-wide blocklist — deny external SSO identities before any token/password branch, so it
+    // also covers external service-account static tokens and ingestion. Native/internal untouched.
+    #[cfg(feature = "enterprise")]
+    if blocked_external(&user).await {
+        log::warn!(
+            "Blocked external identity attempted API/ingest access: {}",
+            user.email
+        );
+        return Ok(TokenValidationResponse::default());
+    }
 
     // Check token authentication first (before native login restrictions)
     // This allows service accounts (including SRE agents) and all users to use API tokens
@@ -626,6 +653,16 @@ pub async fn validate_credentials_ext(
         return Ok(TokenValidationResponse::default());
     }
     let user = user.unwrap();
+
+    // System-wide blocklist — this is the `auth_ext` / passcode-ingestion path. Deny blocked
+    // external SSO service accounts here too. This fn is already enterprise-gated.
+    if blocked_external(&user).await {
+        log::warn!(
+            "Blocked external identity attempted passcode/ingest access: {}",
+            user.email
+        );
+        return Ok(TokenValidationResponse::default());
+    }
 
     let hashed_pass = get_hash(
         &format!(
@@ -935,6 +972,18 @@ pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResul
             Ok(_res) => {
                 // Get user from token to set user_id header
                 if let Some(user) = users::get_user_by_token(org_id_end_point[0], token).await {
+                    // System-wide blocklist — a blocked external SSO identity's RUM token must not
+                    // ingest. The rum_token is a separate credential (embedded in browser JS), so
+                    // it bypasses validate_credentials; check it here too.
+                    // Native/internal untouched.
+                    #[cfg(feature = "enterprise")]
+                    if blocked_external(&user).await {
+                        log::warn!(
+                            "Blocked external identity attempted RUM ingest access: {}",
+                            user.email
+                        );
+                        return Err(AuthError::Unauthorized("Unauthorized Access".to_string()));
+                    }
                     Ok(AuthValidationResult {
                         user_email: user.email,
                         user_role: Some(user.role),

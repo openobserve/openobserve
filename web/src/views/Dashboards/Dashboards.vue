@@ -32,6 +32,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :subtitle="t('dashboard.subtitle')"
       >
       <template #actions>
+        <!-- Org home dashboard shortcut: shows which dashboard is pinned to
+             the home page and jumps straight to it. -->
+        <OButton
+          v-if="homeDashboard"
+          variant="outline"
+          size="sm"
+          icon-left="keep"
+          class="max-w-60"
+          data-test="dashboard-home-shortcut"
+          @click="openHomeDashboard"
+        >
+          <span class="truncate">{{ homeDashboard.label }}</span>
+        </OButton>
+        <OTooltip
+          v-if="homeDashboard"
+          side="bottom"
+          :content="t('dashboard.openHomeDashboard')"
+        />
         <!-- import dashboard button with dropdown -->
         <ODropdown side="bottom" align="end">
           <template #trigger>
@@ -178,12 +196,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <template #cell-name="{ row, value }">
-              <span
-                class="text-text-primary"
-                :data-test="`dashboard-name-cell-${value}`"
-                :title="value"
-                >{{ value }}</span
-              >
+              <span class="inline-flex items-center gap-1">
+                <span
+                  class="text-text-primary"
+                  :data-test="`dashboard-name-cell-${value}`"
+                  :title="value"
+                  >{{ value }}</span
+                >
+                <!-- At-a-glance indicator: shows which dashboard is the org
+                     home dashboard without an interactive icon on every row. -->
+                <OIcon
+                  v-if="isHome(row.id)"
+                  name="keep"
+                  size="xs"
+                  class="text-primary shrink-0"
+                  :data-test="`dashboard-home-indicator-${value}`"
+                />
+                <OTooltip
+                  v-if="isHome(row.id)"
+                  side="bottom"
+                  :content="t('dashboard.pinnedOnHome')"
+                />
+              </span>
             </template>
             <template #cell-identifier="{ value }">
               <span
@@ -221,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-actions="{ row }">
               <span
-                class="row-actions flex items-center justify-center gap-0.5"
+                class="row-actions flex items-center justify-end gap-0.5"
               >
                 <OButton
                   v-if="row.actions == 'true'"
@@ -252,6 +286,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-row-action="delete"
                   @click.stop="showDeleteDialogFn({ row })"
                 />
+                <!-- Overflow menu (rightmost) — houses the low-frequency "set as
+                     home" action so it doesn't clutter every row with an
+                     always-on icon. Move/Duplicate/Delete stay inline. -->
+                <ODropdown
+                  v-if="row.actions == 'true'"
+                  side="bottom"
+                  align="end"
+                >
+                  <template #trigger>
+                    <OButton
+                      icon-left="more-vert"
+                      :title="t('dashboard.moreActions')"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      data-test="dashboard-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    :icon-left="isHome(row.id) ? 'keep' : 'keep-outline'"
+                    data-test="dashboard-list-set-home-btn"
+                    @select="toggleHome(row)"
+                  >
+                    <span>{{
+                      isHome(row.id)
+                        ? t("dashboard.removeFromHome")
+                        : t("dashboard.setAsHome")
+                    }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </span>
             </template>
             <template #empty>
@@ -276,14 +340,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex w-full justify-between items-center py-1"
               >
                 <div
-                  class="o2-table-footer-title flex items-center gap-2 shrink-0"
+                  class="o2-table-footer-title flex items-center shrink-0"
                 >
-                  <span class="text-text-primary">{{
-                    resultTotal || 0
-                  }}</span>
-                  <span class="text-text-secondary">{{
-                    t("dashboard.header")
-                  }}</span>
+                  {{ resultTotal || 0 }} {{ t("dashboard.header") }}
                 </div>
                 <div
                   v-if="selectedIds.length > 0"
@@ -478,6 +537,7 @@ import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -551,6 +611,65 @@ export default defineComponent({
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
 
+    const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } =
+      useHomeDashboard();
+    const openHomeDashboard = async () => {
+      if (!homeDashboard.value) return;
+      const org = store.state.selectedOrganization?.identifier;
+      const dashId = homeDashboard.value.dashboardId;
+      const folder = homeDashboard.value.folderId || "default";
+      try {
+        // Confirm the pinned dashboard still resolves before navigating. The GET
+        // is folder-agnostic on the backend, so this both validates existence and
+        // lets the re-synced folder drive the route. A deleted dashboard throws /
+        // returns an empty object — clear the pin instead of routing to a 404.
+        const dash = await getDashboard(store, dashId, folder);
+        if (!dash || typeof dash !== "object" || !(dash as any).title) {
+          throw { response: { status: 404 } };
+        }
+      } catch (e: any) {
+        if (e?.response?.status === 404) {
+          clearHomeDashboard(org);
+          toast({
+            variant: "error",
+            message: t("dashboard.homePinNotFound"),
+          });
+          return;
+        }
+        // Non-404 (e.g. transient error): fall through and attempt navigation.
+      }
+      router.push({
+        path: "/dashboards/view",
+        query: {
+          org_identifier: org,
+          dashboard: dashId,
+          folder: homeDashboard.value?.folderId || "default",
+        },
+      });
+    };
+    const toggleHome = (row: any) => {
+      const org = store.state.selectedOrganization?.identifier;
+      if (isHome(row.id)) {
+        clearHomeDashboard(org);
+      } else {
+        // Resolve the folder the SAME way routeToViewD does: row.folder_id is
+        // only populated in search-across-folders mode; in the normal folder
+        // view it is undefined, so fall back to the active folder (default).
+        // This keeps the home dashboard id (dash:<folderId>:<id>) identical to
+        // the one ViewDashboard produces, so setting home from either place is
+        // idempotent and the home dashboard is fetched with a valid folder
+        // (never "undefined").
+        const folderId = searchAcrossFolders.value
+          ? row.folder_id
+          : activeFolderId.value || "default";
+        setHomeDashboard(org, {
+          dashboardId: row.id,
+          folderId,
+          label: row.name,
+        });
+      }
+    };
+
     // Listen for AI assistant dashboard mutations to auto-refresh the list
     const { on: onDashboardEvent, off: offDashboardEvent } =
       useAiDashboardEvents();
@@ -568,6 +687,11 @@ export default defineComponent({
     };
     onMounted(() => {
       onDashboardEvent(handleAiDashboardEvent);
+      // Re-read the authoritative home_dashboard setting so the shortcut button
+      // navigates to the pinned dashboard's CURRENT folder even if it was moved
+      // on another system since this tab last loaded.
+      const org = store.state.selectedOrganization?.identifier;
+      if (org) useHomeDashboard().load(org);
     });
     onUnmounted(() => {
       offDashboardEvent(handleAiDashboardEvent);
@@ -640,7 +764,7 @@ export default defineComponent({
           sortable: false,
           isAction: true,
           size: 124,
-          meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
+          meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
         },
       ];
 
@@ -979,6 +1103,9 @@ export default defineComponent({
 
     const deleteDashboard = async () => {
       if (selectedDelete.value) {
+        // Capture before the row reference is cleared — used below to drop a
+        // stale Home pin that pointed at the just-deleted dashboard.
+        const deletedWasHome = isHome(selectedDelete.value.id);
         try {
           //delete dashboard by id and folder id
           await deleteDashboardById(
@@ -988,7 +1115,18 @@ export default defineComponent({
               ? selectedDelete.value.folder_id
               : (activeFolderId.value ?? "default"),
           );
-          showPositiveNotification("Dashboard deleted successfully.");
+          showPositiveNotification(
+            deletedWasHome
+              ? t("dashboard.pinnedDeletedPinRemoved")
+              : t("dashboard.deletedSuccessfully"),
+          );
+          // The backend clears the home_dashboard setting on delete; re-read it
+          // so the Home shortcut button / pin state updates immediately instead
+          // of lingering until the next navigation.
+          if (deletedWasHome) {
+            const org = store.state.selectedOrganization?.identifier;
+            if (org) useHomeDashboard().load(org);
+          }
         } catch (err) {
           showErrorNotification(err?.message ?? "Dashboard deletion failed", {
           });
@@ -1206,6 +1344,13 @@ export default defineComponent({
           return;
         }
 
+        // Did this batch include the Home-pinned dashboard? Captured before the
+        // delete so we can refresh the pin state afterwards (the backend clears
+        // the home_dashboard setting when the pinned dashboard is deleted).
+        const bulkIncludedHome = selectedDashboardIds.value.some((id: string) =>
+          isHome(id),
+        );
+
         // Extract dashboard ids
         const payload = {
           ids: selectedDashboardIds.value,
@@ -1256,6 +1401,12 @@ export default defineComponent({
         selectedIds.value = [];
         // Refresh dashboards
         await getDashboards(store, activeFolderId.value);
+        // If the pinned dashboard was in the batch, re-read the (now cleared)
+        // home_dashboard setting so the Home shortcut/pin updates immediately.
+        if (bulkIncludedHome) {
+          const org = store.state.selectedOrganization?.identifier;
+          if (org) await useHomeDashboard().load(org);
+        }
       } catch (error: any) {
         dismiss();
         console.error("Error deleting dashboards:", error);
@@ -1359,6 +1510,10 @@ export default defineComponent({
       openBulkDeleteDialog,
       bulkDeleteDashboards,
       confirmBulkDelete,
+      isHome,
+      toggleHome,
+      homeDashboard,
+      openHomeDashboard,
     };
   },
   methods: {

@@ -192,10 +192,10 @@ test.describe("Cross-Linking testcases", () => {
     });
 
     // P1 Tests - Functional
-    test("should validate required fields - save button disabled without name and URL", {
+    test("should validate required fields - blocks save and shows errors without name and URL", {
         tag: ['@crossLinking', '@functional', '@P1', '@all']
     }, async ({ page }) => {
-        testLogger.info('Testing save button disabled state');
+        testLogger.info('Testing required-field validation on submit');
 
         await pm.crossLinkPage.navigateToStreams();
         await pm.crossLinkPage.searchStream(STREAM_NAME);
@@ -210,16 +210,28 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.clickAddCrossLink();
         await pm.crossLinkPage.expectDialogVisible();
 
-        // Save should be disabled when form is empty
-        await pm.crossLinkPage.expectSaveDisabled();
+        // OForm+zod: the Save button stays enabled and validation runs on submit
+        // (submit-then-change timing). Submitting an empty form surfaces both
+        // required-field errors and keeps the dialog open (nothing is saved).
+        await pm.crossLinkPage.clickSave();
+        await pm.crossLinkPage.expectNameRequiredError();
+        await pm.crossLinkPage.expectUrlRequiredError();
+        await pm.crossLinkPage.expectDialogVisible();
 
-        // Fill only name - save should still be disabled
+        // Fill only the name → its error clears on change, but the URL error
+        // persists on the next submit and the dialog stays open.
         await pm.crossLinkPage.fillCrossLinkName('Test Link');
-        await pm.crossLinkPage.expectSaveDisabled();
+        await pm.crossLinkPage.expectNoNameError();
+        await pm.crossLinkPage.clickSave();
+        await pm.crossLinkPage.expectUrlRequiredError();
+        await pm.crossLinkPage.expectDialogVisible();
 
-        // Fill URL too - save should now be enabled
+        // Fill URL too → both errors clear and the form submits successfully,
+        // closing the dialog.
         await pm.crossLinkPage.fillCrossLinkUrl('https://example.com/${field.__value}');
-        await pm.crossLinkPage.expectSaveEnabled();
+        await pm.crossLinkPage.expectNoUrlError();
+        await pm.crossLinkPage.clickSave();
+        await pm.crossLinkPage.expectDialogNotVisible();
 
         testLogger.info('Test completed');
     });

@@ -205,6 +205,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useShortcut } from "@/lib/vue-shortcut-manager";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -745,6 +746,33 @@ export default defineComponent({
         let tempDefaultOrg = {};
         let localOrgFlag = false;
         const url = new URL(window.location.href);
+
+        // If the org the user is currently on (URL or stored) is no longer in the
+        // available list, it is being deleted (the backend hides deleting orgs from
+        // this list). Warn the user, then fall through to default-org selection and
+        // redirect home so the stale org_identifier query param is dropped.
+        const intendedOrgId =
+          customOrganization ||
+          (useLocalOrganization()?.value?.identifier ?? "");
+        const orgs = store.state.organizations || [];
+        if (
+          intendedOrgId &&
+          orgs.length > 0 &&
+          !orgs.some((o: any) => o.identifier === intendedOrgId)
+        ) {
+          toast({
+            variant: "warning",
+            message: t("organization.orgBeingDeletedSwitching"),
+          });
+          // Clear stale selection so the logic below picks the default org.
+          customOrganization = "";
+          useLocalOrganization("");
+          selectedOrg.value = {};
+          store.dispatch("setSelectedOrganization", {});
+          if (router.currentRoute.value.query.org_identifier) {
+            router.replace({ path: "/", query: {} });
+          }
+        }
         if (store.state.organizations?.length > 0) {
           const localOrg: any = useLocalOrganization();
           if (
@@ -953,6 +981,12 @@ export default defineComponent({
             orgSettings?.data?.data?.org_storage_enabled ??
             defaultSettings.org_storage_enabled,
         });
+
+        // Load the org's home dashboard (settings/v2 KV) alongside the legacy org
+        // settings so it's available on boot and every org switch.
+        await useHomeDashboard().load(
+          store.state?.selectedOrganization?.identifier,
+        );
 
         if (
           orgSettings?.data?.data?.free_trial_expiry != null &&

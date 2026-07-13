@@ -500,7 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr
             v-for="r in SKEL_ROW_COUNT"
             :key="`skel-${r}`"
-            class="flex items-center w-full opacity-0 border-b border-b-[var(--o2-tag-grey-1)] h-7 [animation:o2-skel-row-in_320ms_ease-out_forwards] motion-reduce:opacity-100 motion-reduce:animate-none"
+            class="o2-skel-row flex items-center w-full opacity-0 h-[29px] bg-(--o2-log-table-row-bg) border-b border-(--o2-log-table-row-border) [animation:o2-skel-row-in_320ms_ease-out_forwards] motion-reduce:opacity-100 motion-reduce:animate-none"
             :style="{ animationDelay: `${(r - 1) * 40}ms` }"
           >
             <!-- No columns yet (first paint) — full-width shimmer bar -->
@@ -509,7 +509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="w-full px-4 overflow-hidden"
             >
               <span
-                class="inline-block h-3 rounded-md [background:linear-gradient(90deg,var(--color-grey-100)_0%,rgba(255,255,255,0.65)_50%,var(--color-grey-100)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] dark:[background:linear-gradient(90deg,var(--color-grey-600)_0%,rgba(255,255,255,0.03)_50%,var(--color-grey-600)_100%)] motion-reduce:animate-none"
+                class="o2-skel-pill inline-block h-3 rounded-md"
                 :style="{ width: `${skelCellWidth(r - 1, 0)}%` }"
                 aria-hidden="true"
               />
@@ -524,7 +524,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :style="skelTdStyle(header, c)"
               >
                 <span
-                  class="inline-block h-3 rounded-md [background:linear-gradient(90deg,var(--color-grey-100)_0%,rgba(255,255,255,0.65)_50%,var(--color-grey-100)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] dark:[background:linear-gradient(90deg,var(--color-grey-600)_0%,rgba(255,255,255,0.03)_50%,var(--color-grey-600)_100%)] motion-reduce:animate-none"
+                  class="o2-skel-pill inline-block h-3 rounded-md"
                   :style="{
                     width:
                       c === 0
@@ -2590,5 +2590,22 @@ defineExpose({
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ── Loading skeleton pill (uses OTable skeleton tokens from lib/styles/tokens) ── */
+.o2-skel-pill {
+  background: linear-gradient(
+    90deg,
+    var(--color-skeleton-base)     0%,
+    var(--color-skeleton-highlight) 50%,
+    var(--color-skeleton-base)     100%
+  );
+  background-size: 200% 100%;
+  animation: o2-skel-shimmer 1.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .o2-skel-row  { opacity: 1; animation: none; }
+  .o2-skel-pill { animation: none; }
 }
 </style>

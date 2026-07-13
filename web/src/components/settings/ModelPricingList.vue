@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md flex flex-col h-full p-0">
+  <div class="flex flex-col h-full p-0">
     <!-- Full-page Import View -->
     <ImportModelPricing
       v-if="showImportModelPricingPage"
@@ -128,6 +128,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('modelPricing.searchPlaceholder')"
             />
           </div>
+        </template>
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="model-pricing-list-refresh-btn"
+            @click="fetchModels"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="modelPricingRefresh" />
+          </OButton>
         </template>
         <template #tree-warning="{ row }">
           <div class="flex items-center gap-2 py-1 text-sm leading-none">
@@ -377,8 +389,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- end v-if="!showImportModelPricingPage" -->
 
     <!-- Pricing detail side panel -->
-    <ODrawer data-test="model-pricing-list-pricing-drawer" v-model:open="showPricingDialog" :width="30" title="Hello">
-      <template #header-left>
+    <ODrawer
+      data-test="model-pricing-list-pricing-drawer"
+      v-model:open="showPricingDialog"
+      :width="30"
+      :title="pricingDialogRow?.match_pattern"
+      :title-data-test="'model-pricing-drawer-title'"
+      :sub-title="t('modelPricing.modelDetails')"
+    >
+      <!-- Source (built-in / inherited / custom) indicator trails on the right. -->
+      <template #header-right>
         <span
             v-if="getSource(pricingDialogRow) === 'built_in'"
             class="shrink-0 cursor-default inline-flex"
@@ -503,6 +523,8 @@ import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const { t } = useI18n();
 const store = useStore();
@@ -928,6 +950,10 @@ onActivated(() => {
     showImportModelPricingPage.value = true;
   }
 });
+
+useShortcuts([
+  { id: "modelPricingRefresh", handler: () => { if (!isInputFocused()) fetchModels(); } },
+]);
 </script>
 
 <style>

@@ -411,7 +411,7 @@ async fn check_external_contract_expiry() {
 
             // try cancelling subscription of member orgs
             if let Err(e) =
-                o2_enterprise::enterprise::cloud::billing_group::remove_member_billing_of(&org_id)
+                o2_enterprise::enterprise::cloud::billing_group::remove_member_billing_of(org_id)
                     .await
             {
                 log::error!(

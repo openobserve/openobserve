@@ -15,14 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md flex flex-col h-full p-0">
-    <div v-if="!showDestinationEditor" class="flex flex-col h-full">
+  <div class="flex flex-col h-full p-0">
+    <PageLayout
+      v-if="!showDestinationEditor"
+      :main-panel="false"
+      :header-class="'shrink-0 px-4 border-b border-border-default'"
+    >
       <!-- Standard section header: title + actions only. Search moved to toolbar. -->
+      <template #header>
       <AppPageHeader
         :title="t('pipeline_destinations.header')"
         icon="person-pin-circle"
         :subtitle="'External targets for pipeline output'"
-        class="shrink-0 px-4 border-b border-border-default"
       >
         <template #actions>
           <OButton
@@ -34,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </template>
       </AppPageHeader>
+      </template>
       <div class="card-container flex-1 min-h-0 overflow-hidden">
       <OTable
         :frame="false"
@@ -62,6 +67,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex-1"
             :placeholder="t('pipeline_destinations.search')"
           />
+        </template>
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="pipeline-destination-list-refresh-btn"
+            @click="getDestinations"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="pipelineDestinationsRefresh" />
+          </OButton>
         </template>
         <template #empty>
           <OEmptyState
@@ -132,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
       </div>
-    </div>
+    </PageLayout>
     <div v-else>
       <PipelineDestinationEditor
         :destination="editingDestination"
@@ -183,10 +200,14 @@ import type { Template } from "@/ts/interfaces/index";
 
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -209,10 +230,12 @@ export default defineComponent({
   name: "PageAlerts",
   components: {
     AppPageHeader,
+    PageLayout,
     PipelineDestinationEditor,
     OEmptyState,
     ConfirmDialog,
     OButton,
+    OTooltip,
     OIcon,
     OTag,
     OSearchInput,
@@ -627,6 +650,10 @@ export default defineComponent({
 
       confirmBulkDelete.value = false;
     };
+
+    useShortcuts([
+      { id: "pipelineDestinationsRefresh", handler: () => { if (!isInputFocused()) getDestinations(); } },
+    ]);
 
     return {
       t,

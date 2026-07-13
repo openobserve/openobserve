@@ -31,6 +31,8 @@ pub static GLOBAL_CACHE: Lazy<Arc<TantivyResultCache>> =
 pub enum CacheEntry {
     /// (matched_row_ids bitmap, row_group_size_from_index_file)
     RowIds(Arc<BooleanBuffer>, Option<u32>),
+    /// ((_timestamp, doc_id), row_group_size_from_index_file)
+    SelectCandidates(Arc<Vec<(i64, u32)>>, Option<u32>),
     Count(usize),                            // simple count optimization
     Histogram(Vec<u64>),                     // simple histogram optimization
     MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization
@@ -45,6 +47,12 @@ impl From<CacheEntry> for TantivyResult {
                 row_ids,
                 row_group_size,
             },
+            CacheEntry::SelectCandidates(candidates, row_group_size) => {
+                TantivyResult::SelectCandidates {
+                    candidates,
+                    row_group_size,
+                }
+            }
             CacheEntry::Count(count) => TantivyResult::Count(count),
             CacheEntry::Histogram(histogram) => TantivyResult::Histogram(histogram),
             CacheEntry::MultiHistogram(multi_histogram) => {
@@ -61,6 +69,10 @@ impl CacheEntry {
         match self {
             CacheEntry::RowIds(packed, ..) => {
                 packed.inner().len() + std::mem::size_of::<BooleanBuffer>()
+            }
+            CacheEntry::SelectCandidates(candidates, ..) => {
+                candidates.capacity() * std::mem::size_of::<(i64, u32)>()
+                    + std::mem::size_of::<Vec<(i64, u32)>>()
             }
             CacheEntry::Count(_) => std::mem::size_of::<usize>(),
             CacheEntry::Histogram(histogram) => {
@@ -450,6 +462,26 @@ mod tests {
             assert_eq!(count, 42);
         } else {
             panic!("Expected Count result");
+        }
+    }
+
+    #[test]
+    fn test_tantivy_result_cache_select_candidates_roundtrip() {
+        let cache = TantivyResultCache::new(10);
+
+        let candidates = Arc::new(vec![(100i64, 7u32), (99, 3)]);
+        let entry = CacheEntry::SelectCandidates(candidates.clone(), Some(1024));
+        cache.put("select_candidates_key".to_string(), entry);
+
+        if let Some(TantivyResult::SelectCandidates {
+            candidates: cached,
+            row_group_size,
+        }) = cache.get("select_candidates_key")
+        {
+            assert_eq!(*cached, *candidates);
+            assert_eq!(row_group_size, Some(1024));
+        } else {
+            panic!("Expected SelectCandidates result");
         }
     }
 

@@ -68,6 +68,7 @@ const ODrawerStub = {
     open: { type: Boolean, default: false },
     size: { type: String, default: undefined },
     title: { type: String, default: undefined },
+    titleDataTest: { type: String, default: undefined },
     subTitle: { type: String, default: undefined },
     persistent: { type: Boolean, default: false },
     showClose: { type: Boolean, default: true },
@@ -95,6 +96,8 @@ const ODrawerStub = {
       :data-persistent="String(!!persistent)"
       :data-show-close="String(!!showClose)"
     >
+      <span v-if="title" :data-test="titleDataTest">{{ title }}</span>
+      <span v-if="subTitle" data-test="o-drawer-sub-title">{{ subTitle }}</span>
       <slot name="header" />
       <slot name="header-left" />
       <slot name="header-right" />

@@ -123,6 +123,8 @@ impl IndexCondition {
             Err(anyhow::anyhow!(
                 "All AND conditions are failed to generate tantivy query"
             ))
+        } else if queries.len() == 1 {
+            Ok((queries.pop().unwrap().1, has_skipped))
         } else {
             Ok((Box::new(BooleanQuery::from(queries)), has_skipped))
         }
@@ -470,12 +472,12 @@ impl Condition {
         })
     }
 
+    /// Fields whose queries enumerate terms and therefore require full postings.
+    /// Exact positive and negative terms are exposed by `Query::query_terms`.
     pub fn need_all_term_fields(&self) -> HashSet<String> {
         let mut fields = HashSet::new();
         match self {
-            Condition::StrMatch(field, ..)
-            | Condition::Regex(field, _)
-            | Condition::NotEqual(field, _) => {
+            Condition::StrMatch(field, ..) | Condition::Regex(field, _) => {
                 fields.insert(field.clone());
             }
             Condition::MatchAll(value) => {
@@ -491,18 +493,17 @@ impl Condition {
                 fields.extend(right.need_all_term_fields());
             }
             Condition::Not(condition) => {
-                // not operator will need get all term for each fields
-                fields.extend(condition.get_tantivy_fields());
+                fields.extend(condition.need_all_term_fields());
             }
-            Condition::In(field, _, negated) if *negated => {
-                fields.insert(field.clone());
-            }
-            Condition::All() | Condition::Equal(..) | Condition::In(..) => {}
+            Condition::All()
+            | Condition::Equal(..)
+            | Condition::NotEqual(..)
+            | Condition::In(..) => {}
         }
         fields
     }
 
-    // get the fields use for search in tantivy
+    #[allow(dead_code)]
     pub fn get_tantivy_fields(&self) -> HashSet<String> {
         let mut fields = HashSet::new();
         match self {
@@ -1260,16 +1261,14 @@ mod tests {
     fn test_condition_need_all_term_fields_not_equal() {
         let condition = Condition::NotEqual("field1".to_string(), "value".to_string());
         let fields = condition.need_all_term_fields();
-        assert_eq!(fields.len(), 1);
-        assert!(fields.contains("field1"));
+        assert!(fields.is_empty());
     }
 
     #[test]
     fn test_condition_need_all_term_fields_in_negated() {
         let condition = Condition::In("field1".to_string(), vec!["value1".to_string()], true);
         let fields = condition.need_all_term_fields();
-        assert_eq!(fields.len(), 1);
-        assert!(fields.contains("field1"));
+        assert!(fields.is_empty());
     }
 
     #[test]
@@ -1278,9 +1277,26 @@ mod tests {
         let right = Condition::NotEqual("field2".to_string(), "value".to_string());
         let condition = Condition::Or(Box::new(left), Box::new(right));
         let fields = condition.need_all_term_fields();
-        assert_eq!(fields.len(), 2);
+        assert_eq!(fields.len(), 1);
         assert!(fields.contains("field1"));
-        assert!(fields.contains("field2"));
+    }
+
+    #[test]
+    fn test_condition_need_all_term_fields_not_exact_and_expansion() {
+        let exact = Condition::Not(Box::new(Condition::Equal(
+            "field1".to_string(),
+            "value".to_string(),
+        )));
+        assert!(exact.need_all_term_fields().is_empty());
+
+        let expansion = Condition::Not(Box::new(Condition::Regex(
+            "field1".to_string(),
+            "value.*".to_string(),
+        )));
+        assert_eq!(
+            expansion.need_all_term_fields(),
+            HashSet::from(["field1".to_string()])
+        );
     }
 
     #[test]

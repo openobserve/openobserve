@@ -63,6 +63,19 @@
           />
         </template>
 
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="scorer-list-refresh-btn"
+            @click="emit('refresh')"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="scorersRefresh" />
+          </OButton>
+        </template>
+
         <template #empty>
           <div class="flex items-center justify-center py-8">
             <OEmptyState
@@ -80,7 +93,7 @@
         </template>
 
         <template #bottom="{ totalRows }">
-          <span class="o2-table-footer-title text-primary">
+          <span class="o2-table-footer-title">
             {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scorer.listTitle") }}
           </span>
           <OButton
@@ -154,6 +167,9 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -193,6 +209,7 @@ const emit = defineEmits<{
   (e: "export", row: Scorer): void;
   (e: "export-bulk", ids: string[]): void;
   (e: "add-provider"): void;
+  (e: "refresh"): void;
 }>();
 
 const { t } = useI18n();
@@ -339,4 +356,8 @@ function usedByText(row: Scorer) {
   if (count === 1) return t("onlineEvals.scorer.usedByJob", { count });
   return t("onlineEvals.scorer.usedByJobs", { count });
 }
+
+useShortcuts([
+  { id: "scorersRefresh", handler: () => { if (!isInputFocused()) emit("refresh"); } },
+]);
 </script>
