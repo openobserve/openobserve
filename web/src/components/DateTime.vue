@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSeparator />
         <div class="overflow-y-visible">
         <OTabPanels v-model="selectedType" animated>
-          <OTabPanel v-if="!disableRelative" name="relative" class="p-0">
+          <OTabPanel v-if="!disableRelative" name="relative">
             <div class="date-time-table relative flex flex-col">
               <div
                 class="relative-row flex items-center border-b border-(--o2-border) pl-3 py-2"
