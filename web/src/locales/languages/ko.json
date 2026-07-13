@@ -484,6 +484,10 @@
   },
   "validation": {
     "required": "이 필드는 필수입니다.",
+    "fieldRequired": "필드는 필수입니다!",
+    "alphanumeric": "입력은 영숫자여야 합니다.",
+    "organizationNameRequired": "조직 이름은 필수입니다.",
+    "selectOrganization": "조직을 선택하세요.",
     "invalidFormat": "잘못된 형식",
     "mustBeGreaterThan": "{value} 보다 커야 합니다.",
     "mustBeLessThan": "{value} 보다 작아야 합니다."

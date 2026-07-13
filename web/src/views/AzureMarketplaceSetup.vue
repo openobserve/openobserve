@@ -187,6 +187,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import azureMarketplace from "@/services/azureMarketplace";
 import organizationsService from "@/services/organizations";
@@ -197,9 +198,9 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import {
-  azureCreateOrgSchema,
+  makeAzureCreateOrgSchema,
   azureCreateOrgDefaults,
-  azureLinkOrgSchema,
+  makeAzureLinkOrgSchema,
   azureLinkOrgDefaults,
   type AzureCreateOrgForm,
   type AzureLinkOrgForm,
@@ -223,6 +224,11 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const router = useRouter();
+    const { t } = useI18n();
+
+    // Factory-built so the required messages resolve through i18n.
+    const azureCreateOrgSchema = makeAzureCreateOrgSchema(t);
+    const azureLinkOrgSchema = makeAzureLinkOrgSchema(t);
 
     const state = ref<SetupState>("select_org");
     const errorMessage = ref("");

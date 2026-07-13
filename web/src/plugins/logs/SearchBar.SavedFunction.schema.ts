@@ -29,20 +29,20 @@ export const makeSavedFunctionSchema = (t: (_key: string) => string) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["savedFunctionName"],
-            message: "This field is required",
+            message: t("validation.required"),
           });
         } else if (!SAVED_FUNCTION_NAME_REGEX.test(val.savedFunctionName)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["savedFunctionName"],
-            message: "Input must be alphanumeric",
+            message: t("validation.alphanumeric"),
           });
         }
       } else if (!val.savedFunctionSelectedName) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["savedFunctionSelectedName"],
-          message: "Field is required!",
+          message: t("validation.fieldRequired"),
         });
       }
     });

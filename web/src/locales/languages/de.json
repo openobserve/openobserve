@@ -484,6 +484,10 @@
   },
   "validation": {
     "required": "Dieses Feld ist erforderlich",
+    "fieldRequired": "Feld ist erforderlich!",
+    "alphanumeric": "Eingabe muss alphanumerisch sein",
+    "organizationNameRequired": "Organisationsname ist erforderlich",
+    "selectOrganization": "Bitte wählen Sie eine Organisation aus",
     "invalidFormat": "Ungültiges Format",
     "mustBeGreaterThan": "Muss größer als {value} sein",
     "mustBeLessThan": "Muss kleiner als {value} sein"

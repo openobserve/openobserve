@@ -484,6 +484,10 @@
   },
   "validation": {
     "required": "このフィールドは必須です",
+    "fieldRequired": "フィールドは必須です！",
+    "alphanumeric": "入力は英数字である必要があります",
+    "organizationNameRequired": "組織名は必須です",
+    "selectOrganization": "組織を選択してください",
     "invalidFormat": "形式が無効です",
     "mustBeGreaterThan": "{value} より大きくなければなりません",
     "mustBeLessThan": "{value} より小さくなければなりません"

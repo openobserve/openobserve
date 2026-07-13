@@ -53,7 +53,7 @@ describe("SavedView schema (row 58)", () => {
     });
     expect(r.success).toBe(false);
     if (!r.success) {
-      expect(r.error.issues[0].message).toBe("This field is required");
+      expect(r.error.issues[0].message).toBe("validation.required");
     }
   });
 
@@ -65,7 +65,7 @@ describe("SavedView schema (row 58)", () => {
     });
     expect(r.success).toBe(false);
     if (!r.success) {
-      expect(r.error.issues[0].message).toBe("Input must be alphanumeric");
+      expect(r.error.issues[0].message).toBe("validation.alphanumeric");
     }
   });
 
@@ -86,7 +86,7 @@ describe("SavedView schema (row 58)", () => {
     });
     expect(empty.success).toBe(false);
     if (!empty.success) {
-      expect(empty.error.issues[0].message).toBe("Field is required!");
+      expect(empty.error.issues[0].message).toBe("validation.fieldRequired");
     }
 
     const ok = savedViewSchema.safeParse({
@@ -107,7 +107,7 @@ describe("SavedFunction schema (row 59)", () => {
     });
     expect(r.success).toBe(false);
     if (!r.success) {
-      expect(r.error.issues[0].message).toBe("This field is required");
+      expect(r.error.issues[0].message).toBe("validation.required");
     }
   });
 
@@ -120,7 +120,7 @@ describe("SavedFunction schema (row 59)", () => {
       });
       expect(r.success).toBe(false);
       if (!r.success) {
-        expect(r.error.issues[0].message).toBe("Input must be alphanumeric");
+        expect(r.error.issues[0].message).toBe("validation.alphanumeric");
       }
     }
   });

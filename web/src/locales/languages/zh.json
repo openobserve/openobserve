@@ -484,6 +484,10 @@
   },
   "validation": {
     "required": "此字段为必填字段",
+    "fieldRequired": "字段为必填项！",
+    "alphanumeric": "输入必须为字母数字",
+    "organizationNameRequired": "组织名称为必填项",
+    "selectOrganization": "请选择一个组织",
     "invalidFormat": "格式无效",
     "mustBeGreaterThan": "必须大于 {值}",
     "mustBeLessThan": "必须小于 {值}"

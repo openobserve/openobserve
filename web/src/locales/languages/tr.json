@@ -484,6 +484,10 @@
   },
   "validation": {
     "required": "Bu alan zorunludur",
+    "fieldRequired": "Alan zorunludur!",
+    "alphanumeric": "Girdi alfasayısal olmalıdır",
+    "organizationNameRequired": "Kuruluş adı zorunludur",
+    "selectOrganization": "Lütfen bir kuruluş seçin",
     "invalidFormat": "Geçersiz biçim",
     "mustBeGreaterThan": "{value} 'den büyük olmalıdır",
     "mustBeLessThan": "{value} 'den küçük olmalıdır"

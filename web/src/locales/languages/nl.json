@@ -484,6 +484,10 @@
   },
   "validation": {
     "required": "Dit veld is verplicht",
+    "fieldRequired": "Veld is verplicht!",
+    "alphanumeric": "Invoer moet alfanumeriek zijn",
+    "organizationNameRequired": "Organisatienaam is verplicht",
+    "selectOrganization": "Selecteer een organisatie",
     "invalidFormat": "Ongeldig formaat",
     "mustBeGreaterThan": "Moet groter zijn dan {value}",
     "mustBeLessThan": "Moet kleiner zijn dan {value}"

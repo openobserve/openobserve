@@ -60,7 +60,7 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormCheckboxGroup from "@/lib/forms/Checkbox/OFormCheckboxGroup.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import {
-  filterCreatorPopupSchema,
+  makeFilterCreatorPopupSchema,
   type FilterCreatorPopupForm,
 } from "./FilterCreatorPopup.schema";
 export default defineComponent({
@@ -83,6 +83,9 @@ export default defineComponent({
   setup(props, { emit }) {
     const show = ref(true);
     const { t } = useI18n();
+
+    // Factory-built so the required message resolves through i18n.
+    const filterCreatorPopupSchema = makeFilterCreatorPopupSchema(t);
 
     // Dynamic defaults (seeded from props) → a typed component computed, not a
     // factory in the schema file. selectedValues must always be an array so the

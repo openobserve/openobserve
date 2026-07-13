@@ -139,6 +139,10 @@
   },
   "validation": {
     "required": "此欄位為必填",
+    "fieldRequired": "欄位為必填！",
+    "alphanumeric": "輸入必須為英數字",
+    "organizationNameRequired": "組織名稱為必填",
+    "selectOrganization": "請選擇一個組織",
     "invalidFormat": "格式無效",
     "mustBeGreaterThan": "必須大於 {value}",
     "mustBeLessThan": "必須小於 {value}"

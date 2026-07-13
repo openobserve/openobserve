@@ -19,8 +19,20 @@ import { nextTick } from "vue";
 import AzureMarketplaceSetup from "./AzureMarketplaceSetup.vue";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
+import { createI18n } from "vue-i18n";
 import organizationsService from "@/services/organizations";
 import azureMarketplace from "@/services/azureMarketplace";
+
+// The component calls useI18n() to i18n-drive its schema messages, so the mount
+// needs an i18n plugin. Messages are irrelevant here (these tests assert
+// validity, not error text), so an empty message bag is enough.
+const i18n = createI18n({
+  legacy: false,
+  locale: "en",
+  messages: { en: {} },
+  missingWarn: false,
+  fallbackWarn: false,
+});
 
 // Mock the services the two card-forms drive on submit.
 vi.mock("@/services/organizations", () => ({
@@ -74,7 +86,7 @@ describe("AzureMarketplaceSetup", () => {
   const mountSetup = () =>
     mount(AzureMarketplaceSetup, {
       global: {
-        plugins: [store, router],
+        plugins: [store, router, i18n],
       },
     });
 
@@ -240,7 +252,7 @@ describe("AzureMarketplaceSetup", () => {
 
     const wrapper = mount(AzureMarketplaceSetup, {
       global: {
-        plugins: [darkStore, router],
+        plugins: [darkStore, router, i18n],
       },
     });
 

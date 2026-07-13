@@ -4439,6 +4439,10 @@
   },
   "validation": {
     "required": "यह फ़ील्ड आवश्यक है",
+    "fieldRequired": "फ़ील्ड आवश्यक है!",
+    "alphanumeric": "इनपुट अल्फ़ान्यूमेरिक होना चाहिए",
+    "organizationNameRequired": "संगठन का नाम आवश्यक है",
+    "selectOrganization": "कृपया एक संगठन चुनें",
     "invalidFormat": "अमान्य प्रारूप",
     "mustBeGreaterThan": "{value} से अधिक होना चाहिए",
     "mustBeLessThan": "{value} से कम होना चाहिए"

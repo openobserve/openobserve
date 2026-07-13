@@ -1,8 +1,8 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Validation schema for the Saved View dialog in SearchBar.vue (row 58).
-// Built via a factory so messages stay i18n-driven (pass `t`); a few messages
-// are literals to preserve the exact strings the component used.
+// Built via a factory so all messages stay i18n-driven (pass `t`); the keys
+// resolve to the exact strings the component used before migration.
 //
 // Mode-aware (conditional on `isSavedViewAction`, which is form-owned so the
 // superRefine can branch on it):
@@ -32,20 +32,20 @@ export const makeSavedViewSchema = (t: (_key: string) => string) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["savedViewName"],
-            message: "This field is required",
+            message: t("validation.required"),
           });
         } else if (!SAVED_VIEW_NAME_REGEX.test(val.savedViewName)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["savedViewName"],
-            message: "Input must be alphanumeric",
+            message: t("validation.alphanumeric"),
           });
         }
       } else if (!val.savedViewSelectedName) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["savedViewSelectedName"],
-          message: "Field is required!",
+          message: t("validation.fieldRequired"),
         });
       }
     });
