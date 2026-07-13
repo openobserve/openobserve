@@ -19,8 +19,11 @@ const STATUS_COLOR: Record<string, string> = {
 }
 
 const DEVICE_ICON: Record<string, string> = {
-  laptop_large: 'laptop',
+  desktop:      'laptop',
   tablet:       'tablet_mac',
+  mobile:       'smartphone',
+  // legacy ids — records created before the rename
+  laptop_large: 'laptop',
   mobile_small: 'smartphone',
 }
 

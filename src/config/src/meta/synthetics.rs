@@ -499,7 +499,7 @@ pub struct SshAuth {
 pub struct BrowserDevice {
     /// "chromium" | "firefox" | "edge"
     pub browser: String,
-    /// "laptop_large" | "tablet" | "mobile_small"
+    /// "desktop" | "tablet" | "mobile"
     pub device: String,
 }
 
@@ -576,7 +576,7 @@ fn default_dns_record_type() -> String {
 fn default_browser_devices() -> Vec<BrowserDevice> {
     vec![BrowserDevice {
         browser: "chromium".to_string(),
-        device: "laptop_large".to_string(),
+        device: "desktop".to_string(),
     }]
 }
 

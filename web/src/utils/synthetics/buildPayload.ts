@@ -93,7 +93,7 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
 
     config: {
       steps: journeyToWireSteps(journey),
-      browser_devices: browserDevices ?? [{ browser: 'chromium', device: 'laptop_large' }],
+      browser_devices: browserDevices ?? [{ browser: 'chromium', device: 'desktop' }],
       timeout_ms: 30000,
       capture: {
         screenshot: capture?.screenshot ?? 'on-fail',

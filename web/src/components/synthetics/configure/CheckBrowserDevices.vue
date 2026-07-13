@@ -28,14 +28,17 @@ function deviceLabelKey(label: string): string {
 
 const DEFAULT_BROWSERS = ['chromium', 'firefox']
 const DEFAULT_DEVICES: SyntheticsDevice[] = [
-  { id: 'laptop_large', label: 'Desktop', width: 1440, height: 900 },
-  { id: 'tablet',       label: 'Tablet',  width: 768,  height: 1024 },
-  { id: 'mobile_small', label: 'Mobile',  width: 375,  height: 667 },
+  { id: 'desktop', label: 'Desktop', width: 1440, height: 900 },
+  { id: 'tablet',  label: 'Tablet',  width: 768,  height: 1024 },
+  { id: 'mobile',  label: 'Mobile',  width: 375,  height: 667 },
 ]
 
 const DEVICE_ICONS: Record<string, string> = {
-  laptop_large: 'computer',
+  desktop:      'computer',
   tablet:       'tablet',
+  mobile:       'smartphone',
+  // legacy ids — monitors/records created before the rename
+  laptop_large: 'computer',
   mobile_small: 'smartphone',
 }
 
@@ -56,7 +59,7 @@ const activeDevices = computed(() =>
 )
 
 const selected = computed<{ browser: string; device: string }[]>(
-  () => props.check.browserDevices ?? [{ browser: 'chromium', device: 'laptop_large' }],
+  () => props.check.browserDevices ?? [{ browser: 'chromium', device: 'desktop' }],
 )
 
 function isChecked(browserId: string, deviceId: string) {

@@ -61,7 +61,7 @@ mod tests {
             attempts: 0,
             run_id: "3Fzn001XXXXXXXXXXXXXXXX".to_string(),
             browser_devices: Some(
-                r#"[{"execution_id":"3Fze001XX","engine":"chromium","device":"laptop_large"}]"#
+                r#"[{"execution_id":"3Fze001XX","engine":"chromium","device":"desktop"}]"#
                     .to_string(),
             ),
             metadata: "{}".to_string(),

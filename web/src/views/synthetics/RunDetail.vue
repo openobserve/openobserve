@@ -962,10 +962,10 @@ function locationIcon(region: string): string {
 }
 
 function deviceIcon(name: string): string {
-  console.log(name);
-  if (name === "laptop_large") return "computer";
+  // legacy ids (laptop_large/mobile_small) — records created before the rename
+  if (name === "desktop" || name === "laptop_large") return "computer";
   if (name === "tablet") return "tablet";
-  if (name === "mobile_small") return "smartphone";
+  if (name === "mobile" || name === "mobile_small") return "smartphone";
   return "devices";
 }
 

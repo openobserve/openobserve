@@ -424,7 +424,7 @@ mod tests {
             valid_until: 1750000300000000,
             run_id: "3Fzn001XXXXXXXXXXXXXXXX",
             browser_devices: Some(
-                r#"[{"execution_id":"3Fze001XX","engine":"chromium","device":"laptop_large"}]"#,
+                r#"[{"execution_id":"3Fze001XX","engine":"chromium","device":"desktop"}]"#,
             ),
             metadata: r#"{"tags":["prod","checkout"]}"#,
         };

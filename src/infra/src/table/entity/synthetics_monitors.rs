@@ -59,7 +59,7 @@ mod tests {
             target: "https://app.example.com".to_string(),
             description: "Monitors the login flow".to_string(),
             tags: serde_json::json!(["prod", "checkout"]),
-            config: serde_json::json!({"browser_devices": [{"browser": "chromium", "device": "laptop_large"}], "steps": []}),
+            config: serde_json::json!({"browser_devices": [{"browser": "chromium", "device": "desktop"}], "steps": []}),
             frequency: serde_json::json!({"type": "minutes", "interval": 5, "cron": ""}),
             locations: serde_json::json!(["aws-us-east-1"]),
             enabled: true,

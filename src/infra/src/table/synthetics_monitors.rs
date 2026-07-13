@@ -543,7 +543,7 @@ mod tests {
             description: "Monitors the login flow".to_string(),
             tags: serde_json::json!(["prod"]),
             config: serde_json::json!({
-                "browser_devices": [{"browser": "chromium", "device": "laptop_large"}],
+                "browser_devices": [{"browser": "chromium", "device": "desktop"}],
                 "steps": []
             }),
             frequency: serde_json::json!({"type": "minutes", "interval": 5, "cron": ""}),
