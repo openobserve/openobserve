@@ -13,14 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#![feature(variant_count)]
 #![recursion_limit = "256"]
 
 pub mod cli;
-pub mod handler;
 pub mod migration;
-pub mod router;
 
+pub use openobserve_api::{handler, router};
 #[cfg(feature = "enterprise")]
 pub use openobserve_core::cipher;
 pub use openobserve_core::{common, job, service};
