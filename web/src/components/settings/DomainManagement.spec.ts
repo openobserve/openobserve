@@ -903,7 +903,8 @@ describe("makeAddEmailSchema (required: empty fails, must be valid + belong to d
       mount(DomainManagement, { global: { plugins: [i18n] } });
     const emailFormFor = async (wrapper: any, name: string) => {
       const vm = wrapper.vm as any;
-      vm.domains.push({ name, allowAllUsers: false, allowedEmails: [] });
+      // policy "allow_specific" is what renders the allow-email OForm (whose ref we need).
+      vm.domains.push({ name, policy: "allow_specific", allowedEmails: [], blockedEmails: [] });
       await nextTick();
       await flushPromises();
       await nextTick();
