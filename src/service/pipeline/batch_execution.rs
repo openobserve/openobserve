@@ -943,10 +943,11 @@ impl ExecutablePipeline {
         if let Some(pipeline_errors) = errors {
             // TODO YJDOc2: maybe change error type?
             log::error!(
-                "[Workflow] [inv={inv_id}] id: {}, name: {}, node_errors: {:?}",
+                "[Workflow] [inv={inv_id}] id: {}, name: {}, {:?}, total {} nodes errored while executing",
                 pipeline_errors.pipeline_id,
                 pipeline_errors.pipeline_name,
-                pipeline_errors.node_errors
+                pipeline_errors.error,
+                pipeline_errors.node_errors.len()
             );
             let error_data = ErrorData {
                 _timestamp: Utc::now().timestamp_micros(),

@@ -12,11 +12,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::{
-        extractors::Headers,
-        models::pipelines::{PipelineBulkEnableRequest, PipelineBulkEnableResponse, PipelineList},
-    },
-    service::{db, workflows},
+    handler::http::extractors::Headers,
+    service::workflows,
 };
 
 #[derive(Deserialize)]
