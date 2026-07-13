@@ -179,9 +179,11 @@ export class LogsPage {
         this.recordsPerPageOption = value => `[data-test="logs-search-result-records-per-page-option"][data-test-value="${value}"]`;
         // OPagination per-page buttons forward parentDataTest as `${parent}-page-{n}` (OPagination.vue:98)
         this.resultPaginationPageBtn = pageNumber => `[data-test="logs-search-result-pagination-page-${pageNumber}"]`;
-        // Post-UX-revamp: the field-row "interesting/add" toggle is now
-        // `...-add-<field>-field-btn` (was `...-interesting-<field>-field-btn`).
-        this.interestingFieldBtn = field => `[data-test="log-search-index-list-add-${field}-field-btn"]`;
+        // The field-row "interesting" toggle. Confirmed via live DOM (Playwright MCP):
+        // data-test is `...-interesting-<field>-field-btn`; its `title` reflects state
+        // ("Add to interesting fields" / "Remove from interesting fields") — used for
+        // idempotency. It can be hover-revealed, so callers hover the row first.
+        this.interestingFieldBtn = field => `[data-test="log-search-index-list-interesting-${field}-field-btn"], [data-test="log-search-index-list-add-${field}-field-btn"]`;
         this.logsSearchBarFunctionDropdown = '[data-test="logs-search-bar-function-dropdown"]';
         this.logsSearchBarFunctionDropdownSave = '[data-test="logs-search-bar-function-dropdown"] button';
         this.logsSearchBarSaveTransformBtn = '[data-test="logs-search-bar-save-transform-btn"]';
