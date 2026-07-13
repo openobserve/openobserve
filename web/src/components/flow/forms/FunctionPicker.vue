@@ -40,7 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   Exposes:
     getPayload()  — { name, after_flatten? } or null (and surfaces validation)
-    isCreating    — ref<boolean>, true while the inline editor is open
 -->
 <template>
   <div
@@ -102,16 +101,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="function-picker-definition"
           class="tw:mt-4 tw:mb-4"
         >
-          <OCard class="function-definition-card tw:border tw:border-[#e1e5e9] tw:dark:border-[#2d3748] tw:rounded-lg tw:overflow-hidden tw:dark:bg-[#1a202c]">
-            <OCardSection role="header" class="tw:bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)] tw:dark:bg-[linear-gradient(135deg,#2d3748_0%,#1a202c_100%)] tw:border-b tw:border-b-[#e2e8f0] tw:dark:border-b-[#4a5568]">
-              <div class="tw:text-base tw:font-semibold tw:text-[#2d3748] tw:dark:text-white">
+          <!-- Dark styling is bound to the app theme (store.state.theme), NOT
+               tw:dark: — the tw:dark: variant follows the OS prefers-color-scheme
+               here (no @custom-variant dark), which flips this card dark in the
+               app's light mode. -->
+          <OCard
+            class="function-definition-card tw:border tw:rounded-lg tw:overflow-hidden"
+            :class="isDark
+              ? 'tw:border-[#2d3748] tw:bg-[#1a202c] tw:shadow-[0_4px_12px_rgba(0,0,0,0.4)]'
+              : 'tw:border-[#e1e5e9] tw:shadow-[0_2px_4px_rgba(0,0,0,0.05)]'"
+          >
+            <OCardSection
+              role="header"
+              class="tw:border-b"
+              :class="isDark
+                ? 'tw:bg-[linear-gradient(135deg,#2d3748_0%,#1a202c_100%)] tw:border-b-[#4a5568]'
+                : 'tw:bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)] tw:border-b-[#e2e8f0]'"
+            >
+              <div
+                class="tw:text-base tw:font-semibold"
+                :class="isDark ? 'tw:text-white' : 'tw:text-[#2d3748]'"
+              >
                 {{ t("function.function_definition") }}
               </div>
             </OCardSection>
             <OSeparator />
             <OCardSection class="tw:p-0">
-              <div class="function-code-container tw:bg-[#fafbfc] tw:dark:bg-[#0d1117] tw:dark:border tw:dark:border-[#21262d] tw:max-h-[250px] tw:overflow-y-auto tw:relative">
-                <pre class="function-code tw:text-[#2d3748] tw:dark:text-[#f7fafc] tw:bg-transparent tw:m-0 tw:p-4 tw:text-[13px] tw:leading-normal tw:whitespace-pre-wrap tw:break-words tw:border-0 tw:font-normal tw:cursor-default tw:select-text">{{ selectedDefinition }}</pre>
+              <div
+                class="function-code-container tw:max-h-[250px] tw:overflow-y-auto tw:relative"
+                :class="isDark ? 'tw:bg-[#0d1117] tw:border tw:border-[#21262d]' : 'tw:bg-[#fafbfc]'"
+              >
+                <pre
+                  class="function-code tw:bg-transparent tw:m-0 tw:p-4 tw:text-[13px] tw:leading-normal tw:whitespace-pre-wrap tw:break-words tw:border-0 tw:font-normal tw:cursor-default tw:select-text"
+                  :class="isDark ? 'tw:text-[#f7fafc]' : 'tw:text-[#2d3748]'"
+                >{{ selectedDefinition }}</pre>
               </div>
             </OCardSection>
           </OCard>
@@ -201,6 +224,9 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const store = useStore();
 
+// App theme (not tw:dark:, which follows the OS here — see the preview markup).
+const isDark = computed(() => store.state.theme === "dark");
+
 const loading = ref(false);
 const functionOptions = ref<string[]>([]);
 const functionDefs = ref<Record<string, string>>({});
@@ -283,9 +309,7 @@ const getPayload = () => {
     : { name: selectedFunction.value };
 };
 
-const isCreating = computed(() => createNewFunction.value);
-
-defineExpose({ getPayload, isCreating });
+defineExpose({ getPayload });
 </script>
 
 <style scoped>

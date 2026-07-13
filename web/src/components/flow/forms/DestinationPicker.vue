@@ -138,7 +138,5 @@ const getPayload = () => {
   };
 };
 
-const isCreating = computed(() => createNewDestination.value);
-
-defineExpose({ getPayload, isCreating });
+defineExpose({ getPayload });
 </script>
