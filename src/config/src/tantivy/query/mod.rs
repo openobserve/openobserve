@@ -16,4 +16,5 @@
 pub mod contains_query;
 pub mod histogram_collector;
 pub mod ids_collector;
+pub mod top_doc_id_collector;
 pub mod topn_collector;

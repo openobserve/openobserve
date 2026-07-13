@@ -20,6 +20,8 @@ use arrow::buffer::BooleanBuffer;
 use config::tantivy::query::histogram_collector::{
     MultiHistogramCollector, SimpleHistogramCollector, simple_histogram_rank,
 };
+#[cfg(not(feature = "enterprise"))]
+use config::tantivy::query::top_doc_id_collector::collect_top_doc_ids;
 use config::{
     TIMESTAMP_COL_NAME,
     meta::inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS},
@@ -32,11 +34,9 @@ use config::{
 use o2_enterprise::enterprise::search::tantivy::histogram_collector::{
     MultiHistogramCollector, SimpleHistogramCollector, simple_histogram_rank,
 };
-use tantivy::{
-    DocId, Score, Searcher,
-    collector::{Count, TopDocs},
-    query::Query,
-};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::tantivy::top_doc_id_collector::collect_top_doc_ids;
+use tantivy::{Searcher, collector::Count, query::Query};
 
 use crate::service::search::index::IndexCondition;
 
@@ -129,20 +129,7 @@ impl TantivyResult {
         limit: usize,
         ascend: bool,
     ) -> anyhow::Result<Self> {
-        let res = searcher.search(
-            &query,
-            &TopDocs::with_limit(limit).tweak_score(
-                move |_segment_reader: &tantivy::SegmentReader| {
-                    move |doc_id: DocId, _original_score: Score| {
-                        if ascend {
-                            doc_id as i64
-                        } else {
-                            -(doc_id as i64)
-                        }
-                    }
-                },
-            ),
-        )?;
+        let res = collect_top_doc_ids(searcher, query.as_ref(), limit, ascend)?;
 
         if res.is_empty() {
             return Ok(Self::SelectCandidates {
@@ -158,14 +145,14 @@ impl TantivyResult {
             .i64(TIMESTAMP_COL_NAME)?;
         let candidates = res
             .into_iter()
-            .map(|(_, doc)| {
-                let ts = ts_col.first(doc.doc_id).ok_or_else(|| {
+            .map(|doc_id| {
+                let ts = ts_col.first(doc_id).ok_or_else(|| {
                     anyhow::anyhow!(
                         "missing {TIMESTAMP_COL_NAME} fast-field value for doc_id {}",
-                        doc.doc_id
+                        doc_id
                     )
                 })?;
-                Ok((ts, doc.doc_id))
+                Ok((ts, doc_id))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
         Ok(Self::SelectCandidates {
