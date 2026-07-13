@@ -3865,7 +3865,7 @@
     "addToDashboard": "Add to Dashboard",
     "explorer": {
       "refresh": "Refresh",
-      "filterLabel": "Filter",
+      "filterLabel": "Filters",
       "searchPlaceholder": "Search metrics",
       "withData": "With data",
       "withDataTitle": "Only metrics with data in the selected time range",
@@ -3887,7 +3887,9 @@
       "noData": "No data",
       "noMetrics": "No metrics in this organization yet.",
       "learnIngest": "Learn how to ingest metrics",
-      "noMatch": "No metrics match the current filters.",
+      "noMatch": "No metrics match the current filters",
+      "noMatchHint": "Try removing a label filter, clearing prefix/suffix selections, or switching from “With data” to “All”.",
+      "clearAllFilters": "Clear all filters",
       "noDataHiddenOne": "{count} returned no data and is hidden.",
       "noDataHiddenMany": "{count} returned no data and are hidden.",
       "clearFilters": "Clear filters",
@@ -3938,7 +3940,12 @@
         "selectLabel": "Select a label",
         "invalidLabel": "Invalid label name.",
         "selectOrTypeValue": "Select or type a value",
-        "noSuggestions": "No suggestions — type a value."
+        "noSuggestions": "No suggestions — type a value.",
+        "moreFilters": "+{count} more",
+        "moreFiltersTooltip": "Click to show all filters inline",
+        "showLess": "Show less",
+        "clearAll": "Clear all",
+        "cancelDraftAria": "Cancel this filter"
       },
       "facets": {
         "clear": "Clear",

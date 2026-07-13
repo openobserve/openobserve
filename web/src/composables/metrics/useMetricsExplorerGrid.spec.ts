@@ -598,11 +598,59 @@ describe("useMetricsExplorerGrid", () => {
       grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
       await grid.loadStreams();
 
+      // With empties shown there is nothing to look ahead for: the bump is
+      // immediate and exact.
+      grid.hideEmptyPanels.value = false;
       expect(grid.pageSlice.value).toHaveLength(INITIAL_PAGE_SIZE);
       grid.showMore();
       expect(grid.pageSlice.value).toHaveLength(
         INITIAL_PAGE_SIZE + PAGE_SIZE_INCREMENT,
       );
+    });
+
+    // A budget bump of PAGE_SIZE_INCREMENT can land entirely on cards that turn
+    // out empty and get hidden — the grid does not grow and the click looks
+    // dead. So with the filter on, showMore keeps spending until the visible
+    // grid has grown by a full increment, stepping over the no-data run.
+    it("Show more steps over no-data cards so a click reveals a full page", async () => {
+      getStreamsMock.mockResolvedValue({ list: sparseOrg(500) });
+      const grid = useMetricsExplorerGrid();
+      grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
+      await grid.loadStreams();
+
+      // Everything past the first page is empty until index 54 — two full
+      // increments' worth — then data resumes.
+      const emptyIndex = (name: string) => {
+        const i = Number(name.match(/metric_(\d+)_total/)![1]);
+        return i >= INITIAL_PAGE_SIZE && i < INITIAL_PAGE_SIZE + 24;
+      };
+
+      // The first page renders unqueried, so a click asks for 12 more on top.
+      expect(grid.pagedCards.value).toHaveLength(INITIAL_PAGE_SIZE);
+      const target = INITIAL_PAGE_SIZE + PAGE_SIZE_INCREMENT;
+
+      const done = grid.showMore();
+      // Drive each look-ahead batch's queries as showMore pulls them.
+      for (let i = 0; i < 12; i++) {
+        await flush();
+        // Mid-flight the budget is untouched: the look-ahead resolves BEFORE
+        // the commit, so the grid grows once — not batch by batch — and the
+        // count never ticks back down as empties resolve.
+        if (grid.showingMore.value)
+          expect(grid.pageSlice.value).toHaveLength(INITIAL_PAGE_SIZE);
+        if (!inFlight.length) continue;
+        inFlight.forEach((q) => {
+          const m = q.query.match(/metric_(\d+)_total/);
+          q.complete(m && emptyIndex(m[0]) ? NO_SERIES : SERIES);
+        });
+        inFlight.length = 0;
+      }
+      await done;
+
+      // The grid grew by a full increment...
+      expect(grid.pagedCards.value).toHaveLength(target);
+      // ...and it had to spend past the two empty batches to get there.
+      expect(grid.pageSlice.value.length).toBeGreaterThan(target);
     });
   });
   describe("an org switch must not be polluted by the previous org", () => {
@@ -767,6 +815,65 @@ describe("useMetricsExplorerGrid", () => {
         callsAfterFirst,
       );
       expect(grid.labelNames.value).toEqual(["job", "pod"]);
+    });
+
+    it("widens the window when the backend answers success-but-empty", async () => {
+      // The label index lags ingestion: a short recent window answers
+      // `{status:"success", data:[]}` while a wider ask over the same org
+      // returns hundreds of labels. Believing the windowed emptiness left the
+      // picker at "No options found".
+      const grid = await setup();
+
+      (metricsService.labels as any).mockClear();
+      (metricsService.labels as any)
+        .mockResolvedValueOnce({ data: { data: [] } })
+        .mockResolvedValueOnce({ data: { data: ["job", "pod"] } });
+
+      await grid.loadLabelNames();
+
+      const calls = (metricsService.labels as any).mock.calls;
+      expect(calls.length).toBe(2);
+      // The second ask reaches further back than the first.
+      expect(calls[1][0].start_time).toBeLessThan(calls[0][0].start_time);
+      expect(calls[1][0].end_time).toBe(calls[0][0].end_time);
+      expect(grid.labelNames.value).toEqual(["job", "pod"]);
+    });
+
+    it("falls back to a bounded 30-day window when the widened window is empty", async () => {
+      const grid = await setup();
+
+      (metricsService.labels as any).mockClear();
+      (metricsService.labels as any)
+        .mockResolvedValueOnce({ data: { data: [] } })
+        .mockResolvedValueOnce({ data: { data: [] } })
+        .mockResolvedValueOnce({ data: { data: ["job"] } });
+
+      await grid.loadLabelNames();
+
+      const calls = (metricsService.labels as any).mock.calls;
+      expect(calls.length).toBe(3);
+      // Always bounded — an unbounded ask (`start=0` or an omitted range) makes
+      // the backend scan the whole file list, which it rejects or 502s.
+      expect(calls[2][0].start_time).toBeGreaterThan(0);
+      expect(calls[2][0].start_time).toBeLessThan(calls[1][0].start_time);
+      expect(grid.labelNames.value).toEqual(["job"]);
+    });
+
+    it("walks past a rung that errors instead of giving up", async () => {
+      const grid = await setup();
+
+      (metricsService.labels as any).mockClear();
+      (metricsService.labels as any)
+        .mockResolvedValueOnce({ data: { data: [] } })
+        .mockRejectedValueOnce(new Error("502"))
+        .mockResolvedValueOnce({ data: { data: ["job"] } });
+
+      await grid.loadLabelNames();
+
+      expect((metricsService.labels as any).mock.calls.length).toBe(3);
+      expect(grid.labelNames.value).toEqual(["job"]);
+      // The failure was a rung, not the answer: loading is settled.
+      expect(grid.labelNamesLoading.value).toBe(false);
     });
 
     it("ignores a label-name response that lands after the window moved on", async () => {
@@ -1124,6 +1231,34 @@ describe("useMetricsExplorerGrid", () => {
         data: { data: ["api-1", "api-2"] },
       });
       expect(await grid.loadLabelValues("pod")).toEqual(["api-1", "api-2"]);
+    });
+
+    it("widens the window when the fan-out answers success-but-empty", async () => {
+      // Same index lag as the label names: a short recent window answers empty
+      // with success, and the empty union used to get CACHED — suppressing the
+      // label's suggestions for the whole session.
+      const grid = await setup();
+      (StreamService.nameList as any).mockResolvedValueOnce({
+        data: {
+          list: STREAMS.map((x) => ({ ...x, schema: [{ name: "pod", type: "Utf8" }] })),
+        },
+      });
+      await grid.ensureSchemas();
+
+      const seen: Array<{ start: number; end: number }> = [];
+      (metricsService.labelValues as any).mockImplementation((args: any) => {
+        seen.push({ start: args.start_time, end: args.end_time });
+        // First (windowed) round: success, no values. Later rounds: values.
+        return Promise.resolve({
+          data: { data: seen[0].start === args.start_time ? [] : ["api-1"] },
+        });
+      });
+
+      expect(await grid.loadLabelValues("pod")).toEqual(["api-1"]);
+      // The retry reached further back than the first ask.
+      const starts = [...new Set(seen.map((s) => s.start))];
+      expect(starts.length).toBeGreaterThan(1);
+      expect(Math.min(...starts)).toBeLessThan(starts[0]);
     });
 
     it("keeps label values out of the chart-result cache", async () => {

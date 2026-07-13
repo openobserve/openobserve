@@ -177,12 +177,16 @@ describe("LabelFilterBar", () => {
       expect(wrapper.emitted("focus-picker")).toHaveLength(1);
     });
 
-    it("does not re-emit focus-picker on subsequent opens", async () => {
+    it("re-emits focus-picker on EVERY open, so a cleared list can reload", async () => {
+      // The names are window-scoped: a range change drops them. A one-shot
+      // emit (what this used to assert) left the picker saying "No options
+      // found" for the rest of the page. The parent's loader dedupes, so
+      // re-emitting costs nothing when the names are already there.
       wrapper = createWrapper();
       await openPicker(wrapper);
       await wrapper.vm.cancel();
       await openPicker(wrapper);
-      expect(wrapper.emitted("focus-picker")).toHaveLength(1);
+      expect(wrapper.emitted("focus-picker")).toHaveLength(2);
     });
 
     it("goes straight to the label step — no intermediate panel", async () => {

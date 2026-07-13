@@ -16,22 +16,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex items-center flex-wrap gap-2"
+    ref="barRef"
+    class="relative flex items-center gap-2 min-w-0 flex-1"
+    :class="expanded ? 'flex-wrap' : 'flex-nowrap'"
     data-test="metrics-explorer-label-filter-bar"
   >
-    <!-- Existing filters -->
+    <!-- Invisible copy of EVERY chip at its natural width — what the fit
+         computation measures. Chips cap at 250px, so a long value never
+         monopolises the row. -->
+    <div
+      ref="measureRef"
+      class="absolute invisible h-0 overflow-hidden flex gap-2 pointer-events-none"
+      aria-hidden="true"
+    >
+      <OTag
+        v-for="filter in filters"
+        :key="labelFilterKey(filter)"
+        variant="primary"
+        size="sm"
+        shape="rounded"
+        class="max-w-[250px]"
+      >
+        <span class="font-mono text-xs truncate"
+          >{{ filter.label }} {{ filter.operator || "=" }}
+          {{ filter.value }}</span
+        >
+        <template #trailing>
+          <span class="ml-1 inline-flex items-center"
+            ><OIcon name="close" size="xs"
+          /></span>
+        </template>
+      </OTag>
+    </div>
+
     <!-- Keyed and removed by the WHOLE matcher, never by the label: a label can
          carry several of them (`status=~"5.."` and `status!="503"`), and keying
          on the label alone would collide two chips onto one v-for key. -->
     <OTag
-      v-for="filter in filters"
+      v-for="filter in shownFilters"
       :key="labelFilterKey(filter)"
       variant="primary"
       size="sm"
       shape="rounded"
+      class="min-w-0 max-w-[250px]"
       :data-test="`metrics-explorer-label-chip-${filter.label}`"
     >
-      <span class="font-mono text-xs"
+      <!-- The chip truncates its value; the tooltip is where the whole matcher
+           stays readable. -->
+      <OTooltip
+        :content="`${filter.label} ${filter.operator || '='} ${filter.value}`"
+      />
+      <span class="font-mono text-xs truncate"
         >{{ filter.label }} {{ filter.operator || "=" }}
         {{ filter.value }}</span
       >
@@ -51,6 +86,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </button>
       </template>
     </OTag>
+    <OTag
+      v-if="hiddenFilters.length"
+      type="countChip"
+      value="neutral"
+      size="sm"
+      shape="rounded"
+      clickable
+      class="shrink-0 h-7"
+      role="button"
+      tabindex="0"
+      :aria-label="t('metrics.explorer.labels.moreFiltersTooltip')"
+      data-test="metrics-explorer-label-overflow"
+      @click="expanded = true"
+      @keydown.enter="expanded = true"
+    >
+      {{ t("metrics.explorer.labels.moreFilters", { count: hiddenFilters.length }) }}
+      <OTooltip :delay="300" :max-width="'28rem'">
+        <template #content>
+          <div class="space-y-1">
+            <div v-for="filter in hiddenFilters" :key="labelFilterKey(filter)">
+              <span>{{ filter.label }}</span
+              >{{ filter.operator || "=" }}<span>{{ filter.value }}</span>
+            </div>
+            <!-- The click affordance is invisible without being said. -->
+            <div class="opacity-70">
+              {{ t("metrics.explorer.labels.moreFiltersTooltip") }}
+            </div>
+          </div>
+        </template>
+      </OTooltip>
+    </OTag>
+
+    <!-- ONE wrapper for every action after the chips, so when the expanded row
+         wraps, they move to the next line together — never split across lines. -->
+    <div
+      ref="actionsRef"
+      class="flex items-center gap-2 shrink-0"
+      data-test="metrics-explorer-label-actions"
+    >
+    <OButton
+      v-if="expanded && filters.length > fitCount"
+      variant="ghost"
+      size="xs"
+      class="shrink-0"
+      data-test="metrics-explorer-label-show-less"
+      @click="expanded = false"
+    >
+      {{ t("metrics.explorer.labels.showLess") }}
+    </OButton>
 
     <!-- Membership resolution is deferred to the first filter interaction, so the
          bar itself reports that the grid is still narrowing. -->
@@ -147,13 +231,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("metrics.explorer.labels.noSuggestions") }}
         </span>
+        <OButton
+          variant="ghost"
+          size="xs"
+          icon-left="close"
+          :aria-label="t('metrics.explorer.labels.cancelDraftAria')"
+          data-test="metrics-explorer-label-picker-cancel"
+          @click="cancel"
+        >
+          <OTooltip :content="t('metrics.explorer.labels.cancelDraftAria')" />
+        </OButton>
       </div>
+    </div>
+    <OButton
+      v-if="filters.length > 1 && step === 'idle'"
+      variant="ghost"
+      size="xs"
+      class="shrink-0"
+      data-test="metrics-explorer-label-clear-all"
+      @click="$emit('clear-all')"
+    >
+      {{ t("metrics.explorer.labels.clearAll") }}
+    </OButton>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -190,15 +295,96 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "add", filter: LabelFilter): void;
   (e: "remove", filter: LabelFilter): void;
+  (e: "clear-all"): void;
   /** First open only — lets the parent lazily fetch label names. */
   (e: "focus-picker"): void;
 }>();
 
 const { t } = useI18n();
 
+/* ------------------------------------------------------ chip overflow */
+
+const barRef = ref<HTMLElement | null>(null);
+const measureRef = ref<HTMLElement | null>(null);
+const actionsRef = ref<HTMLElement | null>(null);
+
+const expanded = ref(false);
+
+/** The row's gap-2, in px. */
+const CHIP_GAP = 8;
+/** Room kept for the "+N more" chip whenever the fit hides anything. */
+const MORE_CHIP_WIDTH = 90;
+
+/**
+ * How many chips fit on ONE line beside the actions — from the chips' real
+ * widths (each capped at 250px), not a fixed count, so a wide screen shows
+ * more and a narrow one fewer.
+ */
+const fitCount = ref(Number.MAX_SAFE_INTEGER);
+
+const measure = async () => {
+  await nextTick();
+  const bar = barRef.value;
+  const meas = measureRef.value;
+  // No layout to measure (jsdom, hidden tab): show everything rather than
+  // clamping on a width of zero.
+  if (!bar || !meas || !bar.clientWidth) {
+    fitCount.value = Number.MAX_SAFE_INTEGER;
+    return;
+  }
+
+  const chipWidths = [...meas.children].map(
+    (c) => (c as HTMLElement).getBoundingClientRect().width,
+  );
+  const actions = actionsRef.value?.getBoundingClientRect().width ?? 0;
+  const avail = bar.clientWidth - actions - CHIP_GAP;
+
+  let used = 0;
+  let count = 0;
+  for (const w of chipWidths) {
+    const next = used + (count ? CHIP_GAP : 0) + w;
+    if (next > avail) break;
+    used = next;
+    count++;
+  }
+  if (count < chipWidths.length) {
+    // The "+N more" chip has to fit on the line too.
+    while (count > 1 && used + CHIP_GAP + MORE_CHIP_WIDTH > avail) {
+      count--;
+      used -= chipWidths[count] + (count ? CHIP_GAP : 0);
+    }
+  }
+  fitCount.value = Math.max(1, count);
+  // Everything fits again (a removal, a wider window): fold the row back up.
+  if (props.filters.length <= fitCount.value) expanded.value = false;
+};
+
+let barResizeObserver: ResizeObserver | null = null;
+
+onMounted(() => {
+  measure();
+  if (typeof ResizeObserver !== "undefined" && barRef.value) {
+    barResizeObserver = new ResizeObserver(() => measure());
+    barResizeObserver.observe(barRef.value);
+  }
+});
+
+onBeforeUnmount(() => {
+  barResizeObserver?.disconnect();
+  barResizeObserver = null;
+});
+
+watch(() => props.filters, measure, { deep: true });
+
+const shownFilters = computed(() =>
+  expanded.value ? props.filters : props.filters.slice(0, fitCount.value),
+);
+const hiddenFilters = computed(() =>
+  expanded.value ? [] : props.filters.slice(fitCount.value),
+);
+
 type Step = "idle" | "label" | "value";
 const step = ref<Step>("idle");
-const pickerRequested = ref(false);
 
 const labelStepRef = ref<HTMLElement | null>(null);
 const valueStepRef = ref<HTMLElement | null>(null);
@@ -252,13 +438,14 @@ const cancel = () => {
   resetDraft();
 };
 
+// On EVERY open, not just the first: a window change drops the loaded label
+// names (they are window-scoped), so a one-shot emit left the picker saying
+// "No options found" for the rest of the page. The parent's loader dedupes —
+// it returns early while names are loaded or loading — so re-emitting is free.
 const startPicking = () => {
   resetDraft();
   step.value = "label";
-  if (!pickerRequested.value) {
-    pickerRequested.value = true;
-    emit("focus-picker");
-  }
+  emit("focus-picker");
   autoOpen(() => labelStepRef.value);
 };
 

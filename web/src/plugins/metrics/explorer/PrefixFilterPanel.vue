@@ -16,24 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex flex-col min-h-0 border border-border-default rounded-md"
+    class="flex flex-col min-h-0"
     :data-test="`metrics-explorer-${mode}-panel`"
   >
-    <!-- Header -->
-    <div class="flex items-center justify-between gap-2 px-3 py-2">
-      <span class="text-xs font-semibold text-text-primary">{{ title }}</span>
-      <OButton
-        variant="ghost-primary"
-        size="xs"
-        :disabled="!hasSelection"
-        :data-test="`metrics-explorer-${mode}-clear`"
-        @click="$emit('clear')"
-      >
-        {{ t("metrics.explorer.facets.clear") }}
-      </OButton>
-    </div>
-
-    <!-- The rail's own search — narrows the facet list, not the grid. -->
+    <!-- The rail's own search — narrows the facet list, not the grid. Clear
+         lives in the title row above, beside the panel's name. -->
     <div class="px-3 pb-2">
       <OInput
         v-model="search"
@@ -56,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="facet in visibleFacets"
         :key="facet.id"
         class="flex items-center justify-between gap-2 px-2 py-1 rounded hover:bg-surface-subtle"
+        :class="{ 'bg-surface-subtle': selected.has(facet.id) }"
       >
         <OCheckbox
           size="sm"
@@ -100,7 +88,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -122,7 +109,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   /** Always a NEW Set — never a mutation of the prop. */
   (e: "update:selected", value: Set<string>): void;
-  (e: "clear"): void;
 }>();
 
 const { t } = useI18n();
@@ -162,8 +148,6 @@ const emptyLabel = computed(() =>
       : "metrics.explorer.facets.noSuffixMatch",
   ),
 );
-
-const hasSelection = computed(() => props.selected.size > 0);
 
 const visibleFacets = computed(() => {
   const term = search.value.trim().toLowerCase();

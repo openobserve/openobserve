@@ -58,34 +58,33 @@ describe("PrefixFilterPanel", () => {
   });
 
   describe("header", () => {
-    it("renders the prefix title in prefix mode", () => {
+    // The visible title is the tab above the panel; here the mode title
+    // survives as the facet group's accessible name.
+    it("labels the facet group with the prefix title in prefix mode", () => {
       wrapper = createWrapper({ mode: "prefix" });
-      expect(wrapper.text()).toContain("Filter by prefix");
+      expect(
+        wrapper
+          .find('[data-test="metrics-explorer-prefix-facets"]')
+          .attributes("aria-label"),
+      ).toBe("Filter by prefix");
     });
 
-    it("renders the suffix title in suffix mode", () => {
+    it("labels the facet group with the suffix title in suffix mode", () => {
       wrapper = createWrapper({ mode: "suffix" });
-      expect(wrapper.text()).toContain("Filter by suffix");
+      expect(
+        wrapper
+          .find('[data-test="metrics-explorer-suffix-facets"]')
+          .attributes("aria-label"),
+      ).toBe("Filter by suffix");
     });
 
-    it("disables the clear button when nothing is selected", () => {
-      wrapper = createWrapper({ selected: new Set() });
-      const clear = wrapper.find('[data-test="metrics-explorer-prefix-clear"]');
-      expect(clear.attributes("disabled")).toBeDefined();
-    });
-
-    it("enables the clear button when something is selected", () => {
+    // Clear lives in the aside's title row (MetricsExplorer), not in the panel:
+    // the panel renders only its search and list.
+    it("renders no clear button of its own", () => {
       wrapper = createWrapper({ selected: new Set(["node_cpu"]) });
-      const clear = wrapper.find('[data-test="metrics-explorer-prefix-clear"]');
-      expect(clear.attributes("disabled")).toBeUndefined();
-    });
-
-    it("emits clear when the clear button is clicked", async () => {
-      wrapper = createWrapper({ selected: new Set(["node_cpu"]) });
-      await wrapper
-        .find('[data-test="metrics-explorer-prefix-clear"]')
-        .trigger("click");
-      expect(wrapper.emitted("clear")).toBeTruthy();
+      expect(
+        wrapper.find('[data-test="metrics-explorer-prefix-clear"]').exists(),
+      ).toBe(false);
     });
   });
 

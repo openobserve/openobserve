@@ -762,8 +762,69 @@ export function useMetricsExplorerGrid() {
     Math.max(0, sortedCandidates.value.length - pageSize.value),
   );
 
-  const showMore = () => {
-    pageSize.value += PAGE_SIZE_INCREMENT;
+  /**
+   * A single "Show more" may pull at most this many budget batches while
+   * stepping over no-data cards. A guard, not a target: it stops a long run of
+   * empty metrics from walking the whole list in one click. ~8 batches is the
+   * same order as a handful of manual clicks, never the query storm an unbounded
+   * fill would cost on a sparse org.
+   */
+  const SHOW_MORE_MAX_BATCHES = 8;
+  /** True while a "Show more" click is resolving; drives the button's spinner. */
+  const showingMore = ref(false);
+
+  /**
+   * Reveal one more page.
+   *
+   * With no-data panels hidden, the budget is spent on candidates BEFORE they
+   * are known to be empty, so a fixed +12 bump can land entirely on rows that
+   * are then hidden — the grid does not grow and the click looks dead. So when
+   * the filter is on, look ahead: query candidate batches until enough with-data
+   * cards are found (or SHOW_MORE_MAX_BATCHES caps the walk), and only THEN
+   * commit the budget. One commit per click — committing per batch made the
+   * grid grow in visible steps, and rendering cards before their emptiness was
+   * known made the count tick back down as they resolved.
+   */
+  const showMore = async () => {
+    if (!hideEmptyPanels.value) {
+      pageSize.value += PAGE_SIZE_INCREMENT;
+      return;
+    }
+    if (showingMore.value) return;
+    showingMore.value = true;
+    try {
+      const cands = sortedCandidates.value;
+      let cursor = pageSize.value;
+      let revealed = 0;
+      let batches = 0;
+      while (
+        batches < SHOW_MORE_MAX_BATCHES &&
+        cursor < cands.length &&
+        revealed < PAGE_SIZE_INCREMENT
+      ) {
+        const next = Math.min(cands.length, cursor + PAGE_SIZE_INCREMENT);
+        await Promise.all(
+          cands
+            .slice(cursor, next)
+            .map((card) =>
+              requestPreview(card, { priority: PRIORITY.PREFETCH }).catch(
+                () => {},
+              ),
+            ),
+        );
+        revealed += cands
+          .slice(cursor, next)
+          .filter((c) => !emptyMetrics.value.has(c.name)).length;
+        cursor = next;
+        batches++;
+      }
+      // The list changed while we were querying (filter edit, org switch) — the
+      // reset watcher already chose the right page size for the new list.
+      if (sortedCandidates.value !== cands) return;
+      pageSize.value = cursor;
+    } finally {
+      showingMore.value = false;
+    }
   };
 
   /**
@@ -1624,23 +1685,43 @@ export function useMetricsExplorerGrid() {
     const generation = labelNamesGeneration;
     labelNamesLoading.value = true;
     try {
-      const response = await metricsService.labels({
-        org_identifier: org.value,
-        start_time: timeRange.value.start_time,
-        end_time: timeRange.value.end_time,
-      });
-      // The endpoint returns every record field, which includes OpenObserve's
-      // internal columns (`aggregation_temporality`, `_timestamp`, `value`, …).
-      // Those are not labels and filtering on them is meaningless, so they are
-      // kept out of the picker.
-      // Another org's labels, or another window's.
-      if (generation !== labelNamesGeneration) return;
-      labelNames.value = (response?.data?.data ?? []).filter(
-        (l: string) =>
-          l && !l.startsWith("__") && !INTERNAL_LABEL_FIELDS.has(l),
-      );
-    } catch {
-      if (generation === labelNamesGeneration) labelNames.value = [];
+      const { start_time, end_time } = timeRange.value;
+      const DAY_US = 24 * 3600 * 1_000_000;
+      // Walked only while the answer is empty; a rung that ERRORS is walked
+      // past too. Always BOUNDED: an unbounded ask (`start=0` or an omitted
+      // range) makes the backend scan the whole file list, which it rejects
+      // as an invalid time range or 502s. Thirty days covers any realistic
+      // index lag at a cost the backend actually serves.
+      const windows = [
+        { start_time, end_time },
+        { start_time: Math.min(start_time, end_time - DAY_US), end_time },
+        { start_time: Math.min(start_time, end_time - 30 * DAY_US), end_time },
+      ];
+      for (let attempt = 0; attempt < windows.length; attempt++) {
+        let names: string[] = [];
+        try {
+          const response = await metricsService.labels({
+            org_identifier: org.value,
+            ...windows[attempt],
+          });
+          // Another org's labels, or another window's.
+          if (generation !== labelNamesGeneration) return;
+          // The endpoint returns every record field, which includes OpenObserve's
+          // internal columns (`aggregation_temporality`, `_timestamp`, `value`, …).
+          // Those are not labels and filtering on them is meaningless, so they are
+          // kept out of the picker.
+          names = (response?.data?.data ?? []).filter(
+            (l: string) =>
+              l && !l.startsWith("__") && !INTERNAL_LABEL_FIELDS.has(l),
+          );
+        } catch {
+          if (generation !== labelNamesGeneration) return;
+        }
+        if (names.length || attempt === windows.length - 1) {
+          labelNames.value = names;
+          return;
+        }
+      }
     } finally {
       if (generation === labelNamesGeneration) labelNamesLoading.value = false;
     }
@@ -1678,53 +1759,75 @@ export function useMetricsExplorerGrid() {
 
     await ensureSchemas();
 
-    // The QUEUE's key, which is a different thing from the cache's. It identifies
-    // an in-flight request, so it has to name the exact question being asked —
-    // org, label, window, stream — or a request issued for one window would be
-    // deduplicated against, and answered by, a request for another.
-    const requestKey = `${org.value}|${label}|${timeRange.value.start_time}|${timeRange.value.end_time}`;
-
     const matching = Object.entries(labelsByStream.value)
       .filter(([, labels]) => labels.includes(label))
       .map(([name]) => name)
       .sort()
       .slice(0, LABEL_VALUE_FANOUT);
 
-    const responses = await Promise.allSettled(
-      matching.map((stream) =>
-        queue.run(
-          `labelvalues:${requestKey}:${stream}`,
-          PRIORITY.DIALOG,
-          (signal) =>
-            metricsService
-              .labelValues({
-              org_identifier: org.value,
-              label,
-              match: stream,
-                start_time: timeRange.value.start_time,
-                end_time: timeRange.value.end_time,
-                signal,
-              })
-              .then((r: any) => r.data?.data ?? []),
-          // These are label strings, not chart data. Letting them into the preview
-          // LRU meant a 5-way fan-out per label evicted five cards' worth of query
-          // results from a cache sized for charts — and they have their own cache
-          // (`labelValueCache`) anyway. Use the queue for its concurrency limit and
-          // cancellation, not for its cache.
-          { cache: false },
-        ),
-      ),
-    );
+    // The same widening ladder as the label names, for the same reason: the
+    // label index lags ingestion, so a short recent window answers empty while
+    // a wider ask over the same streams has the values. Without it, the empty
+    // blink got CACHED and suppressed this label's suggestions all session.
+    // Bounded like the names ladder — an unbounded ask makes the backend scan
+    // the whole file list, which it rejects or 502s. A rung whose fan-out
+    // fails is walked past (allSettled), same as an empty one.
+    const { start_time, end_time } = timeRange.value;
+    const DAY_US = 24 * 3600 * 1_000_000;
+    const windows = [
+      { start_time, end_time },
+      { start_time: Math.min(start_time, end_time - DAY_US), end_time },
+      { start_time: Math.min(start_time, end_time - 30 * DAY_US), end_time },
+    ];
 
-    const union = new Set<string>();
+    let values: string[] = [];
     let anyFulfilled = false;
-    for (const response of responses) {
-      if (response.status !== "fulfilled") continue;
-      anyFulfilled = true;
-      for (const value of response.value as string[]) union.add(value);
-    }
+    for (let attempt = 0; attempt < windows.length; attempt++) {
+      const win = windows[attempt];
+      // The QUEUE's key, which is a different thing from the cache's. It
+      // identifies an in-flight request, so it has to name the exact question
+      // being asked — org, label, window, stream — or a request issued for one
+      // window would be deduplicated against, and answered by, a request for
+      // another.
+      const requestKey = `${org.value}|${label}|${win.start_time}|${win.end_time}`;
 
-    const values = [...union].sort().slice(0, LABEL_VALUE_CAP);
+      const responses = await Promise.allSettled(
+        matching.map((stream) =>
+          queue.run(
+            `labelvalues:${requestKey}:${stream}`,
+            PRIORITY.DIALOG,
+            (signal) =>
+              metricsService
+                .labelValues({
+                  org_identifier: org.value,
+                  label,
+                  match: stream,
+                  start_time: win.start_time,
+                  end_time: win.end_time,
+                  signal,
+                })
+                .then((r: any) => r.data?.data ?? []),
+            // These are label strings, not chart data. Letting them into the preview
+            // LRU meant a 5-way fan-out per label evicted five cards' worth of query
+            // results from a cache sized for charts — and they have their own cache
+            // (`labelValueCache`) anyway. Use the queue for its concurrency limit and
+            // cancellation, not for its cache.
+            { cache: false },
+          ),
+        ),
+      );
+
+      const union = new Set<string>();
+      anyFulfilled = false;
+      for (const response of responses) {
+        if (response.status !== "fulfilled") continue;
+        anyFulfilled = true;
+        for (const value of response.value as string[]) union.add(value);
+      }
+      values = [...union].sort().slice(0, LABEL_VALUE_CAP);
+
+      if (values.length || matching.length === 0) break;
+    }
 
     // Only cache an ANSWER. If every request failed, `values` is empty because we
     // learned nothing — not because the label has no values — and caching that
@@ -1969,6 +2072,7 @@ export function useMetricsExplorerGrid() {
     hasMore,
     remainingCount,
     showMore,
+    showingMore,
     pageSize,
     previews,
     streamNameSet,

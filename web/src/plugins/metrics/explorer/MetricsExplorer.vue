@@ -32,15 +32,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          So the first row IS the toolbar, and it carries both clusters the way
          the Logs toolbar does: scope on the left (what you are looking at),
          time on the right (which window, and how often it reloads). -->
+    <!-- items-START, not center: expanding the chips grows the row downward
+         while the label and the time controls stay pinned to the first line. -->
     <div
-      class="flex items-center gap-2 shrink-0 px-4 py-2 border-b border-border-default"
+      class="flex items-start gap-2 shrink-0 px-4 py-2 border-b border-border-default"
       data-test="metrics-explorer-filter-bar"
     >
-      <!-- Chips wrap WITHIN the left cluster as they accumulate, rather than
-           wrapping the row — otherwise a few label filters would shove the time
-           controls onto a second line and the toolbar would grow as you filter. -->
-      <div class="flex flex-1 min-w-0 items-center gap-2 flex-wrap">
-        <span class="text-xs font-medium text-text-secondary shrink-0">
+      <!-- One line by default: the bar clips its chips to the first row and
+           collapses the rest behind an "n more filters" button, so the time
+           controls never get shoved onto a second line as filters accumulate. -->
+      <div class="flex flex-1 min-w-0 items-start gap-2">
+        <span
+          class="text-xs font-medium text-text-secondary shrink-0 leading-7"
+        >
           {{ t("metrics.explorer.filterLabel") }}
         </span>
         <LabelFilterBar
@@ -52,6 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @focus-picker="grid.loadLabelNames"
           @add="onAddLabelFilter"
           @remove="onRemoveLabelFilter"
+          @clear-all="onClearLabelFilters"
         />
       </div>
 
@@ -211,7 +216,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           :variant="grid.showFavoritesOnly.value ? 'primary' : 'ghost'"
           size="icon"
-          :icon-left="grid.showFavoritesOnly.value ? 'favorite' : 'favorite-border'"
+          :icon-left="
+            grid.showFavoritesOnly.value ? 'favorite' : 'favorite-border'
+          "
           :aria-label="favoritesTooltip"
           :aria-pressed="String(grid.showFavoritesOnly.value)"
           data-test="metrics-explorer-rail-favorite"
@@ -223,32 +230,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <aside
         v-if="showRailPanel"
-        class="w-60 flex-none overflow-y-auto p-2 border-r border-border-default"
+        class="w-60 flex-none flex flex-col min-h-0 py-2 border-r border-border-default"
       >
+        <!-- The title row owns Clear: it clears the ACTIVE panel's selection,
+             whichever tab that is, and only shows while there is one. min-h
+             pins the row at the button's height so it does not jump when the
+             button appears. -->
+        <div
+          class="flex items-center justify-between gap-2 px-3 pb-2 min-h-[36px]"
+        >
+          <p class="text-xs font-semibold text-text-primary">
+            {{ railHint }}
+          </p>
+          <OButton
+            v-if="railHasSelection"
+            variant="ghost-primary"
+            size="xs"
+            data-test="metrics-explorer-rail-clear"
+            @click="clearActiveRail"
+          >
+            {{ t("metrics.explorer.facets.clear") }}
+          </OButton>
+        </div>
+
         <PrefixFilterPanel
           v-if="grid.activeRail.value === 'prefix'"
           mode="prefix"
+          class="flex-1"
           :facets="grid.prefixFacets.value"
           :selected="grid.selectedPrefixes.value"
           @update:selected="onPrefixChange"
-          @clear="grid.selectedPrefixes.value = new Set()"
         />
         <PrefixFilterPanel
           v-else-if="grid.activeRail.value === 'suffix'"
           mode="suffix"
+          class="flex-1"
           :facets="grid.suffixFacets.value"
           :selected="grid.selectedSuffixes.value"
           @update:selected="onSuffixChange"
-          @clear="grid.selectedSuffixes.value = new Set()"
         />
 
         <div
           v-else-if="grid.activeRail.value === 'type'"
-          class="flex flex-col gap-1"
+          class="flex flex-col gap-1 px-3 overflow-y-auto"
         >
-          <div class="text-xs font-semibold mb-1">
-            {{ t("metrics.explorer.metricType") }}
-          </div>
           <OCheckbox
             v-for="facet in grid.typeFacets.value"
             :key="facet.id"
@@ -296,31 +321,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div v-else-if="!visibleCards.length" class="explorer-state">
-          <span v-if="grid.emptyHiddenCount.value">
-            {{ t("metrics.explorer.noMatch") }}
-            {{ noDataHiddenLabel }}
-          </span>
-          <span v-else>{{ t("metrics.explorer.noMatch") }}</span>
-
-          <div class="flex items-center gap-2">
-            <OButton
-              variant="ghost"
-              size="sm"
-              data-test="metrics-explorer-clear"
-              @click="grid.clearFilters"
-              >{{ t("metrics.explorer.clearFilters") }}</OButton
-            >
-            <!-- Without this, hiding every card leaves the user staring at an
-                 empty grid with no clue that a toggle did it. -->
-            <OButton
-              v-if="grid.emptyHiddenCount.value"
-              variant="ghost"
-              size="sm"
-              data-test="metrics-explorer-show-empty"
-              @click="grid.hideEmptyPanels.value = false"
-              >{{ t("metrics.explorer.showNoDataPanels") }}</OButton
-            >
+          <div
+            class="w-13 h-13 rounded-xl bg-surface-subtle flex items-center justify-center"
+            aria-hidden="true"
+          >
+            <OIcon name="query-stats" size="lg" class="text-text-secondary" />
           </div>
+          <span class="text-[15px] font-bold text-text-primary">
+            {{ t("metrics.explorer.noMatch") }}
+            <template v-if="grid.emptyHiddenCount.value">
+              {{ noDataHiddenLabel }}</template
+            >
+          </span>
+          <span class="text-sm text-text-secondary max-w-90 text-center">
+            {{ t("metrics.explorer.noMatchHint") }}
+          </span>
+          <!-- One button, per the redesign: it clears every filter AND flips to
+               "All", so it always brings the grid back — including when the
+               no-data toggle was what emptied it. -->
+          <OButton
+            variant="primary"
+            size="sm"
+            data-test="metrics-explorer-clear"
+            @click="onClearAllFilters"
+            >{{ t("metrics.explorer.clearAllFilters") }}</OButton
+          >
         </div>
 
         <!-- Virtualized by ROW: only visible rows exist in the DOM, so ECharts
@@ -375,6 +400,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="outline"
             size="sm"
+            :loading="grid.showingMore.value"
+            :disabled="grid.showingMore.value"
             data-test="metrics-explorer-show-more"
             @click="grid.showMore"
           >
@@ -615,8 +642,7 @@ export default defineComponent({
     // Prefix and suffix carry a `glyph` instead of an `icon`: `A_` and `_Z` say
     // "matches the start of the name" / "matches the end" more plainly than any
     // icon in the registry does. Where an `icon` IS given, the name must be a
-    // key in OIcon's registry (kebab-case) — an unknown name renders nothing at
-    // all, silently, which is how the rail once ended up blank.
+    // key in OIcon's registry — an unknown name renders nothing, silently.
     const rails = computed<
       Array<{
         id: string;
@@ -644,6 +670,38 @@ export default defineComponent({
 
     const showRailPanel = computed(() => !!grid.activeRail.value);
 
+    // Clicking the active rail icon toggles its panel shut.
+    const toggleRail = (id: any) => {
+      grid.activeRail.value = grid.activeRail.value === id ? "" : id;
+    };
+
+    const railHint = computed(() =>
+      t(
+        grid.activeRail.value === "prefix"
+          ? "metrics.explorer.filterByPrefix"
+          : grid.activeRail.value === "suffix"
+            ? "metrics.explorer.filterBySuffix"
+            : "metrics.explorer.metricType",
+      ),
+    );
+
+    /** The ACTIVE panel's selection — what the title row's Clear acts on. */
+    const activeRailSelection = computed(() =>
+      grid.activeRail.value === "prefix"
+        ? grid.selectedPrefixes
+        : grid.activeRail.value === "suffix"
+          ? grid.selectedSuffixes
+          : grid.selectedTypes,
+    );
+
+    const railHasSelection = computed(
+      () => activeRailSelection.value.value.size > 0,
+    );
+
+    const clearActiveRail = () => {
+      activeRailSelection.value.value = new Set();
+    };
+
     const favoritesTooltip = computed(() =>
       grid.showFavoritesOnly.value
         ? t("metrics.explorer.showAllMetrics")
@@ -652,9 +710,10 @@ export default defineComponent({
           }),
     );
 
-    // Clicking the active rail icon toggles its panel shut.
-    const toggleRail = (id: any) => {
-      grid.activeRail.value = grid.activeRail.value === id ? "" : id;
+    /** The empty state's single way out: every filter, including no-data. */
+    const onClearAllFilters = () => {
+      grid.clearFilters();
+      grid.hideEmptyPanels.value = false;
     };
 
     const toggleType = (id: string) => {
@@ -690,6 +749,12 @@ export default defineComponent({
 
     const onRemoveLabelFilter = async (filter: LabelFilter) => {
       grid.removeLabelFilter(filter);
+      await requestOnScreen({ skipCache: true });
+    };
+
+    const onClearLabelFilters = async () => {
+      // Over a copy: each removal mutates the source array.
+      [...grid.labelFilters.value].forEach((f) => grid.removeLabelFilter(f));
       await requestOnScreen({ skipCache: true });
     };
 
@@ -1016,13 +1081,18 @@ export default defineComponent({
       resultCountLabel,
       rails,
       showRailPanel,
-      favoritesTooltip,
       toggleRail,
+      railHint,
+      railHasSelection,
+      clearActiveRail,
+      favoritesTooltip,
+      onClearAllFilters,
       toggleType,
       onPrefixChange,
       onSuffixChange,
       onAddLabelFilter,
       onRemoveLabelFilter,
+      onClearLabelFilters,
       sortOptions,
       PAGE_SIZE_INCREMENT,
       viewOptions,
