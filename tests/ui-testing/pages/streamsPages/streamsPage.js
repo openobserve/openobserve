@@ -6,14 +6,20 @@ import { ManagementPage } from '../generalPages/managementPage.js';
 
 import { getHeaders, getIngestionUrl, sendRequest } from '../../utils/apiUtils.js';
 const http = require('http');
+const https = require('https');
 const nodeFetch = require('node-fetch');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 // node-fetch v2 keep-alive pooling + gzip decompression is the root cause of
 // "Premature close" / ECONNRESET flakiness in CI.
-const _noKeepAliveAgent = new http.Agent({ keepAlive: false });
+// Pick the agent by protocol so both local (http://localhost) and cloud/alpha
+// (https://) ingestion URLs work — an http.Agent rejects https:// URLs.
+const _noKeepAliveHttpAgent = new http.Agent({ keepAlive: false });
+const _noKeepAliveHttpsAgent = new https.Agent({ keepAlive: false });
+const _selectAgent = (parsedURL) =>
+    parsedURL.protocol === 'https:' ? _noKeepAliveHttpsAgent : _noKeepAliveHttpAgent;
 function _nodeFetchSafe(url, opts = {}) {
-    return nodeFetch(url, { ...opts, compress: false, agent: _noKeepAliveAgent });
+    return nodeFetch(url, { ...opts, compress: false, agent: _selectAgent });
 }
 
 export class StreamsPage {
