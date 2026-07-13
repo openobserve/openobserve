@@ -29,12 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         'drag-allow': !viewOnly && !simplifiedPanelView,
       }"
     >
-      <!-- Tinted so the title bar reads as panel chrome rather than as the top
-           of the chart. Same `surface-subtle` token as the metrics explorer's
-           cards, so the two stay in step and dark mode is handled by the token
-           rather than by a hard-coded alpha. -->
       <div
-        class="flex flex-nowrap items-center w-full min-h-7 py-1 px-2 bg-surface-subtle border-b border-border-subtle rounded-t-lg"
+        class="flex flex-nowrap items-center w-full min-h-7 py-1 px-2 border-b border-border-subtle rounded-t-lg"
         :class="{ 'border-b-transparent': isPanelLoading }"
         data-test="dashboard-panel-bar"
       >

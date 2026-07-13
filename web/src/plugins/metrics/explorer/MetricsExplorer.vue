@@ -438,7 +438,7 @@ import {
   watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 
@@ -469,6 +469,17 @@ import {
   encodeMetricsConfig,
   METRICS_BLOB_VERSION,
 } from "@/composables/metrics/metricsUrlState";
+import {
+  EXPLORER_FILTER_PARAM_KEYS,
+  explorerFiltersToQuery,
+  queryToExplorerFilters,
+} from "@/utils/metrics/explorerUrlState";
+import {
+  queryParamsToSelectedDate,
+  selectedDateToQueryParams,
+  refreshLabelToInterval,
+  refreshIntervalToLabel,
+} from "@/utils/dashboard/urlTimeParams";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import segment from "@/services/segment_analytics";
 
@@ -517,6 +528,7 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
+    const route = useRoute();
     const grid = useMetricsExplorerGrid();
 
     const scrollRef = ref<HTMLElement | null>(null);
@@ -832,17 +844,6 @@ export default defineComponent({
 
     /* ---------------------------------------------------- Select handoff */
 
-    const selectedDateToQuery = () => {
-      const date = selectedDate.value;
-      if (date?.valueType === "relative" && date.relativeTimePeriod) {
-        return { period: date.relativeTimePeriod };
-      }
-      if (date?.startTime && date?.endTime) {
-        return { from: String(date.startTime), to: String(date.endTime) };
-      }
-      return {};
-    };
-
     const onSelect = (card: MetricCardModel) => {
       // Resolved for a PANEL, not for the card: the rate window goes over as
       // `$__rate_interval` rather than the concrete window the card charted, so
@@ -867,13 +868,108 @@ export default defineComponent({
         query: {
           org_identifier: store.state.selectedOrganization?.identifier,
           metrics_data: encodeMetricsConfig({ v: METRICS_BLOB_VERSION, data }),
-          ...selectedDateToQuery(),
+          ...selectedDateToQueryParams(selectedDate.value),
           ...(refreshInterval.value
-            ? { refresh: String(refreshInterval.value) }
+            ? { refresh: refreshIntervalToLabel(refreshInterval.value) }
             : {}),
         },
       });
     };
+
+    /* --------------------------------------------------------------- URL */
+
+    // Restore synchronously, before children mount: the picker reads
+    // selectedDate as its initial model, and the first preview queries must
+    // already carry the label matchers.
+    const applyUrlState = () => {
+      const q = route.query as Record<string, any>;
+      const f = queryToExplorerFilters(q);
+
+      if (f.searchTerm !== undefined) grid.searchTerm.value = f.searchTerm;
+      if (f.selectedPrefixes) grid.selectedPrefixes.value = f.selectedPrefixes;
+      if (f.selectedSuffixes) grid.selectedSuffixes.value = f.selectedSuffixes;
+      if (f.selectedTypes) grid.selectedTypes.value = f.selectedTypes;
+      if (f.showFavoritesOnly !== undefined)
+        grid.showFavoritesOnly.value = f.showFavoritesOnly;
+      if (f.hideEmptyPanels !== undefined)
+        grid.hideEmptyPanels.value = f.hideEmptyPanels;
+      if (f.sortBy) grid.sortBy.value = f.sortBy;
+      if (f.viewMode) grid.viewMode.value = f.viewMode;
+      if (f.labelFilters) {
+        grid.labelFilters.value = f.labelFilters;
+        // Without membership data the chips fail open and narrow nothing.
+        grid.ensureSchemas();
+      }
+
+      if (q.period || (q.from && q.to)) {
+        selectedDate.value = queryParamsToSelectedDate(q);
+      }
+      if (q.refresh != null) {
+        refreshInterval.value = refreshLabelToInterval(
+          q.refresh,
+          store.state?.zoConfig?.min_auto_refresh_interval || 0,
+        );
+      }
+    };
+    applyUrlState();
+
+    // State -> URL via replace, so filter changes never stack history entries.
+    // Managed keys are wiped first — a cleared filter must leave the URL, and
+    // anything else (org_identifier) rides along untouched. Defaults serialize
+    // to nothing, so an unfiltered grid keeps a bare /metrics URL.
+    const syncUrlState = () => {
+      const query: Record<string, any> = { ...route.query };
+      for (const key of EXPLORER_FILTER_PARAM_KEYS) delete query[key];
+      delete query.period;
+      delete query.from;
+      delete query.to;
+      delete query.refresh;
+
+      Object.assign(
+        query,
+        explorerFiltersToQuery({
+          searchTerm: grid.searchTerm.value,
+          selectedPrefixes: grid.selectedPrefixes.value,
+          selectedSuffixes: grid.selectedSuffixes.value,
+          selectedTypes: grid.selectedTypes.value,
+          labelFilters: grid.labelFilters.value,
+          showFavoritesOnly: grid.showFavoritesOnly.value,
+          hideEmptyPanels: grid.hideEmptyPanels.value,
+          sortBy: grid.sortBy.value,
+          viewMode: grid.viewMode.value,
+        }),
+      );
+      const time: any = selectedDateToQueryParams(selectedDate.value);
+      // The default window is recoverable from its absence, like the filters.
+      if (time.period !== "15m") Object.assign(query, time);
+      if (refreshInterval.value)
+        query.refresh = refreshIntervalToLabel(refreshInterval.value);
+
+      const changed =
+        Object.keys(query).some(
+          (k) => String(query[k]) !== String(route.query[k] ?? ""),
+        ) || Object.keys(route.query).some((k) => !(k in query));
+      if (changed) router.replace({ query }).catch(() => {});
+    };
+
+    // A getter, not an array of refs: reading `.value` inside it tracks every
+    // dependency, and the callback fires on any of them changing.
+    watch(
+      () => [
+        grid.searchTerm.value,
+        grid.selectedPrefixes.value,
+        grid.selectedSuffixes.value,
+        grid.selectedTypes.value,
+        grid.labelFilters.value,
+        grid.showFavoritesOnly.value,
+        grid.hideEmptyPanels.value,
+        grid.sortBy.value,
+        grid.viewMode.value,
+        selectedDate.value,
+        refreshInterval.value,
+      ],
+      syncUrlState,
+    );
 
     /* ------------------------------------------------------------- time */
 

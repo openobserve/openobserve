@@ -98,7 +98,13 @@ vi.mock("vuex", async (importOriginal) => ({
     state: { selectedOrganization: { identifier: "org1" }, theme: "light" },
   }),
 }));
-vi.mock("vue-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("vue-router", () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn().mockResolvedValue(undefined),
+  }),
+  useRoute: () => ({ query: {} }),
+}));
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (k: string) => k }) }));
 vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@tanstack/vue-virtual", () => ({

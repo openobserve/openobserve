@@ -604,6 +604,15 @@ export default defineComponent({
     };
 
     const goBackToExplorer = () => {
+      const back = router.options?.history?.state?.back;
+      if (
+        typeof back === "string" &&
+        back.startsWith("/metrics") &&
+        !back.startsWith("/metrics/editor")
+      ) {
+        router.back();
+        return;
+      }
       router.push({
         name: "metrics",
         query: {

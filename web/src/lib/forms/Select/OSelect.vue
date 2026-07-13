@@ -1457,12 +1457,12 @@ const fieldWidthClass = computed(() => {
                               <span class="truncate font-medium" :title="optionTooltip ? filteredOptions[vRow.index].label : undefined">{{ filteredOptions[vRow.index].label }}</span>
                               <span
                                 v-if="filteredOptions[vRow.index].badge"
-                                class="shrink-0 inline-flex items-center justify-center leading-none rounded"
+                                class="shrink-0 rounded"
                                 :class="[
                                   filteredOptions[vRow.index].badgeTitle ? 'cursor-help' : undefined,
                                   filteredOptions[vRow.index].badgeStyle
-                                    ? 'ml-auto min-w-[1.125rem] h-[1.125rem] px-1 text-xs font-semibold'
-                                    : 'px-1 py-px border border-solid text-[10px] font-medium',
+                                    ? 'inline-flex items-center justify-center leading-none ml-auto min-w-[1.125rem] h-[1.125rem] px-1 text-xs font-semibold'
+                                    : 'text-[10px] font-medium px-1 py-px border border-solid leading-tight',
                                 ]"
                                 :title="filteredOptions[vRow.index].badgeTitle"
                                 :style="
