@@ -597,8 +597,18 @@ onMounted(async () => {
   // Store handler reference for cleanup
   (window as any).pipelineKeydownHandler = handleKeydown;
 
+  // Kick off the used-streams fetch immediately (in parallel with destinations)
+  // and publish the in-flight promise so the Stream node drawer reuses THIS
+  // exact request instead of issuing its own on the first node drag — even if
+  // the drag happens before the request resolves. Avoids the duplicate
+  // pipelines/streams call and the transient "No options found" flash.
+  const usedStreamsRequest = getUsedStreamsList();
+  pipelineObj.usedStreams = usedStreamsRequest;
+
   pipelineDestinationsList.value = await getPipelineDestinations();
-  usedStreamsListResponse.value = await getUsedStreamsList();
+  usedStreamsListResponse.value = await usedStreamsRequest;
+  // Replace the promise with the resolved array for later synchronous reads.
+  pipelineObj.usedStreams = usedStreamsListResponse.value;
   const { path, query } = router.currentRoute.value;
     if (path.includes("edit") && !query.id) {
       router.push({

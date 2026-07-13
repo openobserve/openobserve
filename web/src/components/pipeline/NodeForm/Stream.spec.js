@@ -29,8 +29,9 @@ const mockAddNode            = vi.fn();
 const mockDeletePipelineNode = vi.fn();
 const mockCheckIfDefaultDestinationNode = vi.fn().mockReturnValue(false);
 
-const { mockToast } = vi.hoisted(() => ({
+const { mockToast, mockGetUsedStreamsList } = vi.hoisted(() => ({
   mockToast: vi.fn(),
+  mockGetUsedStreamsList: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -55,7 +56,7 @@ vi.mock("@/composables/useStreams", () => ({
 
 vi.mock("@/composables/usePipelines", () => ({
   default: () => ({
-    getUsedStreamsList: vi.fn().mockResolvedValue([]),
+    getUsedStreamsList: mockGetUsedStreamsList,
     getPipelineDestinations: vi.fn().mockResolvedValue([]),
   }),
 }));
@@ -202,6 +203,33 @@ describe("Stream Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       expect(mockPipelineObj.userSelectedNode).toEqual({});
+    });
+
+    it("reuses pipelineObj.usedStreams (resolved array) and skips the pipelines/streams API", async () => {
+      const cached = [{ stream_name: "logs_stream_1", stream_type: "logs" }];
+      const wrapper = createWrapper({ usedStreams: cached });
+      await flushPromises();
+      // The editor already fetched the list on mount — the drawer must not
+      // re-hit the API on every node drag (source of the "No options" flash).
+      expect(mockGetUsedStreamsList).not.toHaveBeenCalled();
+      expect(wrapper.vm.usedStreams).toEqual(cached);
+    });
+
+    it("awaits the editor's in-flight promise instead of issuing its own request", async () => {
+      const cached = [{ stream_name: "logs_stream_1", stream_type: "logs" }];
+      // Editor kicked the fetch off but it hasn't resolved yet — the drawer must
+      // reuse the SAME request rather than firing a duplicate pipelines/streams.
+      const inflight = Promise.resolve(cached);
+      const wrapper = createWrapper({ usedStreams: inflight });
+      await flushPromises();
+      expect(mockGetUsedStreamsList).not.toHaveBeenCalled();
+      expect(wrapper.vm.usedStreams).toEqual(cached);
+    });
+
+    it("falls back to the pipelines/streams API when usedStreams isn't shared yet", async () => {
+      const wrapper = createWrapper({ usedStreams: null });
+      await flushPromises();
+      expect(mockGetUsedStreamsList).toHaveBeenCalledTimes(1);
     });
 
     it("all required functions are exposed", async () => {

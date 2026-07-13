@@ -269,7 +269,19 @@ onMounted(async () => {
   if (pipelineObj.userSelectedNode) {
     pipelineObj.userSelectedNode = {};
   }
-  usedStreams.value = await getUsedStreamsList();
+  // Show the loading state immediately so the stream-name select renders a
+  // spinner instead of a transient "No options found" while the option list is
+  // still being built.
+  isFetchingStreams.value = true;
+  // Reuse the used-streams request the editor already started on mount
+  // (PipelineEditor stores the in-flight promise, then its resolved array, on
+  // pipelineObj.usedStreams). `await` transparently handles both, so a node
+  // drag never issues its own pipelines/streams request. Only fall back to a
+  // fresh fetch if the editor hasn't kicked it off at all.
+  usedStreams.value =
+    pipelineObj.usedStreams != null
+      ? await pipelineObj.usedStreams
+      : await getUsedStreamsList();
   await getStreamList();
 });
 

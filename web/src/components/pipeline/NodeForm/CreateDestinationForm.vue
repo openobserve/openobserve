@@ -95,11 +95,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="flex flex-col gap-4">
+            <!-- Name is the destination's identifier — it can't be changed once
+                 created, so lock it in edit mode (parity with the pre-migration
+                 AddDestination form, which rendered it readonly + disabled). -->
             <OFormInput
               data-test="add-destination-name-input"
               name="name"
               :label="t('alerts.name')"
               required
+              :readonly="isEditMode"
+              :disabled="isEditMode"
               tabindex="0"
             />
 
