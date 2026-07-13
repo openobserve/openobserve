@@ -68,13 +68,7 @@ async function globalSetup() {
     testLogger.info(`[alpha1] Login attempt ${attempt}/${maxAttempts} (stagger: ${staggerMs}ms)`);
     await new Promise(r => setTimeout(r, staggerMs));
 
-    // PW_HEADED=true opens the setup browser visibly for local debugging
-    // (CI leaves it unset → headless, unchanged). Headed uses the installed
-    // Chrome channel because the bundled chromium-1155 crashes headed on macOS.
-    const headed = process.env.PW_HEADED === 'true';
-    const browser = await chromium.launch(
-      headed ? { headless: false, channel: 'chrome' } : { headless: true }
-    );
+    const browser = await chromium.launch();
     const context = await browser.newContext({
       viewport: { width: 1500, height: 1024 },
     });
