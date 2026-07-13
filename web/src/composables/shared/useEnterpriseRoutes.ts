@@ -21,7 +21,7 @@ import store from "@/stores";
 // Synthetics routes are gated on the backend /config flag `synthetics_enabled`
 // (enterprise O2_SYNTHETICS_ENABLED). Direct URL access redirects home when off.
 const syntheticsRouteGuard = (to: any, from: any, next: any) => {
-  if (store.state.zoConfig?.synthetics_enabled !== true) {
+  if (store.state.zoConfig?.synthetics_enabled === false) {
     next("/");
     return;
   }
