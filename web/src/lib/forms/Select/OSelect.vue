@@ -555,7 +555,27 @@ function close() {
   searchTerm.value = "";
 }
 
-defineExpose({ close });
+/** Focus the trigger programmatically (both listbox and native-select modes). */
+function focus() {
+  if (typeof document === "undefined") return;
+  document.getElementById(inputId.value)?.focus();
+}
+
+defineExpose({ close, focus });
+
+// Type-to-search on the closed trigger: a printable keystroke opens the
+// dropdown and seeds the filter, mirroring native <select> typeahead. The
+// event is consumed here so page-level single-letter shortcuts (logs "s",
+// "r", "h", …) never fire while the select has keyboard focus.
+function handleTriggerKeydown(e: KeyboardEvent) {
+  if (props.disabled) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key.length !== 1 || e.key === " ") return;
+  e.preventDefault();
+  e.stopPropagation();
+  popoverOpen.value = true;
+  if (inputEnabled.value) searchTerm.value = searchTerm.value + e.key;
+}
 
 // ── Virtual scroll (listbox mode) ─────────────────────────────────────────
 // Items are virtualised whenever the listbox has more than 50 entries, keeping
@@ -696,6 +716,19 @@ const selectOpen = ref(false);
 const isOpen = computed(() =>
   listboxModeEnabled.value ? popoverOpen.value : selectOpen.value,
 );
+
+// Clicking the field label opens the dropdown — mirroring how clicking an
+// OInput's label focuses its input. Reka's triggers open on `pointerdown`, so
+// the `click` a native <label for> forwards never opens them; open explicitly.
+// `.prevent` (on the template handler) stops the redundant native forwarding.
+function handleLabelClick() {
+  if (props.disabled) return;
+  if (listboxModeEnabled.value) {
+    popoverOpen.value = true;
+  } else {
+    selectOpen.value = true;
+  }
+}
 
 
 // When this OSelect is nested inside an ODropdown, signal its
@@ -960,8 +993,9 @@ const fieldWidthClass = computed(() => {
       :for="inputId"
       :class="[
         'o-input-label text-sm font-semibold leading-tight flex items-center gap-1',
-        disabled && 'o-input-label--disabled',
+        disabled ? 'o-input-label--disabled' : 'cursor-pointer',
       ]"
+      @click.prevent="handleLabelClick"
     >
       {{ label }}<span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
@@ -989,6 +1023,9 @@ const fieldWidthClass = computed(() => {
             :name="name"
             :disabled="disabled"
             :tabindex="inputTabindex"
+            role="combobox"
+            :aria-expanded="popoverOpen"
+            @keydown="handleTriggerKeydown"
             :data-test="
               parentDataTest ? `${parentDataTest}-trigger` : undefined
             "
@@ -1006,8 +1043,8 @@ const fieldWidthClass = computed(() => {
               labelPosition === 'inside' && label ? '' : ($slots['icon-left'] ? 'ps-2' : 'ps-3'),
               'bg-select-bg',
               hasError
-                ? 'border-select-border-error'
-                : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus',
+                ? 'border-select-border-error focus:ring-[0.125rem] focus:ring-select-border-error/30 data-[state=open]:ring-[0.125rem] data-[state=open]:ring-select-border-error/30'
+                : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-[0.125rem] focus:ring-primary-500/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-[0.125rem] data-[state=open]:ring-primary-500/25',
               /* Keep the red error border on focus; focus border color applies only when there's no error. */
               'focus:outline-none',
               'transition-[color,background-color,border-color,box-shadow] duration-150',
@@ -1170,7 +1207,6 @@ const fieldWidthClass = computed(() => {
             ]"
             :style="[dropdownStyle, { maxHeight: 'min(18rem, var(--reka-popover-content-available-height, 18rem))' }]"
             @click.stop
-            @pointerdown.stop
           >
             <ListboxRoot
               :model-value="listboxStringModelValue"
@@ -1539,8 +1575,8 @@ const fieldWidthClass = computed(() => {
             labelPosition === 'inside' && label ? '' : 'ps-3',
             'bg-select-bg',
             hasError
-              ? 'border-select-border-error'
-              : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus',
+              ? 'border-select-border-error focus:ring-[0.125rem] focus:ring-select-border-error/30 data-[state=open]:ring-[0.125rem] data-[state=open]:ring-select-border-error/30'
+              : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-[0.125rem] focus:ring-primary-500/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-[0.125rem] data-[state=open]:ring-primary-500/25',
             /* Keep the red error border on focus; focus border color applies only when there's no error. */
             'focus:outline-none',
             'transition-[color,background-color,border-color,box-shadow] duration-150',

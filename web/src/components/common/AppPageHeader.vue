@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   global, *unlayered* h1/h2 rules (styles/app.scss) that otherwise beat
   Tailwind utilities (unlayered CSS wins over layered utilities in v4).
 
-  Props: title | subtitle | icon | breadcrumb | breadcrumbMaxInline | back | tabsBelow
+  Props: title | titleDataTest | subtitle | icon | breadcrumb | breadcrumbMaxInline | back | tabsBelow
   Slots: title-prefix | title | subtitle | actions | tabs | back
 -->
 <template>
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <slot name="back">
           <button
             type="button"
-            class="inline-flex items-center justify-center shrink-0 w-9.5 h-9.5 rounded-[0.625rem] text-text-secondary transition-colors hover:bg-surface-subtle hover:text-text-primary outline-none focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset"
+            class="inline-flex items-center justify-center shrink-0 w-9.5 h-9.5 rounded-[0.625rem] bg-surface-subtle text-text-primary transition-colors hover:bg-button-ghost-hover-bg outline-none focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset"
             :title="backLabel"
             :aria-label="backLabel"
             :data-test="props.back?.dataTest ?? 'app-page-header-back'"
@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <h1
           class="text-[1.0625rem]! font-semibold! leading-[1.45]! tracking-[-0.02em]! text-text-primary truncate min-h-6"
           :title="title"
+          :data-test="titleDataTest"
         >
           <slot name="title">{{ title }}</slot>
         </h1>
@@ -185,6 +186,9 @@ interface BackTarget {
 const props = withDefaults(
   defineProps<{
     title?: string;
+    /** Optional data-test attribute rendered on the <h1>, so consumers can
+     *  drop the #title slot (whose only purpose was attaching a test hook). */
+    titleDataTest?: string;
     subtitle?: string;
     icon?: IconName;
     /** Level-3+ ancestor path; renders an AppBreadcrumb into the subtitle band. */

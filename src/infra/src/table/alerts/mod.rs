@@ -38,7 +38,10 @@ use super::{
     entity::{alerts, folders},
     folders::folder_type_into_i16,
 };
-use crate::errors::{self, FromStrError, PutAlertError};
+use crate::{
+    db::{ORM_CLIENT, connect_to_orm},
+    errors::{self, FromStrError, PutAlertError},
+};
 
 pub mod intermediate;
 
@@ -723,6 +726,19 @@ fn update_mutable_fields(
     alert_am.dedup_time_window_minutes = Set(dedup_time_window_minutes);
     alert_am.dedup_config = Set(dedup_config);
     alert_am.creates_incident = Set(alert.creates_incident);
+    Ok(())
+}
+
+/// Deletes all alerts belonging to the given org.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    // Init the ORM client BEFORE taking the lock: connect_to_orm acquires the
+    // same lock internally, so locking first can deadlock on the initial connect.
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = super::get_lock().await;
+    alerts::Entity::delete_many()
+        .filter(alerts::Column::Org.eq(org_id))
+        .exec(client)
+        .await?;
     Ok(())
 }
 

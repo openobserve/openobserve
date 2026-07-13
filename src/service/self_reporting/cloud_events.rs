@@ -14,6 +14,7 @@ const CLOUD_EVENT_STREAM: &str = "cloud_events";
 pub enum EventType {
     OrgCreated,
     OrgDeleted,
+    OrgCleanupFailed,
     UserJoined,
     CheckoutSessionCreated,
     SubscriptionCreated,
@@ -65,7 +66,7 @@ async fn _inner_flush() {
         let creds = if cfg.cloud.cloud_events_reporting_creds.starts_with("Basic") {
             cfg.cloud.cloud_events_reporting_creds.to_string()
         } else {
-            format!("Basic {}", &cfg.cloud.cloud_events_reporting_creds)
+            format!("Basic {}", cfg.cloud.cloud_events_reporting_creds)
         };
         match reqwest::Client::builder()
             .build()

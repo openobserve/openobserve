@@ -34,7 +34,11 @@ export class RumFormValidationPage {
     this.fileUploadArea = page.locator('[data-test="rum-upload-source-maps-file-dropzone"]');
     // The hidden <input type="file"> inside the dropzone
     this.fileInput = page.locator('[data-test="rum-upload-source-maps-file-input"]');
-    // Error shown when no file is selected and Upload is clicked (toast)
+    // Inline file validation error (SourceMapDropzone) — after the OForm+zod
+    // migration the "required" / "only .zip" file errors surface INLINE via the
+    // schema (firstFieldError), not as a toast. Shown on submit.
+    this.fileError = page.locator('[data-test="rum-upload-source-maps-file-error"]');
+    // Toast locators — still used for the success path (and any server-side error).
     this.toastError = page.locator('[data-test-variant="error"]');
     this.toastMessage = page.locator('[data-test="o-toast-message"]');
     this.toastSuccess = page.locator('[data-test-variant="success"]');
@@ -54,7 +58,8 @@ export class RumFormValidationPage {
     const orgId   = process.env['ORGNAME']      || 'default';
     const baseUrl = process.env['ZO_BASE_URL']  || 'http://localhost:5080';
     await this.page.goto(`${baseUrl}/web/rum/upload-source-maps?org_identifier=${orgId}`);
-    await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    // The Upload button is the explicit page-ready signal (networkidle is
+    // unreliable with streaming connections and is discouraged by Playwright).
     await this.uploadBtn.waitFor({ state: 'visible', timeout: 15000 });
     testLogger.debug('Upload Source Maps page ready');
   }
@@ -113,6 +118,7 @@ export class RumFormValidationPage {
   getVersionErrorLocator()    { return this.versionError; }
   getEnvironmentInputLocator(){ return this.environmentInput; }
   getFileUploadAreaLocator()  { return this.fileUploadArea; }
+  getFileErrorLocator()       { return this.fileError; }
   getUploadBtnLocator()       { return this.uploadBtn; }
   getCancelBtnLocator()       { return this.cancelBtn; }
   getToastErrorLocator()      { return this.toastError; }

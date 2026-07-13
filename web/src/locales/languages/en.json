@@ -12,13 +12,20 @@
       "action": "Widen time range",
       "actionDesc": "Search across a longer period"
     },
+    "noPatterns": {
+      "title": "No patterns found",
+      "description": "Try increasing the time range or selecting a different stream with more log data. Pattern extraction works best with at least 1,000 logs.",
+      "logsAnalyzed": "Only {count} logs were analyzed."
+    },
     "noStreamSelected": {
       "title": "Select a stream to get started",
       "description": "Pick a stream, then run your query to explore its data. Refine results with filters and a custom time range."
     },
     "noQueryApplied": {
       "title": "Run a query to see results",
-      "description": "Adjust your filters and click 'Run query' to load events for this stream."
+      "description": "Adjust your filters and click 'Run query' to load events for this stream.",
+      "action": "Run query",
+      "actionDesc": "Load events for the selected filters"
     },
 
     "noDashboards": {
@@ -81,7 +88,9 @@
       "title": "No destinations yet",
       "description": "Destinations define where alert notifications are sent — Slack, email, webhooks, and more.",
       "action": "New destination",
-      "actionDesc": "Connect a notification channel"
+      "actionDesc": "Connect a notification channel",
+      "import": "Import destination",
+      "importDesc": "Import from a JSON file"
     },
     "noPipelineDestinations": {
       "title": "No destinations yet",
@@ -93,7 +102,9 @@
       "title": "No templates yet",
       "description": "Templates define the format of alert notification messages.",
       "action": "New template",
-      "actionDesc": "Create a notification template"
+      "actionDesc": "Create a notification template",
+      "import": "Import template",
+      "importDesc": "Import from a JSON file"
     },
     "noEvalTemplates": {
       "title": "No evaluation templates yet",
@@ -143,6 +154,20 @@
       "title": "No backfill jobs",
       "description": "Backfill jobs reprocess historical data through a pipeline. Run one to get started."
     },
+    "noRegexPatterns": {
+      "title": "No regex patterns yet",
+      "description": "Create a reusable pattern to redact sensitive data, or import one from your library.",
+      "action": "New pattern",
+      "actionDesc": "Define a new regex pattern",
+      "import": "Import pattern",
+      "importDesc": "Reuse a pattern from your library"
+    },
+    "noStorageConfig": {
+      "title": "No bucket configured",
+      "description": "Route this org's data to a dedicated bucket — independently of other orgs and global defaults.",
+      "action": "Configure storage",
+      "actionDesc": "Connect an S3, GCS, or Azure bucket"
+    },
     "noPipelineHistory": {
       "title": "No pipeline history yet",
       "description": "Pipeline execution history will appear here once your pipelines run."
@@ -162,10 +187,12 @@
       "actionDesc": "Write a new VRL function"
     },
     "noStreams": {
-      "title": "Waiting for your first data",
-      "description": "No data has arrived yet. Connect a source and your streams will show up here automatically.",
+      "title": "Connect a source to create your first stream",
+      "description": "Streams are created automatically the moment data arrives. Set up ingestion from your app, agent, or collector to get started.",
       "action": "Set up ingestion",
-      "actionDesc": "Connect a data source"
+      "actionDesc": "Connect a data source",
+      "createAction": "New stream",
+      "createActionDesc": "Manually define a stream schema"
     },
     "noAlerts": {
       "title": "Create your first alert",
@@ -175,7 +202,7 @@
     },
     "noIncidents": {
       "title": "No active incidents",
-      "description": "You're all caught up — nothing needs your attention right now. Triggered incidents will appear here."
+      "description": "Incidents are created when an alert triggers — none have fired yet. Once you have alerts in place, any triggered incidents will appear here."
     },
     "noLLMInsights": {
       "title": "No LLM activity yet",
@@ -192,20 +219,24 @@
     "noScorers": {
       "title": "No scorers yet",
       "description": "Scorers grade LLM responses against your score configs — start with an LLM judge or import one from the library.",
-      "action": "Create scorer",
-      "actionDesc": "Define an LLM judge or remote scorer"
+      "action": "New scorer",
+      "actionDesc": "Define an LLM judge or remote scorer",
+      "import": "Import scorer",
+      "importDesc": "Import from a JSON file"
     },
     "noEvalJobs": {
       "title": "No evaluation jobs yet",
       "description": "Jobs schedule scorers against an LLM stream. Create one to start grading conversations on a cadence.",
-      "action": "Create eval job",
+      "action": "New job",
       "actionDesc": "Pick a stream + scorers + cadence"
     },
     "noScoreConfigs": {
       "title": "No score configs yet",
       "description": "Score configs define the schema scorers produce — numeric, boolean, or categorical. Add one to start scoring.",
-      "action": "Create score config",
-      "actionDesc": "Define the score shape + healthy range"
+      "action": "New score config",
+      "actionDesc": "Define the score shape + healthy range",
+      "import": "Import score config",
+      "importDesc": "Import from a JSON file"
     },
     "loadError": {
       "title": "Something went wrong",
@@ -272,6 +303,7 @@
     },
     "nouns": {
       "logs": "logs",
+      "patterns": "patterns",
       "dashboards": "dashboards",
       "pipelines": "pipelines",
       "functions": "functions",
@@ -306,7 +338,8 @@
       "scorers": "scorers",
       "evalJobs": "evaluation jobs",
       "scoreConfigs": "score configs",
-      "pipelineHistory": "pipeline history"
+      "pipelineHistory": "pipeline history",
+      "regexPatterns": "regex patterns"
     }
   },
   "common": {
@@ -386,6 +419,8 @@
     "legendWidth": "Legend Width",
     "exceptions": "Exceptions",
     "nameRequired": "Name is required",
+    "invalidEmail": "Please enter a valid email address.",
+    "nameMaxLength": "Name must be at most {max} characters.",
     "edit": "Edit",
     "delete": "Delete",
     "remove": "Remove",
@@ -450,6 +485,10 @@
   },
   "validation": {
     "required": "This field is required",
+    "fieldRequired": "Field is required!",
+    "alphanumeric": "Input must be alphanumeric",
+    "organizationNameRequired": "Organization name is required",
+    "selectOrganization": "Please select an organization",
     "invalidFormat": "Invalid format",
     "mustBeGreaterThan": "Must be greater than {value}",
     "mustBeLessThan": "Must be less than {value}"
@@ -848,6 +887,12 @@
     "webVitals": "Web Vitals",
     "errors": "Errors",
     "api": "API",
+    "uploadSourceMapsForm": {
+      "serviceRequired": "Service is required",
+      "versionRequired": "Version is required",
+      "fileRequired": "Please select a ZIP file to upload",
+      "fileTypeZip": "Only ZIP files are allowed"
+    },
     "emptyState": {
       "title": "Monitor your users with Real User Monitoring",
       "description": "RUM tracks real user interactions — page loads, errors, API calls, and session replays — so you can see exactly how users experience your application.",
@@ -1323,6 +1368,14 @@
     "newPassword": "New Password",
     "organization": "Organization",
     "otherOrganization": "Other Organization",
+    "roleRequired": "Role is required",
+    "fieldRequired": "Field is required",
+    "passwordRequired": "Password is required.",
+    "passwordPolicyHint": "Password must be 8-128 characters and contain at least one lowercase letter, one uppercase letter, one digit, and one special character.",
+    "currentPasswordRequired": "Current password is required.",
+    "newPasswordRequired": "New password is required.",
+    "otherOrgInvalid": "Organization name must start with a letter and be alphanumeric, _ or -.",
+    "inviteEmailInvalid": "Please enter correct email id.",
     "isExistingUser": "Existing User?",
     "deleteAPIKeyMessage": "Are you sure you want to delete this User API Key? This action cannot be undone. Click OK to confirm.",
     "apiKeyNotFound": "User API Key Not Found.",
@@ -1363,6 +1416,7 @@
   },
   "serviceAccounts": {
     "header": "Service Accounts",
+    "emailInvalid": "Please enter a valid email address",
     "headerSubtitle": "Programmatic access tokens for APIs",
     "search": "Search Service Account",
     "refresh": "Refresh Service Token",
@@ -1556,6 +1610,7 @@
   },
   "organization": {
     "header": "Organizations",
+    "orgBeingDeletedSwitching": "This organization is being deleted. Switching you to another organization.",
     "orgName": "Organization Name",
     "createOrganization": "New organization",
     "updateOrganization": "Update organization",
@@ -1590,7 +1645,10 @@
     "subscription_type": "Plan Type",
     "proceed_subscription": "Proceed to Subscription",
     "subscription_plan": "Subscription Plan",
-    "manage": "Manage"
+    "manage": "Manage",
+    "pendingDeletion": "Pending deletion",
+    "daysLeft": "{n} days left",
+    "resurrect": "Resurrect organization"
   },
   "template": {
     "header": "Templates",
@@ -1602,6 +1660,11 @@
     "subtitle": "Index management and stream configuration",
     "streamNameHelpText": "Use alphanumeric characters, underscore and colon only.",
     "search": "Search Stream",
+    "emptyOr": "Or:",
+    "emptyKubernetes": "Kubernetes",
+    "emptyAws": "AWS / CloudWatch",
+    "emptyLinux": "Linux",
+    "emptyWindows": "Windows",
     "name": "Name",
     "docNum": "Events",
     "storageSize": "Ingested Data",
@@ -1643,6 +1706,9 @@
     "labelIndex": "Index",
     "add": "New stream",
     "dataRetention": "Data Retention (in days)",
+    "streamNameRequired": "Stream name is required",
+    "streamTypeRequired": "Please select a stream type",
+    "dataRetentionMin": "Data retention must be at least 1 day",
     "indexing": "Indexing",
     "createStream": "Create Stream",
     "indexType": "Index Type",
@@ -1782,6 +1848,27 @@
     "dragDropNodesHere": "Drag and drop nodes here",
     "promqlOnlyForMetrics": "PromQL is only available for metrics stream type",
     "invalidCronExpression": "Invalid cron expression",
+    "cronRequired": "Cron expression is required",
+    "destResourceNameInvalid": "Characters like :, ?, /, #, and spaces are not allowed.",
+    "urlTrailingSlash": "URL should not end with a trailing slash",
+    "orgRequiredOpenobserve": "Organization is required for OpenObserve",
+    "streamRequiredOpenobserve": "Stream name is required for OpenObserve",
+    "endpointMustStartSlash": "Endpoint path must start with /",
+    "indexRequiredEsbulk": "Index name is required for ESBulk format",
+    "separatorRequiredStringseparated": "Separator is required for StringSeparated format",
+    "ddSourceRequiredDatadog": "DD Source is required for Datadog",
+    "ddTagsRequiredDatadog": "DD Tags are required for Datadog",
+    "periodGreaterThanZero": "Period should be greater than 0",
+    "frequencyGreaterThanSeconds": "Frequency should be greater than {seconds} seconds.",
+    "minimumFrequencyMinutes": "Minimum frequency should be {minutes} minutes",
+    "streamSelectionNameInvalid": "Use alphanumeric and '+=,.@-_' characters only, without spaces.",
+    "functionAlreadyAssociated": "Function is already associated",
+    "atLeastOneCondition": "Please add at least one condition",
+    "fillAllConditionFields": "Please fill in all condition fields (column, operator and value are required)",
+    "selectExternalDestination": "Please select External destination from the list",
+    "backfillNumericRange": "Must be between {min} and {max}",
+    "selectValidTimeRange": "Please select a valid time range",
+    "startBeforeEndTime": "Start time must be before end time",
     "thresholdShouldNotBeEmpty": "Threshold should not be empty",
     "errorGettingResults": "Error while getting results",
     "save": "Save",
@@ -2048,6 +2135,7 @@
     "defaultTokenBadge": "DEFAULT",
     "createTokenBtn": "Create New Token",
     "createTokenTitle": "Create Token",
+    "searchToken": "Search tokens",
     "tokenNameLabel": "Name",
     "tokenDescriptionLabel": "Description",
     "rotateTokenBtn": "Rotate",
@@ -2092,6 +2180,17 @@
     "header": "Dashboards",
     "subtitle": "Create, organize, and share dashboards across folders",
     "add": "New dashboard",
+    "setAsHome": "Pin to home page",
+    "removeFromHome": "Unpin from home page",
+    "isHomeDashboard": "Home dashboard",
+    "openHomeDashboard": "View pinned dashboard",
+    "pinnedOnHome": "Pinned dashboard on home page",
+    "deletedSuccessfully": "Dashboard deleted successfully.",
+    "pinnedDeletedPinRemoved": "Pinned dashboard was deleted, so its Home pin was removed.",
+    "homePinNotFound": "This dashboard no longer exists and was removed from Home.",
+    "homePinUnavailable": "This dashboard is no longer available and was removed from Home.",
+    "setAsHomeDesc": "Show this dashboard on the home page for everyone in the org",
+    "moreActions": "More actions",
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete Dashboard",
@@ -2161,6 +2260,7 @@
     "selectVariableScope": "Select variable scope",
     "variableScopeHelp": "Variables will be applied to all tabs and panels if global is selected.",
     "newTab": "Add Tab",
+    "editTab": "Edit Tab",
     "generalSettingsTitle": "General Settings",
     "tabSettingsTitle": "Tabs Settings",
     "addGeneralSettings": "General",
@@ -2530,14 +2630,34 @@
     "editDrilldown": "Edit Drilldown",
     "goTo": "Go to :",
     "selectLogsMode": "Select Logs Mode:",
-    "enterCustomQuery": "Enter Custom Query:",
-    "enterUrl": "Enter URL:",
+    "enterCustomQuery": "Custom SQL Query * :",
+    "sqlQueryRequired": "SQL query is required",
+    "variableNameRequired": "Variable name is required.",
+    "variableNameInvalid": "Only letters, numbers, hyphens (-), and underscores (_) are allowed.",
+    "atLeastOneTabRequired": "At least one tab is required.",
+    "atLeastOnePanelRequired": "At least one panel is required.",
+    "streamTypeRequired": "Stream type is required.",
+    "streamIndexRequired": "Stream / index is required.",
+    "fieldRequired": "Field is required.",
+    "constantValueRequired": "Constant value is required.",
+    "operatorRequired": "Operator is required.",
+    "filterValueRequired": "Required",
+    "labelRequired": "Label is required.",
+    "optionValueRequired": "Field is required!",
+    "seriesValueRequired": "Series value is required",
+    "colorRequired": "Color is required",
+    "onlyHttpsUrlsAllowed": "Only HTTP(S) URLs are allowed",
+    "urlRequired": "URL is required",
+    "folderRequired": "Folder is required",
+    "dashboardRequired": "Dashboard is required",
+    "tabRequired": "Tab is required",
+    "enterUrl": "Enter URL",
     "invalidUrl": "Invalid URL",
-    "selectFolderDrilldown": "Select Folder * :",
+    "selectFolderDrilldown": "Select Folder",
     "noFoldersAvailable": "No folders available",
-    "selectDashboardDrilldown": "Select Dashboard * :",
+    "selectDashboardDrilldown": "Select Dashboard",
     "noDashboardsAvailable": "No dashboards available",
-    "selectTabDrilldown": "Select Tab * :",
+    "selectTabDrilldown": "Select Tab",
     "noTabAvailable": "No tab Available",
     "variables": "Variables :",
     "passAllCurrentVariables": "Pass all current variables :",
@@ -2660,6 +2780,11 @@
     "operations": "Operations",
     "promQLBuilder": "PromQL Builder",
     "joins": "Joins",
+    "xAxisShort": "X-Axis",
+    "yAxisShort": "Y-Axis",
+    "rowFields": "Row Fields",
+    "valueFields": "Value Fields",
+    "noData": "No Data",
     "addJoin": "Add Join",
     "removeJoin": "Remove Join",
     "leftJoin": "Left Join",
@@ -2735,6 +2860,7 @@
     "tabAiAssistant": "O2 Assistant",
     "tabOverview": "Overview",
     "tabUsage": "Usage",
+    "removeHomeDashboard": "Remove home dashboard",
     "subtitle": "Your observability workspace at a glance"
   },
   "overview": {
@@ -2887,6 +3013,18 @@
     "enterpriseNote": "High volume needs? Let's talk scale! Contact us for tailored solutions.",
     "contactSupport": "Contact Support",
     "totalUsage": "Total Usage",
+    "usageTrends": {
+      "dailyUsage": "Daily usage",
+      "enableTitle": "See your daily usage",
+      "enableSubtitle": "Turn on usage reporting to chart your ingestion and query volume day by day. Your totals above stay available either way.",
+      "enableButton": "Enable usage reporting",
+      "enablePending": "Usage reporting enabled. Your daily chart will start filling in shortly as new usage is recorded.",
+      "enableSuccess": "Usage reporting enabled",
+      "enableConfirmTitle": "Enable usage reporting?",
+      "enableConfirmMessage": "This starts recording your organization's usage to its own stream so we can chart daily ingestion and query volume. It applies to this organization only and can be turned off later in organization settings.",
+      "waitingTitle": "Waiting for usage data",
+      "waitingForData": "Your daily chart will appear here once usage starts being reported for this organization."
+    },
     "aiCredits": "AI Credits",
     "aiModeFree": "Free",
     "aiModePayAsYouGo": "Pay as you go",
@@ -2918,6 +3056,7 @@
       "inviteTitle": "Invite An Organization",
       "inviteOrgIdLabel": "Organization Identifier",
       "inviteOrgIdPlaceholder": "Enter Organization Identifier",
+      "inviteOrgIdRequired": "Organization Identifier is required",
       "sendInvite": "Send Invite",
       "inviteSent": "Invite Sent Successfully",
       "inviteSameOrg": "An Organization Cannot Invite Itself",
@@ -3001,9 +3140,9 @@
     "searchAllFolders": "All folders",
     "streamConfig": "Stream Config",
     "alertRules": "Alert Rules",
-    "noTemplatesMsg": "It looks like you haven't created any Templates yet. To create an Alert, you'll need to have at least one Destination and one Template in place",
+    "noTemplatesMsg": "To create an alert you need at least one template and one destination. Templates define the format of the notification message — start by creating one.",
     "createTemplateBtn": "Create Template",
-    "noDestinationsMsg": "It looks like you haven't created any Destinations yet. To create an Alert, you'll need to have at least one Destination and one Template in place",
+    "noDestinationsMsg": "To create an alert you need at least one destination and one template. Destinations define where notifications are sent — start by creating one.",
     "createDestinationBtn": "Create Destination",
     "add": "New alert",
     "edit": "Edit",
@@ -3361,7 +3500,6 @@
     "incidents": {
       "title": "Incidents",
       "subtitle": "Incident management and tracking",
-      "header": "Alert Incidents",
       "search": "Search incidents...",
       "noIncidents": "No incidents found",
       "id": "ID",
@@ -3455,6 +3593,7 @@
       "evaluationHistory": "Evaluation History",
       "loadingHistory": "Loading history...",
       "noHistoryAvailable": "No evaluation history available for this alert",
+      "tryExpandingTimeRange": "Try expanding the time range",
       "results": "Results"
     },
     "historyTable": {
@@ -3865,12 +4004,24 @@
     "domainConfiguredCount": "{count} domain(s) configured",
     "allowAllUsersFromDomain": "Allow all users from {domain}",
     "allowOnlySpecificUsers": "Allow only specific users from {domain}",
+    "blockSpecificUsers": "Block only specific users from {domain}",
+    "blockAllUsersFromDomain": "Block all users from {domain}",
     "allUsersAllowedMessage": "All users with email addresses ending in {domain} will be allowed to login.",
+    "allUsersBlockedMessage": "All external SSO users with email addresses ending in {domain} will be blocked from the system (UI, API and ingestion).",
+    "blockedUsersHint": "Blocked entries apply to external SSO identities only (SSO users and SSO/token service accounts). They override any allow rule and cover UI, API and ingestion. Native and API-created accounts are not affected — delete those instead.",
+    "addBlockedEmail": "Block Email",
+    "blockedEmailPlaceholder": "e.g. user{domain}",
+    "domainNeedsBlockedEmails": "Domain '{domain}' must have at least one email address when blocking specific users",
+    "confirmRemoveBlockedEmail": "Are you sure you want to unblock the email '{email}'?",
+    "blockedEmailAdded": "Email address blocked successfully",
+    "blockedEmailRemoved": "Email address unblocked successfully",
     "emailPlaceholder": "e.g. user{domain}",
     "addEmail": "Add Email",
     "saveChanges": "Save",
     "invalidDomain": "Please enter a valid domain name",
     "invalidEmail": "Please enter a valid email address for this domain",
+    "domainRequired": "Domain is required",
+    "emailRequired": "Email is required",
     "domainAlreadyExists": "This domain has already been added",
     "domainAdded": "Domain added successfully",
     "confirmRemoveDomain": "Are you sure you want to remove the domain '{domain}'?",
@@ -3887,6 +4038,7 @@
     "pageSubtitle": "Adjust settings for your Application",
     "platformSettings": "Platform Settings",
     "scrapeIntervalRequired": "Scrape interval is required",
+    "scrapeIntervalPositive": "Scrape interval must be a positive number",
     "scrapeIntervalDescription": "The scrape interval is the frequency, in seconds, at which the monitoring system collects metrics.",
     "maxSeriesPerQueryLabel": "Max Series Per Query",
     "maxSeriesPerQueryDescription": "Maximum number of series that can be returned from a single PromQL query. Helps prevent UI freezing with large result sets. Leave empty to use system default (40,000).",
@@ -3909,6 +4061,14 @@
     "pickCustomColor": "Pick Custom Color",
     "close": "Close",
     "organizationSettingsUpdated": "Organization settings updated",
+    "dangerZone": "Danger Zone",
+    "deleteOrganization": "Delete organization",
+    "deleteOrganizationDescription": "Schedule this organization for deletion. It becomes inaccessible right away and is permanently removed after a grace period.",
+    "deleteOrganizationConfirm": "This will schedule \"{name}\" — and all of its streams, dashboards, alerts, pipelines, users, and settings — for deletion.",
+    "deleteOrganizationWarning": "The organization becomes unavailable immediately and is hidden from everyone who uses it. Ingestion is blocked and scheduled alerts, pipelines, and reports stop running, so no notifications are sent while it is scheduled for deletion.",
+    "deleteOrganizationRecoverable": "It is kept in a recoverable state during the grace period. You can restore it until then — activity resumes on restore. After the grace period its data is permanently deleted and cannot be recovered.",
+    "deleteOrganizationTypeToConfirm": "To confirm, type {name} below:",
+    "deleteOrganizationInitiated": "Organization scheduled for deletion. It is now hidden and recoverable until the grace period ends.",
     "somethingWentWrong": "Something went wrong",
     "logoUpdatedSuccessfully": "{mode} logo updated successfully.",
     "errorUploadingImage": "Error while uploading image.",
@@ -4188,6 +4348,51 @@
     "querySource": "Query Source"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "Search Services",
+      "noStreamsDetected": "No streams detected. Ensure service graph metrics include stream_name labels.",
+      "streamOnlyInfo": "Service graph uses stream-only architecture with zero in-memory state",
+      "borderColor": "Border Color",
+      "borderColorMetric": "Errors",
+      "nodeSize": "Node Size",
+      "nodeSizeMetric": "Requests",
+      "sizeLow": "Low",
+      "sizeHigh": "High",
+      "status": {
+        "healthy": "Healthy",
+        "degraded": "Degraded",
+        "warning": "Warning",
+        "critical": "Critical"
+      },
+      "range": {
+        "healthy": "< 1%",
+        "degraded": "1 – 5%",
+        "warning": "5 – 10%",
+        "critical": "> 10%"
+      },
+      "entities": "entities",
+      "distribution": "Distribution",
+      "total": "Total",
+      "showTypes": "Show types",
+      "typesFiltered": "Some types are hidden. Open to change what's shown.",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fitToScreen": "Fit to screen",
+      "layout": "Layout",
+      "types": "Types",
+      "mode": {
+        "auto": "Auto",
+        "expanded": "Expanded",
+        "collapsed": "Collapsed"
+      },
+      "kind": {
+        "service": "Services",
+        "database": "Datastores",
+        "queue": "Queues",
+        "external": "External",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "Open in full view",
     "viewLogs": "View Logs",
     "viewRelated": "View Related",
@@ -4466,6 +4671,7 @@
     "servicesCatalog": {
       "tabLabel": "Service Catalog",
       "title": "Service Catalog",
+      "footerTitle": "Services",
       "filterPlaceholder": "Filter by service name...",
       "noServicesFound": "No services found in the selected time range.",
       "loading": "Loading services...",
@@ -4492,6 +4698,15 @@
       "servicesLabel": "services",
       "viewTraces": "View Traces",
       "exportCsv": "Export CSV",
+      "types": {
+        "all": "All",
+        "service": "Services",
+        "datastore": "Datastores",
+        "queue": "Queues",
+        "external": "External",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{count} {status}",
       "legend": {
         "title": "Error Rate"
       }
@@ -5202,6 +5417,7 @@
     },
     "quality": {
       "scopeLabel": "All quality dimensions in this workspace",
+      "agentPlaceholder": "All agents",
       "timeRange": {
         "label": "Time range",
         "last1h": "Past 1 hour",
@@ -6095,6 +6311,10 @@
       "functions": "Functions",
       "reports": "Reports",
       "iam": "IAM",
+      "settings": "Settings",
+      "onlineEvals": "Online Evals",
+      "actions": "Actions",
+      "rum": "RUM",
       "runningQueries": "Running Queries"
     },
     "pages": {
@@ -6120,7 +6340,30 @@
       "panelEditor": "Panel Editor",
       "traceDetail": "Trace Detail",
       "runningQueries": "Running Queries",
-      "ingestionTokens": "IAM — Ingestion Tokens"
+      "ingestionTokens": "IAM — Ingestion Tokens",
+      "alertIncidents": "Alerts — Incidents",
+      "pipelineDestinations": "Pipelines — Destinations",
+      "enrichmentTables": "Enrichment Tables",
+      "iamInvitations": "IAM — Invitations",
+      "iamOrganizations": "IAM — Organizations",
+      "regexPatterns": "Regex Patterns",
+      "cipherKeys": "Cipher Keys",
+      "nodes": "Nodes",
+      "modelPricing": "Model Pricing",
+      "searchSchedulers": "Search Schedulers",
+      "searchHistory": "Search History",
+      "sessions": "Sessions",
+      "evalTemplates": "Online Evals — Templates",
+      "scorers": "Online Evals — Scorers",
+      "evalJobs": "Online Evals — Jobs",
+      "scoreConfigs": "Online Evals — Score Configs",
+      "actions": "Actions",
+      "llmProviders": "LLM Providers",
+      "aiToolsets": "AI Toolsets",
+      "orgManagement": "Organization Management",
+      "rumErrors": "RUM — Error Tracking",
+      "rumSessions": "RUM — Sessions",
+      "sourceMaps": "RUM — Source Maps"
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
@@ -6200,7 +6443,30 @@
       "logsExport": "Export results as CSV",
       "tableRowOpen": "Open / expand hovered row",
       "tableRowInspect": "Inspect hovered row",
-      "tracesCopyUrl": "Copy trace share URL"
+      "tracesCopyUrl": "Copy trace share URL",
+      "alertIncidentsRefresh": "Refresh list",
+      "pipelineDestinationsRefresh": "Refresh list",
+      "enrichmentTablesRefresh": "Refresh list",
+      "iamInvitationsRefresh": "Refresh list",
+      "iamOrganizationsRefresh": "Refresh list",
+      "regexPatternsRefresh": "Refresh list",
+      "cipherKeysRefresh": "Refresh list",
+      "nodesRefresh": "Refresh list",
+      "modelPricingRefresh": "Refresh list",
+      "searchSchedulersRefresh": "Refresh list",
+      "searchHistoryRefresh": "Refresh list",
+      "sessionsRefresh": "Refresh list",
+      "evalTemplatesRefresh": "Refresh list",
+      "scorersRefresh": "Refresh list",
+      "evalJobsRefresh": "Refresh list",
+      "scoreConfigsRefresh": "Refresh list",
+      "actionsRefresh": "Refresh list",
+      "llmProvidersRefresh": "Refresh list",
+      "aiToolsetsRefresh": "Refresh list",
+      "orgManagementRefresh": "Refresh list",
+      "rumErrorsRefresh": "Refresh list",
+      "rumSessionsRefresh": "Refresh list",
+      "sourceMapsRefresh": "Refresh list"
     }
   }
 }

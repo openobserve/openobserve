@@ -1,38 +1,33 @@
 <template>
   <ODialog data-test="cross-link-dialog" v-model:open="dialogVisible" persistent size="md" :show-close="false"
+    form-id="cross-link-form"
     :title="isEditing ? t('crossLinks.editCrossLink') : t('crossLinks.addCrossLink')"
     :secondary-button-label="t('common.cancel')"
     :primary-button-label="isEditing ? t('crossLinks.update') : t('crossLinks.add')"
-    :primary-button-disabled="!form.name || !form.url"
     @click:secondary="onCancel"
-    @click:primary="onSubmit"
   >
     <template #header-right>
       <CrossLinkUserGuide />
     </template>
-        <div>
+        <OForm id="cross-link-form" :form="form">
           <!-- Name -->
           <div class="mb-3">
-            <label class="block text-sm font-semibold mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.name") }} *</label>
-            <OInput
-              v-model="form.name"
+            <OFormInput
+              name="name"
+              :label="t('crossLinks.name')"
+              required
               :placeholder="t('crossLinks.namePlaceholder')"
-              :error="!!nameError"
-              :error-message="nameError"
-              @update:model-value="nameError = ''"
               data-test="cross-link-name-input"
             />
           </div>
 
           <!-- URL Template -->
           <div class="mb-3">
-            <label class="block text-sm font-semibold mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.urlTemplate") }} *</label>
-            <OInput
-              v-model="form.url"
+            <OFormInput
+              name="url"
+              :label="t('crossLinks.urlTemplate')"
+              required
               :placeholder="t('crossLinks.urlPlaceholder')"
-              :error="!!urlError"
-              :error-message="urlError"
-              @update:model-value="urlError = ''"
               data-test="cross-link-url-input"
             />
             <div class="text-xs mt-1" style="color: var(--o2-text-muted)">
@@ -42,13 +37,13 @@
 
           <!-- Fields -->
           <div class="mb-2">
-            <label class="block text-sm font-semibold mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.fields") }} *</label>
+            <label class="block text-sm font-semibold mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.fields") }}</label>
             <div class="text-xs mb-2" style="color: var(--o2-text-muted)">
               {{ t("crossLinks.fieldsHint") }}
             </div>
-            <div v-if="form.fields.length > 0" class="flex flex-wrap gap-1 mb-2">
+            <div v-if="formFields.length > 0" class="flex flex-wrap gap-1 mb-2">
               <OTag
-                v-for="(field, idx) in form.fields"
+                v-for="(field, idx) in formFields"
                 :key="idx"
                 type="selectionChip"
                 class="max-w-[250px]"
@@ -61,7 +56,7 @@
                     :aria-label="`Remove ${field.name}`"
                     :data-test="`cross-link-field-chip-remove-${idx}`"
                     class="inline-flex items-center justify-center cursor-pointer hover:opacity-70"
-                    @click="form.fields.splice(idx, 1)"
+                    @click="removeField(idx)"
                   >
                     <OIcon name="close" size="xs" />
                   </button>
@@ -73,25 +68,26 @@
               @keydown="onFieldKeydown"
             >
               <!--
-                OCombobox provides suggestions from `availableFields` while
-                still allowing custom (free-text) field names. Enter on the
-                input adds the current value (whether it came from a listbox
-                pick or was typed manually), so cross-links remain valid even
-                when the stream schema doesn't list a given field yet.
+                Chip-builder scratch input — now a form-owned `newFieldName`
+                field (R1-strict: no bare control inside the OForm). The
+                committed chips live in the form-owned `fields` array (bridged
+                from `fieldsModel`). OFormCombobox provides suggestions from
+                `availableFields` while still allowing custom (free-text) names;
+                the OFormInput is the fallback when no suggestions exist.
               -->
-              <OCombobox
+              <OFormCombobox
                 v-if="availableFields.length > 0"
                 ref="fieldComboboxRef"
-                v-model="newFieldName"
+                name="newFieldName"
                 class="flex-1"
                 :items="availableFieldOptions"
                 :placeholder="t('crossLinks.fieldInputPlaceholder')"
                 @select="onFieldSelect"
                 data-test="cross-link-field-input"
               />
-              <OInput
+              <OFormInput
                 v-else
-                v-model="newFieldName"
+                name="newFieldName"
                 class="flex-1"
                 :placeholder="t('crossLinks.fieldInputPlaceholder')"
                 data-test="cross-link-field-input"
@@ -101,12 +97,11 @@
                 size="icon-sm"
                 icon-left="add"
                 @click="addField"
-                :disabled="!newFieldName"
                 data-test="cross-link-add-field-btn"
               />
             </div>
           </div>
-        </div>
+        </OForm>
   </ODialog>
 </template>
 
@@ -119,8 +114,14 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
+import {
+  makeCrossLinkDialogSchema,
+  type CrossLinkDialogForm,
+} from "./CrossLinkDialog.schema";
 
 export interface CrossLink {
   name: string;
@@ -130,7 +131,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkDialog",
-  components: { CrossLinkUserGuide, OTag, OButton, OCombobox, ODialog, OIcon, OInput },
+  components: { CrossLinkUserGuide, OTag, OButton, OFormCombobox, ODialog, OForm, OFormInput, OIcon },
   props: {
     modelValue: {
       type: Boolean,
@@ -154,98 +155,132 @@ export default defineComponent({
       set: (val) => emit("update:modelValue", val),
     });
 
-    const nameError = ref("");
-    const urlError = ref("");
+    const crossLinkDialogSchema = makeCrossLinkDialogSchema(t);
     const isEditing = computed(() => !!props.link?.name);
-    const newFieldName = ref("");
-    // Template ref to OCombobox so we can call its imperative `clear()` after
-    // every commit (Add / Enter / select). The v-model path alone is
-    // unreliable because reka-ui's internal search-term state survives
-    // synchronous v-model round-trips when the parent clears in the same tick.
-    const fieldComboboxRef = ref<{ clear: () => Promise<void> } | null>(null);
+    // Template ref to the OFormCombobox so we can call its forwarded imperative
+    // `clear()` after every commit (Add / Enter / select) — needed because
+    // reka-ui keeps an internal search-term state that survives a model reset.
+    const fieldComboboxRef = ref<{ clear: () => void } | null>(null);
 
-    const form = ref({
-      name: "",
-      url: "",
-      fields: [] as Array<{ name: string }>,
+    // Dynamic (edit-prefill) defaults → a typed component computed. Seeds
+    // name/url/fields/newFieldName from the current `link`; re-applied on open
+    // via form.reset (the form is created here, so it persists across opens).
+    const crossLinkDefaults = computed((): CrossLinkDialogForm => ({
+      name: props.link?.name ?? "",
+      url: props.link?.url ?? "",
+      fields: props.link?.fields
+        ? props.link.fields.map((f) => ({ name: f.name }))
+        : [],
+      newFieldName: "",
+    }));
+
+    // Owner-pattern form (Rule ③): CrossLinkDialog OWNS the <OForm> and its
+    // template renders the chip list from the form-owned `fields` array. We
+    // create the form here with useOForm and read `fields` reactively via
+    // form.useStore — ONE source of truth (no `fieldsModel` mirror / watch→
+    // setFieldValue bridge). The chip handlers write `fields` THROUGH the form.
+    const form = useOForm<CrossLinkDialogForm>({
+      defaultValues: crossLinkDefaults.value,
+      schema: crossLinkDialogSchema,
+      onSubmit,
     });
 
+    // Reactive read-only view of the form-owned `fields` array (NOT a copy).
+    // useOForm keeps the form's TFormData generic, so cast the loose reads to
+    // the schema shape.
+    const formFields = form.useStore(
+      (s) => (s.values.fields as Array<{ name: string }> | undefined) ?? [],
+    );
+
+    // Typed snapshot read of the form-owned `fields` array (for handlers).
+    const currentFields = (): Array<{ name: string }> =>
+      (form.state.values.fields as Array<{ name: string }> | undefined) ?? [];
+
+    const currentNewFieldName = (): string =>
+      (form.state.values?.newFieldName ?? "") as string;
+
     function clearFieldInput() {
-      // Reset the v-model AND call OCombobox's imperative `clear()`. The
-      // v-model write alone is insufficient because Vue's pre-flush watcher
-      // dedupes synchronous "" → value → "" round-trips (they look like a
-      // no-op), and reka-ui keeps an internal search-term state that survives
-      // the v-model reset. The exposed clear() resets both layers together.
-      newFieldName.value = "";
-      fieldComboboxRef.value?.clear();
+      // OFormCombobox path: clear() resets reka-ui's internal search text AND
+      // emits update:model-value "" → the form's `newFieldName` field clears
+      // too (the model write alone is insufficient — reka-ui keeps a separate
+      // search-term state that survives it).
+      const combobox = fieldComboboxRef.value;
+      if (combobox?.clear) {
+        combobox.clear();
+      } else {
+        // OFormInput fallback (no suggestions) → just clear the form field.
+        form.setFieldValue("newFieldName", "");
+      }
     }
 
-    function addField() {
-      const name = (newFieldName.value || "").trim();
-      if (name && !form.value.fields.some((f) => f.name === name)) {
-        form.value.fields.push({ name });
+    // Commit a staged field name as a chip (dedup + non-empty) by writing it
+    // INTO the form-owned `fields` array, then reset the scratch input.
+    function commitField(rawName: string) {
+      const name = (rawName || "").trim();
+      const current = currentFields();
+      if (name && !current.some((f) => f.name === name)) {
+        form.setFieldValue("fields", [...current, { name }]);
       }
       clearFieldInput();
     }
 
-    // Suggestion options shown by the OCombobox. We filter out fields that
+    function addField() {
+      commitField(currentNewFieldName());
+    }
+
+    function removeField(idx: number) {
+      form.setFieldValue(
+        "fields",
+        currentFields().filter((_, i) => i !== idx),
+      );
+    }
+
+    // Suggestion options shown by the OFormCombobox. We filter out fields that
     // have already been added so the dropdown only suggests remaining
     // schema columns; custom (free-text) values are still accepted via the
-    // OCombobox input + Enter / Add button.
+    // combobox input + Enter / Add button.
     const availableFieldOptions = computed(() => {
-      const added = new Set(form.value.fields.map((f) => f.name));
+      const added = new Set((formFields.value ?? []).map((f) => f.name));
       return (props.availableFields || [])
         .filter((name) => !added.has(name))
         .map((name) => ({ label: name, value: name }));
     });
 
     function onFieldSelect(value: string) {
-      // Selecting from the suggestions list should commit the field
-      // immediately; the typed value is already synced via v-model.
-      newFieldName.value = value;
-      addField();
+      // Selecting from the suggestions list commits the picked value directly.
+      commitField(value);
     }
 
-    // Enter on the wrapper bubbles up from OCombobox's internal input.
-    // reka-ui's Combobox handles Enter to commit the highlighted item to
-    // v-model first; by the time this fires `newFieldName.value` is the
-    // selected / typed text, so addField() picks up the correct value.
+    // Enter on the wrapper bubbles up from the combobox's internal input.
+    // reka-ui commits the highlighted/typed text to the form field first; defer
+    // a microtask so that update has landed before addField() reads it.
     function onFieldKeydown(event: KeyboardEvent) {
       if (event.key !== "Enter") return;
       event.preventDefault();
-      // Defer to the next microtask so reka-ui's update:model-value has
-      // a chance to land before we read newFieldName.value.
       queueMicrotask(() => addField());
     }
 
-    // Reset form when dialog opens
+    // Re-seed the form on open. The form is created in setup() (owner pattern),
+    // so it persists across the dialog body's unmount/remount — reset it from
+    // the current `link` whenever the dialog opens.
     watch(
       () => props.modelValue,
       (visible) => {
-        if (visible) {
-          if (props.link) {
-            form.value = {
-              name: props.link.name,
-              url: props.link.url,
-              fields: props.link.fields
-                ? props.link.fields.map((f) => ({ name: f.name }))
-                : [],
-            };
-          } else {
-            form.value = { name: "", url: "", fields: [] };
-          }
-          newFieldName.value = "";
-        }
+        if (visible) form.reset(crossLinkDefaults.value);
       },
     );
 
-    function onSubmit() {
-      nameError.value = !form.value.name ? t('crossLinks.nameRequired') : '';
-      urlError.value = !form.value.url ? t('crossLinks.urlRequired') : '';
-      if (nameError.value || urlError.value) return;
-      // Auto-add pending field if user typed something but didn't press +
+    // onSubmit fires only once the schema passes (name + url required), so the
+    // old imperative nameError/urlError guard is gone. name/url come from the
+    // validated `value`; `fields` is read from the form after committing any
+    // field the user typed but didn't add with +.
+    function onSubmit(value: CrossLinkDialogForm) {
       addField();
-      emit("save", { ...form.value });
+      emit("save", {
+        name: value.name,
+        url: value.url,
+        fields: currentFields().map((f) => ({ name: f.name })),
+      });
     }
 
     function onCancel() {
@@ -258,16 +293,15 @@ export default defineComponent({
       store,
       dialogVisible,
       isEditing,
-      nameError,
-      urlError,
+      // The form is created in setup() and handed to <OForm :form="form">.
       form,
-      newFieldName,
+      formFields,
       fieldComboboxRef,
       availableFieldOptions,
       addField,
+      removeField,
       onFieldSelect,
       onFieldKeydown,
-      onSubmit,
       onCancel,
     };
   },

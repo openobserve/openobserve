@@ -13,7 +13,7 @@
         onClick: () => $emit('cancel'),
         dataTest: 'scorer-form-back-btn',
       }"
-      class="card-container px-3 border-b border-border-default"
+      class="px-3 border-b border-border-default"
       style="flex-shrink: 0"
     >
       <template #title>

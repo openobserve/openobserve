@@ -186,12 +186,6 @@ pub trait FileList: Sync + Send + 'static {
         is_recent: bool,
     ) -> Result<()>;
     async fn reset_stream_stats(&self) -> Result<()>;
-    async fn reset_stream_stats_min_ts(
-        &self,
-        org_id: &str,
-        stream: &str,
-        min_ts: i64,
-    ) -> Result<()>;
     async fn len(&self) -> usize;
     async fn is_empty(&self) -> bool;
     async fn clear(&self) -> Result<()>;
@@ -234,6 +228,11 @@ pub trait FileList: Sync + Send + 'static {
         date_range: (String, String),
     ) -> Result<StreamStats>;
     async fn org_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)>;
+    async fn delete_by_org(&self, org_id: &str) -> Result<()>;
+}
+
+pub async fn delete_by_org(org_id: &str) -> Result<()> {
+    CLIENT.delete_by_org(org_id).await
 }
 
 pub async fn health_check() -> Result<()> {
@@ -547,13 +546,6 @@ pub async fn set_stream_stats(
 #[inline]
 pub async fn reset_stream_stats() -> Result<()> {
     CLIENT.reset_stream_stats().await
-}
-
-#[inline]
-pub async fn reset_stream_stats_min_ts(org_id: &str, stream: &str, min_ts: i64) -> Result<()> {
-    CLIENT
-        .reset_stream_stats_min_ts(org_id, stream, min_ts)
-        .await
 }
 
 #[inline]

@@ -110,7 +110,7 @@ pub async fn link_subscription(
         );
     }
 
-    let members = match billing_group::list_billing_group_members_of(&org_id).await {
+    let members = match billing_group::list_billing_group_members_of(org_id).await {
         Ok(v) => v,
         Err(e) => {
             log::error!(

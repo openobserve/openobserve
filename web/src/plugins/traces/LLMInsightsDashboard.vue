@@ -103,15 +103,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Generic error state — kept separate because a failed request is a
          different signal from "no data yet". Once we have a result we fall
          through to the consolidated empty / dashboard branches below. -->
-    <EvalEmptyState
+    <OEmptyState
       v-else-if="error && hasLoadedOnce"
+      size="hero"
+      illustration="broken-panel"
+      variant="error"
       data-test="llm-insights-empty-error"
-      icon="error-outline"
       title="Failed to load LLM Insights"
       :description="error || ''"
-      cta-label="Retry"
-      cta-data-test="llm-insights-retry-btn"
-      @create="loadInsights()"
+      action-label="Retry"
+      action-icon="refresh"
+      @action="loadInsights()"
     />
 
     <!-- Consolidated empty state — single OEmptyState covers all three
@@ -278,7 +280,6 @@ import LLMErrorTable from "./LLMErrorTable.vue";
 import LLMInsightsSkeleton from "./LLMInsightsSkeleton.vue";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import EvalEmptyState from "@/components/EvalEmptyState.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";

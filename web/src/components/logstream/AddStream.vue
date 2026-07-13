@@ -259,18 +259,20 @@ const showDataRetention = computed(
 const validateStream = () => {
   let valid = true;
   if (!streamInputs.value.name.trim()) {
-    nameError.value = 'Field is required!';
+    nameError.value = t('logStream.streamNameRequired');
     valid = false;
   } else if (!streamNameRegex.test(streamInputs.value.name)) {
     nameError.value = streamNameHelpText;
     valid = false;
   }
   if (!streamInputs.value.stream_type) {
-    streamTypeError.value = 'Field is required!';
+    streamTypeError.value = t('logStream.streamTypeRequired');
     valid = false;
   }
   if (showDataRetention.value && !(streamInputs.value.dataRetentionDays > 0)) {
-    dataRetentionError.value = 'Field is required!';
+    // A value of 0 IS entered but rejected here, so "required" is misleading —
+    // state the actual rule (must be ≥ 1 day) instead.
+    dataRetentionError.value = t('logStream.dataRetentionMin');
     valid = false;
   }
   // Fields are optional, but any field that has been added must pass the

@@ -180,10 +180,12 @@ export class PipelinesPage {
         // OSelect renders its `:error-message` inside a `<span>` with
         // `data-test="${parent}-error"` (auto-derived from the wrapper data-test).
         this.fieldRequiredError = page.locator('[data-test="associate-function-select-function-input-error"]');
-        // Condition node's "Please add at least one condition" toast — OToast
-        // exposes the message via `data-test-message`.
+        // Condition node's "Please add at least one condition" validation error.
+        // The OForm migration replaced the old imperative toast with inline schema
+        // validation (Condition.schema.ts superRefine), rendered as a form-level
+        // error div `data-test="add-condition-error"` in Condition.vue.
         this.conditionRequiredToast = page.locator(
-          '[data-test-message="Please add at least one condition"]'
+          '[data-test="add-condition-error"]'
         );
         this.tableRowsLocator = page.locator("tbody tr");
         this.confirmButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
@@ -938,9 +940,10 @@ export class PipelinesPage {
     }
 
     async verifyConditionRequiredError() {
-        // Condition.saveCondition emits a toast "Please add at least one
-        // condition" when no condition row exists. OToast exposes the
-        // message as `data-test-message="<text>"` on its root.
+        // Saving a condition node with no valid condition fails the OForm schema
+        // (conditionSchema superRefine), which surfaces the "Please add at least
+        // one condition" message inline as `data-test="add-condition-error"`
+        // (no toast is emitted anymore).
         await this.conditionRequiredToast.first().waitFor({ state: 'visible', timeout: 10000 });
     }
 
@@ -1659,11 +1662,11 @@ export class PipelinesPage {
     }
 
     async verifyNotificationVisible() {
-        const notification = this.qNotificationMessage;
-        if (await notification.count() > 0) {
-            await expect(notification.first()).toBeVisible();
-        }
-        await this.page.waitForTimeout(2000);
+        // Saving without a valid condition surfaces the OForm schema error inline
+        // (`data-test="add-condition-error"`), not a `[role="alert"]` notification.
+        // The old `[role="alert"]` locator now matches Monaco's hidden a11y alert
+        // (`class="monaco-alert" data-aria-hidden="true"`), so assert the real error.
+        await this.conditionRequiredToast.first().waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async fillPartialCondition(columnName) {

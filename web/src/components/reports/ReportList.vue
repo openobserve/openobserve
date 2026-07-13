@@ -23,8 +23,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Row 1: standard header — title + actions only. Tabs / search / folder
            scope moved into the table's own toolbar below. -->
       <template #header>
-        <AppPageHeader icon="description" :subtitle="t('reports.subtitle')">
-          <template #title><span data-test="report-list-title">{{ t('reports.header') }}</span></template>
+        <AppPageHeader
+          :title="t('reports.header')"
+          title-data-test="report-list-title"
+          icon="description"
+          :subtitle="t('reports.subtitle')"
+        >
           <template #actions>
             <OButton
               data-test="report-list-add-report-btn"

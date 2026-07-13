@@ -118,8 +118,9 @@ jobs:
       # "Allow GitHub Actions to create and approve pull requests" to be enabled
       # (Settings → Actions → General → Workflow permissions).
       - name: Create pull request with translation updates
+        id: cpr
         if: steps.check_changes.outputs.changes == 'true'
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: chore/update-translations
@@ -139,7 +140,39 @@ jobs:
             (`web/src/locales/languages/en.json`).
 
             🤖 Generated with automated translation workflow
-          labels: translations
+          labels: |
+            translations
+            e2e
+
+      # Approve the PR so it satisfies the required-review rule. GITHUB_TOKEN
+      # cannot approve a PR it authored (the PR above is authored by
+      # github-actions[bot]), so this uses a personal access token that belongs
+      # to the reviewer account `nikhilsaikethe` — the approval is attributed to
+      # that user. Store that account's PAT in the TRANSLATIONS_APPROVE_TOKEN
+      # secret. PR number is passed via env (never interpolated into the shell body).
+      - name: Approve the translation PR
+        if: steps.check_changes.outputs.changes == 'true' && steps.cpr.outputs.pull-request-number
+        env:
+          GH_TOKEN: ${{ secrets.TRANSLATIONS_APPROVE_TOKEN }}
+          PR_NUMBER: ${{ steps.cpr.outputs.pull-request-number }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh pr review "$PR_NUMBER" --repo "$REPO" --approve \
+            --body "Auto-approved: automated translation update."
+
+      # Enable auto-merge so the PR enters the merge queue automatically once the
+      # required review (above) and status checks pass. Uses the same PAT so the
+      # enqueue is attributed to a real user and downstream workflows (e.g. the
+      # merge_group checks) trigger correctly. Merge method must match the repo's
+      # merge-queue configuration — change --squash if the queue uses merge/rebase.
+      - name: Enable auto-merge (merge queue)
+        if: steps.check_changes.outputs.changes == 'true' && steps.cpr.outputs.pull-request-number
+        env:
+          GH_TOKEN: ${{ secrets.TRANSLATIONS_APPROVE_TOKEN }}
+          PR_NUMBER: ${{ steps.cpr.outputs.pull-request-number }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh pr merge "$PR_NUMBER" --repo "$REPO" --auto --squash
 
       - name: Summary
         if: always()
@@ -149,7 +182,7 @@ jobs:
             exit 0
           fi
           if [ "${{ steps.check_changes.outputs.changes }}" == "true" ]; then
-            echo "✅ Translations updated — pull request created/updated (branch: chore/update-translations)."
+            echo "✅ Translations updated — PR #${{ steps.cpr.outputs.pull-request-number }} created/updated (branch: chore/update-translations), labeled 'translations,e2e', approved, and set to auto-merge into the merge queue."
           else
             echo "ℹ️  No new or modified keys — translations already up to date."
           fi

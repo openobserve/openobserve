@@ -270,7 +270,7 @@
             class="text-orange-400"
           />
           <div
-            class="text-[15px] text-gray-600"
+            class="text-[15px]"
             :class="
               store.state.theme === 'dark'
                 ? 'text-gray-200'

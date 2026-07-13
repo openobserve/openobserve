@@ -12,13 +12,20 @@
       "action": "Vergroot het tijdsbereik",
       "actionDesc": "Zoek over een langere periode"
     },
+    "noPatterns": {
+      "title": "Geen patronen gevonden",
+      "description": "Probeer het tijdbereik te vergroten of een andere stream te selecteren met meer loggegevens. Patroonextractie werkt het beste met minstens 1.000 logboeken.",
+      "logsAnalyzed": "Alleen de logboeken van {count} zijn geanalyseerd."
+    },
     "noStreamSelected": {
       "title": "Selecteer een stream om aan de slag te gaan",
       "description": "Kies een stream en voer vervolgens uw zoekopdracht uit om de bijbehorende gegevens te verkennen. Verfijn de resultaten met filters en een aangepast tijdbereik."
     },
     "noQueryApplied": {
       "title": "Voer een query uit om logboeken te bekijken",
-      "description": "Pas je filters aan en klik op 'Query uitvoeren' om gebeurtenissen voor deze stream te laden."
+      "description": "Pas je filters aan en klik op 'Query uitvoeren' om gebeurtenissen voor deze stream te laden.",
+      "action": "Query uitvoeren",
+      "actionDesc": "Gebeurtenissen laden voor de geselecteerde filters"
     },
     "noDashboards": {
       "title": "Maak je eerste dashboard",
@@ -80,7 +87,9 @@
       "title": "Nog geen bestemmingen",
       "description": "Bestemmingen bepalen waar waarschuwingsmeldingen worden verzonden: Slack, e-mail, webhooks en meer.",
       "action": "Nieuwe bestemming",
-      "actionDesc": "Een meldingskanaal koppelen"
+      "actionDesc": "Een meldingskanaal koppelen",
+      "import": "Bestemming importeren",
+      "importDesc": "Importeren vanuit een JSON-bestand"
     },
     "noPipelineDestinations": {
       "title": "Nog geen bestemmingen",
@@ -92,7 +101,9 @@
       "title": "Nog geen sjablonen",
       "description": "Sjablonen bepalen de indeling van waarschuwingsberichten.",
       "action": "Nieuw sjabloon",
-      "actionDesc": "Een meldingssjabloon maken"
+      "actionDesc": "Een meldingssjabloon maken",
+      "import": "Sjabloon importeren",
+      "importDesc": "Importeren vanuit een JSON-bestand"
     },
     "noEvalTemplates": {
       "title": "Nog geen evaluatiesjablonen",
@@ -142,6 +153,20 @@
       "title": "Geen opvulopdrachten",
       "description": "Bij opvulopdrachten worden historische gegevens opnieuw verwerkt via een pijplijn. Voer er een uit om te beginnen."
     },
+    "noRegexPatterns": {
+      "title": "Nog geen regex-patronen",
+      "description": "Maak een herbruikbaar patroon om gevoelige gegevens te redigeren, of importeer een patroon uit je bibliotheek.",
+      "action": "Nieuw patroon",
+      "actionDesc": "Definieer een nieuw regex-patroon",
+      "import": "Patroon importeren",
+      "importDesc": "Hergebruik een patroon uit je bibliotheek"
+    },
+    "noStorageConfig": {
+      "title": "Geen bucket geconfigureerd",
+      "description": "Routeer de gegevens van deze organisatie naar een speciale bucket — onafhankelijk van andere organisaties en globale standaardinstellingen.",
+      "action": "Opslag configureren",
+      "actionDesc": "Een S3-, GCS- of Azure-bucket aansluiten"
+    },
     "noPipelineHistory": {
       "title": "Nog geen geschiedenis van de pijplijn",
       "description": "De uitvoeringsgeschiedenis van de pijplijn verschijnt hier zodra uw pijplijnen actief zijn."
@@ -161,10 +186,12 @@
       "actionDesc": "Schrijf een nieuwe VRL-functie"
     },
     "noStreams": {
-      "title": "Wachten op je eerste gegevens",
-      "description": "Er zijn nog geen gegevens binnengekomen. Sluit een bron aan en je streams worden hier automatisch weergegeven.",
+      "title": "Sluit een bron aan om je eerste stream te maken",
+      "description": "Streams worden automatisch aangemaakt op het moment dat gegevens binnenkomen. Stel de opname via je app, agent of verzamelaar in om aan de slag te gaan.",
       "action": "Inslikken instellen",
-      "actionDesc": "Een gegevensbron aansluiten"
+      "actionDesc": "Een gegevensbron aansluiten",
+      "createAction": "Nieuwe stream",
+      "createActionDesc": "Handmatig een streamschema definiëren"
     },
     "noAlerts": {
       "title": "Maak je eerste waarschuwing",
@@ -174,7 +201,7 @@
     },
     "noIncidents": {
       "title": "Geen actieve incidenten",
-      "description": "Je bent helemaal verstrikt — niets heeft op dit moment je aandacht nodig. De geactiveerde incidenten verschijnen hier."
+      "description": "Incidenten worden gecreëerd wanneer een waarschuwing wordt geactiveerd — er zijn nog geen incidenten afgevuurd. Zodra u de waarschuwingen hebt ingevoerd, worden alle geactiveerde incidenten hier weergegeven."
     },
     "noLLMInsights": {
       "title": "Nog geen LLM-activiteit",
@@ -191,20 +218,24 @@
     "noScorers": {
       "title": "Nog geen scorers",
       "description": "Scorers beoordelen LLM-reacties op basis van je scoreconfiguraties — begin met een LLM-jurylid of importeer er een uit de bibliotheek.",
-      "action": "Maak een scorer",
-      "actionDesc": "Definieer een LLM-jurylid of externe scorer"
+      "action": "Nieuwe scorer",
+      "actionDesc": "Definieer een LLM-jurylid of externe scorer",
+      "import": "Scorer importeren",
+      "importDesc": "Importeren vanuit een JSON-bestand"
     },
     "noEvalJobs": {
       "title": "Nog geen evaluatieopdrachten",
       "description": "Jobs rangschik scorers tegen een LLM-stream. Maak er een om te beginnen met het beoordelen van gesprekken op basis van een cadans.",
-      "action": "Een evaluatietaak aanmaken",
+      "action": "Nieuwe baan",
       "actionDesc": "Kies een stream + scorers + cadans"
     },
     "noScoreConfigs": {
       "title": "Nog geen scoreconfiguraties",
       "description": "Scoreconfiguraties definiëren het schema dat scorers produceren: numeriek, booleaans of categorisch. Voeg er een toe om te beginnen met scoren.",
-      "action": "Scoreconfiguratie aanmaken",
-      "actionDesc": "Definieer de scorevorm + gezond bereik"
+      "action": "Nieuwe scoreconfiguratie",
+      "actionDesc": "Definieer de scorevorm + gezond bereik",
+      "import": "Scoreconfiguratie importeren",
+      "importDesc": "Importeren vanuit een JSON-bestand"
     },
     "loadError": {
       "title": "Er is iets misgegaan",
@@ -271,6 +302,7 @@
     },
     "nouns": {
       "logs": "logboeken",
+      "patterns": "patronen",
       "dashboards": "spatschermen",
       "pipelines": "pijpleidingen",
       "functions": "functioneert",
@@ -305,7 +337,8 @@
       "scorers": "scorers",
       "evalJobs": "evaluatietaken",
       "scoreConfigs": "scoreconfiguraties",
-      "pipelineHistory": "pipelinegeschiedenis"
+      "pipelineHistory": "pipelinegeschiedenis",
+      "regexPatterns": "regex-patronen"
     }
   },
   "common": {
@@ -385,6 +418,8 @@
     "legendWidth": "Breedte van de legenda",
     "exceptions": "Uitzonderingen",
     "nameRequired": "Naam is verplicht",
+    "invalidEmail": "Voer een geldig e-mailadres in.",
+    "nameMaxLength": "De naam moet uit maximaal {max} tekens bestaan.",
     "edit": "Bewerken",
     "delete": "Verwijderen",
     "remove": "Verwijderen",
@@ -449,6 +484,10 @@
   },
   "validation": {
     "required": "Dit veld is verplicht",
+    "fieldRequired": "Veld is verplicht!",
+    "alphanumeric": "Invoer moet alfanumeriek zijn",
+    "organizationNameRequired": "Organisatienaam is verplicht",
+    "selectOrganization": "Selecteer een organisatie",
     "invalidFormat": "Ongeldig formaat",
     "mustBeGreaterThan": "Moet groter zijn dan {value}",
     "mustBeLessThan": "Moet kleiner zijn dan {value}"
@@ -847,6 +886,12 @@
     "webVitals": "Vitalen voor het web",
     "errors": "Fouten",
     "api": "API",
+    "uploadSourceMapsForm": {
+      "serviceRequired": "Service is vereist",
+      "versionRequired": "Versie is vereist",
+      "fileRequired": "Selecteer een ZIP-bestand om te uploaden",
+      "fileTypeZip": "Alleen ZIP-bestanden zijn toegestaan"
+    },
     "emptyState": {
       "title": "Bewaak uw gebruikers met Real User Monitoring",
       "description": "RUM houdt echte gebruikersinteracties bij, zoals het laden van pagina's, fouten, API-aanroepen en herhalingen van sessies, zodat u precies kunt zien hoe gebruikers uw toepassing ervaren.",
@@ -1322,6 +1367,14 @@
     "newPassword": "Nieuw wachtwoord",
     "organization": "Organisatie",
     "otherOrganization": "Andere organisatie",
+    "roleRequired": "Rol is vereist",
+    "fieldRequired": "Veld is verplicht",
+    "passwordRequired": "Wachtwoord is vereist.",
+    "passwordPolicyHint": "Het wachtwoord moet 8-128 tekens lang zijn en minstens één kleine letter, één hoofdletter, één cijfer en één speciaal teken bevatten.",
+    "currentPasswordRequired": "Het huidige wachtwoord is vereist.",
+    "newPasswordRequired": "Een nieuw wachtwoord is vereist.",
+    "otherOrgInvalid": "De naam van de organisatie moet beginnen met een letter en alfanumeriek zijn, _ of -.",
+    "inviteEmailInvalid": "Voer het juiste e-mailadres in.",
     "isExistingUser": "Bestaande gebruiker?",
     "deleteAPIKeyMessage": "Weet u zeker dat u deze gebruikers-API-sleutel wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt. Klik op OK om te bevestigen.",
     "apiKeyNotFound": "API-sleutel van de gebruiker niet gevonden.",
@@ -1362,6 +1415,7 @@
   },
   "serviceAccounts": {
     "header": "Serviceaccounts",
+    "emailInvalid": "Voer een geldig e-mailadres in",
     "headerSubtitle": "Programmatische toegangstokens voor API's",
     "search": "Serviceaccount zoeken",
     "refresh": "Servicetoken vernieuwen",
@@ -1601,6 +1655,11 @@
     "subtitle": "Indexbeheer en streamconfiguratie",
     "streamNameHelpText": "Gebruik alleen alfanumerieke tekens, onderstrepingstekens en dubbele punten.",
     "search": "Stream zoeken",
+    "emptyOr": "Of:",
+    "emptyKubernetes": "Kubernetes",
+    "emptyAws": "AWS/CloudWatch",
+    "emptyLinux": "Linux",
+    "emptyWindows": "Ramen",
     "name": "Naam",
     "docNum": "Doc Num",
     "storageSize": "Opgenomen gegevens",
@@ -1642,6 +1701,9 @@
     "labelIndex": "Indexeren",
     "add": "Stream toevoegen",
     "dataRetention": "Bewaring van gegevens (in dagen)",
+    "streamNameRequired": "Streamnaam is verplicht",
+    "streamTypeRequired": "Selecteer een streamtype",
+    "dataRetentionMin": "Gegevensbewaring moet minimaal 1 dag zijn",
     "indexing": "Indexering",
     "createStream": "Stream maken",
     "indexType": "Indextype",
@@ -1781,6 +1843,27 @@
     "dragDropNodesHere": "Knooppunten hierheen slepen en neerzetten",
     "promqlOnlyForMetrics": "ProMQL is alleen beschikbaar voor het streamtype voor statistieken",
     "invalidCronExpression": "Ongeldige cron-expressie",
+    "cronRequired": "Cron-expressie is verplicht",
+    "destResourceNameInvalid": "Tekens zoals :, ?, /, # en spaties zijn niet toegestaan.",
+    "urlTrailingSlash": "URL mag niet eindigen met een schuine streep",
+    "orgRequiredOpenobserve": "Organisatie is verplicht voor OpenObserve",
+    "streamRequiredOpenobserve": "Streamnaam is verplicht voor OpenObserve",
+    "endpointMustStartSlash": "Het endpointpad moet beginnen met /",
+    "indexRequiredEsbulk": "Indexnaam is verplicht voor ESBulk-indeling",
+    "separatorRequiredStringseparated": "Scheidingsteken is verplicht voor StringSeparated-indeling",
+    "ddSourceRequiredDatadog": "DD Source is verplicht voor Datadog",
+    "ddTagsRequiredDatadog": "DD Tags zijn verplicht voor Datadog",
+    "periodGreaterThanZero": "Periode moet groter zijn dan 0",
+    "frequencyGreaterThanSeconds": "Frequentie moet groter zijn dan {seconds} seconden.",
+    "minimumFrequencyMinutes": "Minimale frequentie moet {minutes} minuten zijn",
+    "streamSelectionNameInvalid": "Gebruik alleen alfanumerieke tekens en '+=,.@-_', zonder spaties.",
+    "functionAlreadyAssociated": "Functie is al gekoppeld",
+    "atLeastOneCondition": "Voeg minstens één voorwaarde toe",
+    "fillAllConditionFields": "Vul alle voorwaardevelden in (kolom, operator en waarde zijn verplicht)",
+    "selectExternalDestination": "Selecteer een externe bestemming uit de lijst",
+    "backfillNumericRange": "Moet tussen {min} en {max} liggen",
+    "selectValidTimeRange": "Selecteer een geldig tijdsbereik",
+    "startBeforeEndTime": "De starttijd moet vóór de eindtijd liggen",
     "thresholdShouldNotBeEmpty": "Drempelwaarde mag niet leeg zijn",
     "errorGettingResults": "Fout bij het verkrijgen van resultaten",
     "save": "Opslaan",
@@ -2047,6 +2130,7 @@
     "defaultTokenBadge": "STANDAARD",
     "createTokenBtn": "Maak een nieuw token",
     "createTokenTitle": "Token aanmaken",
+    "searchToken": "Tokens zoeken",
     "tokenNameLabel": "Naam",
     "tokenDescriptionLabel": "Omschrijving",
     "rotateTokenBtn": "Roteren",
@@ -2091,6 +2175,17 @@
     "header": "Dashboards",
     "subtitle": "Dashboards maken, ordenen en delen in verschillende mappen",
     "add": "Nieuw dashboard",
+    "setAsHome": "Naar de startpagina vastzetten",
+    "removeFromHome": "Van de startpagina loskoppelen",
+    "isHomeDashboard": "Dashboard voor thuis",
+    "openHomeDashboard": "Bekijk het vastgezette dashboard",
+    "pinnedOnHome": "Vastgezet dashboard op de startpagina",
+    "deletedSuccessfully": "Dashboard is succesvol verwijderd.",
+    "pinnedDeletedPinRemoved": "Het vastgezette dashboard is verwijderd, dus de Home-pincode is verwijderd.",
+    "homePinNotFound": "Dit dashboard bestaat niet meer en is verwijderd van Home.",
+    "homePinUnavailable": "Dit dashboard is niet langer beschikbaar en is verwijderd van Home.",
+    "setAsHomeDesc": "Laat dit dashboard op de startpagina zien voor iedereen in de organisatie",
+    "moreActions": "Meer acties",
     "save": "Opslaan",
     "cancel": "Annuleer",
     "delete": "Dashboard verwijderen",
@@ -2160,6 +2255,7 @@
     "selectVariableScope": "Variabel bereik selecteren",
     "variableScopeHelp": "Variabelen worden toegepast op alle tabbladen en panelen als globaal is geselecteerd.",
     "newTab": "Tabblad toevoegen",
+    "editTab": "Tabblad bewerken",
     "generalSettingsTitle": "Algemene instellingen",
     "tabSettingsTitle": "Tabblad-instellingen",
     "addGeneralSettings": "Generaal",
@@ -2534,14 +2630,34 @@
     "editDrilldown": "Drilldown bewerken",
     "goTo": "Ga naar:",
     "selectLogsMode": "Selecteer de modus Logboeken:",
-    "enterCustomQuery": "Voer een aangepaste zoekopdracht in:",
-    "enterUrl": "Voer de URL in:",
+    "enterCustomQuery": "Aangepaste SQL-query *:",
+    "sqlQueryRequired": "SQL-query is vereist",
+    "variableNameRequired": "Variabelenaam is vereist.",
+    "variableNameInvalid": "Alleen letters, cijfers, koppeltekens en onderstrepingstekens zijn toegestaan",
+    "atLeastOneTabRequired": "Er is minstens één tabblad vereist.",
+    "atLeastOnePanelRequired": "Er is minstens één paneel vereist.",
+    "streamTypeRequired": "Streamtype is vereist.",
+    "streamIndexRequired": "Stream / index is vereist.",
+    "fieldRequired": "Veld is verplicht.",
+    "constantValueRequired": "Constante waarde is vereist.",
+    "operatorRequired": "Operator is vereist.",
+    "filterValueRequired": "Vereist",
+    "labelRequired": "Label is vereist.",
+    "optionValueRequired": "Veld is verplicht!",
+    "seriesValueRequired": "Reekswaarde is vereist",
+    "colorRequired": "Kleur is vereist",
+    "onlyHttpsUrlsAllowed": "Alleen HTTP(S)-URL's zijn toegestaan",
+    "urlRequired": "URL is vereist",
+    "folderRequired": "Map is vereist",
+    "dashboardRequired": "Dashboard is vereist",
+    "tabRequired": "Tabblad is vereist",
+    "enterUrl": "Voer een URL in",
     "invalidUrl": "Ongeldige URL",
-    "selectFolderDrilldown": "Selecteer map *:",
+    "selectFolderDrilldown": "Selecteer een map",
     "noFoldersAvailable": "Geen mappen beschikbaar",
-    "selectDashboardDrilldown": "Selecteer Dashboard *:",
+    "selectDashboardDrilldown": "Selecteer Dashboard",
     "noDashboardsAvailable": "Geen dashboards beschikbaar",
-    "selectTabDrilldown": "Selecteer Tab *:",
+    "selectTabDrilldown": "Tabblad selecteren",
     "noTabAvailable": "Geen tabblad beschikbaar",
     "variables": "Variabelen:",
     "passAllCurrentVariables": "Geef alle huidige variabelen door:",
@@ -2664,6 +2780,11 @@
     "operations": "Operaties",
     "promQLBuilder": "ProMQL Builder",
     "joins": "Sluit zich aan",
+    "xAxisShort": "X-as",
+    "yAxisShort": "Y-as",
+    "rowFields": "Rijvelden",
+    "valueFields": "Waardevelden",
+    "noData": "Geen gegevens",
     "addJoin": "Join toevoegen",
     "removeJoin": "Join verwijderen",
     "leftJoin": "Links aansluiten",
@@ -2686,7 +2807,7 @@
     "enterCustomSql": "Voer uw aangepaste SQL-query in...",
     "back": "<< Terug",
     "sqlBuilder": "SQL Builder",
-    "promQL": "ProMQL",
+    "promQL": "PromQL",
     "latitude": "Breedtegraad",
     "longitude": "Lengtegraad",
     "weight": "Gewicht",
@@ -2739,6 +2860,7 @@
     "tabAiAssistant": "O2 AI-assistent",
     "tabOverview": "Overzicht",
     "tabUsage": "Gebruik",
+    "removeHomeDashboard": "Home-dashboard verwijderen",
     "subtitle": "Uw observabiliteitswerkruimte in één oogopslag"
   },
   "overview": {
@@ -2891,6 +3013,9 @@
     "enterpriseNote": "Heeft u grote hoeveelheden nodig? Laten we het over schaal hebben! Neem contact met ons op voor oplossingen op maat.",
     "contactSupport": "Contact opnemen met de klantenservice",
     "totalUsage": "Totaal gebruik",
+    "usageTrends": {
+      "dailyUsage": "Dagelijks gebruik"
+    },
     "aiCredits": "AI-kredieten",
     "aiModeFree": "Gratis",
     "aiModePayAsYouGo": "Betaal terwijl je onderweg bent",
@@ -2922,6 +3047,7 @@
       "inviteTitle": "Een organisatie uitnodigen",
       "inviteOrgIdLabel": "Identificatie van de organisatie",
       "inviteOrgIdPlaceholder": "Voer de identificatiecode van de organisatie in",
+      "inviteOrgIdRequired": "Identificatie van de organisatie is vereist",
       "sendInvite": "Uitnodiging verzenden",
       "inviteSent": "Uitnodiging succesvol verzonden",
       "inviteSameOrg": "Een organisatie kan zichzelf niet uitnodigen",
@@ -3005,9 +3131,9 @@
     "searchAllFolders": "Alle mappen",
     "streamConfig": "Configuratie van de stream",
     "alertRules": "Regels voor waarschuwingen",
-    "noTemplatesMsg": "Het lijkt erop dat je nog geen sjablonen hebt gemaakt. Als u een waarschuwing wilt maken, moet u ten minste één bestemming en één sjabloon hebben",
+    "noTemplatesMsg": "Om een waarschuwing aan te maken heb je minstens één sjabloon en één bestemming nodig. Sjablonen bepalen de indeling van het meldingsbericht — begin met het aanmaken van een bericht.",
     "createTemplateBtn": "Sjabloon maken",
-    "noDestinationsMsg": "Het lijkt erop dat je nog geen bestemmingen hebt aangemaakt. Als u een waarschuwing wilt maken, moet u ten minste één bestemming en één sjabloon hebben",
+    "noDestinationsMsg": "Om een waarschuwing aan te maken heb je minstens één bestemming en één sjabloon nodig. Bestemmingen bepalen waar meldingen worden verzonden — begin door er een aan te maken.",
     "createDestinationBtn": "Bestemming aanmaken",
     "add": "Waarschuwing toevoegen",
     "edit": "Bewerken",
@@ -3869,12 +3995,24 @@
     "domainConfiguredCount": "{count} domein (s) geconfigureerd",
     "allowAllUsersFromDomain": "Alle gebruikers van {domain} toestaan",
     "allowOnlySpecificUsers": "Alleen specifieke gebruikers van {domain} toestaan",
+    "blockSpecificUsers": "Blokkeer alleen specifieke gebruikers van {domain}",
+    "blockAllUsersFromDomain": "Blokkeer alle gebruikers van {domain}",
+    "allUsersBlockedMessage": "Alle externe SSO-gebruikers met e-mailadressen die eindigen op {domain} worden uit het systeem geblokkeerd (gebruikersinterface, API en opname).",
+    "blockedUsersHint": "Geblokkeerde vermeldingen zijn alleen van toepassing op externe SSO-identiteiten (SSO-gebruikers en SSO-/tokenserviceaccounts). Ze negeren elke toestemingsregel en hebben betrekking op de gebruikersinterface, API en opname. Native accounts en door de API aangemaakte accounts worden niet beïnvloed. Verwijder ze in plaats daarvan.",
+    "addBlockedEmail": "E-mailadres blokkeren",
+    "blockedEmailPlaceholder": "bijv. gebruiker {domain}",
+    "domainNeedsBlockedEmails": "Domein '{domain}' moet minstens één e-mailadres hebben om specifieke gebruikers te kunnen blokkeren",
+    "confirmRemoveBlockedEmail": "Weet je zeker dat je de e-mail '{email}' wilt deblokkeren?",
+    "blockedEmailAdded": "E-mailadres succesvol geblokkeerd",
+    "blockedEmailRemoved": "E-mailadres succesvol gedeblokkeerd",
     "allUsersAllowedMessage": "Alle gebruikers met e-mailadressen die eindigen op {domain} kunnen inloggen.",
     "emailPlaceholder": "bijv. gebruiker {domain}",
     "addEmail": "E-mailadres toevoegen",
     "saveChanges": "Opslaan",
     "invalidDomain": "Voer een geldige domeinnaam in",
     "invalidEmail": "Voer een geldig e-mailadres in voor dit domein",
+    "domainRequired": "Domein is vereist",
+    "emailRequired": "E-mailadres is vereist",
     "domainAlreadyExists": "Dit domein is al toegevoegd",
     "domainAdded": "Domein succesvol toegevoegd",
     "confirmRemoveDomain": "Weet je zeker dat je het domein '{domain}' wilt verwijderen?",
@@ -3891,6 +4029,7 @@
     "pageSubtitle": "Instellingen voor uw toepassing aanpassen",
     "platformSettings": "Platform-instellingen",
     "scrapeIntervalRequired": "Schraapinterval is vereist",
+    "scrapeIntervalPositive": "Het schraapinterval moet een positief getal zijn",
     "scrapeIntervalDescription": "Het schraapinterval is de frequentie, in seconden, waarmee het bewakingssysteem statistieken verzamelt.",
     "maxSeriesPerQueryLabel": "Max. aantal reeksen per zoekopdracht",
     "maxSeriesPerQueryDescription": "Maximaal aantal series dat kan worden geretourneerd uit een enkele ProMQL-query. Helpt bij grote resultatensets te voorkomen dat de gebruikersinterface vastloopt. Laat dit veld leeg om de systeemstandaard te gebruiken (40.000).",
@@ -4192,6 +4331,51 @@
     "querySource": "Bron van de zoekopdracht"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "Diensten voor het zoeken",
+      "noStreamsDetected": "Er zijn geen streams gedetecteerd. Zorg ervoor dat de statistieken van servicegrafieken stream_name-labels bevatten.",
+      "streamOnlyInfo": "Service Graph maakt gebruik van stream-only architectuur zonder in-memory status",
+      "borderColor": "Kleur van de rand",
+      "borderColorMetric": "Fouten",
+      "nodeSize": "Knooppuntgrootte",
+      "nodeSizeMetric": "Verzoeken",
+      "sizeLow": "Laag",
+      "sizeHigh": "Hoog",
+      "status": {
+        "healthy": "Gezond",
+        "degraded": "Gedegradeerd",
+        "warning": "Waarschuwing",
+        "critical": "Kritiek"
+      },
+      "range": {
+        "healthy": "< 1%",
+        "degraded": "1 — 5%",
+        "warning": "5 — 10%",
+        "critical": "> 10%"
+      },
+      "entities": "entiteiten",
+      "distribution": "Distributie",
+      "total": "Totaal",
+      "showTypes": "Typen weergeven",
+      "typesFiltered": "Sommige soorten zijn verborgen. Open om te wijzigen wat er wordt weergegeven.",
+      "zoomIn": "Inzoomen",
+      "zoomOut": "Uitzoomen",
+      "fitToScreen": "Aanpassen aan het scherm",
+      "layout": "Indeling",
+      "types": "Typen",
+      "mode": {
+        "auto": "Auto",
+        "expanded": "Uitgebreid",
+        "collapsed": "Ingestort"
+      },
+      "kind": {
+        "service": "Diensten",
+        "database": "Datastores",
+        "queue": "Wachtrijen",
+        "external": "Extern",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "In volledige weergave openen",
     "viewLogs": "Logboeken bekijken",
     "viewRelated": "Gerelateerd bekijken",
@@ -4470,6 +4654,7 @@
     "servicesCatalog": {
       "tabLabel": "Servicecatalogus",
       "title": "Servicecatalogus",
+      "footerTitle": "Diensten",
       "filterPlaceholder": "Filteren op servicenaam...",
       "noServicesFound": "Er zijn geen services gevonden in de geselecteerde periode.",
       "loading": "Diensten aan het laden...",
@@ -4496,6 +4681,15 @@
       "servicesLabel": "services",
       "viewTraces": "Bekijk de sporen",
       "exportCsv": "CSV exporteren",
+      "types": {
+        "all": "Alles",
+        "service": "Diensten",
+        "datastore": "Datastores",
+        "queue": "Wachtrijen",
+        "external": "Extern",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{aantal} {status}",
       "legend": {
         "title": "Foutpercentage"
       }
@@ -5233,6 +5427,7 @@
     },
     "quality": {
       "scopeLabel": "Alle kwaliteitsdimensies in deze werkruimte",
+      "agentPlaceholder": "Alle agenten",
       "timeRange": {
         "label": "Tijdbereik",
         "last1h": "Afgelopen 1 uur",
@@ -6126,6 +6321,10 @@
       "functions": "Functies",
       "reports": "Rapporten",
       "iam": "IAM",
+      "settings": "Instellingen",
+      "onlineEvals": "Online evaluaties",
+      "actions": "Acties",
+      "rum": "RUM",
       "runningQueries": "Zoekopdrachten uitvoeren"
     },
     "pages": {
@@ -6151,7 +6350,30 @@
       "panelEditor": "Paneel-editor",
       "traceDetail": "Detail traceren",
       "runningQueries": "Zoekopdrachten uitvoeren",
-      "ingestionTokens": "IAM — Tokens voor opname"
+      "ingestionTokens": "IAM — Tokens voor opname",
+      "alertIncidents": "Waarschuwingen — Incidenten",
+      "pipelineDestinations": "Pijpleidingen — Bestemmingen",
+      "enrichmentTables": "Verrijkingstabellen",
+      "iamInvitations": "IAM — Uitnodigingen",
+      "iamOrganizations": "IAM — Organisaties",
+      "regexPatterns": "Regex-patronen",
+      "cipherKeys": "Cijfersleutels",
+      "nodes": "Knopen",
+      "modelPricing": "Modelprijzen",
+      "searchSchedulers": "Planners zoeken",
+      "searchHistory": "Zoekgeschiedenis",
+      "sessions": "Sessies",
+      "evalTemplates": "Online evaluaties — Sjablonen",
+      "scorers": "Online evaluaties — Scorers",
+      "evalJobs": "Online evaluaties — Vacatures",
+      "scoreConfigs": "Online evaluaties — Score-configuraties",
+      "actions": "Acties",
+      "llmProviders": "LLM-aanbieders",
+      "aiToolsets": "AI-toolsets",
+      "orgManagement": "Beheer van de organisatie",
+      "rumErrors": "RUM — Foutopsporing",
+      "rumSessions": "RUM — Sessies",
+      "sourceMaps": "RUM — Bronkaarten"
     },
     "actions": {
       "openCheatsheet": "Cheatsheet voor sneltoetsen openen",
@@ -6231,7 +6453,30 @@
       "logsExport": "Exporteer resultaten als CSV",
       "tableRowOpen": "Zweefrij openen/uitvouwen",
       "tableRowInspect": "Inspecteer de zweverige rij",
-      "tracesCopyUrl": "Kopieer de URL voor het delen van sporen"
+      "tracesCopyUrl": "Kopieer de URL voor het delen van sporen",
+      "alertIncidentsRefresh": "Lijst verversen",
+      "pipelineDestinationsRefresh": "Lijst verversen",
+      "enrichmentTablesRefresh": "Lijst verversen",
+      "iamInvitationsRefresh": "Lijst verversen",
+      "iamOrganizationsRefresh": "Lijst verversen",
+      "regexPatternsRefresh": "Lijst verversen",
+      "cipherKeysRefresh": "Lijst verversen",
+      "nodesRefresh": "Lijst verversen",
+      "modelPricingRefresh": "Lijst verversen",
+      "searchSchedulersRefresh": "Lijst verversen",
+      "searchHistoryRefresh": "Lijst verversen",
+      "sessionsRefresh": "Lijst verversen",
+      "evalTemplatesRefresh": "Lijst verversen",
+      "scorersRefresh": "Lijst verversen",
+      "evalJobsRefresh": "Lijst verversen",
+      "scoreConfigsRefresh": "Lijst verversen",
+      "actionsRefresh": "Lijst verversen",
+      "llmProvidersRefresh": "Lijst verversen",
+      "aiToolsetsRefresh": "Lijst verversen",
+      "orgManagementRefresh": "Lijst verversen",
+      "rumErrorsRefresh": "Lijst verversen",
+      "rumSessionsRefresh": "Lijst verversen",
+      "sourceMapsRefresh": "Lijst verversen"
     }
   }
 }

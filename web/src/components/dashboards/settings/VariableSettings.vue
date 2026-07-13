@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div>
+  <div class="full-height">
     <div v-if="isAddVariable" class="flex flex-col full-height">
       <AddSettingVariable
         v-if="isAddVariable"

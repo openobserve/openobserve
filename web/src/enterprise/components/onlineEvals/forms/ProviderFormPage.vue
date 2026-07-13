@@ -1,52 +1,37 @@
 <template>
   <OForm
-    class="flex flex-col flex-1 min-h-0 bg-card-bg border border-dialog-header-border rounded-md"
+    class="flex flex-col flex-1 min-h-0 bg-card-bg"
     :form="form"
     v-slot="{ isSubmitting }"
   >
-    <div class="flex items-center gap-2.5 min-h-12 px-3.5 py-2 border-b border-dialog-header-border shrink-0">
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="arrow-back-ios-new"
-        data-test="provider-form-back-btn"
-        :title="t('onlineEvals.provider.backTo')"
-        :disabled="isSubmitting"
-        @click="$emit('cancel')"
-      />
-      <div class="m-0 text-[17px] font-semibold text-text-primary tracking-[0.005em] whitespace-nowrap">
-        {{
-          mode === "create"
-            ? t("onlineEvals.provider.createTitle")
-            : t("onlineEvals.provider.editTitle")
-        }}
-      </div>
-      <span class="text-text-secondary text-xs overflow-hidden text-ellipsis whitespace-nowrap min-w-0">{{ t("onlineEvals.provider.subtitle") }}</span>
-      <div class="flex-1 min-w-2" />
-      <button
-        type="button"
-        class="provider-form__close inline-flex items-center justify-center w-7 h-7 p-0 text-text-secondary bg-transparent border-0 rounded-md cursor-pointer transition-[background,color] duration-150 hover:bg-[color-mix(in_srgb,var(--color-text-primary)_6%,transparent)] hover:text-[var(--color-primary-600,#3F7994)]"
-        :aria-label="t('onlineEvals.buttons.cancel')"
-        data-test="provider-form-close-btn"
-        :disabled="isSubmitting"
-        @click="$emit('cancel')"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-      </button>
-    </div>
+    <AppPageHeader
+      :subtitle="t('onlineEvals.provider.subtitle')"
+      :back="{
+        label: t('onlineEvals.provider.backTo'),
+        onClick: () => $emit('cancel'),
+        dataTest: 'provider-form-back-btn',
+      }"
+      class="px-3 border-b border-border-default"
+      style="flex-shrink: 0"
+    >
+      <template #title>
+        <span data-test="provider-form-title">
+          {{ mode === "create" ? t("onlineEvals.provider.createTitle") : t("onlineEvals.provider.editTitle") }}
+        </span>
+      </template>
+      <template #actions>
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="close"
+          :aria-label="t('onlineEvals.buttons.cancel')"
+          :title="t('onlineEvals.buttons.cancel')"
+          data-test="provider-form-close-btn"
+          :disabled="isSubmitting"
+          @click="$emit('cancel')"
+        />
+      </template>
+    </AppPageHeader>
 
     <div class="flex-1 min-h-0 overflow-auto px-6 py-4.5 [&_textarea]:max-h-[220px] [&_textarea]:overflow-y-auto [&_textarea]:font-mono">
       <section class="mb-6">
@@ -189,6 +174,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
 import {

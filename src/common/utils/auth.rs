@@ -80,16 +80,10 @@ static RE_SPACE_AROUND: Lazy<Regex> = Lazy::new(|| {
     Regex::new(&pattern).unwrap()
 });
 
-pub static EMAIL_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(
-        r"^([a-zA-Z0-9_+]([a-zA-Z0-9_+\-]*(\.[a-zA-Z0-9_+\-]+)*)?[a-zA-Z0-9_+])@([a-zA-Z0-9]+([\-\.]{1}[a-zA-Z0-9]+)*\.[a-zA-Z]{2,6})",
-    )
-    .unwrap()
-});
-
-pub fn is_valid_email(email: &str) -> bool {
-    EMAIL_REGEX.is_match(email)
-}
+// Email validation lives in the shared `config` crate so the OSS auth layer and the enterprise
+// domain-management blocklist validate identically. Re-exported here to preserve the existing
+// `crate::common::utils::auth::{EMAIL_REGEX, is_valid_email}` API.
+pub use config::utils::str::{EMAIL_REGEX, is_valid_email};
 
 pub fn into_ofga_supported_format(name: &str) -> String {
     // remove spaces around special characters
@@ -158,8 +152,10 @@ pub async fn save_org_tuples(_org_id: &str) {}
 pub async fn delete_org_tuples(org_id: &str) {
     use o2_openfga::config::get_config as get_openfga_config;
 
-    if get_openfga_config().enabled {
-        o2_openfga::authorizer::authz::delete_org_tuples(org_id).await
+    if get_openfga_config().enabled
+        && let Err(e) = o2_openfga::authorizer::authz::delete_org_tuples(org_id).await
+    {
+        log::error!("[auth] failed to delete org tuples for {org_id}: {e}");
     }
 }
 
@@ -824,6 +820,15 @@ mod tests {
         assert!(is_valid_email("user@example.com"));
         assert!(is_valid_email("john.doe+123@mail.co.in"));
         assert!(is_valid_email("a_b-c.d+e@domain.org"));
+        // Regression for #12961: local part ending in a single-char dotted segment.
+        assert!(is_valid_email("first.x@example.com"));
+        assert!(is_valid_email("s.a@example.com"));
+        assert!(is_valid_email("first.x.y@example.com"));
+        assert!(is_valid_email("first.xy@example.com"));
+        // TLDs longer than 6 letters, incl. the RFC 2606 reserved `.invalid`
+        // used across the API test suite.
+        assert!(is_valid_email("sa_88dddbd4@test.invalid"));
+        assert!(is_valid_email("user@example.software"));
         assert!(!is_valid_email("no-at-symbol.com"));
         assert!(!is_valid_email("@missing-user.com"));
         assert!(!is_valid_email("user@.com"));
@@ -971,6 +976,8 @@ mod tests {
         assert!(!is_valid_email("user@domain with space.com"));
         assert!(!is_valid_email(".user@example.com"));
         assert!(!is_valid_email("user@.example.com"));
+        assert!(!is_valid_email("user.@example.com")); // trailing dot in local part
+        assert!(!is_valid_email("user@example.com trailing")); // trailing garbage
     }
 
     #[test]

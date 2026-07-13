@@ -25,7 +25,16 @@ const emit = defineEmits<{
   edit: [row: any];
   delete: [row: any];
   "bulk-delete": [];
+  create: [];
 }>();
+
+const onEmptyStateAction = (id?: string) => {
+  if (id === "clear-filters") {
+    emit("update:globalFilter", "");
+    return;
+  }
+  if (id === "create") emit("create");
+};
 
 const columns: OTableColumnDef[] = [
   {
@@ -89,6 +98,9 @@ const columns: OTableColumnDef[] = [
         />
       </div>
     </template>
+    <template #toolbar-trailing>
+      <slot name="toolbar-trailing" />
+    </template>
     <!-- Row actions: edit + delete -->
     <template #cell-actions="{ row }">
       <div class="flex items-center justify-center">
@@ -120,13 +132,12 @@ const columns: OTableColumnDef[] = [
         size="hero"
         preset="no-roles"
         :filtered="!!globalFilter"
-        :hide-action="!globalFilter"
-        @action="emit('update:globalFilter', '')"
+        @action="onEmptyStateAction"
       />
     </template>
 
     <template #bottom>
-      <span class="o2-table-footer-title text-text-primary">{{ data.length }} {{ t("iam.roles") }}</span>
+      <span class="o2-table-footer-title">{{ data.length }} {{ t("iam.roles") }}</span>
       <OButton
         v-if="(selectedIds?.length ?? 0) > 0"
         data-test="iam-roles-bulk-delete-btn"
