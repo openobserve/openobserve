@@ -1790,9 +1790,6 @@ describe("TraceDetailsSidebar", async () => {
       parent_id: "6702b0494b2b6e57",
       events: "",
       links: "",
-      llm_input: '{"messages": [{"role": "user", "content": "Hello"}]}',
-      llm_output: '{"choices": [{"message": {"content": "Hi there!"}}]}',
-      llm_model_name: "gpt-4",
       gen_ai_operation_name: "chat",
       gen_ai_response_model: "gpt-4",
       gen_ai_input_messages:
@@ -1850,14 +1847,14 @@ describe("TraceDetailsSidebar", async () => {
       expect(previewTab.exists()).toBe(true);
     });
 
-    it("should render the input LLMContentRenderer when llm_input has content", () => {
+    it("should render the input LLMContentRenderer when gen_ai_input_messages has content", () => {
       const inputRenderer = llmWrapper.find(
         '[data-test="llm-content-renderer-input"]',
       );
       expect(inputRenderer.exists()).toBe(true);
     });
 
-    it("should render the output LLMContentRenderer when llm_output has content", () => {
+    it("should render the output LLMContentRenderer when gen_ai_output_messages has content", () => {
       const outputRenderer = llmWrapper.find(
         '[data-test="llm-content-renderer-output"]',
       );

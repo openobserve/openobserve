@@ -206,13 +206,13 @@ pub async fn get_latest_sessions(
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
     // session_id may appear on the first span only or on all spans of a trace.
-    // gen_ai_*/llm_* fields may be on different spans than session_id.
+    // gen_ai_* fields may be on different spans than session_id.
     // So we must: get session→trace_id mapping first, then query by trace_id
     // (which captures ALL spans) to get accurate usage totals.
     //
-    // Use ValidatedLlmSchema (Tier 1) for column-name resolution and optional
-    // field detection. Session handler keeps its own SQL shape (Phase 1 groups
-    // by session_id; Phase 2 queries by trace_id; ordering is done in Rust).
+    // Validate required GenAI fields and detect optional fields. Session handler
+    // keeps its own SQL shape (Phase 1 groups by session_id; Phase 2 queries by
+    // trace_id; ordering is done in Rust).
     let stream_type = StreamType::Traces;
     let schema = infra::schema::get_stream_schema_from_cache(
         org_id.as_str(),
@@ -221,12 +221,14 @@ pub async fn get_latest_sessions(
     )
     .await;
     let validated = match schema.as_ref() {
-        Some(s) => match super::schema_compat::validate_llm_schema(s, &stream_name) {
+        Some(s) => match super::gen_ai_schema::validate_gen_ai_schema(s, &stream_name) {
             Ok(v) => {
                 // Verify a session identifier column actually exists — even if
-                // all required LLM fields pass, we cannot run a session query
+                // all required GenAI fields pass, we cannot run a session query
                 // without something to group by.
-                if s.field_with_name(v.columns.session_id).is_err() {
+                if s.field_with_name(super::gen_ai_schema::GEN_AI_SESSION_ID_COL)
+                    .is_err()
+                {
                     return MetaHttpResponse::json(PaginatedResponse {
                         took: 0,
                         total: 0,
@@ -241,7 +243,7 @@ pub async fn get_latest_sessions(
             }
             Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
         },
-        None => Some(super::schema_compat::ValidatedLlmSchema::fallback(false)),
+        None => Some(super::gen_ai_schema::GenAiSchema::fallback()),
     };
     let validated = match validated {
         Some(v) => v,
@@ -257,10 +259,11 @@ pub async fn get_latest_sessions(
             });
         }
     };
-    let session_id_col = validated.columns.session_id;
+    let session_id_col = super::gen_ai_schema::GEN_AI_SESSION_ID_COL;
     let user_id_opt = Some(user_id.to_string());
 
-    // Phase 1: Get paginated session list with trace_ids per session
+    // Phase 1: get the paginated session ids ordered by Last Seen. Keep this
+    // query narrow; trace-id membership is fetched only for the returned page.
     let session_filter = if filter.is_empty() {
         format!("{session_id_col} IS NOT NULL AND {session_id_col} != ''")
     } else {
@@ -268,8 +271,7 @@ pub async fn get_latest_sessions(
     };
     let query_sql = format!(
         "SELECT {session_id_col}, \
-        min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
-        array_agg(DISTINCT trace_id) as trace_ids \
+        max({TIMESTAMP_COL_NAME}) as zo_sql_timestamp \
         FROM \"{stream_name}\" \
         WHERE {session_filter} \
         GROUP BY {session_id_col} \
@@ -336,9 +338,67 @@ pub async fn get_latest_sessions(
         return MetaHttpResponse::json(resp_search);
     }
 
-    // Parse session_id -> trace_ids from Phase 1 results
-    let (session_ids, session_trace_ids) =
-        parse_session_trace_ids(&resp_search.hits, session_id_col);
+    let session_ids = parse_session_ids(&resp_search.hits, session_id_col);
+    if session_ids.is_empty() {
+        return MetaHttpResponse::json(PaginatedResponse {
+            took: 0,
+            total: 0,
+            from,
+            size,
+            hits: vec![],
+            trace_id,
+            function_error: String::new(),
+        });
+    }
+
+    // Phase 1b: fetch every trace_id for the returned sessions. The optional
+    // filter above only chooses session membership; metrics should still roll up
+    // all turns in each matched session within the selected time window.
+    req.query.sql = build_session_trace_membership_sql(&stream_name, session_id_col, &session_ids);
+    req.query.from = 0;
+    req.query.size = -1;
+    let resp_membership = match SearchService::cache::search(
+        &trace_id,
+        &org_id,
+        stream_type,
+        user_id_opt.clone(),
+        &req,
+        "".to_string(),
+        false,
+        None,
+        false,
+    )
+    .instrument(http_span.clone())
+    .await
+    {
+        Ok(res) => res,
+        Err(err) => {
+            let time = start.elapsed().as_secs_f64();
+            metrics::HTTP_RESPONSE_TIME
+                .with_label_values(&[
+                    "/api/org/traces/session",
+                    "500",
+                    &org_id,
+                    stream_type.as_str(),
+                    "",
+                    "",
+                ])
+                .observe(time);
+            metrics::HTTP_INCOMING_REQUESTS
+                .with_label_values(&[
+                    "/api/org/traces/session",
+                    "500",
+                    &org_id,
+                    stream_type.as_str(),
+                    "",
+                    "",
+                ])
+                .inc();
+            log::error!("get sessions trace membership error: {err:?}");
+            return map_error_to_http_response(&err, Some(trace_id));
+        }
+    };
+    let session_trace_ids = parse_session_trace_membership(&resp_membership.hits, session_id_col);
 
     // Collect all unique trace_ids across sessions
     let all_trace_ids: Vec<String> = session_trace_ids
@@ -364,115 +424,55 @@ pub async fn get_latest_sessions(
     // Trace IDs originate from ingested data and could contain injected SQL if not validated.
     let sanitized_ids: Vec<String> = all_trace_ids
         .iter()
-        .map(|tid| {
-            tid.chars()
-                .filter(|c| c.is_ascii_hexdigit() || *c == '-')
-                .collect::<String>()
-        })
+        .map(|tid| sanitize_trace_id_for_sql(tid))
         .filter(|tid| !tid.is_empty())
+        .collect::<hashbrown::HashSet<String>>()
+        .into_iter()
         .collect();
+    if sanitized_ids.is_empty() {
+        return MetaHttpResponse::json(PaginatedResponse {
+            took: 0,
+            total: 0,
+            from,
+            size,
+            hits: vec![],
+            trace_id,
+            function_error: String::new(),
+        });
+    }
     let trace_ids_sql = sanitized_ids.join("','");
 
-    // Build Phase 2 SQL using ValidatedLlmSchema for column names and optional
-    // field presence (the session handler keeps its own SQL shape).
-    let query_sql = if validated.has_gen_ai {
-        let first_msg_clause = if validated.has_input_messages {
-            "FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '')".to_string()
-        } else {
-            "''".to_string()
-        };
-        let total_tokens_expr = if validated.has_total_tokens {
-            "sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total"
-        } else {
-            "0 as gen_ai_usage_details_total"
-        };
-        let cache_read_tokens_expr = optional_sum_expr(
-            validated.has_cache_read_input_tokens,
-            "gen_ai_usage_cache_read_input_tokens",
-            "gen_ai_usage_cache_read_input_tokens",
-        );
-        let cache_creation_tokens_expr = optional_sum_expr(
-            validated.has_cache_creation_input_tokens,
-            "gen_ai_usage_cache_creation_input_tokens",
-            "gen_ai_usage_cache_creation_input_tokens",
-        );
-        let cost_cache_read_expr = optional_sum_expr(
-            validated.has_cost_cache_read_input,
-            "gen_ai_usage_cost_cache_read_input",
-            "gen_ai_usage_cost_cache_read_input",
-        );
-        let cost_cache_creation_expr = optional_sum_expr(
-            validated.has_cost_cache_creation_input,
-            "gen_ai_usage_cost_cache_creation_input",
-            "gen_ai_usage_cost_cache_creation_input",
-        );
-        let cost_estimated_without_cache_expr = optional_sum_expr(
-            validated.has_cost_estimated_without_cache,
-            "gen_ai_usage_cost_estimated_without_cache",
-            "gen_ai_usage_cost_estimated_without_cache",
-        );
-        let cost_cache_read_savings_expr = optional_sum_expr(
-            validated.has_cost_cache_read_savings,
-            "gen_ai_usage_cost_cache_read_savings",
-            "gen_ai_usage_cost_cache_read_savings",
-        );
-        let cost_net_cache_impact_expr = optional_sum_expr(
-            validated.has_cost_net_cache_impact,
-            "gen_ai_usage_cost_net_cache_impact",
-            "gen_ai_usage_cost_net_cache_impact",
-        );
-        format!(
-            "SELECT trace_id, \
-            max(user_id) as user_id,
-            min(start_time) as trace_start_time, \
-            max(end_time) as trace_end_time, \
-            sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
-            sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
-            {total_tokens_expr}, \
-            sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
-            {cache_read_tokens_expr}, \
-            {cache_creation_tokens_expr}, \
-            {cost_cache_read_expr}, \
-            {cost_cache_creation_expr}, \
-            {cost_estimated_without_cache_expr}, \
-            {cost_cache_read_savings_expr}, \
-            {cost_net_cache_impact_expr}, \
-            sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count, \
-            {first_msg_clause} as gen_ai_input_messages \
-            FROM \"{stream_name}\" \
-            WHERE trace_id IN ('{trace_ids_sql}') \
-            GROUP BY trace_id"
-        )
+    // Build Phase 2 SQL with optional fields only when the schema contains them.
+    let first_msg_clause = if validated.has_input_messages {
+        "FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '')".to_string()
     } else {
-        let first_msg_clause = if validated.has_input_messages {
-            "FIRST_VALUE(llm_input ORDER BY start_time ASC) FILTER (WHERE llm_input IS NOT NULL AND llm_input != '')".to_string()
-        } else {
-            "''".to_string()
-        };
-        let total_tokens_expr = if validated.has_total_tokens {
-            "sum(llm_usage_tokens_total) as gen_ai_usage_details_total"
-        } else {
-            "0 as gen_ai_usage_details_total"
-        };
-        format!(
-            "SELECT trace_id, \
-            max(llm_user_id) as user_id,
-            min(start_time) as trace_start_time, \
-            max(end_time) as trace_end_time, \
-            sum(llm_usage_tokens_input) as gen_ai_usage_details_input, \
-            sum(llm_usage_tokens_output) as gen_ai_usage_details_output, \
-            {total_tokens_expr}, \
-            sum(llm_usage_cost_total) as gen_ai_usage_cost_details, \
-            sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count, \
-            {first_msg_clause} as gen_ai_input_messages \
-            FROM \"{stream_name}\" \
-            WHERE trace_id IN ('{trace_ids_sql}') \
-            GROUP BY trace_id"
-        )
+        "''".to_string()
     };
+    let total_tokens_expr = if validated.has_total_tokens {
+        "sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total"
+    } else {
+        "0 as gen_ai_usage_details_total"
+    };
+    let optional_usage_selects = gen_ai_optional_usage_selects(&validated);
+    let query_sql = format!(
+        "SELECT trace_id, \
+        max(user_id) as user_id,
+        min(start_time) as trace_start_time, \
+        max(end_time) as trace_end_time, \
+        sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
+        sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
+        {total_tokens_expr}, \
+        sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
+        {optional_usage_selects}, \
+        sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count, \
+        {first_msg_clause} as gen_ai_input_messages \
+        FROM \"{stream_name}\" \
+        WHERE trace_id IN ('{trace_ids_sql}') \
+        GROUP BY trace_id"
+    );
     req.query.sql = query_sql;
     req.query.from = 0;
-    req.query.size = all_trace_ids.len() as i64;
+    req.query.size = sanitized_ids.len() as i64;
 
     let mut trace_details: HashMap<String, TraceDetail> = HashMap::new();
     let resp = match SearchService::cache::search(
@@ -758,9 +758,11 @@ pub async fn get_session_details(
     )
     .await;
     let validated = match schema.as_ref() {
-        Some(s) => match super::schema_compat::validate_llm_schema(s, &stream_name) {
+        Some(s) => match super::gen_ai_schema::validate_gen_ai_schema(s, &stream_name) {
             Ok(v) => {
-                if s.field_with_name(v.columns.session_id).is_err() {
+                if s.field_with_name(super::gen_ai_schema::GEN_AI_SESSION_ID_COL)
+                    .is_err()
+                {
                     return MetaHttpResponse::json(PaginatedResponse {
                         took: 0,
                         total: 0,
@@ -775,9 +777,9 @@ pub async fn get_session_details(
             }
             Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
         },
-        None => super::schema_compat::ValidatedLlmSchema::fallback(false),
+        None => super::gen_ai_schema::GenAiSchema::fallback(),
     };
-    let session_id_col = validated.columns.session_id;
+    let session_id_col = super::gen_ai_schema::GEN_AI_SESSION_ID_COL;
     let safe_session_id = escape_sql_string(&session_id);
     let use_cache = get_use_cache_from_request(&query);
     let user_id_opt = Some(user_id.to_string());
@@ -962,7 +964,7 @@ async fn fetch_session_trace_hits(
     stream_type: StreamType,
     user_id_opt: Option<String>,
     stream_name: &str,
-    validated: &super::schema_compat::ValidatedLlmSchema,
+    validated: &super::gen_ai_schema::GenAiSchema,
     has_ref_parent_id: bool,
     has_infer: bool,
     start_time: i64,
@@ -1084,7 +1086,7 @@ async fn fetch_session_trace_hits(
 
 fn build_session_trace_details_sql(
     stream_name: &str,
-    validated: &super::schema_compat::ValidatedLlmSchema,
+    validated: &super::gen_ai_schema::GenAiSchema,
     has_ref_parent_id: bool,
     service_key_expr: &str,
     trace_ids_sql: &str,
@@ -1108,101 +1110,33 @@ fn build_session_trace_details_sql(
          first_value(operation_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_operation_name"
     );
 
-    if validated.has_gen_ai {
-        let first_msg_clause = if validated.has_input_messages {
-            "FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '')".to_string()
-        } else {
-            "''".to_string()
-        };
-        let total_tokens_expr = if validated.has_total_tokens {
-            "sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total"
-        } else {
-            "0 as gen_ai_usage_details_total"
-        };
-        let cache_read_tokens_expr = optional_sum_expr(
-            validated.has_cache_read_input_tokens,
-            "gen_ai_usage_cache_read_input_tokens",
-            "gen_ai_usage_cache_read_input_tokens",
-        );
-        let cache_creation_tokens_expr = optional_sum_expr(
-            validated.has_cache_creation_input_tokens,
-            "gen_ai_usage_cache_creation_input_tokens",
-            "gen_ai_usage_cache_creation_input_tokens",
-        );
-        let cost_cache_read_expr = optional_sum_expr(
-            validated.has_cost_cache_read_input,
-            "gen_ai_usage_cost_cache_read_input",
-            "gen_ai_usage_cost_cache_read_input",
-        );
-        let cost_cache_creation_expr = optional_sum_expr(
-            validated.has_cost_cache_creation_input,
-            "gen_ai_usage_cost_cache_creation_input",
-            "gen_ai_usage_cost_cache_creation_input",
-        );
-        let cost_estimated_without_cache_expr = optional_sum_expr(
-            validated.has_cost_estimated_without_cache,
-            "gen_ai_usage_cost_estimated_without_cache",
-            "gen_ai_usage_cost_estimated_without_cache",
-        );
-        let cost_cache_read_savings_expr = optional_sum_expr(
-            validated.has_cost_cache_read_savings,
-            "gen_ai_usage_cost_cache_read_savings",
-            "gen_ai_usage_cost_cache_read_savings",
-        );
-        let cost_net_cache_impact_expr = optional_sum_expr(
-            validated.has_cost_net_cache_impact,
-            "gen_ai_usage_cost_net_cache_impact",
-            "gen_ai_usage_cost_net_cache_impact",
-        );
-        format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
-            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
-            (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
-            sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
-            {total_tokens_expr}, \
-            sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
-            {cache_read_tokens_expr}, \
-            {cache_creation_tokens_expr}, \
-            {cost_cache_read_expr}, \
-            {cost_cache_creation_expr}, \
-            {cost_estimated_without_cache_expr}, \
-            {cost_cache_read_savings_expr}, \
-            {cost_net_cache_impact_expr}, \
-            array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
-            {first_msg_clause} as gen_ai_input_messages, \
-            {trace_selects} \
-            FROM \"{stream_name}\" \
-            WHERE trace_id IN ('{trace_ids_sql}') \
-            GROUP BY trace_id"
-        )
+    let first_msg_clause = if validated.has_input_messages {
+        "FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '')".to_string()
     } else {
-        let first_msg_clause = if validated.has_input_messages {
-            "FIRST_VALUE(llm_input ORDER BY start_time ASC) FILTER (WHERE llm_input IS NOT NULL AND llm_input != '')".to_string()
-        } else {
-            "''".to_string()
-        };
-        let total_tokens_expr = if validated.has_total_tokens {
-            "sum(llm_usage_tokens_total) as gen_ai_usage_details_total"
-        } else {
-            "0 as gen_ai_usage_details_total"
-        };
-        format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
-            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
-            (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(llm_usage_tokens_input) as gen_ai_usage_details_input, \
-            sum(llm_usage_tokens_output) as gen_ai_usage_details_output, \
-            {total_tokens_expr}, \
-            sum(llm_usage_cost_total) as gen_ai_usage_cost_details, \
-            array_agg(DISTINCT llm_model_name) FILTER (WHERE llm_model_name IS NOT NULL AND llm_model_name != '') as gen_ai_response_models, \
-            {first_msg_clause} as gen_ai_input_messages, \
-            {trace_selects} \
-            FROM \"{stream_name}\" \
-            WHERE trace_id IN ('{trace_ids_sql}') \
-            GROUP BY trace_id"
-        )
-    }
+        "''".to_string()
+    };
+    let total_tokens_expr = if validated.has_total_tokens {
+        "sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total"
+    } else {
+        "0 as gen_ai_usage_details_total"
+    };
+    let optional_usage_selects = gen_ai_optional_usage_selects(validated);
+    format!(
+        "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
+        min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+        (max(end_time) - min(start_time)) as zo_sql_duration, \
+        sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
+        sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
+        {total_tokens_expr}, \
+        sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
+        {optional_usage_selects}, \
+        array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
+        {first_msg_clause} as gen_ai_input_messages, \
+        {trace_selects} \
+        FROM \"{stream_name}\" \
+        WHERE trace_id IN ('{trace_ids_sql}') \
+        GROUP BY trace_id"
+    )
 }
 
 fn build_session_trace_response_item(
@@ -1359,12 +1293,46 @@ fn escape_sql_string(value: &str) -> String {
     value.replace('\'', "''")
 }
 
-fn optional_sum_expr(has_field: bool, column: &str, alias: &str) -> String {
+fn optional_sum_expr(has_field: bool, field_name: &str) -> String {
     if has_field {
-        format!("sum({column}) as {alias}")
+        format!("sum({field_name}) as {field_name}")
     } else {
-        format!("0 as {alias}")
+        format!("0 as {field_name}")
     }
+}
+
+fn gen_ai_optional_usage_selects(validated: &super::gen_ai_schema::GenAiSchema) -> String {
+    [
+        optional_sum_expr(
+            validated.has_cache_read_input_tokens,
+            "gen_ai_usage_cache_read_input_tokens",
+        ),
+        optional_sum_expr(
+            validated.has_cache_creation_input_tokens,
+            "gen_ai_usage_cache_creation_input_tokens",
+        ),
+        optional_sum_expr(
+            validated.has_cost_cache_read_input,
+            "gen_ai_usage_cost_cache_read_input",
+        ),
+        optional_sum_expr(
+            validated.has_cost_cache_creation_input,
+            "gen_ai_usage_cost_cache_creation_input",
+        ),
+        optional_sum_expr(
+            validated.has_cost_estimated_without_cache,
+            "gen_ai_usage_cost_estimated_without_cache",
+        ),
+        optional_sum_expr(
+            validated.has_cost_cache_read_savings,
+            "gen_ai_usage_cost_cache_read_savings",
+        ),
+        optional_sum_expr(
+            validated.has_cost_net_cache_impact,
+            "gen_ai_usage_cost_net_cache_impact",
+        ),
+    ]
+    .join(", ")
 }
 
 #[derive(Debug, Serialize)]
@@ -1570,30 +1538,62 @@ impl SessionDetails {
     }
 }
 
-fn parse_session_trace_ids(
-    hits: &[json::Value],
-    session_id_col: &str,
-) -> (Vec<String>, HashMap<String, Vec<String>>) {
-    let mut session_trace_ids: HashMap<String, Vec<String>> = HashMap::with_capacity(hits.len());
-    let mut session_ids: Vec<String> = Vec::with_capacity(hits.len());
+fn parse_session_ids(hits: &[json::Value], session_id_col: &str) -> Vec<String> {
+    let mut seen = HashSet::with_capacity(hits.len());
+    let mut session_ids = Vec::with_capacity(hits.len());
     for item in hits {
         let session_id = match item.get(session_id_col).and_then(|v| v.as_str()) {
             Some(s) => s.to_string(),
             None => continue,
         };
-        let trace_ids: Vec<String> = item
-            .get("trace_ids")
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                    .collect()
-            })
-            .unwrap_or_default();
-        session_ids.push(session_id.clone());
-        session_trace_ids.insert(session_id, trace_ids);
+        if seen.insert(session_id.clone()) {
+            session_ids.push(session_id);
+        }
     }
-    (session_ids, session_trace_ids)
+    session_ids
+}
+
+fn build_session_trace_membership_sql(
+    stream_name: &str,
+    session_id_col: &str,
+    session_ids: &[String],
+) -> String {
+    let session_ids_sql = session_ids
+        .iter()
+        .map(|id| escape_sql_string(id))
+        .collect::<Vec<_>>()
+        .join("','");
+    format!(
+        "SELECT {session_id_col}, trace_id \
+         FROM \"{stream_name}\" \
+         WHERE {session_id_col} IN ('{session_ids_sql}') \
+         AND trace_id IS NOT NULL AND trace_id != '' \
+         GROUP BY {session_id_col}, trace_id"
+    )
+}
+
+fn parse_session_trace_membership(
+    hits: &[json::Value],
+    session_id_col: &str,
+) -> HashMap<String, Vec<String>> {
+    let mut session_trace_ids: HashMap<String, Vec<String>> = HashMap::with_capacity(hits.len());
+    let mut seen_pairs: HashSet<(String, String)> = HashSet::with_capacity(hits.len());
+    for item in hits {
+        let Some(session_id) = item.get(session_id_col).and_then(|v| v.as_str()) else {
+            continue;
+        };
+        let Some(trace_id) = item.get("trace_id").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        if trace_id.is_empty() {
+            continue;
+        }
+        let pair = (session_id.to_string(), trace_id.to_string());
+        if seen_pairs.insert(pair.clone()) {
+            session_trace_ids.entry(pair.0).or_default().push(pair.1);
+        }
+    }
+    session_trace_ids
 }
 
 fn aggregate_sessions(
@@ -1617,7 +1617,7 @@ fn aggregate_sessions(
             &details,
         ));
     }
-    sessions_data.sort_by_key(|k| std::cmp::Reverse(k.start_time));
+    sessions_data.sort_by_key(|k| std::cmp::Reverse(k.end_time));
     sessions_data
 }
 
@@ -1629,7 +1629,7 @@ mod tests {
 
     #[test]
     fn session_trace_details_sql_aggregates_by_trace_id() {
-        let validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        let validated = super::super::gen_ai_schema::GenAiSchema::fallback();
         let sql = build_session_trace_details_sql(
             "default",
             &validated,
@@ -1687,44 +1687,61 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_session_trace_ids_empty() {
-        let (ids, map) = parse_session_trace_ids(&[], "gen_ai_conversation_id");
+    fn test_parse_session_ids_empty() {
+        let ids = parse_session_ids(&[], "gen_ai_conversation_id");
         assert!(ids.is_empty());
-        assert!(map.is_empty());
     }
 
     #[test]
-    fn test_parse_session_trace_ids_basic() {
+    fn test_parse_session_ids_deduplicates_in_order() {
         let hits = vec![
-            json!({"gen_ai_conversation_id": "sess-1", "trace_ids": ["t1", "t2"]}),
-            json!({"gen_ai_conversation_id": "sess-2", "trace_ids": ["t3"]}),
+            json!({"gen_ai_conversation_id": "sess-1"}),
+            json!({"gen_ai_conversation_id": "sess-1"}),
+            json!({"gen_ai_conversation_id": "sess-2"}),
         ];
-        let (ids, map) = parse_session_trace_ids(&hits, "gen_ai_conversation_id");
+        let ids = parse_session_ids(&hits, "gen_ai_conversation_id");
         assert_eq!(ids, vec!["sess-1", "sess-2"]);
+    }
+
+    #[test]
+    fn test_parse_session_ids_skips_missing_col() {
+        let hits = vec![
+            json!({"other": "value"}),
+            json!({"gen_ai_conversation_id": "sess-1"}),
+        ];
+        let ids = parse_session_ids(&hits, "gen_ai_conversation_id");
+        assert_eq!(ids, vec!["sess-1"]);
+    }
+
+    #[test]
+    fn test_build_session_trace_membership_sql_escapes_session_ids() {
+        let sql = build_session_trace_membership_sql(
+            "default",
+            "gen_ai_conversation_id",
+            &["sess-1".to_string(), "o'brien".to_string()],
+        );
+
+        assert!(sql.contains("gen_ai_conversation_id IN ('sess-1','o''brien')"));
+        assert!(sql.contains("GROUP BY gen_ai_conversation_id, trace_id"));
+    }
+
+    #[test]
+    fn test_parse_session_trace_membership_groups_and_deduplicates() {
+        let hits = vec![
+            json!({"gen_ai_conversation_id": "sess-1", "trace_id": "t1"}),
+            json!({"gen_ai_conversation_id": "sess-1", "trace_id": "t1"}),
+            json!({"gen_ai_conversation_id": "sess-1", "trace_id": "t2"}),
+            json!({"gen_ai_conversation_id": "sess-2", "trace_id": "t3"}),
+            json!({"gen_ai_conversation_id": "sess-3", "trace_id": ""}),
+        ];
+        let map = parse_session_trace_membership(&hits, "gen_ai_conversation_id");
+
         assert_eq!(
             map.get("sess-1").unwrap(),
             &vec!["t1".to_string(), "t2".to_string()]
         );
         assert_eq!(map.get("sess-2").unwrap(), &vec!["t3".to_string()]);
-    }
-
-    #[test]
-    fn test_parse_session_trace_ids_skips_missing_col() {
-        let hits = vec![
-            json!({"other": "value"}),
-            json!({"gen_ai_conversation_id": "sess-1", "trace_ids": ["t1"]}),
-        ];
-        let (ids, map) = parse_session_trace_ids(&hits, "gen_ai_conversation_id");
-        assert_eq!(ids.len(), 1);
-        assert!(map.contains_key("sess-1"));
-    }
-
-    #[test]
-    fn test_parse_session_trace_ids_no_trace_ids_array() {
-        let hits = vec![json!({"gen_ai_conversation_id": "sess-1"})];
-        let (ids, map) = parse_session_trace_ids(&hits, "gen_ai_conversation_id");
-        assert_eq!(ids, vec!["sess-1"]);
-        assert!(map.get("sess-1").unwrap().is_empty());
+        assert!(!map.contains_key("sess-3"));
     }
 
     #[test]
@@ -1787,7 +1804,7 @@ mod tests {
     }
 
     #[test]
-    fn test_aggregate_sessions_sorted_descending_by_start_time() {
+    fn test_aggregate_sessions_sorted_descending_by_end_time() {
         let session_ids = vec!["sess-1".to_string(), "sess-2".to_string()];
         let mut session_trace_ids = HashMap::new();
         session_trace_ids.insert("sess-1".to_string(), vec!["t1".to_string()]);
@@ -1797,7 +1814,7 @@ mod tests {
             "t1".to_string(),
             TraceDetail {
                 start_time: 1000,
-                end_time: 2000,
+                end_time: 9000,
                 gen_ai_usage_input_tokens: 0,
                 gen_ai_usage_output_tokens: 0,
                 gen_ai_usage_total_tokens: 0,
@@ -1824,7 +1841,8 @@ mod tests {
 
         let result = aggregate_sessions(&session_ids, &session_trace_ids, &trace_details);
         assert_eq!(result.len(), 2);
-        assert!(result[0].start_time >= result[1].start_time);
+        assert!(result[0].end_time >= result[1].end_time);
+        assert_eq!(result[0].session_id, "sess-1");
     }
 
     #[test]

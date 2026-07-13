@@ -201,25 +201,11 @@ pub async fn get_latest_users(
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
     // user_id may appear on the first span only or on all spans of a trace.
-    // gen_ai_*/llm_* fields may be on different spans than user_id.
+    // gen_ai_* fields may be on different spans than user_id.
     // So we must: get user→trace_id mapping first, then query by trace_id
     // (which captures ALL spans) to get accurate usage totals.
-    //
-    // Detect schema generation up front so both Phase 1 (user-id column) and
-    // Phase 2 (token/cost columns) pick consistent names.
     let stream_type = StreamType::Traces;
-    let has_gen_ai_fields = super::schema_compat::stream_has_gen_ai_fields(
-        org_id.as_str(),
-        stream_name.as_str(),
-        stream_type,
-    )
-    .await;
-    let llm_cols = if has_gen_ai_fields {
-        super::schema_compat::LlmColumns::current()
-    } else {
-        super::schema_compat::LlmColumns::legacy()
-    };
-    let user_id_col = llm_cols.user_id;
+    let user_id_col = super::gen_ai_schema::GEN_AI_USER_ID_COL;
     let user_id_opt = Some(user_id.to_string());
 
     // Get paginated user list with trace_ids per user
@@ -299,7 +285,7 @@ pub async fn get_latest_users(
     }
 
     // Parse user_id -> trace_ids from Phase 1 results
-    let (llm_user_ids, user_trace_ids) = parse_user_trace_ids(&resp_search.hits, user_id_col);
+    let (user_ids, user_trace_ids) = parse_user_trace_ids(&resp_search.hits, user_id_col);
 
     // Collect all unique trace_ids across users
     let all_trace_ids: Vec<String> = user_trace_ids
@@ -322,31 +308,16 @@ pub async fn get_latest_users(
         .filter(|tid| !tid.is_empty())
         .collect();
     let trace_ids_sql = sanitized_ids.join("','");
-    let query_sql = if has_gen_ai_fields {
-        format!(
-            "SELECT trace_id, \
-            min(start_time) as trace_start_time, \
-            max(end_time) as trace_end_time, \
-            sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
-            sum(gen_ai_usage_cost) as gen_ai_usage_cost_details \
-            FROM \"{stream_name}\" \
-            WHERE trace_id IN ('{trace_ids_sql}') \
-            GROUP BY trace_id"
-        )
-    } else {
-        // Legacy `_o2_llm` schema (pre-PR #11626): tokens live under
-        // `llm_usage_tokens_total` and cost under `llm_usage_cost_total`.
-        format!(
-            "SELECT trace_id, \
-            min(start_time) as trace_start_time, \
-            max(end_time) as trace_end_time, \
-            sum(llm_usage_tokens_total) as gen_ai_usage_details_total, \
-            sum(llm_usage_cost_total) as gen_ai_usage_cost_details \
-            FROM \"{stream_name}\" \
-            WHERE trace_id IN ('{trace_ids_sql}') \
-            GROUP BY trace_id"
-        )
-    };
+    let query_sql = format!(
+        "SELECT trace_id, \
+        min(start_time) as trace_start_time, \
+        max(end_time) as trace_end_time, \
+        sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
+        sum(gen_ai_usage_cost) as gen_ai_usage_cost_details \
+        FROM \"{stream_name}\" \
+        WHERE trace_id IN ('{trace_ids_sql}') \
+        GROUP BY trace_id"
+    );
     req.query.sql = query_sql;
     req.query.from = 0;
     req.query.size = all_trace_ids.len() as i64;
@@ -415,7 +386,7 @@ pub async fn get_latest_users(
     }
 
     // Aggregate per user from trace details
-    let users_data = aggregate_users(&llm_user_ids, &user_trace_ids, &trace_details);
+    let users_data = aggregate_users(&user_ids, &user_trace_ids, &trace_details);
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -497,9 +468,9 @@ fn parse_user_trace_ids(
     user_id_col: &str,
 ) -> (Vec<String>, HashMap<String, Vec<String>>) {
     let mut user_trace_ids: HashMap<String, Vec<String>> = HashMap::with_capacity(hits.len());
-    let mut llm_user_ids: Vec<String> = Vec::with_capacity(hits.len());
+    let mut user_ids: Vec<String> = Vec::with_capacity(hits.len());
     for item in hits {
-        let llm_user_id = match item.get(user_id_col).and_then(|v| v.as_str()) {
+        let user_id = match item.get(user_id_col).and_then(|v| v.as_str()) {
             Some(s) => s.to_string(),
             None => continue,
         };
@@ -512,20 +483,20 @@ fn parse_user_trace_ids(
                     .collect()
             })
             .unwrap_or_default();
-        llm_user_ids.push(llm_user_id.clone());
-        user_trace_ids.insert(llm_user_id, trace_ids);
+        user_ids.push(user_id.clone());
+        user_trace_ids.insert(user_id, trace_ids);
     }
-    (llm_user_ids, user_trace_ids)
+    (user_ids, user_trace_ids)
 }
 
 fn aggregate_users(
-    llm_user_ids: &[String],
+    user_ids: &[String],
     user_trace_ids: &HashMap<String, Vec<String>>,
     trace_details: &HashMap<String, TraceDetail>,
 ) -> Vec<UserResponseItem> {
-    let mut users_data: Vec<UserResponseItem> = Vec::with_capacity(llm_user_ids.len());
-    for llm_user_id in llm_user_ids {
-        let trace_ids = match user_trace_ids.get(llm_user_id) {
+    let mut users_data: Vec<UserResponseItem> = Vec::with_capacity(user_ids.len());
+    for user_id in user_ids {
+        let trace_ids = match user_trace_ids.get(user_id) {
             Some(ids) => ids,
             None => continue,
         };
@@ -534,7 +505,7 @@ fn aggregate_users(
             .filter_map(|tid| trace_details.get(tid).cloned())
             .collect();
         users_data.push(UserResponseItem::from_trace_details(
-            llm_user_id.clone(),
+            user_id.clone(),
             trace_ids.len(),
             &details,
         ));

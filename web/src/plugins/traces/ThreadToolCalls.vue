@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</span>
           <OIcon name="build" size="xs" class="thread-tool-row__icon" />
           <span class="thread-tool-row__name">{{
-            t.tool_name || t.gen_ai_tool_name || t.operation_name
+            t.gen_ai_tool_name || t.operation_name
           }}</span>
           <span class="flex-1" />
           <span
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="thread-tool-body__section">
             <div class="thread-tool-body__label">Arguments</div>
             <pre class="thread-tool-body__pre">{{
-              formatToolPayload(getInputRaw(t) || t.tool_args)
+              formatToolPayload(getInputRaw(t))
             }}</pre>
           </div>
           <div class="thread-tool-body__section">

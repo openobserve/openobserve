@@ -112,6 +112,7 @@ describe("useSessions — fetchPage: field mapping", () => {
     const row = sessions.value[0];
     expect(row.sessionId).toBe("sess-abc");
     expect(row.firstSeenNanos).toBe(1700000000000000000);
+    expect(row.lastSeenNanos).toBe(1700001000000000000);
     expect(row.durationNanos).toBe(1000000000);
     expect(row.turns).toBe(5);
     expect(row.inputTokens).toBe(100);

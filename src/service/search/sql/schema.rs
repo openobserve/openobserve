@@ -224,36 +224,37 @@ pub fn generate_quick_mode_fields(
         }
     }
 
-    // include gen AI fields for LLM streams
+    // Include GenAI fields for LLM streams so quick mode does not trim fields
+    // required by the GenAI observability UI.
     if let Some(settings) = unwrap_stream_settings(schema)
         && settings.is_llm_stream
     {
-        use crate::handler::http::request::traces::schema_compat::{
-            GEN_AI_SENTINEL_COLUMN, OPTIONAL_GEN_AI_FIELDS, OPTIONAL_LLM_FIELDS,
-            REQUIRED_GEN_AI_FIELDS, REQUIRED_LLM_FIELDS,
-        };
+        const GEN_AI_QUICK_MODE_FIELDS: &[&str] = &[
+            "trace_id",
+            "gen_ai_conversation_id",
+            "user_id",
+            "gen_ai_usage_input_tokens",
+            "gen_ai_usage_output_tokens",
+            "gen_ai_usage_cost",
+            "gen_ai_response_model",
+            "gen_ai_input_messages",
+            "gen_ai_output_messages",
+            "gen_ai_usage_total_tokens",
+            "gen_ai_usage_cache_read_input_tokens",
+            "gen_ai_usage_cache_creation_input_tokens",
+            "gen_ai_usage_cost_cache_read_input",
+            "gen_ai_usage_cost_cache_creation_input",
+            "gen_ai_usage_cost_estimated_without_cache",
+            "gen_ai_usage_cost_cache_read_savings",
+            "gen_ai_usage_cost_net_cache_impact",
+        ];
 
-        let field_lists: &[&[&str]] = if schema.field_with_name(GEN_AI_SENTINEL_COLUMN).is_ok() {
-            &[
-                REQUIRED_GEN_AI_FIELDS,
-                OPTIONAL_GEN_AI_FIELDS,
-                &["trace_id", "gen_ai_conversation_id", "user_id"],
-            ]
-        } else {
-            &[
-                REQUIRED_LLM_FIELDS,
-                OPTIONAL_LLM_FIELDS,
-                &["trace_id", "llm_session_id", "llm_user_id"],
-            ]
-        };
-        for list in field_lists {
-            for field_name in *list {
-                if !fields_name.contains(*field_name)
-                    && let Ok(field) = schema.field_with_name(field_name)
-                {
-                    fields.push(Arc::new(field.clone()));
-                    fields_name.insert(field_name.to_string());
-                }
+        for field_name in GEN_AI_QUICK_MODE_FIELDS {
+            if !fields_name.contains(*field_name)
+                && let Ok(field) = schema.field_with_name(field_name)
+            {
+                fields.push(Arc::new(field.clone()));
+                fields_name.insert(field_name.to_string());
             }
         }
     }

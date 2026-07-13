@@ -79,7 +79,7 @@ function makeToolSpan(overrides: Record<string, unknown> = {}): Record<string, u
     trace_id: "trace-001",
     span_id: "span-tool-001",
     gen_ai_operation_name: "execute_tool",
-    tool_name: "search_db",
+    gen_ai_tool_name: "search_db",
     gen_ai_input_messages: undefined,
     start_time: BASE_TIME_NS + 100_000_000,
     end_time: BASE_TIME_NS + 300_000_000,
@@ -367,7 +367,7 @@ describe("ThreadView", () => {
       return makeToolSpan({
         span_id: "span-tool-linked",
         reference_parent_span_id: parentSpanId,
-        tool_name: "search_db",
+        gen_ai_tool_name: "search_db",
         ...overrides,
       });
     }
@@ -396,7 +396,10 @@ describe("ThreadView", () => {
     it("should use pluralised label for multiple tool calls", () => {
       const llm = makeLLMSpan({ span_id: "llm-p" });
       const t1 = makeLinkedToolSpan("llm-p", { span_id: "tool-1" });
-      const t2 = makeLinkedToolSpan("llm-p", { span_id: "tool-2", tool_name: "write_file" });
+      const t2 = makeLinkedToolSpan("llm-p", {
+        span_id: "tool-2",
+        gen_ai_tool_name: "write_file",
+      });
       wrapper = mountThreadView({ spans: [llm, t1, t2] });
       const count = wrapper.find(".tt-count");
       expect(count.text().replace(/\s+/g, " ")).toContain("2 tool calls");

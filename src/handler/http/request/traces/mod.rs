@@ -59,7 +59,7 @@ use crate::{
 };
 
 pub mod dag;
-pub(crate) mod schema_compat;
+pub(crate) mod gen_ai_schema;
 pub mod session;
 pub mod user;
 
@@ -341,7 +341,7 @@ pub async fn get_latest_traces(
     let is_llm_stream =
         infra::schema::get_is_llm_stream(org_id.as_str(), stream_name.as_str(), StreamType::Traces)
             .await;
-    // Fetch and validate the LLM schema so SQL never references missing columns.
+    // Fetch and validate the GenAI schema so SQL never references missing columns.
     let schema = infra::schema::get_stream_schema_from_cache(
         org_id.as_str(),
         stream_name.as_str(),
@@ -350,13 +350,13 @@ pub async fn get_latest_traces(
     .await;
     let validated_schema = if is_llm_stream {
         match schema.as_ref() {
-            Some(s) => match schema_compat::validate_llm_schema(s, &stream_name) {
+            Some(s) => match gen_ai_schema::validate_gen_ai_schema(s, &stream_name) {
                 Ok(v) => Some(v),
                 Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
             },
             // Schema not yet cached: fall back with all required fields assumed
             // present and optional fields marked absent.
-            None => Some(schema_compat::ValidatedLlmSchema::fallback(false)),
+            None => Some(gen_ai_schema::GenAiSchema::fallback()),
         }
     } else {
         None
@@ -810,7 +810,7 @@ pub async fn get_latest_traces(
     })
 }
 
-/// Build the shared LLM trace aggregation SQL (Query 1) for table and streaming
+/// Build the shared GenAI trace aggregation SQL (Query 1) for table and streaming
 /// handlers.
 ///
 /// Produces a `SELECT trace_id … GROUP BY trace_id` query that computes per-trace
@@ -820,68 +820,38 @@ pub async fn get_latest_traces(
 /// `extra_selects` are additional aggregate columns appended before `FROM` (e.g.
 /// span_count, error_count, max_duration — the Q2a fields now merged into Q1).
 ///
-/// For legacy `_o2_llm` streams the column names are mapped to the legacy
-/// `llm_*` equivalents. The function is pure — callers add WHERE and ORDER BY.
+/// The function is pure — callers add WHERE and ORDER BY.
 fn build_llm_trace_query(
     stream_name: &str,
-    validated: &schema_compat::ValidatedLlmSchema,
+    validated: &gen_ai_schema::GenAiSchema,
     extra_selects: &str,
 ) -> String {
-    let first_msg_clause = if validated.has_gen_ai {
-        if validated.has_input_messages {
-            format!(
-                "FIRST_VALUE(gen_ai_input_messages ORDER BY {TIMESTAMP_COL_NAME} ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '')"
-            )
-        } else {
-            "''".to_string()
-        }
-    } else if validated.has_input_messages {
+    let first_msg_clause = if validated.has_input_messages {
         format!(
-            "FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) FILTER (WHERE llm_input IS NOT NULL AND llm_input != '')"
+            "FIRST_VALUE(gen_ai_input_messages ORDER BY {TIMESTAMP_COL_NAME} ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '')"
         )
     } else {
         "''".to_string()
     };
 
-    if validated.has_gen_ai {
-        let total_tokens_expr = if validated.has_total_tokens {
-            "sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total"
-        } else {
-            "0 as gen_ai_usage_details_total"
-        };
-        format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
-            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
-            (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
-            sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
-            {total_tokens_expr}, \
-            sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
-            array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
-            {first_msg_clause} as gen_ai_input_messages, \
-            {extra_selects} \
-            FROM \"{stream_name}\""
-        )
+    let total_tokens_expr = if validated.has_total_tokens {
+        "sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total"
     } else {
-        let total_tokens_expr = if validated.has_total_tokens {
-            "sum(llm_usage_tokens_total) as gen_ai_usage_details_total"
-        } else {
-            "0 as gen_ai_usage_details_total"
-        };
-        format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
-            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
-            (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(llm_usage_tokens_input) as gen_ai_usage_details_input, \
-            sum(llm_usage_tokens_output) as gen_ai_usage_details_output, \
-            {total_tokens_expr}, \
-            sum(llm_usage_cost_total) as gen_ai_usage_cost_details, \
-            array_agg(DISTINCT llm_model_name) FILTER (WHERE llm_model_name IS NOT NULL AND llm_model_name != '') as gen_ai_response_models, \
-            {first_msg_clause} as gen_ai_input_messages, \
-            {extra_selects} \
-            FROM \"{stream_name}\""
-        )
-    }
+        "0 as gen_ai_usage_details_total"
+    };
+    format!(
+        "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
+        min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+        (max(end_time) - min(start_time)) as zo_sql_duration, \
+        sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
+        sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
+        {total_tokens_expr}, \
+        sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
+        array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
+        {first_msg_clause} as gen_ai_input_messages, \
+        {extra_selects} \
+        FROM \"{stream_name}\""
+    )
 }
 
 /// GetLatestTracesStream — HTTP/2 streaming variant of GetLatestTraces
@@ -1060,11 +1030,11 @@ pub async fn get_latest_traces_stream(
         )
         .await;
         match schema.as_ref() {
-            Some(s) => match schema_compat::validate_llm_schema(s, &stream_name) {
+            Some(s) => match gen_ai_schema::validate_gen_ai_schema(s, &stream_name) {
                 Ok(v) => Some(v),
                 Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
             },
-            None => Some(schema_compat::ValidatedLlmSchema::fallback(false)),
+            None => Some(gen_ai_schema::GenAiSchema::fallback()),
         }
     } else {
         None
@@ -1182,7 +1152,7 @@ async fn process_latest_traces_stream(
     timeout: i64,
     sort_order: String,
     sql_order_expr: String,
-    validated_schema: Option<schema_compat::ValidatedLlmSchema>,
+    validated_schema: Option<gen_ai_schema::GenAiSchema>,
     use_cache: bool,
     range_error: String,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
