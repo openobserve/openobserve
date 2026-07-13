@@ -15,14 +15,36 @@ use crate::{
     },
 };
 
+#[derive(Serialize, Deserialize, Debug)]
+pub enum WorkflowTriggerType {
+    AlertFired,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct InputMap {
     complete: Vec<Value>,
     node_map: HashMap<String, Vec<Value>>,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct WorkflowTrigger {
+    pub trace_id: String,
+    pub source_id: String,
+    pub trigger_type: WorkflowTriggerType,
+    pub org_id: String,
+    pub workflow_id: String,
+    pub metadata: HashMap<String, String>,
+    pub data_file_path: String,
+    pub origin_cluster: String,
+}
+
 pub fn get_inputs_file_path(org_id: &str, workflow_id: &str, run_id: &str) -> String {
     format!("files/{org_id}/workflow_inputs/{workflow_id}-{run_id}.json")
+}
+
+pub fn get_trigger_data_file_path(org_id: &str, workflow_id: &str) -> String {
+    let ider = config::ider::generate_file_name();
+    format!("files/{org_id}/workflow_data/{workflow_id}-{ider}.json")
 }
 
 // this function does not return error, as we do not have retry.
@@ -52,6 +74,72 @@ async fn store_file_locally(mut errors: WorkflowRunErrors, file_data: bytes::Byt
     log::info!(
         "stored workflow inputs file for org_id {org} path {path} in local cluster successfully"
     );
+}
+
+// TODO YJDoc2: reuse in the get_inputs_file_data fn below
+async fn get_file_data(source_cluster: &str, path: &str) -> Result<bytes::Bytes, anyhow::Error> {
+    if source_cluster == config::get_cluster_name() {
+        let get_res = infra::storage::get("", path).await?;
+        let bytes = get_res.bytes().await?;
+        return Ok(bytes);
+    }
+
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        use o2_enterprise::enterprise::super_cluster::search::get_cluster_node_by_name;
+
+        let trace_id = config::ider::generate_trace_id();
+        let node = get_cluster_node_by_name(source_cluster).await?;
+        let file_path = path.to_string();
+
+        let cluster = source_cluster.to_string();
+
+        log::info!("getting file at path {file_path} from cluster {cluster}");
+
+        let task = tokio::task::spawn(async move {
+            use infra::client::grpc::make_grpc_search_client;
+
+            let mut request = tonic::Request::new(proto::cluster_rpc::GetFileRequest {
+                path: file_path.clone(),
+            });
+            let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
+            match client.get_file(request).await {
+                Ok(res) => {
+                    let response = res.into_inner();
+                    Ok(response.file_data)
+                }
+                Err(err) => {
+                    log::error!(
+                        "[trace_id: {trace_id}] error getting file from cluster {cluster} node {} for path {file_path} : {err:?}",
+                        node.get_grpc_addr(),
+                    );
+                    let err = infra::errors::ErrorCodes::from_json(err.message())?;
+                    Err(anyhow::anyhow!(
+                        "error getting file from other cluster {cluster} : {err}",
+                    ))
+                }
+            }
+        });
+        let response = task
+            .await
+            .map_err(|e| anyhow::anyhow!("internal error : {e}"))?;
+        match response {
+            Ok(v) => {
+                log::info!(
+                    "successfully received file at path {path} from cluster {source_cluster}",
+                );
+                let bytes = bytes::Bytes::from(v);
+                return Ok(bytes);
+            }
+            Err(e) => return Err(e),
+        }
+    }
+
+    // if super cluster is not enabled AND cluster name is not same
+    // then we cannot do anything, so this is the default fallback to error
+    Err(anyhow::anyhow!(
+        "unexpected cluster name {source_cluster} and super cluster not enabled"
+    ))
 }
 
 async fn get_inputs_file_data(errors: &WorkflowRunErrors) -> Result<bytes::Bytes, anyhow::Error> {
@@ -397,4 +485,76 @@ pub async fn retry_run(
         .process_workflow(org_id, inputs, from_node)
         .await?;
     Ok(res)
+}
+
+pub async fn send_workflow_trigger(
+    trace_id: &str,
+    org_id: &str,
+    source_id: String,
+    trigger_type: WorkflowTriggerType,
+    workflow_id: &str,
+    metadata: HashMap<String, String>,
+    data: &[Value],
+) -> Result<(), anyhow::Error> {
+    let data = serde_json::to_string(data)?;
+
+    let file_path = get_trigger_data_file_path(org_id, workflow_id);
+    infra::storage::put("", &file_path, data.into()).await?;
+
+    let trigger = WorkflowTrigger {
+        trace_id: trace_id.to_string(),
+        source_id,
+        trigger_type,
+        org_id: org_id.to_string(),
+        workflow_id: workflow_id.to_string(),
+        metadata,
+        data_file_path: file_path,
+        origin_cluster: config::get_cluster_name(),
+    };
+
+    db::workflows::send_workflow_trigger(trigger).await?;
+
+    Ok(())
+}
+
+pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
+    let run_id = config::ider::uuid();
+    log::info!(
+        "received workflow trigger for event {:?} with trace id {} for workflow id {}, assigning run id {}",
+        trigger.trigger_type,
+        trigger.trace_id,
+        trigger.workflow_id,
+        run_id
+    );
+
+    let trace_id = trigger.trace_id;
+
+    let file_data = match get_file_data(&trigger.origin_cluster, &trigger.data_file_path).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!(
+                "[workflow_trigger {trace_id}] run id {run_id} error getting data file : {e}, skipping"
+            );
+            return;
+        }
+    };
+
+    let data: Vec<Value> = match serde_json::from_slice(&file_data) {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!(
+                "[workflow_trigger {trace_id}] run id {run_id} error deserializing the stored data at {} : {e}, skipping",
+                trigger.data_file_path
+            );
+            return;
+        }
+    };
+
+    let now = chrono::Utc::now().timestamp_micros();
+
+    let workflow_run_result =
+        execute_workflow(&trigger.org_id, &trigger.workflow_id, &run_id, data).await;
+
+    log::info!("[workflow_trigger {trace_id}] run id {run_id} completed execution");
+    // TODO YJDoc2: update trigger stream
 }
