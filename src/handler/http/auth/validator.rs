@@ -226,8 +226,8 @@ pub async fn validate_token(token: &str, org_id: &str) -> Result<(), AuthError> 
 ///
 /// Denies **external SSO identities** (users AND SSO/token service accounts) that are on the
 /// blocklist — covering UI/API session tokens, external static tokens, and passcode ingestion. The
-/// `is_external` short-circuit means native/internal principals (incl. root, which is internal) skip
-/// the cache lookup entirely. Kept as one helper so the validator call sites stay identical.
+/// `is_external` short-circuit means native/internal principals (incl. root, which is internal)
+/// skip the cache lookup entirely. Kept as one helper so the validator call sites stay identical.
 #[cfg(feature = "enterprise")]
 async fn blocked_external(user: &config::meta::user::User) -> bool {
     use o2_enterprise::enterprise::domain_management::{self, meta::AccessDecision};
@@ -973,8 +973,9 @@ pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResul
                 // Get user from token to set user_id header
                 if let Some(user) = users::get_user_by_token(org_id_end_point[0], token).await {
                     // System-wide blocklist — a blocked external SSO identity's RUM token must not
-                    // ingest. The rum_token is a separate credential (embedded in browser JS), so it
-                    // bypasses validate_credentials; check it here too. Native/internal untouched.
+                    // ingest. The rum_token is a separate credential (embedded in browser JS), so
+                    // it bypasses validate_credentials; check it here too.
+                    // Native/internal untouched.
                     #[cfg(feature = "enterprise")]
                     if blocked_external(&user).await {
                         log::warn!(
