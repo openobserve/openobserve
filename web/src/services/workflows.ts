@@ -15,27 +15,14 @@
 
 import http from "./http";
 
-// Workflows API layer. Mirrors services/pipelines.ts.
-//
-// Only the routes that exist on `feat/workflows_v1` are implemented here
-// (handler/http/router/mod.rs:857-861):
-//   GET    /api/{org}/workflows                  list
-//   POST   /api/{org}/workflows                  create (save)
-//   PUT    /api/{org}/workflows/{id}             update
-//   DELETE /api/{org}/workflows/{id}             delete
-//   POST   /api/{org}/workflows/{id}/test        dry-run (per-node errors)
-//   GET    /api/{org}/workflows/{id}/errors      run/error history (Runs tab)
-//   POST   /api/{org}/workflows/{id}/retry       re-run a failed run
-//
-// Not yet on the backend (plan tasks B5/B6): GET /workflows/{id} (load-by-id),
-// GET /workflows/{id}/runs (success log), and an enable/toggle route. Add the
-// corresponding methods here once those land.
 const workflows = {
+  // List all workflows for the org .
   listWorkflows: (org_identifier: string) => {
     const url = `/api/${org_identifier}/workflows`;
     return http().get(url);
   },
 
+  // Save a new workflow.
   createWorkflow: ({
     org_identifier,
     data,
@@ -47,6 +34,7 @@ const workflows = {
     return http().post(url, data);
   },
 
+  // Update an existing workflow by id.
   updateWorkflow: ({
     org_identifier,
     id,
@@ -60,6 +48,7 @@ const workflows = {
     return http().put(url, data);
   },
 
+  // Delete a workflow by id.
   deleteWorkflow: ({
     org_identifier,
     id,
@@ -72,7 +61,6 @@ const workflows = {
   },
 
   // Enable/disable (pause/resume) a workflow.
-  //   PUT /api/{org}/workflows/{id}/enable?value=true|false
   enableWorkflow: ({
     org_identifier,
     id,
@@ -86,8 +74,8 @@ const workflows = {
     return http().put(url);
   },
 
-  // Dry-run the workflow against a sample payload. `from_node` runs from a
-  // specific node (the backend's "run from here" affordance).
+  // Dry-run the workflow against a sample payload. `from_node` re-runs from a
+  // specific node.
   testWorkflow: ({
     org_identifier,
     id,
@@ -103,6 +91,7 @@ const workflows = {
     return http().post(url, { inputs, from_node });
   },
 
+  // Run/error history for a workflow (Runs tab — not yet wired in the UI).
   getWorkflowErrors: ({
     org_identifier,
     id,
@@ -114,6 +103,8 @@ const workflows = {
     return http().get(url);
   },
 
+  // Re-run a failed run, optionally from a specific node (Runs tab — not yet
+  // wired in the UI).
   retryWorkflow: ({
     org_identifier,
     id,
