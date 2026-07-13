@@ -320,33 +320,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
 
-        <div v-else-if="!visibleCards.length" class="explorer-state">
-          <div
-            class="w-13 h-13 rounded-xl bg-surface-subtle flex items-center justify-center"
-            aria-hidden="true"
-          >
-            <OIcon name="query-stats" size="lg" class="text-text-secondary" />
-          </div>
-          <span class="text-[15px] font-bold text-text-primary">
-            {{ t("metrics.explorer.noMatch") }}
-            <template v-if="grid.emptyHiddenCount.value">
-              {{ noDataHiddenLabel }}</template
-            >
-          </span>
-          <span class="text-sm text-text-secondary max-w-90 text-center">
-            {{ t("metrics.explorer.noMatchHint") }}
-          </span>
-          <!-- One button, per the redesign: it clears every filter AND flips to
-               "All", so it always brings the grid back — including when the
-               no-data toggle was what emptied it. -->
-          <OButton
-            variant="primary"
-            size="sm"
-            data-test="metrics-explorer-clear"
-            @click="onClearAllFilters"
-            >{{ t("metrics.explorer.clearAllFilters") }}</OButton
-          >
-        </div>
+        <!-- Every remedy the hint names, as an action card — but only the ones
+             that would actually change anything right now: each card is gated
+             on its own cause being active. "Clear all filters" is always last. -->
+        <OEmptyState
+          v-else-if="!visibleCards.length"
+          size="block"
+          preset="no-search-results"
+          :title="t('metrics.explorer.noMatch')"
+          :description="noMatchDescription"
+          :actions="noMatchActions"
+          data-test="metrics-explorer-no-match"
+          @action="onEmptyStateAction"
+        />
 
         <!-- Virtualized by ROW: only visible rows exist in the DOM, so ECharts
              instances are created and disposed along with them. -->
@@ -450,6 +436,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -517,6 +504,7 @@ export default defineComponent({
     OCheckbox,
     OSearchInput,
     OSpinner,
+    OEmptyState,
     OTooltip,
     OToggleGroup,
     OToggleGroupItem,
@@ -729,6 +717,102 @@ export default defineComponent({
     const onClearAllFilters = () => {
       grid.clearFilters();
       grid.hideEmptyPanels.value = false;
+    };
+
+    /** The hint, with the hidden-count sentence in front when it applies. */
+    const noMatchDescription = computed(() =>
+      grid.emptyHiddenCount.value
+        ? `${noDataHiddenLabel.value} ${t("metrics.explorer.noMatchHint")}`
+        : t("metrics.explorer.noMatchHint"),
+    );
+
+    /**
+     * One card per remedy the hint names — gated on its cause, so a card is
+     * never an offer to clear something that is not set. Keys, not strings:
+     * OEmptyState's action cards run titleKey/descriptionKey through t().
+     */
+    const noMatchActions = computed(() => {
+      const actions: Array<{
+        id: string;
+        icon: string;
+        titleKey: string;
+        descriptionKey: string;
+      }> = [];
+      if (grid.searchTerm.value) {
+        actions.push({
+          id: "clear-search",
+          icon: "search",
+          titleKey: "metrics.explorer.emptyActions.clearSearch",
+          descriptionKey: "metrics.explorer.emptyActions.clearSearchDesc",
+        });
+      }
+      if (grid.labelFilters.value.length) {
+        actions.push({
+          id: "clear-labels",
+          icon: "label",
+          titleKey: "metrics.explorer.emptyActions.clearLabels",
+          descriptionKey: "metrics.explorer.emptyActions.clearLabelsDesc",
+        });
+      }
+      if (
+        grid.selectedPrefixes.value.size ||
+        grid.selectedSuffixes.value.size ||
+        grid.selectedTypes.value.size
+      ) {
+        actions.push({
+          id: "clear-facets",
+          icon: "filter-list",
+          titleKey: "metrics.explorer.emptyActions.clearFacets",
+          descriptionKey: "metrics.explorer.emptyActions.clearFacetsDesc",
+        });
+      }
+      if (grid.showFavoritesOnly.value) {
+        actions.push({
+          id: "clear-favorites",
+          icon: "favorite",
+          titleKey: "metrics.explorer.emptyActions.clearFavorites",
+          descriptionKey: "metrics.explorer.emptyActions.clearFavoritesDesc",
+        });
+      }
+      if (grid.hideEmptyPanels.value) {
+        actions.push({
+          id: "show-all",
+          icon: "all-inclusive",
+          titleKey: "metrics.explorer.emptyActions.showAll",
+          descriptionKey: "metrics.explorer.emptyActions.showAllDesc",
+        });
+      }
+      actions.push({
+        id: "clear-all",
+        icon: "restart-alt",
+        titleKey: "metrics.explorer.clearAllFilters",
+        descriptionKey: "metrics.explorer.emptyActions.clearAllDesc",
+      });
+      return actions;
+    });
+
+    const onEmptyStateAction = (id?: string) => {
+      switch (id) {
+        case "clear-search":
+          grid.searchTerm.value = "";
+          break;
+        case "clear-labels":
+          onClearLabelFilters();
+          break;
+        case "clear-facets":
+          grid.selectedPrefixes.value = new Set();
+          grid.selectedSuffixes.value = new Set();
+          grid.selectedTypes.value = new Set();
+          break;
+        case "clear-favorites":
+          grid.showFavoritesOnly.value = false;
+          break;
+        case "show-all":
+          grid.hideEmptyPanels.value = false;
+          break;
+        default:
+          onClearAllFilters();
+      }
     };
 
     const toggleType = (id: string) => {
@@ -1267,6 +1351,9 @@ export default defineComponent({
       sortModel,
       viewModel,
       noDataHiddenLabel,
+      noMatchDescription,
+      noMatchActions,
+      onEmptyStateAction,
       showMoreLabel,
       badgeLabels: BADGE_LABELS,
       queriesFor,
