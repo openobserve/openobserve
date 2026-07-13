@@ -18,7 +18,10 @@ use datafusion::error::Result;
 use hashbrown::HashMap;
 use promql_parser::parser::LabelModifier;
 
-use crate::service::promql::aggregations::{Accumulate, AggFunc};
+use crate::service::promql::{
+    aggregations::{Accumulate, AggFunc},
+    common::kahan_sum_increment,
+};
 
 pub fn avg(param: &Option<LabelModifier>, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     let start = std::time::Instant::now();
@@ -49,7 +52,7 @@ impl AggFunc for Avg {
 }
 
 pub struct AvgAccumulate {
-    sum: HashMap<i64, f64>,
+    sum: HashMap<i64, (f64, f64)>,
     count: HashMap<i64, usize>,
 }
 
@@ -64,19 +67,38 @@ impl AvgAccumulate {
 
 impl Accumulate for AvgAccumulate {
     fn accumulate(&mut self, sample: &Sample) {
-        let sum_entry = self.sum.entry(sample.timestamp).or_insert(0.0);
-        *sum_entry += sample.value;
+        let (sum, c) = self.sum.entry(sample.timestamp).or_insert((0.0, 0.0));
+        (*sum, *c) = kahan_sum_increment(sample.value, *sum, *c);
         let count_entry = self.count.entry(sample.timestamp).or_insert(0);
         *count_entry += 1;
+    }
+
+    fn merge(&mut self, other: Box<dyn Accumulate>) {
+        let other = other.into_any().downcast::<Self>().expect("same type");
+        for (timestamp, (other_sum, other_c)) in other.sum {
+            let (sum, c) = self.sum.entry(timestamp).or_insert((0.0, 0.0));
+            // Fold the other partial's sum and compensation in as two
+            // separate compensated increments: a plain `c + other_c` add
+            // rounds residuals away before the main sums get to cancel.
+            (*sum, *c) = kahan_sum_increment(other_sum, *sum, *c);
+            (*sum, *c) = kahan_sum_increment(other_c, *sum, *c);
+        }
+        for (timestamp, count) in other.count {
+            *self.count.entry(timestamp).or_insert(0) += count;
+        }
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
     }
 
     fn evaluate(self: Box<Self>) -> Vec<Sample> {
         self.sum
             .into_iter()
-            .filter_map(|(timestamp, sum)| {
+            .filter_map(|(timestamp, (sum, c))| {
                 self.count
                     .get(&timestamp)
-                    .map(|&count| Sample::new(timestamp, sum / count as f64))
+                    .map(|&count| Sample::new(timestamp, (sum + c) / count as f64))
             })
             .collect()
     }

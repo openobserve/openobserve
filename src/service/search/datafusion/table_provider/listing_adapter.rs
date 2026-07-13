@@ -264,7 +264,7 @@ fn handler_tantivy_index(
         let mut config = config.clone();
         config.file_groups = new_file_groups;
         let mut plan = Arc::new(DataSourceExec::new(Arc::new(config))) as Arc<dyn ExecutionPlan>;
-        // skip repartitioning when `reverse` is true, becuase is already have many groups
+        // skip repartitioning when `reverse` is true, becuase it is already have many groups
         if !reverse
             && let Ok(Some(repartition_plan)) =
                 plan.repartitioned(target_partitions, state.config_options())

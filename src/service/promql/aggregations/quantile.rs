@@ -72,6 +72,12 @@ impl AggFunc for Quantile {
     fn build(&self) -> Box<dyn super::Accumulate> {
         Box::new(QuantileAccumulate::new(self.qtile))
     }
+
+    // Buffers every sample; merging partials would re-copy them at each
+    // reduction level.
+    fn mergeable(&self) -> bool {
+        false
+    }
 }
 
 pub struct QuantileAccumulate {
@@ -93,6 +99,17 @@ impl Accumulate for QuantileAccumulate {
     fn accumulate(&mut self, sample: &Sample) {
         let entry = self.values.entry(sample.timestamp).or_default();
         entry.push(sample.value);
+    }
+
+    fn merge(&mut self, other: Box<dyn Accumulate>) {
+        let other = other.into_any().downcast::<Self>().expect("same type");
+        for (timestamp, values) in other.values {
+            self.values.entry(timestamp).or_default().extend(values);
+        }
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
     }
 
     fn evaluate(self: Box<Self>) -> Vec<Sample> {

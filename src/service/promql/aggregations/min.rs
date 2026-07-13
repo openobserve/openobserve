@@ -69,6 +69,20 @@ impl Accumulate for MinAccumulate {
         }
     }
 
+    fn merge(&mut self, other: Box<dyn Accumulate>) {
+        let other = other.into_any().downcast::<Self>().expect("same type");
+        for (timestamp, value) in other.min {
+            let entry = self.min.entry(timestamp).or_insert(f64::INFINITY);
+            if value < *entry {
+                *entry = value;
+            }
+        }
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
+    }
+
     fn evaluate(self: Box<Self>) -> Vec<Sample> {
         self.min
             .into_iter()

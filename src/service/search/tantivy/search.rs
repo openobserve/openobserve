@@ -159,12 +159,15 @@ impl TantivyResult {
         let candidates = res
             .into_iter()
             .map(|(_, doc)| {
-                let ts = ts_col
-                    .first(doc.doc_id)
-                    .expect("_timestamp fast field has one value per doc");
-                (ts, doc.doc_id)
+                let ts = ts_col.first(doc.doc_id).ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "missing {TIMESTAMP_COL_NAME} fast-field value for doc_id {}",
+                        doc.doc_id
+                    )
+                })?;
+                Ok((ts, doc.doc_id))
             })
-            .collect();
+            .collect::<anyhow::Result<Vec<_>>>()?;
         Ok(Self::SelectCandidates {
             candidates: Arc::new(candidates),
             row_group_size: None,
@@ -394,6 +397,30 @@ mod tests {
             }
             other => panic!("expected SelectCandidates, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_handle_simple_select_missing_timestamp_returns_error() {
+        let mut schema_builder = tantivy::schema::SchemaBuilder::new();
+        schema_builder.add_i64_field(TIMESTAMP_COL_NAME, tantivy::schema::FAST);
+        let index = tantivy::index::Index::create_in_ram(schema_builder.build());
+        let mut writer = index.writer_with_num_threads(1, 15_000_000).unwrap();
+        writer.add_document(tantivy::doc!()).unwrap();
+        writer.commit().unwrap();
+        let searcher = index.reader().unwrap().searcher();
+
+        let error = TantivyResult::handle_simple_select(
+            &searcher,
+            Box::new(tantivy::query::AllQuery),
+            1,
+            false,
+        )
+        .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("missing _timestamp fast-field value for doc_id 0")
+        );
     }
 
     #[test]
