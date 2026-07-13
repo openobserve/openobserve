@@ -18,7 +18,10 @@ import {
   buildDefaultSqlFields,
   SKIP_SEED_TYPES,
 } from "@/utils/dashboard/defaultFields";
-import { applyPromqlSeed } from "@/utils/dashboard/promqlSeed";
+import {
+  applyPromqlSeed,
+  isAutoSeededSlot,
+} from "@/utils/dashboard/promqlSeed";
 
 /**
  * Shared default-field seeding for the Add Panel and Metrics pages (both render
@@ -52,7 +55,12 @@ const useDefaultPanelFields = (pageKey: string = "dashboard") => {
     query.customQuery = false;
 
     if (queryType === "promql") {
-      if (stream) applyPromqlSeed(dashboardPanelData, stream);
+      // Only a slot that still holds what we put there. The Builder toggle comes
+      // back through here on a panel the user has been building in, and seeding
+      // it again would drop their label filters and operations.
+      if (stream && isAutoSeededSlot(dashboardPanelData)) {
+        applyPromqlSeed(dashboardPanelData, stream);
+      }
       return;
     }
 

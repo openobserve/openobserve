@@ -17,6 +17,7 @@ import { describe, it, expect } from "vitest";
 import {
   applyPromqlSeed,
   applySeedPanelShape,
+  isAutoSeededSlot,
   promqlSeedFor,
 } from "./promqlSeed";
 import type { PromqlSeed } from "@/utils/metrics/metricPanelSeed";
@@ -264,6 +265,63 @@ describe("promqlSeedFor — which metric was the current query seeded for?", () 
     expect(seed.query).toBeTruthy();
     // A contract that only makes sense on a heatmap must not ride along onto a table.
     expect(seed.config.heatmap_mode).toBeUndefined();
+  });
+});
+
+describe("isAutoSeededSlot — may the slot be re-seeded?", () => {
+  const slotWith = (query: string, labels: any[] = [], type = "bar") => ({
+    layout: { currentQueryIndex: 0 },
+    data: {
+      type,
+      config: {},
+      queries: [
+        {
+          query,
+          customQuery: false,
+          fields: {
+            stream: "http_requests_total",
+            promql_labels: labels,
+            promql_operations: [],
+          },
+          config: {},
+        },
+      ],
+    },
+    meta: { stream: { streamResultsType: "metrics", streamResults: STREAMS } },
+  });
+
+  it("says yes for a slot the toggle has just emptied", () => {
+    expect(isAutoSeededSlot(slotWith(""))).toBe(true);
+  });
+
+  it("says yes for a query we generated ourselves", () => {
+    expect(
+      isAutoSeededSlot(
+        slotWith("sum(rate(http_requests_total{}[$__rate_interval]))"),
+      ),
+    ).toBe(true);
+  });
+
+  it("says no once the user has built something", () => {
+    // Builder -> Custom -> Builder re-enters the seeding path; re-seeding here
+    // wiped the label filters and operations they had just added.
+    expect(
+      isAutoSeededSlot(
+        slotWith('rate(http_requests_total{code="500"}[5m])', [
+          { label: "code", op: "=", value: "500" },
+        ]),
+      ),
+    ).toBe(false);
+  });
+
+  it("says no for a label row that has been added but not filled in", () => {
+    // It renders to nothing, so the query is still the bare selector — only the
+    // rows themselves show that there is a chip on screen to protect.
+    expect(
+      isAutoSeededSlot(
+        slotWith("http_requests_total{}", [{ label: "", op: "=", value: "" }]),
+      ),
+    ).toBe(false);
   });
 });
 

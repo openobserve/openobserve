@@ -23,6 +23,7 @@
 import {
   buildPromqlSeed,
   CHART_TYPE_CONTRACT_KEYS,
+  isAutoSeededQuery,
   isUntouchedPanelType,
   seedOwnsChartType,
   type PromqlSeed,
@@ -87,6 +88,42 @@ export function promqlSeedFor(
     requireBuilder,
     ...seedOverrides,
   });
+}
+
+/**
+ * Whether the current query slot still holds only what a seed put there — and
+ * may therefore be re-seeded. Seeding initializes an untouched slot; it must
+ * never overwrite builder state the user authored.
+ *
+ * The slot-level counterpart of `isAutoSeededQuery`, which the stream watchers
+ * ask of the query text alone. In Builder mode the query is rendered FROM the
+ * labels and operations, so the text covers most of it — except a label row that
+ * has been added but not yet filled in, which renders to nothing yet is still a
+ * chip on screen that must not vanish.
+ */
+export function isAutoSeededSlot(
+  dashboardPanelData: any,
+  overrides: SeedContext = {},
+): boolean {
+  const idx = dashboardPanelData.layout.currentQueryIndex;
+  const slot = dashboardPanelData.data.queries?.[idx];
+  if (!slot) return true;
+
+  const labels = slot.fields?.promql_labels ?? [];
+  if (labels.some((label: any) => !label?.label)) return false;
+
+  const { previousStream, ...seedOverrides } = overrides;
+
+  return isAutoSeededQuery(
+    slot.query,
+    previousStream ?? slot.fields?.stream,
+    metricsStreamsOf(dashboardPanelData),
+    {
+      chartType: dashboardPanelData.data.type,
+      requireBuilder: !slot.customQuery,
+      ...seedOverrides,
+    },
+  );
 }
 
 /**
