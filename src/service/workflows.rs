@@ -512,7 +512,9 @@ pub async fn send_workflow_trigger(
         origin_cluster: config::get_cluster_name(),
     };
 
+    log::info!("sending workflow trigger for trace id {trace_id}");
     db::workflows::send_workflow_trigger(trigger).await?;
+    log::info!("successfully sent workflow trigger for trace id {trace_id}");
 
     Ok(())
 }
@@ -552,8 +554,18 @@ pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
 
     let now = chrono::Utc::now().timestamp_micros();
 
-    let workflow_run_result =
-        execute_workflow(&trigger.org_id, &trigger.workflow_id, &run_id, data).await;
+    let final_data = serde_json::json!({
+        "meta":trigger.metadata,
+        "data": data
+    });
+
+    let workflow_run_result = execute_workflow(
+        &trigger.org_id,
+        &trigger.workflow_id,
+        &run_id,
+        vec![final_data],
+    )
+    .await;
 
     log::info!("[workflow_trigger {trace_id}] run id {run_id} completed execution");
     // TODO YJDoc2: update trigger stream

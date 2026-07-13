@@ -860,6 +860,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(db::org_storage_providers::watch());
         tokio::task::spawn(db::workflows::clean());
         tokio::task::spawn(db::workflows::watch());
+        if LOCAL_NODE.is_alert_manager() {
+            tokio::task::spawn(db::workflows::watch_workflow_triggers());
+        }
     }
 
     #[cfg(feature = "vectorscan")]
