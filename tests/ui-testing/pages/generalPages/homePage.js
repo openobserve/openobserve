@@ -708,7 +708,7 @@ export class HomePage {
      * Validate Settings - General page UI elements
      */
     async validateSettingsGeneralPageElements() {
-        await expect(this.page.locator('[data-test="settings-general-page-title"]')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="general-settings-tab"]')).toBeVisible({ timeout: 10000 });
         await expect(this.page.locator('[data-test="dashboard-add-submit"]')).toBeVisible({ timeout: 5000 });
     }
 
