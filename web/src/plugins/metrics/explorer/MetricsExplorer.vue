@@ -23,62 +23,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex flex-col h-full min-h-0 w-full" data-test="metrics-explorer">
-    <!-- AppPageHeader has no gutter of its own; consumers supply it. Same
-         wrapper the dashboards page uses, so the title and the toolbar actions
-         line up with every other page instead of hugging the frame. -->
-    <div class="shrink-0 px-4 border-b border-border-default">
-      <!-- The header holds only the TIME cluster: what window you are looking
-           at, and how often it reloads. Scope controls (label filters, search,
-           facets) all live on the left, below. -->
-      <AppPageHeader :title="t('search.metrics')" icon="bar-chart">
-        <template #actions>
-          <DateTimePickerDashboard
-            ref="dateTimePickerRef"
-            v-model="selectedDate"
-            @on:date-change="onDateChange"
-          />
-          <AutoRefreshInterval
-            v-model="refreshInterval"
-            trigger
-            @trigger="onRefreshTick"
-          />
-          <!-- Same refresh control as the dashboard toolbar. -->
-          <OButton
-            variant="outline"
-            size="icon-toolbar"
-            icon-left="refresh"
-            :disabled="refreshing || grid.loading.value"
-            :loading="refreshing"
-            data-test="metrics-explorer-refresh"
-            @click="onRefresh"
-          >
-            <OTooltip :content="t('metrics.explorer.refresh')" />
-          </OButton>
-        </template>
-      </AppPageHeader>
-    </div>
+    <!-- No page title. Metrics is an EXPLORE surface, like Logs and Traces:
+         you arrive to look at data, so the data starts at the top of the frame.
+         An H1 saying "Metrics" above a nav item already saying "Metrics" bought
+         nothing and cost ~68px of chart. AppPageHeader stays where it earns its
+         keep — settings, billing, list and detail pages.
 
-    <!-- Label filters get their own left-aligned row: they narrow WHAT you are
-         looking at, which is the same category as search and the rail facets —
-         not the same category as the time controls above. Chips wrap into this
-         row as they accumulate. -->
+         So the first row IS the toolbar, and it carries both clusters the way
+         the Logs toolbar does: scope on the left (what you are looking at),
+         time on the right (which window, and how often it reloads). -->
     <div
-      class="flex items-center gap-2 flex-wrap px-4 py-2 border-b border-border-default"
+      class="flex items-center gap-2 shrink-0 px-4 py-2 border-b border-border-default"
       data-test="metrics-explorer-filter-bar"
     >
-      <span class="text-xs font-medium text-text-secondary shrink-0">
-        {{ t("metrics.explorer.filterLabel") }}
-      </span>
-      <LabelFilterBar
-        :filters="grid.labelFilters.value"
-        :label-names="grid.labelNames.value"
-        :label-names-loading="grid.labelNamesLoading.value"
-        :schema-loading="grid.schemaLoading.value"
-        :load-values="grid.loadLabelValues"
-        @focus-picker="grid.loadLabelNames"
-        @add="onAddLabelFilter"
-        @remove="onRemoveLabelFilter"
-      />
+      <!-- Chips wrap WITHIN the left cluster as they accumulate, rather than
+           wrapping the row — otherwise a few label filters would shove the time
+           controls onto a second line and the toolbar would grow as you filter. -->
+      <div class="flex flex-1 min-w-0 items-center gap-2 flex-wrap">
+        <span class="text-xs font-medium text-text-secondary shrink-0">
+          {{ t("metrics.explorer.filterLabel") }}
+        </span>
+        <LabelFilterBar
+          :filters="grid.labelFilters.value"
+          :label-names="grid.labelNames.value"
+          :label-names-loading="grid.labelNamesLoading.value"
+          :schema-loading="grid.schemaLoading.value"
+          :load-values="grid.loadLabelValues"
+          @focus-picker="grid.loadLabelNames"
+          @add="onAddLabelFilter"
+          @remove="onRemoveLabelFilter"
+        />
+      </div>
+
+      <div class="flex items-center gap-2 shrink-0">
+        <DateTimePickerDashboard
+          ref="dateTimePickerRef"
+          v-model="selectedDate"
+          @on:date-change="onDateChange"
+        />
+        <AutoRefreshInterval
+          v-model="refreshInterval"
+          trigger
+          @trigger="onRefreshTick"
+        />
+        <!-- Same refresh control as the dashboard toolbar. -->
+        <OButton
+          variant="outline"
+          size="icon-toolbar"
+          icon-left="refresh"
+          :disabled="refreshing || grid.loading.value"
+          :loading="refreshing"
+          data-test="metrics-explorer-refresh"
+          @click="onRefresh"
+        >
+          <OTooltip :content="t('metrics.explorer.refresh')" />
+        </OButton>
+      </div>
     </div>
 
     <div
@@ -414,7 +414,6 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -471,7 +470,6 @@ const ROW_HEIGHT = CARD_HEIGHT + ROW_GAP;
 export default defineComponent({
   name: "MetricsExplorer",
   components: {
-    AppPageHeader,
     DateTimePickerDashboard,
     AutoRefreshInterval,
     OButton,
