@@ -3465,7 +3465,6 @@
     "incidents": {
       "title": "Incidents",
       "subtitle": "Incident management and tracking",
-      "header": "Alert Incidents",
       "search": "Search incidents...",
       "noIncidents": "No incidents found",
       "id": "ID",
@@ -3559,6 +3558,7 @@
       "evaluationHistory": "Evaluation History",
       "loadingHistory": "Loading history...",
       "noHistoryAvailable": "No evaluation history available for this alert",
+      "tryExpandingTimeRange": "Try expanding the time range",
       "results": "Results"
     },
     "historyTable": {
