@@ -84,7 +84,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toggleFullscreen } from "@/utils/dom";
 import {
-  scriptToolbarSchema,
+  makeScriptToolbarSchema,
   type ScriptToolbarForm,
 } from "./ScriptToolbar.schema";
 
@@ -118,7 +118,7 @@ const onSubmit = (_value: ScriptToolbarForm) => {
 // parent-owned `name`; handed down via <OForm :form="form">.
 const form = useOForm<ScriptToolbarForm>({
   defaultValues: { name: props.name ?? "" },
-  schema: scriptToolbarSchema,
+  schema: makeScriptToolbarSchema(t),
   onSubmit,
 });
 

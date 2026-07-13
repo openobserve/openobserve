@@ -4689,6 +4689,9 @@
     "search": "搜索操作",
     "timezone": "时区",
     "zipFileRequired": "ZIP 文件是必填的！",
+    "fieldRequired": "字段为必填项！",
+    "nameInvalidChars": "不允许使用 :、?、/、# 等字符和空格。",
+    "invalidMethodName": "方法名称无效。必须以字母或下划线开头。只能使用字母、数字和下划线。",
     "zipFile": "ZIP 文件",
     "frequency": "频率"
   },

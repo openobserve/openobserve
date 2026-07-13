@@ -4689,6 +4689,9 @@
     "search": "검색 작업",
     "timezone": "타임존",
     "zipFileRequired": "ZIP 파일이 필요합니다!",
+    "fieldRequired": "필드는 필수입니다!",
+    "nameInvalidChars": ":, ?, /, # 및 공백과 같은 문자는 허용되지 않습니다.",
+    "invalidMethodName": "잘못된 메서드 이름입니다. 문자 또는 밑줄로 시작해야 합니다. 문자, 숫자, 밑줄만 사용하세요.",
     "zipFile": "ZIP 파일",
     "frequency": "주파수"
   },

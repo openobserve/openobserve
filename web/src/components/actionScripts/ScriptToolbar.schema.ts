@@ -10,8 +10,10 @@
 // inverts to a positive Zod constraint, so it is required + regex — not
 // regex-only.
 //
-// Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
-// this file only describes WHAT is valid.
+// Built via a factory so the messages stay i18n-driven (pass useI18n's `t`),
+// consistent with the other migrated schemas. Validation TIMING is owned by
+// OForm (submit-then-change via revalidateLogic); this file only describes WHAT
+// is valid.
 
 import { z } from "zod";
 
@@ -20,18 +22,18 @@ import { z } from "zod";
 // use elsewhere.)
 export const scriptMethodNameRegex = /^[A-Z_][A-Z0-9_]*$/i;
 
-export const scriptToolbarSchema = z.object({
-  name: z
-    .string()
-    // Pre-migration used `v-model.trim`, so surrounding whitespace was stripped
-    // before the required + method-name checks ran. `.trim()` restores that
-    // parity — " abc " validates as "abc" instead of being rejected by the regex.
-    .trim()
-    .min(1, "Field is required!")
-    .regex(
-      scriptMethodNameRegex,
-      "Invalid method name. Must start with a letter or underscore. Use only letters, numbers, and underscores.",
-    ),
-});
+export const makeScriptToolbarSchema = (
+  t: (_key: string, _params?: Record<string, unknown>) => string,
+) =>
+  z.object({
+    name: z
+      .string()
+      // Pre-migration used `v-model.trim`, so surrounding whitespace was stripped
+      // before the required + method-name checks ran. `.trim()` restores that
+      // parity — " abc " validates as "abc" instead of being rejected by the regex.
+      .trim()
+      .min(1, t("actions.fieldRequired"))
+      .regex(scriptMethodNameRegex, t("actions.invalidMethodName")),
+  });
 
-export type ScriptToolbarForm = z.infer<typeof scriptToolbarSchema>;
+export type ScriptToolbarForm = z.infer<ReturnType<typeof makeScriptToolbarSchema>>;

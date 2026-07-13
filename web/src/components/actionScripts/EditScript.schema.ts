@@ -31,11 +31,8 @@
 import { z } from "zod";
 import { isValidResourceName } from "@/utils/zincutils";
 
-const RESOURCE_NAME_MESSAGE =
-  "Characters like :, ?, /, #, and spaces are not allowed.";
-
 export interface EditScriptSchemaOptions {
-  /** i18n translator (used for the name-required message). */
+  /** i18n translator (used for all validation messages). */
   t: (_key: string) => string;
   /** Whether the form is in EDIT mode — codeZip is required only on CREATE. */
   getIsEditing: () => boolean;
@@ -73,11 +70,11 @@ export const makeEditScriptSchema = (opts: EditScriptSchemaOptions) =>
         .trim()
         .min(1, opts.t("common.nameRequired"))
         .refine((v) => isValidResourceName(String(v)), {
-          message: RESOURCE_NAME_MESSAGE,
+          message: opts.t("actions.nameInvalidChars"),
         }),
       description: z.string().optional().default(""),
-      type: z.string().min(1, "Field is required!"),
-      service_account: z.string().min(1, "Field is required!"),
+      type: z.string().min(1, opts.t("actions.fieldRequired")),
+      service_account: z.string().min(1, opts.t("actions.fieldRequired")),
       // Disabled field whose value is always "UTC". Pre-migration main had NO
       // timezone rule, so it's defaulted but NOT enforced (parity).
       timezone: z.string().default("UTC"),
@@ -99,7 +96,7 @@ export const makeEditScriptSchema = (opts: EditScriptSchemaOptions) =>
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["codeZip"],
-          message: "ZIP File is required!",
+          message: opts.t("actions.zipFileRequired"),
         });
       }
 
@@ -121,7 +118,7 @@ export const makeEditScriptSchema = (opts: EditScriptSchemaOptions) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["cron"],
-            message: "Field is required!",
+            message: opts.t("actions.fieldRequired"),
           });
         } else {
           const cronError = opts.getCronError(cron);

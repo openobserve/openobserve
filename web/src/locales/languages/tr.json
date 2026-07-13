@@ -4689,6 +4689,9 @@
     "search": "Arama Eylemi",
     "timezone": "Saat dilimi",
     "zipFileRequired": "ZIP Dosyası gereklidir!",
+    "fieldRequired": "Alan gereklidir!",
+    "nameInvalidChars": ":, ?, /, # gibi karakterlere ve boşluklara izin verilmez.",
+    "invalidMethodName": "Geçersiz yöntem adı. Bir harf veya alt çizgi ile başlamalıdır. Yalnızca harf, rakam ve alt çizgi kullanın.",
     "zipFile": "ZIP Dosyası",
     "frequency": "Frekans"
   },

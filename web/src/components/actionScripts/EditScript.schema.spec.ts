@@ -14,7 +14,9 @@ vi.mock("@/utils/zincutils", () => ({
   isValidResourceName: (val: string) => !/[:\/?#\s]/.test(val),
 }));
 
-// i18n passthrough (the only key the schema uses is common.nameRequired).
+// i18n passthrough. The schema translates every message (common.nameRequired,
+// actions.nameInvalidChars, actions.fieldRequired, actions.zipFileRequired); the
+// tests assert on error PATHS, not copy, so returning the key is sufficient.
 const t = (key: string) =>
   key === "common.nameRequired" ? "Name is required" : key;
 
