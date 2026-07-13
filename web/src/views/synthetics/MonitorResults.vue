@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <AppPageHeader
       :title="monitorName"
+      :subtitle="folderName"
       :back="{
         label: t('synthetics.results.monitors'),
         to: { name: 'synthetic' },
@@ -119,6 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <RunDetail
       :drawer-mode="true"
       :override-monitor-id="monitorId"
+      :override-monitor-name="monitorName"
       :override-run-id="selectedRunId"
       :override-execution-id="selectedExecutionId"
       @update-status="onRunStatusUpdate"
@@ -151,6 +153,7 @@ const monitorId = computed(() => String(route.params.id ?? ""));
 const monitorName = computed(
   () => String(route.query.name ?? "") || t("synthetics.results.title"),
 );
+const folderName = computed(() => String(route.query.folder ?? ""));
 const monitorStatus = computed<"healthy" | "degraded" | "critical">(
   () => (route.query.status as any) || "degraded",
 );

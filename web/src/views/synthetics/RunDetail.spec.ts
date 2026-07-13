@@ -171,7 +171,7 @@ describe("RunDetail", () => {
     ).toBe(true);
   });
 
-  it("should render the info bar with 4 chips", () => {
+  it("should render the info bar with 5 chips", () => {
     const infoBar = wrapper.find(
       '[data-test="synthetics-run-detail-info-bar"]',
     );
@@ -179,7 +179,7 @@ describe("RunDetail", () => {
     const chips = infoBar.findAll(
       ":scope > div",
     );
-    expect(chips.length).toBe(4);
+    expect(chips.length).toBe(5);
   });
 
   it("should render the summary tab by default", () => {

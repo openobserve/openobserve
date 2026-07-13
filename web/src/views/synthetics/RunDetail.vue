@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       v-if="!drawerMode"
       class="px-2!"
-      :subtitle="currentRun.monitorName"
+      :subtitle="displayMonitorName"
       :back="{
         label: t('synthetics.results.monitors'),
         to: { name: 'synthetic-monitor-results', params: { id: monitorId } },
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ════════════ SUMMARY ════════════ -->
         <OTabPanel name="summary" data-test="synthetics-run-detail-summary-tab">
           <div
-            class="py-[0.875rem] pb-[1.75rem] flex flex-col gap-[0.875rem]"
+            class="py-[0.875rem] pb-[1.75rem] flex flex-col"
           >
             <!-- Info chips skeleton -->
             <template v-if="loading">
@@ -154,10 +154,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="i in 5"
                   :key="i"
-                  class="card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
+                  class="card-container rounded-lg flex flex-row items-center px-[0.875rem] py-[0.625rem] gap-1.5 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
                 >
-                  <OSkeleton type="text" class="h-3 w-16" />
-                  <OSkeleton type="text" class="h-5 w-24 mt-1" />
+                  <OSkeleton type="circle" class="h-4 w-4 shrink-0" />
+                  <OSkeleton type="text" class="h-4 w-20" />
                 </div>
               </div>
             </template>
@@ -170,23 +170,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="chip in infoChips"
                   :key="chip.label"
-                  class="card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
+                  class="card-container rounded-lg flex flex-row items-center px-[0.875rem] py-[0.625rem] gap-1.5 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
                 >
+                  <OIcon
+                    v-if="chip.icon"
+                    :name="chip.icon"
+                    size="sm"
+                    class="shrink-0"
+                    :class="chip.colorClass ? chip.colorClass : ''"
+                  />
                   <span
-                    class="kpi-label text-[0.7rem] font-semibold text-[var(--o2-text-muted)] capitalize"
+                    class="text-sm leading-none truncate"
+                    :class="chip.colorClass || 'text-[var(--o2-text-body)]'"
                   >
-                    {{ chip.label }}
-                  </span>
-                  <span
-                    class="flex items-center gap-1 text-xs font-bold leading-none"
-                    :class="chip.colorClass || 'text-[var(--o2-text-primary)]'"
-                  >
-                    <OIcon
-                      v-if="chip.icon"
-                      :name="chip.icon"
-                      size="sm"
-                      class="shrink-0"
-                    />
                     {{ chip.value }}
                   </span>
                 </div>
@@ -217,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Lambda execution error (no steps) -->
             <div
               v-else-if="isErrorRun"
-              class="bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30 rounded-lg overflow-hidden"
+              class="bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30 rounded-lg overflow-hidden m-2"
               role="alert"
               data-test="synthetics-run-detail-steps-error-banner"
             >
@@ -233,9 +229,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ currentRun.errorType }}
                     </span>
                   </div>
-                  <p class="text-sm text-badge-error-ol-text font-semibold mt-0.5 mb-0">
-                    Lambda execution failed
-                  </p>
                   <OButton
                     v-if="currentRun.errorStack"
                     variant="ghost-destructive"
@@ -266,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- ══ Split: Replay Player (left) + Steps Timeline (right) ══ -->
-            <div v-else-if="steps.length > 0" class="flex gap-[0.875rem] items-start">
+            <div v-else-if="steps.length > 0" class="flex items-start">
               <!-- ── Left: Session Replay Player ── -->
               <OCard
                 v-if="currentRun.hasReplay"
@@ -301,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- ── Right: Execution Timeline ── -->
               <div class="flex-1 min-w-0 flex flex-col">
-                <div class="flex items-center gap-2 px-3 py-2">
+                <div class="flex items-center gap-2 px-3 py-4">
                   <h4 class="font-bold text-sm text-text-heading m-0">Steps</h4>
                   <OBadge variant="default" size="sm">{{ steps.length }}</OBadge>
                   <span class="flex-1" />
@@ -343,16 +336,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <div class="rounded border border-[var(--o2-border-color)] overflow-hidden">
                             <div
                               class="aspect-[16/10] flex items-center justify-center overflow-hidden"
-                              :class="row.status === 'fail' ? 'bg-[var(--o2-status-error-subtle)]' : 'bg-surface-subtle'"
+                              :class="row.status === 'fail' ? 'bg-[var(--o2-status-error-bg)]' : 'bg-surface-subtle'"
                             >
-                              <img
+                              <div
                                 v-if="row.screenshotKey"
-                                :src="screenshotUrl(row.screenshotKey)"
-                                alt="Step screenshot"
-                                class="w-full h-full object-contain"
-                              />
+                                class="relative w-full h-full group"
+                              >
+                                <OButton
+                                  variant="ghost"
+                                  size="sm"
+                                  class="w-full h-full! p-0! rounded-none! border-0!"
+                                  data-test="synthetics-run-detail-step-screenshot-thumb"
+                                  @click="openLightbox(row.id)"
+                                >
+                                  <img
+                                    :src="screenshotUrl(row.screenshotKey)"
+                                    alt="Step screenshot"
+                                    class="w-full h-full object-contain transition-opacity group-hover:opacity-90"
+                                  />
+                                </OButton>
+                                <div
+                                  class="absolute top-2 right-2 flex items-center justify-center w-7 h-7 rounded-md bg-[var(--o2-card-bg)]/80 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm pointer-events-none"
+                                  aria-hidden="true"
+                                >
+                                  <OIcon name="fullscreen" size="sm" class="text-[var(--o2-text-heading)]" />
+                                </div>
+                              </div>
                               <template v-else>
-                                <OIcon :name="row.status === 'fail' ? 'broken_image' : 'image'" :class="row.status === 'fail' ? 'text-status-error-text' : 'text-text-caption'" size="lg" />
+                                <OIcon name="image" :class="row.status === 'fail' ? 'text-status-error-text' : 'text-text-caption'" size="lg" />
                                 <span class="text-xs font-semibold" :class="row.status === 'fail' ? 'text-status-error-text' : 'text-text-caption'">
                                   {{ row.status === 'fail' ? 'Failure screenshot' : 'Screenshot placeholder' }}
                                 </span>
@@ -361,19 +372,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </div>
 
-                        <div class="flex-1 flex flex-col gap-2 relative">
-                          <div class="flex absolute right-0 top-0">
-                            <OButton variant="outline" size="xs" icon-left="fullscreen" data-test="synthetics-run-detail-step-fullscreen-btn" @click="openFullScreen(row.id)" />
-                          </div>
-                          <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs pt-4">
-                            <dt class="text-[10px] font-semibold text-text-secondary uppercase tracking-wide">Action</dt>
-                            <dd class="text-text-body">{{ row.action }}</dd>
-                            <dt class="text-[10px] font-semibold text-text-secondary uppercase tracking-wide">Selector</dt>
-                            <dd class="font-mono text-text-body">{{ row.detail }}</dd>
-                            <dt class="text-[10px] font-semibold text-text-secondary uppercase tracking-wide">URL</dt>
-                            <dd class="font-mono truncate text-text-body">{{ row.detail }}</dd>
-                            <dt class="text-[10px] font-semibold text-text-secondary uppercase tracking-wide">Duration</dt>
-                            <dd class="text-text-heading">{{ row.durStr }}</dd>
+                        <div class="flex-1 flex flex-col gap-4">
+                          <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
+                            <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">Action</dt>
+                            <dd class="text-text-secondary">{{ row.action }}</dd>
+                            <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">Selector</dt>
+                            <dd class="text-text-secondary">{{ row.detail }}</dd>
+                            <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">URL</dt>
+                            <dd class="truncate text-text-secondary">{{ row.detail }}</dd>
+                            <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">Duration</dt>
+                            <dd class="text-text-secondary">{{ row.durStr }}</dd>
                           </dl>
 
                           <div
@@ -382,7 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :data-test="`synthetics-run-detail-step-error-card-${row.id}`"
                           >
                             <div class="flex items-center gap-2 px-3 py-2 bg-[var(--color-badge-error-soft-bg)]">
-                              <OIcon name="error" size="sm" class="text-[var(--o2-status-error)]" aria-hidden="true" />
+                              <OIcon name="error" size="sm" class="text-[var(--o2-status-error-text)]" aria-hidden="true" />
                               <span class="text-xs font-semibold text-[var(--o2-text-heading)] flex-1">Error</span>
                             </div>
                             <div class="px-3 py-3">
@@ -390,13 +398,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 class="text-[12.5px] text-[var(--o2-text-body)] m-0 whitespace-pre-wrap font-mono leading-relaxed"
                                 :class="{ 'max-h-[96px] overflow-hidden': !expandedStepErrors.has(row.id) && (row.error?.length ?? 0) > 200 }"
                               >{{ row.error }}</pre>
-                              <button
-                                v-if="(row.error?.length ?? 0) > 200"
-                                class="text-xs font-semibold text-[var(--o2-text-link)] mt-1.5 hover:underline cursor-pointer"
-                                @click="toggleStepError(row.id)"
-                              >
-                                {{ expandedStepErrors.has(row.id) ? 'Show less' : 'Show full error' }}
-                              </button>
+                              <div class="flex items-center gap-2 mt-1.5">
+                                <button
+                                  v-if="(row.error?.length ?? 0) > 200"
+                                  class="text-xs font-semibold text-[var(--o2-text-link)] hover:underline cursor-pointer"
+                                  @click="toggleStepError(row.id)"
+                                >
+                                  {{ expandedStepErrors.has(row.id) ? 'Show less' : 'Show full error' }}
+                                </button>
+                                <OButton
+                                  variant="ghost"
+                                  size="xs"
+                                  data-test="synthetics-run-detail-step-view-error-btn"
+                                  @click="openErrorFullscreen(row.id)"
+                                >
+                                  View full error
+                                </OButton>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -475,100 +493,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
 
-  <!-- ════════════ Full-Screen Step Content ════════════ -->
+  <!-- ════════════ Screenshot Lightbox ════════════ -->
   <ODialog
-    v-model:open="fullScreenOpen"
+    v-model:open="lightboxOpen"
     size="full"
-    :title="fullScreenTitle"
-    data-test="synthetics-run-detail-step-fullscreen"
+    :title="lightboxTitle"
+    data-test="synthetics-run-detail-step-screenshot-lightbox"
   >
-    <div class="flex flex-col h-full overflow-y-auto p-6 gap-6">
-      <!-- Screenshot (larger, full width) -->
-      <div
-        v-if="fullScreenStep"
-        class="rounded-lg border border-[var(--o2-border-color)] overflow-hidden"
-      >
-        <div
-          class="flex flex-col items-center justify-center"
-          :class="
-            fullScreenStep.status === 'fail'
-              ? 'bg-[var(--o2-status-error-subtle)]'
-              : 'bg-surface-subtle'
-          "
-        >
-          <img
-            v-if="fullScreenStep.screenshotKey"
-            :src="screenshotUrl(fullScreenStep.screenshotKey)"
-            alt="Step screenshot"
-            class="w-full object-contain max-h-[55vh]"
-          />
-          <template v-else>
-            <div class="flex flex-col items-center gap-2 py-12">
-              <OIcon
-                :name="fullScreenStep.status === 'fail' ? 'broken_image' : 'image'"
-                size="xl"
-                class="text-text-caption"
-              />
-              <span class="text-sm text-text-caption font-semibold">
-                {{
-                  fullScreenStep.status === 'fail'
-                    ? 'Failure screenshot'
-                    : 'Screenshot placeholder'
-                }}
-              </span>
-            </div>
-          </template>
-        </div>
-      </div>
+    <div
+      v-if="lightboxStep"
+      class="flex items-center justify-center h-full p-6"
+      :class="
+        lightboxStep.status === 'fail'
+          ? 'bg-[var(--o2-status-error-bg)]'
+          : 'bg-surface-subtle'
+      "
+    >
+      <img
+        v-if="lightboxStep.screenshotKey"
+        :src="screenshotUrl(lightboxStep.screenshotKey)"
+        alt="Step screenshot"
+        class="max-w-full max-h-[85vh] object-contain"
+      />
+    </div>
+  </ODialog>
 
-      <!-- Metadata grid (wider, larger text) -->
-      <dl
-        v-if="fullScreenStep"
-        class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm"
-      >
-        <dt
-          class="text-[11px] font-semibold text-text-secondary uppercase tracking-wide"
-        >
-          Action
-        </dt>
-        <dd class="text-text-body">{{ fullScreenStep.action }}</dd>
-        <dt
-          class="text-[11px] font-semibold text-text-secondary uppercase tracking-wide"
-        >
-          Selector
-        </dt>
-        <dd class="font-mono text-text-body">
-          {{ fullScreenStep.detail }}
-        </dd>
-        <dt
-          class="text-[11px] font-semibold text-text-secondary uppercase tracking-wide"
-        >
-          URL
-        </dt>
-        <dd class="font-mono truncate text-text-body">
-          {{ fullScreenStep.detail }}
-        </dd>
-        <dt
-          class="text-[11px] font-semibold text-text-secondary uppercase tracking-wide"
-        >
-          Duration
-        </dt>
-        <dd class="text-text-heading">{{ fullScreenStep.durStr }}</dd>
-      </dl>
-
-      <!-- Error section (failed steps only) -->
-      <div
-        v-if="fullScreenStep?.status === 'fail' && fullScreenStep?.error"
-        class="rounded-lg border border-badge-error-ol-border/30 overflow-hidden"
-        data-test="synthetics-run-detail-step-fullscreen-error"
-      >
+  <!-- ════════════ Error Fullscreen ════════════ -->
+  <ODialog
+    v-model:open="errorOpen"
+    size="full"
+    :title="errorTitle"
+    data-test="synthetics-run-detail-step-error-fullscreen"
+  >
+    <div
+      v-if="errorStep"
+      class="flex flex-col h-full overflow-y-auto p-6"
+    >
+      <div class="rounded-lg border border-badge-error-ol-border/30 overflow-hidden">
         <div
           class="flex items-center gap-2 px-4 py-2.5 bg-[var(--color-badge-error-soft-bg)]"
         >
           <OIcon
             name="error"
             size="sm"
-            class="text-[var(--o2-status-error)]"
+            class="text-[var(--o2-status-error-text)]"
             aria-hidden="true"
           />
           <span
@@ -579,7 +547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="px-4 py-3">
           <pre
             class="text-sm text-[var(--o2-text-body)] m-0 whitespace-pre-wrap font-mono leading-relaxed"
-          >{{ fullScreenStep.error }}</pre>
+          >{{ errorStep.error }}</pre>
         </div>
       </div>
     </div>
@@ -641,12 +609,14 @@ const emit = defineEmits<{
 interface Props {
   drawerMode?: boolean;
   overrideMonitorId?: string;
+  overrideMonitorName?: string;
   overrideRunId?: string;
   overrideExecutionId?: string;
 }
 const props = withDefaults(defineProps<Props>(), {
   drawerMode: false,
   overrideMonitorId: "",
+  overrideMonitorName: "",
   overrideRunId: "",
   overrideExecutionId: "",
 });
@@ -869,6 +839,7 @@ function toDisplayRun(detail: SyntheticRunDetail | null): DisplayRun {
       hasReplay: false,
     };
   }
+
   const isFail = detail.status === "failed";
   const isError = detail.status === "error";
   const hasIssue = isFail || isError;
@@ -923,28 +894,52 @@ const stepsWithTotal = computed(() => {
   return steps.value.map((s) => ({ ...s, _totalDuration: total }));
 });
 
-// ── Full-screen step content ────────────────────────────────────────────────
-const fullScreenStepId = ref<number | null>(null);
+// ── Screenshot lightbox ──────────────────────────────────────────────────────
+const lightboxStepId = ref<number | null>(null);
 
-const fullScreenOpen = computed({
-  get: () => fullScreenStepId.value !== null,
+const lightboxOpen = computed({
+  get: () => lightboxStepId.value !== null,
   set: (v: boolean) => {
-    if (!v) fullScreenStepId.value = null;
+    if (!v) lightboxStepId.value = null;
   },
 });
 
-const fullScreenStep = computed(() => {
-  if (fullScreenStepId.value === null) return null;
-  return steps.value.find((s) => s.id === fullScreenStepId.value) ?? null;
+const lightboxStep = computed(() => {
+  if (lightboxStepId.value === null) return null;
+  return steps.value.find((s) => s.id === lightboxStepId.value) ?? null;
 });
 
-const fullScreenTitle = computed(() => {
-  const s = fullScreenStep.value;
+const lightboxTitle = computed(() => {
+  const s = lightboxStep.value;
   return s ? `Step ${s.id}: ${s.action}` : "";
 });
 
-function openFullScreen(id: number) {
-  fullScreenStepId.value = id;
+function openLightbox(id: number) {
+  lightboxStepId.value = id;
+}
+
+// ── Error fullscreen ─────────────────────────────────────────────────────────
+const errorStepId = ref<number | null>(null);
+
+const errorOpen = computed({
+  get: () => errorStepId.value !== null,
+  set: (v: boolean) => {
+    if (!v) errorStepId.value = null;
+  },
+});
+
+const errorStep = computed(() => {
+  if (errorStepId.value === null) return null;
+  return steps.value.find((s) => s.id === errorStepId.value) ?? null;
+});
+
+const errorTitle = computed(() => {
+  const s = errorStep.value;
+  return s ? `Step ${s.id}: ${s.action} — Error` : "";
+});
+
+function openErrorFullscreen(id: number) {
+  errorStepId.value = id;
 }
 
 // Computed: current run from composable data
@@ -961,6 +956,11 @@ const isFailed = computed(
 );
 
 const isErrorRun = computed(() => currentRun.value.status === "error");
+
+// ── Display monitor name — prefers explicit prop, falls back to SQL result ──
+const displayMonitorName = computed(() =>
+  props.overrideMonitorName || currentRun.value.monitorName,
+);
 
 const steps = computed<StepRow[]>(() => {
   if (synthetics.runDetail.value) {
@@ -1056,7 +1056,7 @@ const statusChip = computed(() => {
 
 const infoChips = computed(() => [
   statusChip.value,
-  { label: "Duration", value: fmtDur(currentRun.value.duration), icon: "" },
+  { label: "Duration", value: fmtDur(currentRun.value.duration), icon: "schedule" },
   {
     label: "Browser",
     value: currentRun.value.browser,
@@ -1069,7 +1069,7 @@ const infoChips = computed(() => [
   },
   {
     label: "Location",
-    value: "AWS " + currentRun.value.location,
+    value: currentRun.value.location,
     icon: locationIcon(currentRun.value.location),
   },
 ]);
@@ -1110,7 +1110,8 @@ watch(
   ([newRunId, newExecId]) => {
     if (newRunId && newExecId) {
       expandedStepIds.value = new Set();
-      fullScreenStepId.value = null;
+      lightboxStepId.value = null;
+      errorStepId.value = null;
       loadRun();
     }
   },

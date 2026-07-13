@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ════════════ OVERVIEW ════════════ -->
         <OTabPanel name="overview">
           <div
-            class="mx-auto py-2 pb-[1.75rem] flex flex-col gap-2"
+            class="mx-auto py-2 flex flex-col gap-2"
           >
             <!-- Status Timeline — gated on runs query -->
             <template v-if="runsLoading || !runsHasLoadedOnce">
@@ -648,7 +648,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ════════════ STEPS ════════════ -->
         <OTabPanel name="steps">
           <div
-            class="mx-auto px-2 py-2 pb-[1.75rem] flex flex-col gap-2"
+            class="mx-auto px-2 py-2 flex flex-col gap-2"
           >
             <div class="flex items-center gap-2.5">
               <span class="font-bold text-sm text-text-heading">

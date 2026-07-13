@@ -37,6 +37,11 @@ const headerTitle = computed(() => {
   if (phase.value === 'extension-setup') return 'Set up the recorder'
   return check.value.name || 'Untitled check'
 })
+const folderName = computed(() => {
+  const fid = check.value.folder
+  if (!fid || fid === 'default') return ''
+  return folders.value.find((f) => f.folderId === fid)?.name ?? ''
+})
 const currentStep = ref(1)
 const journeyStepDone = ref(false)
 const checkName = ref('')
@@ -370,6 +375,7 @@ function onClearResults() {
   <div class="flex flex-col h-full bg-[var(--o2-body-primary-bg)]">
     <AppPageHeader
       :title="headerTitle"
+      :subtitle="folderName"
       :back="{ label: 'Checks', to: { name: 'synthetic' }, dataTest: 'synthetics-create-back-btn' }"
       class="shrink-0 px-4 border-b border-border-default"
     />

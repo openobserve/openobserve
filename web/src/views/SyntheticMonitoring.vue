@@ -705,7 +705,7 @@ const openDetail = (monitor: any) => {
   router.push({
     name: 'synthetic-monitor-results',
     params: { id: String(monitor.id) },
-    query: { name: monitor.name },
+    query: { name: monitor.name, folder: monitor.folder_name },
   });
 };
 

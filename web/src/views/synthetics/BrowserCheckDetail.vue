@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed, onMounted, onBeforeUnmount, onUnmounted, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useStore } from 'vuex'
 import type { BrowserCheck, SyntheticsLocation, SyntheticsDevice, SyntheticsFolder } from '@/types/synthetics'
 import { buildCreateBrowserTestPayload, mapResponseToBrowserCheck } from '@/utils/synthetics/buildPayload'
@@ -9,6 +9,7 @@ import { getFoldersListByType } from '@/utils/commons'
 import syntheticsService from '@/services/synthetics'
 import destinationService from '@/services/alert_destination'
 import { toast } from '@/lib/feedback/Toast/useToast'
+import AppPageHeader from '@/components/common/AppPageHeader.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OSwitch from '@/lib/forms/Switch/OSwitch.vue'
@@ -254,17 +255,19 @@ async function saveCheck() {
     </div>
 
     <!-- Header row -->
-    <header class="flex items-center gap-3 px-6 py-3 border-b border-[var(--o2-border-color)]">
-      <RouterLink :to="{ name: 'synthetic' }" class="text-sm text-[var(--o2-text-link)] hover:text-[var(--o2-text-link-hover)] flex items-center gap-1">
-        ← Back to checks
-      </RouterLink>
-      <h2 class="text-base font-semibold">{{ check.name || '…' }}</h2>
-      <OSwitch
-        v-model="enabled"
-        size="sm"
-        data-test="synthetics-detail-enabled-switch"
-      />
-    </header>
+    <AppPageHeader
+      :title="check.name || '…'"
+      :back="{ label: 'Checks', to: { name: 'synthetic' }, dataTest: 'synthetics-detail-back-btn' }"
+      class="shrink-0 px-4 border-b border-border-default"
+    >
+      <template #title-trail>
+        <OSwitch
+          v-model="enabled"
+          size="sm"
+          data-test="synthetics-detail-enabled-switch"
+        />
+      </template>
+    </AppPageHeader>
 
     <!-- Tab bar -->
     <OTabs v-model="activeTab" bordered class="px-6 bg-[var(--o2-card-bg)]">

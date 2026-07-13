@@ -31,6 +31,7 @@ export const SYNTHETIC_RESULTS_STREAM = "synthetics_results";
 
 export const SYNTHETIC_FIELDS = {
   monitorId: "synthetics_id",
+  monitorName: "synthetics_name",
   status: "status",
   timestamp: "_timestamp",
   duration: "response_time_ms",
@@ -357,7 +358,7 @@ export function buildRunDetailSql(
   const id = escapeSqlLiteral(monitorId);
   const rid = escapeSqlLiteral(runId);
   const eid = escapeSqlLiteral(executionId);
-  return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, ${F.error} as error, job_id, execution_id, trace_key, last_attempt_steps, recorded_steps
+  return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, ${F.error} as error, ${F.monitorName} as synthetics_name, job_id, execution_id, trace_key, last_attempt_steps, recorded_steps
 FROM ${TABLE}
 WHERE ${F.monitorId} = '${id}' AND run_id = '${rid}' AND execution_id = '${eid}'
 ORDER BY ${F.location} ASC`;
