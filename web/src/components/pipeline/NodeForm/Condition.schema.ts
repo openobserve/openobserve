@@ -5,9 +5,10 @@
 // The drawer's only editable content is the composite FilterGroup child — it has
 // no OForm* equivalent, so its model (`conditionGroup`) is BRIDGED into the form
 // as the `conditions` field (watch → setFieldValue, the documented sanctioned
-// bridge) and validated here via `superRefine`:
+// bridge) and validated here via `superRefine`. Built via a factory taking `t`
+// (vue-i18n) so every message stays i18n-driven:
 //   • at-least-one-condition — a non-empty condition (column + operator + value)
-//     OR a nested group ('Please add at least one condition'). This replaces the
+//     OR a nested group (t('pipeline.atLeastOneCondition')). This replaces the
 //     old imperative `saveCondition()` toast gate (pattern → schema).
 //   • complete-fields — once a condition is started, every leaf condition must be
 //     fully filled (column, operator AND value). FilterCondition's inline
@@ -51,33 +52,33 @@ const isBlankCondition = (c: any): boolean =>
 const isCompleteCondition = (c: any): boolean =>
   isFilled(c?.column) && isFilled(c?.operator) && isFilled(c?.value);
 
-export const conditionSchema = z
-  .object({
-    conditions: z.any(),
-  })
-  .superRefine((val, ctx) => {
-    const leaves = collectLeafConditions(val.conditions);
+export const makeConditionSchema = (t: (_key: string) => string) =>
+  z
+    .object({
+      conditions: z.any(),
+    })
+    .superRefine((val, ctx) => {
+      const leaves = collectLeafConditions(val.conditions);
 
-    // Nothing added yet — no leaves at all, or every leaf is untouched.
-    if (leaves.length === 0 || leaves.every(isBlankCondition)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["conditions"],
-        message: "Please add at least one condition",
-      });
-      return;
-    }
+      // Nothing added yet — no leaves at all, or every leaf is untouched.
+      if (leaves.length === 0 || leaves.every(isBlankCondition)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["conditions"],
+          message: t("pipeline.atLeastOneCondition"),
+        });
+        return;
+      }
 
-    // At least one condition is started — every leaf must be fully filled so a
-    // condition with a column/operator but an empty value can't slip through.
-    if (!leaves.every(isCompleteCondition)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["conditions"],
-        message:
-          "Please fill in all condition fields (column, operator and value are required)",
-      });
-    }
-  });
+      // At least one condition is started — every leaf must be fully filled so a
+      // condition with a column/operator but an empty value can't slip through.
+      if (!leaves.every(isCompleteCondition)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["conditions"],
+          message: t("pipeline.fillAllConditionFields"),
+        });
+      }
+    });
 
-export type ConditionForm = z.infer<typeof conditionSchema>;
+export type ConditionForm = z.infer<ReturnType<typeof makeConditionSchema>>;

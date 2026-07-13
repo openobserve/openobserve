@@ -27,13 +27,10 @@ export const makeAddPipelineSchema = (t: (_key: string) => string) =>
       // persist the space. Validate the raw value — the regex below rejects
       // spaces, so a whitespace name is correctly blocked.
       .min(1, t("common.nameRequired"))
-      .regex(
-        streamSelectionNameRegex,
-        "Use alphanumeric and '+=,.@-_' characters only, without spaces.",
-      ),
+      .regex(streamSelectionNameRegex, t("pipeline.streamSelectionNameInvalid")),
     description: z.string().optional(),
-    stream_type: z.string().min(1, "Field is required!"),
-    stream_name: z.string().min(1, "Field is required!"),
+    stream_type: z.string().min(1, t("pipeline.fieldRequired")),
+    stream_name: z.string().min(1, t("pipeline.fieldRequired")),
   });
 
 export type AddPipelineForm = z.infer<ReturnType<typeof makeAddPipelineSchema>>;

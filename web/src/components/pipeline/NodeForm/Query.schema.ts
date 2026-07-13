@@ -47,8 +47,9 @@ import {
 } from "@/utils/zincutils";
 
 // Minimal translator type — Query passes vue-i18n's `t`. Falls back to the
-// literal key so the schema is usable without an i18n instance (tests).
-type Translate = (_key: string) => string;
+// literal key so the schema is usable without an i18n instance (tests). Accepts
+// an optional named-params object for interpolated messages (frequency/minutes).
+type Translate = (_key: string, _params?: Record<string, unknown>) => string;
 
 const aggregationShape = z
   .object({
@@ -88,7 +89,7 @@ export function makeQuerySchema(min: number, t: Translate = (k) => k) {
         .object({
           period: z.coerce
             .number()
-            .min(1, "Period should be greater than 0"),
+            .min(1, t("pipeline.periodGreaterThanZero")),
           frequency_type: z.string().optional(),
           frequency: z.any().optional(),
           cron: z.string().optional().nullable(),
@@ -132,7 +133,9 @@ export function makeQuerySchema(min: number, t: Translate = (k) => k) {
               ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 path: ["trigger_condition", "cron"],
-                message: `Frequency should be greater than ${minSeconds - 1} seconds.`,
+                message: t("pipeline.frequencyGreaterThanSeconds", {
+                  seconds: minSeconds - 1,
+                }),
               });
             }
           } catch {
@@ -148,7 +151,9 @@ export function makeQuerySchema(min: number, t: Translate = (k) => k) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["trigger_condition", "frequency"],
-            message: `Minimum frequency should be ${minMinutes} minutes`,
+            message: t("pipeline.minimumFrequencyMinutes", {
+              minutes: minMinutes,
+            }),
           });
         }
       }

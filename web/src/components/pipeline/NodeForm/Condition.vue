@@ -170,7 +170,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
-import { conditionSchema, type ConditionForm } from "./Condition.schema";
+import { makeConditionSchema, type ConditionForm } from "./Condition.schema";
 import {
   getTimezoneOffset,
   getUUID,
@@ -470,7 +470,7 @@ const conditionDefaults = computed((): ConditionForm => ({
 
 const form = useOForm<ConditionForm>({
   defaultValues: conditionDefaults.value,
-  schema: conditionSchema,
+  schema: makeConditionSchema(t),
   onSubmit: () => saveCondition(),
 });
 

@@ -231,6 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -244,7 +245,7 @@ import backfillService from "../../services/backfill";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
-import { backfillSchema, type BackfillForm } from "./backfillJob.schema";
+import { makeBackfillSchema, type BackfillForm } from "./backfillJob.schema";
 
 interface Props {
   modelValue: boolean;
@@ -262,6 +263,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const store = useStore();
+const { t } = useI18n();
 
 const show = computed({
   get: () => props.modelValue,
@@ -292,7 +294,7 @@ const backfillDefaults = computed((): BackfillForm => ({
 // no store.subscribe). The form is handed to <OForm :form="form">.
 const form = useOForm<BackfillForm>({
   defaultValues: backfillDefaults.value,
-  schema: backfillSchema,
+  schema: makeBackfillSchema(t),
   onSubmit: (value) => onSubmit(value),
 });
 

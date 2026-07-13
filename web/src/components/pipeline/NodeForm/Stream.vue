@@ -161,7 +161,7 @@ import AddStream from "@/components/logstream/AddStream.vue";
 
 import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { streamSchema, type StreamForm } from "./Stream.schema";
+import { makeStreamSchema, type StreamForm } from "./Stream.schema";
 
 const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });
 const emit = defineEmits(["cancel:hideform"]);
@@ -237,7 +237,7 @@ const streamDefaults = computed((): StreamForm => ({
 // hand-mirror, no store.subscribe).
 const form = useOForm<StreamForm>({
   defaultValues: streamDefaults.value,
-  schema: streamSchema,
+  schema: makeStreamSchema(t),
   onSubmit: (value) => onSubmit(value),
 });
 

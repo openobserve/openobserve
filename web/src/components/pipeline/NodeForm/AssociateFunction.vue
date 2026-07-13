@@ -290,6 +290,7 @@ const store = useStore();
 // prop + isUpdating at validation time via getters. selectedFunction required +
 // "already associated" uniqueness are both schema-driven now.
 const associateFunctionSchema = makeAssociateFunctionSchema(
+  t,
   () => (props.associatedFunctions as string[]) ?? [],
   () => isUpdating.value,
 );

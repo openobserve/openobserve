@@ -33,11 +33,6 @@
 import { z } from "zod";
 import { isValidResourceName } from "@/utils/zincutils";
 
-// Mirrors the old per-field :validators on `name`: required + the resource-name
-// character check ("Characters like :, ?, /, #, and spaces are not allowed.").
-const RESOURCE_NAME_MESSAGE =
-  "Characters like :, ?, /, #, and spaces are not allowed.";
-
 // One row in the dynamic Headers array-field. Both fields are free-form text
 // (a blank starter row is valid — only non-empty rows are persisted on save).
 export const headerRowSchema = z.object({
@@ -53,15 +48,15 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
         .string()
         .min(1, t("common.nameRequired"))
         .refine((val) => isValidResourceName(String(val)), {
-          message: RESOURCE_NAME_MESSAGE,
+          message: t("pipeline.destResourceNameInvalid"),
         }),
       url: z
         .string()
         .refine((val) => String(val ?? "").trim().length > 0, {
-          message: "Field is required!",
+          message: t("pipeline.fieldRequired"),
         })
         .refine((val) => !String(val ?? "").trim().endsWith("/"), {
-          message: "URL should not end with a trailing slash",
+          message: t("pipeline.urlTrailingSlash"),
         }),
 
       // ── Form-owned toggle ────────────────────────────────────────────────
@@ -107,14 +102,14 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["org"],
-            message: "Organization is required for OpenObserve",
+            message: t("pipeline.orgRequiredOpenobserve"),
           });
         }
         if (!trimmed(val.stream)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["stream"],
-            message: "Stream name is required for OpenObserve",
+            message: t("pipeline.streamRequiredOpenobserve"),
           });
         }
       }
@@ -125,14 +120,14 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["url_endpoint"],
-          message: "Field is required!",
+          message: t("pipeline.fieldRequired"),
         });
       }
       if (trimmed(val.url_endpoint) && !trimmed(val.url_endpoint).startsWith("/")) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["url_endpoint"],
-          message: "Endpoint path must start with /",
+          message: t("pipeline.endpointMustStartSlash"),
         });
       }
 
@@ -142,14 +137,14 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["method"],
-          message: "Field is required!",
+          message: t("pipeline.fieldRequired"),
         });
       }
       if (!val.output_format) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["output_format"],
-          message: "Field is required!",
+          message: t("pipeline.fieldRequired"),
         });
       }
 
@@ -158,7 +153,7 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["esbulk_index"],
-          message: "Index name is required for ESBulk format",
+          message: t("pipeline.indexRequiredEsbulk"),
         });
       }
 
@@ -174,7 +169,7 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["separator"],
-          message: "Separator is required for StringSeparated format",
+          message: t("pipeline.separatorRequiredStringseparated"),
         });
       }
 
@@ -184,14 +179,14 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["metadata", "ddsource"],
-            message: "DD Source is required for Datadog",
+            message: t("pipeline.ddSourceRequiredDatadog"),
           });
         }
         if (!trimmed(val.metadata?.ddtags)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["metadata", "ddtags"],
-            message: "DD Tags are required for Datadog",
+            message: t("pipeline.ddTagsRequiredDatadog"),
           });
         }
       }

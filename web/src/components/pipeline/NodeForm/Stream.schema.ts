@@ -20,10 +20,11 @@
 
 import { z } from "zod";
 
-export const streamSchema = z.object({
-  stream_type: z.string().min(1, "Field is required!"),
-  stream_name: z.string().min(1, "Field is required!"),
-  appendData: z.boolean().optional(),
-});
+export const makeStreamSchema = (t: (_key: string) => string) =>
+  z.object({
+    stream_type: z.string().min(1, t("pipeline.fieldRequired")),
+    stream_name: z.string().min(1, t("pipeline.fieldRequired")),
+    appendData: z.boolean().optional(),
+  });
 
-export type StreamForm = z.infer<typeof streamSchema>;
+export type StreamForm = z.infer<ReturnType<typeof makeStreamSchema>>;

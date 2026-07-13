@@ -90,7 +90,7 @@ import CreateDestinationForm from "./CreateDestinationForm.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
-  externalDestinationSchema,
+  makeExternalDestinationSchema,
   type ExternalDestinationForm,
 } from "./ExternalDestination.schema";
 
@@ -108,6 +108,10 @@ function handleDrawerClose(v: boolean) {
 }
 const store = useStore();
 const { t } = useI18n();
+
+// Schema built here so its required message stays i18n-driven; bound in the
+// template via <OForm :schema="externalDestinationSchema">.
+const externalDestinationSchema = makeExternalDestinationSchema(t);
 
 const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
 const createNewDestination = ref(false);

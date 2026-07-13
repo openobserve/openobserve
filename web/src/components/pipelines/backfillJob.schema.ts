@@ -32,45 +32,52 @@ const optionalNumericRange = (min: number, max: number, message: string) =>
     z.union([z.null(), z.number().int().min(min, message).max(max, message)]),
   );
 
-export const backfillSchema = z
-  .object({
-    timerange: z
-      .object({
-        type: z.string().optional(),
-        from: z.number().optional(), // microseconds
-        to: z.number().optional(),
-        period: z.string().optional(),
-      })
-      .optional(),
-    chunkPeriodMinutes: optionalNumericRange(
-      1,
-      1440,
-      "Must be between 1 and 1440",
-    ),
-    delayBetweenChunks: optionalNumericRange(1, 3600, "Must be between 1 and 3600"),
-    deleteBeforeBackfill: z.boolean().optional(),
-  })
-  .superRefine((val, ctx) => {
-    // Cross-field time-range guard (replaces the old imperative toast/error
-    // checks in each dialog's @submit handler). Surfaced via path ["timerange"].
-    if (
-      !val.timerange?.from ||
-      val.timerange.from <= 0 ||
-      !val.timerange?.to ||
-      val.timerange.to <= 0
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["timerange"],
-        message: "Please select a valid time range",
-      });
-    } else if (val.timerange.from >= val.timerange.to) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["timerange"],
-        message: "Start time must be before end time",
-      });
-    }
-  });
+export const makeBackfillSchema = (
+  t: (_key: string, _params?: Record<string, unknown>) => string,
+) =>
+  z
+    .object({
+      timerange: z
+        .object({
+          type: z.string().optional(),
+          from: z.number().optional(), // microseconds
+          to: z.number().optional(),
+          period: z.string().optional(),
+        })
+        .optional(),
+      chunkPeriodMinutes: optionalNumericRange(
+        1,
+        1440,
+        t("pipeline.backfillNumericRange", { min: 1, max: 1440 }),
+      ),
+      delayBetweenChunks: optionalNumericRange(
+        1,
+        3600,
+        t("pipeline.backfillNumericRange", { min: 1, max: 3600 }),
+      ),
+      deleteBeforeBackfill: z.boolean().optional(),
+    })
+    .superRefine((val, ctx) => {
+      // Cross-field time-range guard (replaces the old imperative toast/error
+      // checks in each dialog's @submit handler). Surfaced via path ["timerange"].
+      if (
+        !val.timerange?.from ||
+        val.timerange.from <= 0 ||
+        !val.timerange?.to ||
+        val.timerange.to <= 0
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["timerange"],
+          message: t("pipeline.selectValidTimeRange"),
+        });
+      } else if (val.timerange.from >= val.timerange.to) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["timerange"],
+          message: t("pipeline.startBeforeEndTime"),
+        });
+      }
+    });
 
-export type BackfillForm = z.infer<typeof backfillSchema>;
+export type BackfillForm = z.infer<ReturnType<typeof makeBackfillSchema>>;

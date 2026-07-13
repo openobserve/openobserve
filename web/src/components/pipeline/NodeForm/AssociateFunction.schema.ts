@@ -8,23 +8,25 @@
 // mode-toggle stays a bare UI control OUTSIDE the form (its true branch
 // delegates to the AddFunction child).
 //
-// The schema is built via a factory taking GETTERS for the cross-field context
-// (`associatedFunctions` prop + `isUpdating`) so `superRefine` reads their CURRENT
-// values at validation time (the schema instance is created once at mount):
-//   • required → `min(1, 'Field is required!')` (restored BEFORE-baseline rule).
+// The schema is built via a factory taking `t` (vue-i18n) plus GETTERS for the
+// cross-field context (`associatedFunctions` prop + `isUpdating`) so `superRefine`
+// reads their CURRENT values at validation time (the schema instance is created
+// once at mount) and all messages stay i18n-driven:
+//   • required → `min(1, t('pipeline.fieldRequired'))` (restored BEFORE-baseline rule).
 //   • uniqueness → `superRefine`: a not-yet-associated function unless editing
-//     ('Function is already associated'), preserving the old `functionExists`
+//     (t('pipeline.functionAlreadyAssociated')), preserving the old `functionExists`
 //     behavior.
 
 import { z } from "zod";
 
 export const makeAssociateFunctionSchema = (
+  t: (_key: string) => string,
   getAssociated: () => string[],
   getIsUpdating: () => boolean,
 ) =>
   z
     .object({
-      selectedFunction: z.string().min(1, "Field is required!"),
+      selectedFunction: z.string().min(1, t("pipeline.fieldRequired")),
       afterFlattening: z.boolean().optional(),
     })
     .superRefine((val, ctx) => {
@@ -36,7 +38,7 @@ export const makeAssociateFunctionSchema = (
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["selectedFunction"],
-          message: "Function is already associated",
+          message: t("pipeline.functionAlreadyAssociated"),
         });
       }
     });
