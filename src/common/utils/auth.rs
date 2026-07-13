@@ -80,23 +80,10 @@ static RE_SPACE_AROUND: Lazy<Regex> = Lazy::new(|| {
     Regex::new(&pattern).unwrap()
 });
 
-pub static EMAIL_REGEX: Lazy<Regex> = Lazy::new(|| {
-    // Local part follows the RFC 5321/5322 dot-atom form: one or more non-empty
-    // atoms separated by single dots. This accepts single-character dotted
-    // segments (e.g. `first.x`) while still rejecting leading/trailing/consecutive
-    // dots. The domain requires at least one dot-separated label and a TLD of
-    // 2-63 letters (RFC 1035 max label length; covers long TLDs like `.software`
-    // and the RFC 2606 reserved `.invalid`). Anchored on both ends to reject any
-    // trailing/leading garbage.
-    Regex::new(
-        r"^([a-zA-Z0-9_+\-]+(\.[a-zA-Z0-9_+\-]+)*)@([a-zA-Z0-9]+([\-\.][a-zA-Z0-9]+)*\.[a-zA-Z]{2,63})$",
-    )
-    .unwrap()
-});
-
-pub fn is_valid_email(email: &str) -> bool {
-    EMAIL_REGEX.is_match(email)
-}
+// Email validation lives in the shared `config` crate so the OSS auth layer and the enterprise
+// domain-management blocklist validate identically. Re-exported here to preserve the existing
+// `crate::common::utils::auth::{EMAIL_REGEX, is_valid_email}` API.
+pub use config::utils::str::{EMAIL_REGEX, is_valid_email};
 
 pub fn into_ofga_supported_format(name: &str) -> String {
     // remove spaces around special characters
