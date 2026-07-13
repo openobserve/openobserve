@@ -716,13 +716,13 @@ export class StreamsPage {
 
     // Selectors - VERIFIED from AddStream.vue and LogStream.vue
     get addStreamButton() { return this.page.locator('[data-test="log-stream-add-stream-btn"]'); }
-    get addStreamModal() { return this.page.locator('[data-test="add-stream-title"]'); }
+    get addStreamModal() { return this.page.locator('[data-test="add-stream-dialog"]'); }
     get streamNameInput() { return this.page.locator('[data-test="add-stream-name-input"] input'); }
     get streamTypeSelect() { return this.page.locator('[data-test="add-stream-type-input"]'); }
     get dataRetentionInput() { return this.page.locator('[data-test="add-stream-data-retention-input"] input'); }
-    get saveStreamButton() { return this.page.locator('[data-test="save-stream-btn"]'); }
-    get cancelStreamButton() { return this.page.locator('[data-test="add-stream-cancel-btn"]'); }
-    get closeStreamButton() { return this.page.locator('[data-test="add-stream-close-btn"]'); }
+    get saveStreamButton() { return this.page.locator('[data-test="add-stream-dialog"] [data-test="o-dialog-primary-btn"]'); }
+    get cancelStreamButton() { return this.page.locator('[data-test="add-stream-dialog"] [data-test="o-dialog-secondary-btn"]'); }
+    get closeStreamButton() { return this.page.locator('[data-test="add-stream-dialog"] [data-test="o-dialog-close-btn"]'); }
     get streamsTable() { return this.page.locator('[data-test="log-stream-table"]'); }
     get searchStreamInput() { return this.page.locator('[data-test="streams-search-stream-input-field"]'); }
     get indexTypeSelect() { return this.page.locator('[data-test="schema-field-kubernetes_host-index-type-select"]').first(); }
