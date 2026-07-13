@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-if="createNewFunction"
-          class="text-sm text-gray-600"
+          class="text-sm text-gray-600 dark:text-gray-300"
         >
           ({{ t("alerts.newFunctionAssociationMsg") }})
         </div>
