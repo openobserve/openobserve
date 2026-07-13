@@ -23,10 +23,10 @@ publish = false
 
 [features]
 default = []
-enterprise = []
-vectorscan = []
-cloud = []
-vortex = ["config/vortex"]
+enterprise = ["openobserve-core/enterprise"]
+vectorscan = ["openobserve-core/vectorscan"]
+cloud = ["openobserve-core/cloud"]
+vortex = ["config/vortex", "openobserve-core/vortex"]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = [
@@ -223,6 +223,7 @@ roaring.workspace = true
 flight.workspace = true
 async-stream.workspace = true
 sourcemap = "9.3.2"
+openobserve-core = { path = "crates/openobserve-core" }
 
 [dev-dependencies]
 expect-test.workspace = true
@@ -233,6 +234,7 @@ rcgen = "0.14.4"
 
 [workspace]
 members = [
+    "crates/openobserve-core",
     "src/config",
     "src/infra",
     "src/ingester",
@@ -258,6 +260,11 @@ proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
 flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
+o2_dex = { path = "crates/enterprise-stubs/o2_dex" }
+o2_enterprise = { path = "crates/enterprise-stubs/o2_enterprise", default-features = false }
+o2_openfga = { path = "crates/enterprise-stubs/o2_openfga" }
+vortex = { path = "crates/enterprise-stubs/vortex" }
+vortex-datafusion = { path = "crates/enterprise-stubs/vortex-datafusion" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
 axum = { version = "0.8", features = ["macros", "multipart", "tracing"] }
@@ -301,6 +308,7 @@ async-stream = "0.3"
 async-trait = "0.1"
 async-recursion = "1.0"
 aws-config = "1.8"
+aws-credential-types = "1.2.14"
 aws-sdk-sns = { version = "1.97", default-features = false, features = [
     "behavior-version-latest",
     "default-https-client",

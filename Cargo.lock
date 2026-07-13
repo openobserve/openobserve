@@ -2364,7 +2364,7 @@ dependencies = [
  "urlencoding",
  "utoipa",
  "uuid",
- "vortex",
+ "vortex 0.1.0 (git+https://github.com/openobserve/vortex?branch=0.75.0-fix)",
  "vrl",
 ]
 
@@ -6631,6 +6631,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "o2_dex"
+version = "0.1.0"
+
+[[package]]
+name = "o2_enterprise"
+version = "0.1.0"
+
+[[package]]
+name = "o2_openfga"
+version = "0.1.0"
+
+[[package]]
 name = "objc2"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6884,6 +6896,7 @@ dependencies = [
  "mime_guess",
  "multer",
  "object_store",
+ "openobserve-core",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-proto",
@@ -6950,6 +6963,158 @@ dependencies = [
  "utoipa-axum",
  "utoipa-swagger-ui",
  "version-compare",
+ "vrl",
+ "wal",
+ "webpki-roots 1.0.6",
+ "x509-parser",
+ "zip 8.2.0",
+ "zstd",
+]
+
+[[package]]
+name = "openobserve-core"
+version = "0.1.0"
+dependencies = [
+ "ahash 0.8.12",
+ "anyhow",
+ "argon2",
+ "arrow",
+ "arrow-flight",
+ "arrow-json",
+ "arrow-schema",
+ "async-recursion",
+ "async-stream",
+ "async-trait",
+ "aws-config",
+ "aws-credential-types",
+ "aws-sdk-sns",
+ "axum",
+ "axum-client-ip",
+ "axum-extra",
+ "axum-server",
+ "base64 0.22.1",
+ "bitflags 2.11.0",
+ "blake3",
+ "brotli",
+ "byteorder",
+ "bytes",
+ "chromiumoxide",
+ "chrono",
+ "clap",
+ "config",
+ "console-subscriber",
+ "cron",
+ "csv",
+ "dashmap",
+ "datafusion",
+ "datafusion-functions-aggregate-common",
+ "datafusion-functions-json",
+ "datafusion-proto",
+ "derive_more 2.1.1",
+ "enrichment",
+ "env_logger",
+ "expect-test",
+ "faststr",
+ "flate2",
+ "flight",
+ "futures",
+ "futures-core",
+ "futures-util",
+ "hashbrown 0.16.1",
+ "hashlink 0.11.0",
+ "hex",
+ "http 1.4.0",
+ "http-auth-basic",
+ "http-body 1.0.1",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "infra",
+ "ingester",
+ "itertools 0.14.0",
+ "jemalloc_pprof",
+ "jsonwebtoken",
+ "lettre",
+ "log",
+ "maxminddb",
+ "md5",
+ "memchr",
+ "mimalloc",
+ "mime",
+ "mime_guess",
+ "multer",
+ "o2_dex",
+ "o2_enterprise",
+ "o2_openfga",
+ "object_store",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry-proto",
+ "opentelemetry_sdk",
+ "parking_lot 0.12.5",
+ "parquet",
+ "pin-project-lite",
+ "pprof",
+ "prettytable-rs",
+ "prometheus",
+ "promql-parser",
+ "prost 0.14.3",
+ "prost-wkt-types",
+ "proto",
+ "rand 0.10.1",
+ "rayon",
+ "rcgen",
+ "regex",
+ "regex-syntax",
+ "report_server",
+ "reqwest 0.13.2",
+ "roaring",
+ "rquickjs",
+ "rust-embed-for-web",
+ "rustls",
+ "rustls-native-certs",
+ "sea-orm",
+ "segment",
+ "serde",
+ "serde_json",
+ "sha256",
+ "snafu 0.9.0",
+ "snap",
+ "sourcemap",
+ "sqlparser",
+ "sqlx",
+ "strum 0.28.0",
+ "svix-ksuid",
+ "tantivy",
+ "tantivy-fst",
+ "tantivy_utils",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tiktoken-rs",
+ "tikv-jemalloc-ctl",
+ "tikv-jemalloc-sys",
+ "tikv-jemallocator",
+ "time",
+ "tokio",
+ "tokio-rustls",
+ "tokio-stream",
+ "tokio-util",
+ "tonic",
+ "tonic-prost",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-appender",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+ "uaparser",
+ "url",
+ "utoipa",
+ "utoipa-axum",
+ "utoipa-swagger-ui",
+ "version-compare",
+ "vortex 0.1.0",
+ "vortex-datafusion",
  "vrl",
  "wal",
  "webpki-roots 1.0.6",
@@ -11532,6 +11697,10 @@ dependencies = [
 [[package]]
 name = "vortex"
 version = "0.1.0"
+
+[[package]]
+name = "vortex"
+version = "0.1.0"
 source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "vortex-alp",
@@ -11712,6 +11881,10 @@ dependencies = [
  "vortex-mask",
  "vortex-utils",
 ]
+
+[[package]]
+name = "vortex-datafusion"
+version = "0.1.0"
 
 [[package]]
 name = "vortex-datetime-parts"

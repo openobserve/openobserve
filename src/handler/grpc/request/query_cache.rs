@@ -44,6 +44,6 @@ mod tests {
 
     #[test]
     fn test_query_cache_server_impl_default() {
-        let _server = QueryCacheServerImpl::default();
+        let _server = QueryCacheServerImpl;
     }
 }

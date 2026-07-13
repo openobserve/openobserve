@@ -1,0 +1,12 @@
+[package]
+name = "o2_openfga"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[features]
+default = []
+cloud = []
+
+[lib]
+path = "lib.rs"
