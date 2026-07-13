@@ -15,8 +15,6 @@
 
 use std::{collections::HashMap, hash::Hasher, sync::Arc};
 
-#[cfg(test)]
-use config::meta::promql::value::LabelsExt;
 use config::{
     meta::promql::{
         NAME_LABEL,
@@ -359,6 +357,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use config::meta::promql::value::LabelsExt;
+
     use super::*;
 
     // Test data helpers
