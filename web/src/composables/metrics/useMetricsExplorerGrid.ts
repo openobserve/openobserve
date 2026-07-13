@@ -443,8 +443,30 @@ export function useMetricsExplorerGrid() {
   const schemaLoaded = ref(false);
   const labelsByStream = shallowRef<Record<string, string[]>>({});
 
-  const ensureSchemas = async () => {
-    if (schemaLoaded.value || schemaLoading.value) return;
+  /**
+   * The load currently in flight, so a second caller AWAITS it instead of
+   * returning early. `ensureSchemas` used to answer `void` while
+   * `schemaLoading` was true — but `loadLabelValues` awaits it precisely to
+   * read `labelsByStream` on the next line, so the early return handed it an
+   * empty map, its fan-out matched no streams, and the resulting `[]` was
+   * cached as this label's answer for the whole session.
+   */
+  let schemaInFlight: Promise<void> | null = null;
+
+  const ensureSchemas = (): Promise<void> => {
+    if (schemaLoaded.value) return Promise.resolve();
+    if (schemaInFlight) return schemaInFlight;
+    // Self-comparing clear: an org switch nulls the slot and a new load may
+    // claim it before THIS one settles — its finally must not evict the
+    // successor.
+    const self: Promise<void> = doEnsureSchemas().finally(() => {
+      if (schemaInFlight === self) schemaInFlight = null;
+    });
+    schemaInFlight = self;
+    return self;
+  };
+
+  const doEnsureSchemas = async () => {
     const generation = orgGeneration;
     schemaLoading.value = true;
     try {
@@ -1396,6 +1418,11 @@ export function useMetricsExplorerGrid() {
     ) {
       return;
     }
+    // The MISS path of the await above: a restore that painted checks the epoch
+    // itself, but a cache miss fell through to the loading write below — and if
+    // the map was cleared while IndexedDB was answering, that write resurrects
+    // an entry into a state the user has already left.
+    if (epoch !== previewsEpoch) return;
 
     const existing = previews.value[card.name];
 
@@ -2051,6 +2078,11 @@ export function useMetricsExplorerGrid() {
     // run from clearing a FRESH run's flag); clearing them here is what makes the
     // new org able to start at all.
     schemaLoading.value = false;
+    // The memoized in-flight load belongs to the previous org: a caller who
+    // awaited it would read the old org's (empty, generation-dropped) map and
+    // cache wrong answers for the new org. Dropping the memo makes the next
+    // ensureSchemas start a fresh load for THIS org.
+    schemaInFlight = null;
     labelNamesLoading.value = false;
     labelNamesGeneration++;
     labelsByStream.value = {};

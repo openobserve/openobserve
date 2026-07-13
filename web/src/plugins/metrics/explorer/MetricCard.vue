@@ -311,6 +311,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("metrics.explorer.noData") }}
       </div>
 
+      <!-- The CONVERSION failed — the query succeeded, so the preview is
+           status "done" and none of the error branches above catch it. Without
+           this tile the emit fell on the floor and the card was a blank white
+           region with no message and no way out. -->
+      <div
+        v-else-if="renderError"
+        class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] text-text-secondary"
+        :data-test="`metrics-explorer-card-render-error-${card.name}`"
+      >
+        <span class="inline-flex items-center gap-1 cursor-help">
+          <OTooltip
+            :content="renderError"
+            content-class="whitespace-pre-line"
+            max-width="360px"
+            :delay="200"
+          />
+          <OIcon name="error-outline" size="sm" class="text-error-600" />
+          <span>{{ t("metrics.explorer.queryFailed") }}</span>
+        </span>
+        <OButton
+          variant="ghost-primary"
+          size="xs"
+          :data-test="`metrics-explorer-card-render-retry-${card.name}`"
+          @click.stop="onRetryRender"
+        >
+          {{ t("metrics.explorer.retry") }}
+        </OButton>
+      </div>
+
       <MetricCardChart
         v-else-if="preview?.results?.length"
         :results="preview.results"
@@ -322,6 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :bucket-unit-custom="bucketO2Unit.unitCustom"
         :color="color"
         :time-range="timeRange"
+        @error="renderError = String($event ?? '')"
       />
 
       <div v-else class="h-full">
@@ -433,6 +463,7 @@ import {
   onBeforeUnmount,
   onMounted,
   ref,
+  watch,
   type PropType,
 } from "vue";
 import { useI18n } from "vue-i18n";
@@ -610,6 +641,24 @@ export default defineComponent({
       });
 
     /**
+     * A CONVERSION failure from the chart child. The preview itself is "done"
+     * (the query succeeded), so none of the preview error branches show it —
+     * this is its only surface. Cleared whenever new results arrive, and by
+     * the tile's own Retry.
+     */
+    const renderError = ref("");
+    watch(
+      () => props.preview?.results,
+      () => {
+        renderError.value = "";
+      },
+    );
+    const onRetryRender = () => {
+      renderError.value = "";
+      emit("refresh", props.card);
+    };
+
+    /**
      * The card stays visible in the grid even with no data, so users still learn
      * the metric exists.
      */
@@ -669,6 +718,8 @@ export default defineComponent({
       copyErrorReport,
       isEmpty,
       isSparse,
+      renderError,
+      onRetryRender,
     };
   },
 });

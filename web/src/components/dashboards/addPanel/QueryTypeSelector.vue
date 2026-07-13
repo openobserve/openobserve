@@ -388,6 +388,14 @@ export default defineComponent({
           ];
         if (!query) return;
 
+        // A SAVED panel is never converted, full stop. Its id is assigned when
+        // it is loaded for editing (new panels carry `id: ""`), and — unlike the
+        // stream guard below — it survives a stream-TYPE change, which clears
+        // `fields.stream` before this watcher runs. Without this, flipping the
+        // stream type to `metrics` on a saved SQL panel went through
+        // `changeToggle()` and silently wiped every query, axis and filter.
+        if (dashboardPanelData.data.id) return;
+
         // A stream is already chosen ⇒ this is not a fresh selection: either an
         // existing panel is being loaded for editing (whose query type is the
         // user's, not ours to change), or they have already built something.

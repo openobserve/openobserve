@@ -873,6 +873,44 @@ describe("QueryTypeSelector", () => {
       );
     });
 
+    it("does NOT convert a SAVED panel when its stream type flips to metrics", async () => {
+      // The saved-panel wipe: `onStreamTypeChange` clears `fields.stream`
+      // BEFORE setting the type, so the stream guard sees the same empty stream
+      // a fresh panel has — and `changeToggle()` then cleared every query, axis
+      // and filter of a panel the user had saved. The id is the signal that
+      // survives the stream clearing: it is assigned when a saved panel loads.
+      wrapper = createWrapper();
+      await nextTick();
+
+      mockDashboardPanelData.data.id = "Panel_ID_saved_1";
+      mockDashboardPanelData.data.queries = [
+        {
+          query: "SELECT histogram(_timestamp), count(*) FROM app_logs",
+          customQuery: false,
+          fields: {
+            // What onStreamTypeChange leaves behind: stream cleared, type set.
+            stream: "",
+            stream_type: "logs",
+            x: [{ alias: "x_axis_1" }],
+            y: [{ alias: "y_axis_1" }],
+          },
+        },
+      ] as any;
+      mockDashboardPanelData.layout.currentQueryIndex = 0;
+      await settle();
+
+      mockDashboardPanelData.data.queries[0].fields.stream_type = "metrics";
+      await settle();
+
+      expect(mockDashboardPanelData.data.queryType).toBe("sql");
+      expect(mockDashboardPanelData.data.queries[0].query).toBe(
+        "SELECT histogram(_timestamp), count(*) FROM app_logs",
+      );
+      expect(mockDashboardPanelData.data.queries[0].fields.x).toHaveLength(1);
+
+      mockDashboardPanelData.data.id = "";
+    });
+
     it("still flips when the other query is only the editor's placeholder SQL", async () => {
       // An untouched slot carries auto-generated SQL against no stream. Counting
       // that as work would block the auto-select on exactly the new panels it is

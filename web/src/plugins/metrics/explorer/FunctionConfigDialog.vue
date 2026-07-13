@@ -137,6 +137,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("metrics.explorer.noData") }}
           </div>
 
+          <!-- @error: a conversion throw lands the tile in the SAME error state
+               a failed query does — without it the emit fell on the floor and
+               the tile was a blank region with no message. -->
           <MetricCardChart
             v-else-if="previewOf(variant).results.length"
             :results="previewOf(variant).results"
@@ -148,6 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :bucket-unit-custom="bucketUnitOf(variant).unitCustom"
             :color="color"
             :data-test="`metrics-fn-chart-${variant.id}`"
+            @error="onRenderError(variant, $event)"
           />
 
           <OSkeleton
@@ -423,6 +427,16 @@ export default defineComponent({
      */
     let generation = 0;
 
+    /**
+     * Per-tile load sequence. A percentile toggle re-loads ONE tile; bumping the
+     * dialog-wide generation for that would silently strand every other tile
+     * still in flight from `loadAll`. This lets a tile supersede only itself:
+     * without it, toggling p99 then p95 raced two loads for the same tile, and
+     * whichever resolved LAST painted — often the stale set, since the newer
+     * query is typically the cache hit.
+     */
+    const tileSeq: Record<string, number> = {};
+
     const isEmpty = (variant: any) => {
       const preview = previewOf(variant);
       if (preview.status !== "done") return false;
@@ -445,6 +459,7 @@ export default defineComponent({
       }
 
       const mine = generation;
+      const seq = (tileSeq[variant.id] = (tileSeq[variant.id] ?? 0) + 1);
       previews.value = {
         ...previews.value,
         [variant.id]: { status: "loading", results: [], error: "" },
@@ -454,13 +469,13 @@ export default defineComponent({
         const results = await Promise.all(
           queries.map((query: any) => props.runPreview(query.expr)),
         );
-        if (mine !== generation) return;
+        if (mine !== generation || seq !== tileSeq[variant.id]) return;
         previews.value = {
           ...previews.value,
           [variant.id]: { status: "done", results, error: "" },
         };
       } catch (error: any) {
-        if (mine !== generation) return;
+        if (mine !== generation || seq !== tileSeq[variant.id]) return;
         // A cancelled tile belongs to a dialog the user has already closed. It is
         // not an error, and must not paint one.
         if (isCancelled(error)) return;
@@ -478,6 +493,22 @@ export default defineComponent({
           },
         };
       }
+    };
+
+    /**
+     * A conversion throw from the chart child. The tile's queries SUCCEEDED —
+     * its preview is "done" — so only this hands the failure to the same error
+     * state a failed query uses (message + Retry) instead of a blank tile.
+     */
+    const onRenderError = (variant: any, error: any) => {
+      previews.value = {
+        ...previews.value,
+        [variant.id]: {
+          status: "error",
+          results: [],
+          error: String(error || "Failed to render chart"),
+        },
+      };
     };
 
     /**
@@ -562,6 +593,7 @@ export default defineComponent({
       previewOf,
       isEmpty,
       load,
+      onRenderError,
       isDirty,
       close,
       onApply,

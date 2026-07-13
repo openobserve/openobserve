@@ -188,7 +188,15 @@ export default defineComponent({
       axis.max = toAxisValue(range.end_time);
     };
 
+    /**
+     * `render` awaits the converter, and the watcher below fires it on every
+     * prop change — so two renders can be in flight at once, and without this
+     * the SLOWER, staler one paints last. Only the newest may write.
+     */
+    let renderSeq = 0;
+
     const render = async () => {
+      const seq = ++renderSeq;
       if (!props.results?.length) {
         chartData.value = { options: null };
         return;
@@ -202,6 +210,8 @@ export default defineComponent({
           ref(null), // hoveredSeriesState — cards have no cross-panel hover
           [], // annotations
         );
+
+        if (seq !== renderSeq) return;
 
         const options = converted?.options;
         if (options) {
@@ -314,6 +324,7 @@ export default defineComponent({
         }
         chartData.value = converted ?? { options: null };
       } catch (error: any) {
+        if (seq !== renderSeq) return;
         chartData.value = { options: null };
         emit("error", error?.message ?? "Failed to render chart");
       }

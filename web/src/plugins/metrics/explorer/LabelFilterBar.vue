@@ -475,13 +475,18 @@ const onLabelPicked = async (value: unknown) => {
 
   try {
     const values = await props.loadValues(label);
+    // The draft moved on while this was in flight — the user picked another
+    // label, or cancelled. A slow answer for label A must not overwrite the
+    // picker that is now showing label B.
+    if (draftLabel.value !== label) return;
     valueOptions.value = (values ?? []).map((v) => ({ label: v, value: v }));
     suggestionsUnavailable.value = valueOptions.value.length === 0;
   } catch {
+    if (draftLabel.value !== label) return;
     valueOptions.value = [];
     suggestionsUnavailable.value = true;
   } finally {
-    valuesLoading.value = false;
+    if (draftLabel.value === label) valuesLoading.value = false;
   }
 };
 

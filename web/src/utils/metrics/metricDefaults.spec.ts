@@ -222,6 +222,8 @@ describe("type resolution (PRD 6.1)", () => {
     expect(baseNameOf("foo")).toBe("foo");
     // `bucket` is only a suffix when something precedes it.
     expect(baseNameOf("bucket")).toBe("bucket");
+    expect(baseNameOf("foo_count_")).toBe("foo_count_");
+    expect(baseNameOf("foo_seconds_bucket_")).toBe("foo_seconds_bucket_");
   });
 });
 

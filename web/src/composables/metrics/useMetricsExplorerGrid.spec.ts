@@ -1261,6 +1261,45 @@ describe("useMetricsExplorerGrid", () => {
       expect(Math.min(...starts)).toBeLessThan(starts[0]);
     });
 
+    it("awaits an in-flight schema load instead of answering from an empty map", async () => {
+      // `ensureSchemas` used to return void while a load was in flight. The
+      // values fan-out awaits it precisely to read `labelsByStream` on the next
+      // line — so the early return handed it an empty map, no streams matched,
+      // and `[]` was cached as the label's answer for the whole session.
+      const grid = await setup();
+
+      let releaseSchemas!: (v: any) => void;
+      (StreamService.nameList as any).mockReturnValueOnce(
+        new Promise((resolve) => {
+          releaseSchemas = resolve;
+        }),
+      );
+
+      // First caller starts the load…
+      const first = grid.ensureSchemas();
+
+      (metricsService.labelValues as any).mockClear();
+      (metricsService.labelValues as any).mockResolvedValue({
+        data: { data: ["api-1"] },
+      });
+
+      // …and the second must WAIT for it, not run against {}.
+      const values = grid.loadLabelValues("pod");
+
+      releaseSchemas({
+        data: {
+          list: STREAMS.map((x) => ({ ...x, schema: [{ name: "pod", type: "Utf8" }] })),
+        },
+      });
+      await first;
+
+      expect(await values).toEqual(["api-1"]);
+      // It really fanned out — the bug's signature was zero labelValues calls.
+      expect(
+        (metricsService.labelValues as any).mock.calls.length,
+      ).toBeGreaterThan(0);
+    });
+
     it("keeps label values out of the chart-result cache", async () => {
       // The preview LRU is sized for chart data. A 5-way label fan-out pushing five
       // entries into it evicts five cards' worth of results — and label values have

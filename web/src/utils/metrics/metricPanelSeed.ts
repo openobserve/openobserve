@@ -123,7 +123,7 @@ export function buildPromqlSeed(
   const defaults = getMetricDefaults(
     card.name,
     stream?.metrics_meta?.metric_type,
-    undefined,
+    card.declaredUnit,
     {
       streamNames: new Set(list.map((s) => s?.name).filter(Boolean) as string[]),
       familyType: card.familyType,

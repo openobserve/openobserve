@@ -260,7 +260,8 @@ export function familySuffixOf(metricName) {
   const parts = segmentsOf(metricName);
   if (parts.length < 2) return "";
   const last = parts[parts.length - 1];
-  return FAMILY_SUFFIXES.includes(last) ? last : "";
+  if (!FAMILY_SUFFIXES.includes(last)) return "";
+  return lower(metricName).endsWith(`_${last}`) ? last : "";
 }
 
 /**

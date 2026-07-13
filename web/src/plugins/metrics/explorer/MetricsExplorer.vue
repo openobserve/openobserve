@@ -441,6 +441,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useVirtualizer } from "@tanstack/vue-virtual";
+import { isEqual } from "lodash-es";
 
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
@@ -534,12 +535,14 @@ export default defineComponent({
     const scrollRef = ref<HTMLElement | null>(null);
     const dateTimePickerRef = ref<any>(null);
     const refreshInterval = ref(0);
-    const selectedDate = ref<any>({
+    /** A factory, not a literal: the route watcher resets to this too. */
+    const defaultSelectedDate = () => ({
       valueType: "relative",
       startTime: null,
       endTime: null,
       relativeTimePeriod: "15m",
     });
+    const selectedDate = ref<any>(defaultSelectedDate());
 
     const isDark = computed(() => store.state.theme === "dark");
     const isGrid = computed(() => grid.viewMode.value === "grid");
@@ -913,37 +916,44 @@ export default defineComponent({
     };
     applyUrlState();
 
+    /** Every URL key this page owns. Anything else rides along untouched. */
+    const MANAGED_PARAM_KEYS = [
+      ...EXPLORER_FILTER_PARAM_KEYS,
+      "period",
+      "from",
+      "to",
+      "refresh",
+    ];
+
+    /** The managed slice of the URL that the CURRENT state serializes to. */
+    const managedFromState = (): Record<string, any> => {
+      const query: Record<string, any> = explorerFiltersToQuery({
+        searchTerm: grid.searchTerm.value,
+        selectedPrefixes: grid.selectedPrefixes.value,
+        selectedSuffixes: grid.selectedSuffixes.value,
+        selectedTypes: grid.selectedTypes.value,
+        labelFilters: grid.labelFilters.value,
+        showFavoritesOnly: grid.showFavoritesOnly.value,
+        hideEmptyPanels: grid.hideEmptyPanels.value,
+        sortBy: grid.sortBy.value,
+        viewMode: grid.viewMode.value,
+      });
+      const time: any = selectedDateToQueryParams(selectedDate.value);
+      // The default window is recoverable from its absence, like the filters.
+      if (time.period !== "15m") Object.assign(query, time);
+      if (refreshInterval.value)
+        query.refresh = refreshIntervalToLabel(refreshInterval.value);
+      return query;
+    };
+
     // State -> URL via replace, so filter changes never stack history entries.
     // Managed keys are wiped first — a cleared filter must leave the URL, and
     // anything else (org_identifier) rides along untouched. Defaults serialize
     // to nothing, so an unfiltered grid keeps a bare /metrics URL.
     const syncUrlState = () => {
       const query: Record<string, any> = { ...route.query };
-      for (const key of EXPLORER_FILTER_PARAM_KEYS) delete query[key];
-      delete query.period;
-      delete query.from;
-      delete query.to;
-      delete query.refresh;
-
-      Object.assign(
-        query,
-        explorerFiltersToQuery({
-          searchTerm: grid.searchTerm.value,
-          selectedPrefixes: grid.selectedPrefixes.value,
-          selectedSuffixes: grid.selectedSuffixes.value,
-          selectedTypes: grid.selectedTypes.value,
-          labelFilters: grid.labelFilters.value,
-          showFavoritesOnly: grid.showFavoritesOnly.value,
-          hideEmptyPanels: grid.hideEmptyPanels.value,
-          sortBy: grid.sortBy.value,
-          viewMode: grid.viewMode.value,
-        }),
-      );
-      const time: any = selectedDateToQueryParams(selectedDate.value);
-      // The default window is recoverable from its absence, like the filters.
-      if (time.period !== "15m") Object.assign(query, time);
-      if (refreshInterval.value)
-        query.refresh = refreshIntervalToLabel(refreshInterval.value);
+      for (const key of MANAGED_PARAM_KEYS) delete query[key];
+      Object.assign(query, managedFromState());
 
       const changed =
         Object.keys(query).some(
@@ -969,6 +979,58 @@ export default defineComponent({
         refreshInterval.value,
       ],
       syncUrlState,
+    );
+
+    // URL -> state, for the navigations the mount-time apply cannot see:
+    // clicking sidebar "Metrics" while filtered (a bare URL must CLEAR the
+    // filters), and back/forward between two /metrics?… entries. Unlike the
+    // mount path, absence here means "reset to default" — that is what makes a
+    // shared bare link honest. Guarded by comparing the URL's managed slice
+    // against what the current state serializes to: our own router.replace
+    // round-trips through this watcher, and re-applying identical state would
+    // fire the filter watchers (page reset, slice sweep) for nothing.
+    watch(
+      () => route.query,
+      () => {
+        // Leaving the page fires this once with the next route's query.
+        if (route.name !== "metrics") return;
+
+        const incoming: Record<string, string> = {};
+        for (const key of MANAGED_PARAM_KEYS) {
+          const v = (route.query as Record<string, any>)[key];
+          if (v != null) incoming[key] = String(v);
+        }
+        const current: Record<string, string> = {};
+        for (const [key, v] of Object.entries(managedFromState())) {
+          current[key] = String(v);
+        }
+        if (isEqual(incoming, current)) return;
+
+        const q = route.query as Record<string, any>;
+        const f = queryToExplorerFilters(q);
+        grid.searchTerm.value = f.searchTerm ?? "";
+        grid.selectedPrefixes.value = f.selectedPrefixes ?? new Set();
+        grid.selectedSuffixes.value = f.selectedSuffixes ?? new Set();
+        grid.selectedTypes.value = f.selectedTypes ?? new Set();
+        grid.labelFilters.value = f.labelFilters ?? [];
+        grid.showFavoritesOnly.value = f.showFavoritesOnly ?? false;
+        grid.hideEmptyPanels.value = f.hideEmptyPanels ?? true;
+        grid.sortBy.value = f.sortBy ?? "a-z";
+        grid.viewMode.value = f.viewMode ?? "grid";
+        if (f.labelFilters?.length) grid.ensureSchemas();
+
+        selectedDate.value =
+          q.period || (q.from && q.to)
+            ? queryParamsToSelectedDate(q)
+            : defaultSelectedDate();
+        refreshInterval.value =
+          q.refresh != null
+            ? refreshLabelToInterval(
+                q.refresh,
+                store.state?.zoConfig?.min_auto_refresh_interval || 0,
+              )
+            : 0;
+      },
     );
 
     /* ------------------------------------------------------------- time */
@@ -1030,7 +1092,16 @@ export default defineComponent({
       // A deliberate change of window must reach the backend — repainting the
       // persisted result would hand the user back the data they just moved away
       // from.
-      await requestOnScreen({ skipCache: true });
+      //
+      // BOTH calls, like onRefresh: a range change resets the emptiness set
+      // (emptiness is a property of the window), so without the sweep every
+      // formerly-hidden no-data card re-enters the grid and blinks back out
+      // one at a time as the user scrolls past it. The sweep re-resolves the
+      // whole slice where it stands.
+      await Promise.all([
+        requestOnScreen({ skipCache: true }),
+        grid.sweepSlice({ skipCache: true }),
+      ]);
     };
 
     /**
@@ -1112,14 +1183,15 @@ export default defineComponent({
     /* ------------------------------------------------------- lifecycle */
 
     let mountedAt = 0;
-    let firstRenderTracked = false;
 
-    watch(
+    // A DEEP watch over every preview is not free — once the first render is
+    // reported there is nothing left for it to say, so it unregisters itself
+    // rather than re-walking the map on every preview for the life of the page.
+    const stopFirstRenderWatch = watch(
       () => grid.previews.value,
       (map) => {
-        if (firstRenderTracked) return;
         if (Object.values(map).some((p: any) => p.status === "done")) {
-          firstRenderTracked = true;
+          stopFirstRenderWatch();
           track("metrics_explorer_first_render", {
             ms: Math.round(performance.now() - mountedAt),
           });
