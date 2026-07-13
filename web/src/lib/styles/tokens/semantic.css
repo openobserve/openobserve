@@ -52,6 +52,18 @@
 
   /* Overlay scrim — semi-transparent backdrop */
   --color-overlay-scrim: color-mix(in srgb, var(--color-grey-950) 50%, transparent);
+
+  /* Status (semantic text+bg pairs) — the --color-* home for what used to be
+     --o2-status-*. Theme-paired via dark.css. Use these for status TEXT and
+     tinted status BACKGROUNDS (badges, callouts, required-field marks, etc.). */
+  --color-status-success-text: #208A3C;
+  --color-status-success-bg:   #F2FCF3;
+  --color-status-info-text:    #588CF3;
+  --color-status-info-bg:      #EDF3FF;
+  --color-status-warning-text: #E56D17;
+  --color-status-warning-bg:   #FFF4EB;
+  --color-status-error-text:   #CC3645;
+  --color-status-error-bg:     #FFF7F7;
 }
 
 /* ── Register ALL semantic tokens for Tailwind utilities ── */
@@ -87,6 +99,17 @@
 
   /* Overlay scrim */
   --color-overlay-scrim: var(--color-overlay-scrim);
+
+  /* Status (self-references so `text-status-error-text` etc. utilities exist
+     and dark.css overrides apply) */
+  --color-status-success-text: var(--color-status-success-text);
+  --color-status-success-bg:   var(--color-status-success-bg);
+  --color-status-info-text:    var(--color-status-info-text);
+  --color-status-info-bg:      var(--color-status-info-bg);
+  --color-status-warning-text: var(--color-status-warning-text);
+  --color-status-warning-bg:   var(--color-status-warning-bg);
+  --color-status-error-text:   var(--color-status-error-text);
+  --color-status-error-bg:     var(--color-status-error-bg);
 
   /* Brand / Primary (re-exports from base.css) */
   --color-primary-50:  var(--color-primary-50);

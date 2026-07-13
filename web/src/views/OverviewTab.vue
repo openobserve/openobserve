@@ -145,19 +145,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex flex-col gap-1 mt-2">
             <div class="flex items-baseline justify-between gap-2">
-              <span class="text-[0.6875rem] font-semibold tracking-[0.04em] uppercase text-(--color-text-secondary)">{{ t('overview.colErrorRate') }}</span>
+              <span class="text-[0.6875rem] font-semibold tracking-[0.04em] text-(--color-text-secondary)">{{ t('overview.colErrorRate') }}</span>
               <span class="text-sm font-medium text-(--color-text-body)" :class="svc.errorFlag ? 'text-(--color-error-600)' : ''">
                 {{ svc.error_rate != null ? svc.error_rate.toFixed(1) + '%' : '—' }}
               </span>
             </div>
             <div class="flex items-baseline justify-between gap-2">
-              <span class="text-[0.6875rem] font-semibold tracking-[0.04em] uppercase text-(--color-text-secondary)">{{ t('overview.colLatency') }}</span>
+              <span class="text-[0.6875rem] font-semibold tracking-[0.04em] text-(--color-text-secondary)">{{ t('overview.colLatency') }}</span>
               <span class="text-sm font-medium text-(--color-text-body)" :class="svc.latencyFlag ? 'text-(--color-warning-700)' : ''">
                 {{ svc.latencyMultiplier ? svc.latencyMultiplier + 'x' : '—' }}
               </span>
             </div>
             <div class="flex items-baseline justify-between gap-2">
-              <span class="text-[0.6875rem] font-semibold tracking-[0.04em] uppercase text-(--color-text-secondary)">{{ t('overview.colReqs') }}</span>
+              <span class="text-[0.6875rem] font-semibold tracking-[0.04em] text-(--color-text-secondary)">{{ t('overview.colReqs') }}</span>
               <span class="text-sm font-medium text-(--color-text-body)">{{ formatReqRate(svc.requests) }}</span>
             </div>
           </div>

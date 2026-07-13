@@ -582,6 +582,16 @@
   --o2-status-warning-bg: #402929;
   --o2-status-error-text: #EB938D;
   --o2-status-error-bg: #402929;
+  /* New --color-status-* tokens — same dark values as the --o2-status-* set
+     above, so both systems render identically in dark mode. */
+  --color-status-success-text: #A0DBA5;
+  --color-status-success-bg: #253627;
+  --color-status-info-text: #A1AFFF;
+  --color-status-info-bg: #181829;
+  --color-status-warning-text: #E37774;
+  --color-status-warning-bg: #402929;
+  --color-status-error-text: #EB938D;
+  --color-status-error-bg: #402929;
   /* Log-severity colors — aligned with STATUS_COLORS_DARK in statusParser.ts */
   --o2-severity-error-color: #D95C5C;
   --o2-severity-warning-color: #D4944A;
