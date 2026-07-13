@@ -60,10 +60,16 @@ lto = "thin"
 [profile.release-profiling]
 inherits = "release"
 # CPU profiling needs function symbols and source line tables, not full local-variable DWARF.
-# Keeping packed split debug info preserves the macOS .dSYM workflow while reducing its size.
+# Unpacked debug info avoids the serial macOS dsymutil step; keep the target directory so
+# profilers and debuggers can resolve source lines from the retained codegen objects.
 debug = 1
 strip = false
 codegen-units = 4
+split-debuginfo = "unpacked"
+
+# Use this profile when a portable, independently archived .dSYM bundle is required.
+[profile.release-profiling-packed]
+inherits = "release-profiling"
 split-debuginfo = "packed"
 
 [dependencies]
