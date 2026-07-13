@@ -152,7 +152,14 @@
         </section>
       </div>
 
-      <JobPreviewPanel :name="formValues.name" :stream-type="formValues.streamType" :mode="mode" />
+      <JobPreviewPanel
+        :name="formValues.name"
+        :stream-type="formValues.streamType"
+        :mode="mode"
+        :stream="formValues.stream"
+        :filter-where="filterWhere"
+        :filter-ready="filterReady"
+      />
     </div>
 
     <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-(--o2-card-bg) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)] shrink-0 z-1">
@@ -235,9 +242,12 @@ import {
 import { parseJson, showError, stringifyJson } from "../utils/evalFormat";
 import {
   buildJobFilterConditionPayload,
+  cleanFilterGroup,
   createEmptyJobFilterGroup,
+  isJobFilterComplete,
   normalizeJobFilterCondition,
 } from "../utils/jobFilter";
+import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import {
   buildJobInputMappingPayload,
   normalizeJobInputMappings,
@@ -290,6 +300,28 @@ const scorerVersions = ref(initScorerVersions(props.row));
 // Which create-mode submit was triggered (draft vs. create-and-activate). Set
 // on click before the form submit fires; loading is form-driven (isSubmitting).
 const activateOnSave = ref(false);
+
+// SQL WHERE body built from the filter builder — feeds the live "matched
+// spans" count in the preview panel. Built from the CLEANED group (incomplete
+// conditions stripped) so the SQL is always valid. Same formatter the form's
+// filter preview line uses (sqlMode → quoted, comparable values).
+const filterWhere = computed<string>(() => {
+  try {
+    return buildConditionsString(cleanFilterGroup(filterGroup.value), {
+      sqlMode: true,
+      addWherePrefix: false,
+      formatValues: true,
+    });
+  } catch {
+    return "";
+  }
+});
+
+// Pauses the match-count query while a condition is half-filled (column picked
+// but value still empty), so we don't query on every keystroke / partial edit.
+const filterReady = computed<boolean>(() =>
+  isJobFilterComplete(filterGroup.value),
+);
 
 const selectedScorers = computed(() =>
   formValues.value.scorerIds

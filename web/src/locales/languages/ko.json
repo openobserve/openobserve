@@ -5403,7 +5403,11 @@
       "authEditNote": "자격 증명은 다시 읽을 수 없습니다. 교체하려는 경우에만 API 키를 다시 입력하세요.",
       "cannotRename": "생성 후에는 이름을 변경할 수 없습니다.",
       "availableModelsHelp": "선택 사항. 이 공급자에서 사용할 수 있는 모델의 쉼표로 구분된 목록입니다.",
-      "saveError": "공급자를 저장하지 못했습니다."
+      "saveError": "공급자를 저장하지 못했습니다.",
+      "nameRequired": "Provider name is required",
+      "typeRequired": "Provider type is required",
+      "defaultModelRequired": "Default model is required",
+      "apiKeyRequired": "API key is required"
     },
     "scoreConfig": {
       "booleanValues": "true / false",
@@ -5520,6 +5524,12 @@
       "falseIsHealthyHint": "true 점수는 품질 문제를 트리거합니다.",
       "thresholdEmptyHint": "이 항목을 비워 두면 이 차원이 제품 전반의 품질 상태 신호에 기여하지 않습니다. 점수는 계속 기록되지만 문제 표시기를 트리거하지 않습니다.",
       "saveError": "점수 구성을 저장하지 못했습니다.",
+      "validation": {
+        "nameRequired": "Name is required",
+        "nameFormat": "Use lowercase letters, numbers, and underscores only",
+        "minRequired": "Min is required",
+        "maxRequired": "Max is required"
+      },
       "empty": {
         "title": "아직 점수 구성이 없습니다",
         "description": "점수 구성은 스코어러가 생성하는 차원(이름, 데이터 유형, 값 범위 및 정상 임계값)을 정의합니다. 온라인 평가 연결을 시작하려면 하나를 생성하세요.",
@@ -5753,6 +5763,21 @@
       },
       "requestBodyLabel": "본문 템플릿 요청",
       "saveError": "채점자 저장 실패",
+      "validation": {
+        "nameRequired": "Scorer name is required",
+        "scoreConfigRequired": "A score config is required",
+        "templateRequired": "A prompt / request body template is required",
+        "providerRequired": "A provider is required",
+        "endpointRequired": "An endpoint URL is required",
+        "bearerTokenRequired": "Token is required",
+        "basicUsernameRequired": "Username is required",
+        "basicPasswordRequired": "Password is required",
+        "apiKeyHeaderRequired": "Header name is required",
+        "apiKeyTokenRequired": "Token is required",
+        "timeoutInvalid": "Timeout must be 0 or greater",
+        "retriesInvalid": "Retries must be 0 or greater",
+        "duplicateFieldName": "Field names must be unique"
+      },
       "versionsLoadError": "점수 구성 버전을 로드하지 못했습니다.",
       "testPanel": {
         "title": "이 채점자 테스트",
@@ -5932,7 +5957,12 @@
       "selectAtLeastOne": "최소 한 명의 득점자 선택",
       "saveError": "평가 작업을 저장하지 못했습니다.",
       "createdAndActivated": "평가 작업이 생성되고 활성화되었습니다",
-      "createdButActivateFailed": "평가 작업이 생성되었으나 활성화에 실패했습니다"
+      "createdButActivateFailed": "평가 작업이 생성되었으나 활성화에 실패했습니다",
+      "validation": {
+        "nameRequired": "Job name is required",
+        "streamRequired": "A stream is required",
+        "samplingValueRequired": "A sampling value is required"
+      }
     }
   },
   "llmProviders": {

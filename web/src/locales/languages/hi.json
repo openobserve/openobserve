@@ -5028,7 +5028,11 @@
       "authEditNote": "क्रेडेंशियल वापस नहीं पढ़े जा सकते। यदि आप इसे रोटेट करना चाहते हैं तो ही API कुंजी फिर से दर्ज करें।",
       "cannotRename": "निर्माण के बाद नाम नहीं बदला जा सकता।",
       "availableModelsHelp": "वैकल्पिक। इस प्रदाता पर उपलब्ध मॉडलों की अल्पविराम से अलग की गई सूची।",
-      "saveError": "प्रदाता सहेजने में विफल"
+      "saveError": "प्रदाता सहेजने में विफल",
+      "nameRequired": "Provider name is required",
+      "typeRequired": "Provider type is required",
+      "defaultModelRequired": "Default model is required",
+      "apiKeyRequired": "API key is required"
     },
     "scoreConfig": {
       "booleanValues": "true / false",
@@ -5143,6 +5147,12 @@
       "falseIsHealthyHint": "true के स्कोर गुणवत्ता समस्याएँ ट्रिगर करते हैं।",
       "thresholdEmptyHint": "इसे खाली छोड़ने का अर्थ है कि यह आयाम पूरे उत्पाद में गुणवत्ता स्थिति संकेतों में योगदान नहीं करेगा। स्कोर फिर भी दर्ज किए जाएँगे लेकिन समस्या संकेतक ट्रिगर नहीं करेंगे।",
       "saveError": "स्कोर कॉन्फ़िग सहेजने में विफल",
+      "validation": {
+        "nameRequired": "Name is required",
+        "nameFormat": "Use lowercase letters, numbers, and underscores only",
+        "minRequired": "Min is required",
+        "maxRequired": "Max is required"
+      },
       "empty": {
         "title": "अभी तक कोई स्कोर कॉन्फ़िग नहीं",
         "description": "स्कोर कॉन्फ़िग उन आयामों को परिभाषित करते हैं जो आपके स्कोरर उत्पन्न करते हैं — नाम, डेटा प्रकार, मान सीमा, और स्वस्थ थ्रेशोल्ड। ऑनलाइन मूल्यांकन वायरिंग शुरू करने के लिए एक बनाएँ।",
@@ -5384,6 +5394,21 @@
       },
       "requestBodyLabel": "अनुरोध बॉडी टेम्पलेट",
       "saveError": "स्कोरर सहेजने में विफल",
+      "validation": {
+        "nameRequired": "Scorer name is required",
+        "scoreConfigRequired": "A score config is required",
+        "templateRequired": "A prompt / request body template is required",
+        "providerRequired": "A provider is required",
+        "endpointRequired": "An endpoint URL is required",
+        "bearerTokenRequired": "Token is required",
+        "basicUsernameRequired": "Username is required",
+        "basicPasswordRequired": "Password is required",
+        "apiKeyHeaderRequired": "Header name is required",
+        "apiKeyTokenRequired": "Token is required",
+        "timeoutInvalid": "Timeout must be 0 or greater",
+        "retriesInvalid": "Retries must be 0 or greater",
+        "duplicateFieldName": "Field names must be unique"
+      },
       "versionsLoadError": "स्कोर कॉन्फ़िग संस्करण लोड करने में विफल",
       "testPanel": {
         "title": "इस स्कोरर का परीक्षण करें",
@@ -5573,7 +5598,12 @@
       "selectAtLeastOne": "कम से कम एक स्कोरर चुनें",
       "saveError": "Eval जॉब सहेजने में विफल",
       "createdAndActivated": "Eval जॉब बनाया और सक्रिय किया गया",
-      "createdButActivateFailed": "Eval जॉब बनाया गया, लेकिन सक्रियण विफल रहा"
+      "createdButActivateFailed": "Eval जॉब बनाया गया, लेकिन सक्रियण विफल रहा",
+      "validation": {
+        "nameRequired": "Job name is required",
+        "streamRequired": "A stream is required",
+        "samplingValueRequired": "A sampling value is required"
+      }
     }
   },
   "llmProviders": {
