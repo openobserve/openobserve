@@ -215,10 +215,9 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
-// Co-located Zod schema (factory keeps messages i18n-driven and branches the
-// apiKey-required rule on create-vs-edit `mode`). The form is mounted fresh for
-// each create/edit action, so capturing `props.mode` once is safe.
-const providerFormSchema = makeProviderFormSchema(t, props.mode);
+// Co-located Zod schema (factory keeps messages i18n-driven). apiKey is optional
+// in both modes, so the schema no longer branches on `mode`.
+const providerFormSchema = makeProviderFormSchema(t);
 
 // Headless OForm instance (matches ScorerFormPage): created here so the endpoint
 // placeholder can read the selected providerType reactively via form.useStore.

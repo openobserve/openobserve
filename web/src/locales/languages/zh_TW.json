@@ -5387,7 +5387,6 @@
       "validation": {
         "nameRequired": "Scorer name is required",
         "scoreConfigRequired": "A score config is required",
-        "templateRequired": "A prompt / request body template is required",
         "providerRequired": "A provider is required",
         "endpointRequired": "An endpoint URL is required",
         "bearerTokenRequired": "Token is required",

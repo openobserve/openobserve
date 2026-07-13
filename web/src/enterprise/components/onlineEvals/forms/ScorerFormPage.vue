@@ -81,7 +81,6 @@
           <div class="mb-3">
             <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
               {{ t("onlineEvals.scorer.producesScoreConfigLabel") }}
-              <span class="text-(--o2-status-error-text) ml-[2px]">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary)" />
             </label>
             <OFormSelect
@@ -406,11 +405,18 @@
             <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
               {{ t("onlineEvals.scorer.remoteAuthLabel") }}
             </label>
+            <!-- Clearable so a user can return to "no auth": the auth-type
+                 options list only bearer/basic/api_key (a "" option can't be
+                 selected — OSelect treats "" as unselected), and each of those
+                 makes its token fields required. Without the ✕, picking a type
+                 by accident (or wanting to remove auth on edit) would be a trap
+                 with no way back to the empty/no-auth state. -->
             <OFormSelect
               name="authType"
               size="md"
               :options="authTypeOptions"
               :searchable="false"
+              :clearable="true"
               :placeholder="t('onlineEvals.scorer.remoteAuth.placeholder')"
               data-test="scorer-form-remote-auth-type"
             />

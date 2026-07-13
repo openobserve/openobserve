@@ -54,9 +54,14 @@ export const makeScorerFormSchema = (t: (_key: string) => string) =>
       // Discriminator — seeded once, drives the conditional requireds below.
       scorerType: z.enum(["llm_judge", "remote"]).default("llm_judge"),
       description: z.string().optional().default(""),
-      producesScoreConfigId: requiredText(
-        t("onlineEvals.scorer.validation.scoreConfigRequired"),
-      ),
+      // Optional — matches main + the backend contract. A scorer with no score
+      // config is a valid server-side entity (`produces_score_config_id:
+      // Option<String>` with #[serde(default)]), and it was creatable on main
+      // (the `*` marker was cosmetic, never enforced). The @submit handler maps
+      // an empty selection to `null`. Do NOT make this `requiredText`: that
+      // made scorers without a score config uncreatable, and blocked editing
+      // legacy scorers that already have none (the field is locked in edit).
+      producesScoreConfigId: z.string().optional().default(""),
       // Internal version-pinning state — not a rendered control; optional.
       producesScoreConfigVersion: z.string().optional().default(""),
       pinScoreConfigVersion: z.boolean().optional().default(false),
@@ -64,7 +69,12 @@ export const makeScorerFormSchema = (t: (_key: string) => string) =>
       // ── LLM judge ───────────────────────────────────────────────────────
       providerId: z.string().optional().default(""),
       model: z.string().optional().default(""),
-      template: requiredText(t("onlineEvals.scorer.validation.templateRequired")),
+      // Template is intentionally NOT required, matching pre-migration
+      // (origin/main) behavior: main had no template validation, so legacy
+      // scorers may exist with an empty template. Requiring it here would block
+      // re-saving those records on edit — so it stays optional (create seeds a
+      // default template; edit preserves whatever was stored).
+      template: z.string().optional().default(""),
       includeReasoning: z.boolean().optional().default(true),
       extraMetadataFields: z.array(extraMetadataFieldSchema).default([]),
 

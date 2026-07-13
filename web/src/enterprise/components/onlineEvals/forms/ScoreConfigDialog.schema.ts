@@ -2,8 +2,10 @@
 //
 // Validation schema for ScoreConfigDialog.vue (online-evals score-config drawer).
 // Client-side validation: (1) name — required + a create-only lowercase-slug
-// pattern (matching origin/main); (2) numeric min/max — each must be a non-empty
-// number (a blank field is rejected rather than coerced to 0). There is NO min<max
+// pattern (matching origin/main); (2) min/max — each must be a non-empty number,
+// but ONLY when the data type is numeric (the inputs are hidden and the values are
+// dropped from the payload for categorical/boolean, so a blank must not block Save
+// there — the check is gated on dataType in superRefine). There is NO min<max
 // ordering rule and NO "≥1 category" rule — main allowed both, so those stay
 // deliberately absent (online-evals-migration.md row 68).
 //
@@ -31,20 +33,13 @@ import type { ScoreDataType } from "@/services/online-evals.service";
 // config whose name predates this rule must still be editable (description-only).
 const NAME_PATTERN = /^[a-z0-9_]+$/;
 
-// A numeric-range endpoint (min / max). The number <input> stores a RAW STRING —
-// "" when cleared — which `z.coerce.number()` would silently turn into 0, so a
-// blank field must be rejected explicitly: empty / null / non-numeric all fail.
-// Any actual number is accepted (there is no min<max ordering rule — matches
-// main). `.transform` keeps the inferred type `number`; the payload builder in the
-// component re-coerces the raw store value on submit.
-const rangeNumber = (message: string) =>
-  z
-    .any()
-    .refine(
-      (v) => v !== "" && v !== null && v !== undefined && !Number.isNaN(Number(v)),
-      { message },
-    )
-    .transform((v) => Number(v));
+// True when a number <input>'s RAW store value is not a usable number — "" (the
+// cleared state), null / undefined, or non-numeric. Used to require min/max, but
+// ONLY for the numeric data type (see superRefine). `z.coerce.number()` can't do
+// this: it would silently turn "" into 0. The payload builder in the component
+// re-coerces the raw store value on submit.
+const isBlankNumber = (v: unknown) =>
+  v === "" || v === null || v === undefined || Number.isNaN(Number(v));
 
 export const makeScoreConfigSchema = (
   t: (_key: string) => string,
@@ -71,9 +66,13 @@ export const makeScoreConfigSchema = (
       dataType: z
         .enum(["numeric", "categorical", "boolean"])
         .default("numeric"),
-      // Required numbers — a blank min/max is rejected (see rangeNumber).
-      min: rangeNumber(t("onlineEvals.scoreConfig.validation.minRequired")),
-      max: rangeNumber(t("onlineEvals.scoreConfig.validation.maxRequired")),
+      // Numeric range endpoints. Kept permissive at the field level — the
+      // "required number" rule applies ONLY to the numeric data type and lives in
+      // superRefine below, so a blank min/max can't trap the user on a type whose
+      // inputs are hidden. The store holds the raw string; the payload builder
+      // coerces on submit.
+      min: z.any(),
+      max: z.any(),
       // Categorical values (bridged from the tag-entry).
       categories: z.array(z.string()).default([]),
       // ── Healthy threshold (all optional — bridged where bespoke) ─────────
@@ -82,12 +81,35 @@ export const makeScoreConfigSchema = (
       healthyLteValue: z.coerce.number().optional(),
       healthyCategories: z.array(z.string()).default([]),
       healthyBool: z.boolean().nullable().default(null),
+    })
+    .superRefine((val, ctx) => {
+      // Min/Max are required numbers ONLY when the data type is numeric. For
+      // categorical/boolean the inputs are not rendered and buildNumericRange
+      // drops the values, so validating a blank min/max off-numeric would block
+      // Save behind an invisible field (clear min on numeric → switch to
+      // categorical → Save silently no-ops). Gate the check on dataType.
+      if (val.dataType !== "numeric") return;
+      if (isBlankNumber(val.min)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["min"],
+          message: t("onlineEvals.scoreConfig.validation.minRequired"),
+        });
+      }
+      if (isBlankNumber(val.max)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["max"],
+          message: t("onlineEvals.scoreConfig.validation.maxRequired"),
+        });
+      }
     });
     // NOTE: matching pre-migration (origin/main) behavior, there is intentionally
     // NO numeric `min < max` ordering rule and NO categorical "≥1 category" rule —
     // main allowed both (min≥max ranges, and empty categorical → `categories:
     // null`). The only validation the migration restores is name required + the
-    // create-only slug pattern above. See ScoreConfigDialog.vue save().
+    // create-only slug pattern above (plus the numeric-only min/max requirement).
+    // See ScoreConfigDialog.vue save().
 
 export type ScoreConfigForm = z.infer<ReturnType<typeof makeScoreConfigSchema>>;
 

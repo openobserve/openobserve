@@ -92,14 +92,21 @@ describe("ProviderFormPage", () => {
     expect(onlineEvalsService.providers.create).not.toHaveBeenCalled();
   });
 
-  it("requires the API key on create", async () => {
+  it("allows create WITHOUT an API key (keyless self-hosted providers)", async () => {
     wrapper = createWrapper();
-    setField(wrapper, "name", "Prod OpenAI");
-    setField(wrapper, "defaultModel", "gpt-4o-mini");
-    // apiKey left blank → superRefine must fail on create.
+    setField(wrapper, "name", "Local Ollama");
+    setField(wrapper, "providerType", "ollama");
+    setField(wrapper, "defaultModel", "llama3");
+    // apiKey left blank → still valid client-side (matches main, which never
+    // enforced it). Self-hosted providers (Ollama/vLLM) run keyless; the
+    // per-type requirement for cloud providers is owned by the backend.
     await submit(wrapper);
-    expect(oform(wrapper).form.state.isValid).toBe(false);
-    expect(onlineEvalsService.providers.create).not.toHaveBeenCalled();
+    expect(oform(wrapper).form.state.isValid).toBe(true);
+    expect(onlineEvalsService.providers.create).toHaveBeenCalledTimes(1);
+    expect(onlineEvalsService.providers.create).toHaveBeenCalledWith(
+      "test-org",
+      expect.objectContaining({ authConfig: { api_key: "" } }),
+    );
   });
 
   it("creates a provider with the EXACT payload and emits saved when the schema passes", async () => {

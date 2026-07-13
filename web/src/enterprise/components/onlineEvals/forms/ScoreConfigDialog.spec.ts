@@ -171,6 +171,27 @@ describe("ScoreConfigDialog", () => {
     expect(onlineEvalsService.scoreConfigs.create).not.toHaveBeenCalled();
   });
 
+  it("does NOT block a categorical save after min/max were cleared on numeric (min/max are numeric-only)", async () => {
+    // Regression: min/max are required only for the numeric data type. Clearing
+    // min on numeric leaves "" in the store; switching to categorical hides the
+    // inputs but the stale "" persists. If the requirement weren't gated on
+    // dataType, Save would be blocked by an error on an invisible field.
+    wrapper = await createWrapper();
+    setField(wrapper, "name", "verdict");
+    await typeNumber("score-config-min-input", "");
+    await flushPromises();
+    // Now switch away from numeric — the min/max inputs unmount.
+    setField(wrapper, "dataType", "categorical");
+    await flushPromises();
+    await submit(wrapper);
+    expect(oform(wrapper).form.state.isValid).toBe(true);
+    expect(onlineEvalsService.scoreConfigs.create).toHaveBeenCalledTimes(1);
+    const payload = (onlineEvalsService.scoreConfigs.create as any).mock.calls[0][1];
+    expect(payload.dataType).toBe("categorical");
+    // Numeric range is dropped for non-numeric types.
+    expect(payload.numericRange).toBeNull();
+  });
+
   it("allows an empty categorical config (no ≥1-category guard — pre-migration parity)", async () => {
     wrapper = await createWrapper();
     setField(wrapper, "name", "verdict");
