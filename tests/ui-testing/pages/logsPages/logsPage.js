@@ -7974,10 +7974,15 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async clickVrlToggleButton() {
-        const vrlToggle = this.page.locator('[data-test="logs-search-bar-vrl-toggle-btn"]');
+        // Transform (VRL) editor toggle now lives inside the utilities ("More") menu
+        // — the old standalone logs-search-bar-vrl-toggle-btn no longer exists.
+        await this.page.keyboard.press('Escape').catch(() => {});
+        await this.page.locator(this.utilitiesMenuButton).click();
+        const vrlToggle = this.page.locator(this.menuTransformEditorToggleBtn);
         await vrlToggle.waitFor({ state: 'visible', timeout: 10000 });
         await vrlToggle.click();
-        testLogger.info('Clicked VRL toggle button');
+        await this.page.waitForLoadState('domcontentloaded').catch(() => {});
+        testLogger.info('Clicked VRL toggle button via utilities menu');
     }
 
     /**
