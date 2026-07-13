@@ -16,10 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Workflow canvas composable — a fork of plugins/pipelines/useDnD.ts.
 //
-// Differences from the pipeline version (FD1/FD2):
-//   - NO node sidebar / drag-from-palette. Nodes are added programmatically via
-//     the hover-`+` StepMenu (addNodeAfter, wired in a later slice), so all the
-//     onDragStart/onDragOver/onDrop machinery is removed.
+// Differences from the pipeline version:
+//   - Docked node palette (the shared NodePalette). Nodes can be added three
+//     ways: drag-from-palette (onDragStart/onDragOver/onDrop — placed
+//     unconnected, wired manually), palette click (addNodeToEnd — appends after
+//     the end node and auto-wires), and the hover-`+` step picker (addNodeAfter
+//     — appends after a specific node and auto-wires).
 //   - Restricted, colour-coded node taxonomy (trigger / logic / action).
 //   - Cycle + single-incoming validation use edge.source/target strings
 //     (always present) instead of VueFlow's runtime sourceNode/targetNode.
@@ -28,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // the editor, canvas, nodes and node-forms all share one object.
 
 import { reactive } from "vue";
-import { MarkerType, useVueFlow } from "@vue-flow/core";
+import { useVueFlow } from "@vue-flow/core";
 import { getUUID } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
@@ -439,13 +441,14 @@ export const hydrateWorkflow = (wf: any) => {
     }
     return node;
   });
-  const edges = (wf.edges || []).map((e: any) => ({
-    ...e,
-    type: "custom",
-    markerEnd: { type: MarkerType.ArrowClosed, width: 20, height: 20 },
-    style: { strokeWidth: 2 },
-    animated: true,
-  }));
+  // Take styling from the shared makeEdge (arrow + grey stroke) so loaded edges
+  // look identical to freshly-added ones; keep each loaded edge's own id/fields.
+  const edges = (wf.edges || []).map((e: any) => {
+    const src = e.source ?? e.sourceNode?.id;
+    const tgt = e.target ?? e.targetNode?.id;
+    const styled = makeEdge(src, tgt, e.sourceHandle);
+    return { ...e, ...styled, id: e.id || styled.id };
+  });
   workflowObj.currentSelectedWorkflow = { ...wf, nodes, edges };
   workflowObj.workflowWithoutChange = JSON.parse(JSON.stringify(wf));
   workflowObj.isEditWorkflow = true;

@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   Workflow canvas — fork of plugins/pipelines/PipelineFlow.vue.
 
-  No sidebar / drag-drop wiring (FD2): nodes are added via the hover-`+`
-  StepMenu (a later slice). This slice renders the VueFlow surface with the
-  colour-coded WorkflowNode, shared FlowEdge, a dotted grid background, zoom
-  controls and an empty-state hint.
+  Renders the VueFlow surface with the colour-coded WorkflowNode, shared
+  FlowEdge, a dotted grid background, zoom controls and an empty-state hint.
+  Nodes are added via the docked palette (drag-drop or click) and the hover-`+`
+  step picker.
 -->
 <template>
   <VueFlow
