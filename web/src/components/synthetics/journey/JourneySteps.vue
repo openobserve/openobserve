@@ -1,0 +1,391 @@
+<!-- Copyright 2026 OpenObserve Inc. -->
+
+<!--
+  JourneySteps — Thin OTable wrapper for synthetic monitoring step lists.
+
+  Two modes:
+    editor  — draggable, selectable, expandable step editor (BrowserJourney)
+    results — read-only step timeline with pass/fail indicators (RunDetail)
+
+  This component owns the OTable configuration (columns, density, borders,
+  etc.) and renders step-specific cell content via OTable cell slots.
+  Recording, replay, data fetching, and screenshot resolution stay in the
+  parent views or composables.
+-->
+
+<script setup lang="ts" generic="TData extends Record<string, any>">
+import { computed } from "vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+
+// ── Re-export StepDotState for consumers ──────────────────────────
+export type StepDotState = "pending" | "active" | "pass" | "fail" | "skip";
+
+// ── Props ──────────────────────────────────────────────────────────
+const props = withDefaults(
+  defineProps<{
+    /** Step data rows. Each row must have an `id` field for selection/expansion keys. */
+    data: TData[];
+    /** Render mode: editor (editable) or results (read-only). */
+    mode: "editor" | "results";
+    /** Accessor for the action field on each row. */
+    actionKey?: string;
+    /** Accessor for the step name field on each row. */
+    nameKey?: string;
+    /** Accessor for the selector/details field on each row. */
+    detailKey?: string;
+    /** Accessor for the icon name field on each row (results mode). */
+    iconKey?: string;
+    /** When set, renders colored status dots per step during replay. */
+    dotStateFn?: (row: TData) => StepDotState | undefined;
+    /** When true, hides row action buttons (during replay). */
+    locked?: boolean;
+    /** When true, the step list is read-only (no drag, no selection). */
+    readonly?: boolean;
+    /** Whether drag reorder is enabled (editor mode, disabled during record/replay/filter). */
+    enableReorder?: boolean;
+    /** Per-row predicate: return false to disable the drag handle for that row. */
+    disableRowReorder?: (row: TData) => boolean;
+    /** When true, the global filter is active and reorder auto-disables. */
+    filterActive?: boolean;
+    /** When true, selection checkboxes are shown. */
+    selectionEnabled?: boolean;
+    /** Selected row ids (v-model). */
+    selectedIds?: string[];
+    /** Expanded row ids (v-model). */
+    expandedIds?: string[];
+    /** Per-step replay results for error cards. */
+    getReplayResult?: (row: TData) =>
+      | { passed: boolean; durationMs: number; error?: string; structuredError?: any }
+      | undefined;
+  }>(),
+  {
+    actionKey: "action",
+    nameKey: "name",
+    detailKey: "detail",
+    iconKey: "icon",
+    enableReorder: false,
+    filterActive: false,
+    locked: false,
+    readonly: false,
+    selectionEnabled: false,
+  },
+);
+
+const emit = defineEmits<{
+  "update:data": [value: TData[]];
+  "update:selected-ids": [ids: string[]];
+  "update:expanded-ids": [ids: string[]];
+  "row-click": [row: TData, event: MouseEvent];
+  // Row actions emitted for parent handling
+  "expand": [row: TData];
+  "delete": [row: TData];
+  "duplicate": [row: TData];
+  "insert-below": [row: TData];
+  "retry-replay": [];
+}>();
+
+defineSlots<{
+  expansion: (props: { row: TData }) => any;
+  empty: () => any;
+}>();
+
+// ── Action maps (reused from BrowserJourneyStep.vue) ──────────────
+type StepAction =
+  | "navigate"
+  | "click"
+  | "type"
+  | "select"
+  | "press"
+  | "hover"
+  | "scroll"
+  | "wait"
+  | "assert"
+  | "screenshot";
+
+const ACTION_ICON_MAP: Record<string, IconName> = {
+  navigate: "open-in-browser",
+  click: "ads-click",
+  type: "keyboard",
+  select: "checklist",
+  press: "keyboard",
+  hover: "touch-app",
+  scroll: "swap-vert",
+  wait: "hourglass-empty",
+  assert: "fact-check",
+  screenshot: "photo-camera",
+};
+
+const ACTION_LABEL_MAP: Record<string, string> = {
+  navigate: "NAVIGATE",
+  click: "CLICK",
+  type: "TYPE",
+  select: "SELECT",
+  press: "PRESS",
+  hover: "HOVER",
+  scroll: "SCROLL",
+  wait: "WAIT",
+  assert: "ASSERT",
+  screenshot: "SCREENSHOT",
+};
+
+function actionIcon(row: TData): IconName {
+  const action: string = row[props.actionKey] ?? "";
+  return (ACTION_ICON_MAP[action] as IconName) ?? "ads-click";
+}
+
+function actionLabel(row: TData): string {
+  const action: string = row[props.actionKey] ?? "";
+  return ACTION_LABEL_MAP[action] ?? action.toUpperCase();
+}
+
+function stepName(row: TData): string {
+  return (row[props.nameKey] as string) || actionLabel(row);
+}
+
+function stepDetail(row: TData): string {
+  return (row[props.detailKey] as string) ?? "";
+}
+
+// ── Status dot rendering ───────────────────────────────────────────
+function dotClass(state: StepDotState | undefined): string {
+  if (!state) {
+    return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-[var(--o2-text-muted)] text-[var(--o2-text-muted)] text-xs font-semibold";
+  }
+  switch (state) {
+    case "active":
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-primary-soft-bg)] text-[var(--color-badge-primary-soft-text)] border border-[var(--color-badge-primary-soft-text)] text-xs font-semibold";
+    case "pass":
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-success-soft-bg)] text-[var(--color-badge-success-soft-text)] border border-[var(--color-badge-success-soft-text)] text-xs font-semibold";
+    case "fail":
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-error-soft-bg)] text-[var(--color-badge-error-soft-text)] border border-[var(--color-badge-error-soft-text)] text-xs font-semibold";
+    case "skip":
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-default-soft-bg)] text-[var(--color-badge-default-soft-text)] border border-[var(--color-badge-default-soft-text)] text-xs font-semibold opacity-50";
+    default:
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-[var(--o2-text-muted)] text-[var(--o2-text-muted)] text-xs font-semibold";
+  }
+}
+
+function getDotState(row: TData): StepDotState | undefined {
+  return props.dotStateFn?.(row);
+}
+
+// ── Column definitions ─────────────────────────────────────────────
+const isEditor = computed(() => props.mode === "editor");
+
+const columns = computed<OTableColumnDef<TData>[]>(() => {
+  if (isEditor.value) {
+    return [
+      { id: "details", header: "Step", size: 200, meta: { autoWidth: true } },
+      { id: "actions", header: "", size: 128, isAction: true },
+    ];
+  }
+  // Results mode
+  return [
+    { id: "step", header: "", size: 44 },
+    { id: "screenshot", header: "", size: 80 },
+    { id: "details", header: "Step", size: 200, meta: { autoWidth: true } },
+    { id: "progress", header: "", size: 90 },
+    { id: "duration", header: "Duration", size: 80 },
+  ];
+});
+
+// ── Derived OTable props ───────────────────────────────────────────
+const reorderEnabled = computed(() => props.enableReorder && !props.filterActive);
+
+const isLocked = computed(() => props.locked);
+
+function handleRowReorder(data: TData[]) {
+  emit("update:data", data);
+}
+
+function handleUpdateSelected(ids: string[]) {
+  emit("update:selected-ids", ids);
+}
+
+function handleUpdateExpanded(ids: string[]) {
+  emit("update:expanded-ids", ids);
+}
+</script>
+
+<template>
+  <OTable
+    :data="data"
+    :columns="columns"
+    row-key="id"
+    :show-header="false"
+    :selection="selectionEnabled ? 'multiple' : 'none'"
+    :selected-ids="selectedIds"
+    :expansion="'multiple'"
+    :expanded-ids="expandedIds"
+    :enable-row-reorder="reorderEnabled"
+    :disable-row-reorder="disableRowReorder"
+    :global-filter-active="filterActive"
+    :pagination="'none'"
+    :sorting="'none'"
+    :show-global-filter="false"
+    :dense="true"
+    :bordered="true"
+    :default-columns="false"
+    :fill-height="false"
+    @row-reorder="handleRowReorder"
+    @update:selected-ids="handleUpdateSelected"
+    @update:expanded-ids="handleUpdateExpanded"
+    @row-click="(row: TData, evt: MouseEvent) => emit('row-click', row, evt)"
+  >
+    <!-- ── cell-step: Status dot (results mode) ───────────────── -->
+    <template v-if="mode === 'results'" #cell-step="{ row }">
+      <div class="flex items-center justify-center">
+        <span :class="dotClass(getDotState(row))">
+          {{ (row as any).id ?? "" }}
+        </span>
+      </div>
+    </template>
+
+    <!-- ── cell-screenshot: Thumbnail (results mode) ───────────── -->
+    <template v-if="mode === 'results'" #cell-screenshot="{ row }">
+      <div
+        class="w-18 h-12 shrink-0 rounded border border-[var(--o2-border-color)] bg-surface-subtle flex items-center justify-center overflow-hidden"
+      >
+        <slot name="screenshot-thumb" :row="row">
+          <OIcon name="image" size="xs" class="text-text-caption" />
+        </slot>
+      </div>
+    </template>
+
+    <!-- ── cell-details: Step content (both modes) ─────────────── -->
+    <template #cell-details="{ row }">
+      <div class="flex items-center gap-2 min-w-0">
+        <!-- Step number (editor mode — circle during replay, plain text otherwise) -->
+        <span
+          v-if="mode === 'editor'"
+          :class="[
+            getDotState(row) ? dotClass(getDotState(row)) : '',
+            'shrink-0 tabular-nums',
+            getDotState(row) ? '' : 'text-sm text-[var(--o2-text-muted)] w-6 text-center',
+          ]"
+        >
+          <OSpinner
+            v-if="getDotState(row) === 'active'"
+            variant="ring"
+            size="xs"
+            class="text-[var(--o2-primary-color)]"
+          />
+          <template v-else>{{ (data as any[]).indexOf(row) + 1 }}</template>
+        </span>
+
+        <!-- Selection is handled by OTable's built-in checkbox column when selection="multiple" -->
+
+        <!-- Action icon chip -->
+        <span
+          class="bg-[var(--o2-primary-50)] rounded p-1 shrink-0 flex items-center"
+        >
+          <OIcon
+            :name="actionIcon(row)"
+            size="sm"
+            class="text-[var(--o2-primary-color)]"
+            aria-hidden="true"
+          />
+        </span>
+
+        <!-- Action label badge -->
+        <OBadge variant="default" size="sm">{{ actionLabel(row) }}</OBadge>
+
+        <!-- Step display name -->
+        <span class="text-sm text-[var(--o2-text-body)] flex-1 truncate min-w-0">
+          {{ stepName(row) }}
+        </span>
+
+        <!-- Selector/value preview (editor mode only) -->
+        <span
+          v-if="mode === 'editor' && stepDetail(row)"
+          class="font-mono text-xs text-[var(--o2-text-secondary)] truncate max-w-[25%] shrink-0"
+        >
+          {{ stepDetail(row) }}
+        </span>
+      </div>
+    </template>
+
+    <!-- ── cell-progress: Progress bar (results mode) ──────────── -->
+    <template v-if="mode === 'results'" #cell-progress="{ row }">
+      <OProgressBar
+        :value="((row as any).duration ?? 0) / Math.max((row as any)._totalDuration ?? 1, 1)"
+        :variant="(row as any).status === 'fail' ? 'danger' : 'default'"
+        size="xs"
+        class="w-20! shrink-0 h-2!"
+      />
+    </template>
+
+    <!-- ── cell-duration: Duration text (results mode) ─────────── -->
+    <template v-if="mode === 'results'" #cell-duration="{ row }">
+      <span class="text-xs text-[var(--o2-text-secondary)] shrink-0 font-mono tabular-nums">
+        {{ (row as any).durStr ?? "" }}
+      </span>
+    </template>
+
+    <!-- ── cell-actions: Row action buttons (editor mode) ──────── -->
+    <template v-if="mode === 'editor'" #cell-actions="{ row }">
+      <div
+        class="flex items-center gap-0.5 shrink-0"
+        :class="{ invisible: isLocked }"
+      >
+        <!-- Expand/collapse is handled by OTable's built-in expand button when expansion="multiple" -->
+
+        <OButton
+          v-if="!readonly"
+          variant="ghost"
+          size="xs"
+          aria-label="Insert step below"
+          data-test="synthetics-journey-step-insert-btn"
+          :disabled="isLocked"
+          @click="emit('insert-below', row)"
+        >
+          <OIcon name="add" size="sm" aria-hidden="true" />
+        </OButton>
+
+        <OButton
+          v-if="!readonly"
+          variant="ghost"
+          size="xs"
+          aria-label="Duplicate step"
+          data-test="synthetics-journey-step-duplicate-btn"
+          data-row-action="duplicate"
+          :disabled="isLocked"
+          @click="emit('duplicate', row)"
+        >
+          <OIcon name="content-copy" size="sm" aria-hidden="true" />
+        </OButton>
+
+        <OButton
+          v-if="!readonly"
+          variant="ghost"
+          size="xs"
+          aria-label="Delete step"
+          data-test="synthetics-journey-step-delete-btn"
+          data-row-action="delete"
+          :disabled="isLocked"
+          class="hover:text-[var(--o2-status-error)]"
+          @click="emit('delete', row)"
+        >
+          <OIcon name="delete" size="sm" aria-hidden="true" />
+        </OButton>
+      </div>
+    </template>
+
+    <!-- ── expansion: Expanded content passthrough ─────────────── -->
+    <template #expansion="{ row }">
+      <slot name="expansion" :row="row" />
+    </template>
+
+    <!-- ── empty: Custom empty state ───────────────────────────── -->
+    <template #empty>
+      <slot name="empty" />
+    </template>
+  </OTable>
+</template>

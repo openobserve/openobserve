@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       v-if="!drawerMode"
       class="px-2!"
+      :subtitle="currentRun.monitorName"
       :back="{
         label: t('synthetics.results.monitors'),
         to: { name: 'synthetic-monitor-results', params: { id: monitorId } },
@@ -147,11 +148,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Info chips skeleton -->
             <template v-if="loading">
               <div
-                class="grid grid-cols-4 gap-[0.625rem]"
+                class="grid grid-cols-5 gap-[0.625rem]"
                 data-test="synthetics-run-detail-info-skeleton"
               >
                 <div
-                  v-for="i in 4"
+                  v-for="i in 5"
                   :key="i"
                   class="card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
                 >
@@ -163,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Info chips -->
             <template v-else>
               <div
-                class="grid grid-cols-4 gap-[0.625rem]"
+                class="grid grid-cols-5 gap-[0.625rem]"
                 data-test="synthetics-run-detail-info-bar"
               >
                 <div
@@ -177,7 +178,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ chip.label }}
                   </span>
                   <span
-                    class="flex items-center gap-1 text-xs font-bold leading-none text-[var(--o2-text-primary)]"
+                    class="flex items-center gap-1 text-xs font-bold leading-none"
+                    :class="chip.colorClass || 'text-[var(--o2-text-primary)]'"
                   >
                     <OIcon
                       v-if="chip.icon"
@@ -190,79 +192,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </template>
-
-            <!-- Error callout -->
-            <div
-              v-if="isFailed"
-              class="bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30 rounded-lg overflow-hidden"
-              data-test="synthetics-run-detail-error-callout"
-            >
-              <div class="flex items-start gap-2 p-3">
-                <OIcon
-                  name="error"
-                  class="text-[var(--o2-status-error-text)] shrink-0"
-                  size="md"
-                />
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2 flex-wrap h-6">
-                    <span
-                      class="text-[13.5px] font-bold text-[var(--o2-status-error-text)]"
-                    >
-                      {{ errorType }}
-                    </span>
-                    <OBadge v-if="failedStepInfo" variant="error" size="sm" clickable>
-                      Step {{ failedStepInfo.step.id }}: {{ failedStepInfo.step.action }} failed
-                    </OBadge>
-                  </div>
-                  <OButton
-                    v-if="errorStack"
-                    variant="ghost-destructive""
-                    size="xs"
-                    class="mt-2"
-                    data-test="synthetics-run-detail-error-expand-btn"
-                    @click="toggleStack"
-                  >
-                    <template #icon-left>
-                      <OIcon
-                        name="expand-more"
-                        size="xs"
-                        class="transition-transform duration-150"
-                        :class="{ 'rotate-180': stackOpen }"
-                      />
-                    </template>
-                    <span
-                      class="text-[11.5px] font-semibold text-[var(--o2-status-error-text)]"
-                    >
-                      View full error &amp; stack trace
-                    </span>
-                  </OButton>
-                  <pre
-                    v-if="stackOpen && errorStack"
-                    class="mt-2 text-[11px] leading-[1.6] text-text-body bg-[var(--o2-code-bg)] rounded-md p-[10px_12px] overflow-auto whitespace-pre-wrap font-mono"
-                    data-test="synthetics-run-detail-error-stack"
-                    >{{ errorStack }}</pre
-                  >
-                </div>
-              </div>
-            </div>
-            <div
-              v-else-if="steps.length > 0"
-              class="flex items-center gap-2 px-3 py-3 mb-2 rounded bg-[var(--color-badge-success-soft-bg)] border border-badge-success-ol-border/50"
-              role="status"
-              data-test="synthetics-run-detail-steps-passed-banner"
-            >
-              <OIcon
-                name="check-circle"
-                size="md"
-                class="text-[var(--color-timeline-dot-success)]"
-                aria-hidden="true"
-              />
-              <span
-                class="text-sm text-badge-success-ol-text font-semibold"
-              >
-                Run passed
-              </span>
-            </div>
 
             <!-- Steps skeleton -->
             <template v-if="loading">
@@ -285,6 +214,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OCardSection>
               </OCard>
             </template>
+            <!-- Lambda execution error (no steps) -->
+            <div
+              v-else-if="isErrorRun"
+              class="bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30 rounded-lg overflow-hidden"
+              role="alert"
+              data-test="synthetics-run-detail-steps-error-banner"
+            >
+              <div class="flex items-start gap-2 p-3">
+                <OIcon
+                  name="error"
+                  class="text-[var(--o2-status-error-text)] shrink-0"
+                  size="md"
+                />
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-[13.5px] font-bold text-[var(--o2-status-error-text)]">
+                      {{ currentRun.errorType }}
+                    </span>
+                  </div>
+                  <p class="text-sm text-badge-error-ol-text font-semibold mt-0.5 mb-0">
+                    Lambda execution failed
+                  </p>
+                  <OButton
+                    v-if="currentRun.errorStack"
+                    variant="ghost-destructive"
+                    size="xs"
+                    class="mt-1"
+                    data-test="synthetics-run-detail-error-expand-btn"
+                    @click="stackOpen = !stackOpen"
+                  >
+                    <template #icon-left>
+                      <OIcon
+                        name="expand-more"
+                        size="xs"
+                        class="transition-transform duration-150"
+                        :class="{ 'rotate-180': stackOpen }"
+                      />
+                    </template>
+                    <span class="text-[11.5px] font-semibold text-[var(--o2-status-error-text)]">
+                      View full error &amp; stack trace
+                    </span>
+                  </OButton>
+                  <pre
+                    v-if="stackOpen && currentRun.errorStack"
+                    class="mt-2 text-[11px] leading-[1.6] text-text-body bg-[var(--o2-code-bg)] rounded-md p-[10px_12px] overflow-auto whitespace-pre-wrap font-mono"
+                    data-test="synthetics-run-detail-error-stack"
+                  >{{ currentRun.errorStack }}</pre>
+                </div>
+              </div>
+            </div>
+
             <!-- ══ Split: Replay Player (left) + Steps Timeline (right) ══ -->
             <div v-else-if="steps.length > 0" class="flex gap-[0.875rem] items-start">
               <!-- ── Left: Session Replay Player ── -->
@@ -320,275 +300,111 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OCard>
 
               <!-- ── Right: Execution Timeline ── -->
-              <OCard class="p-0 gap-0 flex-1 min-w-0">
-                <OCardSection role="header" class="gap-2">
-                  <span class="font-bold text-sm text-text-heading">Steps</span>
-                  <OBadge variant="default" size="sm">{{
-                    steps.length
-                  }}</OBadge>
+              <div class="flex-1 min-w-0 flex flex-col">
+                <div class="flex items-center gap-2 px-3 py-2">
+                  <h4 class="font-bold text-sm text-text-heading m-0">Steps</h4>
+                  <OBadge variant="default" size="sm">{{ steps.length }}</OBadge>
                   <span class="flex-1" />
-                </OCardSection>
-                <OSeparator />
-                <OCardSection
-                  role="body"
-                  scrollable
-                  class="max-h-[35rem] p-2 overflow-auto"
-                >
-                  <!-- Steps pass/fail banner -->
-                  <div
-                    v-if="isErrorRun"
-                    class="flex items-start gap-2 px-3 py-2 mb-2 rounded bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30"
-                    role="alert"
-                    data-test="synthetics-run-detail-steps-error-banner"
+                </div>
+
+                <div class="flex-1 min-h-0 overflow-auto pb-2">
+                  <!-- JourneySteps in results mode -->
+                  <JourneySteps
+                    :data="stepsWithTotal"
+                    mode="results"
+                    action-key="action"
+                    name-key="name"
+                    detail-key="detail"
+                    icon-key="icon"
+                    :dot-state-fn="stepDotState"
+                    :expanded-ids="expandedStepIdsArr"
+                    @update:expanded-ids="handleUpdateExpanded"
                   >
-                    <OIcon
-                      name="error"
-                      size="sm"
-                      class="mt-0.5 text-badge-error-ol-text"
-                      aria-hidden="true"
-                    />
-                    <div class="flex flex-col gap-0.5 flex-1 min-w-0">
-                      <span
-                        class="text-sm text-badge-error-ol-text font-semibold"
-                      >
-                        Lambda execution failed — check the error details above
-                      </span>
-                    </div>
-                  </div>
-                  <div
-                    v-for="st in steps"
-                    :key="st.id"
-                    class="rounded border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] mb-1"
-                    :data-test="`synthetics-run-detail-step-row-${st.id}`"
-                  >
-                    <!-- Compact row -->
-                    <div
-                      class="flex items-center gap-2 px-2 h-16 min-h-16 rounded"
-                      :class="{
-                        'border-b border-[var(--o2-border-color)]': isExpanded(
-                          st.id,
-                        ),
-                      }"
-                    >
-                      <!-- Step number (colored status circle) -->
-                      <span
-                        :class="[
-                          st.status === 'fail'
-                            ? 'w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-error-soft-bg)] text-[var(--color-badge-error-soft-text)] border border-[var(--color-badge-error-soft-text)] text-xs font-semibold'
-                            : 'w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-success-soft-bg)] text-[var(--color-badge-success-soft-text)] border border-[var(--color-badge-success-soft-text)] text-xs font-semibold',
-                        ]"
-                      >
-                        {{ st.id }}
-                      </span>
-                      <!-- Screenshot thumbnail 60×40 -->
-                      <div
-                        class="w-18 h-12 shrink-0 rounded border border-[var(--o2-border-color)] bg-surface-subtle flex items-center justify-center overflow-hidden"
-                      >
-                        <img
-                          v-if="st.screenshotKey"
-                          :src="screenshotUrl(st.screenshotKey)"
-                          alt="Step screenshot"
-                          class="w-full h-full object-cover"
-                        />
-                        <OIcon
-                          v-else
-                          name="image"
-                          size="xs"
-                          class="text-text-caption"
-                        />
-                      </div>
-
-                      <!-- Action icon -->
-                      <span
-                        class="bg-[var(--o2-primary-50)] rounded p-1 flex items-center shrink-0"
-                      >
-                        <OIcon
-                          :name="st.icon"
-                          size="sm"
-                          class="text-[var(--o2-primary-color)]"
-                        />
-                      </span>
-
-                      <!-- Action label badge -->
-                      <OBadge variant="default" size="sm">{{
-                        st.action
-                      }}</OBadge>
-
-                      <!-- Step name -->
-                      <span
-                        class="text-sm text-[var(--o2-text-body)] flex-1 truncate min-w-0"
-                      >
-                        {{ st.name }}
-                      </span>
-
-                      <OProgressBar
-                        :value="(st.duration / currentRun.duration) || 0"
-                        :variant="st.status === 'fail' ? 'danger' : 'default'"
-                        size="xs"
-                        class="w-20! shrink-0 h-2!"
+                    <!-- Screenshot thumbnail -->
+                    <template #screenshot-thumb="{ row }">
+                      <img
+                        v-if="row.screenshotKey"
+                        :src="screenshotUrl(row.screenshotKey)"
+                        alt="Step screenshot"
+                        class="w-full h-full object-cover"
                       />
-
-                      <!-- Duration -->
-                      <span
-                        class="text-xs text-[var(--o2-text-secondary)] shrink-0 font-mono tabular-nums w-10 ml-2"
-                      >
-                        {{ st.durStr }}
-                      </span>
-
-                      <!-- Expand/collapse -->
-                      <OButton
-                        variant="ghost"
+                      <OIcon
+                        v-else
+                        name="image"
                         size="xs"
-                        class="shrink-0"
-                        :data-test="`synthetics-run-detail-step-expand-${st.id}`"
-                        @click="toggleExpand(st.id)"
-                      >
-                        <OIcon
-                          :name="
-                            isExpanded(st.id) ? 'expand-less' : 'expand-more'
-                          "
-                          size="sm"
-                        />
-                      </OButton>
-                    </div>
+                        class="text-text-caption"
+                      />
+                    </template>
 
-                    <!-- Expanded content (auto-expanded for failed steps) -->
-                    <div v-if="isExpanded(st.id)" class="flex gap-4 p-3">
-                      <!-- Screenshot preview 280px -->
-                      <div class="w-[40%] shrink-0">
-                        <div
-                          class="rounded border border-[var(--o2-border-color)] overflow-hidden"
-                        >
-                          <div
-                            class="aspect-[16/10] flex items-center justify-center overflow-hidden"
-                            :class="
-                              st.status === 'fail'
-                                ? 'bg-[var(--o2-status-error-subtle)]'
-                                : 'bg-surface-subtle'
-                            "
-                          >
-                            <img
-                              v-if="st.screenshotKey"
-                              :src="screenshotUrl(st.screenshotKey)"
-                              alt="Step screenshot"
-                              class="w-full h-full object-contain"
-                            />
-                            <template v-else>
-                              <OIcon
-                                :name="
-                                  st.status === 'fail'
-                                    ? 'broken_image'
-                                    : 'image'
-                                "
-                                :class="
-                                  st.status === 'fail'
-                                    ? 'text-status-error-text'
-                                    : 'text-text-caption'
-                                "
-                                size="lg"
+                    <!-- Expanded content: screenshot + metadata + error -->
+                    <template #expansion="{ row }">
+                      <div class="flex gap-4 p-3">
+                        <div class="w-[40%] shrink-0">
+                          <div class="rounded border border-[var(--o2-border-color)] overflow-hidden">
+                            <div
+                              class="aspect-[16/10] flex items-center justify-center overflow-hidden"
+                              :class="row.status === 'fail' ? 'bg-[var(--o2-status-error-subtle)]' : 'bg-surface-subtle'"
+                            >
+                              <img
+                                v-if="row.screenshotKey"
+                                :src="screenshotUrl(row.screenshotKey)"
+                                alt="Step screenshot"
+                                class="w-full h-full object-contain"
                               />
-                              <span
-                                class="text-xs font-semibold"
-                                :class="
-                                  st.status === 'fail'
-                                    ? 'text-status-error-text'
-                                    : 'text-text-caption'
-                                "
-                              >
-                                {{
-                                  st.status === "fail"
-                                    ? "Failure screenshot"
-                                    : "Screenshot placeholder"
-                                }}
-                              </span>
-                            </template>
+                              <template v-else>
+                                <OIcon :name="row.status === 'fail' ? 'broken_image' : 'image'" :class="row.status === 'fail' ? 'text-status-error-text' : 'text-text-caption'" size="lg" />
+                                <span class="text-xs font-semibold" :class="row.status === 'fail' ? 'text-status-error-text' : 'text-text-caption'">
+                                  {{ row.status === 'fail' ? 'Failure screenshot' : 'Screenshot placeholder' }}
+                                </span>
+                              </template>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <!-- Details (right panel): error + KV metadata + actions -->
-                      <div class="flex-1 flex flex-col gap-2 relative">
-                        <div class="flex absolute right-0 top-0">
-                          <OButton
-                            variant="outline"
-                            size="xs"
-                            icon-left="fullscreen"
-                            data-test="synthetics-run-detail-step-fullscreen-btn"
-                            @click="openFullScreen(st.id)"
-                          />
-                        </div>
-                        <dl
-                          class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs pt-4"
-                        >
-                          <dt
-                            class="text-[10px] font-semibold text-text-secondary uppercase tracking-wide"
-                          >
-                            Action
-                          </dt>
-                          <dd class="text-text-body">{{ st.action }}</dd>
-                          <dt
-                            class="text-[10px] font-semibold text-text-secondary uppercase tracking-wide"
-                          >
-                            Selector
-                          </dt>
-                          <dd class="font-mono text-text-body">
-                            {{ st.detail }}
-                          </dd>
-                          <dt
-                            class="text-[10px] font-semibold text-text-secondary uppercase tracking-wide"
-                          >
-                            URL
-                          </dt>
-                          <dd class="font-mono truncate text-text-body">
-                            {{ st.detail }}
-                          </dd>
-                          <dt
-                            class="text-[10px] font-semibold text-text-secondary uppercase tracking-wide"
-                          >
-                            Duration
-                          </dt>
-                          <dd class="text-text-heading">{{ st.durStr }}</dd>
-                        </dl>
+                        <div class="flex-1 flex flex-col gap-2 relative">
+                          <div class="flex absolute right-0 top-0">
+                            <OButton variant="outline" size="xs" icon-left="fullscreen" data-test="synthetics-run-detail-step-fullscreen-btn" @click="openFullScreen(row.id)" />
+                          </div>
+                          <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs pt-4">
+                            <dt class="text-[10px] font-semibold text-text-secondary uppercase tracking-wide">Action</dt>
+                            <dd class="text-text-body">{{ row.action }}</dd>
+                            <dt class="text-[10px] font-semibold text-text-secondary uppercase tracking-wide">Selector</dt>
+                            <dd class="font-mono text-text-body">{{ row.detail }}</dd>
+                            <dt class="text-[10px] font-semibold text-text-secondary uppercase tracking-wide">URL</dt>
+                            <dd class="font-mono truncate text-text-body">{{ row.detail }}</dd>
+                            <dt class="text-[10px] font-semibold text-text-secondary uppercase tracking-wide">Duration</dt>
+                            <dd class="text-text-heading">{{ row.durStr }}</dd>
+                          </dl>
 
-                        <!-- Error section (failed steps only) -->
-                        <div
-                          v-if="st.status === 'fail' && st.error"
-                          class="rounded-lg border border-badge-error-ol-border/30 overflow-hidden"
-                          :data-test="`synthetics-run-detail-step-error-card-${st.id}`"
-                        >
                           <div
-                            class="flex items-center gap-2 px-3 py-2 bg-[var(--color-badge-error-soft-bg)]"
+                            v-if="row.status === 'fail' && row.error"
+                            class="rounded-lg border border-badge-error-ol-border/30 overflow-hidden"
+                            :data-test="`synthetics-run-detail-step-error-card-${row.id}`"
                           >
-                            <OIcon
-                              name="error"
-                              size="sm"
-                              class="text-[var(--o2-status-error)]"
-                              aria-hidden="true"
-                            />
-                            <span
-                              class="text-xs font-semibold text-[var(--o2-text-heading)] flex-1"
-                              >Error</span
-                            >
-                          </div>
-                          <div class="px-3 py-3">
-                            <pre
-                              class="text-[12.5px] text-[var(--o2-text-body)] m-0 whitespace-pre-wrap font-mono leading-relaxed"
-                              :class="{ 'max-h-[96px] overflow-hidden': !expandedStepErrors.has(st.id) && (st.error?.length ?? 0) > 200 }"
-                            >{{ st.error }}</pre>
-                            <button
-                              v-if="(st.error?.length ?? 0) > 200"
-                              class="text-xs font-semibold text-[var(--o2-text-link)] mt-1.5 hover:underline cursor-pointer"
-                              @click="toggleStepError(st.id)"
-                            >
-                              {{ expandedStepErrors.has(st.id) ? 'Show less' : 'Show full error' }}
-                            </button>
+                            <div class="flex items-center gap-2 px-3 py-2 bg-[var(--color-badge-error-soft-bg)]">
+                              <OIcon name="error" size="sm" class="text-[var(--o2-status-error)]" aria-hidden="true" />
+                              <span class="text-xs font-semibold text-[var(--o2-text-heading)] flex-1">Error</span>
+                            </div>
+                            <div class="px-3 py-3">
+                              <pre
+                                class="text-[12.5px] text-[var(--o2-text-body)] m-0 whitespace-pre-wrap font-mono leading-relaxed"
+                                :class="{ 'max-h-[96px] overflow-hidden': !expandedStepErrors.has(row.id) && (row.error?.length ?? 0) > 200 }"
+                              >{{ row.error }}</pre>
+                              <button
+                                v-if="(row.error?.length ?? 0) > 200"
+                                class="text-xs font-semibold text-[var(--o2-text-link)] mt-1.5 hover:underline cursor-pointer"
+                                @click="toggleStepError(row.id)"
+                              >
+                                {{ expandedStepErrors.has(row.id) ? 'Show less' : 'Show full error' }}
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                </OCardSection>
-              </OCard>
+                    </template>
+                  </JourneySteps>
+                </div>
+              </div>
             </div>
           </div>
         </OTabPanel>
@@ -793,6 +609,8 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import VideoPlayer from "@/components/rum/VideoPlayer.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import JourneySteps from "@/components/synthetics/journey/JourneySteps.vue";
+import type { StepDotState } from "@/components/synthetics/journey/JourneySteps.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
 import type {
   SyntheticRunDetail,
@@ -1089,15 +907,21 @@ const stackOpen = ref(true);
 
 /** Multi-expand: set of expanded step IDs. */
 const expandedStepIds = ref(new Set<number>());
-function isExpanded(id: number): boolean {
-  return expandedStepIds.value.has(id);
+const expandedStepIdsArr = computed(() => Array.from(expandedStepIds.value));
+
+function handleUpdateExpanded(ids: string[]) {
+  expandedStepIds.value = new Set(ids.map(Number));
 }
-function toggleExpand(id: number) {
-  const next = new Set(expandedStepIds.value);
-  if (next.has(id)) next.delete(id);
-  else next.add(id);
-  expandedStepIds.value = next;
+
+function stepDotState(row: any): StepDotState | undefined {
+  return row.status === 'fail' ? 'fail' : 'pass';
 }
+
+/** Steps enriched with total duration for progress bar calculation. */
+const stepsWithTotal = computed(() => {
+  const total = currentRun.value.duration || 1;
+  return steps.value.map((s) => ({ ...s, _totalDuration: total }));
+});
 
 // ── Full-screen step content ────────────────────────────────────────────────
 const fullScreenStepId = ref<number | null>(null);
@@ -1204,10 +1028,34 @@ const statusLabel = computed(() =>
   isErrorRun.value ? "Error" : isFailed.value ? "Failed" : "Passed",
 );
 
-const errorType = computed(() => currentRun.value.errorType ?? "");
-const errorStack = computed(() => currentRun.value.errorStack ?? "");
+const statusChip = computed(() => {
+  if (isErrorRun.value) {
+    return {
+      label: "Status",
+      value: "Error",
+      icon: "error",
+      colorClass: "text-[var(--o2-status-error-text)]",
+    };
+  }
+  if (currentRun.value.status === "fail") {
+    const stepNum = failedStepInfo.value?.step?.id;
+    return {
+      label: "Status",
+      value: stepNum ? `Failed at Step ${stepNum}` : "Failed",
+      icon: "cancel",
+      colorClass: "text-[var(--o2-status-error-text)]",
+    };
+  }
+  return {
+    label: "Status",
+    value: "Passed",
+    icon: "check_circle",
+    colorClass: "text-[var(--o2-status-success-text)]",
+  };
+});
 
 const infoChips = computed(() => [
+  statusChip.value,
   { label: "Duration", value: fmtDur(currentRun.value.duration), icon: "" },
   {
     label: "Browser",
@@ -1268,8 +1116,4 @@ watch(
   },
   { immediate: true },
 );
-
-function toggleStack() {
-  stackOpen.value = !stackOpen.value;
-}
 </script>

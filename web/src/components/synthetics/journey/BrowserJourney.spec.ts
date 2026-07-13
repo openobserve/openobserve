@@ -12,9 +12,13 @@ const OInputStub = {
   props: ['modelValue'],
   template: '<input v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
 }
-const BrowserJourneyStepStub = {
-  props: ['step', 'index', 'expanded'],
-  template: '<div class="bjs-stub">{{ step.name }}</div>',
+const JourneyStepsStub = {
+  props: ['data', 'mode', 'selectedIds', 'expandedIds'],
+  template: '<div class="journey-steps-stub" :data-test-multi="$attrs[\'data-test\']"><div v-for="item in data" :key="item.id" class="step-row">{{ item.name }}</div></div>',
+}
+
+const ConfirmDialogStub = {
+  template: '<div class="confirm-dialog-stub" />',
 }
 
 const STUBS = {
@@ -22,7 +26,8 @@ const STUBS = {
   OIcon: OIconStub,
   OBadge: OBadgeStub,
   OInput: OInputStub,
-  BrowserJourneyStep: BrowserJourneyStepStub,
+  JourneySteps: JourneyStepsStub,
+  ConfirmDialog: ConfirmDialogStub,
 }
 
 interface FakePort {
@@ -103,8 +108,8 @@ describe('BrowserJourney recording', () => {
     port.emit({ type: 'synthetics-recorder', recordingId: 'rec_1', payload: { method: 'setActions', browserSteps: [{ id: 's1', action: 'click', name: 'Click login', selector: '#login' }] } })
     await flushPromises()
 
-    expect(wrapper.findAll('.bjs-stub')).toHaveLength(1)
-    expect(wrapper.find('.bjs-stub').text()).toBe('Click login')
+    expect(wrapper.findAll('.step-row')).toHaveLength(1)
+    expect(wrapper.find('.step-row').text()).toBe('Click login')
   })
 
   it('should merge recorded steps into the journey on stop', async () => {

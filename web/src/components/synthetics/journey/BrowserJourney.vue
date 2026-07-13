@@ -2,16 +2,17 @@
 // Copyright 2026 OpenObserve Inc.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { BrowserStep, ReplayPhase, StepReplayResult } from '@/types/synthetics'
-import type { StepDotState } from './BrowserJourneyStep.vue'
+import type { StepDotState } from './JourneySteps.vue'
 import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
 import { getUUIDv7 } from '@/utils/zincutils'
-import { VueDraggableNext } from 'vue-draggable-next'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OInput from '@/lib/forms/Input/OInput.vue'
+import OSelect from '@/lib/forms/Select/OSelect.vue'
 import OBadge from '@/lib/core/Badge/OBadge.vue'
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue'
-import BrowserJourneyStep from './BrowserJourneyStep.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import JourneySteps from './JourneySteps.vue'
 
 const props = defineProps<{
   modelValue: BrowserStep[]
@@ -39,20 +40,32 @@ const emit = defineEmits<{
   'selection-changed': [{ count: number; isRecording: boolean }]
 }>()
 
-// ── Filter / expand state ──────────────────────────────────────────────────
+// ── Filter / expand / select state ──────────────────────────────────────────
 const filterQuery = ref('')
-const expandedSteps = ref<Set<string>>(new Set())
+const expandedStepIds = ref<string[]>([])
+const selectedStepIds = ref<string[]>([])
+
+// Delete confirmation
+const deleteConfirm = ref<{ show: boolean; step: BrowserStep | null }>({
+  show: false,
+  step: null,
+})
+
+const deleteConfirmMessage = computed(() => {
+  const step = deleteConfirm.value.step
+  if (!step) return ''
+  const label = step.name || `#${props.modelValue.indexOf(step) + 1}`
+  return `Are you sure you want to delete step "${label}"?`
+})
 
 // ── Drag-and-drop ──────────────────────────────────────────────────────────
-const stepsModel = ref<BrowserStep[]>([...props.modelValue])
-const dragActive = ref(false)
-
-// Sync from parent mutations (add, delete, recording stop, etc.)
-// Suppressed during drag to prevent watcher from overwriting the reorder.
-watch(() => props.modelValue, (val) => {
-  if (dragActive.value) return
-  stepsModel.value = [...val]
-})
+const dragReady = computed(() =>
+  !isRecording.value && !isReplayActive.value && !props.readonly && !filterQuery.value.trim()
+)
+// Column stays visible during replay (handles invisible) to prevent layout shift
+const showDragColumn = computed(() =>
+  !isRecording.value && !props.readonly && !filterQuery.value.trim()
+)
 
 // ── Replay helpers ──────────────────────────────────────────────────────────
 const isReplayRunning = computed(() => props.replayPhase === 'running')
@@ -92,69 +105,38 @@ function stepDotState(stepId: string): StepDotState | undefined {
   return 'pending'
 }
 
-const dragDisabled = computed(() =>
-  isRecording.value || isReplayActive.value || props.readonly || !!filterQuery.value.trim()
-)
-
-function onDragStart() {
-  dragActive.value = true
-}
-
-function onDragEnd() {
-  dragActive.value = false
-  console.log(" steps after drag ----", JSON.parse(JSON.stringify(stepsModel.value)));
-  emit('update:modelValue', [...stepsModel.value])
-}
-
-// ── Multi-select ───────────────────────────────────────────────────────────
-const selectedStepIds = ref<Set<string>>(new Set())
-
-const selectedCount = computed(() => selectedStepIds.value.size)
+// ── Selection helpers ──────────────────────────────────────────────────────
+const selectedCount = computed(() => selectedStepIds.value.length)
 
 const allSelected = computed(() =>
-  props.modelValue.length > 0 && props.modelValue.every((s) => selectedStepIds.value.has(s.id))
+  props.modelValue.length > 0 && props.modelValue.every((s) => selectedStepIds.value.includes(s.id))
 )
-
-const isIndeterminate = computed(() => {
-  const count = props.modelValue.filter((s) => selectedStepIds.value.has(s.id)).length
-  return count > 0 && count < props.modelValue.length
-})
-
-const selectAllModel = computed<boolean | 'indeterminate'>(() =>
-  allSelected.value ? true : isIndeterminate.value ? 'indeterminate' : false
-)
-
-function toggleStepSelection(id: string) {
-  const next = new Set(selectedStepIds.value)
-  next.has(id) ? next.delete(id) : next.add(id)
-  selectedStepIds.value = next
-}
 
 function toggleSelectAll() {
-  selectedStepIds.value = allSelected.value || isIndeterminate.value
-    ? new Set()
-    : new Set(props.modelValue.map((s) => s.id))
+  selectedStepIds.value = allSelected.value
+    ? []
+    : props.modelValue.map((s) => s.id)
 }
 
 function deleteSelectedSteps() {
-  const ids = selectedStepIds.value
+  const ids = new Set(selectedStepIds.value)
   emit('update:modelValue', props.modelValue.filter((s) => !ids.has(s.id)))
-  selectedStepIds.value = new Set()
+  selectedStepIds.value = []
 }
 
 // Clear selection when the step list changes, filter changes, or replay starts
-watch(() => props.modelValue.length, () => { selectedStepIds.value = new Set() })
-watch(filterQuery, () => { selectedStepIds.value = new Set() })
-watch(() => props.replayPhase, (phase, prev) => {
+watch(() => props.modelValue.length, () => { selectedStepIds.value = [] })
+watch(filterQuery, () => { selectedStepIds.value = [] })
+watch(() => props.replayPhase, (phase) => {
   if (phase === 'running') {
-    selectedStepIds.value = new Set()
-    expandedSteps.value = new Set() // collapse all on new replay
+    selectedStepIds.value = []
+    expandedStepIds.value = [] // collapse all on new replay
     return
   }
   // Auto-expand the first failing step when replay fails
   if (phase === 'failed' && firstFailedIndex.value >= 0) {
     const stepId = props.modelValue[firstFailedIndex.value]?.id
-    if (stepId) expandedSteps.value = new Set([stepId])
+    if (stepId) expandedStepIds.value = [stepId]
   }
 })
 
@@ -247,11 +229,10 @@ onBeforeUnmount(() => {
 })
 
 // ── Step list (single flat list — one journey, one start URL) ───────────────
-const filteredSteps = computed<{ step: BrowserStep; originalIndex: number }[]>(() => {
-  const indexed = props.modelValue.map((step, originalIndex) => ({ step, originalIndex }))
+const filteredSteps = computed<BrowserStep[]>(() => {
   const q = filterQuery.value.trim().toLowerCase()
-  if (!q) return indexed
-  return indexed.filter(({ step }) =>
+  if (!q) return props.modelValue
+  return props.modelValue.filter((step) =>
     (step.name?.toLowerCase().includes(q)) ||
     step.action.toLowerCase().includes(q) ||
     (step.selector?.toLowerCase().includes(q)) ||
@@ -259,45 +240,120 @@ const filteredSteps = computed<{ step: BrowserStep; originalIndex: number }[]>((
   )
 })
 
+// ── Expand / collapse ─────────────────────────────────────────────────────
 const allExpanded = computed(() =>
-  props.modelValue.length > 0 && props.modelValue.every((s) => expandedSteps.value.has(s.id))
+  props.modelValue.length > 0 && props.modelValue.every((s) => expandedStepIds.value.includes(s.id))
 )
 
 function toggleExpandAll() {
-  expandedSteps.value = allExpanded.value ? new Set() : new Set(props.modelValue.map((s) => s.id))
+  expandedStepIds.value = allExpanded.value ? [] : props.modelValue.map((s) => s.id)
 }
 
-function isStepExpanded(id: string) { return expandedSteps.value.has(id) }
+function isStepExpanded(id: string) { return expandedStepIds.value.includes(id) }
 
-function setStepExpanded(id: string, val: boolean) {
-  const next = new Set(expandedSteps.value)
-  val ? next.add(id) : next.delete(id)
-  expandedSteps.value = next
+function handleToggleExpand(row: BrowserStep) {
+  if (expandedStepIds.value.includes(row.id)) {
+    expandedStepIds.value = expandedStepIds.value.filter((id) => id !== row.id)
+  } else {
+    expandedStepIds.value = [...expandedStepIds.value, row.id]
+  }
 }
 
-function updateStep(index: number, updated: BrowserStep) {
-  const next = [...props.modelValue]; 
-  next[index] = updated; 
-  emit('update:modelValue', next)
+// ── Step CRUD — find by id and mutate ──────────────────────────────────────
+function findIndex(row: BrowserStep): number {
+  return props.modelValue.findIndex((s) => s.id === row.id)
 }
-function deleteStep(index: number) {
-  const next = [...props.modelValue]; next.splice(index, 1); emit('update:modelValue', next)
+
+function handleDelete(row: BrowserStep) {
+  deleteConfirm.value = { show: true, step: row }
 }
-function duplicateStep(index: number) {
+
+function confirmDelete() {
+  if (!deleteConfirm.value.step) return
+  const idx = findIndex(deleteConfirm.value.step)
+  deleteConfirm.value = { show: false, step: null }
+  if (idx < 0) return
+  const next = [...props.modelValue]; next.splice(idx, 1); emit('update:modelValue', next)
+}
+
+function cancelDelete() {
+  deleteConfirm.value = { show: false, step: null }
+}
+function handleDuplicate(row: BrowserStep) {
+  const idx = findIndex(row)
+  if (idx < 0) return
   const next = [...props.modelValue]
-  next.splice(index + 1, 0, { ...next[index], id: getUUIDv7(true) })
+  next.splice(idx + 1, 0, { ...next[idx], id: getUUIDv7(true) })
   emit('update:modelValue', next)
 }
-function insertStepBelow(index: number) {
+function handleInsertBelow(row: BrowserStep) {
+  const idx = findIndex(row)
+  if (idx < 0) return
   const next = [...props.modelValue]
-  next.splice(index + 1, 0, { id: getUUIDv7(true), action: 'click', name: '', timeout: 30000 })
+  next.splice(idx + 1, 0, { id: getUUIDv7(true), action: 'click', name: '', timeout: 30000 })
   emit('update:modelValue', next)
+}
+function handleRowReorder(reordered: BrowserStep[]) {
+  emit('update:modelValue', reordered)
+}
+function handleUpdateSelected(ids: string[]) {
+  selectedStepIds.value = ids
+}
+function handleUpdateExpanded(ids: string[]) {
+  expandedStepIds.value = ids
 }
 function addStep() {
   emit('update:modelValue', [...props.modelValue, { id: getUUIDv7(true), action: 'click', name: '', timeout: 30000 }])
 }
 function duplicateCapturedStep(index: number, step: BrowserStep) {
   capturedSteps.value.splice(index + 1, 0, { ...step, id: getUUIDv7(true) })
+}
+
+// ── Dot state wrapper for JourneySteps ────────────────────────────────────
+function dotStateForRow(row: BrowserStep): StepDotState | undefined {
+  return stepDotState(row.id)
+}
+
+// ── Inline editor helpers ──────────────────────────────────────────────────
+const SELECTOR_ACTIONS: BrowserStep['action'][] = ['click', 'type', 'select', 'hover', 'assert']
+const VALUE_ACTIONS: BrowserStep['action'][] = ['navigate', 'type', 'select', 'press', 'scroll', 'wait', 'assert']
+const selectorActions = SELECTOR_ACTIONS
+const valueActions = VALUE_ACTIONS
+
+const ACTION_LABEL_MAP: Record<string, string> = {
+  navigate: 'NAVIGATE', click: 'CLICK', type: 'TYPE', select: 'SELECT',
+  press: 'PRESS', hover: 'HOVER', scroll: 'SCROLL', wait: 'WAIT',
+  assert: 'ASSERT', screenshot: 'SCREENSHOT',
+}
+
+const VALUE_LABEL_MAP: Record<string, string> = {
+  navigate: 'URL', type: 'Text to type', select: 'Option', press: 'Key',
+  scroll: 'To (px or selector)', wait: 'Duration (ms)', assert: 'Expected',
+}
+
+const actionOptions = (Object.keys(ACTION_LABEL_MAP) as BrowserStep['action'][]).map((a) => ({
+  label: ACTION_LABEL_MAP[a],
+  value: a,
+}))
+
+const selectorTypeOptions = [
+  { label: 'CSS', value: 'CSS' },
+  { label: 'XPath', value: 'XPath' },
+  { label: 'Text', value: 'Text' },
+  { label: 'TestID', value: 'TestID' },
+  { label: 'Role', value: 'Role' },
+]
+
+function valueActionLabel(action: string): string {
+  return VALUE_LABEL_MAP[action] || 'Value'
+}
+
+function handleStepUpdate(row: BrowserStep, patch: Partial<BrowserStep>) {
+  const idx = findIndex(row)
+  if (idx < 0) return
+  const next = [...props.modelValue]
+  next[idx] = { ...next[idx], ...patch }
+  emit('update:modelValue', next)
 }
 
 function openChromeExtensions() {
@@ -308,17 +364,18 @@ function openChromeExtensions() {
 </script>
 
 <template>
-  <div class="flex flex-col min-h-0 w-full p-2">
+  <div class="flex flex-col min-h-0 w-full">
 
-    <!-- Toolbar — no-layout-shift design: fluid search + fixed w-80 action area -->
-    <div class="flex items-center gap-4 mb-3 pl-3">
+    <!-- Toolbar — pl-4 mirrors the expand column (w-4) so the select-all checkbox
+         aligns with the row checkboxes in the OTable below. -->
+    <div class="flex items-center gap-4 mb-3 ml-5.5 px-3">
       <!-- Select-all — visibility:hidden during replay to preserve layout -->
       <OCheckbox
-        :model-value="selectAllModel"
-        size="xs"
+        :model-value="allSelected || undefined"
+        size="sm"
         :class="{ 'invisible': isRecording || readonly }"
         data-test="synthetics-journey-select-all"
-        @update:model-value="toggleSelectAll"
+        @update:model-value="toggleSelectAll()"
       />
       <div class="flex">
         <h3 class="text-base font-semibold text-[var(--o2-text-heading)] mr-0">Steps</h3>
@@ -468,7 +525,7 @@ function openChromeExtensions() {
     <!-- Replay running banner -->
     <div
       v-if="replayPhase === 'running'"
-      class="flex items-center gap-2 px-3 py-2 mb-3 rounded bg-[var(--color-badge-primary-soft-bg)] border border-[var(--o2-border-color)]"
+      class="flex items-center gap-2 mx-2 px-3 py-2 mb-3 rounded bg-[var(--color-badge-primary-soft-bg)] border border-[var(--o2-border-color)]"
       role="status"
       data-test="synthetics-journey-replay-banner"
     >
@@ -487,7 +544,7 @@ function openChromeExtensions() {
     <!-- Replay passed banner -->
     <div
       v-else-if="replayPhase === 'passed'"
-      class="flex items-center gap-2 px-3 py-2 mb-3 rounded bg-[var(--color-badge-success-soft-bg)] border border-badge-success-ol-border/50"
+      class="flex items-center gap-2 mx-2 px-3 py-2 mb-3 rounded bg-[var(--color-badge-success-soft-bg)] border border-badge-success-ol-border/50"
       role="status"
       data-test="synthetics-journey-passed-banner"
     >
@@ -562,20 +619,18 @@ function openChromeExtensions() {
         <span class="text-xs text-[var(--o2-text-muted)]">{{ capturedSteps.length }} steps</span>
       </div>
 
-      <div v-if="capturedSteps.length > 0" class="flex flex-col gap-1">
-        <BrowserJourneyStep
-          v-for="(step, index) in capturedSteps"
-          :key="step.id"
-          :step="step"
-          :index="index"
-          :expanded="false"
-          @update:step="capturedSteps[index] = $event"
-          @update:expanded="() => {}"
-          @delete="capturedSteps.splice(index, 1)"
-          @duplicate="duplicateCapturedStep(index, step)"
-          @insert-below="() => {}"
-        />
-      </div>
+      <JourneySteps
+        v-if="capturedSteps.length > 0"
+        :data="capturedSteps"
+        mode="editor"
+        action-key="action"
+        name-key="name"
+        detail-key="selector"
+        :locked="true"
+        :selection-enabled="false"
+        @delete="(row: BrowserStep) => capturedSteps.splice(capturedSteps.findIndex(s => s.id === row.id), 1)"
+        @duplicate="(row: BrowserStep) => { const idx = capturedSteps.findIndex(s => s.id === row.id); duplicateCapturedStep(idx, row) }"
+      />
 
       <!-- Waiting for first step -->
       <div v-else class="flex flex-col items-center justify-center gap-3 py-16 text-center">
@@ -598,77 +653,108 @@ function openChromeExtensions() {
       </div>
     </div>
 
-    <!-- Step list — draggable when not recording, replaying, readonly, or filtered -->
-    <VueDraggableNext
-      v-else-if="!dragDisabled"
-      v-model="stepsModel"
-      @start="onDragStart"
-      @end="onDragEnd"
-      handle="[data-test='synthetics-journey-step-drag-handle']"
-      :animation="200"
-      ghost-class="synthetics-drag-ghost"
-      drag-class="synthetics-drag-dragging"
-      item-key="id"
+    <!-- JourneySteps — draggable/selectable/expandable as mode permits -->
+    <JourneySteps
+      v-else
+      :data="filterQuery ? filteredSteps : modelValue"
+      mode="editor"
+      action-key="action"
+      name-key="name"
+      detail-key="selector"
+      :dot-state-fn="dotStateForRow"
+      :locked="isReplayLocked"
+      :readonly="readonly"
+      :enable-reorder="showDragColumn"
+      :disable-row-reorder="() => !dragReady"
+      :filter-active="!!filterQuery.trim()"
+      :selection-enabled="multiSelectEnabled"
+      :selected-ids="selectedStepIds"
+      :expanded-ids="expandedStepIds"
+      @update:data="handleRowReorder"
+      @update:selected-ids="handleUpdateSelected"
+      @update:expanded-ids="handleUpdateExpanded"
+      @expand="handleToggleExpand"
+      @delete="handleDelete"
+      @duplicate="handleDuplicate"
+      @insert-below="handleInsertBelow"
+      @retry-replay="emit('replay')"
     >
-      <BrowserJourneyStep
-        v-for="(step, index) in stepsModel"
-        :key="step.id"
-        :step="step"
-        :index="index"
-        :expanded="isStepExpanded(step.id)"
-        :selected="selectedStepIds.has(step.id)"
-        :selection-enabled="multiSelectEnabled"
-        :replay-dot-state="stepDotState(step.id)"
-        :replay-locked="isReplayLocked"
-        :replay-result="props.stepResults?.get(step.id)"
-        @update:step="updateStep(index, $event)"
-        @update:expanded="setStepExpanded(step.id, $event)"
-        @delete="deleteStep(index)"
-        @duplicate="duplicateStep(index)"
-        @insert-below="insertStepBelow(index)"
-        @toggle-select="toggleStepSelection(step.id)"
-        @retry-replay="emit('replay')"
-      />
-    </VueDraggableNext>
+      <!-- Inline editor (expanded content) -->
+      <template #expansion="{ row }">
+        <div class="pt-3 pb-3 px-8 flex flex-col gap-3">
+          <!-- Action select -->
+          <OSelect
+            :model-value="row.action"
+            label="Action"
+            :options="actionOptions"
+            data-test="synthetics-journey-step-action-select"
+            @update:model-value="(v: any) => handleStepUpdate(row, { action: v as any })"
+          />
+          <!-- Step name -->
+          <OInput
+            :model-value="row.name ?? ''"
+            label="Step name (optional)"
+            placeholder="Enter a descriptive name"
+            data-test="synthetics-journey-step-name-input"
+            @update:model-value="(v: any) => handleStepUpdate(row, { name: v })"
+          />
+          <!-- Selector type + selector (when applicable) -->
+          <template v-if="selectorActions.includes(row.action)">
+            <div class="flex gap-2">
+              <OSelect
+                :model-value="row.selectorType ?? 'CSS'"
+                label="Selector type"
+                :options="selectorTypeOptions"
+                class="w-32! shrink-0"
+                data-test="synthetics-journey-step-selector-type-select"
+                @update:model-value="(v: any) => handleStepUpdate(row, { selectorType: v })"
+              />
+              <OInput
+                :model-value="row.selector ?? ''"
+                label="Selector"
+                placeholder="#my-button or .class-name"
+                class="flex-1"
+                data-test="synthetics-journey-step-selector-input"
+                @update:model-value="(v: any) => handleStepUpdate(row, { selector: v })"
+              />
+            </div>
+          </template>
+          <!-- Value (action-specific label) -->
+          <OInput
+            v-if="valueActions.includes(row.action)"
+            :model-value="row.value ?? ''"
+            :label="valueActionLabel(row.action)"
+            :placeholder="valueActionLabel(row.action)"
+            data-test="synthetics-journey-step-value-input"
+            @update:model-value="(v: any) => handleStepUpdate(row, { value: v })"
+          />
+          <!-- Timeout -->
+          <OInput
+            :model-value="String(row.timeout ?? '')"
+            label="Timeout (ms)"
+            placeholder="30000"
+            type="number"
+            data-test="synthetics-journey-step-timeout-input"
+            @update:model-value="(v: any) => handleStepUpdate(row, { timeout: v ? Number(v) : undefined })"
+          />
+        </div>
+      </template>
+    </JourneySteps>
 
-    <!-- Plain list when drag is disabled (filter active, etc.) -->
-    <div v-else class="flex flex-col gap-1">
-      <BrowserJourneyStep
-        v-for="{ step, originalIndex } in filteredSteps"
-        :key="step.id"
-        :step="step"
-        :index="originalIndex"
-        :expanded="isStepExpanded(step.id)"
-        :selected="selectedStepIds.has(step.id)"
-        :selection-enabled="multiSelectEnabled"
-        :replay-dot-state="stepDotState(step.id)"
-        :replay-locked="isReplayLocked"
-        :replay-result="props.stepResults?.get(step.id)"
-        @update:step="updateStep(originalIndex, $event)"
-        @update:expanded="setStepExpanded(step.id, $event)"
-        @delete="deleteStep(originalIndex)"
-        @duplicate="duplicateStep(originalIndex)"
-        @insert-below="insertStepBelow(originalIndex)"
-        @toggle-select="toggleStepSelection(step.id)"
-        @retry-replay="emit('replay')"
-      />
-    </div>
-
+    <!-- Delete confirmation dialog -->
+    <ConfirmDialog
+      v-model:model-value="deleteConfirm.show"
+      :title="'Delete Step'"
+      :message="deleteConfirmMessage"
+      ok-label="Delete"
+      ok-color="danger"
+      @update:ok="confirmDelete"
+      @update:cancel="cancelDelete"
+    />
   </div>
 </template>
 
 <style>
-.synthetics-drag-ghost {
-  opacity: 0.3;
-  background: var(--o2-primary-50);
-  border: 1px dashed var(--o2-primary-color);
-  border-radius: 0.375rem;
-}
-.synthetics-drag-dragging {
-  opacity: 0.5;
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-}
-
 @keyframes recording-pulse-expand {
   0% {
     transform: scale(1);

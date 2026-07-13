@@ -571,7 +571,7 @@ function onClearResults() {
       <OStepper
         v-model="currentStep"
         :navigable="true"
-        class="flex-1 overflow-y-auto min-h-0 px-2 my-2 h-full"
+        class="flex-1 overflow-y-auto min-h-0 my-2 h-full"
       >
         <OStep
           :name="1"

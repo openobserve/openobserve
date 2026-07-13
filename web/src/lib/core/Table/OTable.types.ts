@@ -299,6 +299,14 @@ export interface OTableProps<TData = any> {
   /** Which column ids to apply highlighting to (default: all) */
   highlightFields?: string[];
 
+  // ── Row Reorder ──
+  /** Enable drag-and-drop row reordering. Renders a drag handle (grip icon)
+   *  as the first column. Uses vue-draggable-next under the hood. */
+  enableRowReorder?: boolean;
+  /** Per-row predicate: return false to disable dragging for that row.
+   *  Defaults to all rows draggable when `enableRowReorder` is true. */
+  disableRowReorder?: (row: TData) => boolean;
+
   // ── Row Styling ──
   /** Static class or dynamic function for row <tr> */
   rowClass?: string | ((row: TData) => string);
@@ -378,6 +386,9 @@ export interface OTableEmits<TData = any> {
     sizes: Record<string, number>,
     idMap: Record<string, string>,
   ];
+
+  // Row reorder
+  "row-reorder": [data: TData[]];
 
   // Virtual scroll
   "scroll-end": [scrollInfo: any];
