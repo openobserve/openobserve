@@ -59,7 +59,9 @@ lto = "thin"
 
 [profile.release-profiling]
 inherits = "release"
-debug = true
+# CPU profiling needs function symbols and source line tables, not full local-variable DWARF.
+# Keeping packed split debug info preserves the macOS .dSYM workflow while reducing its size.
+debug = 1
 strip = false
 codegen-units = 4
 split-debuginfo = "packed"
