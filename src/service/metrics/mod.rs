@@ -35,40 +35,55 @@ const EXCLUDE_LABELS: [&str; 8] = [
     "_all",
 ];
 
-/// The value policy for every metric record we write.
+/// The value policy for every metric we ingest, on every path.
 ///
-/// Mirrors the remote-write path (see `prom.rs`): infinities clamp to the f64
-/// bounds, NaN means "no observation" and the record is dropped. A NaN written
-/// through serde_json becomes `Value::Null`, an all-null column is never inferred
-/// into the schema, and the resulting stream cannot be read by PromQL at all --
-/// while still costing full ingest and storage.
-pub fn metric_value(v: f64) -> Option<config::utils::json::Value> {
+/// NaN means "no observation": the sample is not recorded. An absent series is how Prometheus
+/// itself represents no data, and a NaN written through serde_json becomes `Value::Null` --
+/// an all-null column is never inferred into the Arrow schema, so the stream it lands in can
+/// never be read by PromQL while still costing full ingest, storage and replication.
+/// Infinities clamp to the f64 bounds.
+///
+/// Both ingestion paths go through here: remote-write (`prom.rs`) and OTLP (`otlp.rs`).
+pub fn sanitize_metric_value(v: f64) -> Option<f64> {
     if v.is_nan() {
         return None;
     }
-    let v = if v == f64::INFINITY || v > f64::MAX {
-        f64::MAX
+    // the `>`/`<` arms are unreachable for a finite f64 and are kept only so the two clamp
+    // sites stay textually identical. Simplify them in both, or in neither.
+    if v == f64::INFINITY || v > f64::MAX {
+        Some(f64::MAX)
     } else if v == f64::NEG_INFINITY || v < f64::MIN {
-        f64::MIN
+        Some(f64::MIN)
     } else {
-        v
-    };
-    Some(config::utils::json::json!(v))
+        Some(v)
+    }
+}
+
+/// [`sanitize_metric_value`], as the JSON a record carries. `None` means the record must not
+/// be written at all.
+pub fn metric_value(v: f64) -> Option<config::utils::json::Value> {
+    sanitize_metric_value(v).map(|v| config::utils::json::json!(v))
 }
 
 pub fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
     let metadata = schema.metadata.get(METADATA_LABEL)?;
-    let mut metadata: Metadata = config::utils::json::from_str(metadata).ok()?;
+    let mut metadata: Metadata = match config::utils::json::from_str(metadata) {
+        Ok(metadata) => metadata,
+        Err(e) => {
+            // this used to panic the process on a single corrupt schema entry
+            log::warn!("failed to parse {METADATA_LABEL} from schema: {e}, input: {metadata}");
+            return None;
+        }
+    };
 
-    // Historical schemas carry a JSON-quoted family name: the OTLP writer used to build it
-    // with `Value::to_string()`, which yields the serialised JSON (`"name"`, quotes included)
-    // rather than the string content. The stored bytes are not rewritten -- we decline to
-    // serve the quotes. Until those schemas age out, this is what makes the family join work.
-    metadata.metric_family_name = metadata
-        .metric_family_name
-        .trim()
-        .trim_matches('"')
-        .to_string();
+    // Historical schemas carry a JSON-quoted family name: the OTLP writer used to build it with
+    // `Value::to_string()`, which yields the serialised JSON (`"name"`, quotes included) rather
+    // than the string content. Reversing that is exactly a JSON-string parse -- a clean name is
+    // not valid JSON, so it is left alone. The stored bytes are not rewritten; we simply decline
+    // to serve the quotes, which is what makes the family join work on data already written.
+    let family_name = metadata.metric_family_name.trim();
+    metadata.metric_family_name = config::utils::json::from_str::<String>(family_name)
+        .unwrap_or_else(|_| family_name.to_string());
 
     Some(metadata)
 }

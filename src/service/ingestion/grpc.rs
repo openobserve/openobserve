@@ -87,16 +87,16 @@ pub fn get_severity_value(severity_number: i32) -> String {
     .into()
 }
 
-/// Returns `None` when the data point carries no usable value -- either no value at all,
-/// or a NaN. The caller must drop the record in that case: a record written with a null
-/// value never gets a `value` column inferred into the schema, which makes the whole
-/// stream unreadable by PromQL. See [`crate::service::metrics::metric_value`].
-pub fn get_metric_val(attr_val: &Option<number_data_point::Value>) -> Option<json::Value> {
-    let val = match attr_val.as_ref()? {
-        number_data_point::Value::AsDouble(val) => *val,
-        number_data_point::Value::AsInt(val) => *val as f64,
-    };
-    crate::service::metrics::metric_value(val)
+/// Extracts the data point's value. Returns `None` when it carries none -- an absent value
+/// is not an observation, so the caller has no record to write.
+///
+/// The value is returned raw: whether a NaN or an infinity may be *recorded* is the metrics
+/// value policy, and lives with it (`crate::service::metrics::metric_value`).
+pub fn get_metric_val(attr_val: &Option<number_data_point::Value>) -> Option<f64> {
+    match attr_val.as_ref()? {
+        number_data_point::Value::AsDouble(val) => Some(*val),
+        number_data_point::Value::AsInt(val) => Some(*val as f64),
+    }
 }
 
 pub fn get_exemplar_val(attr_val: &Option<exemplar::Value>) -> json::Value {
@@ -329,37 +329,22 @@ mod tests {
     fn test_get_metric_val() {
         // Test AsDouble variant
         let double_val = number_data_point::Value::AsDouble(42.5);
-        let resp = get_metric_val(&Some(double_val)).unwrap();
-        assert_eq!(resp.as_f64().unwrap(), 42.5);
+        assert_eq!(get_metric_val(&Some(double_val)).unwrap(), 42.5);
 
         // Test AsInt variant
         let int_val = number_data_point::Value::AsInt(42);
-        let resp = get_metric_val(&Some(int_val)).unwrap();
-        assert_eq!(resp.as_f64().unwrap(), 42.0);
+        assert_eq!(get_metric_val(&Some(int_val)).unwrap(), 42.0);
 
         // Test None case
         assert!(get_metric_val(&None).is_none());
     }
 
+    /// The value is returned raw -- deciding what a NaN *means* is the metrics value policy,
+    /// not this extractor's job.
     #[test]
-    fn test_get_metric_val_nan_has_no_value() {
+    fn test_get_metric_val_returns_nan_unjudged() {
         let nan = number_data_point::Value::AsDouble(f64::NAN);
-        assert!(get_metric_val(&Some(nan)).is_none());
-    }
-
-    #[test]
-    fn test_get_metric_val_clamps_infinities() {
-        let pos_inf = number_data_point::Value::AsDouble(f64::INFINITY);
-        assert_eq!(
-            get_metric_val(&Some(pos_inf)).unwrap().as_f64().unwrap(),
-            f64::MAX
-        );
-
-        let neg_inf = number_data_point::Value::AsDouble(f64::NEG_INFINITY);
-        assert_eq!(
-            get_metric_val(&Some(neg_inf)).unwrap().as_f64().unwrap(),
-            f64::MIN
-        );
+        assert!(get_metric_val(&Some(nan)).unwrap().is_nan());
     }
 
     #[test]

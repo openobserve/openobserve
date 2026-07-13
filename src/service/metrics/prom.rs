@@ -301,18 +301,11 @@ pub async fn remote_write(
         let sample_start = std::time::Instant::now();
         for sample in event.samples {
             sample_count += 1;
-            let mut sample_val = sample.value;
-            // revisit in future
-            if sample_val.is_infinite() {
-                if sample_val == f64::INFINITY || sample_val > f64::MAX {
-                    sample_val = f64::MAX;
-                } else if sample_val == f64::NEG_INFINITY || sample_val < f64::MIN {
-                    sample_val = f64::MIN;
-                }
-            } else if sample_val.is_nan() {
-                // skip the entry from adding to store
+            // NaN -> no observation -> no record; infinities clamp. Shared with the OTLP
+            // writer so the two ingestion paths cannot drift apart on this.
+            let Some(sample_val) = super::sanitize_metric_value(sample.value) else {
                 continue;
-            }
+            };
             let metric = Metric {
                 labels: &labels,
                 value: sample_val,
@@ -1011,11 +1004,26 @@ pub(crate) async fn get_label_values(
                     if metadata.metric_type == MetricType::Histogram
                         || metadata.metric_type == MetricType::Summary
                     {
-                        stats::get_stream_stats(
+                        // the base stream of a histogram/summary holds only metadata, so the
+                        // family's liveness has to come from a member stream. `_count` is the
+                        // one that is always there: it is a u64 on every data point, whereas
+                        // `_sum` is optional in OTLP and is not recorded at all when the source
+                        // reports it as NaN. Fall back to `_sum` for anything that predates a
+                        // `_count` stream.
+                        let count = stats::get_stream_stats(
                             org_id,
-                            &format!("{}_sum", schema.stream_name),
+                            &format!("{}_count", schema.stream_name),
                             stream_type,
-                        )
+                        );
+                        if count.doc_num > 0 {
+                            count
+                        } else {
+                            stats::get_stream_stats(
+                                org_id,
+                                &format!("{}_sum", schema.stream_name),
+                                stream_type,
+                            )
+                        }
                     } else {
                         stats::get_stream_stats(org_id, &schema.stream_name, stream_type)
                     }
@@ -1228,11 +1236,8 @@ mod tests {
         )
     }
 
-    /// `/api/v1/metadata` must read the blob through the shared reader, not parse it a second
-    /// time -- that is where a historically JSON-quoted family name gets normalised, and a
-    /// private parse here would drift from what `/streams` serves.
     #[test]
-    fn test_get_metadata_object_delegates_to_shared_reader() {
+    fn test_get_metadata_object_serves_type_help_unit() {
         let schema = schema_with_metadata(
             r#"{"metric_type":"Histogram","metric_family_name":"\"foo\"","help":"h","unit":"s"}"#,
         );
@@ -1241,19 +1246,13 @@ mod tests {
         assert_eq!(served["type"], "histogram");
         assert_eq!(served["help"], "h");
         assert_eq!(served["unit"], "s");
-
-        // and the shared reader -- the one both this endpoint and `/streams` now go through --
-        // serves the family name without the stored quotes
-        assert_eq!(
-            super::super::get_prom_metadata_from_schema(&schema)
-                .unwrap()
-                .metric_family_name,
-            "foo"
-        );
     }
 
-    /// A single corrupt schema entry used to take the process down here: this reader had its
-    /// own `panic!("BUG: failed to parse ...")`.
+    /// This endpoint used to parse the blob itself, with its own
+    /// `panic!("BUG: failed to parse ...")` -- one corrupt schema entry took the process down.
+    /// It now delegates to the shared reader, which returns `None` instead. That delegation is
+    /// also what keeps `/api/v1/metadata` and `/streams` from drifting apart on a family name
+    /// that is JSON-quoted in storage: only the shared reader normalises it.
     #[test]
     fn test_get_metadata_object_malformed_blob_is_none_not_panic() {
         assert!(get_metadata_object(&schema_with_metadata("not json")).is_none());

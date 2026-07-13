@@ -255,9 +255,7 @@ pub async fn handle_otlp_request(
 
                 let records = match &metric.data {
                     Some(data) => match data {
-                        Data::Gauge(gauge) => {
-                            process_gauge(&mut rec, gauge, metadata, &mut prom_meta)
-                        }
+                        Data::Gauge(gauge) => process_gauge(&rec, gauge, metadata, &mut prom_meta),
                         Data::Sum(sum) => process_sum(&mut rec, sum, metadata, &mut prom_meta),
                         Data::Histogram(hist) => {
                             process_histogram(&mut rec, hist, metadata, &mut prom_meta)
@@ -284,6 +282,14 @@ pub async fn handle_otlp_request(
                         vec![]
                     }
                 };
+
+                // a metric that yields no records -- every data point NaN, no data points at
+                // all, or an undecodable type -- gets no stream: no schema, no metadata entry,
+                // and nothing buffered for a pipeline that is configured on this stream (the
+                // pipeline loop below treats a missing input buffer as a bug and logs it).
+                if records.is_empty() {
+                    continue;
+                }
 
                 // update schema metadata
                 if !schema_exists.has_metrics_metadata {
@@ -846,7 +852,7 @@ fn process_data_point(rec: &mut json::Value, data_point: &NumberDataPoint) -> bo
     for attr in &data_point.attributes {
         rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
     }
-    let Some(value) = get_metric_val(&data_point.value) else {
+    let Some(value) = get_metric_val(&data_point.value).and_then(super::metric_value) else {
         return false;
     };
     rec[VALUE_LABEL] = value;
@@ -1268,7 +1274,7 @@ mod tests {
     #[test]
     fn test_process_gauge() {
         let metric = create_test_gauge_metric("test_gauge", 42.5);
-        let mut rec = json!({
+        let rec = json!({
             "__name__": "test_gauge",
             "__type__": "gauge"
         });
@@ -1281,7 +1287,7 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Gauge(gauge)) = &metric.data {
-            let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
+            let result = process_gauge(&rec, gauge, metadata, &mut prom_meta);
 
             // Verify the processed data
             assert!(!result.is_empty());
@@ -1526,8 +1532,8 @@ mod tests {
         assert!(!metric_names.contains(&"test_histogram_sum"));
         assert!(!metric_names.contains(&"test_histogram_min"));
         assert!(!metric_names.contains(&"test_histogram_max"));
-        // `.get(..).is_some()` would pass on a null value -- `Value::Null` is still
-        // `Some(&Value::Null)` -- which is exactly the bug that has to stay dead
+        // `!is_null()`, not `.get(..).is_some()`: a null value is still `Some(&Value::Null)`.
+        // The writers are held to this across NaN inputs in `test_no_writer_emits_a_null_value`.
         assert!(result.iter().all(|r| !r[VALUE_LABEL].is_null()));
     }
 
@@ -1714,7 +1720,7 @@ mod tests {
     #[test]
     fn test_metric_with_attributes() {
         let metric = create_test_gauge_metric("test_metric_with_attrs", 42.0);
-        let mut rec = json!({
+        let rec = json!({
             "__name__": "test_metric_with_attrs",
             "__type__": "gauge"
         });
@@ -1727,7 +1733,7 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Gauge(gauge)) = &metric.data {
-            let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
+            let result = process_gauge(&rec, gauge, metadata, &mut prom_meta);
 
             // Verify the processed data has required fields
             assert!(!result.is_empty());
@@ -1846,7 +1852,7 @@ mod tests {
         #[test]
         fn test_gauge_with_zero_value() {
             let metric = create_test_gauge_metric("zero_gauge", 0.0);
-            let mut rec = json!({"__name__": "zero_gauge", "__type__": "gauge"});
+            let rec = json!({"__name__": "zero_gauge", "__type__": "gauge"});
             let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
@@ -1856,7 +1862,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Gauge(gauge)) = &metric.data {
-                let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
+                let result = process_gauge(&rec, gauge, metadata, &mut prom_meta);
                 assert!(!result.is_empty());
                 assert_eq!(result[0]["value"], 0.0);
             }
@@ -1865,7 +1871,7 @@ mod tests {
         #[test]
         fn test_gauge_with_negative_value() {
             let metric = create_test_gauge_metric("negative_gauge", -42.5);
-            let mut rec = json!({"__name__": "negative_gauge", "__type__": "gauge"});
+            let rec = json!({"__name__": "negative_gauge", "__type__": "gauge"});
             let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
@@ -1875,7 +1881,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Gauge(gauge)) = &metric.data {
-                let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
+                let result = process_gauge(&rec, gauge, metadata, &mut prom_meta);
                 assert!(!result.is_empty());
                 assert_eq!(result[0]["value"], -42.5);
             }
@@ -1884,7 +1890,7 @@ mod tests {
         #[test]
         fn test_gauge_with_infinity() {
             let metric = create_test_gauge_metric("infinity_gauge", f64::INFINITY);
-            let mut rec = json!({"__name__": "infinity_gauge", "__type__": "gauge"});
+            let rec = json!({"__name__": "infinity_gauge", "__type__": "gauge"});
             let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
@@ -1894,7 +1900,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Gauge(gauge)) = &metric.data {
-                let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
+                let result = process_gauge(&rec, gauge, metadata, &mut prom_meta);
                 assert_eq!(result.len(), 1);
                 // an infinity is clamped to the f64 bound, matching the remote-write path.
                 // it is never written as JSON null: a null value suppresses the `value`
