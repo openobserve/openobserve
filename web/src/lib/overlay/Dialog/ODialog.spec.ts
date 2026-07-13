@@ -300,4 +300,55 @@ describe("ODialog", () => {
       expect(wrapper.emitted("update:open")).toBeFalsy();
     });
   });
+
+  // A bare printable key pressed on a non-field element inside the modal
+  // (footer button, panel itself) must not bubble to the window-level shortcut
+  // manager, where it would fire page shortcuts (e.g. logs "s" opening Saved
+  // Views on top of an open dialog). Keys typed in inputs, modifier combos,
+  // and non-printable keys (Escape) must keep propagating.
+  describe("modal keystroke containment", () => {
+    function dispatchKeydown(el: Element, init: KeyboardEventInit): boolean {
+      const spy = vi.fn();
+      document.addEventListener("keydown", spy);
+      el.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init }),
+      );
+      document.removeEventListener("keydown", spy);
+      return spy.mock.calls.length > 0;
+    }
+
+    it("should stop a printable key pressed on a footer button from reaching document", () => {
+      const wrapper = mount(ODialog, {
+        attachTo: document.body,
+        props: { open: true, title: "Test", primaryButtonLabel: "OK" },
+      });
+      const btn = wrapper.find('[data-test="o-dialog-primary-btn"]');
+      expect(btn.exists()).toBe(true);
+      expect(dispatchKeydown(btn.element, { key: "s" })).toBe(false);
+      wrapper.unmount();
+    });
+
+    it("should let a printable key typed inside an input propagate", () => {
+      const wrapper = mount(ODialog, {
+        attachTo: document.body,
+        props: { open: true, title: "Test" },
+        slots: { default: '<input data-testid="field" />' },
+      });
+      const input = wrapper.find('[data-testid="field"]');
+      expect(input.exists()).toBe(true);
+      expect(dispatchKeydown(input.element, { key: "s" })).toBe(true);
+      wrapper.unmount();
+    });
+
+    it("should let modifier combos and non-printable keys propagate", () => {
+      const wrapper = mount(ODialog, {
+        attachTo: document.body,
+        props: { open: true, title: "Test", primaryButtonLabel: "OK" },
+      });
+      const btn = wrapper.find('[data-test="o-dialog-primary-btn"]');
+      expect(dispatchKeydown(btn.element, { key: "s", ctrlKey: true })).toBe(true);
+      expect(dispatchKeydown(btn.element, { key: "Escape" })).toBe(true);
+      wrapper.unmount();
+    });
+  });
 });
