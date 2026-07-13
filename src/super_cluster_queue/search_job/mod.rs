@@ -32,7 +32,13 @@ use infra::{
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
-use crate::service::db::{sourcemaps::SOURCEMAP_PREFIX, workflows::WORKFLOWS_PREFIX};
+use crate::service::{
+    db::{
+        sourcemaps::SOURCEMAP_PREFIX,
+        workflows::{WORKFLOW_TRIGGER_PREFIX, WORKFLOWS_PREFIX},
+    },
+    workflows::WorkflowTrigger,
+};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
@@ -193,6 +199,25 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     );
                 }
             }
+        }
+
+        MessageType::WorkflowTriggerPut => {
+            let trigger: WorkflowTrigger = json::from_slice(&msg.value.unwrap())?;
+            log::info!(
+                "received workflow trigger notification for type: {:?} workflow_id: {} trace_id: {}",
+                trigger.trigger_type,
+                trigger.workflow_id,
+                trigger.trace_id
+            );
+            let cluster_coordinator = get_coordinator().await;
+            cluster_coordinator
+                .put(
+                    WORKFLOW_TRIGGER_PREFIX,
+                    serde_json::to_vec(&trigger)?.into(),
+                    true,
+                    None,
+                )
+                .await?;
         }
 
         _ => {

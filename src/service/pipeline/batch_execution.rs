@@ -33,7 +33,7 @@ use config::{
             components::{NodeData, WorkflowDestination},
         },
         self_reporting::error::{ErrorData, ErrorSource, NodeErrors, PipelineError},
-        stream::{RemoteStreamParams, StreamParams, StreamType},
+        stream::{StreamParams, StreamType},
     },
     metrics,
     stats::MemorySize,
@@ -2328,7 +2328,7 @@ async fn process_stream_node(
 
 async fn process_destination_node(
     metadata: ProcessMetadata,
-    channels: ProcessChannels,
+    mut channels: ProcessChannels,
     node: &ExecutableNode,
     destination: &WorkflowDestination,
 ) -> Result<usize, anyhow::Error> {
@@ -2337,6 +2337,15 @@ async fn process_destination_node(
         &destination.destination_id,
     )
     .await?;
+
+    let cfg = config::get_config();
+
+    let mut data = Vec::new();
+    while let Some(pipeline_item) = channels.receiver.recv().await {
+        data.push(std::sync::Arc::new(pipeline_item.record));
+    }
+
+    let data_count = data.len();
 
     match dest.module {
         Module::Alert { .. } => {
@@ -2362,14 +2371,50 @@ async fn process_destination_node(
             }
             return Ok(0);
         }
-        Module::Pipeline { .. } => {
-            let params = RemoteStreamParams {
-                org_id: metadata.org_id.clone().into(),
-                destination_name: destination.destination_id.clone().into(),
-            };
-            return process_remote_stream_node(&params, metadata, node, channels).await;
+        Module::Pipeline { endpoint } => {
+            let op_fmt = endpoint.output_format.unwrap_or_default();
+            let send_data = op_fmt.get_body_from_data(&data, &endpoint.metadata);
+            let content_type = op_fmt.get_content_type();
+            let headers = endpoint.headers.unwrap_or_default();
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(
+                    cfg.pipeline.remote_request_timeout,
+                ))
+                .danger_accept_invalid_certs(endpoint.skip_tls_verify)
+                .build()
+                .unwrap();
+
+            let mut client = client
+                .post(endpoint.url)
+                .header("Content-type", content_type);
+            for (name, val) in headers {
+                client = client.header(name, val);
+            }
+            if let Err(e) = client.body(send_data).send().await {
+                let data_copy: Vec<_> = data.into_iter().map(|v| v.as_ref().clone()).collect();
+                let data = Value::Array(data_copy);
+                if let Err(send_err) = channels
+                    .error_sender
+                    .send((
+                        node.id.to_string(),
+                        node.node_type(),
+                        e.to_string(),
+                        None,
+                        Some(data),
+                    ))
+                    .await
+                {
+                    log::error!(
+                        "[Pipeline] {} [inv={}]: LeafNode failed sending errors for collection caused by: {send_err}",
+                        metadata.inv_id,
+                        metadata.pipeline_name
+                    );
+                }
+                return Ok(0);
+            }
         }
     }
+    Ok(data_count)
 }
 
 #[cfg(feature = "enterprise")]

@@ -12,11 +12,15 @@ use crate::{
         meta::authz::Authz,
         utils::auth::{remove_ownership, set_ownership},
     },
-    service::{db, workflows::get_inputs_file_path},
+    service::{
+        db,
+        workflows::{WorkflowTrigger, get_inputs_file_path, handle_workflow_trigger},
+    },
 };
 
 const CHECK_INTERVAL_MIN: u64 = 30;
 pub const WORKFLOWS_PREFIX: &str = "/workflows/";
+pub const WORKFLOW_TRIGGER_PREFIX: &str = "/workflow_trigger/";
 
 pub async fn save_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
     infra::table::workflows::save_workflow(workflow.clone()).await?;
@@ -212,6 +216,49 @@ pub async fn clean() {
     }
 }
 
+pub async fn send_workflow_trigger(trigger: WorkflowTrigger) -> Result<(), anyhow::Error> {
+    // trigger watch event by putting value to cluster coordinator
+    let cluster_coordinator = get_coordinator().await;
+    cluster_coordinator
+        .put(
+            WORKFLOW_TRIGGER_PREFIX,
+            serde_json::to_vec(&trigger)?.into(),
+            true,
+            None,
+        )
+        .await?;
+
+    #[cfg(feature = "enterprise")]
+    {
+        let config = o2_enterprise::enterprise::common::config::get_config();
+        if config.super_cluster.enabled {
+            match o2_enterprise::enterprise::super_cluster::queue::send_workflow_trigger(
+                serde_json::to_string(&trigger)?,
+            )
+            .await
+            {
+                Ok(_) => {
+                    log::info!(
+                        "successfully sent workflow trigger notification to super cluster queue for type: {:?} workflow_id: {} trace_id: {}",
+                        trigger.trigger_type,
+                        trigger.workflow_id,
+                        trigger.trace_id
+                    );
+                }
+                Err(e) => {
+                    log::error!(
+                        "error in sending workflow trigger notification to super cluster queue for type: {:?} workflow_id: {} trace_id: {} : {e}",
+                        trigger.trigger_type,
+                        trigger.workflow_id,
+                        trigger.trace_id
+                    );
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 pub async fn watch() -> Result<(), anyhow::Error> {
     let prefix = WORKFLOWS_PREFIX;
     let cluster_coordinator = db::get_coordinator().await;
@@ -253,6 +300,39 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 // TODO: YJDoc2 check if caching should be handled
             }
             Event::Empty => {}
+        }
+    }
+}
+
+pub async fn watch_workflow_triggers() -> Result<(), anyhow::Error> {
+    let prefix = WORKFLOW_TRIGGER_PREFIX;
+    let cluster_coordinator = db::get_coordinator().await;
+    let mut events = cluster_coordinator.watch(prefix).await?;
+    let events = Arc::get_mut(&mut events).unwrap();
+    log::info!("Start watching workflow triggers");
+
+    loop {
+        let ev = match events.recv().await {
+            Some(ev) => ev,
+            None => {
+                log::error!("watch_workflow_triggers: event channel closed");
+                return Ok(());
+            }
+        };
+
+        match ev {
+            Event::Put(ev) => {
+                let Some(item_v) = ev.value else {
+                    log::error!("watch_workflow_triggers : missing value for put");
+                    continue;
+                };
+                let Ok(entry) = serde_json::from_slice::<WorkflowTrigger>(&item_v) else {
+                    log::error!("watch_workflow_triggers : invalid json value for put");
+                    continue;
+                };
+                handle_workflow_trigger(entry).await;
+            }
+            e => {}
         }
     }
 }

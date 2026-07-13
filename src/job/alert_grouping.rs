@@ -35,17 +35,19 @@ pub async fn process_expired_batches() {
         #[cfg(feature = "enterprise")]
         {
             let batches = crate::service::alerts::grouping::get_expired_batches();
+            let trace_id = config::ider::generate_trace_id();
+            let trace_id = format!("expired_batched_{trace_id}");
 
             if !batches.is_empty() {
                 log::debug!(
-                    "[alert_grouping_worker] Processing {} expired batches",
+                    "[alert_grouping_worker] Processing {} expired batches with trace_id {trace_id}",
                     batches.len()
                 );
 
                 for batch in batches {
-                    if let Err(e) = send_grouped_notification(batch).await {
+                    if let Err(e) = send_grouped_notification(&trace_id, batch).await {
                         log::error!(
-                            "[alert_grouping_worker] Error sending grouped notification: {}",
+                            "[alert_grouping_worker] Error sending grouped notification: {} trace_id : {trace_id}",
                             e
                         );
                     }
@@ -58,14 +60,16 @@ pub async fn process_expired_batches() {
 /// Send a grouped notification for a batch of alerts (public wrapper for sync call)
 #[cfg(feature = "enterprise")]
 pub async fn send_grouped_notification_sync(
+    trace_id: &str,
     batch: crate::service::alerts::grouping::PendingBatch,
 ) -> Result<(), anyhow::Error> {
-    send_grouped_notification(batch).await
+    send_grouped_notification(trace_id, batch).await
 }
 
 /// Send a grouped notification for a batch of alerts
 #[cfg(feature = "enterprise")]
 async fn send_grouped_notification(
+    trace_id: &str,
     batch: crate::service::alerts::grouping::PendingBatch,
 ) -> Result<(), anyhow::Error> {
     use config::meta::alerts::deduplication::SendStrategy;
@@ -196,6 +200,7 @@ async fn send_grouped_notification(
     // Send notification using alert's send_notification method
     match notification_alert
         .send_notification(
+            trace_id,
             &combined_rows,
             rows_end_time,
             start_time,
