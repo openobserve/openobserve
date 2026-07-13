@@ -265,7 +265,7 @@ export class AlertsPage {
             // Import/Export locators
             alertImportButton: '[data-test="alert-import"]',
             alertExportButton: '[data-test="alert-list-export-alerts-btn"]',
-            alertListHeaderCheckbox: '[data-test="o2-table-select-all"] button[role="checkbox"]',
+            alertListHeaderCheckbox: '[data-test="o2-table-th-select"] button[role="checkbox"]',
             alertImportJsonBtn: '[data-test="alert-import-json-btn"]',
             alertImportJsonFileInput: '[data-test="alert-import-json-file-input"]',
             alertImportJsonFileInputField: '[data-test="alert-import-json-file-input-field"]',
@@ -281,7 +281,7 @@ export class AlertsPage {
             tableBodyRowWithIndex: 'tbody tr[data-index]',
             tableLocator: 'table',
             tableCheckbox: '[data-test="o2-table-select-cell"] button[role="checkbox"]',
-            headerCheckbox: '[data-test="o2-table-select-all"] button[role="checkbox"]',
+            headerCheckbox: '[data-test="o2-table-th-select"] button[role="checkbox"]',
 
             // Alert settings inline locators
             silenceNotificationInput: '.silence-notification-input input',
