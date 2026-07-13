@@ -147,6 +147,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => ({
 import useMetricsExplorerGrid, {
   INITIAL_PAGE_SIZE,
   PAGE_SIZE_INCREMENT,
+  SWEEP_DEBOUNCE_MS,
 } from "./useMetricsExplorerGrid";
 import StreamService from "@/services/stream";
 import metricsService from "@/services/metrics";
@@ -984,6 +985,8 @@ describe("useMetricsExplorerGrid", () => {
       // covers what the user can see.
       const grid = await setup();
       grid.hideEmptyPanels.value = false;
+
+      await new Promise((r) => setTimeout(r, SWEEP_DEBOUNCE_MS + 50));
       inFlight.length = 0;
 
       grid.sweepSlice();
