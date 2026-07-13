@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ── Route mode header ── -->
     <AppPageHeader
       v-if="!drawerMode"
-      class="px-4"
+      class="px-2!"
       :back="{
         label: t('synthetics.results.monitors'),
         to: { name: 'synthetic-monitor-results', params: { id: monitorId } },
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ════════ SUB TABS ════════ -->
     <OTabs
       v-model="activeTab"
-      class="shrink-0 px-5 border-b border-border-default"
+      class="shrink-0 px-2 border-b border-border-default"
     >
       <OTab name="summary" data-test="synthetics-run-detail-tab-summary">
         <span class="flex items-center gap-1.5">
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ════════════ SUMMARY ════════════ -->
         <OTabPanel name="summary" data-test="synthetics-run-detail-summary-tab">
           <div
-            class="mx-auto px-5 py-[0.875rem] pb-[1.75rem] flex flex-col gap-[0.875rem]"
+            class="mx-auto px-2 py-[0.875rem] pb-[1.75rem] flex flex-col gap-[0.875rem]"
           >
             <!-- Info chips skeleton -->
             <template v-if="loading">

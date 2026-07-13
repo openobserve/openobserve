@@ -1,7 +1,12 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { BrowserCheck, SyntheticsDevice } from '@/types/synthetics'
+import chromiumSvgUrl from '@/assets/images/synthetics/chromium.svg'
+import firefoxSvgUrl from '@/assets/images/synthetics/firefox.svg'
+import OIcon from '@/lib/core/Icon/OIcon.vue'
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue'
 
 const props = defineProps<{
   check: BrowserCheck
@@ -9,6 +14,17 @@ const props = defineProps<{
   devices?: SyntheticsDevice[]
 }>()
 const emit = defineEmits<{ 'update:check': [value: BrowserCheck] }>()
+
+const { t } = useI18n()
+
+function deviceLabelKey(label: string): string {
+  const map: Record<string, string> = {
+    Desktop: 'synthetics.browserDevices.desktop',
+    Tablet: 'synthetics.browserDevices.tablet',
+    Mobile: 'synthetics.browserDevices.mobile',
+  }
+  return map[label] ?? label
+}
 
 const DEFAULT_BROWSERS = ['chromium', 'firefox']
 const DEFAULT_DEVICES: SyntheticsDevice[] = [
@@ -18,9 +34,14 @@ const DEFAULT_DEVICES: SyntheticsDevice[] = [
 ]
 
 const DEVICE_ICONS: Record<string, string> = {
-  laptop_large: 'laptop',
-  tablet:       'tablet_mac',
+  laptop_large: 'computer',
+  tablet:       'tablet',
   mobile_small: 'smartphone',
+}
+
+const BROWSER_ICONS: Record<string, string> = {
+  chromium: chromiumSvgUrl,
+  firefox: firefoxSvgUrl,
 }
 
 const activeBrowsers = computed(() =>
@@ -58,105 +79,50 @@ function toggle(browserId: string, deviceId: string) {
 </script>
 
 <template>
-  <div class="rounded-lg border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] p-6 mb-4">
-    <h3 class="text-base font-semibold text-[var(--o2-text-heading)] mb-1">
-      Browsers &amp; Devices
+  <div
+    class="rounded-lg border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] p-6 mb-4"
+    data-test="synthetics-check-browser-devices"
+  >
+    <h3 class="text-base font-semibold text-[var(--o2-text-heading)] pb-4">
+      {{ t('synthetics.browserDevices.title') }}
     </h3>
-    <p class="text-xs text-[var(--o2-text-muted)] mb-5">
-      Each selected combination runs as a separate execution per check. At least one must be selected.
-    </p>
 
-    <!-- Grid: rows = browsers, cols = devices -->
-    <div class="overflow-x-auto">
-      <table class="device-grid w-full">
-        <thead>
-          <tr>
-            <th class="w-28" />
-            <th
-              v-for="device in activeDevices"
-              :key="device.id"
-              class="text-xs font-semibold text-[var(--o2-text-muted)] uppercase tracking-wide text-center pb-2"
-            >
-              <div class="flex flex-col items-center gap-1">
-                <span class="material-symbols-outlined text-base text-[var(--o2-text-muted)] normal-case not-italic">{{ DEVICE_ICONS[device.id] ?? 'devices' }}</span>
-                {{ device.label }}
-              </div>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="browser in activeBrowsers" :key="browser.id">
-            <td class="py-2 pr-4 text-sm font-medium text-[var(--o2-text-primary)] capitalize">
-              {{ browser.label }}
-            </td>
-            <td
-              v-for="device in activeDevices"
-              :key="device.id"
-              class="text-center py-2"
-            >
-              <button
-                class="device-cell"
-                :class="isChecked(browser.id, device.id) ? 'device-cell--on' : 'device-cell--off'"
-                :title="`${browser.label} · ${device.label}`"
-                :aria-pressed="isChecked(browser.id, device.id)"
-                @click="toggle(browser.id, device.id)"
-              >
-                <span
-                  v-if="isChecked(browser.id, device.id)"
-                  class="material-symbols-outlined text-sm"
-                >check</span>
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <div class="flex flex-col gap-3">
+      <!-- Device column headers -->
+      <div class="flex items-center gap-10 pl-36 pb-2">
+        <div
+          v-for="device in activeDevices"
+          :key="device.id"
+          class="flex items-center gap-1 text-xs font-semibold capitalize w-20"
+        >
+          <OIcon :name="DEVICE_ICONS[device.id] ?? 'devices'" size="sm" />
+          {{ t(deviceLabelKey(device.label)) }}
+        </div>
+      </div>
 
-    <!-- Selected combos summary -->
-    <div class="flex flex-wrap gap-2 mt-4">
-      <span
-        v-for="combo in selected"
-        :key="`${combo.browser}-${combo.device}`"
-        class="inline-flex items-center gap-1.5 text-xs font-medium bg-[var(--o2-surface-secondary)] border border-[var(--o2-border-color)] rounded-full px-2.5 py-1 text-[var(--o2-text-secondary)] capitalize"
+      <!-- Browser rows -->
+      <div
+        v-for="browser in activeBrowsers"
+        :key="browser.id"
+        class="flex items-center gap-10"
       >
-        {{ combo.browser }} · {{ combo.device.replace('_', ' ') }}
-      </span>
+        <div class="flex items-center gap-2 w-32 shrink-0">
+          <img :src="BROWSER_ICONS[browser.id]" class="size-5" alt="" />
+          <span class="text-sm font-medium text-[var(--o2-text-primary)] capitalize">{{ browser.label }}</span>
+        </div>
+        <div
+          v-for="device in activeDevices"
+          :key="device.id"
+          class="w-20"
+        >
+          <OCheckbox
+            :model-value="isChecked(browser.id, device.id)"
+            size="md"
+            :data-test="`synthetics-check-browser-devices-cell-${browser.id}-${device.id}`"
+            @update:model-value="toggle(browser.id, device.id)"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>
-
-<style scoped lang="scss">
-.device-cell {
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 0.375rem;
-  border: 1.5px solid var(--o2-border-color);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s, border-color 0.15s;
-  cursor: pointer;
-
-  &--on {
-    background: var(--o2-primary-color, #6366f1);
-    border-color: var(--o2-primary-color, #6366f1);
-    color: white;
-  }
-
-  &--off {
-    background: var(--o2-card-bg);
-    color: transparent;
-
-    &:hover {
-      border-color: var(--o2-primary-color, #6366f1);
-      background: color-mix(in srgb, var(--o2-primary-color, #6366f1) 10%, transparent);
-    }
-  }
-}
-
-.device-grid td,
-.device-grid th {
-  padding-left: 0.75rem;
-  padding-right: 0.75rem;
-}
-</style>

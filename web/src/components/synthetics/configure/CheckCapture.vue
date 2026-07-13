@@ -1,17 +1,20 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { BrowserCheck } from '@/types/synthetics'
 import OSelect from '@/lib/forms/Select/OSelect.vue'
 
 const props = defineProps<{ check: BrowserCheck }>()
 const emit = defineEmits<{ 'update:check': [value: BrowserCheck] }>()
 
-const captureOptions = [
-  { label: 'Always', value: 'always' },
-  { label: 'On fail', value: 'on-fail' },
-  { label: 'Off', value: 'off' },
-]
+const { t } = useI18n()
+
+const captureOptions = computed(() => [
+  { label: t('synthetics.capture.options.always'), value: 'always' },
+  { label: t('synthetics.capture.options.onFail'), value: 'on-fail' },
+  { label: t('synthetics.capture.options.off'), value: 'off' },
+])
 
 const screenshot = computed({
   get: () => props.check.capture.screenshot,
@@ -25,19 +28,19 @@ const screenshot = computed({
 
 <template>
   <div class="rounded-lg border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] p-6 mb-4">
-    <h3 class="text-base font-semibold text-[var(--o2-text-heading)] pb-4">Capture</h3>
+    <h3 class="text-base font-semibold text-[var(--o2-text-heading)] pb-4">{{ t('synthetics.capture.title') }}</h3>
     <div class="flex flex-col gap-4">
 
       <div class="flex items-center gap-4">
-        <label class="text-sm text-[var(--o2-text-primary)] w-24 shrink-0">Screenshot</label>
+        <label class="text-sm text-[var(--o2-text-label)] w-24 shrink-0">{{ t('synthetics.capture.screenshot') }}</label>
         <OSelect
           v-model="screenshot"
           :options="captureOptions"
-          class="w-40"
+          class="w-40!"
           data-test="synthetics-check-capture-screenshot"
         />
         <p class="text-xs text-[var(--o2-text-secondary)]">
-          Capture a full-page screenshot at each step.
+          {{ t('synthetics.capture.screenshotDescription') }}
         </p>
       </div>
 

@@ -6262,6 +6262,102 @@
     "dataStale": "Data is stale",
     "lastRefreshed": "Last refreshed: {time}"
   },
+  "synthetics": {
+    "results": {
+      "title": "Monitor Results",
+      "monitors": "Monitors",
+      "editMonitor": "Edit Monitor",
+      "uptime": "Uptime",
+      "p95Duration": "P95 Duration",
+      "failedRuns": "Failed Runs",
+      "lastRun": "Last Run",
+      "responseTime": "Response Time",
+      "responseTimeSubtitle": "Total journey duration",
+      "recentRuns": "Recent Runs",
+      "runs": "Runs",
+      "noRuns": "No runs found for the selected time range.",
+      "status": "Status",
+      "started": "Started",
+      "duration": "Duration",
+      "location": "Location",
+      "device": "Device",
+      "passed": "Passed",
+      "failed": "Failed",
+      "warning": "Warning",
+      "error": "Error"
+    },
+    "scheduleAlert": {
+      "title": "Schedule & Alerting",
+      "frequency": "Frequency",
+      "frequencyOptions": {
+        "1min": "1 min",
+        "5min": "5 min",
+        "15min": "15 min",
+        "30min": "30 min",
+        "1hour": "1 hour",
+        "cron": "Cron",
+        "custom": "Custom"
+      },
+      "scheduleNow": "Schedule now",
+      "scheduleLater": "Schedule later",
+      "scheduleNowTooltip": "Check becomes active immediately using the current date and timezone.",
+      "scheduleLaterTooltip": "Choose a future date and time to activate the check.",
+      "startDate": "Start date",
+      "startTime": "Start time",
+      "timezone": "Timezone",
+      "cronExpression": "Cron expression",
+      "cronPlaceholder": "*/5 * * * *",
+      "retries": "Retries",
+      "retriesOnFailure": "Retries on failure",
+      "retriesOnFailureSuffix": "times.",
+      "retryDelay": "Wait for",
+      "retryDelaySuffix": "ms in between retries.",
+      "alert": "Alert",
+      "alertedIfFails": "Alerted if test fails",
+      "alertedIfFailsSuffix": "times.",
+      "destinations": "Destinations",
+      "noDestinations": "No destinations available",
+      "refreshDestinations": "Refresh destinations",
+      "addNewDestination": "Add New Destination",
+      "destinationRequired": "At least one destination is required",
+      "customIntervalValue": "Repeat every",
+      "customIntervalUnit": {
+        "label": "Frequency",
+        "minutes": "Minutes",
+        "hours": "Hours",
+        "days": "Days",
+        "weeks": "Weeks",
+        "months": "Months"
+      },
+      "cooldownPeriod": "Cooldown Period",
+      "minutes": "minutes",
+      "seconds":"Seconds"
+    },
+    "locations": {
+      "title": "Locations",
+      "subtitle": "Select the locations the journey runs from",
+      "locationAwsEast": "AWS · us-east-1",
+      "comingSoon": "More regions & private locations — Coming soon",
+      "empty": "No locations available"
+    },
+    "browserDevices": {
+      "title": "Browsers & Devices",
+      "description": "Each selected combination runs as a separate execution per check. At least one must be selected.",
+      "desktop": "Desktop",
+      "tablet": "Tablet",
+      "mobile": "Mobile"
+    },
+    "capture": {
+      "title": "Capture",
+      "screenshot": "Screenshot",
+      "screenshotDescription": "Capture a full-page screenshot at each step.",
+      "options": {
+        "always": "Always",
+        "onFail": "On fail",
+        "off": "Off"
+      }
+    }
+  },
   "shortcuts": {
     "title": "Keyboard Shortcuts",
     "mac": "Mac",

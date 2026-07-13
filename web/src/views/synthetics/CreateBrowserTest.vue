@@ -469,8 +469,8 @@ function onClearResults() {
         <div class="rounded-xl border border-[var(--o2-border-color)] divide-y divide-[var(--o2-border-color)] mb-6">
           <!-- Step 1 -->
           <div class="flex items-start gap-4 p-4">
-            <span 
-            class="flex-shrink-0 w-7 h-7 rounded-full bg-[var(--o2-primary-color)] text-[var(--o2-text-inverse)] flex items-center justify-center text-sm font-semibold" 
+            <span
+            class="flex-shrink-0 w-7 h-7 rounded-full bg-[var(--o2-primary-color)] text-[var(--o2-text-inverse)] flex items-center justify-center text-sm font-semibold"
             :class="extensionInstalled ? 'bg-[var(--o2-status-success-text)]!': ''"
             >
               1
@@ -487,7 +487,7 @@ function onClearResults() {
                   rel="noopener noreferrer"
                   class="text-sm text-[var(--o2-text-link)] underline"
                   data-test="synthetics-setup-install-link"
-                >              
+                >
                   <OButton
                     v-if="!extensionInstalled"
                     variant="outline"
@@ -571,7 +571,7 @@ function onClearResults() {
       <OStepper
         v-model="currentStep"
         :navigable="true"
-        class="flex-1 overflow-y-auto min-h-0 p-2 h-full"
+        class="flex-1 overflow-y-auto min-h-0 px-2 my-2 h-full"
       >
         <OStep
           :name="1"
@@ -590,7 +590,7 @@ function onClearResults() {
             :step-results="stepResults"
             :active-step-id="activeStepId"
             :blocked-reason="blockedReason"
-            class="h-full! border-t! border-border-default!"
+            class="h-full!"
             @need-extension-setup="onNeedExtensionSetup"
             @replay="onReplay"
             @stop-replay="onStopReplay"
@@ -613,7 +613,7 @@ function onClearResults() {
             :devices="devices"
             :destinations="destinations"
             :folders="folders"
-            class="border-t! border-border-default! w-full!"
+            class="w-full!"
             @refresh:destinations="fetchDestinations"
             @update:check="onConfigureUpdate"
           />

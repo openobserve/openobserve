@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
       >
         <span
-          class="w-[7px] h-[7px] rounded-full bg-[var(--o2-status-error-text)]"
+          class="w-[7px] h-[7px] rounded-full bg-[var(--color-badge-error-solid-bg)]"
         />
         {{ failCount }} Failed
       </span>
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
       >
         <span
-          class="w-[7px] h-[7px] rounded-full bg-[var(--o2-status-warning-text)]"
+          class="w-[7px] h-[7px] rounded-full bg-[var(--color-badge-orange-solid-bg)]"
         />
         {{ mixedCount }} Warning
       </span>
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
       >
         <span
-          class="w-[7px] h-[7px] rounded-full bg-[var(--o2-status-success-text)]"
+          class="w-[7px] h-[7px] rounded-full bg-[var(--color-badge-success-solid-bg)]"
         />
         {{ passCount }} Passed
       </span>
@@ -75,7 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="seg in segments"
             :key="seg.runId"
             class="shrink-0 h-full min-w-[3px] cursor-pointer transition-all duration-100 hover:scale-y-[1.35]"
-            :style="{ width: 100 / MAX_VISIBLE + '%', background: seg.color }"
+            :style="{ width: 100 / MAX_VISIBLE + '%' }"
+            :class="seg.color"
           >
             <OTooltip side="top" :delay="0" :max-width="'auto'">
               <template #content>
@@ -84,13 +85,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="px-1 font-semibold text-text-heading mb-1.5 text-xs flex items-center gap-1.5 flex-wrap border-b pb-1"
                   >
                     <span
-                      class="w-2 h-2 rounded-full shrink-0 bg-[var(--o2-status-success-text)]"
+                      class="w-2 h-2 rounded-full shrink-0 bg-[var(--color-badge-success-solid-bg)]"
                     />
                     <span class="text-text-secondary"
                       >{{ passCountLocal(seg.executions) }} passed</span
                     >
                     <span
-                      class="w-2 h-2 rounded-full shrink-0 bg-[var(--o2-status-error-text)]"
+                      class="w-2 h-2 rounded-full shrink-0 bg-[var(--color-badge-error-solid-bg)]"
                     />
                     <span class="text-text-secondary"
                       >{{ failCountLocal(seg.executions) }} failed</span
@@ -106,11 +107,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span
                         class="w-2 h-2 rounded-full shrink-0"
                         :class="{
-                          'bg-[var(--o2-status-success-text)]':
+                          'bg-badge-success-solid-bg':
                             group.status === 'all-pass',
-                          'bg-[var(--o2-status-warning-text)]':
+                          'bg-color-badge-orange-solid-bg':
                             group.status === 'mixed',
-                          'bg-[var(--o2-status-error-text)]':
+                          'bg-color-badge-error-solid-bg':
                             group.status === 'all-fail',
                         }"
                       />
@@ -127,8 +128,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="w-2 h-2 rounded-full shrink-0"
                         :class="
                           exec.status === 'pass'
-                            ? 'bg-[var(--o2-status-success-text)]'
-                            : 'bg-[var(--o2-status-error-text)]'
+                            ? 'bg-[var(--color-badge-success-solid-bg)]'
+                            : 'bg-[var(--color-badge-error-solid-bg)]'
                         "
                       />
                       <img

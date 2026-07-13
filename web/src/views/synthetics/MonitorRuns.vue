@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ── Tabs ──────────────────────────────────────────────────────── -->
     <OTabs
       v-model="activeTab"
-      class="shrink-0 px-5 border-b border-border-default"
+      class="shrink-0 px-2 border-b border-border-default"
     >
       <OTab name="overview" data-test="monitor-runs-tab-overview">
         Overview
@@ -53,19 +53,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ════════════ OVERVIEW ════════════ -->
         <OTabPanel name="overview">
           <div
-            class="mx-auto px-5 py-[0.875rem] pb-[1.75rem] flex flex-col gap-[0.875rem]"
+            class="mx-auto py-2 pb-[1.75rem] flex flex-col gap-2"
           >
             <!-- Skeleton (while loading or before first data arrives) -->
             <template v-if="loading || !hasLoadedOnce">
+              <div class="px-2">
               <MonitorRunsSkeleton />
 
               <!-- Charts skeleton -->
-              <div class="grid grid-cols-2 gap-[0.875rem]">
+              <div class="grid grid-cols-2 gap-2">
                 <div
                   class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
                 >
                   <div
-                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
                   >
                     <SkeletonBox width="110px" height="14px" rounded />
                     <span class="flex-1" />
@@ -80,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
                 >
                   <div
-                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
                   >
                     <SkeletonBox width="120px" height="14px" rounded />
                     <span class="flex-1" />
@@ -94,14 +95,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Breakdown skeleton -->
-              <div class="grid grid-cols-3 gap-[0.875rem]">
+              <div class="grid grid-cols-3 gap-2">
                 <div
                   v-for="n in 3"
                   :key="n"
                   class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
                 >
                   <div
-                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
                   >
                     <SkeletonBox
                       width="16px"
@@ -111,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <SkeletonBox width="110px" height="14px" rounded />
                   </div>
                   <div class="border-t border-[var(--o2-border-color)]" />
-                  <div class="px-[0.875rem] py-[0.5rem] flex flex-col">
+                  <div class="px-2 py-[0.5rem] flex flex-col">
                     <div
                       v-for="row in 3"
                       :key="row"
@@ -132,10 +133,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
+              </div>
             </template>
 
             <!-- Real content (once loaded at least once) -->
             <template v-else>
+              <div class="px-2 flex flex-col gap-2">
               <MonitorStatusTimeline
                 :segments="timelineSegments"
                 :fail-count="timelineFailCount"
@@ -149,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="card in kpiCards"
                   :key="card.key"
-                  class="card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+                  class="card-container rounded-lg flex flex-col px-2 pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
                   :data-test="`monitor-runs-kpi-${card.key}`"
                 >
                   <div class="flex flex-col gap-[0.25rem]">
@@ -172,12 +175,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Charts row -->
-              <div class="grid grid-cols-2 gap-[0.875rem]">
+              <div class="grid grid-cols-2 gap-2">
                 <div
                   class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
                 >
                   <div
-                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
                   >
                     <span class="font-bold text-sm text-text-heading">
                       Response Time
@@ -199,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
                 >
                   <div
-                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
                   >
                     <span class="font-bold text-sm text-text-heading">
                       Errors Over Time
@@ -220,12 +223,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Breakdown cards -->
-              <div class="grid grid-cols-3 gap-[0.875rem]">
+              <div class="grid grid-cols-3 gap-2">
                 <div
                   class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
                 >
                   <div
-                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
                   >
                     <OIcon name="language" size="sm" class="text-primary-700" />
                     <span class="font-bold text-sm text-text-heading">
@@ -233,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </div>
                   <div class="border-t border-[var(--o2-border-color)]" />
-                  <div class="px-[0.875rem] py-[0.5rem]">
+                  <div class="px-2 py-[0.5rem]">
                     <div
                       v-for="b in browserBreakdown"
                       :key="b.name"
@@ -270,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
                 >
                   <div
-                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
                   >
                     <OIcon
                       name="location-on"
@@ -282,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </div>
                   <div class="border-t border-[var(--o2-border-color)]" />
-                  <div class="px-[0.875rem] py-[0.5rem]">
+                  <div class="px-2 py-[0.5rem]">
                     <div
                       v-for="l in locationBreakdown"
                       :key="l.name"
@@ -319,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
                 >
                   <div
-                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
                   >
                     <OIcon name="devices" size="sm" class="text-primary-700" />
                     <span class="font-bold text-sm text-text-heading">
@@ -327,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </div>
                   <div class="border-t border-[var(--o2-border-color)]" />
-                  <div class="px-[0.875rem] py-[0.5rem]">
+                  <div class="px-2 py-[0.5rem]">
                     <div
                       v-for="d in deviceBreakdown"
                       :key="d.name"
@@ -361,10 +364,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
+              </div>
             </template>
 
             <!-- Filter bar -->
-            <div class="flex items-center gap-2 flex-wrap">
+            <div class="flex items-center gap-2 flex-wrap px-2">
               <OToggleGroup v-model="statusFilter" variant="default">
                 <OToggleGroupItem
                   v-for="so in statusOptions"
@@ -442,7 +446,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Error filter indicator -->
             <div
               v-if="errorFilter"
-              class="flex items-center gap-2"
+              class="flex items-center gap-2 px-2"
               data-test="monitor-runs-error-filter-badge"
             >
               <span class="text-xs text-text-secondary"
@@ -460,13 +464,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Runs table -->
-            <OCard class="p-0">
+            <OCard class="p-0" :key="tableFilterKey">
               <OTable
                 :columns="runColumns"
                 :data="visibleRuns"
                 :loading="loading"
                 pagination="client"
-                :page-size="20"
+                :page-size="10"
                 :page-size-options="[10, 20, 25, 50]"
                 row-key="id"
                 :show-global-filter="false"
@@ -574,20 +578,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OCard>
 
             <!-- Empty state -->
-            <OEmptyState
-              v-if="visibleRuns.length === 0 && !loading"
-              preset="no-results"
-              size="sm"
-              data-test="monitor-runs-empty"
-              @action="resetFilters"
-            />
+            <div class="px-2">
+              <OEmptyState
+                v-if="visibleRuns.length === 0 && !loading"
+                preset="no-results"
+                size="sm"
+                data-test="monitor-runs-empty"
+                @action="resetFilters"
+              />
+            </div>
           </div>
         </OTabPanel>
 
         <!-- ════════════ STEPS ════════════ -->
         <OTabPanel name="steps">
           <div
-            class="mx-auto px-5 py-[0.875rem] pb-[1.75rem] flex flex-col gap-[0.875rem]"
+            class="mx-auto px-2 py-2 pb-[1.75rem] flex flex-col gap-2"
           >
             <div class="flex items-center gap-2.5">
               <span class="font-bold text-sm text-text-heading">
@@ -782,7 +788,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ════════════ ERRORS ════════════ -->
         <OTabPanel name="errors">
           <div
-            class="mx-auto px-5 py-[0.875rem] pb-[1.75rem] flex flex-col gap-[0.875rem]"
+            class="mx-auto px-2 py-2 pb-[1.75rem] flex flex-col gap-2"
           >
             <div class="flex items-center gap-2.5">
               <span class="font-bold text-sm text-text-heading">
@@ -1160,6 +1166,13 @@ const errorFilter = ref<string | null>(null);
 const stepsGroupBy = ref<"step" | "locator">("step");
 const expandedRows = ref<Record<string, boolean>>({});
 
+// Composite key that changes when any filter changes — ensures the runs
+// table fully re-renders with the filtered data.
+const tableFilterKey = computed(
+  () =>
+    `${statusFilter.value}|${browserFilter.value}|${deviceFilter.value}|${locationFilter.value}|${errorFilter.value ?? ""}`,
+);
+
 // ── Select options (dynamic from run data) ──────────────────────────────
 function uniqueValues(key: "browser" | "device" | "location"): string[] {
   const vals = new Set(allRuns.value.map((r) => r[key]).filter(Boolean));
@@ -1307,6 +1320,19 @@ const kpiCards = computed<KpiCard[]>(() => {
   if (hasKpiData.value) {
     return [
       {
+        key: "last-run",
+        label: "Last Run",
+        value: k.lastRunStatus
+          ? k.lastRunStatus === "failed"
+            ? "Failed"
+            : "Passed"
+          : "—",
+        valueClass:
+          k.lastRunStatus === "failed"
+            ? "text-status-error-text!"
+            : "text-status-success-text!",
+      },
+      {
         key: "pass-rate",
         label: "Pass Rate",
         value: k.totalRuns > 0 ? k.uptimePct.toFixed(1) + "%" : "—",
@@ -1330,19 +1356,6 @@ const kpiCards = computed<KpiCard[]>(() => {
         label: "Failed Runs",
         value: String(k.failedRuns),
         valueClass: k.failedRuns > 0 ? "text-status-error-text!" : undefined,
-      },
-      {
-        key: "last-run",
-        label: "Last Run",
-        value: k.lastRunStatus
-          ? k.lastRunStatus === "failed"
-            ? "Failed"
-            : "Passed"
-          : "—",
-        valueClass:
-          k.lastRunStatus === "failed"
-            ? "text-status-error-text!"
-            : "text-status-success-text!",
       },
     ];
   }
@@ -1428,10 +1441,10 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
 
     const color =
       status === "all-pass"
-        ? "var(--o2-status-success-text)"
+        ? "bg-badge-success-solid-bg/80"
         : status === "all-fail"
-          ? "var(--o2-status-error-text)"
-          : "var(--o2-status-warning-text)";
+          ? "bg-badge-error-solid-bg/80"
+          : "bg-badge-orange-solid-bg/80";
 
     const passCount = executions.filter((e) => e.status === "pass").length;
     const failCount = executions.length - passCount;
@@ -1671,12 +1684,6 @@ const visibleRuns = computed<VisibleRun[]>(() => {
 const runColumns: OTableColumnDef[] = [
   { id: "status", header: "Status", accessorKey: "status", size: 60 },
   {
-    id: "scheduled_at",
-    header: "Scheduled At",
-    accessorKey: "scheduledTs",
-    size: 100,
-  },
-  {
     id: "last_run_at",
     header: "Last Run At",
     accessorKey: "lastRunTs",
@@ -1696,6 +1703,12 @@ const runColumns: OTableColumnDef[] = [
     header: "Trigger",
     accessorKey: "triggerType",
     size: 90,
+  },
+  {
+    id: "scheduled_at",
+    header: "Scheduled At",
+    accessorKey: "scheduledTs",
+    size: 100,
   },
 ];
 
