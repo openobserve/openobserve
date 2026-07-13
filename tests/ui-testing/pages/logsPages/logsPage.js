@@ -4340,7 +4340,15 @@ export class LogsPage {
     }
 
     async clickInterestingFieldButton(field) {
-        const btnLocator = this.page.locator(this.interestingFieldBtn(field)).first();
+        // Prefer the Quick-Mode "interesting" toggle; fall back to the normal-mode
+        // "add" button. Resolve by count rather than .first() on a combined selector —
+        // both can be in the DOM and .first() would pick DOM order (sometimes the wrong one).
+        const interestingSel = `[data-test="log-search-index-list-interesting-${field}-field-btn"]`;
+        const addSel = `[data-test="log-search-index-list-add-${field}-field-btn"]`;
+        const resolveBtn = async () =>
+            (await this.page.locator(interestingSel).count()) > 0
+                ? this.page.locator(interestingSel).first()
+                : this.page.locator(addSel).first();
         // Post-revamp: button is revealed on field-row hover — wait for the row then hover.
         const rowLocator = this.page.locator(`[data-test="logs-field-list-item-${field}"]`).first();
         const inputLocator = this.page.locator(this.logSearchIndexListFieldSearchInput);
@@ -4350,7 +4358,7 @@ export class LogsPage {
                 .then(() => true).catch(() => false);
             if (rowVisible) {
                 await rowLocator.hover().catch(() => {});
-                await btnLocator.click({ force: true });
+                await (await resolveBtn()).click({ force: true });
                 return;
             }
             // Field not in list — re-apply filter to ensure field is present.
@@ -4361,7 +4369,7 @@ export class LogsPage {
             await expect(inputLocator).toHaveValue(field, { timeout: 5000 }).catch(() => {});
         }
         await rowLocator.hover().catch(() => {});
-        await btnLocator.click({ force: true });
+        await (await resolveBtn()).click({ force: true });
     }
 
     /**
@@ -4372,9 +4380,17 @@ export class LogsPage {
      * we skip the click so we don't accidentally remove it.
      */
     async ensureFieldIsInteresting(field) {
-        const btnLocator = this.page.locator(this.interestingFieldBtn(field)).first();
-        // Post-revamp the add/interesting button is revealed on field-row hover,
-        // so wait for the ROW (always visible) then hover to expose the button.
+        // Prefer the Quick-Mode "interesting" toggle (its title reflects state);
+        // fall back to the normal-mode "add" button. Resolve by count so we never
+        // click the wrong DOM-order match when both buttons exist.
+        const interestingSel = `[data-test="log-search-index-list-interesting-${field}-field-btn"]`;
+        const addSel = `[data-test="log-search-index-list-add-${field}-field-btn"]`;
+        const resolveBtn = async () =>
+            (await this.page.locator(interestingSel).count()) > 0
+                ? this.page.locator(interestingSel).first()
+                : this.page.locator(addSel).first();
+        // Post-revamp the button is revealed on field-row hover, so wait for the ROW
+        // (always visible) then hover to expose the button.
         const rowLocator = this.page.locator(`[data-test="logs-field-list-item-${field}"]`).first();
         const inputLocator = this.page.locator(this.logSearchIndexListFieldSearchInput);
 
@@ -4383,12 +4399,13 @@ export class LogsPage {
                 .then(() => true).catch(() => false);
             if (rowVisible) {
                 await rowLocator.hover().catch(() => {});
-                const title = await btnLocator.getAttribute('title').catch(() => '');
+                const btn = await resolveBtn();
+                const title = await btn.getAttribute('title').catch(() => '');
                 if (title && title.toLowerCase().includes('remove')) {
                     // Already interesting — nothing to do.
                     return;
                 }
-                await btnLocator.click({ force: true });
+                await btn.click({ force: true });
                 return;
             }
             await inputLocator.fill('');
@@ -4397,7 +4414,7 @@ export class LogsPage {
             await expect(inputLocator).toHaveValue(field, { timeout: 5000 }).catch(() => {});
         }
         await rowLocator.hover().catch(() => {});
-        await btnLocator.click({ force: true });
+        await (await resolveBtn()).click({ force: true });
     }
 
     async expectInterestingFieldInEditor(field) {
