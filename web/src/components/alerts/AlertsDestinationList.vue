@@ -17,18 +17,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex flex-col h-full p-0">
 
-    <div v-if="!showDestinationEditor && !showImportDestination" class="flex flex-col h-full">
+    <PageLayout
+      v-if="!showDestinationEditor && !showImportDestination"
+      :main-panel="false"
+      :header-class="'shrink-0 px-4 border-b border-border-default'"
+    >
+      <template #header>
       <AppPageHeader
         :title="t('alert_destinations.header')"
+        title-data-test="alert-destinations-list-title"
         icon="location-on"
         subtitle="Where triggered alerts are delivered"
-        class="shrink-0 px-4 border-b border-border-default"
       >
-        <template #title>
-          <span data-test="alert-destinations-list-title">{{
-            t("alert_destinations.header")
-          }}</span>
-        </template>
         <template #actions>
           <OToggleGroup
             :model-value="activeTab"
@@ -63,6 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t(`alert_destinations.add`) }}</OButton>
         </template>
       </AppPageHeader>
+      </template>
       <div class="card-container flex-1 min-h-0">
         <OTable
           data-test="alert-destinations-list-table"
@@ -222,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTable>
       </div>
-    </div>
+    </PageLayout>
     <div v-else-if="showDestinationEditor && !showImportDestination">
       <AddDestination
         :is-alerts="true"
@@ -295,6 +296,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -322,6 +324,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     AppPageHeader,
+    PageLayout,
   },
   setup() {
     const store = useStore();
