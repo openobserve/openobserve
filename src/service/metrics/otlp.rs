@@ -2875,9 +2875,14 @@ mod tests {
                 records[1].get("zone").is_none(),
                 "second data point carried no zone, so the record must not have one"
             );
-            assert_ne!(
-                records[0][HASH_LABEL], records[1][HASH_LABEL],
-                "the series hash must reflect the labels the data point actually carried"
+
+            // and the series identity follows: the hash of the leak-free record is the hash of
+            // the same data point sent on its own. An `assert_ne!` against the first record
+            // would not show this -- `pod` alone already makes those two differ.
+            let alone = gauge_records(vec![number_dp(2.0, vec![attr("pod", "b")])]);
+            assert_eq!(
+                records[1][HASH_LABEL], alone[0][HASH_LABEL],
+                "the series hash must be computed over the labels the data point actually carried"
             );
         }
 
