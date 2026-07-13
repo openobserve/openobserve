@@ -3979,6 +3979,9 @@
     "search": "搜尋動作",
     "timezone": "時區",
     "zipFileRequired": "ZIP 檔案為必填！",
+    "fieldRequired": "欄位為必填項目！",
+    "nameInvalidChars": "不允許使用 :、?、/、# 等字元和空格。",
+    "invalidMethodName": "方法名稱無效。必須以字母或底線開頭。只能使用字母、數字和底線。",
     "zipFile": "ZIP 檔案",
     "frequency": "頻率"
   },

@@ -4742,7 +4742,10 @@
     "timezone": "Timezone",
     "zipFileRequired": "ZIP File is required!",
     "zipFile": "ZIP File",
-    "frequency": "Frequency"
+    "frequency": "Frequency",
+    "fieldRequired": "Field is required!",
+    "nameInvalidChars": "Characters like :, ?, /, #, and spaces are not allowed.",
+    "invalidMethodName": "Invalid method name. Must start with a letter or underscore. Use only letters, numbers, and underscores."
   },
   "aiToolset": {
     "header": "AI Toolsets",

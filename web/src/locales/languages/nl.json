@@ -4724,6 +4724,9 @@
     "search": "Zoekactie",
     "timezone": "Tijdzone",
     "zipFileRequired": "ZIP-bestand is vereist!",
+    "fieldRequired": "Veld is verplicht!",
+    "nameInvalidChars": "Tekens zoals :, ?, /, # en spaties zijn niet toegestaan.",
+    "invalidMethodName": "Ongeldige methodenaam. Moet beginnen met een letter of onderstrepingsteken. Gebruik alleen letters, cijfers en onderstrepingstekens.",
     "zipFile": "ZIP-bestand",
     "frequency": "Frequentie"
   },

@@ -4724,6 +4724,9 @@
     "search": "Suchaktion",
     "timezone": "Zeitzone",
     "zipFileRequired": "ZIP-Datei ist erforderlich!",
+    "fieldRequired": "Feld ist erforderlich!",
+    "nameInvalidChars": "Zeichen wie :, ?, /, # und Leerzeichen sind nicht erlaubt.",
+    "invalidMethodName": "Ungültiger Methodenname. Muss mit einem Buchstaben oder Unterstrich beginnen. Verwenden Sie nur Buchstaben, Zahlen und Unterstriche.",
     "zipFile": "ZIP-Datei",
     "frequency": "Frequenz"
   },
