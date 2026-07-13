@@ -68,7 +68,13 @@ async function globalSetup() {
     testLogger.info(`[alpha1] Login attempt ${attempt}/${maxAttempts} (stagger: ${staggerMs}ms)`);
     await new Promise(r => setTimeout(r, staggerMs));
 
-    const browser = await chromium.launch();
+    // PW_HEADED=true opens the setup browser visibly for local debugging
+    // (CI leaves it unset → headless, unchanged). Headed uses the installed
+    // Chrome channel because the bundled chromium-1155 crashes headed on macOS.
+    const headed = process.env.PW_HEADED === 'true';
+    const browser = await chromium.launch(
+      headed ? { headless: false, channel: 'chrome' } : { headless: true }
+    );
     const context = await browser.newContext({
       viewport: { width: 1500, height: 1024 },
     });
@@ -385,22 +391,26 @@ async function switchOrgViaDropdown(page, targetOrgId) {
 
   // Open dropdown → search-filter → click menu item
   // (search-input + menu-item-label is more reliable than role=option matching)
-  const dropdown = page.locator('[data-test="navbar-organizations-select"]');
+  // Post-UX-revamp: the org selector opens via a dedicated trigger button
+  // ([data-test="navbar-organizations-select-trigger"]); the old inline
+  // 'arrow_drop_down' text no longer exists (now an SVG icon).
+  const dropdown = page.locator('[data-test="navbar-organizations-select-trigger"]');
   await dropdown.waitFor({ state: 'visible', timeout: 15000 });
-  await dropdown.getByText('arrow_drop_down').click({ force: true });
+  await dropdown.click();
   await page.waitForTimeout(1500);
 
-  const searchInput = page.locator('[data-test="organization-search-input"]');
+  // Post-UX-revamp: data-test moved to the OSearchInput wrapper <div>;
+  // the real editable element is the nested native <input>.
+  const searchInput = page.locator('[data-test="organization-search-input"] input');
   await searchInput.waitFor({ state: 'visible', timeout: 10000 });
   await searchInput.fill(target.name);
   await page.waitForTimeout(1500);
 
-  // Filter menu items by exact org name (regex anchors prevent partial matches
-  // — e.g. an org "Foo" would otherwise also match a row containing "Foo Bar")
-  const escapedName = target.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Post-UX-revamp: each org row carries its identifier on a
+  // data-test-org-identifier attribute — match that exactly instead of
+  // parsing "name | id" row text (whose format changed in the revamp).
   const menuItem = page
-    .locator('[data-test="organization-menu-item-label-item-label"]')
-    .filter({ hasText: new RegExp(`^\\s*${escapedName}\\s*\\|`) })
+    .locator(`[data-test-org-identifier="${targetOrgId}"]`)
     .first();
   await menuItem.waitFor({ state: 'visible', timeout: 5000 });
   await menuItem.click();
