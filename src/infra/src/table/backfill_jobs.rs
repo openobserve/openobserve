@@ -132,6 +132,17 @@ pub async fn delete(org: &str, job_id: &str) -> Result<(), errors::Error> {
     }
 }
 
+/// Deletes all backfill jobs belonging to the given org.
+pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
+    let _lock = get_lock().await;
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::delete_many()
+        .filter(Column::Org.eq(org))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -372,6 +372,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::org_users::watch());
     tokio::task::spawn(db::org_ingestion_tokens::watch());
     tokio::task::spawn(db::organization::watch());
+    tokio::task::spawn(db::org_status::watch());
+    if let Err(e) = db::org_status::load_from_db().await {
+        log::error!("Failed to load org status cache: {e}");
+    }
 
     #[cfg(feature = "cloud")]
     tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
@@ -896,6 +900,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());
+        // Org deletion is data-lifecycle work (object-store + file_list + DB teardown,
+        // via the same compact::retention path the compactor already uses), so both
+        // the cleanup worker and the grace-period promotion scheduler run on the
+        // compactor. Cluster coordination is unchanged: the worker holds a dist-lock
+        // to fetch tasks and a per-task CAS guards execution; the promotion sweep uses
+        // an atomic status CAS — so multiple compactors remain safe, just less
+        // contended. (The org_status cache watch loop stays on every node — see below.)
+        tokio::task::spawn(crate::service::org_cleanup::run());
+        tokio::task::spawn(crate::service::org_cleanup::run_promotion_scheduler());
     }
 
     // load metrics disk cache

@@ -875,11 +875,20 @@ pub async fn check_and_add_to_org(
         }
     }
 
-    // Check if the user is part of any organization
+    // Check if the user is part of any organization. Exclude orgs that are
+    // pending_deletion/deleting: they are hidden + blocked everywhere, so if a
+    // user's ONLY org is being deleted we must treat them as having no org and
+    // create a fresh default one — otherwise the org-list API returns empty and
+    // the UI is stuck on a blank screen / login loop.
     let org_users = list_org_users_by_user(user_email).await;
     if org_users.is_err() {
         log::error!("Error fetching orgs for user: {}", user_email);
     }
+    let org_users = org_users.map(|orgs| {
+        orgs.into_iter()
+            .filter(|o| !crate::service::db::org_status::is_blocked(&o.org_id))
+            .collect::<Vec<_>>()
+    });
 
     let (org_name, role) = match org_users {
         Ok(existing_orgs) if !existing_orgs.is_empty() => (

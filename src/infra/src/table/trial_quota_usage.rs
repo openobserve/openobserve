@@ -159,3 +159,14 @@ pub async fn load_all_checkpoints() -> Result<Vec<(String, i16)>, sea_orm::DbErr
         .filter(|(_, cp)| *cp > 0)
         .collect())
 }
+
+/// Deletes all trial quota usage entries for the given org.
+pub async fn delete_by_org(org_id: &str) -> Result<(), sea_orm::DbErr> {
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    trial_quota_usage::Entity::delete_many()
+        .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .exec(db)
+        .await?;
+    Ok(())
+}

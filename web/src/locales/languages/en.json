@@ -1600,6 +1600,7 @@
   },
   "organization": {
     "header": "Organizations",
+    "orgBeingDeletedSwitching": "This organization is being deleted. Switching you to another organization.",
     "orgName": "Organization Name",
     "createOrganization": "New organization",
     "updateOrganization": "Update organization",
@@ -1634,7 +1635,10 @@
     "subscription_type": "Plan Type",
     "proceed_subscription": "Proceed to Subscription",
     "subscription_plan": "Subscription Plan",
-    "manage": "Manage"
+    "manage": "Manage",
+    "pendingDeletion": "Pending deletion",
+    "daysLeft": "{n} days left",
+    "resurrect": "Resurrect organization"
   },
   "template": {
     "header": "Templates",
@@ -4012,6 +4016,14 @@
     "pickCustomColor": "Pick Custom Color",
     "close": "Close",
     "organizationSettingsUpdated": "Organization settings updated",
+    "dangerZone": "Danger Zone",
+    "deleteOrganization": "Delete organization",
+    "deleteOrganizationDescription": "Schedule this organization for deletion. It becomes inaccessible right away and is permanently removed after a grace period.",
+    "deleteOrganizationConfirm": "This will schedule \"{name}\" — and all of its streams, dashboards, alerts, pipelines, users, and settings — for deletion.",
+    "deleteOrganizationWarning": "The organization becomes unavailable immediately and is hidden from everyone who uses it. Ingestion is blocked and scheduled alerts, pipelines, and reports stop running, so no notifications are sent while it is scheduled for deletion.",
+    "deleteOrganizationRecoverable": "It is kept in a recoverable state during the grace period. You can restore it until then — activity resumes on restore. After the grace period its data is permanently deleted and cannot be recovered.",
+    "deleteOrganizationTypeToConfirm": "To confirm, type {name} below:",
+    "deleteOrganizationInitiated": "Organization scheduled for deletion. It is now hidden and recoverable until the grace period ends.",
     "somethingWentWrong": "Something went wrong",
     "logoUpdatedSuccessfully": "{mode} logo updated successfully.",
     "errorUploadingImage": "Error while uploading image.",
