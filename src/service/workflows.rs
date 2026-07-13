@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use config::meta::pipeline::components::NodeData;
+use config::meta::{
+    pipeline::components::NodeData,
+    self_reporting::usage::{TriggerData, TriggerDataStatus, TriggerDataType},
+};
 use infra::table::workflows::{self, Workflow, WorkflowError, WorkflowRunErrors};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
@@ -12,6 +15,7 @@ use crate::{
     service::{
         db,
         pipeline::batch_execution::{ExecutablePipeline, WorkflowResult},
+        self_reporting::publish_triggers_usage,
     },
 };
 
@@ -36,6 +40,11 @@ pub struct WorkflowTrigger {
     pub metadata: HashMap<String, String>,
     pub data_file_path: String,
     pub origin_cluster: String,
+}
+
+enum WorkflowExecutionStatus {
+    Success,
+    Errored,
 }
 
 pub fn get_inputs_file_path(org_id: &str, workflow_id: &str, run_id: &str) -> String {
@@ -332,18 +341,18 @@ pub async fn test_workflow(
     Ok(res)
 }
 
-pub async fn execute_workflow(
+async fn execute_workflow(
     org_id: &str,
     id: &str,
     run_id: &str,
     inputs: Vec<serde_json::Value>,
-) -> Result<(), anyhow::Error> {
+) -> Result<WorkflowExecutionStatus, anyhow::Error> {
     let workflow = workflows::get_by_org_wid(org_id, id)
         .await?
         .ok_or(anyhow::anyhow!("workflow with given id not found"))?;
 
     if !workflow.enabled {
-        return Ok(());
+        return Ok(WorkflowExecutionStatus::Success);
     }
 
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
@@ -420,9 +429,10 @@ pub async fn execute_workflow(
         let bytes = serde_json::to_vec(&ip_map)?;
         let path = get_inputs_file_path(org_id, id, run_id);
         infra::storage::put("", &path, bytes.into()).await?;
+        return Ok(WorkflowExecutionStatus::Errored);
     }
 
-    Ok(())
+    Ok(WorkflowExecutionStatus::Success)
 }
 
 pub async fn get_workflow_errors(
@@ -552,13 +562,12 @@ pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
         }
     };
 
-    let now = chrono::Utc::now().timestamp_micros();
-
     let final_data = serde_json::json!({
         "meta":trigger.metadata,
         "data": data
     });
 
+    let start_time = chrono::Utc::now().timestamp_micros();
     let workflow_run_result = execute_workflow(
         &trigger.org_id,
         &trigger.workflow_id,
@@ -566,7 +575,42 @@ pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
         vec![final_data],
     )
     .await;
+    let end_time = chrono::Utc::now().timestamp_micros();
+
+    let error = match workflow_run_result {
+        Ok(WorkflowExecutionStatus::Errored) => {
+            Some("some node errored during execution".to_string())
+        }
+        Err(e) => Some(e.to_string()),
+        _ => None,
+    };
+
+    let trigger_data_stream: TriggerData = TriggerData {
+        _timestamp: start_time,
+        org: trigger.org_id.clone(),
+        module: TriggerDataType::Workflow,
+        key: format!(
+            "{}/{:?}/{}",
+            trigger.workflow_id, trigger.trigger_type, run_id
+        ),
+        is_realtime: false,
+        is_silenced: false,
+        status: TriggerDataStatus::Completed,
+        start_time,
+        end_time,
+        error,
+        evaluation_took_in_secs: Some((end_time - start_time) as f64 / 1_000_000.0),
+        scheduler_trace_id: Some(trace_id.clone()),
+        ..Default::default()
+    };
+    publish_triggers_usage(trigger_data_stream);
+
+    if let Err(e) = infra::storage::del(vec![("", &trigger.data_file_path)]).await {
+        log::error!(
+            "error in deleting trigger data file {} : {e}",
+            trigger.data_file_path
+        );
+    }
 
     log::info!("[workflow_trigger {trace_id}] run id {run_id} completed execution");
-    // TODO YJDoc2: update trigger stream
 }
