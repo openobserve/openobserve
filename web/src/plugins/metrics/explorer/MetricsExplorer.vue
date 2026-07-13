@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-explorer-refresh"
             @click="onRefresh"
           >
-            <OTooltip content="Refresh" />
+            <OTooltip :content="t('metrics.explorer.refresh')" />
           </OButton>
         </template>
       </AppPageHeader>
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="metrics-explorer-filter-bar"
     >
       <span class="text-xs font-medium text-text-secondary shrink-0">
-        Filter
+        {{ t("metrics.explorer.filterLabel") }}
       </span>
       <LabelFilterBar
         :filters="grid.labelFilters.value"
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         clearable
         :debounce="200"
-        placeholder="Search metrics"
+        :placeholder="t('metrics.explorer.searchPlaceholder')"
         data-test="metrics-explorer-search"
         class="flex-1 min-w-0"
       >
@@ -109,17 +109,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               value="with-data"
               size="xs"
               icon-left="show-chart"
-              title="Only metrics with data in the selected time range"
+              :title="t('metrics.explorer.withDataTitle')"
               data-test="metrics-explorer-hide-empty"
-              >With data</OToggleGroupItem
+              >{{ t("metrics.explorer.withData") }}</OToggleGroupItem
             >
             <OToggleGroupItem
               value="all"
               size="xs"
               icon-left="all-inclusive"
-              title="Every metric, including those with no data in this range"
+              :title="t('metrics.explorer.allTitle')"
               data-test="metrics-explorer-show-all"
-              >All</OToggleGroupItem
+              >{{ t("metrics.explorer.all") }}</OToggleGroupItem
             >
           </OToggleGroup>
         </template>
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span
         aria-live="polite"
         data-test="metrics-explorer-count"
-        class="shrink-0 whitespace-nowrap text-xs text-gray-600 dark:text-gray-400 tabular-nums"
+        class="shrink-0 whitespace-nowrap text-xs text-text-secondary tabular-nums"
         >{{ resultCountLabel }}</span
       >
 
@@ -171,8 +171,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex flex-1 min-h-0">
       <nav
-        class="flex flex-col gap-1 p-2 border-r border-gray-200 dark:border-gray-700"
-        aria-label="Metric filters"
+        class="flex flex-col gap-1 p-2 border-r border-border-default"
+        :aria-label="t('metrics.explorer.railsAriaLabel')"
       >
         <!-- OTooltip nests INSIDE the button and attaches to it — the pattern
              the rest of the app uses. (Pass the label via the `content` prop,
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Favorites is not a fourth selector: it narrows the grid to pinned
              metrics and composes with whatever the three panels have selected.
              Hence the divider. -->
-        <div class="my-1 border-t border-gray-200 dark:border-gray-700" />
+        <div class="my-1 border-t border-border-default" />
 
         <OButton
           :variant="grid.showFavoritesOnly.value ? 'primary' : 'ghost'"
@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <aside
         v-if="showRailPanel"
-        class="w-60 flex-none overflow-y-auto p-2 border-r border-gray-200 dark:border-gray-700"
+        class="w-60 flex-none overflow-y-auto p-2 border-r border-border-default"
       >
         <PrefixFilterPanel
           v-if="grid.activeRail.value === 'prefix'"
@@ -246,7 +246,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="grid.activeRail.value === 'type'"
           class="flex flex-col gap-1"
         >
-          <div class="text-xs font-semibold mb-1">Metric type</div>
+          <div class="text-xs font-semibold mb-1">
+            {{ t("metrics.explorer.metricType") }}
+          </div>
           <OCheckbox
             v-for="facet in grid.typeFacets.value"
             :key="facet.id"
@@ -266,40 +268,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div v-if="grid.loading.value" class="explorer-state">
           <OSpinner size="lg" />
-          <span>Loading metrics…</span>
+          <span>{{ t("metrics.explorer.loading") }}</span>
         </div>
 
         <div v-else-if="grid.loadError.value" class="explorer-state">
-          <OIcon name="error-outline" size="lg" class="text-red-500" />
+          <OIcon name="error-outline" size="lg" class="text-error-600" />
           <span>{{ grid.loadError.value }}</span>
           <OButton
             variant="primary"
             size="sm"
             data-test="metrics-explorer-reload"
             @click="grid.loadStreams(true)"
-            >Retry</OButton
+            >{{ t("metrics.explorer.retry") }}</OButton
           >
         </div>
 
         <div v-else-if="!grid.cards.value.length" class="explorer-state">
           <OIcon name="show-chart" size="lg" />
-          <span>No metrics in this organization yet.</span>
+          <span>{{ t("metrics.explorer.noMetrics") }}</span>
           <a
             class="text-primary underline"
             href="https://openobserve.ai/docs/user-guide/metrics/"
             target="_blank"
             rel="noopener"
-            >Learn how to ingest metrics</a
+            >{{ t("metrics.explorer.learnIngest") }}</a
           >
         </div>
 
         <div v-else-if="!visibleCards.length" class="explorer-state">
           <span v-if="grid.emptyHiddenCount.value">
-            No metrics match the current filters.
-            {{ grid.emptyHiddenCount.value }} returned no data and
-            {{ grid.emptyHiddenCount.value === 1 ? "is" : "are" }} hidden.
+            {{ t("metrics.explorer.noMatch") }}
+            {{ noDataHiddenLabel }}
           </span>
-          <span v-else>No metrics match the current filters.</span>
+          <span v-else>{{ t("metrics.explorer.noMatch") }}</span>
 
           <div class="flex items-center gap-2">
             <OButton
@@ -307,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               data-test="metrics-explorer-clear"
               @click="grid.clearFilters"
-              >Clear filters</OButton
+              >{{ t("metrics.explorer.clearFilters") }}</OButton
             >
             <!-- Without this, hiding every card leaves the user staring at an
                  empty grid with no clue that a toggle did it. -->
@@ -317,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               data-test="metrics-explorer-show-empty"
               @click="grid.hideEmptyPanels.value = false"
-              >Show no-data panels</OButton
+              >{{ t("metrics.explorer.showNoDataPanels") }}</OButton
             >
           </div>
         </div>
@@ -379,10 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- From the constant, not a literal: a hardcoded 9 here would go on
                  promising 9 after the increment changed, and reveal a different
                  number. -->
-            Show
-            {{ Math.min(PAGE_SIZE_INCREMENT, grid.remainingCount.value) }} more
-            ({{ grid.remainingCount.value.toLocaleString() }}
-            remaining)
+            {{ showMoreLabel }}
           </OButton>
         </div>
       </section>
@@ -529,14 +527,34 @@ export default defineComponent({
     // No "Recent". It ranked by what you had opened, which in practice is a
     // handful of metrics out of thousands — so the option mostly reordered
     // nothing, and it made the sort control a three-way choice to say it.
-    const sortOptions = [
-      { value: "a-z", label: "A–Z" },
-      { value: "z-a", label: "Z–A" },
-    ];
-    const viewOptions = [
-      { value: "grid", label: "Grid", icon: "grid-on" },
-      { value: "rows", label: "Rows", icon: "list" },
-    ];
+    const sortOptions = computed(() => [
+      { value: "a-z", label: t("metrics.explorer.sortAsc") },
+      { value: "z-a", label: t("metrics.explorer.sortDesc") },
+    ]);
+    const viewOptions = computed(() => [
+      { value: "grid", label: t("metrics.explorer.viewGrid"), icon: "grid-on" },
+      { value: "rows", label: t("metrics.explorer.viewRows"), icon: "list" },
+    ]);
+
+    /**
+     * The no-data suffix on the empty state. Two keys rather than an
+     * interpolated verb: "is"/"are" is not a value a translator can be handed.
+     */
+    const noDataHiddenLabel = computed(() =>
+      t(
+        grid.emptyHiddenCount.value === 1
+          ? "metrics.explorer.noDataHiddenOne"
+          : "metrics.explorer.noDataHiddenMany",
+        { count: grid.emptyHiddenCount.value },
+      ),
+    );
+
+    const showMoreLabel = computed(() =>
+      t("metrics.explorer.showMore", {
+        count: Math.min(PAGE_SIZE_INCREMENT, grid.remainingCount.value),
+        remaining: grid.remainingCount.value.toLocaleString(),
+      }),
+    );
 
     /**
      * OToggleGroup emits `undefined` when the ACTIVE item is clicked again — it
@@ -600,23 +618,39 @@ export default defineComponent({
     // icon in the registry does. Where an `icon` IS given, the name must be a
     // key in OIcon's registry (kebab-case) — an unknown name renders nothing at
     // all, silently, which is how the rail once ended up blank.
-    const rails: Array<{
-      id: string;
-      label: string;
-      icon?: string;
-      glyph?: string;
-    }> = [
-      { id: "prefix", glyph: "A_", label: "Filter by prefix" },
-      { id: "suffix", glyph: "_Z", label: "Filter by suffix" },
-      { id: "type", icon: "filter-list", label: "Metric type" },
-    ];
+    const rails = computed<
+      Array<{
+        id: string;
+        label: string;
+        icon?: string;
+        glyph?: string;
+      }>
+    >(() => [
+      {
+        id: "prefix",
+        glyph: "A_",
+        label: t("metrics.explorer.filterByPrefix"),
+      },
+      {
+        id: "suffix",
+        glyph: "_Z",
+        label: t("metrics.explorer.filterBySuffix"),
+      },
+      {
+        id: "type",
+        icon: "filter-list",
+        label: t("metrics.explorer.metricType"),
+      },
+    ]);
 
     const showRailPanel = computed(() => !!grid.activeRail.value);
 
     const favoritesTooltip = computed(() =>
       grid.showFavoritesOnly.value
-        ? "Show all metrics"
-        : `Favorites (${grid.favorites.value.length})`,
+        ? t("metrics.explorer.showAllMetrics")
+        : t("metrics.explorer.favorites", {
+            count: grid.favorites.value.length,
+          }),
     );
 
     // Clicking the active rail icon toggles its panel shut.
@@ -995,6 +1029,8 @@ export default defineComponent({
       viewOptions,
       sortModel,
       viewModel,
+      noDataHiddenLabel,
+      showMoreLabel,
       badgeLabels: BADGE_LABELS,
       queriesFor,
       dialogOpen,

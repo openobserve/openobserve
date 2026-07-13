@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ badgeLabel }}</span
         >
         <span class="truncate text-xs text-text-secondary">
-          Choose how this metric is aggregated
+          {{ t("metrics.explorer.fn.subtitle") }}
         </span>
       </div>
     </template>
@@ -64,14 +64,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="metrics-fn-empty"
     >
       <OIcon name="settings" size="md" />
-      <span>There is nothing to configure for this metric type.</span>
+      <span>{{ t("metrics.explorer.fn.nothingToConfigure") }}</span>
     </div>
 
     <ORadioGroup
       v-else
       :model-value="selectedId"
       orientation="horizontal"
-      :label="`Query to chart for ${card.name}`"
+      :label="t('metrics.explorer.fn.variantsAria', { name: card.name })"
       data-test="metrics-fn-variants"
       @update:model-value="select"
     >
@@ -110,14 +110,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`metrics-fn-error-${variant.id}`"
           >
             <OIcon name="error" size="sm" class="text-error-600" />
-            <span>Query failed</span>
+            <span>{{ t("metrics.explorer.queryFailed") }}</span>
             <OButton
               variant="ghost-primary"
               size="xs"
               :data-test="`metrics-fn-retry-${variant.id}`"
               @click.stop="load(variant)"
             >
-              Retry
+              {{ t("metrics.explorer.retry") }}
             </OButton>
           </div>
 
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex h-full items-center justify-center text-xs text-text-secondary"
             :data-test="`metrics-fn-nopreview-${variant.id}`"
           >
-            No preview for this function
+            {{ t("metrics.explorer.fn.noPreview") }}
           </div>
 
           <div
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex h-full items-center justify-center rounded text-xs text-text-secondary"
             :data-test="`metrics-fn-nodata-${variant.id}`"
           >
-            No data
+            {{ t("metrics.explorer.noData") }}
           </div>
 
           <MetricCardChart
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="metrics-fn-restore"
           @click="onRestore"
         >
-          Reset to default
+          {{ t("metrics.explorer.fn.resetToDefault") }}
         </OButton>
 
         <div class="flex items-center gap-2">
@@ -198,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-fn-cancel"
             @click="close"
           >
-            Cancel
+            {{ t("metrics.explorer.fn.cancel") }}
           </OButton>
           <OButton
             variant="primary"
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-fn-apply"
             @click="onApply"
           >
-            Apply
+            {{ t("metrics.explorer.fn.apply") }}
           </OButton>
         </div>
       </div>
@@ -217,6 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, ref, watch, type PropType } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import MetricCardChart from "./MetricCardChart.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -292,6 +293,7 @@ export default defineComponent({
   },
   emits: ["update:modelValue", "apply", "restore"],
   setup(props, { emit }) {
+    const { t } = useI18n();
     const store = useStore();
     const isDark = computed(() => store.state.theme === "dark");
 
@@ -544,6 +546,7 @@ export default defineComponent({
     const onRestore = () => emit("restore");
 
     return {
+      t,
       badge,
       badgeLabel,
       variants,

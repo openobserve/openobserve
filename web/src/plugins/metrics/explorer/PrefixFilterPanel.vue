@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`metrics-explorer-${mode}-clear`"
         @click="$emit('clear')"
       >
-        Clear
+        {{ t("metrics.explorer.facets.clear") }}
       </OButton>
     </div>
 
@@ -39,8 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="search"
         size="sm"
         clearable
-        :placeholder="`Search ${mode}es`"
-        :aria-label="`Search ${mode} filters`"
+        :placeholder="searchPlaceholder"
+        :aria-label="searchAriaLabel"
         :data-test="`metrics-explorer-${mode}-search`"
       />
     </div>
@@ -62,7 +62,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="min-w-0 flex-1"
           :model-value="selected.has(facet.id)"
           :data-test="`metrics-explorer-${mode}-facet-${facet.id}`"
-          :aria-label="`${facet.label}, ${facet.count} metrics`"
+          :aria-label="
+            t('metrics.explorer.facets.facetAria', {
+              label: facet.label,
+              count: facet.count,
+            })
+          "
           @update:model-value="toggle(facet.id)"
         >
           <template #label>
@@ -86,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="px-2 py-3 text-xs text-text-secondary"
         :data-test="`metrics-explorer-${mode}-empty`"
       >
-        No {{ mode }}es match.
+        {{ emptyLabel }}
       </div>
     </div>
   </div>
@@ -94,6 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -119,10 +125,42 @@ const emit = defineEmits<{
   (e: "clear"): void;
 }>();
 
+const { t } = useI18n();
+
 const search = ref("");
 
+const isPrefix = computed(() => props.mode === "prefix");
+
 const title = computed(() =>
-  props.mode === "prefix" ? "Filter by prefix" : "Filter by suffix",
+  t(
+    isPrefix.value
+      ? "metrics.explorer.filterByPrefix"
+      : "metrics.explorer.filterBySuffix",
+  ),
+);
+
+const searchPlaceholder = computed(() =>
+  t(
+    isPrefix.value
+      ? "metrics.explorer.facets.searchPrefixes"
+      : "metrics.explorer.facets.searchSuffixes",
+  ),
+);
+
+const searchAriaLabel = computed(() =>
+  t(
+    isPrefix.value
+      ? "metrics.explorer.facets.searchPrefixesAria"
+      : "metrics.explorer.facets.searchSuffixesAria",
+  ),
+);
+
+const emptyLabel = computed(() =>
+  t(
+    isPrefix.value
+      ? "metrics.explorer.facets.noPrefixMatch"
+      : "metrics.explorer.facets.noSuffixMatch",
+  ),
 );
 
 const hasSelection = computed(() => props.selected.size > 0);

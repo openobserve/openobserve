@@ -19,7 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="root"
     class="group relative flex flex-col h-full overflow-hidden border border-border-default rounded-md px-3 py-2 bg-surface-panel hover:border-primary focus-within:border-primary"
     role="group"
-    :aria-label="`${card.name}. ${badgeLabel}.`"
+    :aria-label="
+      t('metrics.explorer.card.ariaLabel', {
+        name: card.name,
+        type: badgeLabel,
+      })
+    "
     :data-test="`metrics-explorer-card-${card.name}`"
   >
     <!-- Deliberately NOT a button. Making the whole card clickable meant any
@@ -90,7 +95,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon"
           icon-left="info-outline"
-          :aria-label="`About ${card.name}: ${card.help}`"
+          :aria-label="
+            t('metrics.explorer.card.helpAria', {
+              name: card.name,
+              help: card.help,
+            })
+          "
           :data-test="`metrics-explorer-card-help-${card.name}`"
           @click.stop
         >
@@ -103,11 +113,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon"
           icon-left="refresh"
           :loading="preview?.status === 'loading'"
-          :aria-label="`Refresh ${card.name}`"
+          :aria-label="
+            t('metrics.explorer.card.refreshAria', { name: card.name })
+          "
           :data-test="`metrics-explorer-card-refresh-${card.name}`"
           @click="$emit('refresh', card)"
         >
-          <OTooltip content="Refresh this metric" />
+          <OTooltip :content="t('metrics.explorer.card.refreshTooltip')" />
         </OButton>
 
         <OButton
@@ -115,11 +127,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon"
           icon-left="settings"
-          :aria-label="`Configure function for ${card.name}`"
+          :aria-label="
+            t('metrics.explorer.card.configureAria', { name: card.name })
+          "
           :data-test="`metrics-explorer-card-fn-${card.name}`"
           @click="$emit('configure', card)"
         >
-          <OTooltip content="Configure function" />
+          <OTooltip :content="t('metrics.explorer.card.configureTooltip')" />
         </OButton>
 
         <OButton
@@ -128,15 +142,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :icon-left="isFavorite ? 'favorite' : 'favorite-border'"
           :aria-label="
             isFavorite
-              ? `Remove ${card.name} from favorites`
-              : `Add ${card.name} to favorites`
+              ? t('metrics.explorer.card.favoriteRemoveAria', {
+                  name: card.name,
+                })
+              : t('metrics.explorer.card.favoriteAddAria', { name: card.name })
           "
           :aria-pressed="String(isFavorite)"
           :data-test="`metrics-explorer-card-favorite-${card.name}`"
           @click="$emit('toggle-favorite', card)"
         >
           <OTooltip
-            :content="isFavorite ? 'Remove from favorites' : 'Add to favorites'"
+            :content="
+              isFavorite
+                ? t('metrics.explorer.card.favoriteRemoveTooltip')
+                : t('metrics.explorer.card.favoriteAddTooltip')
+            "
           />
         </OButton>
 
@@ -152,11 +172,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost-primary"
           size="icon"
           icon-left="open-in-new"
-          :aria-label="`Open ${card.name} in the editor`"
+          :aria-label="t('metrics.explorer.card.openAria', { name: card.name })"
           :data-test="`metrics-explorer-card-select-${card.name}`"
           @click="$emit('select', card)"
         >
-          <OTooltip content="Open in editor" />
+          <OTooltip :content="t('metrics.explorer.card.openTooltip')" />
         </OButton>
       </div>
     </div>
@@ -170,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`metrics-explorer-card-unsupported-${card.name}`"
       >
         <OIcon name="help-outline" size="sm" />
-        <span>Unsupported type (v1)</span>
+        <span>{{ t("metrics.explorer.card.unsupported") }}</span>
       </div>
 
       <!-- Understood, but the chosen variant is not something a card can draw —
@@ -184,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`metrics-explorer-card-nopreview-${card.name}`"
       >
         <OIcon name="table-chart" size="sm" />
-        <span>No preview — open in editor</span>
+        <span>{{ t("metrics.explorer.card.noPreview") }}</span>
       </div>
 
       <div
@@ -203,7 +223,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              a 16px dot. -->
         <span
           class="inline-flex flex-col items-center gap-1.5 cursor-help"
-          :aria-label="`${card.name} query failed: ${preview.error}`"
+          :aria-label="
+            t('metrics.explorer.card.queryFailedAria', {
+              name: card.name,
+              error: preview.error,
+            })
+          "
           :data-test="`metrics-explorer-card-error-tip-${card.name}`"
         >
           <OTooltip
@@ -212,8 +237,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             max-width="360px"
             :delay="200"
           />
-          <OIcon name="error-outline" size="sm" class="text-red-500" />
-          <span>Query failed</span>
+          <OIcon name="error-outline" size="sm" class="text-error-600" />
+          <span>{{ t("metrics.explorer.queryFailed") }}</span>
         </span>
 
         <div class="flex items-center gap-1">
@@ -223,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`metrics-explorer-card-retry-${card.name}`"
             @click.stop="$emit('refresh', card)"
           >
-            Retry
+            {{ t("metrics.explorer.retry") }}
           </OButton>
 
           <!-- A tooltip cannot be selected, so the trace id in it can only be
@@ -231,11 +256,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="xs"
-            :aria-label="`Copy the error details for ${card.name}`"
+            :aria-label="
+              t('metrics.explorer.card.copyErrorAria', { name: card.name })
+            "
             :data-test="`metrics-explorer-card-copy-error-${card.name}`"
             @click.stop="copyErrorReport"
           >
-            Copy details
+            {{ t("metrics.explorer.card.copyDetails") }}
             <OTooltip
               :content="errorReport"
               content-class="whitespace-pre-line"
@@ -259,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] opacity-65 rounded text-text-secondary bg-[repeating-linear-gradient(45deg,rgba(128,128,128,0.08),rgba(128,128,128,0.08)_6px,transparent_6px,transparent_12px)]"
         :data-test="`metrics-explorer-card-nodata-${card.name}`"
       >
-        No data
+        {{ t("metrics.explorer.noData") }}
       </div>
 
       <MetricCardChart
@@ -287,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <span class="inline-flex cursor-help">
           <OTooltip
-            content="Re-queried with a NaN guard: this metric's values are small enough that the plain aggregation underflowed."
+            :content="t('metrics.explorer.card.nanGuard')"
             max-width="360px"
             :delay="200"
           />
@@ -307,7 +334,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           type="button"
           class="inline-flex cursor-pointer"
-          :aria-label="`Copy the failed-refresh details for ${card.name}`"
+          :aria-label="
+            t('metrics.explorer.card.staleCopyAria', { name: card.name })
+          "
           :data-test="`metrics-explorer-card-stale-copy-${card.name}`"
           @click.stop="copyErrorReport"
         >
@@ -334,11 +363,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              dashboards raise on a panel. -->
         <span
           v-if="preview?.cachedDataDiffersFromTimeRange"
-          class="inline-flex text-amber-500 cursor-help"
+          class="inline-flex text-warning-600 cursor-help"
           :data-test="`metrics-explorer-card-cached-differs-${card.name}`"
         >
           <OTooltip
-            content="The data shown is cached and is different from the selected time range."
+            :content="t('metrics.explorer.card.cachedDiffers')"
             max-width="360px"
             :delay="200"
           />
@@ -356,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="mr-0.5">🕑</span>
           <RelativeTime
             :timestamp="preview.lastTriggeredAt"
-            full-time-prefix="Last Refreshed At: "
+            :full-time-prefix="t('metrics.explorer.card.lastRefreshedPrefix')"
           />
         </span>
 
@@ -383,6 +412,7 @@ import {
   ref,
   type PropType,
 } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import MetricCardChart from "./MetricCardChart.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
@@ -466,6 +496,7 @@ export default defineComponent({
     "refresh",
   ],
   setup(props, { emit }) {
+    const { t } = useI18n();
     const store = useStore();
     const root = ref<HTMLElement | null>(null);
     const isDark = computed(() => store.state.theme === "dark");
@@ -516,9 +547,9 @@ export default defineComponent({
     /** As above, but a stale card still shows its old chart, so it says so. */
     const staleTooltip = computed(() => {
       const failure = errorTooltip.value;
-      const preamble = "Refresh failed — showing the last successful result.";
+      const preamble = t("metrics.explorer.card.stalePreamble");
       const body = failure ? `${preamble}\n\n${failure}` : preamble;
-      return `${body}\n\nClick to copy the details.`;
+      return `${body}\n\n${t("metrics.explorer.card.staleClickToCopy")}`;
     });
 
     /**
@@ -547,7 +578,7 @@ export default defineComponent({
 
     const copyErrorReport = () =>
       copyToClipboard(errorReport.value, {
-        successMessage: "Error details copied",
+        successMessage: t("metrics.explorer.card.errorCopied"),
       });
 
     /**
@@ -589,6 +620,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       root,
       color,
       badge,

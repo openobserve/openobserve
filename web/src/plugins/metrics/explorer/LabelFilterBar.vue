@@ -39,7 +39,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           type="button"
           class="ml-1 inline-flex items-center cursor-pointer"
-          :aria-label="`Remove filter ${labelFilterKey(filter)}`"
+          :aria-label="
+            t('metrics.explorer.labels.removeFilterAria', {
+              filter: labelFilterKey(filter),
+            })
+          "
           :data-test="`metrics-explorer-label-chip-remove-${filter.label}`"
           @click.stop="$emit('remove', filter)"
         >
@@ -54,10 +58,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="schemaLoading"
       class="inline-flex items-center cursor-help"
       role="status"
-      aria-label="Resolving label membership"
+      :aria-label="t('metrics.explorer.labels.schemaLoadingAria')"
       data-test="metrics-explorer-label-schema-loading"
     >
-      <OTooltip content="Resolving which metrics carry these labels…" :delay="200" />
+      <OTooltip
+        :content="t('metrics.explorer.labels.schemaLoadingTooltip')"
+        :delay="200"
+      />
       <OSpinner size="xs" />
     </span>
 
@@ -74,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="metrics-explorer-label-add"
         @click="startPicking"
       >
-        Filter
+        {{ t("metrics.explorer.labels.addFilter") }}
       </OButton>
 
       <div
@@ -87,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="draftLabel"
           searchable
           size="sm"
-          placeholder="Select a label"
+          :placeholder="t('metrics.explorer.labels.selectLabel')"
           :options="labelOptions"
           :loading="labelNamesLoading"
           :error="!!labelError"
@@ -125,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchable
             creatable
             size="sm"
-            placeholder="Select or type a value"
+            :placeholder="t('metrics.explorer.labels.selectOrTypeValue')"
             :options="valueOptions"
             :loading="valuesLoading"
             @update:model-value="onValuePicked"
@@ -138,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-xs text-text-secondary shrink-0"
           data-test="metrics-explorer-label-picker-no-suggestions"
         >
-          No suggestions — type a value.
+          {{ t("metrics.explorer.labels.noSuggestions") }}
         </span>
       </div>
     </div>
@@ -147,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -185,6 +193,8 @@ const emit = defineEmits<{
   /** First open only — lets the parent lazily fetch label names. */
   (e: "focus-picker"): void;
 }>();
+
+const { t } = useI18n();
 
 type Step = "idle" | "label" | "value";
 const step = ref<Step>("idle");
@@ -261,7 +271,7 @@ const onLabelPicked = async (value: unknown) => {
   if (!label) return;
 
   if (!LABEL_NAME_RE.test(label)) {
-    labelError.value = "Invalid label name.";
+    labelError.value = t("metrics.explorer.labels.invalidLabel");
     return;
   }
 
