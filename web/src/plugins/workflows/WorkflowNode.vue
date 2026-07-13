@@ -72,11 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-else-if="testStatus === 'ok'"
-        class="wf-test-badge wf-test-ok wf-test-pop wf-test-clickable nodrag"
+        class="wf-test-badge wf-test-ok wf-test-pop"
         :data-test="`workflow-node-${data?.node_type}-test-ok`"
-        :title="t('workflow.test.stepResult.viewHint')"
-        @pointerdown.stop
-        @click.stop="openResult"
       >
         <OIcon name="check" size="xs" />
       </div>
@@ -343,13 +340,6 @@ const openResult = () => {
 .wf-test-ok {
   background: #22c55e;
   color: #fff;
-}
-.wf-test-clickable {
-  cursor: pointer;
-  transition: transform 0.14s ease;
-}
-.wf-test-clickable:hover {
-  transform: scale(1.12);
 }
 .wf-test-skipped {
   background: #9ca3af;

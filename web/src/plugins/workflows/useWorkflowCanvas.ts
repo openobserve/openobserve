@@ -358,9 +358,8 @@ const downstreamOfErrorNodes = (errorIds: string[]): string[] => {
 
 // Run the workflow Test (from the Test dialog or a node's Replay button) and
 // kick off the staged reveal. Shared so both entry points behave identically.
-// `nodeIo` is the backend's per-node input/output when present (drives the
-// Input/Output drawer); today the backend returns errors only, so the drawer
-// derives error-node input from `errors` until that field ships.
+// The backend returns errors only — the step drawer (error nodes only) derives
+// its input/output from `errors`, so there's no per-node node_io to carry.
 export const executeTestRun = async (opts: {
   orgId: string;
   inputs: any[];
@@ -375,7 +374,6 @@ export const executeTestRun = async (opts: {
       from_node: opts.fromNode || undefined,
     });
     const errors = res.data?.errors || {};
-    const nodeIo = res.data?.node_io || {};
     const ranNodeIds = opts.fromNode
       ? [...reachableFrom(wf.edges || [], [opts.fromNode])]
       : (wf.nodes || []).map((n: any) => n.id);
@@ -383,8 +381,6 @@ export const executeTestRun = async (opts: {
       errors,
       ranNodeIds,
       blockedNodeIds: downstreamOfErrorNodes(Object.keys(errors)),
-      nodeIo,
-      input: opts.inputs,
     });
     return { ok: true };
   } catch (e: any) {
@@ -397,8 +393,6 @@ export const startTestPlayback = (result: {
   errors: Record<string, any>;
   ranNodeIds: string[];
   blockedNodeIds?: string[];
-  nodeIo?: Record<string, any>;
-  input?: any[];
 }) => {
   stopTestPlayback();
   workflowObj.testRun.result = result;

@@ -35,10 +35,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="onOpenChange"
   >
     <div class="tw:flex tw:flex-col tw:gap-3 tw:p-4 tw:h-full tw:min-h-0">
-      <!-- status — right aligned -->
+      <!-- status — the drawer only opens for error nodes, so it's always Errored -->
       <div class="tw:flex tw:items-center tw:justify-end">
-        <OBadge :variant="statusVariant" size="sm">
-          {{ t(`workflow.test.stepResult.status.${status}`) }}
+        <OBadge variant="error-soft" size="sm">
+          {{ t("workflow.test.stepResult.status.error") }}
         </OBadge>
       </div>
 
@@ -127,16 +127,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div class="io-content-box">
-            <CodeQueryEditor
-              v-if="outputText"
-              editor-id="workflow-step-output"
-              language="json"
-              :read-only="true"
-              :query="outputText"
-              :show-auto-complete="false"
-            />
-            <!-- Error node: no output, show the error messages instead. -->
-            <div v-else-if="errorMessages.length" class="io-errors">
+            <!-- The step errored — show the error message(s) as the output. -->
+            <div v-if="errorMessages.length" class="io-errors">
               <div
                 v-for="(m, i) in errorMessages"
                 :key="i"
@@ -227,23 +219,9 @@ const drawerTitle = computed(() => {
   return full.length > 30 ? `${full.slice(0, 30)}…` : full;
 });
 
-const status = computed<"ok" | "error" | "skipped">(() => {
-  const r = result.value;
-  if (r?.errors?.[nodeId.value]) return "error";
-  if (r?.blockedNodeIds?.includes(nodeId.value)) return "skipped";
-  return "ok";
-});
-const statusVariant = computed(() =>
-  status.value === "error"
-    ? "error-soft"
-    : status.value === "skipped"
-      ? "default-soft"
-      : "success-soft",
-);
-
-const backendIo = computed<any>(() => result.value?.nodeIo?.[nodeId.value]);
-
-// NodeErrors serializes as { error_count, errors: [ [message, inputValue?], ... ] }.
+// The drawer only opens for ERROR nodes. NodeErrors serializes as
+// { error_count, errors: [ [message, inputValue?], ... ] } — the Output is those
+// error messages (no per-node node_io from the backend, by design).
 const errorEntries = computed<any[]>(() => {
   const raw = result.value?.errors?.[nodeId.value];
   return Array.isArray(raw?.errors) ? raw.errors : [];
@@ -251,18 +229,6 @@ const errorEntries = computed<any[]>(() => {
 const errorMessages = computed<string[]>(() =>
   errorEntries.value.map((e) => (Array.isArray(e) ? String(e[0]) : String(e))),
 );
-
-const outputRecords = computed<any[] | null>(() =>
-  backendIo.value?.output ?? null,
-);
-
-const toJson = (v: any) => {
-  try {
-    return JSON.stringify(v, null, 2);
-  } catch {
-    return "";
-  }
-};
 
 // ONE central input, shared with the Test dialog (workflowObj.testRun.input).
 // Editing it here or in the Test dialog stays in sync; Replay from this node
@@ -284,15 +250,9 @@ const parsedReplayInput = computed<any[] | null>(() => {
   }
 });
 const inputInvalid = computed(() => parsedReplayInput.value === null);
-const outputText = computed(() =>
-  outputRecords.value && outputRecords.value.length
-    ? toJson(outputRecords.value)
-    : "",
-);
-// What the Output copy button copies (JSON output, or the error text).
-const copyableOutput = computed(
-  () => outputText.value || errorMessages.value.join("\n"),
-);
+
+// Output copy = the error text.
+const copyableOutput = computed(() => errorMessages.value.join("\n"));
 
 const copy = (text: string, type: "input" | "output") => {
   if (!text) return;
