@@ -26,8 +26,6 @@ import { z } from "zod";
 // Allowed characters mirror the backend `format_stream_name` regex
 // (src/config/src/utils/schema.rs): alphanumeric, underscore and colon only.
 export const streamFieldNameRegex = /^[a-zA-Z0-9_:]+$/;
-export const streamFieldNameHelpText =
-  "Use alphanumeric characters, underscore and colon only.";
 
 /**
  * Build the single-row schema.
@@ -49,7 +47,7 @@ export const makeStreamFieldRowSchema = (t: (_key: string) => string) =>
     name: z
       .string()
       .min(1, t("logStream.fieldRequired"))
-      .regex(streamFieldNameRegex, streamFieldNameHelpText),
+      .regex(streamFieldNameRegex, t("logStream.streamNameHelpText")),
     type: z.string().min(1, t("logStream.dataTypeRequired")),
     index_type: z.array(z.any()).optional().default([]),
   });

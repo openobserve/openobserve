@@ -269,7 +269,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSlider from "@/lib/forms/Slider/OFormSlider.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
-  llmEvaluationSettingsSchema,
+  makeLlmEvaluationSettingsSchema,
   llmEvaluationSettingsDefaults,
   type LlmEvaluationSettingsForm,
 } from "./LlmEvaluationSettings.schema";
@@ -316,7 +316,7 @@ export default defineComponent({
     // is wired through useOForm({ onSubmit }), not @submit.
     const llmEvalForm = useOForm<LlmEvaluationSettingsForm>({
       defaultValues: llmEvaluationSettingsDefaults(),
-      schema: llmEvaluationSettingsSchema,
+      schema: makeLlmEvaluationSettingsSchema(t),
       onSubmit: (value) => onSubmit(value),
     });
 

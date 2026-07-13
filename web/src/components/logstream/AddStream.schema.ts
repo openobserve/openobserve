@@ -32,8 +32,6 @@ import { makeStreamFieldRowSchema } from "./StreamFieldInputs.schema";
 // Allowed characters mirror the backend `format_stream_name` regex
 // (src/config/src/utils/schema.rs): alphanumeric, underscore and colon only.
 export const streamNameRegex = /^[a-zA-Z0-9_:]+$/;
-export const streamNameHelpText =
-  "Use alphanumeric characters, underscore and colon only.";
 
 /**
  * Build the AddStream scalar schema.
@@ -59,7 +57,7 @@ export const makeAddStreamSchema = (
       name: z
         .string()
         .min(1, t("logStream.streamNameRequired"))
-        .regex(streamNameRegex, streamNameHelpText),
+        .regex(streamNameRegex, t("logStream.streamNameHelpText")),
       stream_type: z.string().min(1, t("logStream.streamTypeRequired")),
       // number <input> can emit a string — coerce. The "> 0" rule is
       // conditional (see superRefine) so a hidden retention field never blocks.

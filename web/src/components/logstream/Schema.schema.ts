@@ -20,10 +20,7 @@
 // remain invalid (like "!" or ".") fail — the space/hyphen auto-fix is kept.
 
 import { z } from "zod";
-import {
-  streamFieldNameRegex,
-  streamFieldNameHelpText,
-} from "./StreamFieldInputs.schema";
+import { streamFieldNameRegex } from "./StreamFieldInputs.schema";
 
 // Mirrors the save-time normalization in schema.vue's onSubmit — keep in sync.
 const normalizeFieldName = (v: string): string =>
@@ -54,7 +51,7 @@ export const makeSchemaFieldsSchema = (t: (_key: string) => string) =>
               (v) =>
                 v.trim().length === 0 ||
                 streamFieldNameRegex.test(normalizeFieldName(v)),
-              { message: streamFieldNameHelpText },
+              { message: t("logStream.streamNameHelpText") },
             ),
           // data_type is visible + required in schema.vue's Add Field(s) card.
           type: z.string().min(1, t("logStream.dataTypeRequired")),
