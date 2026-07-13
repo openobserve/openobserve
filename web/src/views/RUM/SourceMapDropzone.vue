@@ -31,8 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <div
           data-test="rum-upload-source-maps-file-dropzone"
-          class="upload-area"
-          :class="{ 'drag-over': isDragging, 'has-file': field.state.value }"
+          class="border-2 border-dashed border-(--o2-border-color) rounded-lg p-8 text-center cursor-pointer transition-all duration-300 bg-(--q-background) hover:border-(--q-primary) dark:border-[rgba(255,255,255,0.1)] dark:hover:bg-[rgba(var(--q-primary-rgb),0.05)]"
+          :class="[
+            isDragging ? 'border-(--q-primary)! bg-[rgba(var(--q-primary-rgb),0.05)]! border-solid! dark:bg-[rgba(var(--q-primary-rgb),0.1)]!' : '',
+            field.state.value ? 'p-6! text-left! border-solid! border-(--q-positive)! bg-[rgba(var(--q-positive-rgb),0.02)]! dark:bg-[rgba(var(--q-positive-rgb),0.05)]!' : ''
+          ]"
           @dragover.prevent="isDragging = true"
           @dragleave.prevent="isDragging = false"
           @drop.prevent="(e) => onDrop(field, e)"
@@ -47,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @change="onFileInput(field, $event)"
           />
 
-          <div v-if="!field.state.value" class="upload-content">
+          <div v-if="!field.state.value" class="flex flex-col items-center justify-center">
             <OIcon name="backup" size="xl" class="mb-3" />
             <div class="text-xl font-semibold text-gray-500 mb-2">Drop your file here</div>
             <div class="text-sm text-gray-400 mb-3">or click to browse</div>
@@ -144,59 +147,3 @@ const formatFileSize = (bytes: number): string => {
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
 };
 </script>
-
-<style lang="scss" scoped>
-.upload-area {
-  border: 2px dashed var(--q-border-color, #e0e0e0);
-  border-radius: 8px;
-  padding: 2rem 2rem;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  background-color: var(--q-background);
-
-  &:hover {
-    border-color: var(--q-primary);
-    background-color: rgba(var(--q-primary-rgb), 0.02);
-  }
-
-  &.drag-over {
-    border-color: var(--q-primary);
-    background-color: rgba(var(--q-primary-rgb), 0.05);
-    border-style: solid;
-  }
-
-  &.has-file {
-    padding: 1.5rem;
-    text-align: left;
-    border-style: solid;
-    border-color: var(--q-positive);
-    background-color: rgba(var(--q-positive-rgb), 0.02);
-  }
-}
-
-.upload-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-:deep(.q-dark) {
-  .upload-area {
-    border-color: rgba(255, 255, 255, 0.1);
-
-    &:hover {
-      background-color: rgba(var(--q-primary-rgb), 0.05);
-    }
-
-    &.drag-over {
-      background-color: rgba(var(--q-primary-rgb), 0.1);
-    }
-
-    &.has-file {
-      background-color: rgba(var(--q-positive-rgb), 0.05);
-    }
-  }
-}
-</style>
