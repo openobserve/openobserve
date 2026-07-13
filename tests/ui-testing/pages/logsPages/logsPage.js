@@ -35,7 +35,7 @@ export class LogsPage {
         // For the logs sidebar prefix is `logs-page`. Legacy non-prefixed variants kept as fallback
         // for any consumer that still ships the old data-test names.
         this.allFieldsToggleBtn = '[data-test="logs-page-all-fields-btn"], [data-test="logs-all-fields-btn"], [data-test="logs-page-user-defined-fields-btn-all_fields_slot"], [data-test="logs-user-defined-fields-btn-all_fields_slot"]';
-        this.interestingFieldsToggleBtn = '[data-test="logs-page-interesting-fields-btn"], [data-test="logs-interesting-fields-btn"], [data-test="logs-page-user-defined-fields-btn-interesting_fields_slot"], [data-test="logs-user-defined-fields-btn-interesting_fields_slot"]';
+        this.interestingFieldsToggleBtn = '[data-test="logs-page-user-defined-fields-btn"], [data-test="logs-page-interesting-fields-btn"], [data-test="logs-interesting-fields-btn"], [data-test="logs-page-user-defined-fields-btn-interesting_fields_slot"], [data-test="logs-user-defined-fields-btn-interesting_fields_slot"]';
         this.fieldListResetIcon = '[data-test="logs-page-fields-list-reset-icon"]';
         this.sqlModeToggle = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
         // OSwitch renders the wrapper data-test on a div and the toggle state on an inner
@@ -4339,23 +4339,26 @@ export class LogsPage {
 
     async clickInterestingFieldButton(field) {
         const btnLocator = this.page.locator(this.interestingFieldBtn(field)).first();
+        // Post-revamp: button is revealed on field-row hover — wait for the row then hover.
+        const rowLocator = this.page.locator(`[data-test="logs-field-list-item-${field}"]`).first();
         const inputLocator = this.page.locator(this.logSearchIndexListFieldSearchInput);
 
         for (let attempt = 0; attempt < 5; attempt++) {
-            const visible = await btnLocator.waitFor({ state: 'visible', timeout: 8000 })
+            const rowVisible = await rowLocator.waitFor({ state: 'visible', timeout: 8000 })
                 .then(() => true).catch(() => false);
-            if (visible) {
+            if (rowVisible) {
+                await rowLocator.hover().catch(() => {});
                 await btnLocator.click({ force: true });
                 return;
             }
-            // Button not visible — re-apply filter to ensure field is in the list.
+            // Field not in list — re-apply filter to ensure field is present.
             await inputLocator.fill('');
             await inputLocator.click({ force: true });
             await inputLocator.pressSequentially(field, { delay: 30 });
             // Wait deterministically for the debounced filter to reflect the typed value
             await expect(inputLocator).toHaveValue(field, { timeout: 5000 }).catch(() => {});
         }
-        await btnLocator.waitFor({ state: 'visible', timeout: 8000 });
+        await rowLocator.hover().catch(() => {});
         await btnLocator.click({ force: true });
     }
 
