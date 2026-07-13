@@ -538,6 +538,7 @@ pub mod deprecated {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::service::folders::FolderError;
 
     #[test]
     fn test_folder_error_conversion() {

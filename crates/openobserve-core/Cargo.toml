@@ -180,3 +180,8 @@ roaring.workspace = true
 flight.workspace = true
 async-stream.workspace = true
 sourcemap = "9.3.2"
+
+[dev-dependencies]
+expect-test.workspace = true
+multer = "3.1"
+rcgen = "0.14.4"
