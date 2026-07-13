@@ -50,26 +50,25 @@ export default {
 </script>
 
 <template>
-  <div class="np-sidebar tw:shrink-0 tw:w-[200px] tw:pr-3 tw:pl-1" :data-test="testPrefix">
+  <div class="np-sidebar tw:shrink-0 tw:w-[200px] tw:pr-3" :data-test="testPrefix">
     <div
-      class="np-header tw:mb-3 tw:mx-1 tw:text-base tw:font-semibold tw:px-1 tw:pb-2 tw:text-center tw:tracking-wide"
+      class="np-header tw:mb-2 tw:mx-2 tw:text-base tw:font-semibold tw:px-1 tw:pb-2 tw:text-center tw:tracking-wide"
       :data-test="`${testPrefix}-title`"
     >
       {{ title || t("pipeline.nodes") }}
     </div>
 
-    <div class="np-body">
-      <template v-for="(node, idx) in items" :key="`${node.subtype}-${node.io_type}-${idx}`">
-        <!-- section label (Source / Transform / Destination) -->
-        <div
-          v-if="node.isSectionHeader"
-          class="np-section tw:mt-4 tw:mb-2 tw:first:mt-0 tw:text-[13px] tw:font-semibold"
-        >
-          {{ node.label }}
+    <div class="tw:flex tw:mt-2">
+      <div class="np-body np-panel">
+        <template v-for="(node, idx) in items" :key="`${node.subtype}-${node.io_type}-${idx}`">
+        <!-- section label (Source / Transform / Destination). Same mb-3 outer
+             gap as the node cards (matching the original NodeSidebar). -->
+        <div v-if="node.isSectionHeader" class="tw:rounded-lg tw:mb-3">
+          <div class="np-section tw:text-base tw:font-medium">{{ node.label }}</div>
         </div>
 
         <!-- draggable / clickable node card -->
-        <div v-else class="o2vf_node tw:transition-all tw:rounded-lg tw:mb-2 tw:last:mb-0">
+        <div v-else class="o2vf_node tw:transition-all tw:rounded-lg tw:mb-3 tw:last:mb-0">
           <OButton
             variant="ghost"
             size="md"
@@ -102,36 +101,65 @@ export default {
               </div>
               <div class="node-label tw:w-[70px] tw:text-left tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:font-medium tw:text-[12px]">{{ node.label }}</div>
               <div class="drag-dots tw:grid tw:gap-0.5 tw:w-2 tw:h-2" style="grid-template-columns: 1fr 1fr">
-                <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all tw:bg-[rgba(107,114,128,0.6)] tw:dark:bg-[rgba(255,255,255,0.5)]!"></span>
-                <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all tw:bg-[rgba(107,114,128,0.6)] tw:dark:bg-[rgba(255,255,255,0.5)]!"></span>
-                <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all tw:bg-[rgba(107,114,128,0.6)] tw:dark:bg-[rgba(255,255,255,0.5)]!"></span>
-                <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all tw:bg-[rgba(107,114,128,0.6)] tw:dark:bg-[rgba(255,255,255,0.5)]!"></span>
+                <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all"></span>
+                <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all"></span>
+                <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all"></span>
+                <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all"></span>
               </div>
             </div>
           </OButton>
         </div>
       </template>
+      </div>
     </div>
   </div>
 </template>
 
 <style>
-/* ── Header: "Nodes" title with a purple underline spanning the column ─────── */
+/* ── Header: "Nodes" title with a purple underline spanning the column
+      (matches the pipeline editor's purple accent bar) ───────────────────── */
 .np-header {
   color: #1f2937;
   border-bottom: 2px solid #8b5cf6;
-}
-.np-section {
-  color: #6b7280;
 }
 .body--dark .np-header {
   color: rgba(255, 255, 255, 0.95);
   border-bottom-color: #a855f7;
 }
-.body--dark .np-section {
-  color: rgba(255, 255, 255, 0.6);
+
+/* ── Frosted-glass panel wrapping the node cards (the original NodeSidebar
+      look, shared by both palettes) ──────────────────────────────────────── */
+.np-panel {
+  background: rgba(226, 232, 240, 0.9);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  padding: 12px 8px;
+  margin: 4px 2px;
+  transition: all 0.3s ease-in-out;
+}
+.np-panel:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+.body--dark .np-panel {
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+.body--dark .np-panel:hover {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
+/* Drag-affordance dots. Coloured via `.body--dark` (the app's theme class) — NOT
+   Tailwind's `dark:` variant, which follows the OS `prefers-color-scheme` and so
+   turned the dots white in the app's light mode. */
+.dot {
+  background: rgba(107, 114, 128, 0.6);
+}
+.body--dark .dot {
+  background: rgba(255, 255, 255, 0.5);
+}
 .drag-handle:hover .dot {
   background: rgba(107, 114, 128, 0.8);
   transform: scale(1.1);
