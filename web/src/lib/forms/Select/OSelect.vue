@@ -1490,8 +1490,8 @@ const fieldWidthClass = computed(() => {
                                 :title="filteredOptions[vRow.index].badgeTitle"
                                 :style="
                                   filteredOptions[vRow.index].badgeStyle ?? {
-                                    color: 'var(--o2-positive)',
-                                    borderColor: 'var(--o2-positive)',
+                                    color: 'var(--color-status-positive)',
+                                    borderColor: 'var(--color-status-positive)',
                                   }
                                 "
                               >{{ filteredOptions[vRow.index].badge }}</span>
