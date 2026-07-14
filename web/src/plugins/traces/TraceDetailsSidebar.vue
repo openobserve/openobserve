@@ -2199,8 +2199,8 @@ export default defineComponent({
 
 .trace-detail-tab-table th,
 .trace-detail-tab-table td {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  border-right: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 1px solid var(--color-table-row-divider);
+  border-right: 1px solid var(--color-table-row-divider);
   text-align: left;
   padding: 8px !important;
   font-size: 13px;
@@ -2260,9 +2260,9 @@ export default defineComponent({
 }
 
 .trace-detail-tab-table table.q-table {
-  background: rgba(240, 240, 245, 0.8);
+  background: var(--color-surface-base);
   backdrop-filter: blur(0.625rem);
-  border: 0.125rem solid rgba(100, 100, 120, 0.5);
+  border: 0.125rem solid var(--color-table-header-border);
 }
 
 .table-header .table-head-chip {
@@ -2769,8 +2769,8 @@ body.body--dark .trace-details-toolbar-container .provider-badge {
 
 .body--dark .trace-detail-tab-table th,
 .body--dark .trace-detail-tab-table td {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  border-right: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 1px solid var(--color-table-row-divider);
+  border-right: 1px solid var(--color-table-row-divider);
 }
 
 /* Light theme support for glassmorphic tables */
@@ -2781,8 +2781,8 @@ body.body--dark .trace-details-toolbar-container .provider-badge {
 
 .body--light .trace-detail-tab-table th,
 .body--light .trace-detail-tab-table td {
-  border-bottom: 1px solid rgba(100, 100, 120, 0.2);
-  border-right: 1px solid rgba(100, 100, 120, 0.3);
+  border-bottom: 1px solid var(--color-table-row-divider);
+  border-right: 1px solid var(--color-table-row-divider);
 }
 
 .trace-detail-tab-table th {

@@ -41,6 +41,7 @@ import type { LLMPanelDef } from "./config/llmInsightsPanels";
 /** Our internal panel type → dashboard chart type id (see ChartSelection.vue). */
 const TYPE_MAP: Record<string, string> = {
   "stacked-area": "area-stacked",
+  "stacked-bar": "stacked",
   "horizontal-bar": "h-bar",
 };
 
@@ -81,15 +82,19 @@ export function buildLLMPanelSchema(opts: {
       ? seriesField
         ? "area-stacked"
         : "area"
-      : (TYPE_MAP[panel.type] ?? "line");
+      : panel.type === "stacked-bar"
+        ? seriesField
+          ? "stacked"
+          : "bar"
+        : (TYPE_MAP[panel.type] ?? "line");
 
   // Field roles differ by panel shape:
-  //  - trends (stacked-area): time on X, the series field is the BREAKDOWN.
+  //  - trends (stacked-area / stacked-bar): time on X, series field = BREAKDOWN.
   //  - bars (horizontal-bar): the series field (e.g. model) is the X category
   //    and there is no breakdown (a single fixed-color series of bars).
-  const isBar = panel.type === "horizontal-bar";
-  const xFieldName = isBar ? seriesField : timeField;
-  const breakdownName = isBar ? undefined : seriesField;
+  const isHBar = panel.type === "horizontal-bar";
+  const xFieldName = isHBar ? seriesField : timeField;
+  const breakdownName = isHBar ? undefined : seriesField;
 
   return {
     version: 2,
@@ -127,6 +132,13 @@ export function buildLLMPanelSchema(opts: {
       // draw a lone point (it'd be invisible). Symbols make single-bucket
       // windows show up as a dot. (`show_symbol` → echarts `showSymbol`.)
       show_symbol: true,
+      // Rounded (smooth) connectors between points — the trend area charts read
+      // cleaner as smooth curves than the default sharp/linear zig-zag. Only
+      // affects line/area panels; bar panels ignore it.
+      line_interpolation: "smooth",
+      // Slightly thicker line for a more solid, polished trend curve (default is
+      // 1.5). Keeps the per-point dots but makes the connecting line read cleaner.
+      line_thickness: 2.5,
       axis_border_show: true,
       wrap_table_cells: false,
       base_map: { type: "osm" },
@@ -166,7 +178,7 @@ export function buildLLMPanelSchema(opts: {
             ? [
                 axisField(
                   xFieldName,
-                  isBar
+                  isHBar
                     ? panel.series?.length
                       ? xFieldName
                       : ""

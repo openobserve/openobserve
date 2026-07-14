@@ -752,7 +752,7 @@ const renderMarkdown = (content: string): string => {
 }
 
 .messages-view .message-item .message-content blockquote {
-  border-left: 3px solid var(--o2-border-color);
+  border-left: 3px solid var(--color-border-default);
   margin: 8px 0;
   padding-left: 12px;
   color: var(--color-text-secondary);
@@ -766,7 +766,7 @@ const renderMarkdown = (content: string): string => {
 
 .messages-view .message-item .message-content table th,
 .messages-view .message-item .message-content table td {
-  border: 1px solid var(--o2-border-color);
+  border: 1px solid var(--color-border-default);
   padding: 6px 8px;
   text-align: left;
 }

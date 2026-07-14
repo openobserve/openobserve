@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="card in kpiCards"
           :key="card.label"
-          class="card-container rounded-lg flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 bg-(--o2-card-bg) border border-(--o2-border-color) transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+          class="card-container rounded-lg flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 bg-(--color-surface-base) border border-(--color-border-default) transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
         >
           <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see
@@ -195,11 +195,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template v-else>
             <div class="flex flex-col gap-[0.25rem]">
-              <div class="text-[0.7rem] leading-normal font-semibold mb-[0.25rem] text-(--color-text-muted)">
-                {{ card.label }}
+              <div class="flex items-center justify-between gap-2 mb-[0.25rem]">
+                <div class="text-[0.7rem] leading-normal font-semibold text-(--color-text-secondary) min-w-0 truncate">
+                  {{ card.label }}
+                </div>
+                <span
+                  class="inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-md bg-(--color-surface-subtle) text-(--color-text-secondary)"
+                >
+                  <OIcon :name="card.icon" size="sm" />
+                </span>
               </div>
               <div class="flex items-baseline gap-[0.2rem]">
-                <span class="text-[1.4rem] font-bold leading-none text-(--color-text-primary)">
+                <span class="text-[1.4rem] font-bold leading-none text-(--color-grey-600)">
                   {{ card.value }}
                 </span>
                 <span
@@ -280,6 +287,7 @@ import LLMErrorTable from "./LLMErrorTable.vue";
 import LLMInsightsSkeleton from "./LLMInsightsSkeleton.vue";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -628,6 +636,8 @@ function onEmptyAction(id?: string) {
 
 interface KpiCard {
   label: string;
+  /** Material-symbol icon name (OIcon) shown in the card's corner tile. */
+  icon: string;
   value: string;
   unit?: string;
   sparkData?: number[];
@@ -651,6 +661,7 @@ const kpiCards = computed<KpiCard[]>(() => {
   // isn't emitting cost; either way we render "$0".
   const costCard: KpiCard = {
     label: "Total Cost",
+    icon: "payments",
     ...splitCost(kpi.value.totalCost),
     sparkData: sparklines.value.cost,
     sparkColor: "#0ea5e9",
@@ -660,6 +671,7 @@ const kpiCards = computed<KpiCard[]>(() => {
     costCard,
     {
       label: "Total Tokens",
+      icon: "tag",
       value: tokens.value,
       unit: tokens.unit,
       sparkData: sparklines.value.tokens,
@@ -667,6 +679,7 @@ const kpiCards = computed<KpiCard[]>(() => {
     },
     {
       label: "Total Traces",
+      icon: "account-tree",
       value: traces.value,
       unit: traces.unit,
       sparkData: sparklines.value.traces,
@@ -674,6 +687,7 @@ const kpiCards = computed<KpiCard[]>(() => {
     },
     {
       label: "P95 Latency",
+      icon: "schedule",
       value: p95.value,
       unit: p95.unit,
       sparkData: sparklines.value.p95Micros,
@@ -682,6 +696,7 @@ const kpiCards = computed<KpiCard[]>(() => {
     },
     {
       label: "Error Rate",
+      icon: "error",
       value: errorRate.toFixed(1),
       unit: "%",
       sparkData: sparklines.value.errorRate,

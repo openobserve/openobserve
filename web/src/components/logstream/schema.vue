@@ -2701,7 +2701,7 @@ export default defineComponent({
 }
 
 .indexDetailsContainer .o2-schema-table thead tr th {
-  font-size: 0.875rem;
+  font-size: var(--text-xs);
   height: 35px;
 }
 

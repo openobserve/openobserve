@@ -415,7 +415,7 @@ const getTimeRangeValue = (dateTime: any) => {
 }
 
 .scheduled-dashboards thead tr {
-  background-color: var(--color-theme-table-header-bg) !important;
+  background-color: var(--color-table-header-bg);
 }
 
 .scheduled-dashboards .rum-tabs {

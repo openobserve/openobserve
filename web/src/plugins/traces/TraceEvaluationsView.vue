@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
 <template>
-  <div class="w-full h-full flex flex-col overflow-y-auto bg-(--o2-surface) p-4 gap-4">
+  <div class="w-full h-full flex flex-col overflow-y-auto bg-(--color-surface-base) p-4 gap-4">
     <!-- Loading state -->
     <div v-if="isLoading" class="flex flex-col items-center justify-center h-[60vh] gap-4 text-(--color-text-secondary)">
       <OSpinner size="xl" />
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
         <div class="flex gap-3 mb-4 h-[100px]">
           <!-- 1. Quality Score Card -->
           <div
-            class="flex-1 flex flex-col justify-between border border-[var(--color-border-default)] rounded-lg bg-[var(--o2-card-bg)] p-3"
+            class="flex-1 flex flex-col justify-between border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] p-3"
           >
             <div class="flex justify-between items-start">
               <div class="text-xs font-medium text-[var(--color-text-secondary)]">
@@ -71,14 +71,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                         class="text-[20px]" />
               </div>
             </div>
-            <div class="text-3xl font-bold tracking-tight leading-none text-[var(--color-text-primary)]">
+            <div class="text-3xl font-bold tracking-tight leading-none text-[var(--color-grey-600)]">
               {{ formatScore(record.llm_evaluation_quality_score) }}
             </div>
           </div>
 
           <!-- 2. Verdict Card -->
           <div
-            class="flex-1 flex flex-col justify-between border border-[var(--color-border-default)] rounded-lg bg-[var(--o2-card-bg)] p-3"
+            class="flex-1 flex flex-col justify-between border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] p-3"
           >
             <div class="flex justify-between items-start">
               <div class="text-xs font-medium text-[var(--color-text-secondary)]">
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
           <!-- 3. Steps Card -->
           <div
-            class="flex-1 flex flex-col justify-between border border-[var(--color-border-default)] rounded-lg bg-[var(--o2-card-bg)] p-3"
+            class="flex-1 flex flex-col justify-between border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] p-3"
           >
             <div class="flex justify-between items-start">
               <div class="text-xs font-medium text-[var(--color-text-secondary)]">
@@ -109,14 +109,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 <OIcon name="layers" size="sm" class="text-blue-500 text-[20px]" />
               </div>
             </div>
-            <div class="text-3xl font-bold tracking-tight leading-none text-[var(--color-text-primary)]">
+            <div class="text-3xl font-bold tracking-tight leading-none text-[var(--color-grey-600)]">
               {{ record.total_steps || "0" }}
             </div>
           </div>
 
           <!-- 4. Tools Card -->
           <div
-            class="flex-1 flex flex-col justify-between border border-[var(--color-border-default)] rounded-lg bg-[var(--o2-card-bg)] p-3"
+            class="flex-1 flex flex-col justify-between border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] p-3"
           >
             <div class="flex justify-between items-start">
               <div class="text-xs font-medium text-[var(--color-text-secondary)]">
@@ -126,14 +126,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 <OIcon name="build" size="sm" class="text-purple-500 text-[20px]" />
               </div>
             </div>
-            <div class="text-3xl font-bold leading-none text-[var(--color-text-primary)]">
+            <div class="text-3xl font-bold leading-none text-[var(--color-grey-600)]">
               {{ record.total_tool_calls || "0" }}
             </div>
           </div>
 
           <!-- 5. Completion Card -->
           <div
-            class="flex-1 flex flex-col justify-between border border-[var(--color-border-default)] rounded-lg bg-[var(--o2-card-bg)] p-3"
+            class="flex-1 flex flex-col justify-between border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] p-3"
           >
             <div class="flex justify-between items-start">
               <div class="text-xs font-medium text-[var(--color-text-secondary)]">
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 <OIcon name="flag" size="sm" class="text-teal-500 text-[20px]" />
               </div>
             </div>
-            <div class="text-lg font-semibold leading-tight text-[var(--color-text-primary)] truncate" :title="record.completion_signal">
+            <div class="text-lg font-semibold leading-tight text-[var(--color-grey-600)] truncate" :title="record.completion_signal">
               {{ record.completion_signal || "N/A" }}
             </div>
           </div>
@@ -154,10 +154,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
           <!-- PART 1: Primary Content (Analysis & reasoning) - 2/3 Width -->
           <div class="flex flex-col gap-4 w-[66.67%]">
             <!-- 2.1A: Issues & Analysis Card -->
-            <div class="border border-[var(--color-border-default)] rounded-lg bg-[var(--o2-card-bg)] p-4">
+            <div class="border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] p-4">
               <div class="flex items-center gap-2 mb-3">
                 <OIcon name="rule" size="sm" />
-                <div class="text-sm font-semibold text-[var(--color-text-primary)]">{{ $t("traces.evaluations.issuesAnalysis") }}</div>
+                <div class="text-sm font-semibold text-[var(--color-text-heading)]">{{ $t("traces.evaluations.issuesAnalysis") }}</div>
               </div>
 
               <!-- Template Evaluation Criteria (shown when a template with content is active) -->
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                     <OIcon name="warning" size="xs" />
                     <span>{{ $t("traces.evaluations.criteriaTemplateMismatchNote", { template: selectedTemplateData?.name, evaluated: evaluatedTemplateName(record) }) }}</span>
                   </div>
-                  <div class="mt-2 p-3 bg-[var(--o2-border-color)] rounded-md text-xs leading-relaxed whitespace-pre-wrap text-[var(--color-text-primary)]">
+                  <div class="mt-2 p-3 bg-[var(--color-border-default)] rounded-md text-xs leading-relaxed whitespace-pre-wrap text-[var(--color-text-heading)]">
                     {{ selectedTemplateData.content }}
                   </div>
                   <div class="mt-1 text-[10px] text-[var(--color-text-secondary)] italic">
@@ -199,12 +199,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
               <!-- Fix Suggestions Card (Phase 2) -->
               <div v-if="getFixSuggestions(record).length > 0" class="mb-4">
-                <div class="text-[10px] font-bold text-[var(--color-text-secondary)] uppercase mb-2 text-primary">{{ $t("traces.evaluations.recommendedFixes") }}</div>
+                <div class="text-[10px] font-bold text-[var(--color-text-secondary)] uppercase mb-2">{{ $t("traces.evaluations.recommendedFixes") }}</div>
                 <div class="space-y-2">
                   <div v-for="(fix, i) in getFixSuggestions(record)" :key="i"
                        class="flex items-start gap-2 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg border-dashed">
                     <OIcon name="lightbulb" size="sm" class="mt-1" />
-                    <div class="text-xs text-[var(--color-text-primary)] flex-1 leading-relaxed">
+                    <div class="text-xs text-[var(--color-text-heading)] flex-1 leading-relaxed">
                       <strong>{{ $t("traces.evaluations.fixSuggestion") }}</strong> {{ fix }}
                     </div>
                   </div>
@@ -217,24 +217,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                   <span class="text-xs font-medium text-[var(--color-text-secondary)]">{{ $t("traces.evaluations.weakestDimension") }}</span>
                   <OTag type="evalBadge" value="weakest">{{ formatDimLabel(getWeakestDimension(record)!.dimension) }}</OTag>
                 </div>
-                <div v-if="getWeakestDimension(record)!.reasoning" class="text-sm bg-[var(--o2-border-color)] p-3 rounded-md leading-relaxed">
+                <div v-if="getWeakestDimension(record)!.reasoning" class="text-sm bg-[var(--color-border-default)] p-3 rounded-md leading-relaxed">
                   {{ getWeakestDimension(record)!.reasoning }}
                 </div>
               </div>
             </div>
 
             <!-- 2.1B: Score Reasoning Card -->
-            <div class="border border-[var(--color-border-default)] rounded-lg bg-[var(--o2-card-bg)] p-4">
+            <div class="border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] p-4">
               <div class="flex items-center gap-2 mb-3">
                 <OIcon name="psychology" size="sm" />
-                <div class="text-sm font-semibold text-[var(--color-text-primary)]">{{ $t("traces.evaluations.dimensionReasoning") }}</div>
+                <div class="text-sm font-semibold text-[var(--color-text-heading)]">{{ $t("traces.evaluations.dimensionReasoning") }}</div>
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <div
                   v-for="dim in getDimensionScores(record).filter(d => d.reasoning).slice().sort((a, b) => (isTemplateDimension(b.dimension) ? 1 : 0) - (isTemplateDimension(a.dimension) ? 1 : 0))"
                   :key="dim.dimension"
                   class="p-3 rounded-md flex flex-col gap-1"
-                  :class="isTemplateDimension(dim.dimension) ? 'bg-[rgba(25,118,210,0.05)] border border-[rgba(25,118,210,0.2)] dark:bg-[rgba(96,165,250,0.07)] dark:border-[rgba(96,165,250,0.25)]' : 'bg-[var(--o2-border-color)]'"
+                  :class="isTemplateDimension(dim.dimension) ? 'bg-[rgba(25,118,210,0.05)] border border-[rgba(25,118,210,0.2)] dark:bg-[rgba(96,165,250,0.07)] dark:border-[rgba(96,165,250,0.25)]' : 'bg-[var(--color-border-default)]'"
                 >
                   <div class="flex items-center gap-1.5">
                     <div class="text-[10px] font-bold text-[var(--color-text-secondary)] uppercase tracking-wider">
@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                       class="text-[9px] py-px px-1"
                     />
                   </div>
-                  <div class="text-xs leading-relaxed text-[var(--color-text-primary)]">
+                  <div class="text-xs leading-relaxed text-[var(--color-text-heading)]">
                     {{ truncateContent(dim.reasoning, 200) }}
                   </div>
                 </div>
@@ -259,15 +259,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             </div>
 
             <!-- 2.1C: Query & Response Card (Full Width in column) -->
-            <div class="border border-[var(--color-border-default)] rounded-lg bg-[var(--o2-card-bg)] overflow-hidden">
-              <div class="px-4 py-3 border-b border-[var(--o2-border-color)] bg-[var(--o2-border-color)]/30">
+            <div class="border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] overflow-hidden">
+              <div class="px-4 py-3 border-b border-[var(--color-border-default)] bg-[var(--color-border-default)]/30">
                 <div class="flex items-center gap-2">
                   <OIcon name="code" size="sm" />
-                  <div class="text-sm font-semibold text-[var(--color-text-primary)]">{{ $t("traces.evaluations.queryResponse") }}</div>
+                  <div class="text-sm font-semibold text-[var(--color-text-heading)]">{{ $t("traces.evaluations.queryResponse") }}</div>
                 </div>
               </div>
 
-              <div class="flex flex-col divide-y divide-[var(--o2-border-color)]">
+              <div class="flex flex-col divide-y divide-[var(--color-border-default)]">
                 <!-- System Prompt (Expandable) -->
                 <OCollapsible
                   v-if="parseMessages(record.gen_ai_input_messages, record.gen_ai_system_instructions).system"
@@ -321,11 +321,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
           <!-- PART 2: Sidebar Content (Dimensions & Metadata) - 1/3 Width -->
           <div class="flex flex-col gap-4 w-[33.33%]">
             <!-- 2.2A: Dimensions Card -->
-            <div class="border border-[var(--color-border-default)] rounded-lg bg-[var(--o2-card-bg)] p-4 flex flex-col gap-4">
+            <div class="border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] p-4 flex flex-col gap-4">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <OIcon name="analytics" size="sm" />
-                  <div class="text-sm font-semibold text-[var(--color-text-primary)]">{{ $t("traces.evaluations.dimensions") }}</div>
+                  <div class="text-sm font-semibold text-[var(--color-text-heading)]">{{ $t("traces.evaluations.dimensions") }}</div>
                 </div>
                 <!-- Threshold explainer shown only when template dimensions are present -->
                 <div v-if="selectedTemplateData?.dimensions?.length" class="flex items-center gap-1">
@@ -360,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                   <div class="flex justify-between items-center">
                     <div class="flex items-center gap-2">
                       <OIcon :name="getDimIcon(dim.dimension)" :class="getDimColorClass(dim.dimension)" size="sm" />
-                      <span class="text-xs font-medium text-[var(--color-text-primary)]">{{ formatDimLabel(dim.dimension) }}</span>
+                      <span class="text-xs font-medium text-[var(--color-text-heading)]">{{ formatDimLabel(dim.dimension) }}</span>
                       <!-- Template aspect badge -->
                       <OTag
                         v-if="isTemplateDimension(dim.dimension)"
@@ -377,10 +377,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                         :value="getDimVerdict(dim.score)"
                         class="text-[9px] py-px px-1"
                       />
-                      <span class="text-xs font-bold text-[var(--color-text-primary)]">{{ formatScore(dim.score) }}</span>
+                      <span class="text-xs font-bold text-[var(--color-text-heading)]">{{ formatScore(dim.score) }}</span>
                     </div>
                   </div>
-                  <div class="h-1.5 w-full bg-[var(--o2-border-color)] rounded-full overflow-hidden">
+                  <div class="h-1.5 w-full bg-[var(--color-border-default)] rounded-full overflow-hidden">
                     <div
                       class="h-full transition-all duration-500"
                       :style="{
@@ -397,7 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             </div>
 
             <!-- 2.2B: Metadata Details Card -->
-            <div class="border border-[var(--color-border-default)] rounded-lg bg-[var(--o2-card-bg)] p-4">
+            <div class="border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] p-4">
               <div class="flex items-center gap-2 mb-4">
                 <OIcon name="info" size="sm" />
                 <div class="text-sm font-semibold">{{ $t("traces.evaluations.technicalDetails") }}</div>
@@ -668,11 +668,11 @@ export default defineComponent({
       numeric_grounding: "numbers",
     };
     const DIM_COLOR_CLASSES: Record<string, string> = {
-      relevance: "text-[var(--o2-primary)]",
-      groundedness: "text-[var(--color-status-positive)]",
+      relevance: "text-[var(--color-primary-600)]",
+      groundedness: "text-[var(--color-success-600)]",
       conciseness: "text-purple-700",
       instruction_following: "text-orange-500",
-      accuracy: "text-[var(--color-status-negative)]",
+      accuracy: "text-[var(--color-error-600)]",
       trajectory_efficiency: "text-cyan-500",
       completeness: "text-teal-500",
       safety: "text-red-500",

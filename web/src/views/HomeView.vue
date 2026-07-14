@@ -388,20 +388,23 @@ export default defineComponent({
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 1rem;
+  height: 1rem;
   line-height: 1;
   border: none;
   background: transparent;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   opacity: 0.6;
-  font-size: 14px;
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  transition: all 0.2s ease;
 }
 
 .home-tab-close:hover {
   opacity: 1;
-  background: rgba(128, 128, 128, 0.2);
+  background: var(--color-surface-subtle-hover);
+  color: var(--color-text-primary);
 }
 
 /* Chat fills remaining width and height */

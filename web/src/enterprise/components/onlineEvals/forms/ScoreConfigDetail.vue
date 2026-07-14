@@ -120,7 +120,7 @@
             </h4>
             <div
               v-if="healthyLabel"
-              class="flex items-baseline gap-2 p-[12px_14px] border border-[color-mix(in_srgb,var(--color-status-success-text,#2e7d32)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-status-success-text,#2e7d32)_8%,transparent)] rounded-md"
+              class="flex items-baseline gap-2 p-[12px_14px] border border-[color-mix(in_srgb,var(--color-status-success-text)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-status-success-text)_8%,transparent)] rounded-md"
             >
               <span class="text-lg font-bold text-(--color-status-success-text)">{{ thresholdSign }}</span>
               <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] font-bold text-sm text-(--color-text-primary)">{{ healthyLabel }}</span>
@@ -367,7 +367,7 @@ function formatTimestamp(microsOrMs: number): string {
 .scd-kv dt {
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--color-text-secondary, var(--color-text-secondary));
+  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .scd-kv dd {

@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="thread-tool-body__section">
             <div class="thread-tool-body__label">
               Result
-              <span v-if="t.span_status === 'ERROR'" class="text-[#dc2626]">
+              <span v-if="t.span_status === 'ERROR'" class="text-[color:var(--color-error-600)]">
                 · ERROR
               </span>
             </div>
@@ -204,9 +204,9 @@ function formatDuration(ns: number): string {
     align-items: center;
     gap: 2px;
     padding: 0.5rem 1.125rem;
-    border: 1px solid var(--o2-border-color);
+    border: 1px solid var(--color-border-default);
     border-radius: 0.625rem;
-    background: var(--o2-card-bg);
+    background: var(--color-surface-base);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
     transition: box-shadow 0.15s ease, border-color 0.15s ease;
   }
@@ -224,7 +224,7 @@ function formatDuration(ns: number): string {
 
   .tt-link {
     font-size: 0.78rem;
-    color: var(--o2-interactive-primary, #3b82f6);
+    color: var(--color-primary-500, #3b82f6);
     font-weight: 650;
   }
 
@@ -295,7 +295,7 @@ function formatDuration(ns: number): string {
     border-radius: 0.25rem;
     background: transparent;
     border: none;
-    color: var(--color-text-label);
+    color: var(--color-text-secondary);
     cursor: pointer;
     line-height: 1;
     flex-shrink: 0;
@@ -322,21 +322,21 @@ function formatDuration(ns: number): string {
 
   &--ok {
     background: rgba(22, 163, 74, 0.1);
-    color: #16a34a;
+    color: var(--color-success-600);
     border: 1px solid rgba(22, 163, 74, 0.25);
   }
 
   &--error {
     background: rgba(220, 38, 38, 0.1);
-    color: #dc2626;
+    color: var(--color-error-600);
     border: 1px solid rgba(220, 38, 38, 0.25);
   }
 }
 
 .thread-tool-body {
   padding: 0.5rem 0.75rem 0.75rem;
-  background: var(--o2-bg-2, var(--o2-card-bg));
-  border-top: 1px dashed var(--o2-border-color);
+  background: var(--color-surface-base);
+  border-top: 1px dashed var(--color-border-default);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -351,18 +351,18 @@ function formatDuration(ns: number): string {
     font-size: 0.62rem;
     font-weight: 700;
     letter-spacing: 0.06rem;
-    color: var(--color-text-label);
+    color: var(--color-text-secondary);
   }
 
   &__pre {
     margin: 0;
     padding: 0.5rem 0.625rem;
-    background: var(--o2-card-bg);
-    border: 1px solid var(--o2-border-color);
+    background: var(--color-surface-base);
+    border: 1px solid var(--color-border-default);
     border-radius: 0.25rem;
     font-family: monospace;
     font-size: 0.72rem;
-    color: var(--color-text-caption);
+    color: var(--color-text-body);
     line-height: 1.45;
     white-space: pre-wrap;
     word-break: break-word;

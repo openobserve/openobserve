@@ -1,7 +1,7 @@
 <template>
-  <aside class="flex-[3.5] min-w-0 overflow-auto p-2 bg-(--o2-card-bg) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)]">
-    <section class="py-[14px] px-4 mb-3 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md">
-      <header class="flex items-center gap-[6px] mb-[6px] text-(--color-text-secondary,var(--color-text-secondary))">
+  <aside class="flex-[3.5] min-w-0 overflow-auto p-2 bg-(--color-surface-base) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)]">
+    <section class="py-[14px] px-4 mb-3 border border-(--color-dialog-header-border,var(--o2-border)) rounded-md">
+      <header class="flex items-center gap-[6px] mb-[6px] text-(--color-text-secondary,var(--o2-text-secondary))">
         <OIcon name="visibility" size="xs" />
         <span class="m-0 text-[0.8125rem] font-semibold text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.preview.title") }}</span>
       </header>
@@ -14,19 +14,19 @@
       <div v-else-if="matchedLoading" class="m-0 text-text-secondary text-xs leading-normal">
         {{ t("onlineEvals.job.preview.matchedLoading") }}
       </div>
-      <div v-else-if="matchedError" class="m-0 text-xs text-(--color-status-error-text,#c62828)">
+      <div v-else-if="matchedError" class="m-0 text-xs text-(--color-status-error-text)">
         {{ t("onlineEvals.job.preview.matchedError") }}
       </div>
       <div v-else class="flex items-baseline gap-1.5">
-        <span class="text-2xl font-bold text-(--color-text-primary,currentColor) [font-variant-numeric:tabular-nums]">{{ formattedCount }}</span>
-        <span class="text-xs text-(--color-text-secondary,var(--color-text-secondary))">
+        <span class="text-2xl font-bold text-(--color-grey-600) [font-variant-numeric:tabular-nums]">{{ formattedCount }}</span>
+        <span class="text-xs text-(--color-text-secondary,var(--o2-text-secondary))">
           {{ t("onlineEvals.job.preview.matchedSuffix") }}
         </span>
       </div>
     </section>
 
-    <section class="py-[14px] px-4 mb-0 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md">
-      <header class="flex items-center gap-[6px] mb-[6px] text-(--color-text-secondary,var(--color-text-secondary))">
+    <section class="py-[14px] px-4 mb-0 border border-(--color-dialog-header-border,var(--o2-border)) rounded-md">
+      <header class="flex items-center gap-[6px] mb-[6px] text-(--color-text-secondary,var(--o2-text-secondary))">
         <OIcon name="info" size="xs" />
         <span class="m-0 text-[0.8125rem] font-semibold text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.preview.summaryTitle") }}</span>
       </header>

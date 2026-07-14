@@ -44,7 +44,7 @@
            consistent. Pinned band (shrink-0) with a bottom divider; the cards
            below carry their own chrome via Tailwind. -->
       <section
-        class="flex-shrink-0 grid grid-cols-4 gap-[0.625rem] px-5 py-4 border-b border-b-[var(--color-dialog-header-border,var(--color-border-default))]"
+        class="flex-shrink-0 grid grid-cols-4 gap-[0.625rem] px-5 py-4 border-b border-b-[var(--color-dialog-header-border,var(--o2-border))]"
       >
         <!-- While the KPI query is in flight, show skeleton tiles in place of
              the cards (matches the LLM Insights dashboard pattern). -->
@@ -53,16 +53,16 @@
           v-for="card in kpiCards"
           v-else
           :key="card.label"
-          class="rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
+          class="rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--color-surface-base)] border border-[var(--color-border-default)] transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
         >
           <div
-            class="kpi-label text-[0.7rem] leading-normal font-semibold mb-[0.25rem]"
+            class="kpi-label text-[0.7rem] leading-normal font-semibold mb-[0.25rem] text-[var(--color-text-secondary)]"
           >
             {{ card.label }}
           </div>
           <div class="flex items-baseline gap-[0.2rem]">
             <span
-              class="text-[1.4rem] font-bold leading-none text-[var(--color-text-primary)]"
+              class="text-[1.4rem] font-bold leading-none text-[var(--color-grey-600)]"
             >
               {{ card.value }}
             </span>
@@ -970,7 +970,7 @@ function relativeTime(timestampMs: number): string {
 .jd-kv dt {
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--color-text-secondary, var(--color-text-secondary));
+  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .jd-kv dd {
@@ -984,7 +984,7 @@ function relativeTime(timestampMs: number): string {
 // bordered, neutral surface + header bar) so condition rendering is consistent
 // across drawers.
 .jd-codeblock {
-  border: 0.0625rem solid var(--color-dialog-header-border, var(--color-border-default));
+  border: 0.0625rem solid var(--color-dialog-header-border, var(--o2-border));
   border-radius: 0.5rem;
   overflow: hidden;
   background: color-mix(
@@ -999,7 +999,7 @@ function relativeTime(timestampMs: number): string {
   align-items: center;
   justify-content: space-between;
   padding: 0.375rem 0.625rem;
-  border-bottom: 0.0625rem solid var(--color-dialog-header-border, var(--color-border-default));
+  border-bottom: 0.0625rem solid var(--color-dialog-header-border, var(--o2-border));
   background: color-mix(
     in srgb,
     var(--color-text-secondary) 6%,
@@ -1010,7 +1010,7 @@ function relativeTime(timestampMs: number): string {
 .jd-codeblock__label {
   font-size: 0.6875rem;
   font-weight: 500;
-  color: var(--color-text-secondary, var(--color-text-secondary));
+  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .jd-codeblock__content {
@@ -1102,7 +1102,7 @@ function relativeTime(timestampMs: number): string {
 
 .jd-scorers__icon--unknown {
   background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  color: var(--color-text-secondary, var(--color-text-secondary));
+  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .jd-scorers__main {
@@ -1141,7 +1141,7 @@ function relativeTime(timestampMs: number): string {
 
 .jd-scorers__version {
   font-size: 0.6875rem;
-  color: var(--color-text-secondary, var(--color-text-secondary));
+  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .jd-scorers__produces {
@@ -1149,13 +1149,13 @@ function relativeTime(timestampMs: number): string {
   align-items: center;
   gap: 0.375rem;
   font-size: 0.75rem;
-  color: var(--color-text-secondary, var(--color-text-secondary));
+  color: var(--color-text-secondary, var(--o2-text-secondary));
   flex-wrap: wrap;
 }
 
 .jd-scorers__produces-icon {
   flex-shrink: 0;
-  color: var(--color-text-secondary, var(--color-text-secondary));
+  color: var(--color-text-secondary, var(--o2-text-secondary));
   opacity: 0.7;
 }
 
@@ -1170,11 +1170,11 @@ function relativeTime(timestampMs: number): string {
 
 .jd-scorers__produces-type,
 .jd-scorers__produces-range {
-  color: var(--color-text-secondary, var(--color-text-secondary));
+  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .jd-scorers__sep {
-  color: var(--color-text-secondary, var(--color-text-secondary));
+  color: var(--color-text-secondary, var(--o2-text-secondary));
   opacity: 0.5;
 }
 
@@ -1183,7 +1183,7 @@ function relativeTime(timestampMs: number): string {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  color: var(--color-text-secondary, var(--color-text-secondary));
+  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .jd-scorers__cta-label {
@@ -1217,30 +1217,30 @@ function relativeTime(timestampMs: number): string {
   display: inline-flex;
   align-items: center;
   gap: 0.3125rem;
-  color: var(--color-text-secondary, var(--color-text-secondary));
+  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .jd-status-cell__dot {
   width: 0.375rem;
   height: 0.375rem;
   border-radius: 50%;
-  background: var(--color-text-secondary, var(--color-text-secondary));
+  background: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .jd-status-cell--success {
-  color: var(--color-status-success-text, #2e7d32);
+  color: var(--color-status-success-text);
 }
 .jd-status-cell--success .jd-status-cell__dot {
-  background: var(--color-status-success-text, #2e7d32);
+  background: var(--color-status-success-text);
 }
 
 .jd-status-cell--error,
 .jd-status-cell--timeout {
-  color: var(--color-status-error-text, #c62828);
+  color: var(--color-status-error-text);
 }
 .jd-status-cell--error .jd-status-cell__dot,
 .jd-status-cell--timeout .jd-status-cell__dot {
-  background: var(--color-status-error-text, #c62828);
+  background: var(--color-status-error-text);
 }
 
 .jd-status-cell--skipped .jd-status-cell__dot {

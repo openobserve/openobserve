@@ -331,20 +331,12 @@ export default defineComponent({
 /* Pivot table styles */
 .table-wrapper .pivot-total-row {
   font-weight: bold;
-  background-color: rgba(0, 0, 0, 0.03);
-}
-
-.body--dark .table-wrapper .pivot-total-row {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: var(--color-table-row-striped-bg);
 }
 
 .table-wrapper .pivot-group-header {
   font-weight: 600;
-  border-bottom: 2px solid rgba(0, 0, 0, 0.12);
-}
-
-.body--dark .table-wrapper .pivot-group-header {
-  border-bottom-color: rgba(255, 255, 255, 0.12);
+  border-bottom: 2px solid var(--color-table-row-divider);
 }
 
 .table-wrapper .pivot-section-border {

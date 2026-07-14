@@ -37,7 +37,7 @@
     </AppPageHeader>
 
     <div class="flex-1 min-h-0 overflow-hidden grid grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)] max-[1100px]:grid-cols-1 gap-2.5">
-      <div class="scorer-form__main min-w-0 overflow-auto p-[18px_24px_24px] bg-(--o2-card-bg) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)]">
+      <div class="scorer-form__main min-w-0 overflow-auto p-[18px_24px_24px] bg-(--color-surface-base) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)]">
         <!-- Section 01: Identity -->
         <section class="mb-6">
           <div class="flex items-center gap-[10px] pb-[10px] border-b border-(--color-dialog-header-border) mb-3">
@@ -91,8 +91,8 @@
             />
             <div class="text-[11.5px] text-(--color-text-secondary) mt-1">{{ t("onlineEvals.scorer.producesScoreHelp") }}</div>
 
-            <div v-if="selectedScoreConfig" class="flex items-center flex-wrap gap-[6px_10px] p-[8px_12px] mt-2 border border-[color-mix(in_srgb,var(--o2-status-info-text)_25%,transparent)] rounded-md bg-[color-mix(in_srgb,var(--o2-status-info-text)_8%,transparent)] text-xs text-(--color-text-primary)">
-              <span class="w-2 h-2 rounded-full bg-(--o2-status-info-text) shrink-0" />
+            <div v-if="selectedScoreConfig" class="flex items-center flex-wrap gap-[6px_10px] p-[8px_12px] mt-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] rounded-md bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] text-xs text-(--color-text-primary)">
+              <span class="w-2 h-2 rounded-full bg-(--color-status-info-text) shrink-0" />
               <span class="font-medium">
                 {{ t("onlineEvals.scorer.selectedPrefix") }}
                 <strong class="font-mono">{{ selectedScoreConfig.name }}</strong>
@@ -150,8 +150,8 @@
               />
             </div>
 
-            <div v-if="selectedProvider" class="flex items-center flex-wrap gap-[6px_10px] p-[8px_12px] mt-2 border border-[color-mix(in_srgb,var(--o2-status-info-text)_25%,transparent)] rounded-md bg-[color-mix(in_srgb,var(--o2-status-info-text)_8%,transparent)] text-xs text-(--color-text-primary)">
-              <span class="w-2 h-2 rounded-full bg-(--o2-status-info-text) shrink-0" />
+            <div v-if="selectedProvider" class="flex items-center flex-wrap gap-[6px_10px] p-[8px_12px] mt-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] rounded-md bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] text-xs text-(--color-text-primary)">
+              <span class="w-2 h-2 rounded-full bg-(--color-status-info-text) shrink-0" />
               <span class="text-(--color-text-secondary)">
                 {{ t("onlineEvals.scorer.endpointLabel") }}
                 <span class="font-mono">{{ providerEndpoint(selectedProvider) }}</span>
@@ -298,7 +298,7 @@
             <div class="flex justify-between gap-3">
               <button
                 type="button"
-                class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-(--color-button-primary) cursor-pointer disabled:text-(--color-text-muted) disabled:cursor-not-allowed"
+                class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-(--color-primary-600) cursor-pointer disabled:text-(--color-text-muted) disabled:cursor-not-allowed"
                 :disabled="form.extraMetadataFields.length >= MAX_EXTRA_FIELDS"
                 data-test="scorer-form-extra-field-add"
                 @click="addExtraField"
@@ -311,7 +311,7 @@
 
               <button
                 type="button"
-                class="scorer-extras__preview border-0 bg-transparent py-1 px-0 text-xs font-semibold text-(--color-button-primary) cursor-pointer"
+                class="scorer-extras__preview border-0 bg-transparent py-1 px-0 text-xs font-semibold text-(--color-primary-600) cursor-pointer"
                 data-test="scorer-form-preview-schema"
                 @click="previewOutputSchema"
               >
@@ -545,7 +545,7 @@
             <div class="flex justify-between gap-3">
               <button
                 type="button"
-                class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-(--color-button-primary) cursor-pointer"
+                class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-(--color-primary-600) cursor-pointer"
                 data-test="scorer-form-remote-header-add"
                 @click="addCustomHeader"
               >
@@ -600,7 +600,7 @@
       />
     </div>
 
-    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-(--o2-card-bg) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)] shrink-0 z-1">
+    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-(--color-surface-base) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)] shrink-0 z-1">
       <OButton
         data-test="scorer-form-cancel-btn"
         type="button"
