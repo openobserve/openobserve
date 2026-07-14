@@ -324,7 +324,7 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
-import { formatDate } from "@/utils/date";
+import { convertUnixToQuasarFormat } from "@/utils/date";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -616,12 +616,6 @@ const clearSearch = () => {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function convertUnixToQuasarFormat(unixMicroseconds: any) {
-  if (!unixMicroseconds) return "";
-  const unixSeconds = unixMicroseconds / 1e6;
-  const dateToFormat = new Date(unixSeconds * 1000);
-  return formatDate(dateToFormat.toISOString(), "YYYY-MM-DDTHH:mm:ssZ");
-}
 
 const filterData = (rows: any[], terms: any) => {
   const lc = terms.toLowerCase();

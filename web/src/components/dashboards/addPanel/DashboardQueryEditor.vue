@@ -815,6 +815,32 @@ export default defineComponent({
       updateQuery(newQuery, {});
     };
 
+    /**
+     * Commit what the editor is showing into the tab being left, before the tab
+     * index moves. `handleQueryUpdate` writes the editor's debounced content
+     * into whatever tab is active when it fires, so switching tabs mid-debounce
+     * loses the edit: the outgoing tab never receives it, and `props.query`
+     * re-renders the editor from that tab's stale state.
+     *
+     * Must be `flush: "sync"` — a pre-flush watcher already runs too late, with
+     * `props.query` having overwritten the model. Custom queries only: in
+     * builder mode the editor is read-only and derived, never a source of truth.
+     */
+    watch(
+      () => dashboardPanelData.layout.currentQueryIndex,
+      (_newIndex, oldIndex) => {
+        const outgoing = dashboardPanelData.data.queries?.[oldIndex];
+        if (!outgoing?.customQuery) return;
+
+        const editorValue = queryEditorRef.value?.getValue?.();
+        if (typeof editorValue !== "string") return;
+
+        const trimmed = editorValue.trim();
+        if (trimmed && outgoing.query !== trimmed) outgoing.query = trimmed;
+      },
+      { flush: "sync" },
+    );
+
     // Unified Query Editor: Handle language change
     const handleLanguageChange = (newLanguage: "sql" | "promql") => {
       dashboardPanelData.data.queryType = newLanguage;

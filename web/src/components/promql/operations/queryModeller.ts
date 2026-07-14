@@ -14,18 +14,19 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import {
-  PromVisualQuery,
-  QueryBuilderLabelFilter,
-  QueryBuilderOperationDef,
-  PromQueryModeller,
-  QueryBuilderOperation,
-  PromOperationId,
-  PromVisualQueryOperationCategory,
+  PromqlBuilderQuery,
+  PromqlLabelMatcher,
+  PromqlStepSpec,
+  PromqlRenderer,
+  PromqlStep,
+  PromqlStepId,
+  PromqlStepGroup,
+  normalizeStepId,
 } from "../types";
-import { getOperationDefinitions } from "./index";
+import { buildPromqlStepCatalog } from "./index";
 
-class PromQueryModellerClass implements PromQueryModeller {
-  private operations: Map<string, QueryBuilderOperationDef>;
+class PromqlRendererImpl implements PromqlRenderer {
+  private operations: Map<string, PromqlStepSpec>;
 
   constructor() {
     this.operations = new Map();
@@ -33,7 +34,7 @@ class PromQueryModellerClass implements PromQueryModeller {
   }
 
   private initOperations() {
-    const ops = getOperationDefinitions();
+    const ops = buildPromqlStepCatalog();
     ops.forEach((op) => {
       this.operations.set(op.id, op);
     });
@@ -43,7 +44,7 @@ class PromQueryModellerClass implements PromQueryModeller {
    * Render label filters as PromQL string
    * Example: {label1="value1", label2=~"regex.*"}
    */
-  renderLabels(labels: QueryBuilderLabelFilter[]): string {
+  renderLabels(labels: PromqlLabelMatcher[]): string {
     if (labels.length === 0) return "";
 
     const labelStrings = labels.map((label) => {
@@ -62,29 +63,32 @@ class PromQueryModellerClass implements PromQueryModeller {
    * Render a single operation
    */
   private renderOperation(
-    operation: QueryBuilderOperation,
+    operation: PromqlStep,
     innerExpr: string
   ): string {
-    const def = this.operations.get(operation.id);
+    // A panel saved before the scalar-math steps were renamed still carries the
+    // old id, so resolve it before anything looks it up or switches on it.
+    const id = normalizeStepId(operation.id);
+    const def = this.operations.get(id);
     if (!def) return innerExpr;
 
     const params = operation.params || def.defaultParams;
 
     // Handle quantile_over_time first (special case with 2 params)
-    if (operation.id === PromOperationId.QuantileOverTime) {
+    if (id === PromqlStepId.QuantileOverTime) {
       const quantile = params[0] || 0.95;
       const range = params[1] || "$__interval";
-      return `${operation.id}(${quantile}, ${innerExpr}[${range}])`;
+      return `${id}(${quantile}, ${innerExpr}[${range}])`;
     }
 
     // Handle range functions (rate, increase, etc.)
-    if (def.category === PromVisualQueryOperationCategory.RangeFunctions) {
+    if (def.group === PromqlStepGroup.RateAndRange) {
       const range = params[0] || "$__interval";
-      return `${operation.id}(${innerExpr}[${range}])`;
+      return `${id}(${innerExpr}[${range}])`;
     }
 
     // Handle aggregations (sum, avg, etc.)
-    if (def.category === PromVisualQueryOperationCategory.Aggregations) {
+    if (def.group === PromqlStepGroup.Aggregation) {
       const byLabelsParam = params[params.length - 1];
       const otherParams = params.slice(0, -1);
 
@@ -111,42 +115,42 @@ class PromQueryModellerClass implements PromQueryModeller {
 
         if (funcParams) {
           // e.g., topk by (label) (k, expr)
-          return `${operation.id}${byClause} (${funcParams}, ${innerExpr})`;
+          return `${id}${byClause} (${funcParams}, ${innerExpr})`;
         } else {
           // e.g., sum by (label) (expr)
-          return `${operation.id}${byClause} (${innerExpr})`;
+          return `${id}${byClause} (${innerExpr})`;
         }
       }
 
       // No by clause
       if (funcParams) {
         // e.g., topk(k, expr)
-        return `${operation.id}(${funcParams}, ${innerExpr})`;
+        return `${id}(${funcParams}, ${innerExpr})`;
       }
-      return `${operation.id}(${innerExpr})`;
+      return `${id}(${innerExpr})`;
     }
 
     // Handle histogram_quantile
-    if (operation.id === PromOperationId.HistogramQuantile) {
+    if (id === PromqlStepId.HistogramQuantile) {
       const quantile = params[0] || 0.95;
-      return `${operation.id}(${quantile}, ${innerExpr})`;
+      return `${id}(${quantile}, ${innerExpr})`;
     }
 
     // Handle binary operations (arithmetic)
-    if (def.category === PromVisualQueryOperationCategory.BinaryOps) {
+    if (def.group === PromqlStepGroup.ScalarMath) {
       const value = params[0] || 0;
-      switch (operation.id) {
-        case PromOperationId.Addition:
+      switch (id) {
+        case PromqlStepId.Addition:
           return `${innerExpr} + ${value}`;
-        case PromOperationId.Subtraction:
+        case PromqlStepId.Subtraction:
           return `${innerExpr} - ${value}`;
-        case PromOperationId.MultiplyBy:
+        case PromqlStepId.MultiplyBy:
           return `${innerExpr} * ${value}`;
-        case PromOperationId.DivideBy:
+        case PromqlStepId.DivideBy:
           return `${innerExpr} / ${value}`;
-        case PromOperationId.Modulo:
+        case PromqlStepId.Modulo:
           return `${innerExpr} % ${value}`;
-        case PromOperationId.Exponent:
+        case PromqlStepId.Exponent:
           return `${innerExpr} ^ ${value}`;
         default:
           return innerExpr;
@@ -155,7 +159,7 @@ class PromQueryModellerClass implements PromQueryModeller {
 
     // Handle functions with no parameters
     if (params.length === 0) {
-      return `${operation.id}(${innerExpr})`;
+      return `${id}(${innerExpr})`;
     }
 
     // Handle functions with parameters
@@ -164,32 +168,32 @@ class PromQueryModellerClass implements PromQueryModeller {
     // Functions like clamp that have params before the expression
     if (
       [
-        PromOperationId.Clamp,
-        PromOperationId.ClampMax,
-        PromOperationId.ClampMin,
-        PromOperationId.Round,
-      ].includes(operation.id as PromOperationId)
+        PromqlStepId.Clamp,
+        PromqlStepId.ClampMax,
+        PromqlStepId.ClampMin,
+        PromqlStepId.Round,
+      ].includes(id as PromqlStepId)
     ) {
-      if (operation.id === PromOperationId.Clamp) {
-        return `${operation.id}(${innerExpr}, ${params[0]}, ${params[1]})`;
+      if (id === PromqlStepId.Clamp) {
+        return `${id}(${innerExpr}, ${params[0]}, ${params[1]})`;
       } else if (
-        operation.id === PromOperationId.Round &&
+        id === PromqlStepId.Round &&
         params[0] &&
         params[0] !== 1
       ) {
-        return `${operation.id}(${innerExpr}, ${params[0]})`;
+        return `${id}(${innerExpr}, ${params[0]})`;
       }
-      return `${operation.id}(${innerExpr})`;
+      return `${id}(${innerExpr})`;
     }
 
     // Default: function(innerExpr)
-    return `${operation.id}(${innerExpr})`;
+    return `${id}(${innerExpr})`;
   }
 
   /**
    * Render the complete PromQL query
    */
-  renderQuery(query: PromVisualQuery): string {
+  renderQuery(query: PromqlBuilderQuery): string {
     // Start with metric and labels
     let queryStr = query.metric || "";
     const labelsStr = this.renderLabels(query.labels);
@@ -200,8 +204,8 @@ class PromQueryModellerClass implements PromQueryModeller {
       queryStr += "{}";
     }
 
-    // Apply operations from LAST to FIRST (right-to-left)
-    // This way, the last added operation wraps all previous ones
+    // Each step wraps the expression built so far, so the FIRST step ends up
+    // innermost and the last one outermost.
     // Example: [max, rate, sum] renders as: sum(rate(max(...)))
     let currentExpr = queryStr;
     for (let i = 0; i < query.operations.length; i++) {
@@ -212,35 +216,31 @@ class PromQueryModellerClass implements PromQueryModeller {
   }
 
   /**
-   * Get operation definition by ID
+   * The catalog entry for a step id, accepting ids as old panels persisted them.
    */
-  getOperationDef(id: string): QueryBuilderOperationDef | undefined {
-    return this.operations.get(id);
+  getStepSpec(id: string): PromqlStepSpec | undefined {
+    return this.operations.get(normalizeStepId(id));
   }
 
-  /**
-   * Get all operations for a specific category
-   */
-  getOperationsForCategory(category: string): QueryBuilderOperationDef[] {
+  /** Every step in one group of the picker. */
+  getStepsForGroup(group: string): PromqlStepSpec[] {
     return Array.from(this.operations.values()).filter(
-      (op) => op.category === category
+      (op) => op.group === group
     );
   }
 
-  /**
-   * Get all categories
-   */
-  getCategories(): string[] {
-    return Object.values(PromVisualQueryOperationCategory);
+  /** The picker's groups, in declaration order. */
+  getGroups(): string[] {
+    return Object.values(PromqlStepGroup);
   }
 
   /**
    * Get all operations
    */
-  getAllOperations(): QueryBuilderOperationDef[] {
+  getAllSteps(): PromqlStepSpec[] {
     return Array.from(this.operations.values());
   }
 }
 
 // Export singleton instance
-export const promQueryModeller = new PromQueryModellerClass();
+export const promqlRenderer = new PromqlRendererImpl();

@@ -18,7 +18,5 @@
     "skipLibCheck": true,
     "composite": true,
     "types": ["node"],
-    "baseUrl": ".",
-    "downlevelIteration": true,
   }
 }

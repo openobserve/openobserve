@@ -20,7 +20,10 @@ import { nextTick } from "vue";
 vi.mock("@/views/HomeView.vue", () => ({ default: {} }));
 vi.mock("@/plugins/logs/Index.vue", () => ({ default: {} }));
 vi.mock("@/plugins/logs/SearchResult.vue", () => ({ default: {} }));
-vi.mock("@/plugins/metrics/Index.vue", () => ({ default: {} }));
+vi.mock("@/plugins/metrics/Index.vue", () => ({ default: { chunk: "editor" } }));
+vi.mock("@/plugins/metrics/explorer/MetricsExplorer.vue", () => ({
+  default: { chunk: "explorer" },
+}));
 vi.mock("@/plugins/traces/Index.vue", () => ({ default: {} }));
 vi.mock("@/views/RUM/RealUserMonitoring.vue", () => ({ default: {} }));
 vi.mock("@/views/Dashboards/Dashboards.vue", () => ({ default: {} }));

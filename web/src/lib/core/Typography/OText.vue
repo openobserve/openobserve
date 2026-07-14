@@ -45,7 +45,8 @@ const resolvedAs = computed(
 // Font sizes use Tailwind's built-in scale (text-sm = 14px, text-xs = 12px).
 const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
   // Page title: compact, authoritative. Designed for the page header rail.
-  // Target: same visual weight as Datadog / Grafana page titles — quiet but clear.
+  // Deliberately restrained: a dense observability UI wants the page title to
+  // orient you, not to shout over the data it sits above.
   "page-title": [
     "text-sm font-medium",
     "text-typography-page-title",

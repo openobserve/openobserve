@@ -11,7 +11,7 @@
 
 /* ── Light-mode defaults ─────────────────────────────────── */
 :root {
-  /* Text — grey-based semantic hierarchy (Datadog/Grafana pattern) */
+  /* Text — grey-based semantic hierarchy */
   --color-text-heading:     var(--color-grey-900);  /* h1-h6, modal titles */
   --color-text-primary:     var(--color-grey-900);  /* alias for heading — backward compat */
   --color-text-body:        var(--color-grey-800);  /* paragraphs, default body */
