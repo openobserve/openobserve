@@ -358,6 +358,60 @@ export const executeTestRun = async (opts: {
   }
 };
 
+// Load a PAST run (from the Executions history) into the same testRun.result the
+// canvas already reads — so error nodes paint ✗ and open the step drawer, but
+// read-only (no editable input / Replay). The run detail carries:
+//   errors.data:      [{ node_id, error: string[] }]  — errored nodes + messages
+//   data.node_map:    { node_id: [{ meta, data }] }   — per-node input processed
+//   data.complete:    [{ meta, data }]                — full workflow input
+// The array-vs-map difference in errors.data is bridged here (each entry has its
+// node_id), so it lines up with node_map by key.
+export const loadWorkflowRun = async (opts: {
+  orgId: string;
+  workflowId: string;
+  runId: string;
+}): Promise<{ ok: boolean; error?: string }> => {
+  const wf = workflowObj.currentSelectedWorkflow;
+  try {
+    const res = await workflowService.getWorkflowRun({
+      org_identifier: opts.orgId,
+      id: opts.workflowId,
+      run_id: opts.runId,
+    });
+    const payload = res.data || {};
+
+    // errors.data (array) -> map keyed by node_id, in the same
+    // { error_count, errors: [[message], …] } shape the badges + drawer read.
+    const errList = Array.isArray(payload.errors?.data)
+      ? payload.errors.data
+      : [];
+    const errors: Record<string, any> = {};
+    for (const e of errList) {
+      const msgs = Array.isArray(e.error) ? e.error : [e.error];
+      errors[e.node_id] = {
+        error_count: msgs.length,
+        errors: msgs.map((m: string) => [m]),
+      };
+    }
+
+    workflowObj.testRun.result = {
+      errors,
+      // Every node "ran": upstream shows ✓, errored ✗, downstream ⊘ — via the
+      // existing testStatus logic. Only ✗ nodes are clickable.
+      ranNodeIds: (wf.nodes || []).map((n: any) => n.id),
+      blockedNodeIds: downstreamOfErrorNodes(Object.keys(errors)),
+      // Per-node input the drawer shows (read-only) for an errored node.
+      nodeInputs: payload.data?.node_map || {},
+      fullInput: payload.data?.complete ?? null,
+      mode: "history",
+      runId: opts.runId,
+    };
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e?.response?.data?.message };
+  }
+};
+
 // Load a workflow (a list row or API result) into the shared editor state,
 // normalizing nodes/edges for VueFlow (type from node_type; edge styling). Mirrors
 // the pipeline pattern where editPipeline() sets pipelineObj from the row

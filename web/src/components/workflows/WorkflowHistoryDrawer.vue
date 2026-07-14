@@ -23,7 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    :width="65"
+    :width="width ?? 65"
+    :seamless="seamless"
+    :persistent="seamless"
+    :portal-target="portalTarget"
     :title="t('workflow.history.title')"
     :sub-title="workflowName"
     data-test="workflow-history-drawer"
@@ -45,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @on:date-change="updateDateTime"
       />
       <OButton
-        variant="ghost"
+        variant="outline"
         size="icon-sm"
         icon-left="refresh"
         :loading="loading"
@@ -61,6 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <WorkflowExecutionTimeline
         v-if="rows.length > 0"
         :history="timelineHistory"
+        :firing-label="t('workflow.history.failed')"
+        :ok-label="t('workflow.history.success')"
         class="tw:shrink-0"
       />
 
@@ -82,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sort-order="desc"
           width="100%"
           class="tw:w-full tw:h-full"
+          @row-click="openRun"
         >
           <template #empty>
             <div class="tw:py-10"><NoData /></div>
@@ -120,18 +126,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-error="{ value }">
             <span :title="value || ''">{{ value || "—" }}</span>
           </template>
-
-          <template #cell-actions="{ row }">
-            <OButton
-              variant="ghost"
-              size="icon-sm"
-              icon-left="open-in-new"
-              :data-test="`workflow-history-${row.run_id}-open`"
-              @click="openRun(row)"
-            >
-              <OTooltip side="bottom" :content="t('workflow.history.openRun')" />
-            </OButton>
-          </template>
         </OTable>
       </div>
     </div>
@@ -160,6 +154,11 @@ const props = defineProps<{
   orgId: string;
   workflowId: string;
   workflowName?: string;
+  // Side-by-side mode (open alongside the canvas): transparent, non-dismissing
+  // backdrop, scoped to a container, at a reduced width.
+  seamless?: boolean;
+  width?: number;
+  portalTarget?: string;
 }>();
 const emit = defineEmits<{
   (e: "close"): void;
@@ -266,13 +265,6 @@ const columns = computed<OTableColumnDef[]>(() => [
     accessorKey: "error",
     resizable: true,
     meta: { align: "left", flex: true },
-  },
-  {
-    id: "actions",
-    header: t("workflow.actions"),
-    isAction: true,
-    size: 80,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 1 },
   },
 ]);
 

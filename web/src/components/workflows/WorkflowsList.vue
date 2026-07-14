@@ -167,14 +167,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </template>
                   <ODropdownItem
-                    :data-test="`workflow-list-${row.name}-view-runs`"
-                    @select="openHistory(row)"
-                  >
-                    <template #icon-left><OIcon size="sm" name="history" /></template>
-                    {{ t("workflow.viewRuns") }}
-                  </ODropdownItem>
-                  <ODropdownSeparator />
-                  <ODropdownItem
                     :data-test="`workflow-list-${row.name}-delete`"
                     variant="destructive"
                     @select="openDeleteDialog(row)"
@@ -229,7 +221,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model="confirmDialogMeta.show"
   />
 
-  <!-- Run history (Executions) — opened by clicking a workflow row. -->
+  <!-- Run history — opened by clicking a workflow row. Clicking a run inside it
+       navigates to the editor with that run loaded. -->
   <WorkflowHistoryDrawer
     v-if="showHistory"
     :open="showHistory"
@@ -258,7 +251,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import WorkflowHistoryDrawer from "@/components/workflows/WorkflowHistoryDrawer.vue";
@@ -416,9 +408,8 @@ const editWorkflow = (row: any) => {
   });
 };
 
-// Runs tab is a later slice (#15).
-// Run-history (Executions) drawer — opened by clicking a workflow row or the
-// "View Runs" menu action (mirrors AlertList's row-click → history drawer).
+// Run history — clicking a workflow row opens its history first (not the editor),
+// since viewing runs is the common case. Full-width modal drawer over the list.
 const showHistory = ref(false);
 const historyWorkflow = ref<any>({ id: "", name: "" });
 const openHistory = (row: any) => {
@@ -427,14 +418,16 @@ const openHistory = (row: any) => {
   showHistory.value = true;
 };
 
-// From the history drawer's "open run" icon: hydrate the editor from the full
-// workflow row and deep-link to the editor with the run_id so it can surface
-// that run's per-node input/output.
+// From the history drawer: clicking a run takes the user to the edit page with
+// that run loaded (read-only). Hydrate from the row so the editor renders the
+// graph immediately; the run_id query drives the run load in the editor.
 const openRunInEditor = (runId: string) => {
   const row = historyWorkflow.value;
   if (!row?.id) return;
-  hydrateWorkflow(row);
+  // Close this (list) history drawer first — the editor opens its own
+  // side-by-side one, and leaving this mounted would stack two drawers.
   showHistory.value = false;
+  hydrateWorkflow(row);
   router.push({
     name: "workflowEditor",
     query: { id: row.id, name: row.name, org_identifier: orgId.value, run_id: runId },

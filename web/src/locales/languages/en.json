@@ -1652,8 +1652,8 @@
     "updated": "Updated",
     "actions": "Actions",
     "history": {
-      "button": "Executions",
-      "title": "Workflow Executions",
+      "button": "Runs",
+      "title": "Workflow History",
       "started": "Started",
       "ended": "Ended",
       "duration": "Duration",
@@ -1661,13 +1661,13 @@
       "error": "Error",
       "success": "Success",
       "failed": "Failed",
-      "openRun": "Open Run",
+      "open": "History",
       "empty": "No Executions Yet",
-      "loadError": "Error While Loading Executions"
+      "loadError": "Error While Loading Executions",
+      "loadRunError": "Error While Loading This Run"
     },
     "edit": "Edit",
     "view": "View",
-    "viewRuns": "View Runs",
     "delete": "Delete",
     "deleteTitle": "Delete Workflow",
     "deleteMessage": "Are You Sure You Want To Delete This Workflow?",

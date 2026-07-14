@@ -25,11 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:items-center tw:gap-3">
         <span v-if="firingCount > 0" class="tw:flex tw:items-center tw:gap-1 tw:text-[11px]">
           <span class="tw:inline-block tw:w-2 tw:h-2 tw:rounded-sm" style="background: var(--color-badge-error-solid-bg)" />
-          <span class="tw:font-medium" style="color: var(--color-badge-error-soft-text)">{{ firingCount }} Firing</span>
+          <span class="tw:font-medium" style="color: var(--color-badge-error-soft-text)">{{ firingCount }} {{ firingLabel }}</span>
         </span>
         <span class="tw:flex tw:items-center tw:gap-1 tw:text-[11px]" style="color: var(--color-text-secondary)">
           <span class="tw:inline-block tw:w-2 tw:h-2 tw:rounded-sm" style="background: var(--color-badge-success-solid-bg)" />
-          {{ okCount }} Ok
+          {{ okCount }} {{ okLabel }}
         </span>
         <span v-if="skippedCount > 0" class="tw:flex tw:items-center tw:gap-1 tw:text-[11px]" style="color: var(--color-text-muted)">
           <span class="tw:inline-block tw:w-2 tw:h-2 tw:rounded-sm" style="background: var(--color-border-default)" />
@@ -117,9 +117,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed } from "vue";
 
-const props = defineProps<{
-  history: Array<{ status: string; timestamp: number }>;
-}>();
+const props = withDefaults(
+  defineProps<{
+    history: Array<{ status: string; timestamp: number }>;
+    // Legend/tooltip wording. Defaults are alert-centric ("Firing"/"Ok");
+    // workflows pass "Failed"/"Success".
+    firingLabel?: string;
+    okLabel?: string;
+  }>(),
+  { firingLabel: "Firing", okLabel: "Ok" },
+);
+const { firingLabel, okLabel } = props;
 
 const hoveredIndex = ref<number | null>(null);
 
@@ -137,8 +145,8 @@ function isOk(s: string) {
 
 function normalizeStatus(s: string): string {
   const v = s?.toLowerCase();
-  if (isFiring(v)) return "Firing";
-  if (isOk(v)) return "Ok";
+  if (isFiring(v)) return firingLabel;
+  if (isOk(v)) return okLabel;
   if (v === "skipped") return "Skipped";
   return s?.replace(/_/g, " ") ?? "Unknown";
 }

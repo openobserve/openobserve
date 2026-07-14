@@ -71,26 +71,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="outline"
                 size="icon"
                 :title="t('workflow.test.stepResult.copyInput')"
-                :disabled="!editableInput"
-                @click="copy(editableInput, 'input')"
+                :disabled="!inputModel"
+                @click="copy(inputModel, 'input')"
               >
                 <OIcon name="content-copy" size="xs" />
               </OButton>
             </div>
           </div>
-          <!-- Input is EDITABLE — edit it and Replay re-runs from this step with
-               your input (that's what makes Replay useful). -->
+          <!-- Test mode: input is EDITABLE and Replay re-runs from this step with
+               it. History mode: read-only per-node input captured for the run. -->
           <div class="io-content-box">
             <CodeQueryEditor
               editor-id="workflow-step-input"
               language="json"
-              :query="editableInput"
+              :query="inputModel"
+              :read-only="isHistory"
               :show-auto-complete="false"
-              @update:query="editableInput = $event"
+              @update:query="inputModel = $event"
             />
           </div>
           <div
-            v-if="editableInput && inputInvalid"
+            v-if="!isHistory && editableInput && inputInvalid"
             class="wf-input-error tw:mt-1"
           >
             {{ t("workflow.test.invalidJson") }}
@@ -151,7 +152,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton variant="outline" size="sm-action" @click="close">
           {{ t("common.close") }}
         </OButton>
+        <!-- Replay only makes sense for a live Test run — a past run is read-only. -->
         <OTooltip
+          v-if="!isHistory"
           :content="t('workflow.test.stepResult.replayHint')"
           :delay="300"
           side="top"
@@ -230,12 +233,32 @@ const errorMessages = computed<string[]>(() =>
   errorEntries.value.map((e) => (Array.isArray(e) ? String(e[0]) : String(e))),
 );
 
+// A history run is read-only (viewing a past execution). A live Test run is
+// editable + replayable.
+const isHistory = computed(() => result.value?.mode === "history");
+
 // ONE central input, shared with the Test dialog (workflowObj.testRun.input).
 // Editing it here or in the Test dialog stays in sync; Replay from this node
 // feeds this same payload. Bound directly — no per-node copies to desync.
 const editableInput = computed<string>({
   get: () => workflowObj.testRun.input || "",
   set: (val: string) => (workflowObj.testRun.input = val),
+});
+
+// History mode: the per-node input captured for this run (node_map[nodeId]),
+// pretty-printed and read-only.
+const nodeInputText = computed<string>(() => {
+  const v = result.value?.nodeInputs?.[nodeId.value];
+  return v == null ? "" : JSON.stringify(v, null, 2);
+});
+
+// What the Input editor shows: read-only per-node input for a past run, else the
+// editable central input. The setter no-ops in history mode.
+const inputModel = computed<string>({
+  get: () => (isHistory.value ? nodeInputText.value : editableInput.value),
+  set: (val: string) => {
+    if (!isHistory.value) editableInput.value = val;
+  },
 });
 
 // Parsed editable input for Replay (must be a JSON array of records).

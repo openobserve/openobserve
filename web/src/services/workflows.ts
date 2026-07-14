@@ -114,6 +114,23 @@ const workflows = {
     return http().get(url);
   },
 
+  // Detail of a single run — errors (per errored node) plus the run's input
+  // data (`complete` = full workflow input, `node_map` = per-node input the
+  // node processed/errored on). Powers the read-only run inspection in the
+  // editor (click a run in history -> error nodes show Input/Output).
+  getWorkflowRun: ({
+    org_identifier,
+    id,
+    run_id,
+  }: {
+    org_identifier: string;
+    id: string;
+    run_id: string;
+  }) => {
+    const url = `/api/${org_identifier}/workflows/${id}/errors/${run_id}`;
+    return http().get(url);
+  },
+
   // Re-run a failed run, optionally from a specific node.
   retryWorkflow: ({
     org_identifier,
