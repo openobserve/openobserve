@@ -116,6 +116,35 @@ describe("OTooltip", () => {
     });
   });
 
+  // ── Content wrapper layout ─────────────────────────────────────────────────
+  //
+  // The content wrapper used to be `inline-flex items-center gap-1.5`
+  // unconditionally, purely to align an optional keyboard-shortcut chip. But
+  // `inline-flex` turned every text run / <b> / <br> of a multi-line tooltip
+  // into a separate flex item on one non-wrapping row, so each run collapsed to
+  // its longest word — text wrapped into a narrow column and short leading runs
+  // were vertically centred against the tall body (the "not aligned" bug seen
+  // across Legend / Step / Y-Axis / VRL tooltips). Flex is now applied ONLY when
+  // a shortcut is present; plain tooltips flow as normal wrapping text.
+  it("does not force inline-flex on the content wrapper without a shortcut", () => {
+    const wrapper = mountTooltip(
+      { content: "Multi line body text", open: true },
+      { default: () => h("button", "Hover") },
+    );
+    const contentSpan = wrapper.find('[data-test="o-tooltip-content"] > span');
+    expect(contentSpan.exists()).toBe(true);
+    expect(contentSpan.classes()).not.toContain("inline-flex");
+  });
+
+  it("applies inline-flex on the content wrapper when a shortcut is present", () => {
+    const wrapper = mountTooltip(
+      { content: "Save", open: true, shortcut: "ctrl+s" },
+      { default: () => h("button", "Hover") },
+    );
+    const contentSpan = wrapper.find('[data-test="o-tooltip-content"] > span');
+    expect(contentSpan.classes()).toContain("inline-flex");
+  });
+
   it("applies contentClass to the tooltip bubble", () => {
     const wrapper = mountTooltip(
       { content: "Styled", open: true, contentClass: "my-custom-class" },

@@ -152,7 +152,7 @@ const contentClasses = computed(() => [
           :style="contentStyle"
           :class="contentClasses"
         >
-          <span class="inline-flex items-center gap-1.5">
+          <span :class="(shortcut || shortcutId) ? 'inline-flex items-center gap-1.5' : ''">
             <slot name="content">{{ content }}</slot>
             <OShortcut
               v-if="shortcut || shortcutId"
@@ -195,7 +195,7 @@ const contentClasses = computed(() => [
             :style="contentStyle"
             :class="contentClasses"
           >
-            <span class="inline-flex items-center gap-1.5">
+            <span :class="(shortcut || shortcutId) ? 'inline-flex items-center gap-1.5' : ''">
               <slot name="content">{{ content }}</slot>
               <OShortcut
               v-if="shortcut || shortcutId"
