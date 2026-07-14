@@ -309,6 +309,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Rerun-detection strategy:
+          #  1. On a rerun, query the GitHub Jobs API for this run.
+          #  2. Compare non-completed jobs in the current attempt against total unique
+          #     matrix jobs: all present -> rerun ALL tests; a subset -> rerun FAILED only.
+          #  3. If the API returns an unexpected payload (rate-limit / error body with no
+          #     .jobs key), default to "all tests". Safe (everything runs), just not
+          #     cost-optimized — and it never crashes the step (see guard below).
           echo "::notice::GitHub run attempt: ${{ github.run_attempt }}"
           if [ "${{ github.run_attempt }}" -gt "1" ]; then
             echo "is_rerun=true" >> $GITHUB_OUTPUT
