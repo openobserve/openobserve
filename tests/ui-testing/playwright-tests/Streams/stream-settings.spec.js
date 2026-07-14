@@ -57,7 +57,7 @@ test.describe("Stream Index Type Configuration Tests", () => {
         testLogger.info('Validation error correctly displayed');
     });
 
-    test.skip("should select and delete extended retention period date", {
+    test("should select and delete extended retention period date", {
         tag: ['@streams', '@extendedRetention', '@dateSelection', '@all']
     }, async ({ page }) => {
         testLogger.info('Testing extended retention period date selection and deletion');

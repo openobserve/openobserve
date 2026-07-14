@@ -228,20 +228,24 @@ async function multistreamselect(page) {
     await expect(page.url()).toContain("logs");
   });
 
-  // Note: This test can be flaky due to non-deterministic record ordering across streams
-  test.skip("should click on interesting fields icon and display query in editor", {
-    tag: ['@interestingFields', '@multistream', '@flaky']
+  test("should click on interesting fields icon and display query in editor", {
+    tag: ['@interestingFields', '@multistream']
   }, async ({ page }) => {
     const pageManager = new PageManager(page);
     testLogger.info('Testing interesting fields with multistream selection');
 
     await multistreamselect(page);
 
+    // The interesting-field (ⓘ) button only renders when quick mode is on
+    // (FieldExpansion.vue v-if="showQuickMode"), and surfaces on row hover.
+    await pageManager.logsPage.ensureQuickModeState(true);
+
     // Search for job field using POM
     await pageManager.logsPage.searchFieldByName('job');
     await page.waitForTimeout(2000);
 
-    // Click interesting field button
+    // Hover the field row so its action buttons render, then click ⓘ
+    await page.locator('[data-test="logs-field-list-item-job"]').last().hover();
     await page.locator('[data-test="log-search-index-list-interesting-job-field-btn"]').last().click({ force: true });
 
     // Enable SQL mode using POM
