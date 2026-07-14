@@ -996,7 +996,7 @@ describe("ActionScripts", () => {
   describe("Clone ODialog migration", () => {
     const findODialog = () => wrapper.findComponent({ name: "ODialog" });
 
-    it("should mount the ODialog component (Quasar q-dialog migration)", () => {
+    it("should mount the ODialog component", () => {
       const dialog = findODialog();
       expect(dialog.exists()).toBe(true);
       // The stub renders regardless of `open` so we can verify slot wiring.

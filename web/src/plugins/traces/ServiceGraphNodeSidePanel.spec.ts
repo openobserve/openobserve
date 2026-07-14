@@ -90,13 +90,6 @@ vi.mock("vue-router", async (importOriginal) => {
   };
 });
 
-vi.mock("quasar", () => ({
-  useQuasar: () => ({
-    notify: notifyMock,
-    dialog: vi.fn(),
-  }),
-}));
-
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: toastMock,
 }));

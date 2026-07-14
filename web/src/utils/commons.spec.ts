@@ -78,12 +78,6 @@ vi.mock("./dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((data) => data),
 }));
 
-vi.mock("quasar", () => ({
-  date: {
-    subtractFromDate: vi.fn((date, obj) => new Date(date.getTime() - 3600000)),
-  },
-}));
-
 // Mock moment globally
 global.moment = vi.fn((date) => ({
   format: vi.fn((format) => {

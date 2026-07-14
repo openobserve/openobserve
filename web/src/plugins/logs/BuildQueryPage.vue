@@ -490,10 +490,8 @@ const addPanelToDashboard = () => {
 
 // NOTE: URL sync for build mode fields is handled by explicit actions (runQuery, apply)
 // rather than a deep watcher. A deep watcher here would call router.push on every
-// field/filter mutation, which historically caused Quasar QMenu popups to
-// auto-close (QMenu watches $route.fullPath and dismisses on any route change).
-// We've migrated off QMenu but keep the explicit-action pattern to avoid
-// excessive history pushes.
+// field/filter mutation, causing excessive history pushes. The explicit-action
+// pattern avoids that.
 
 // NOTE: Field change watcher for auto SQL generation has been moved to PanelEditor.vue
 // PanelEditor emits 'queryGenerated' and 'customQueryModeChanged' which we forward to parent

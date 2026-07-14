@@ -181,7 +181,7 @@ describe("AlertHistoryDrawer.vue", () => {
     try {
       wrapper?.unmount();
     } catch {
-      // Quasar teleported components can throw during unmount in jsdom
+      // Teleported components can throw during unmount in jsdom
     }
   });
 

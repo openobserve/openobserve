@@ -67,7 +67,7 @@ describe("VariableQueryValueSelector", () => {
     { label: "Custom Test", value: "custom-test::_o2_custom" }
   ];
 
-  // OSelect stub that exposes the Quasar-style methods the component still
+  // OSelect stub that exposes the methods the component still
   // calls on its selectRef (updateInputValue/blur/hidePopup).
   const OSelectStub = {
     name: "OSelect",

@@ -248,8 +248,8 @@ export const convertToCamelCase = (str: string) => {
 
 /**
  * Re-exported, not reimplemented: `@/utils/zincutils` barrels this module, so
- * this is how the many `import { convertUnixToQuasarFormat } from "@/utils/zincutils"`
+ * this is how the many `import { convertUnixToDateFormat } from "@/utils/zincutils"`
  * call sites resolve. The implementation lives in `@/utils/date` — there is
  * exactly one.
  */
-export { convertUnixToQuasarFormat } from "@/utils/date";
+export { convertUnixToDateFormat } from "@/utils/date";

@@ -179,7 +179,7 @@ import AssessmentIcon from "~icons/material-symbols/analytics-outline";
 import AssignmentIcon from "~icons/material-symbols/assignment-outline";
 import AttachFileIcon from "~icons/material-symbols/attach-file";
 import AttachMoneyIcon from "~icons/material-symbols/attach-money";
-// Material Symbols replacements for `@quasar/extras/material-symbols-outlined`
+// Material Symbols replacements for the old `material-symbols-outlined` icon set
 // (these specific icons don't ship an `-outline` variant in @iconify/material-symbols;
 // the base names render the outlined glyph by default)
 import SoundSampler from "~icons/material-symbols/sound-sampler";

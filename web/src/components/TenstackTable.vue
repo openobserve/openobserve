@@ -1309,7 +1309,7 @@ const props = defineProps({
     type: Object as PropType<Record<string, string> | undefined>,
     default: undefined,
   },
-  /** Returns Quasar/Tailwind class(es) for a given row.
+  /** Returns CSS class(es) for a given row.
    *  Use 'oz-table__row--error' to trigger the red left-border error variant. */
   rowClass: {
     type: Function as PropType<
@@ -1505,7 +1505,7 @@ const { isFTSColumn } = useTextHighlighter();
 const { processedResults, processHitsInChunks } = useLogsHighlighter();
 
 // ── Dashboard: sticky columns composable ─────────────────────────────────────
-// useStickyColumns reads props.columns (Quasar-format when useVirtualScroll=false).
+// useStickyColumns reads props.columns (legacy column format when useVirtualScroll=false).
 const { getStickyColumnStyle, tableId } = useStickyColumns(props, store);
 const getSortingHandler = (e: Event, fn: any) => {
   return fn(e);
@@ -1546,7 +1546,7 @@ const tableRows = shallowRef<any[]>([...(props.rows ?? [])]);
 // Invalidate unique-values filter cache whenever rows are replaced
 watch(tableRows, () => { uniqueValuesCache.value = new Map(); });
 
-// ── Dashboard: convert Quasar column defs → TanStack ColumnDef[] ─────────────
+// ── Dashboard: convert legacy column defs → TanStack ColumnDef[] ─────────────
 const dashboardColumns = computed<ColumnDef<unknown, any>[] | null>(() => {
   if (props.useVirtualScroll || !props.columns) return null;
   return (props.columns as any[])
@@ -1572,8 +1572,8 @@ const dashboardColumns = computed<ColumnDef<unknown, any>[] | null>(() => {
         _isRowField: col._isRowField,
         _isTotalColumn: col._isTotalColumn,
         _totalColRightIndex: col._totalColRightIndex,
-        _col: col, // reference to original Quasar column for style helpers
-        sortable: col.sortable, // mirrors Quasar column flag — drives sort icon visibility
+        _col: col, // reference to original source column for style helpers
+        sortable: col.sortable, // mirrors the source column flag — drives sort icon visibility
       },
     }));
 });
@@ -1598,7 +1598,7 @@ const usesSeparateBorders = computed(
 
 // Dashboard virtual scroll: enabled when not using logs virtual scroll and not paginated.
 // Uses spacer rows + @tanstack/vue-virtual to render only visible rows (matching
-// the old Quasar QTable :virtual-scroll behaviour).
+// the old table's :virtual-scroll behaviour).
 // Disabled when `wrap` is true — wrapped rows have highly variable heights
 // (29-81px) that cause large total-height jumps during scroll, which manifests
 // as visible flicker. Rendering all rows in DOM is acceptable for dashboard

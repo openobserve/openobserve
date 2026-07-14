@@ -108,14 +108,6 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
-vi.mock("quasar", () => ({
-  useQuasar: () => ({
-    dark: {
-      isActive: false,
-    },
-  }),
-}));
-
 // fetchDatabaseEdges (called inside loadServiceGraph) hits streamService.schema
 // and searchService.search. Mock them so the call completes quickly without real
 // HTTP requests that never resolve in the test environment.

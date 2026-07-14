@@ -43,15 +43,6 @@ vi.mock("vuex", () => ({
   useStore: () => mockStore,
 }));
 
-// ── Mock Quasar ────────────────────────────────────────────────────────────────
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    debounce: (fn: any) => fn,
-  };
-});
-
 // ── Mock @tanstack/vue-virtual ─────────────────────────────────────────────────
 vi.mock("@tanstack/vue-virtual", () => ({
   useVirtualizer: () =>

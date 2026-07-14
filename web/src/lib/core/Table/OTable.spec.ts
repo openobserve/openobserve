@@ -356,7 +356,7 @@ describe("OTable", () => {
       const checkbox = wrapper.find(
         '[data-test="o2-table-select-0"] input[type="checkbox"]',
       );
-      // The checkbox might be a Quasar component; trigger the row click
+      // The checkbox might be a nested component; trigger the row click
       const row = wrapper.find('[data-test="o2-table-row-0"]');
       await row.trigger("click");
     });

@@ -72,7 +72,7 @@ export function getConsumableDateTime(dateObj: any) {
 
     let period = "";
     let periodValue = 0;
-    // quasar does not support arithmetic on weeks. convert to days.
+    // arithmetic on weeks is not supported; convert to days.
 
     if (dateObj.relative.period.label.toLowerCase() == "weeks") {
       period = "days";

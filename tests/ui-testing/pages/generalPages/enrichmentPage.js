@@ -38,7 +38,7 @@ class EnrichmentPage {
         // ────────────────────────────────────────────────────────────────────
         // Navigation locators
         // ────────────────────────────────────────────────────────────────────
-        // Use the data-test prefix (no `.o-tab__label` suffix — that Quasar
+        // Use the data-test prefix (no `.o-tab__label` suffix — that
         // class no longer renders under the Reka tabs implementation).
         this.enrichmentTableTab = page.locator('[data-test="pipeline-section-tab-enrichmentTables"]');
 
@@ -210,7 +210,7 @@ class EnrichmentPage {
      * Get the enrichment list table bounding box if visible
      * @returns {Promise<{width: number, height: number}|null>} Bounding box or null
      */
-    async getQuasarTableDimensions() {
+    async getTableDimensions() {
         const table = this.listTable.first();
         const isVisible = await table.isVisible().catch(() => false);
         if (isVisible) {
@@ -223,7 +223,7 @@ class EnrichmentPage {
      * Check if enrichment list table is visible
      * @returns {Promise<boolean>} True if visible
      */
-    async isQuasarTableVisible() {
+    async isTableVisible() {
         return await this.listTable.first().isVisible().catch(() => false);
     }
 
@@ -231,7 +231,7 @@ class EnrichmentPage {
      * Take screenshot of the enrichment list table
      * @param {string} filename - The filename to save screenshot
      */
-    async screenshotQuasarTable(filename) {
+    async screenshotTable(filename) {
         const table = this.listTable.first();
         if (await table.isVisible().catch(() => false)) {
             await table.screenshot({ path: filename });
@@ -837,7 +837,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async exploreAndVerifyInitialData(tableName) {
-        // The first row's explore button — Quasar tableName is provided when the
+        // The first row's explore button — tableName is provided when the
         // legacy caller wants a specific row; fall back to the first explore btn.
         if (tableName) {
             await this.clickExploreButton(tableName);

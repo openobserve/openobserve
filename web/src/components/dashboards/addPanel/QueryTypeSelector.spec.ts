@@ -22,21 +22,6 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
-// Mock Quasar
-vi.mock("quasar", () => ({
-  useQuasar: () => ({
-    notify: vi.fn(),
-    dialog: vi.fn(),
-    loading: {
-      show: vi.fn(),
-      hide: vi.fn(),
-    },
-  }),
-  Quasar: {
-    install: vi.fn(),
-  },
-}));
-
 // Mock Vuex store
 const mockStore = reactive({
   state: {

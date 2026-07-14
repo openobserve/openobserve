@@ -451,7 +451,7 @@ describe("ReportList", () => {
   // ── Date formatting ──────────────────────────────────────────────────────
 
   describe("last_triggered_at formatting", () => {
-    // These used to call `wrapper.vm.convertUnixToQuasarFormat(null)` — asserting
+    // These used to call `wrapper.vm.convertUnixToDateFormat(null)` — asserting
     // the shared util's null handling, which `date.spec.ts` already owns, and
     // forcing the component to `defineExpose` a function purely so a test could
     // reach it. What is actually ReportList's to get right is the ROW mapping:

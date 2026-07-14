@@ -926,7 +926,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import {
-  convertUnixToQuasarFormat as convertUnixToFormat,
+  convertUnixToDateFormat as convertUnixToFormat,
   formatTimestamp,
 } from "@/utils/date";
 import streamService from "../../services/stream";
@@ -1422,8 +1422,8 @@ export default defineComponent({
               index: String(index),
               original_start: field.start,
               original_end: field.end,
-              start: convertUnixToQuasarFormat(field.start),
-              end: convertUnixToQuasarFormat(field.end),
+              start: convertUnixToDateFormat(field.start),
+              end: convertUnixToDateFormat(field.end),
             });
           },
         );
@@ -2287,7 +2287,7 @@ export default defineComponent({
       }
     };
     // Date only: this column shows a retention window, not an instant.
-    const convertUnixToQuasarFormat = (unixMicroseconds: any) =>
+    const convertUnixToDateFormat = (unixMicroseconds: any) =>
       convertUnixToFormat(unixMicroseconds, "DD-MM-YYYY");
     function formatDate(dateString) {
       const date = new Date(dateString); // Convert to Date object
@@ -2665,7 +2665,7 @@ export default defineComponent({
       getFieldIndices,
       setSchema,
       formatDate,
-      convertUnixToQuasarFormat,
+      convertUnixToDateFormat,
       computedSchemaFieldsName,
       groupPatternAssociationsByField,
       ungroupPatternAssociations,

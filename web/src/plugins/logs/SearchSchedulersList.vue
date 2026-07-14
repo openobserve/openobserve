@@ -265,7 +265,7 @@ import searchService from "@/services/search";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTime from "@/components/DateTime.vue";
 import { useI18n } from "vue-i18n";
-import { convertUnixToQuasarFormat } from "@/utils/date";
+import { convertUnixToDateFormat } from "@/utils/date";
 import type { Ref } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
@@ -441,17 +441,17 @@ export default defineComponent({
               element.toBeStoredStartTime = element.start_time;
               element.toBeStoredEndTime = element.end_time;
               element.toBeCreatedAt = element.created_at;
-              element.start_time = convertUnixToQuasarFormat(
+              element.start_time = convertUnixToDateFormat(
                 element.start_time,
               );
-              element.end_time = convertUnixToQuasarFormat(element.end_time);
-              element.created_at = convertUnixToQuasarFormat(
+              element.end_time = convertUnixToDateFormat(element.end_time);
+              element.created_at = convertUnixToDateFormat(
                 element.created_at,
               );
-              element.started_at = convertUnixToQuasarFormat(
+              element.started_at = convertUnixToDateFormat(
                 element.started_at,
               );
-              element.ended_at = convertUnixToQuasarFormat(element.ended_at);
+              element.ended_at = convertUnixToDateFormat(element.ended_at);
               element.status_code = element.status;
               element["sql"] = JSON.parse(element.payload).query.sql;
 
@@ -827,7 +827,7 @@ export default defineComponent({
       toBeCancelled,
       confirmCancel,
       calculateDuration,
-      convertUnixToQuasarFormat,
+      convertUnixToDateFormat,
       dateTimeToBeSent,
       isDateTimeChanged,
       router,

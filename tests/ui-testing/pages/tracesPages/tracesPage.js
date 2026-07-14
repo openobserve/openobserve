@@ -2208,7 +2208,7 @@ export class TracesPage {
   /**
    * Get selected/active stream indicator
    * For traces, checks if stream dropdown has a selected value
-   * Uses stable selectors that don't rely on Quasar internal classes
+   * Uses stable selectors that don't rely on framework-internal CSS classes
    * @returns {Locator}
    */
   getSelectedStreamToggle() {

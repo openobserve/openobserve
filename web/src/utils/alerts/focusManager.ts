@@ -151,7 +151,7 @@ export class AlertFocusManager {
       'input:not([type="hidden"])',
       'select',
       'textarea',
-      '.q-field__native', // Quasar input
+      '.q-field__native', // legacy input
       '[contenteditable="true"]'
     ];
 
