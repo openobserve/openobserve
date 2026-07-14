@@ -275,7 +275,12 @@
                     class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center"
                     >O2 Assistant</span
                   >
-                  <span class="o2-ai-beta-text tw:ml-[8px] tw:relative tw:text-[var(--q-primary)] tw:text-[8px] tw:px-1 tw:rounded-[10px] tw:text-center tw:border tw:border-[var(--q-primary)] tw:uppercase tw:font-semibold tw:[letter-spacing:0.5px] tw:w-[34px]">BETA</span>
+                  <OBadge
+                    variant="primary-outline"
+                    size="sm"
+                    class="tw:ml-[8px] tw:uppercase tw:tracking-[0.5px] tw:font-semibold"
+                    >BETA</OBadge
+                  >
                 </div>
               </div>
             </div>
@@ -1407,6 +1412,7 @@ import {
   getDashboardEventType,
 } from "@/composables/useAiDashboardEvents";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -1459,6 +1465,7 @@ export default defineComponent({
   components: {
     OSeparator,
     OButton,
+    OBadge,
     ConfirmDialog,
     RichTextInput,
     O2AIConfirmDialog,

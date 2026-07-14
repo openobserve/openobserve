@@ -40,16 +40,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :subtitle="t('workflow.subtitle')"
           icon="schema"
         >
+          <template #title>
+            <span class="tw:inline-flex tw:items-center tw:gap-2">
+              {{ t("workflow.header") }}
+              <OBadge
+                variant="primary-outline"
+                size="sm"
+                class="tw:uppercase tw:tracking-[0.5px] tw:font-semibold"
+                >{{ t("workflow.beta") }}</OBadge
+              >
+            </span>
+          </template>
           <template #actions>
-            <!-- Add Workflow opens the trigger-type picker dialog (the trigger
-                 kind is fixed for a workflow, so it's chosen at creation, not by
-                 editing the trigger node later). -->
+            <!-- v1: only the Alert Fired trigger exists, so Add Workflow goes
+                 straight to the editor (which pre-places the Alert Trigger). -->
             <OButton
               data-test="workflow-list-add-btn"
               variant="primary"
               size="sm"
               icon-left="add"
-              @click="showTriggerDialog = true"
+              @click="openCreateEditor()"
             >
               {{ t("workflow.create") }}
             </OButton>
@@ -182,9 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :filtered="!!filterQuery"
                 @action="
                   (id) =>
-                    id === 'clear-filters'
-                      ? (filterQuery = '')
-                      : (showTriggerDialog = true)
+                    id === 'clear-filters' ? (filterQuery = '') : openCreateEditor()
                 "
               />
             </template>
@@ -220,11 +228,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model="confirmDialogMeta.show"
   />
 
-  <WorkflowTriggerDialog
-    v-if="showTriggerDialog"
-    @close="showTriggerDialog = false"
-    @select="onTriggerSelect"
-  />
 </template>
 
 <script setup lang="ts">
@@ -237,6 +240,7 @@ import PageLayout from "@/components/common/PageLayout.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -246,7 +250,6 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import WorkflowTriggerDialog from "@/components/workflows/WorkflowTriggerDialog.vue";
 import WorkflowView from "@/components/workflows/WorkflowView.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
@@ -265,7 +268,6 @@ const orgId = computed(
 
 const loading = ref(true);
 const filterQuery = ref("");
-const showTriggerDialog = ref(false);
 const workflows = ref<any[]>([]);
 
 const filteredWorkflows = computed(() => {
@@ -391,12 +393,6 @@ const openCreateEditor = (trigger = "alert_fired") => {
   });
 };
 
-// Trigger-type card picked in the dialog -> close it and open the editor with
-// that trigger seeded.
-const onTriggerSelect = (triggerKind: string) => {
-  showTriggerDialog.value = false;
-  openCreateEditor(triggerKind);
-};
 
 // Hydrate the shared editor state from the row synchronously (pipeline pattern)
 // so the editor has the name + full graph immediately — no async re-fetch.
