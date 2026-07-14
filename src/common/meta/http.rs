@@ -22,6 +22,10 @@ use infra::errors;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+pub const CONTENT_TYPE_JSON: &str = "application/json";
+pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";
+pub const ERROR_HEADER: &str = "X-Error-Message";
+
 /// HTTP response
 /// code 200 is success
 /// code 400 is error

@@ -26,11 +26,9 @@ use config::{
 };
 #[cfg(feature = "enterprise")]
 use o2_dex::config::get_config as get_dex_config;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::license::block_feature_for_report_failure;
-#[cfg(feature = "enterprise")]
-use o2_openfga::config::get_config as get_openfga_config;
 
+#[cfg(feature = "enterprise")]
+pub use crate::common::utils::auth::get_user_email_from_auth_str;
 use crate::{
     common::{
         infra::config::ORG_INGESTION_TOKENS,
@@ -47,7 +45,7 @@ use crate::{
             redirect_response::RedirectResponseBuilder,
         },
     },
-    service::{db, users},
+    service::{authz::check_permissions, db, users},
 };
 
 pub const PKCE_STATE_ORG: &str = "o2_pkce_state";
@@ -1086,46 +1084,6 @@ async fn oo_validator_internal(
     }
 }
 
-#[cfg(feature = "enterprise")]
-pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
-    if auth_str.starts_with("Basic") {
-        let decoded = match base64::decode(auth_str.strip_prefix("Basic").unwrap().trim()) {
-            Ok(val) => val,
-            Err(_) => return None,
-        };
-
-        match get_user_details(decoded) {
-            Some(value) => Some(value.0),
-            None => None,
-        }
-    } else if auth_str.starts_with("Bearer") {
-        super::token::get_user_name_from_token(auth_str).await
-    } else if auth_str.starts_with("{\"auth_ext\":") {
-        let auth_tokens: AuthTokensExt =
-            config::utils::json::from_str(auth_str).unwrap_or_default();
-        if chrono::Utc::now().timestamp() - auth_tokens.request_time > auth_tokens.expires_in {
-            None
-        } else {
-            let decoded = match base64::decode(
-                auth_tokens
-                    .auth_ext
-                    .strip_prefix("auth_ext")
-                    .unwrap()
-                    .trim(),
-            ) {
-                Ok(val) => val,
-                Err(_) => return None,
-            };
-            match get_user_details(decoded) {
-                Some(value) => Some(value.0),
-                None => None,
-            }
-        }
-    } else {
-        None
-    }
-}
-
 fn get_user_details(decoded: impl AsRef<[u8]>) -> Option<(String, String)> {
     let credentials = str::from_utf8(decoded.as_ref()).ok()?;
     credentials
@@ -1167,107 +1125,6 @@ pub async fn validator_proxy_url(
 ) -> Result<AuthValidationResult, AuthError> {
     let path_prefix = "/proxy/";
     oo_validator_internal(req_data, auth_info, path_prefix).await
-}
-
-#[cfg(feature = "enterprise")]
-pub(crate) async fn check_permissions(
-    user_id: &str,
-    auth_info: AuthExtractor,
-    role: UserRole,
-    _is_external: bool,
-) -> bool {
-    use crate::common::infra::config::ORG_USERS;
-
-    if !get_openfga_config().enabled {
-        return true;
-    }
-
-    if block_feature_for_report_failure().await {
-        return true;
-    }
-
-    let object_str = auth_info.o2_type;
-    log::debug!("Role of user {user_id} is {role:#?}");
-    let role = if role.eq(&UserRole::Root) {
-        // root user should have access to everything , bypass check in openfga
-        return true;
-    } else {
-        format!("{role}")
-    };
-
-    let org_id = &auth_info.org_id;
-
-    // When checking against META_ORG, look up the user's role there
-    let effective_role = if org_id == config::META_ORG_ID {
-        match ORG_USERS.get(&format!("{}/{user_id}", config::META_ORG_ID)) {
-            Some(user) => user.role.to_string(),
-            None => role,
-        }
-    } else {
-        role
-    };
-
-    o2_openfga::authorizer::authz::is_allowed(
-        org_id,
-        user_id,
-        &auth_info.method,
-        &object_str,
-        &auth_info.parent_id,
-        &effective_role,
-        auth_info.use_all_org,
-        auth_info.use_self_context,
-        auth_info.use_self_parent,
-    )
-    .await
-}
-
-#[cfg(not(feature = "enterprise"))]
-pub(crate) async fn check_permissions(
-    _user_id: &str,
-    _auth_info: AuthExtractor,
-    _role: UserRole,
-    _is_external: bool,
-) -> bool {
-    true
-}
-
-#[cfg(feature = "enterprise")]
-async fn list_objects(
-    user_id: &str,
-    permission: &str,
-    object_type: &str,
-    org_id: &str,
-    role: &str,
-) -> Result<Vec<String>, anyhow::Error> {
-    o2_openfga::authorizer::authz::list_objects(user_id, permission, object_type, org_id, role)
-        .await
-}
-
-#[cfg(feature = "enterprise")]
-pub(crate) async fn list_objects_for_user(
-    org_id: &str,
-    user_id: &str,
-    permission: &str,
-    object_type: &str,
-) -> Result<Option<Vec<String>>, AuthError> {
-    let openfga_config = get_openfga_config();
-    if !is_root_user(user_id) && openfga_config.enabled && openfga_config.list_only_permitted {
-        let role = match users::get_user(Some(org_id), user_id).await {
-            Some(user) => user.role.to_string(),
-            None => "".to_string(),
-        };
-        match list_objects(user_id, permission, object_type, org_id, &role).await {
-            Ok(resp) => {
-                log::debug!(
-                    "list_objects_for_user for user {user_id} from {org_id} org returns: {resp:#?}"
-                );
-                Ok(Some(resp))
-            }
-            Err(_) => Err(AuthError::Forbidden("Unauthorized Access".to_string())),
-        }
-    } else {
-        Ok(None)
-    }
 }
 
 /// Helper function to extract the relative path after the base URI and path prefix

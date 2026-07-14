@@ -55,7 +55,6 @@ use {
 use super::self_reporting::report_request_usage_stats;
 use crate::{
     common::utils::functions::{get_all_transform_keys, init_vrl_runtime},
-    handler::grpc::request::search::Searcher,
     service::search::{
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         partition::{
@@ -64,6 +63,10 @@ use crate::{
         },
     },
 };
+
+#[path = "../../handler/grpc/request/search/mod.rs"]
+mod grpc_server;
+use grpc_server::Searcher;
 
 pub(crate) mod bloom_pruner;
 pub(crate) mod cache;

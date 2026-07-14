@@ -21,6 +21,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub mod anomaly_detection;
+pub mod authz;
 pub mod cluster_info;
 pub mod compact;
 pub mod dashboards;
@@ -33,6 +34,7 @@ pub mod folders;
 pub mod functions;
 pub mod github;
 pub mod grpc;
+pub mod http;
 pub mod ingestion;
 pub mod ingestion_tokens;
 pub mod kv;
