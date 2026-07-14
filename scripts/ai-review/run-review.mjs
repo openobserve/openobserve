@@ -30,7 +30,7 @@ const NOISE_EXTENSIONS = [".min.js", ".min.css", ".bundle.js", ".map", ".svg"];
 const NOISE_GENERATED_MARKERS = ["@generated", "auto-generated", "DO NOT EDIT", "Generated file"];
 
 // ─── Agent definitions ─────────────────────────────────────────────────────
-// Model/agent execution is delegated to `opencode serve` (see OpencodeClient below).
+// Model/agent execution is delegated to `opencode serve` (see OpencodeServer below).
 // Each key here maps to an agent of the same name (`ai-review-<key>`) registered in
 // opencode.jsonc, all running GLM-5.2 at max reasoning effort with read-only repo tools.
 const AGENTS = {
@@ -1070,13 +1070,23 @@ async function main() {
 
     const hasGlm = Boolean(process.env.GLM_API_KEY);
     if (!hasGlm) {
-      console.warn(`[${isoNow()}] GLM_API_KEY not set. Skipping AI Code Review.`);
-      outcome = "skipped";
+      outcome = "misconfigured";
       TRACE.setSpanAttributes(rootSpan, {
         "review.skipped": true,
         "review.skip_reason": "missing_glm_api_key",
       });
-      return;
+      // A missing key is a CI/secrets misconfiguration, not a "nothing to review" case —
+      // fail loudly (non-zero exit) instead of warn+return, so review coverage silently
+      // dropping to zero can't slip by as a green check. Also post to the PR so it's
+      // visible without digging into Actions logs.
+      const message = "GLM_API_KEY is not set. AI Code Review did not run for this PR — this is a CI misconfiguration, not a skip.";
+      console.error(`[${isoNow()}] ${message}`);
+      try {
+        postReviewComment(prNumber, `${REVIEW_MARKER}\n## AI Code Review\n\n### Decision: error\n\n⚠️ ${message} Please confirm the \`GLM_API_KEY\` secret is provisioned.`);
+      } catch (postErr) {
+        console.error(`[${isoNow()}] Also failed to post the misconfiguration notice: ${postErr.message}`);
+      }
+      throw new Error(message);
     }
 
     console.log(`[${isoNow()}] GLM (via opencode serve): configured`);
@@ -1242,7 +1252,7 @@ async function main() {
   } catch (err) {
     rootError = err;
     exitCode = 1;
-    outcome = "failure";
+    if (outcome !== "misconfigured") outcome = "failure";
     throw err;
   } finally {
     TRACE.endSpan(rootSpan, {
