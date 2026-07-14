@@ -57,6 +57,9 @@ jobs:
       - name: Check for undefined CSS custom properties
         run: cd web && npm run lint:tokens
 
+      - name: Lint styles (stylelint — bans legacy --o2-* tokens)
+        run: cd web && npm run lint:styles
+
       - name: Build frontend code
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"

@@ -14,60 +14,31 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC_DIR = join(__dirname, "..", "src");
 const EXTS = new Set([".css", ".vue", ".ts"]);
 
-// Runtime/library-injected custom properties that are never statically
-// `--x: value;` defined in our source (Reka UI, Tailwind internals, vue-flow,
-// Quasar remnants) plus a handful of JS-bound `:style` names set only via
-// element.style.setProperty at runtime.
-const ALLOW_PREFIXES = [/^--reka-/, /^--tw-/, /^--vf-/, /^--q-/, /^--o2-span-/];
+// Library-injected custom properties that are never statically `--x: value;`
+// defined in our source (Reka UI, Tailwind internals, vue-flow, Quasar remnants).
+// These resolve at runtime, so a static "undefined" report on them would be a
+// false positive — hence the prefix allowlist.
+//
+// HARD RULE: NO `--o2-*` name may ever appear in any allowlist here. The entire
+// `--o2-*` vocabulary is banned and being migrated away; even the ones set at
+// runtime via Vue `:style` (OTable tree indents, row status, row height) must be
+// renamed off the `--o2-` namespace. If you find a `--o2-*` here, delete it and
+// fix the usage — never re-exempt it.
+const ALLOW_PREFIXES = [/^--reka-/, /^--tw-/, /^--vf-/, /^--q-/];
 const ALLOW_EXACT = new Set([
-  "--node-color",
+  // Non-o2 custom properties set per-element at runtime via Vue `:style`
+  // bindings — dynamic values with no static `--x:` definition.
+  "--node-color", // plugins/pipelines/CustomNode.vue  :style={ '--node-color': ... }
   "--chip-color",
-  "--o2-tree-node-color",
-
-  // JS-set-at-runtime custom properties (OTable tree indents, row status, virtual height).
-  "--o2-row-status-color",
-  "--o2-table-row-height",
-  "--o2-tree-x",
-  "--o2-tree-parent-x",
-  "--o2-tree-connector-x",
-
-  // Pre-existing UNDEFINED/broken --o2-* tokens left out of scope of the token
-  // migration (they reference nothing today). Tracked separately — do NOT add
-  // new entries; fix the reference or migrate it to a --color-* token instead.
-  "--o2-bg",
-  "--o2-bg-card-dark",
-  "--o2-bg-color",
-  "--o2-bg-dark",
-  "--o2-bg-light",
-  "--o2-bg-primary",
-  "--o2-blue-700",
-  "--o2-brand",
-  "--o2-color-primary",
-  "--o2-color-primary-light",
-  "--o2-dark-page-bg",
-  "--o2-destructive",
-  "--o2-font",
-  "--o2-font-mono",
-  "--o2-gray-700",
-  "--o2-green-700",
-  "--o2-hover-bg",
-  "--o2-hover-color",
-  "--o2-input-bg",
-  "--o2-primary",
-  "--o2-primary-btn-bg-rgb",
-  "--o2-primary-dark",
-  "--o2-red-800",
-  "--o2-selected-color",
-  "--o2-shadow-lg",
-  "--o2-status-error",
-  "--o2-status-error-border",
-  "--o2-surface",
-  "--o2-text",
-  "--o2-text-color",
-  "--o2-text-primary-dark",
-  "--o2-url",
-  "--o2-yellow-700",
 ]);
+
+// Guard against accidental re-introduction of an --o2-* exemption above.
+for (const name of [...ALLOW_EXACT, ...ALLOW_PREFIXES.map((re) => re.source)]) {
+  if (String(name).includes("--o2-")) {
+    console.error(`check-css-tokens: '${name}' — --o2-* tokens must never be allowlisted. Remove it.`);
+    process.exit(2);
+  }
+}
 
 function isAllowed(name) {
   if (ALLOW_EXACT.has(name)) return true;
@@ -88,9 +59,14 @@ function walk(dir, files = []) {
 const DECL_RE = /(--[A-Za-z0-9_-]+)\s*:/g;
 // var(--x) or var(--x, fallback) — only flag the no-fallback form.
 const VAR_RE = /var\(\s*(--[A-Za-z0-9_-]+)\s*(,[^)]*)?\)/g;
+// ANY --o2-* occurrence, in any syntax (var(), Tailwind `[var(--o2-x)]` /
+// `(--o2-x)` shorthand, `:style` keys, raw text). The whole vocabulary is banned,
+// so a fallback does NOT make it acceptable — unlike the undefined-ref check.
+const O2_RE = /--o2-[A-Za-z0-9-]+/g;
 
 const defined = new Set();
 const referenced = new Map(); // name -> [{file, line}]
+const bannedO2 = new Map(); // name -> [{file, line}]
 
 for (const file of walk(SRC_DIR)) {
   const text = readFileSync(file, "utf8");
@@ -103,6 +79,11 @@ for (const file of walk(SRC_DIR)) {
       if (!referenced.has(name)) referenced.set(name, []);
       referenced.get(name).push({ file: file.replace(SRC_DIR + "/", "src/"), line: i + 1 });
     }
+    for (const m of line.matchAll(O2_RE)) {
+      const name = m[0];
+      if (!bannedO2.has(name)) bannedO2.set(name, []);
+      bannedO2.get(name).push({ file: file.replace(SRC_DIR + "/", "src/"), line: i + 1 });
+    }
   });
 }
 
@@ -112,18 +93,37 @@ for (const [name, sites] of referenced) {
   undefinedRefs.push({ name, sites });
 }
 
-if (undefinedRefs.length > 0) {
-  console.error(`\nFound ${undefinedRefs.length} undefined CSS custom propert${undefinedRefs.length === 1 ? "y" : "ies"} referenced with no fallback:\n`);
-  for (const { name, sites } of undefinedRefs) {
+function printGroup(map) {
+  for (const [name, sites] of map) {
     console.error(`  ${name}`);
-    for (const { file, line } of sites.slice(0, 5)) {
-      console.error(`    ${file}:${line}`);
-    }
+    for (const { file, line } of sites.slice(0, 5)) console.error(`    ${file}:${line}`);
     if (sites.length > 5) console.error(`    ...and ${sites.length - 5} more`);
   }
+}
+
+let failed = false;
+
+// 1) Banned --o2-* vocabulary — zero tolerance, fallback or not.
+if (bannedO2.size > 0) {
+  const total = [...bannedO2.values()].reduce((n, s) => n + s.length, 0);
+  console.error(`\nFound ${total} banned --o2-* token reference${total === 1 ? "" : "s"} (${bannedO2.size} distinct name${bannedO2.size === 1 ? "" : "s"}):\n`);
+  printGroup(bannedO2);
+  console.error("\nThe entire --o2-* vocabulary is banned. Migrate each to its --color-* equivalent");
+  console.error("(see scripts/o2-token-map.json) or a Tailwind utility. There is no allowlist.\n");
+  failed = true;
+}
+
+// 2) Undefined non-o2 references with no fallback (voids the whole declaration).
+if (undefinedRefs.length > 0) {
+  console.error(`\nFound ${undefinedRefs.length} undefined CSS custom propert${undefinedRefs.length === 1 ? "y" : "ies"} referenced with no fallback:\n`);
+  printGroup(new Map(undefinedRefs.map((r) => [r.name, r.sites])));
   console.error("\nEach of these voids its whole declaration in browsers (invalid var() = unset).");
-  console.error("Either define the token, add a var(--x, fallback), or allowlist it in check-css-tokens.mjs if runtime/library-injected.\n");
+  console.error("Either define the token or add a var(--x, fallback).\n");
+  failed = true;
+}
+
+if (failed) {
   process.exit(1);
 } else {
-  console.log(`OK — no undefined CSS custom property references (${defined.size} tokens defined, ${referenced.size} distinct refs checked).`);
+  console.log(`OK — no --o2-* tokens and no undefined CSS custom property references (${defined.size} tokens defined, ${referenced.size} distinct refs checked).`);
 }

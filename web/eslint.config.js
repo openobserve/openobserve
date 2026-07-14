@@ -12,27 +12,14 @@ import fs from "fs";
 // (e.g. class="bg-[var(--o2-card-bg)]"), <style> blocks, and JS string literals.
 // This is the enforcing gate for the --o2- ban (stylelint can't allowlist values).
 //
-// ALLOWLIST: a fixed set of pre-existing UNDEFINED/broken --o2-* tokens that were
-// left out of scope of the token migration (they reference nothing, or are set at
-// runtime by JS — OTable tree indents, row-status). They are tracked separately and
-// MUST NOT grow. Everything else is a hard error. Do NOT add well-defined tokens here.
-const O2_ALLOWLIST = new Set([
-  // pre-existing undefined/broken tokens (render as unset today; out of scope)
-  "--o2-bg", "--o2-bg-card-dark", "--o2-bg-color", "--o2-bg-dark",
-  "--o2-bg-light", "--o2-bg-primary", "--o2-blue-700", "--o2-brand", "--o2-color-primary",
-  "--o2-color-primary-light", "--o2-dark-page-bg", "--o2-destructive", "--o2-font",
-  "--o2-font-mono", "--o2-gray-700", "--o2-green-700", "--o2-hover-bg", "--o2-hover-color",
-  "--o2-input-bg", "--o2-primary", "--o2-primary-btn-bg-rgb", "--o2-primary-dark",
-  "--o2-red-800", "--o2-selected-color", "--o2-shadow-lg", "--o2-status-error",
-  "--o2-status-error-border", "--o2-surface", "--o2-text", "--o2-text-color",
-  "--o2-text-primary-dark", "--o2-url", "--o2-yellow-700",
-  // JS-set-at-runtime custom properties (OTable tree indents, row status, virtual height)
-  "--o2-row-status-color", "--o2-table-row-height",
-  "--o2-tree-x", "--o2-tree-parent-x", "--o2-tree-connector-x",
-]);
-// dynamic span/trace color palette built via `var(--o2-span-${n})` — undefined bug,
-// tracked separately (see the trace-color follow-up task).
-const O2_ALLOW_PREFIXES = [/^--o2-span-/];
+// ALLOWLIST: EMPTY on purpose. Every `--o2-*` custom property is a hard error —
+// including the ones that still "work" at runtime (OTable tree indents, row-status,
+// the dynamic `--o2-span-*` palette). The goal is to eliminate the --o2-* vocabulary
+// entirely, so these must be renamed off the namespace (to a --color-* token, a
+// Tailwind utility, or a non-o2 runtime custom property). Do NOT add exemptions here;
+// fixing the underlying usage is the only way to make this rule pass.
+const O2_ALLOWLIST = new Set([]);
+const O2_ALLOW_PREFIXES = [];
 
 const noLegacyO2Tokens = {
   rules: {
