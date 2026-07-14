@@ -123,7 +123,7 @@ export async function convertPromQLChartData(
   );
 
   // Step 5: Apply common chart configurations
-  const options = {
+  const options: { series?: any[]; columns?: unknown[]; [key: string]: any } = {
     backgroundColor: "transparent",
     ...chartConfig,
 
@@ -157,10 +157,8 @@ export async function convertPromQLChartData(
   // Step 8: Handle empty data case
   // For ECharts: check series length
   // For tables: check columns length
-  const hasEChartsData = options?.series?.length > 0;
-  // Table converters attach `columns`, which isn't on the ECharts options union.
-  const hasTableData =
-    ((options as { columns?: unknown[] })?.columns?.length ?? 0) > 0;
+  const hasEChartsData = (options?.series?.length ?? 0) > 0;
+  const hasTableData = (options?.columns?.length ?? 0) > 0;
 
   if (!hasEChartsData && !hasTableData) {
     console.warn("No series or columns found - returning empty chart");

@@ -321,12 +321,18 @@ const alertsList = ref<any[]>([]); // Cache alerts list
 provide("selectedTabId", currentTab);
 
 // Context menu
-const contextMenu = reactive({
+const contextMenu = reactive<{
+  show: boolean;
+  x: number;
+  y: number;
+  value: number | string;
+  panelTitle: string;
+  panelId: string;
+}>({
   show: false,
   x: 0,
   y: 0,
-  // Holds either a numeric cell value or an alert-name string.
-  value: 0 as number | string,
+  value: 0,
   panelTitle: "",
   panelId: "",
 });

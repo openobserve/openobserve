@@ -591,7 +591,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ref="inlineQueryEditorRef"
                       data-test-prefix="alert-inline-sql"
                       :languages="localTab === 'promql' ? ['promql'] : ['sql']"
-                      :default-language="(localTab as 'sql' | 'promql')"
+                      :default-language="localTab"
                       :query="localTab === 'sql' ? localSqlQuery : localPromqlQuery"
                       editor-height="100%"
                       :disable-ai="!streamName"
@@ -931,7 +931,7 @@ export default defineComponent({
   },
   props: {
     tab: {
-      type: String,
+      type: String as PropType<"sql" | "promql" | "custom">,
       default: "custom",
     },
     multiTimeRange: {

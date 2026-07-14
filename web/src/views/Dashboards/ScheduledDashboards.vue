@@ -191,11 +191,17 @@ const createScheduledReport = () => {
   });
 };
 
-const scheduledReports = ref<ScheduledDashboardReport[]>(
-  props.reports as ScheduledDashboardReport[],
+// Row shape for the list: adds the raw sort keys not on the shared interface.
+type ScheduledReportRow = ScheduledDashboardReport & {
+  last_triggered_at_raw: number | null;
+  created_at_raw: number | null;
+};
+
+const scheduledReports = ref<ScheduledReportRow[]>(
+  props.reports as ScheduledReportRow[],
 );
 
-const formattedReports = ref<ScheduledDashboardReport[]>([]);
+const formattedReports = ref<ScheduledReportRow[]>([]);
 
 const store = useStore();
 
@@ -238,9 +244,7 @@ const formatReports = () => {
         created_at: convertUnixToDateFormat(report.created_at),
         orgId: report.org_id,
         isCached: !report?.destinations?.length,
-        // *_raw fields are used for sorting but aren't declared on the shared
-        // ScheduledDashboardReport interface (src/ts — not editable here).
-      } as unknown as ScheduledDashboardReport);
+      });
     });
 
   filterReports();

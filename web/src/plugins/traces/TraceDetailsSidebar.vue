@@ -888,7 +888,7 @@ import { cloneDeep } from "lodash-es";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
-import { defineComponent, onBeforeMount, ref, watch, type Ref, inject } from "vue";
+import { defineComponent, onBeforeMount, ref, watch, type Ref, type PropType, inject } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { computed } from "vue";
@@ -955,7 +955,7 @@ export default defineComponent({
   name: "TraceDetailsSidebar",
   props: {
     span: {
-      type: Object,
+      type: Object as PropType<Span>,
       default: () => null,
     },
     baseTracePosition: {
@@ -2068,7 +2068,7 @@ export default defineComponent({
         props.span?.service_name ?? "",
         store.state.theme === "dark",
         props.span
-          ? getOrSetServiceColor(resolveSpanIdentity(props.span as Span))
+          ? getOrSetServiceColor(resolveSpanIdentity(props.span))
           : "#9e9e9e",
       ),
     );

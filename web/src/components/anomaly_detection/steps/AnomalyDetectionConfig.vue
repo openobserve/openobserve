@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div style="width: calc(100% - 190px)">
             <div
-              v-for="(filter, idx) in config.filters as any[]"
+              v-for="(filter, idx) in config.filters as { field: string; operator: string; value: string }[]"
               :key="idx"
               class="flex items-center gap-2 mb-2"
             >

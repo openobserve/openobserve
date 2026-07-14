@@ -214,11 +214,7 @@ const emit = defineEmits<{
 
 const router = useRouter();
 const store = useStore();
-// isLoadingServices is not part of the composable's return type (unused here)
-const { findRelatedTelemetry, error: correlationError, isLoadingServices } =
-  useServiceCorrelation() as ReturnType<typeof useServiceCorrelation> & {
-    isLoadingServices?: unknown;
-  };
+const { findRelatedTelemetry, error: correlationError } = useServiceCorrelation();
 
 const loading = ref(false);
 const correlationResult = ref<CorrelationResult | null>(null);
@@ -237,7 +233,7 @@ const logQueries = computed(() =>
 
 // Watch for context changes and trigger correlation
 watch(
-  () => [props.show, props.context],
+  (): [boolean, TelemetryContext | null] => [props.show, props.context],
   async ([show, context]) => {
     if (!show || !context) {
       correlationResult.value = null;
@@ -246,9 +242,8 @@ watch(
 
     loading.value = true;
     try {
-      // watch tuple widens `context` to `true | TelemetryContext`; guarded above
       const result = await findRelatedTelemetry(
-        context as TelemetryContext,
+        context,
         props.sourceType,
         props.timeWindowMinutes,
         props.currentStream

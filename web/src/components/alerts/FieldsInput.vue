@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else>
       <div
-        v-for="(field, index) in fields as any[]"
+        v-for="(field, index) in fields"
         :key="field.uuid"
         class="flex justify-start items-end gap-2 pb-2"
         :data-test="`alert-conditions-${index + 1}`"
@@ -119,9 +119,16 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useStore } from "vuex";
 
+interface ConditionField {
+  uuid?: string;
+  column?: string;
+  operator?: string;
+  value?: string;
+}
+
 const props = defineProps({
   fields: {
-    type: Array,
+    type: Array as PropType<ConditionField[]>,
     default: () => [],
     required: true,
   },

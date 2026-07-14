@@ -1695,9 +1695,11 @@ export default defineComponent({
     // Load trace streams using the same method as the Traces search page
     const loadTraceStreams = async () => {
       try {
-        const res: any = await getStreams("traces", false, false);
-        if (res?.list?.length > 0) {
-          availableStreams.value = res.list.map((stream: any) => stream.name);
+        const res = (await getStreams("traces", false, false)) as {
+          list?: { name: string }[];
+        };
+        if (res?.list?.length) {
+          availableStreams.value = res.list.map((stream) => stream.name);
         }
       } catch (e) {
         console.error("Error loading trace streams:", e);

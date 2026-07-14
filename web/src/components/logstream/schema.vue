@@ -1362,7 +1362,7 @@ export default defineComponent({
         )
       ) {
         const [level, partition] = Object.entries(settings.partition_keys).find(
-          ([, partition]) => (partition as any)["field"] === property.name,
+          ([, partition]) => partition["field"] === property.name,
         ) as [string, any];
 
         property.level = level;

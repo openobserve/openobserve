@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else>
       <div
-        v-for="(variable, index) in variables as any[]"
+        v-for="(variable, index) in variables"
         :key="variable.uuid"
         class="gap-2 pb-2 flex items-center"
         :data-test="`alert-variables-${index + 1}`"
@@ -101,14 +101,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import type { PropType } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 
+interface AlertVariable {
+  uuid: string;
+  key: string;
+  value: string;
+}
+
 const props = defineProps({
   variables: {
-    type: Array,
+    type: Array as PropType<AlertVariable[]>,
     required: true,
   },
 });

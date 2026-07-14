@@ -1569,7 +1569,7 @@ export default defineComponent({
         const schemaFieldsArray = (schema.uds_schema && schema.uds_schema.length > 0)
           ? schema.uds_schema
           : (schema.schema || schema.fields || []);
-        const schemaFields = new Set(schemaFieldsArray.map((f: any) => f.name));
+        const schemaFields = new Set<string>(schemaFieldsArray.map((f: any) => f.name));
 
         // Step 3: Get semantic groups to resolve dimension names to field patterns
         const semanticGroupsResponse = await serviceStreamsApi.getSemanticGroups(org);
@@ -1602,7 +1602,7 @@ export default defineComponent({
             console.warn(`[Fallback Correlation] Semantic group failed, scanning schema fields directly...`);
             const dimParts = dimId.split('-');
             
-            const schemaFieldsArray = Array.from(schemaFields as Set<string>).filter(f => !f.startsWith('_'));
+            const schemaFieldsArray = Array.from(schemaFields).filter(f => !f.startsWith('_'));
             for (const schemaField of schemaFieldsArray) {
               const fieldLower = schemaField.toLowerCase();
               const allPartsMatch = dimParts.every(part => fieldLower.includes(part.toLowerCase()));

@@ -80,8 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Interesting Fields Toggle (when no user defined schema) -->
     <div v-else-if="showQuickMode">
       <OToggleGroup
-        :model-value="showOnlyInterestingFields as unknown as string"
-        @update:model-value="$emit('toggle-interesting-fields', $event as unknown as boolean)"
+        :model-value="showOnlyInterestingFields"
+        @update:model-value="$emit('toggle-interesting-fields', $event as boolean)"
         data-test="logs-page-field-list-user-defined-schema-toggle"
         class="mr-1"
       >

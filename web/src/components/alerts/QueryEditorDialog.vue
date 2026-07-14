@@ -488,7 +488,7 @@ const props = defineProps({
     required: true,
   },
   tab: {
-    type: String,
+    type: String as PropType<'sql' | 'promql'>,
     default: "sql",
   },
   sqlQuery: {
@@ -609,7 +609,7 @@ const closeDialog = () => {
 
 // Local state
 // Default to SQL tab if no tab is provided, otherwise use the provided tab
-const localTab = ref<'sql' | 'promql'>((props.tab || 'sql') as 'sql' | 'promql');
+const localTab = ref<'sql' | 'promql'>(props.tab || 'sql');
 const localSqlQuery = ref(props.sqlQuery);
 const localPromqlQuery = ref(props.promqlQuery);
 const vrlFunctionContent = ref(props.vrlFunction);
@@ -680,7 +680,7 @@ const runPromqlError = ref("");
 
 // Watch props
 watch(() => props.tab, (newVal) => {
-  localTab.value = (newVal || 'sql') as 'sql' | 'promql';
+  localTab.value = newVal || 'sql';
 });
 
 watch(() => props.sqlQuery, (newVal) => {

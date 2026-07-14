@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex flex-wrap mt-1 ml-1"
   >
     <div
-      v-for="(item, index) in variablesData.values as any[]"
+      v-for="(item, index) in variablesData.values"
       :key="item.name + index"
       :data-test="`dashboard-variable-${item.name}-container`"
     >

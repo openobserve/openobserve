@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-center space-x-4 w-fit!">
             <!-- Back button -->
             <OButton
-              v-if="(mode as string) === 'standalone' && showBackButton"
+              v-if="mode === 'standalone' && showBackButton"
               data-test="trace-details-back-btn"
               variant="ghost-muted"
               size="icon-xs"
@@ -328,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Apply filters button (standalone mode, right side) -->
             <OButton
-              v-if="(mode as string) === 'standalone' && areFiltersAdded"
+              v-if="mode === 'standalone' && areFiltersAdded"
               data-test="trace-details-apply-filters-btn-right"
               variant="outline"
               size="xs"
@@ -357,7 +357,7 @@ size="xs"
 
             <!-- Share button (standalone mode) -->
             <share-button
-              v-if="(mode as string) === 'standalone' && showShareButton"
+              v-if="mode === 'standalone' && showShareButton"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
               variant="outline"
@@ -367,7 +367,7 @@ size="xs"
 
             <!-- Close button -->
             <OButton
-              v-if="(mode as string) === 'standalone' && showCloseButton"
+              v-if="mode === 'standalone' && showCloseButton"
               data-test="trace-details-close-btn"
               variant="ghost"
               size="icon-xs"
@@ -510,7 +510,7 @@ size="sm">
             >
               <OSelect
                 data-test="trace-details-log-streams-select"
-                v-model="(searchObj.data.traceDetails.selectedLogStreams as string[])"
+                v-model="searchObj.data.traceDetails.selectedLogStreams"
                 :placeholder="t('search.selectLogStream')"
                 :options="filteredStreamOptions"
                 multiple
@@ -1827,8 +1827,7 @@ export default defineComponent({
     });
 
     const selectedSpanId = computed(() => {
-      // useTraces types this as the String wrapper; narrow to the primitive.
-      return searchObj.data.traceDetails.selectedSpanId as string | null;
+      return searchObj.data.traceDetails.selectedSpanId;
     });
 
     const hoveredSpanId = ref("");

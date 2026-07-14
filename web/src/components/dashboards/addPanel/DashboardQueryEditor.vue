@@ -582,8 +582,7 @@ export default defineComponent({
         updatePromQLQuery(query, event);
       } else {
         sqlAutoCompleteData.value.query = query;
-        // Top-level cursorIndex is intentional; useSuggestions reads it via `as any`.
-        (sqlAutoCompleteData.value as any).cursorIndex =
+        sqlAutoCompleteData.value.cursorIndex =
           queryEditorRef.value?.getCursorIndex();
         sqlAutoCompleteData.value.popup.open =
           queryEditorRef.value?.triggerAutoComplete;
