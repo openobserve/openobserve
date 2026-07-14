@@ -322,7 +322,10 @@ const linkSelected = async () => {
       variant: "warning",
     });
   } else {
+    // Nothing linked — keep the dialog open with the selection intact so the user
+    // can retry. `linked` would dismiss it: the parent routes away on it.
     toast({ message: t("workflow.linkAlerts.linkError"), variant: "error" });
+    return;
   }
 
   emit("linked");

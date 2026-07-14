@@ -67,9 +67,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="createNewFunction"
         class="flow-add-function flex-1 min-h-0 w-full"
       >
+        <!-- ALWAYS a fresh function. AddFunction's `is-updated` means "editing an
+             EXISTING function" and disables its name input (`:disable-name`), so
+             it must never be fed our `isUpdating` — that flag means "editing the
+             NODE", which is a different thing. Conflating them left the user
+             unable to name the function they were creating. -->
         <AddFunction
           ref="addFunctionRef"
-          :is-updated="isUpdating"
+          :is-updated="false"
           :height-offset="75"
           :sample-events="sampleEvents"
           @update:list="onFunctionCreation"
