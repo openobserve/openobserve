@@ -61,7 +61,7 @@ describe("FieldTypeBadge.vue", () => {
     it("uses boolean CSS variable for background color", () => {
       const wrapper = createWrapper({ dataType: "boolean" });
       const style = wrapper.find('[data-test="common-field-type-badge"]').attributes("style") ?? "";
-      expect(style).toContain("o2-field-type-boolean-bg");
+      expect(style).toContain("color-field-type-boolean-bg");
     });
   });
 
@@ -84,7 +84,7 @@ describe("FieldTypeBadge.vue", () => {
       const style = createWrapper({ dataType: "float64" })
         .find('[data-test="common-field-type-badge"]')
         .attributes("style") ?? "";
-      expect(style).toContain("o2-field-type-float-bg");
+      expect(style).toContain("color-field-type-float-bg");
     });
   });
 
@@ -103,7 +103,7 @@ describe("FieldTypeBadge.vue", () => {
       const style = createWrapper({ dataType: "int32" })
         .find('[data-test="common-field-type-badge"]')
         .attributes("style") ?? "";
-      expect(style).toContain("o2-field-type-number-bg");
+      expect(style).toContain("color-field-type-number-bg");
     });
   });
 
@@ -126,7 +126,7 @@ describe("FieldTypeBadge.vue", () => {
       const style = createWrapper({ dataType: "timestamp" })
         .find('[data-test="common-field-type-badge"]')
         .attributes("style") ?? "";
-      expect(style).toContain("o2-field-type-timestamp-bg");
+      expect(style).toContain("color-field-type-timestamp-bg");
     });
   });
 
@@ -149,7 +149,7 @@ describe("FieldTypeBadge.vue", () => {
       const style = createWrapper({ dataType: "string" })
         .find('[data-test="common-field-type-badge"]')
         .attributes("style") ?? "";
-      expect(style).toContain("o2-field-type-string-bg");
+      expect(style).toContain("color-field-type-string-bg");
     });
   });
 
