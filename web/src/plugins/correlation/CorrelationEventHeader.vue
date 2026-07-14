@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Source Event Banner -->
   <div
     v-if="sourceEvent && (sourceEvent.timestamp || sourceEvent.message)"
-    class="source-event-banner flex items-start gap-3 px-4 py-2 border-b border-solid border-card-glass-border"
+    class="flex items-start gap-3 px-4 py-2 border-b border-solid border-card-glass-border bg-card-glass-bg"
   >
     <OTag
       v-if="sourceEvent.severity"
@@ -319,9 +319,6 @@ const formatEventTimestamp = (ts: number | string | undefined): string => {
 </script>
 
 <style scoped>
-.source-event-banner {
-  background: var(--color-card-glass-bg, var(--color-surface-base));
-}
 .source-event-message {
   display: -webkit-box;
   -webkit-line-clamp: 2;

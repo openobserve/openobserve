@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container llm-trend-panel rounded-lg p-[1rem] flex flex-col"
+    class="card-container rounded-lg p-[1rem] flex flex-col border border-border-default"
   >
     <div class="flex items-baseline justify-between mb-[0.25rem]">
       <div>
@@ -152,10 +152,6 @@ const selectedTimeObj = computed(() => ({
 </script>
 
 <style lang="scss" scoped>
-.llm-trend-panel {
-  border: 1px solid var(--color-border-default);
-}
-
 /* Match LLMTrendPanel's chart height (.llm-trend-chart = 220px) so the
    converted panel lines up with the legacy ones in the same grid row.
    PanelSchemaRenderer needs an explicit 100% size to fill the box — without

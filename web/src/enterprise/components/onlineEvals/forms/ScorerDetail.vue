@@ -146,7 +146,7 @@
                   <span v-if="provider">{{
                     provider.name
                   }}</span>
-                  <span v-else class="sd-muted">{{
+                  <span v-else class="text-text-secondary italic">{{
                     t("onlineEvals.scorer.detail.providerUnknown")
                   }}</span>
                 </dd>
@@ -831,11 +831,6 @@ function relativeTime(timestampMs: number): string {
   margin: 0;
   font-size: 0.8125rem;
   color: var(--color-text-primary, currentColor);
-}
-
-.sd-muted {
-  color: var(--color-text-secondary, var(--color-text-secondary));
-  font-style: italic;
 }
 
 .sd-type-chip {

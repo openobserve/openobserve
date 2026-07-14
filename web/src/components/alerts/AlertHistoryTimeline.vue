@@ -63,8 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Persistent callout pill above the zone -->
           <div class="o2-flap-pill">
             <span class="font-semibold">⚡ Flapping</span>
-            <span class="o2-flap-pill-dot">•</span>{{ seg.flips }} flips
-            <span class="o2-flap-pill-dot">•</span>{{ seg.durationLabel }}
+            <span class="opacity-60 font-normal">•</span>{{ seg.flips }} flips
+            <span class="opacity-60 font-normal">•</span>{{ seg.durationLabel }}
           </div>
           <div
             v-for="(cell, c) in seg.cells"
@@ -418,10 +418,6 @@ function flapCellStyle(status: string) {
   background: #7c3aed;
   box-shadow: var(--shadow-md);
   pointer-events: none;
-}
-.o2-flap-pill-dot {
-  opacity: 0.6;
-  font-weight: 400;
 }
 .o2-flap-pill::after {
   content: "";

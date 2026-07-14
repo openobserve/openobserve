@@ -227,17 +227,17 @@
                       <span class="jd-scorers__produces-prefix">
                         {{ t("onlineEvals.job.detail.producesPrefix") }}
                       </span>
-                      <span class="jd-scorers__produces-name">{{
+                      <span class="text-text-primary font-bold">{{
                         item.scoreConfigName
                       }}</span>
                       <template v-if="item.scoreConfigDataType">
-                        <span class="jd-scorers__sep">·</span>
+                        <span class="text-text-secondary opacity-50">·</span>
                         <span class="jd-scorers__produces-type">
                           {{ item.scoreConfigDataType }}
                         </span>
                       </template>
                       <template v-if="item.scoreConfigRangeText">
-                        <span class="jd-scorers__sep">·</span>
+                        <span class="text-text-secondary opacity-50">·</span>
                         <span class="jd-scorers__produces-range">
                           {{ item.scoreConfigRangeText }}
                         </span>
@@ -1163,19 +1163,9 @@ function relativeTime(timestampMs: number): string {
   font-weight: 500;
 }
 
-.jd-scorers__produces-name {
-  color: var(--color-text-primary, currentColor);
-  font-weight: 700;
-}
-
 .jd-scorers__produces-type,
 .jd-scorers__produces-range {
   color: var(--color-text-secondary, var(--color-text-secondary));
-}
-
-.jd-scorers__sep {
-  color: var(--color-text-secondary, var(--color-text-secondary));
-  opacity: 0.5;
 }
 
 .jd-scorers__cta {
