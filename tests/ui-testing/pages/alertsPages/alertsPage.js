@@ -1465,9 +1465,17 @@ export class AlertsPage {
     async typeInAlertSearchInput(query) {
         const searchInput = this.page.locator(this.locators.alertSearchInputField);
         await searchInput.waitFor({ state: 'visible', timeout: 10000 });
-        await searchInput.click();
-        await searchInput.pressSequentially(query, { delay: 100 });
-        // wait until the typed value is reflected on the input
+        // Re-type if the value doesn't stick: under concurrent load pressSequentially can
+        // drop keystrokes or the input re-renders mid-type, leaving a mismatched value.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            await searchInput.click().catch(() => {});
+            await searchInput.fill('').catch(() => {});
+            await searchInput.pressSequentially(query, { delay: 80 });
+            if ((await searchInput.inputValue().catch(() => '')) === query) return;
+            testLogger.warn('Alert search value did not stick, retrying', { query, attempt });
+            await this.page.waitForTimeout(400);
+        }
+        // Final assertion so a genuine failure still surfaces clearly.
         await expect(searchInput).toHaveValue(query, { timeout: 5000 });
     }
 
