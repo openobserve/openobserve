@@ -722,17 +722,29 @@ abc, err = get_enrichment_table_record("${fileName}", {
                 timeout: 3000
             });
         } catch (error) {
-            testLogger.warn('VRL editor not visible, clicking show query toggle button');
+            // Recover by re-driving the same URL flag the app itself restores the
+            // editor from (useLogs.ts:473), NOT by clicking a toggle button.
+            //
+            // The old fallback clicked showQueryToggleBtnLocator.nth(1), which could
+            // never resolve: the logs page renders at most ONE element carrying
+            // [data-test="logs-search-bar-show-query-toggle-btn"] — the switch inside
+            // the "More" menu (SearchBar.vue:370), which is not even in the DOM until
+            // that menu is opened, because the toolbar's transform/function selectors
+            // are rendered with :hide-toggle="true" (SearchBar.vue:457-470). So .nth(1)
+            // always burned the full 45s action timeout whenever this branch was taken.
+            testLogger.warn('VRL editor not visible, enabling it via the fn_editor URL flag');
 
-            // Click the show query toggle button to reveal the VRL editor
-            await this.showQueryToggleBtnLocator.nth(1).click();
+            const retryUrl = new URL(this.page.url());
+            retryUrl.searchParams.set('fn_editor', 'true');
+            await this.page.goto(retryUrl.toString());
+            await this.page.waitForLoadState('domcontentloaded');
 
             // Retry waiting for VRL editor
             await this.page.waitForSelector(this.vrlEditor, {
                 state: 'visible',
-                timeout: 10000
+                timeout: 15000
             });
-            testLogger.debug('VRL editor visible after clicking toggle button');
+            testLogger.debug('VRL editor visible after enabling fn_editor');
         }
 
         const vrlEditorExists = await this.page.locator('[data-test="logs-vrl-function-editor"]').count();

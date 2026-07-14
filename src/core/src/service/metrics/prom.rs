@@ -29,7 +29,7 @@ use config::{
         promql::*,
         search::default_use_cache,
         self_reporting::usage::UsageType,
-        stream::{StreamParams, StreamPartition, StreamType},
+        stream::{StreamParams, StreamPartition, StreamStats, StreamType},
     },
     metrics,
     utils::{
@@ -301,18 +301,11 @@ pub async fn remote_write(
         let sample_start = std::time::Instant::now();
         for sample in event.samples {
             sample_count += 1;
-            let mut sample_val = sample.value;
-            // revisit in future
-            if sample_val.is_infinite() {
-                if sample_val == f64::INFINITY || sample_val > f64::MAX {
-                    sample_val = f64::MAX;
-                } else if sample_val == f64::NEG_INFINITY || sample_val < f64::MIN {
-                    sample_val = f64::MIN;
-                }
-            } else if sample_val.is_nan() {
-                // skip the entry from adding to store
+            // NaN -> no observation -> no record; infinities clamp. Shared with the OTLP
+            // writer so the two ingestion paths cannot drift apart on this.
+            let Some(sample_val) = super::sanitize_metric_value(sample.value) else {
                 continue;
-            }
+            };
             let metric = Metric {
                 labels: &labels,
                 value: sample_val,
@@ -836,14 +829,11 @@ pub async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<Response
 //
 // [supports]: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
 fn get_metadata_object(schema: &Schema) -> Option<MetadataObject> {
-    schema.metadata.get(METADATA_LABEL).map(|s| {
-        serde_json::from_str::<Metadata>(s)
-            .unwrap_or_else(|error| {
-                tracing::error!(%error, input = ?s, "failed to parse metadata");
-                panic!("BUG: failed to parse {METADATA_LABEL}")
-            })
-            .into()
-    })
+    // delegate rather than parse the blob a second time. The duplicate parse this replaces had
+    // its own `panic!("BUG: failed to parse ...")`, so one corrupt schema entry took the process
+    // down; and a second parser is a second thing to keep in step with the shared reader, which
+    // is where a historically JSON-quoted family name gets normalised.
+    super::get_prom_metadata_from_schema(schema).map(Into::into)
 }
 
 pub async fn get_series(
@@ -983,6 +973,46 @@ pub async fn get_labels(
     Ok(label_names)
 }
 
+/// The stats that say whether a metric family has data in a time range -- i.e. whether the
+/// metric should be offered as a name at all.
+///
+/// A family is stored as one stream per member, and its base stream is mostly a metadata holder:
+/// a histogram writes every row to `_count` / `_sum` / `_bucket` and nothing to the base at all,
+/// so reading the base's stats would hide every histogram in the org. Members are therefore
+/// tried in turn, and the first one with rows answers for the family:
+///
+/// - `_count` first: it is a `u64` on every data point, so it is always written. `_sum` is not --
+///   it is optional in OTLP and, since a NaN is no longer recorded, a source that reports its sum
+///   as NaN writes no `_sum` stream at all. Keying on `_sum` alone would hide the whole family
+///   while its buckets ingested normally.
+/// - then `_sum`, for a family whose `_count` has no stats.
+/// - then the base stream itself, which for a *summary* is where the quantile rows live.
+fn family_stats(
+    org_id: &str,
+    stream_name: &str,
+    metadata: Option<&Metadata>,
+    stream_type: StreamType,
+) -> StreamStats {
+    let is_family = metadata.is_some_and(|m| {
+        matches!(
+            m.metric_type,
+            MetricType::Histogram | MetricType::ExponentialHistogram | MetricType::Summary
+        )
+    });
+    if !is_family {
+        return stats::get_stream_stats(org_id, stream_name, stream_type);
+    }
+
+    let base = stats::get_stream_stats(org_id, stream_name, stream_type);
+    for member in [format!("{stream_name}_count"), format!("{stream_name}_sum")] {
+        let stats = stats::get_stream_stats(org_id, &member, stream_type);
+        if stats.doc_num > 0 {
+            return stats;
+        }
+    }
+    base
+}
+
 pub async fn get_label_values(
     org_id: &str,
     label_name: String,
@@ -1009,22 +1039,12 @@ pub async fn get_label_values(
                 // not it.
                 continue;
             }
-            let stats = match super::get_prom_metadata_from_schema(&schema.schema) {
-                None => stats::get_stream_stats(org_id, &schema.stream_name, stream_type),
-                Some(metadata) => {
-                    if metadata.metric_type == MetricType::Histogram
-                        || metadata.metric_type == MetricType::Summary
-                    {
-                        stats::get_stream_stats(
-                            org_id,
-                            &format!("{}_sum", schema.stream_name),
-                            stream_type,
-                        )
-                    } else {
-                        stats::get_stream_stats(org_id, &schema.stream_name, stream_type)
-                    }
-                }
-            };
+            let stats = family_stats(
+                org_id,
+                &schema.stream_name,
+                super::get_prom_metadata_from_schema(&schema.schema).as_ref(),
+                stream_type,
+            );
             if stats.time_range_intersects(start, end) {
                 label_values.push(schema.stream_name)
             }
@@ -1223,6 +1243,163 @@ mod tests {
     };
 
     use super::*;
+
+    fn schema_with_metadata(blob: &str) -> Schema {
+        Schema::empty().with_metadata(
+            [(METADATA_LABEL.to_string(), blob.to_string())]
+                .into_iter()
+                .collect(),
+        )
+    }
+
+    /// Note `MetadataObject` carries only type/help/unit -- the family name is dropped on the
+    /// way out -- so `/api/v1/metadata` cannot be asserted to serve an unquoted family name.
+    /// What the endpoint gets from delegating is the shared reader's parse, asserted below.
+    #[test]
+    fn test_get_metadata_object_serves_type_help_unit() {
+        let schema = schema_with_metadata(
+            r#"{"metric_type":"Histogram","metric_family_name":"foo","help":"h","unit":"s"}"#,
+        );
+
+        let served = serde_json::to_value(get_metadata_object(&schema).unwrap()).unwrap();
+        assert_eq!(served["type"], "histogram");
+        assert_eq!(served["help"], "h");
+        assert_eq!(served["unit"], "s");
+    }
+
+    fn family_metadata(metric_type: MetricType) -> Metadata {
+        Metadata {
+            metric_type,
+            metric_family_name: "http_request_duration_seconds".to_string(),
+            help: String::new(),
+            unit: String::new(),
+        }
+    }
+
+    fn seed_stats(org_id: &str, stream_name: &str, doc_num: i64, doc_time_max: i64) {
+        stats::set_stream_stats(
+            org_id,
+            stream_name,
+            StreamType::Metrics,
+            StreamStats {
+                doc_num,
+                doc_time_min: 1,
+                doc_time_max,
+                ..Default::default()
+            },
+        );
+    }
+
+    /// The regression this guards: dropping NaN records means a histogram whose sum is always
+    /// NaN writes no `_sum` stream at all. Keyed on `_sum`, the whole family would disappear
+    /// from the metric picker while its buckets were still ingesting.
+    #[test]
+    fn test_family_stats_prefers_count_over_sum() {
+        let org = "test_family_stats_count";
+        seed_stats(org, "http_request_duration_seconds_count", 100, 5_000);
+        // no `_sum` stream at all: its sum is NaN on every data point
+
+        let stats = family_stats(
+            org,
+            "http_request_duration_seconds",
+            Some(&family_metadata(MetricType::Histogram)),
+            StreamType::Metrics,
+        );
+
+        assert_eq!(stats.doc_num, 100);
+        assert!(stats.time_range_intersects(1, 6_000));
+    }
+
+    /// An exponential histogram writes `_count` / `_sum` / `_bucket` like any other histogram and
+    /// nothing to its base stream, so it has to be treated as a family too -- read the base and
+    /// it looks empty, and the metric never appears in the picker.
+    #[test]
+    fn test_family_stats_treats_exponential_histogram_as_a_family() {
+        let org = "test_family_stats_exp_hist";
+        seed_stats(org, "http_request_duration_seconds_count", 100, 5_000);
+
+        let stats = family_stats(
+            org,
+            "http_request_duration_seconds",
+            Some(&family_metadata(MetricType::ExponentialHistogram)),
+            StreamType::Metrics,
+        );
+
+        assert_eq!(stats.doc_num, 100);
+    }
+
+    /// A summary's quantile rows keep the base metric name -- they are not renamed the way
+    /// `_count` and `_sum` are -- so the base stream is the last place worth looking.
+    #[test]
+    fn test_family_stats_falls_back_to_the_base_stream() {
+        let org = "test_family_stats_base";
+        seed_stats(org, "request_latency", 25, 5_000);
+
+        let stats = family_stats(
+            org,
+            "request_latency",
+            Some(&family_metadata(MetricType::Summary)),
+            StreamType::Metrics,
+        );
+
+        assert_eq!(stats.doc_num, 25);
+    }
+
+    /// The fallback: a family with no `_count` stats still resolves rather than disappearing.
+    #[test]
+    fn test_family_stats_falls_back_to_sum_when_count_is_empty() {
+        let org = "test_family_stats_sum";
+        seed_stats(org, "http_request_duration_seconds_sum", 50, 5_000);
+
+        let stats = family_stats(
+            org,
+            "http_request_duration_seconds",
+            Some(&family_metadata(MetricType::Summary)),
+            StreamType::Metrics,
+        );
+
+        assert_eq!(stats.doc_num, 50);
+    }
+
+    /// A gauge or counter keeps its own rows, so it is its own liveness signal.
+    #[test]
+    fn test_family_stats_uses_the_stream_itself_for_non_families() {
+        let org = "test_family_stats_gauge";
+        seed_stats(org, "http_request_duration_seconds", 7, 5_000);
+        seed_stats(org, "http_request_duration_seconds_count", 999, 5_000);
+
+        let stats = family_stats(
+            org,
+            "http_request_duration_seconds",
+            Some(&family_metadata(MetricType::Gauge)),
+            StreamType::Metrics,
+        );
+        assert_eq!(stats.doc_num, 7);
+
+        // and with no metadata at all
+        let stats = family_stats(
+            org,
+            "http_request_duration_seconds",
+            None,
+            StreamType::Metrics,
+        );
+        assert_eq!(stats.doc_num, 7);
+    }
+
+    /// This endpoint used to parse the blob itself, with its own
+    /// `panic!("BUG: failed to parse ...")` -- one corrupt schema entry took the process down.
+    /// It now delegates to the shared reader, which returns `None` instead. That delegation is
+    /// also what keeps `/api/v1/metadata` and `/streams` from drifting apart on a family name
+    /// that is JSON-quoted in storage: only the shared reader normalises it.
+    #[test]
+    fn test_get_metadata_object_malformed_blob_is_none_not_panic() {
+        assert!(get_metadata_object(&schema_with_metadata("not json")).is_none());
+    }
+
+    #[test]
+    fn test_get_metadata_object_absent_metadata_is_none() {
+        assert!(get_metadata_object(&Schema::empty()).is_none());
+    }
 
     fn selector_with_name(name: &str) -> VectorSelector {
         VectorSelector {

@@ -825,4 +825,93 @@ describe("FieldList", () => {
       expect(fieldARow.exists()).toBe(true);
     });
   });
+  // ── PromQL query on a stream change ──────────────────────────────────
+
+  describe("changing the stream in PromQL mode", () => {
+    const currentQuery = () => mockReturn.dashboardPanelData.data.queries[0];
+
+    const METRIC_STREAMS = [
+      {
+        name: "first_metric",
+        stream_type: "metrics",
+        metrics_meta: {
+          metric_type: "Counter",
+          metric_family_name: "first_metric",
+          help: "",
+          unit: "",
+        },
+        stats: { doc_num: 100 },
+      },
+      {
+        name: "second_metric",
+        stream_type: "metrics",
+        metrics_meta: {
+          metric_type: "Counter",
+          metric_family_name: "second_metric",
+          help: "",
+          unit: "",
+        },
+        stats: { doc_num: 100 },
+      },
+    ];
+
+    /**
+     * Set up BEFORE mounting: the component loads the stream list on mount and
+     * overwrites `meta.stream.streamResults` with whatever `getStreams` returns,
+     * so the metrics list has to come from the service mock rather than be
+     * written into the panel data by hand.
+     */
+    const asMetricsPromqlPanel = () => {
+      mockReturn.promqlMode = computed(() => true) as any;
+      mockGetStreams.mockResolvedValue({ list: METRIC_STREAMS });
+      currentQuery().fields.stream_type = "metrics";
+      currentQuery().customQuery = true;
+    };
+
+    it("does NOT destroy a query the user wrote", async () => {
+      // It used to reset the query to a bare `${stream}{}` on every stream
+      // change, so a moment's curiosity about another metric silently threw away
+      // a query that may have taken a while to get right. In Custom mode the
+      // query is what actually runs — the stream field only drives label
+      // suggestions — so leaving the two out of step is recoverable, and deleting
+      // the user's work is not.
+      //
+      // `parsePromQlQuery` is mocked to report no metric name, which is what a
+      // query we did not generate looks like from here.
+      asMetricsPromqlPanel();
+      wrapper = mountComponent({ pageKey: "metrics" });
+      await flushPromises();
+
+      const handWritten = 'sum(rate(first_metric{code="500"}[1h])) * 60';
+      currentQuery().query = handWritten;
+
+      // The first change only records the baseline for this query slot.
+      currentQuery().fields.stream = "first_metric";
+      await flushPromises();
+
+      currentQuery().fields.stream = "second_metric";
+      await flushPromises();
+
+      expect(currentQuery().query).toBe(handWritten);
+    });
+
+    it("still seeds an empty slot", async () => {
+      // Nothing to protect, so the rule set's default lands — `sum(rate(...))`
+      // for a counter, rather than the raw cumulative selector.
+      asMetricsPromqlPanel();
+      wrapper = mountComponent({ pageKey: "metrics" });
+      await flushPromises();
+
+      currentQuery().query = "";
+      currentQuery().fields.stream = "first_metric";
+      await flushPromises();
+
+      currentQuery().fields.stream = "second_metric";
+      await flushPromises();
+
+      // The rule set's default for a counter — not the raw cumulative selector.
+      expect(currentQuery().query).toContain("rate(second_metric{}");
+      expect(currentQuery().query).toContain("sum(");
+    });
+  });
 });
