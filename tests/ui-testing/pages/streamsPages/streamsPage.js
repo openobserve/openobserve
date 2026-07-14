@@ -6,14 +6,20 @@ import { ManagementPage } from '../generalPages/managementPage.js';
 
 import { getHeaders, getIngestionUrl, sendRequest } from '../../utils/apiUtils.js';
 const http = require('http');
+const https = require('https');
 const nodeFetch = require('node-fetch');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 // node-fetch v2 keep-alive pooling + gzip decompression is the root cause of
 // "Premature close" / ECONNRESET flakiness in CI.
-const _noKeepAliveAgent = new http.Agent({ keepAlive: false });
+// Pick the agent by protocol so both local (http://localhost) and cloud/alpha
+// (https://) URLs work — an http.Agent rejects https:// URLs.
+const _noKeepAliveHttpAgent = new http.Agent({ keepAlive: false });
+const _noKeepAliveHttpsAgent = new https.Agent({ keepAlive: false });
+const _selectAgent = (parsedURL) =>
+    parsedURL.protocol === 'https:' ? _noKeepAliveHttpsAgent : _noKeepAliveHttpAgent;
 function _nodeFetchSafe(url, opts = {}) {
-    return nodeFetch(url, { ...opts, compress: false, agent: _noKeepAliveAgent });
+    return nodeFetch(url, { ...opts, compress: false, agent: _selectAgent });
 }
 
 export class StreamsPage {
@@ -714,15 +720,20 @@ export class StreamsPage {
      * ==========================================
      */
 
-    // Selectors - VERIFIED from AddStream.vue and LogStream.vue
+    // Selectors - VERIFIED from AddStream.vue and LogStream.vue.
+    // The streams-page Add Stream form is an ODialog: the panel carries the
+    // consumer data-test ("add-stream-dialog") and the save/cancel/close
+    // buttons are ODialog-owned generic ids, so scope them under the panel.
+    // (The add-stream-save/cancel-btn ids exist only in the pipeline inline
+    // branch of AddStream.vue, not in the dialog.)
     get addStreamButton() { return this.page.locator('[data-test="log-stream-add-stream-btn"]'); }
-    get addStreamModal() { return this.page.locator('[data-test="add-stream-title"]'); }
+    get addStreamModal() { return this.page.locator('[data-test="add-stream-dialog"]'); }
     get streamNameInput() { return this.page.locator('[data-test="add-stream-name-input"] input'); }
     get streamTypeSelect() { return this.page.locator('[data-test="add-stream-type-input"]'); }
     get dataRetentionInput() { return this.page.locator('[data-test="add-stream-data-retention-input"] input'); }
-    get saveStreamButton() { return this.page.locator('[data-test="save-stream-btn"]'); }
-    get cancelStreamButton() { return this.page.locator('[data-test="add-stream-cancel-btn"]'); }
-    get closeStreamButton() { return this.page.locator('[data-test="add-stream-close-btn"]'); }
+    get saveStreamButton() { return this.page.locator('[data-test="add-stream-dialog"] [data-test="o-dialog-primary-btn"]'); }
+    get cancelStreamButton() { return this.page.locator('[data-test="add-stream-dialog"] [data-test="o-dialog-secondary-btn"]'); }
+    get closeStreamButton() { return this.page.locator('[data-test="add-stream-dialog"] [data-test="o-dialog-close-btn"]'); }
     get streamsTable() { return this.page.locator('[data-test="log-stream-table"]'); }
     get searchStreamInput() { return this.page.locator('[data-test="streams-search-stream-input-field"]'); }
     get indexTypeSelect() { return this.page.locator('[data-test="schema-field-kubernetes_host-index-type-select"]').first(); }
