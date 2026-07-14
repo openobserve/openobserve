@@ -24,6 +24,15 @@ const screenshot = computed({
       capture: { ...props.check.capture, screenshot: v },
     }),
 })
+
+const screenshotDescription = computed(() => {
+  switch (screenshot.value) {
+    case 'always': return t('synthetics.capture.screenshotDescriptionAlways')
+    case 'on-fail': return t('synthetics.capture.screenshotDescriptionOnFail')
+    case 'off': return t('synthetics.capture.screenshotDescriptionOff')
+    default: return ''
+  }
+})
 </script>
 
 <template>
@@ -42,8 +51,8 @@ const screenshot = computed({
           class="w-40!"
           data-test="synthetics-check-capture-screenshot"
         />
-        <p class="text-xs text-[var(--color-text-secondary)]">
-          {{ t('synthetics.capture.screenshotDescription') }}
+        <p class="text-sm text-[var(--color-text-secondary)]">
+          {{ screenshotDescription }}
         </p>
       </div>
 
