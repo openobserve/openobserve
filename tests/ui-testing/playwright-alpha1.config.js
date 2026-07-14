@@ -58,7 +58,14 @@ module.exports = defineConfig({
   globalSetup: './playwright-tests/utils/global-setup-alpha1.js',
   globalTeardown: './playwright-tests/utils/global-teardown.js',
 
-  fullyParallel: true,
+  // File-level parallelism only: tests WITHIN a spec run serially, while separate
+  // spec files still run in parallel across workers. On the shared alpha cloud org,
+  // fullyParallel:true let several heavy tests from the SAME file (e.g. the three
+  // ui-operations stream-select tests, or the prebuilt-destination tests) run at once
+  // and pile up on the same dropdown/list fetches, which timed out under load. Running
+  // a file's tests one at a time removes that self-contention without reducing the
+  // --workers count the workflow passes (files still parallelize up to that limit).
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: 3,
