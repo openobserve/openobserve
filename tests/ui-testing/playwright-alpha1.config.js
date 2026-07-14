@@ -48,6 +48,24 @@ testLogger.info(`ORGNAME from .env: ${process.env.ORGNAME}`);
  * Alpha1 Cloud Playwright Configuration
  * Uses Dex "Continue with Email" login flow
  */
+
+// Shared browser context for both projects below.
+const CHROME_USE = {
+  ...devices['Desktop Chrome'],
+  viewport: { width: 1500, height: 1024 },
+  permissions: ['clipboard-read', 'clipboard-write'],
+  // Reuse auth state from global setup (Dex email login)
+  storageState: path.join(__dirname, 'playwright-tests/utils/auth/user.json'),
+};
+
+// A handful of Alerts specs are known to contend on the shared alpha org when they
+// run concurrently at --workers=5 (heavy stream/destination/template dropdown flows
+// hitting the same slow list fetches). Those exact tests are tagged @serialAlpha1 and
+// routed to a dedicated fullyParallel:false project so they run one-at-a-time within
+// their file, while every other test (all other Alerts tests AND every other shard —
+// nothing else carries the tag) keeps running fully in parallel.
+const SERIAL_TAG = /@serialAlpha1/;
+
 module.exports = defineConfig({
   testDir: './playwright-tests',
   testMatch: ['**/*.spec.js'],
@@ -58,14 +76,7 @@ module.exports = defineConfig({
   globalSetup: './playwright-tests/utils/global-setup-alpha1.js',
   globalTeardown: './playwright-tests/utils/global-teardown.js',
 
-  // File-level parallelism only: tests WITHIN a spec run serially, while separate
-  // spec files still run in parallel across workers. On the shared alpha cloud org,
-  // fullyParallel:true let several heavy tests from the SAME file (e.g. the three
-  // ui-operations stream-select tests, or the prebuilt-destination tests) run at once
-  // and pile up on the same dropdown/list fetches, which timed out under load. Running
-  // a file's tests one at a time removes that self-contention without reducing the
-  // --workers count the workflow passes (files still parallelize up to that limit).
-  fullyParallel: false,
+  fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: 3,
@@ -96,14 +107,18 @@ module.exports = defineConfig({
 
   projects: [
     {
+      // Everything WITHOUT the serial tag — runs fully in parallel as before.
       name: 'chromium',
-      use: {
-        ...devices['Desktop Chrome'],
-        viewport: { width: 1500, height: 1024 },
-        permissions: ['clipboard-read', 'clipboard-write'],
-        // Reuse auth state from global setup (Dex email login)
-        storageState: path.join(__dirname, 'playwright-tests/utils/auth/user.json'),
-      },
+      grepInvert: SERIAL_TAG,
+      use: CHROME_USE,
+    },
+    {
+      // Only the tagged, known-contended Alerts tests — serialized within their file
+      // (fullyParallel:false) so they don't pile up on the shared org's list fetches.
+      name: 'chromium-serial',
+      grep: SERIAL_TAG,
+      fullyParallel: false,
+      use: CHROME_USE,
     },
   ],
 });

@@ -167,7 +167,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
     // ==================== DEDUPLICATION TESTS ====================
 
     test("Create scheduled alert with deduplication configuration", {
-        tag: ['@alertsAdvanced', '@all', '@alerts', '@deduplication']
+        tag: ['@alertsAdvanced', '@all', '@alerts', '@deduplication', '@serialAlpha1']
     }, async ({ page }) => {
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);
         testLogger.info('Testing scheduled alert with deduplication configuration', { uniqueSuffix });

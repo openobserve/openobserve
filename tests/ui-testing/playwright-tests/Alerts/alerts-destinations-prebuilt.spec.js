@@ -97,7 +97,7 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
   // ============================================================================
 
   test("P1: Slack - Complete CRUD flow with validation and connectivity test", {
-    tag: ['@prebuiltDestinations', '@slack', '@P1', '@all'],
+    tag: ['@prebuiltDestinations', '@slack', '@P1', '@all', '@serialAlpha1'],
     timeout: EXTENDED_TIMEOUT_MS
   }, async ({ page }) => {
     testLogger.info('===== P1 SLACK TEST: Complete CRUD Flow =====');
@@ -167,7 +167,7 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
   // ============================================================================
 
   test("P1: Prebuilt Types - Create and Edit for Discord, Teams, PagerDuty, Opsgenie, ServiceNow", {
-    tag: ['@prebuiltDestinations', '@discord', '@teams', '@pagerduty', '@opsgenie', '@servicenow', '@P1', '@all'],
+    tag: ['@prebuiltDestinations', '@discord', '@teams', '@pagerduty', '@opsgenie', '@servicenow', '@P1', '@all', '@serialAlpha1'],
     timeout: EXTENDED_TIMEOUT_MS
   }, async ({ page }) => {
     test.slow(); // Mark as slow due to multiple destination types

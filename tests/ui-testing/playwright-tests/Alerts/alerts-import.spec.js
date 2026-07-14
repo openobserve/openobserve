@@ -190,7 +190,7 @@ test.describe("Alerts Import/Export", () => {
    * Covers: webhook/email destinations from URL and FILE
    */
   test('Destination Import from URL and File', {
-    tag: ['@destinationImport', '@all', '@alerts']
+    tag: ['@destinationImport', '@all', '@alerts', '@serialAlpha1']
   }, async ({ page }) => {
     // Create templates needed for destinations
     const webhookTemplateName = 'auto_webhook_template_' + sharedRandomValue;

@@ -69,7 +69,7 @@ test.describe("Alerts UI Operations", () => {
    * Self-contained: generates its own suffix and creates its own resources
    */
   test('Create and Delete Scheduled Alert with SQL Query', {
-    tag: ['@scheduledAlerts', '@all', '@alerts'],
+    tag: ['@scheduledAlerts', '@all', '@alerts', '@serialAlpha1'],
     timeout: FIVE_MINUTES_MS
   }, async ({ page }) => {
     const suffix = pm.alertsPage.generateRandomString();
@@ -123,7 +123,7 @@ test.describe("Alerts UI Operations", () => {
    * Self-contained: generates its own suffix and creates its own resources
    */
   test('Manual Alert Trigger via UI (Feature #9484)', {
-    tag: ['@manualTrigger', '@all', '@alerts', '@feature9484'],
+    tag: ['@manualTrigger', '@all', '@alerts', '@feature9484', '@serialAlpha1'],
     timeout: THREE_MINUTES_MS
   }, async ({ page }) => {
     const suffix = pm.alertsPage.generateRandomString();
@@ -177,7 +177,7 @@ test.describe("Alerts UI Operations", () => {
    * Self-contained: generates its own suffix and creates its own resources
    */
   test('Alert Module UI Validations and Filters Check', {
-    tag: ['@all', '@alerts', '@alertsUIValidations'],
+    tag: ['@all', '@alerts', '@alertsUIValidations', '@serialAlpha1'],
     timeout: FIVE_MINUTES_MS
   }, async ({ page }) => {
     const suffix = pm.alertsPage.generateRandomString();
