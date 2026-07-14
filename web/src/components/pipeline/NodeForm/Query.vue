@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="add-stream-query-routing-section"
       class="w-full h-full stream-routing-section"
       :class="[
-        store.state.theme === 'dark' ? 'bg-[var(--color-surface-base,#1a1a1a)]' : 'bg-white',
+        store.state.theme === 'dark' ? 'bg-surface-base' : 'bg-white',
         { 'fullscreen-mode': isFullscreenMode },
       ]"
     >

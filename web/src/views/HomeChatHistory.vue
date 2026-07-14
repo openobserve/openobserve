@@ -122,7 +122,7 @@ function formatTime(ts: string): string {
 
     <!-- Search -->
     <div class="px-2 pb-[0.375em] shrink-0">
-      <div class="flex items-center gap-[0.375em] bg-(--color-input-bg) rounded-md px-[0.375em]">
+      <div class="flex items-center gap-[0.375em] bg-input-bg rounded-md px-[0.375em]">
         <svg
           class="opacity-50 shrink-0"
           width="0.875em"

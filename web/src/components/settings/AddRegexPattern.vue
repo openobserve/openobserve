@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="fullscreen"
             size="xs"
-            :class="isFullScreen ? 'text-[var(--color-accent)]' : ''"
+            :class="isFullScreen ? 'text-accent' : ''"
           />
         </OButton>
       </div>

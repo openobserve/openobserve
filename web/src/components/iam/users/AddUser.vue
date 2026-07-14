@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="signout"
   >
     <div class="flex items-center gap-3">
-      <div class="bg-[var(--color-accent)] text-white inline-flex items-center justify-center w-10 h-10 rounded-full shrink-0">
+      <div class="bg-accent text-white inline-flex items-center justify-center w-10 h-10 rounded-full shrink-0">
         <OIcon name="info" size="sm" />
       </div>
       <span>As you've chosen to change your password, you'll be automatically

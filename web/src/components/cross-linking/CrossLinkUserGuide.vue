@@ -21,7 +21,7 @@
       class="user-guide-body w-125 max-h-[60vh] overflow-y-auto overflow-x-hidden py-3 px-4 text-sm leading-[1.4]"
       :class="
         store.state.theme == 'dark'
-          ? 'theme-dark bg-[var(--color-surface-base,#1a1a1a)]'
+          ? 'theme-dark bg-surface-base'
           : 'theme-light bg-white'
       "
     >

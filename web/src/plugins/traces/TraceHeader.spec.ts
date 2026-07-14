@@ -166,7 +166,7 @@ describe("TraceHeader", () => {
 
     it("should have correct avatar properties", () => {
       const resizeBtn = wrapper.find('[data-test="trace-header-resize-btn"]');
-      expect(resizeBtn.classes()).toContain("bg-(--color-accent)");
+      expect(resizeBtn.classes()).toContain("bg-accent");
       expect(resizeBtn.classes()).toContain("rounded-full");
     });
   });

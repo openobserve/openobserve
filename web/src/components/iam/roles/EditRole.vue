@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div
             class="flex justify-between items-center flex-shrink-0"
-            :class="store.state.theme === 'dark' ? 'bg-[var(--color-surface-base,#1a1a1a)]' : 'bg-white'"
+            :class="store.state.theme === 'dark' ? 'bg-surface-base' : 'bg-white'"
           >
             <div
               v-show="permissionsUiType === 'table'"

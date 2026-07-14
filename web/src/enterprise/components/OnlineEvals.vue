@@ -7,7 +7,7 @@ the Free Software Foundation, either version 3 of the License, or
 
 <template>
   <div
-    class="flex flex-col gap-2.5 h-[calc(100vh-var(--navbar-height))] min-h-0 pt-1 px-2.5 pb-2.5 text-(--color-text-primary)"
+    class="flex flex-col gap-2.5 h-[calc(100vh-var(--navbar-height))] min-h-0 pt-1 px-2.5 pb-2.5 text-text-primary"
     :class="{ 'h-full! p-0! gap-0!': hideTabBar }"
     data-test="online-evals-page"
   >
@@ -174,7 +174,7 @@ the Free Software Foundation, either version 3 of the License, or
             v-for="tab in tabs"
             :key="tab.value"
             class="online-evals__tab inline-flex items-center gap-1.75 h-9.5 py-0 px-3.5 bg-transparent border-0 border-b-2 border-b-transparent text-text-muted cursor-pointer font-semibold text-[13px]"
-            :class="activeTab === tab.value ? 'is-active text-[var(--color-text-primary)] border-b-[var(--color-accent)] -mb-px' : ''"
+            :class="activeTab === tab.value ? 'is-active text-text-primary border-b-accent -mb-px' : ''"
             type="button"
             @click="activeTab = tab.value"
           >

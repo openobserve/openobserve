@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Embedded (logs) header: existing inline header, kept as-is -->
         <header
           v-else
-          class="h-auto py-[0.125rem] flex! items-center justify-between bg-[var(--color-surface-base)] pl-1"
+          class="h-auto py-[0.125rem] flex! items-center justify-between bg-surface-base pl-1"
         >
           <div class="flex items-center space-x-4 w-fit!">
             <!-- Back button -->

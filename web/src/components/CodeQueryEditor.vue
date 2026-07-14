@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showAiIcon && !disableAi"
       variant="sidebar-toggle"
       size="icon-toolbar"
-      class="absolute! top-2 right-2 z-10 bg-(--color-card-glass-bg) border border-(--color-card-glass-border) transition-all duration-200 hover:bg-button-outline-hover-bg hover:border-[var(--color-accent)]"
-      :class="nlpMode ? 'bg-[var(--color-primary-100)] border-[var(--color-accent)]' : ''"
+      class="absolute! top-2 right-2 z-10 bg-(--color-card-glass-bg) border border-(--color-card-glass-border) transition-all duration-200 hover:bg-button-outline-hover-bg hover:border-accent"
+      :class="nlpMode ? 'bg-primary-100 border-accent' : ''"
       @click="toggleNlpMode"
       data-test="query-editor-ai-icon-btn"
     >

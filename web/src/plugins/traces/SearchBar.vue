@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'
                     "
                     size="sm"
-                    :class="searchObj.meta.liveMode ? 'text-[var(--color-accent)]' : ''"
+                    :class="searchObj.meta.liveMode ? 'text-accent' : ''"
                   />
                 </template>
                 <span>

@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       data-test="add-stream-input-stream-routing-section"
-      :class="store.state.theme === 'dark' ? 'bg-[var(--color-surface-base,#1a1a1a)]' : 'bg-white'"
+      :class="store.state.theme === 'dark' ? 'bg-surface-base' : 'bg-white'"
     >
 
 

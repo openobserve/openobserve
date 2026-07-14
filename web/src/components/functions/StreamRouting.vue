@@ -83,7 +83,7 @@
 
       <div
         class="flex justify-start mt-4 py-2 w-full gap-2"
-        :class="store.state.theme === 'dark' ? 'bg-[var(--color-surface-base,#1a1a1a)]' : 'bg-white'"
+        :class="store.state.theme === 'dark' ? 'bg-surface-base' : 'bg-white'"
       >
         <OButton
           data-test="add-report-cancel-btn"
