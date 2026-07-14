@@ -57,13 +57,13 @@ function handleUpdate(value: BrowserCheck) {
         data-test="synthetics-check-configure-browser-devices"
         @update:check="handleUpdate"
       />
-      <CheckRUM
+      <!-- <CheckRUM
         v-if="(checkType ?? 'browser') === 'browser'"
         :check="check"
         :check-type="checkType"
         data-test="synthetics-check-configure-rum"
         @update:check="handleUpdate"
-      />
+      /> -->
       <CheckCapture
         v-if="(checkType ?? 'browser') === 'browser'"
         :check="check"
