@@ -197,7 +197,7 @@ jobs:
         working-directory: web
         run: |
           COUNT=$(npm run --silent type-check:app 2>&1 | grep -c "error TS" || true)
-          BASELINE=$(cat typecheck-error-baseline.txt)
+          BASELINE=$(cat typecheck-error-baseline.txt 2>/dev/null || echo 0)
           echo "TypeScript errors: $COUNT (baseline: $BASELINE)"
           if [ "$COUNT" -gt "$BASELINE" ]; then
             echo "::error::This change introduces TypeScript errors ($COUNT > $BASELINE). Run 'npm run type-check:app' in web/ to see them."
