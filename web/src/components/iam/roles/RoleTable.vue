@@ -98,6 +98,9 @@ const columns: OTableColumnDef[] = [
         />
       </div>
     </template>
+    <template #toolbar-trailing>
+      <slot name="toolbar-trailing" />
+    </template>
     <!-- Row actions: edit + delete -->
     <template #cell-actions="{ row }">
       <div class="flex items-center justify-center">
@@ -134,7 +137,7 @@ const columns: OTableColumnDef[] = [
     </template>
 
     <template #bottom>
-      <span class="o2-table-footer-title text-text-primary">{{ data.length }} {{ t("iam.roles") }}</span>
+      <span class="o2-table-footer-title">{{ data.length }} {{ t("iam.roles") }}</span>
       <OButton
         v-if="(selectedIds?.length ?? 0) > 0"
         data-test="iam-roles-bulk-delete-btn"

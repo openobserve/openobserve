@@ -53,18 +53,18 @@ use serde_json::Map;
 
 pub mod inferred;
 pub mod otel;
+pub mod schema_compat;
 pub mod service_graph;
 
 #[cfg(feature = "cloud")]
 use crate::service::stream::get_stream;
 use crate::{
     common::meta::{
-        http::HttpResponse as MetaHttpResponse,
+        http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
         ingestion::IngestUser,
         stream::SchemaRecords,
         traces::{Event, Span, SpanLink, SpanLinkContext, SpanRefType},
     },
-    handler::http::router::ERROR_HEADER,
     service::{
         alerts::alert::AlertExt,
         format_stream_name,

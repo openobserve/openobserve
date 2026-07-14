@@ -32,10 +32,13 @@ pub mod common;
 mod engine;
 mod exec;
 mod functions;
+mod label_usage;
 pub mod name_visitor;
 mod rewrite;
 pub mod search;
+mod selector_loader;
 pub mod selector_visitor;
+mod series_labels;
 mod utils;
 
 pub use engine::Engine;

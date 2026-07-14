@@ -496,7 +496,7 @@ describe("AddStream", () => {
       await flushPromises();
 
       expect(mockCreateStream).not.toHaveBeenCalled();
-      expect(vm.streamTypeError).toBe("Field is required!");
+      expect(vm.streamTypeError).toBe("Please select a stream type");
     });
 
     it("should fail validation and not call createStream when data retention days < 1", async () => {
@@ -513,7 +513,7 @@ describe("AddStream", () => {
       await flushPromises();
 
       expect(mockCreateStream).not.toHaveBeenCalled();
-      expect(vm.dataRetentionError).toBe("Field is required!");
+      expect(vm.dataRetentionError).toBe("Data retention must be at least 1 day");
     });
 
     it("should call toast with error message when createStream fails with non-403 error", async () => {
@@ -564,7 +564,7 @@ describe("AddStream", () => {
       await flushPromises();
 
       expect(mockCreateStream).not.toHaveBeenCalled();
-      expect(vm.nameError).toBe("Field is required!");
+      expect(vm.nameError).toBe("Stream name is required");
     });
 
     it("should return early from submitForm when validation fails", async () => {

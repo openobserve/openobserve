@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md p-0 h-full flex flex-col">
+  <div class="p-0 h-full flex flex-col">
     <!-- Standard page header: title + icon + subtitle, matching the Users page. -->
     <AppPageHeader
       :title="t('invitation.pendingInvitations')"
@@ -50,6 +50,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex-1"
               />
             </div>
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="invitation-list-refresh-btn"
+              @click="fetchPendingInvitations"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="iamInvitationsRefresh" />
+            </OButton>
           </template>
           <template #empty>
             <OEmptyState
@@ -96,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #bottom>
-            <span class="o2-table-footer-title text-text-primary">
+            <span class="o2-table-footer-title">
               {{ resultTotal }} {{ t('invitation.pendingInvitations') }}
             </span>
           </template>
@@ -134,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { defineComponent, ref, onMounted } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -149,6 +162,8 @@ import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "InvitationList",
@@ -156,6 +171,7 @@ export default defineComponent({
     AppPageHeader,
     OEmptyState,
     OButton,
+    OTooltip,
     OTag,
     OTimeCell,
     OUserCell,
@@ -397,6 +413,10 @@ export default defineComponent({
         });
       }
     };
+
+    useShortcuts([
+      { id: "iamInvitationsRefresh", handler: () => { if (!isInputFocused()) fetchPendingInvitations(); } },
+    ]);
 
     return {
       t,

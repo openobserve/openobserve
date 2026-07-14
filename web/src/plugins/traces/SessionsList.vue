@@ -126,6 +126,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
 
+      <template #toolbar-trailing>
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          icon-left="refresh"
+          :loading="loading"
+          data-test="sessions-list-refresh-btn"
+          @click="() => refresh()"
+        >
+          <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="sessionsRefresh" />
+        </OButton>
+      </template>
+
       <!-- Empty / error body — rendered inside the frame so the toolbar (and
            thus the stream selector) stays visible. -->
       <template #empty>
@@ -246,6 +259,9 @@ import { useSessions, type SessionRow } from "./composables/useSessions";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -710,4 +726,8 @@ onMounted(() => {
 onUnmounted(() => {
   cancelAll();
 });
+
+useShortcuts([
+  { id: "sessionsRefresh", handler: () => { if (!isInputFocused()) refresh(); } },
+]);
 </script>

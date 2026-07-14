@@ -176,20 +176,27 @@ test.describe("Model Pricing — Create & Form Validation", () => {
             const pm = new PageManager(page);
             await pm.modelPricingPage.gotoEditorCreate();
 
-            // Both fields empty → save disabled
-            await expect(pm.modelPricingPage.saveBtn).toBeDisabled({ timeout: 5000 });
+            // Save is a plain submit button — the OForm has no disabled-gate and
+            // validates submit-then-change, so field errors surface only after the
+            // first submit attempt (not on load / first keystroke).
+            await expect(pm.modelPricingPage.saveBtn).toBeEnabled();
 
-            // Name too long → inline error; fix → error clears
+            // Both fields empty → the first submit arms validation: required errors
+            // appear and the editor stays open (submit is blocked).
+            await pm.modelPricingPage.saveBtn.click();
+            await expect(pm.modelPricingPage.nameInputError).toBeVisible({ timeout: 5000 });
+            await expect(pm.modelPricingPage.patternInputError).toBeVisible({ timeout: 5000 });
+            await pm.modelPricingPage.editorTitle.waitFor({ state: 'visible', timeout: 5000 });
+
+            // Name too long → inline error; fix → error clears (revalidates on change)
             await pm.modelPricingPage.fillName('a'.repeat(257));
             await expect(pm.modelPricingPage.nameInputError).toBeVisible({ timeout: 5000 });
-            await expect(pm.modelPricingPage.saveBtn).toBeDisabled();
             await pm.modelPricingPage.fillName(validName);
             await expect(pm.modelPricingPage.nameInputError).not.toBeVisible({ timeout: 5000 });
 
             // Invalid regex → inline error; fix → error clears
             await pm.modelPricingPage.fillPattern('[invalid(');
             await expect(pm.modelPricingPage.patternInputError).toBeVisible({ timeout: 5000 });
-            await expect(pm.modelPricingPage.saveBtn).toBeDisabled();
             await pm.modelPricingPage.fillPattern(`^${validName}.*`);
             await expect(pm.modelPricingPage.patternInputError).not.toBeVisible({ timeout: 5000 });
 
@@ -197,13 +204,19 @@ test.describe("Model Pricing — Create & Form Validation", () => {
             await pm.modelPricingPage.saveBtn.click();
             await pm.modelPricingPage.editorTitle.waitFor({ state: 'visible', timeout: 5000 });
 
-            // Key with spaces → toast error (filter by text — earlier toasts may still be visible)
-            await pm.modelPricingPage.addPriceRow('input tokens', '0.000002');
+            // Draft key with spaces → save-time toast. The "Add price" button now
+            // commits any non-empty key (bad keys get an inline row error instead),
+            // so key validation as a TOAST fires via the save() draft-row guard on an
+            // uncommitted draft. Leaving it uncommitted also keeps the form clean for
+            // the successful save below. (Filter by text — earlier toasts may linger.)
+            await pm.modelPricingPage.fillDraftPriceRow('input tokens', '0.000002');
+            await pm.modelPricingPage.saveBtn.click();
             await expect(pm.modelPricingPage.toastMessage.filter({ hasText: /must not contain spaces/i }))
                 .toBeVisible({ timeout: 5000 });
 
-            // Pure integer key → toast error
-            await pm.modelPricingPage.addPriceRow('123', '0.000002');
+            // Draft key that is a pure integer → save-time toast
+            await pm.modelPricingPage.fillDraftPriceRow('123', '0.000002');
+            await pm.modelPricingPage.saveBtn.click();
             await expect(pm.modelPricingPage.toastMessage.filter({ hasText: /cannot be a pure integer/i }))
                 .toBeVisible({ timeout: 5000 });
 

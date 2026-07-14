@@ -862,15 +862,18 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!("Cannot delete default organization"));
     }
 
+    // Snapshot the org BEFORE deleting — the cloud OrgDeleted event needs its
+    // name/type, and after delete_org the record is gone. (Previously this was
+    // fetched after deletion, so on cloud it always found None and errored out
+    // without emitting the event.)
+    #[cfg(feature = "cloud")]
+    let org_snapshot = get_org(org_id).await;
+
     match db::organization::delete_org(org_id).await {
         Ok(_) => {
             delete_org_tuples(org_id).await;
             #[cfg(feature = "cloud")]
-            {
-                let org = match get_org(org_id).await {
-                    Some(org) => org,
-                    None => return Err(anyhow::anyhow!("Organization does not exist")),
-                };
+            if let Some(org) = org_snapshot {
                 enqueue_cloud_event(CloudEvent {
                     org_id: org.identifier.clone(),
                     org_name: org.name.clone(),

@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog data-test="dashboard-tab-settings-add-tab-dialog"
     :open="open"
     size="sm"
-    :title="editMode ? 'Edit Tab' : 'Add Tab'"
-    secondary-button-label="Cancel"
-    primary-button-label="Save"
+    :title="editMode ? t('dashboard.editTab') : t('dashboard.newTab')"
+    :secondary-button-label="t('dashboard.cancel')"
+    :primary-button-label="t('dashboard.save')"
     form-id="add-tab-form"
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OForm id="add-tab-form" ref="addTabForm" :schema="addTabSchema" :default-values="addTabDefaults" @submit="onSubmit">
         <OFormInput
           name="name"
-          label="Name"
+          :label="t('dashboard.name')"
           required
           data-test="dashboard-add-tab-name"
         />

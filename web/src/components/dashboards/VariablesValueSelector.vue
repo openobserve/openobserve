@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-add-variable-btn"
         icon-left="add"
       >
-        Add Variable
+        {{ t("dashboard.newVariable") }}
       </OButton>
     </div>
   </div>
@@ -110,6 +110,7 @@ import {
 } from "vue";
 import { defineComponent, reactive } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vue";
 import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.vue";
 import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
@@ -188,6 +189,7 @@ export default defineComponent({
   },
   setup(props: any, { emit }) {
     const store = useStore();
+    const { t } = useI18n();
     // Try to inject variablesManager from parent (for backward compatibility)
 
     // Try to inject variablesManager from parent (for backward compatibility)
@@ -2359,6 +2361,7 @@ export default defineComponent({
       // If using manager, delegate to manager's updateVariableValue
       if (useManager && manager) {
         try {
+          oldVariablesData[currentVariable.name] = currentVariable.value;
           await manager.updateVariableValue(
             currentVariable.name,
             currentVariable.scope || "global",
@@ -2531,6 +2534,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       props,
       variablesData,
       changeInitialVariableValues,

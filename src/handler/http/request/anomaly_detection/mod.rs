@@ -22,6 +22,9 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+pub use crate::service::anomaly_detection::{
+    CreateAnomalyConfigRequest, UpdateAnomalyConfigRequest,
+};
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::extractors::Headers,
@@ -434,80 +437,6 @@ pub async fn get_detection_history(
 }
 
 // Request/Response types
-
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct CreateAnomalyConfigRequest {
-    pub name: String,
-    pub description: Option<String>,
-    pub stream_name: String,
-    pub stream_type: String, // "logs", "metrics", "traces"
-    pub query_mode: String,  // "filters" or "custom_sql"
-    pub filters: Option<serde_json::Value>,
-    pub custom_sql: Option<String>,
-    /// Aggregate function name: "count", "avg", "sum", "min", "max", "p50", "p95", "p99".
-    /// For backwards compatibility, also accepts the combined form "avg(field)".
-    pub detection_function: String,
-    /// Field to aggregate (required for avg/sum/min/max/pXX, ignored for count).
-    /// Combined with `detection_function` into "avg(field)" before saving.
-    pub detection_function_field: Option<String>,
-    /// SQL histogram bucket size, e.g. "5m", "1h".
-    pub histogram_interval: String,
-    /// How often the detection job fires, e.g. "1h", "30m".
-    pub schedule_interval: String,
-    /// How far back each detection run queries, in seconds. Mirrors alerts'
-    /// trigger_period_seconds.
-    pub detection_window_seconds: i64,
-    pub training_window_days: Option<i32>,
-    /// How often to retrain the model (in days). `0` means never retrain automatically.
-    /// Options: 0 (never), 1, 7, 14.
-    pub retrain_interval_days: Option<i32>,
-    /// Anomaly score percentile threshold (50.0–99.9). Points whose RCF score exceeds
-    /// the N-th percentile of training scores are flagged as anomalies.
-    /// 97.0 is the recommended default (flags top 3% of scores as anomalies).
-    /// Lower values = more anomalies; higher values = fewer, more extreme anomalies.
-    pub percentile: Option<f64>,
-    pub rcf_num_trees: Option<i32>,
-    pub rcf_tree_size: Option<i32>,
-    pub rcf_shingle_size: Option<i32>,
-    pub alert_enabled: Option<bool>,
-    #[serde(default)]
-    pub alert_destinations: Vec<String>,
-    pub enabled: Option<bool>,
-    /// Folder to place this config in. Resolved to the org default folder if absent.
-    pub folder_id: Option<String>,
-    /// Owner username. Defaults to the requesting user if absent.
-    pub owner: Option<String>,
-}
-
-#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
-pub struct UpdateAnomalyConfigRequest {
-    pub name: Option<String>,
-    pub description: Option<String>,
-    pub query_mode: Option<String>,
-    pub filters: Option<serde_json::Value>,
-    pub custom_sql: Option<String>,
-    pub detection_function: Option<String>,
-    /// Field to aggregate (required for avg/sum/min/max/pXX).
-    pub detection_function_field: Option<String>,
-    /// SQL histogram bucket size. Changing this requires retraining.
-    pub histogram_interval: Option<String>,
-    /// How often the detection job fires.
-    pub schedule_interval: Option<String>,
-    /// How far back each detection run queries, in seconds.
-    pub detection_window_seconds: Option<i64>,
-    /// Training history window in days (min 1). Changing this requires retraining.
-    /// Seasonality is auto-determined from this value at train time.
-    pub training_window_days: Option<i32>,
-    /// Anomaly score percentile threshold (50.0–99.9). Changing this requires retraining.
-    pub percentile: Option<f64>,
-    /// How often to retrain the model (in days). `0` means never retrain automatically.
-    pub retrain_interval_days: Option<i32>,
-    pub alert_enabled: Option<bool>,
-    pub alert_destinations: Option<Vec<String>>,
-    pub enabled: Option<bool>,
-    pub folder_id: Option<String>,
-    pub owner: Option<String>,
-}
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct FilterRequest {

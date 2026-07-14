@@ -67,6 +67,15 @@ impl Accumulate for GroupAccumulate {
         self.timestamps.insert(sample.timestamp);
     }
 
+    fn merge(&mut self, other: Box<dyn Accumulate>) {
+        let other = other.into_any().downcast::<Self>().expect("same type");
+        self.timestamps.extend(other.timestamps);
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
+    }
+
     fn evaluate(self: Box<Self>) -> Vec<Sample> {
         self.timestamps
             .into_iter()

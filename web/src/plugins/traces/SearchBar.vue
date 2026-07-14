@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               data-test="traces-search-bar-cancel-btn"
               :title="t('search.cancel')"
-              class="p-0 h-[1.875rem]! [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] text-(--text-xs) font-(--font-medium)! leading-4! px-1! py-0! w-[5.875rem]! whitespace-normal break-words text-center bg-(--o2-cancel-query-bg)! text-(--o2-primary-btn-text)! element-box-shadow ![border-radius:0.375rem_0_0_0.375rem]"
+              class="p-0 h-[1.875rem]! [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] text-xs! font-medium! leading-4! px-1! py-0! w-[5.875rem]! whitespace-normal break-words text-center bg-(--o2-cancel-query-bg)! text-(--o2-primary-btn-text)! element-box-shadow ![border-radius:0.375rem_0_0_0.375rem]"
               @click="cancelQueryData"
               >{{ t("search.cancel") }}</OButton
             >
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-refresh-btn"
               data-cy="search-bar-refresh-button"
               :title="t('search.runQuery')"
-              class="p-0 h-[1.875rem]! element-box-shadow [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] hover:opacity-90 hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)] text-(--text-xs) font-(--font-medium)! leading-4! px-1! py-0! w-[5.875rem]! whitespace-normal break-words text-center bg-(--o2-primary-btn-bg)! text-(--o2-primary-btn-text)!"
+              class="p-0 h-[1.875rem]! element-box-shadow [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] hover:opacity-90 hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)] text-xs! font-medium! leading-4! px-1! py-0! w-[5.875rem]! whitespace-normal break-words text-center bg-(--o2-primary-btn-bg)! text-(--o2-primary-btn-text)!"
               :class="
                 store.state.zoConfig.auto_query_enabled
                   ? '![border-radius:0.375rem_0_0_0.375rem]'
@@ -199,7 +199,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 name="autorenew"
                 size="xs"
-                class="mr-1"
               />
               {{ t("search.runQuery") }}
             </OButton>
@@ -352,19 +351,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="services-catalog-date-time-picker"
-            class="h-[2rem]!"
+            class="h-[2rem]! mr-[0.375rem]"
             @on:date-change="updateDateTime"
           />
-          <OButton
-            data-test="services-catalog-refresh-btn"
-            variant="outline"
-            size="icon-toolbar"
-            class="mr-[0.375rem]"
-            @click="$emit('services-catalog-refresh')"
-          >
-            <OIcon name="refresh" size="sm" />
-            <OTooltip :content="t('common.refresh')" />
-          </OButton>
         </div>
       </div>
       </div><!-- /toolbarRightRef wrapper -->
@@ -1045,4 +1034,3 @@ export default defineComponent({
   },
 });
 </script>
-

@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md p-0"
+  <div class="p-0"
   >
     <AppPageHeader
       :back="{
         label: t('pipeline_destinations.header'),
         onClick: () => emit('cancel'),
       }"
-      class="rounded-lg px-3 border-b border-border-default"
+      class="px-3 border-b border-border-default"
     >
       <template #title>
         <span data-test="pipeline-destination-editor-title">

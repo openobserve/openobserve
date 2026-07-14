@@ -36,6 +36,13 @@ vi.mock("@/services/settings", () => ({
   },
 }));
 
+const toastSpy = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => toastSpy(...args),
+}));
+
+import settingsService from "@/services/settings";
+
 // Mock router
 const mockRouter = {
   push: vi.fn(),
@@ -458,6 +465,65 @@ describe("HomeView org home dashboard tab", () => {
     await wrapper.vm.$nextTick();
     expect(hd.homeDashboard.value).toBeNull();
     expect(wrapper.vm.activeHomeTab).not.toBe("dash:default:abc");
+  });
+
+  it("toasts when the pinned dashboard is reported unavailable", async () => {
+    const hd = useHomeDashboard();
+    hd.homeDashboard.value = {
+      dashboardId: "abc",
+      folderId: "default",
+      label: "Payments Health",
+    };
+    wrapper = createWrapper();
+    wrapper.vm.activeHomeTab = "dash:default:abc";
+    await wrapper.vm.$nextTick();
+    toastSpy.mockClear();
+    wrapper
+      .findComponent({ name: "PinnedDashboardTab" })
+      .vm.$emit("unavailable", "abc");
+    await wrapper.vm.$nextTick();
+    expect(toastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error" }),
+    );
+  });
+
+  it("re-syncs the home_dashboard setting when the pinned tab is activated", async () => {
+    (settingsService.getSetting as any).mockClear();
+    (settingsService.getSetting as any).mockResolvedValue({
+      data: { setting_value: { dashboardId: "abc", folderId: "A", label: "X" } },
+    });
+    useHomeDashboard().homeDashboard.value = {
+      dashboardId: "abc",
+      folderId: "B",
+      label: "X",
+    };
+    wrapper = createWrapper();
+    wrapper.vm.activeHomeTab = "dash:B:abc";
+    await flushPromises();
+    // load(org) re-reads the authoritative setting via getSetting(org, key).
+    expect(settingsService.getSetting).toHaveBeenCalledWith(
+      "test-org",
+      "home_dashboard",
+    );
+  });
+
+  it("does NOT toast when the pin is closed deliberately via the ×", async () => {
+    const hd = useHomeDashboard();
+    hd.homeDashboard.value = {
+      dashboardId: "abc",
+      folderId: "default",
+      label: "Payments Health",
+    };
+    wrapper = createWrapper();
+    wrapper.vm.activeHomeTab = "usage";
+    await wrapper.vm.$nextTick();
+    toastSpy.mockClear();
+    await wrapper
+      .find('[data-test="home-tab-close-dash:default:abc"]')
+      .trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(hd.homeDashboard.value).toBeNull();
+    expect(toastSpy).not.toHaveBeenCalled();
   });
 
   it("clicking the × removes home without activating the dashboard tab", async () => {

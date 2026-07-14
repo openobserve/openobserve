@@ -43,6 +43,19 @@
           />
         </template>
 
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="eval-job-list-refresh-btn"
+            @click="emit('refresh')"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="evalJobsRefresh" />
+          </OButton>
+        </template>
+
         <template #empty>
           <div class="flex items-center justify-center py-8">
             <OEmptyState
@@ -126,6 +139,9 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -157,6 +173,7 @@ const emit = defineEmits<{
   (e: "delete", row: EvalJob): void;
   (e: "activate", row: EvalJob): void;
   (e: "pause", row: EvalJob): void;
+  (e: "refresh"): void;
 }>();
 
 function canActivate(status: EvalJobStatus): boolean {
@@ -292,4 +309,8 @@ function formatDateShort(value: number) {
   if (!value) return "—";
   return formatDate(value, "YYYY-MM-DD HH:mm:ss");
 }
+
+useShortcuts([
+  { id: "evalJobsRefresh", handler: () => { if (!isInputFocused()) emit("refresh"); } },
+]);
 </script>

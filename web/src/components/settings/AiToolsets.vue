@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="rounded-md p-0" style="min-height: inherit; height: calc(100vh - 88px);">
+  <div class="p-0" style="min-height: inherit; height: calc(100vh - 88px);">
     <div v-if="!showAddDialog">
       <!-- Standard section header: title + actions only. Search moved into the
            table toolbar below. -->
@@ -59,6 +59,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="w-64 no-border o2-search-input"
             :placeholder="t('aiToolset.search')"
           />
+        </template>
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="ai-toolsets-list-refresh-btn"
+            @click="getData"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="aiToolsetsRefresh" />
+          </OButton>
         </template>
         <template #empty>
           <OEmptyState
@@ -128,6 +140,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -138,6 +151,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
 import aiToolsetsService from "@/services/ai_toolsets";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "PageAiToolsets",
@@ -147,6 +162,7 @@ export default defineComponent({
     ConfirmDialog,
     AddAiToolset,
     OButton,
+    OTooltip,
     OTag,
     OSearchInput,
     OTable,
@@ -261,6 +277,10 @@ export default defineComponent({
     });
 
     watch(visibleRows, (rows) => { resultTotal.value = rows.length; }, { immediate: true });
+
+    useShortcuts([
+      { id: "aiToolsetsRefresh", handler: () => { if (!isInputFocused()) getData(); } },
+    ]);
 
     // -----------------------------------------------------------------------
     // Navigation helpers
