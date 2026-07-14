@@ -250,10 +250,8 @@ o2_dex = { path = "src/enterprise/o2_dex" }
 o2_enterprise = { path = "src/enterprise/o2_enterprise", default-features = false }
 o2_openfga = { path = "src/enterprise/o2_openfga" }
 o2_ratelimit = { path = "src/enterprise/o2_ratelimit" }
-vortex = { git = "https://github.com/openobserve/vortex", branch = "0.75.0-fix", features = [
-    "tokio",
-] }
-vortex-datafusion = { git = "https://github.com/openobserve/vortex", branch = "0.75.0-fix" }
+vortex = { path = "src/enterprise/vortex" }
+vortex-datafusion = { path = "src/enterprise/vortex-datafusion" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
 axum = { version = "0.8", features = ["macros", "multipart", "tracing"] }

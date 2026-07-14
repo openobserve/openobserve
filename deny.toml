@@ -29,6 +29,8 @@ exceptions = [
     { name = "o2_enterprise", allow = ["AGPL-3.0"] },
     { name = "o2_openfga", allow = ["AGPL-3.0"] },
     { name = "o2_ratelimit", allow = ["AGPL-3.0"] },
+    { name = "vortex", allow = ["AGPL-3.0"] },
+    { name = "vortex-datafusion", allow = ["AGPL-3.0"] },
     { name = "config", allow = ["AGPL-3.0"] },
     { name = "infra", allow = ["AGPL-3.0"] },
     { name = "ingester", allow = ["AGPL-3.0"] },
