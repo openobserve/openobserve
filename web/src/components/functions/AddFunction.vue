@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-show="expandState.functions"
-                    class="border solid border-[var(--o2-border-color)] mb-[0.375rem] relative flex-1 min-h-0"
+                    class="mb-[0.375rem] relative flex-1 min-h-0"
                   >
                     <!-- Unified Query Editor (with built-in AI bar) -->
                     <unified-query-editor
