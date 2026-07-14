@@ -98,6 +98,8 @@ pub async fn create_annotations(
         ("Authorization" = [])
     ),
     params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard id"),
         ListTimedAnnotationsQuery
     ),
     responses(

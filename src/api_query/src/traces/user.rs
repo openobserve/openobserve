@@ -297,7 +297,15 @@ pub async fn get_latest_users(
         }
     };
     if resp_search.hits.is_empty() {
-        return MetaHttpResponse::json(resp_search);
+        return MetaHttpResponse::json(PaginatedResponse {
+            took: resp_search.took,
+            total: 0,
+            from,
+            size,
+            hits: vec![],
+            trace_id,
+            function_error: range_error,
+        });
     }
 
     // Parse user_id -> trace_ids from Phase 1 results
