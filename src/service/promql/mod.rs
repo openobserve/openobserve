@@ -32,7 +32,6 @@ pub mod common;
 mod engine;
 mod exec;
 mod functions;
-mod label_cache;
 mod label_usage;
 pub mod name_visitor;
 mod rewrite;

@@ -32,8 +32,9 @@ use promql_parser::{
 use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
 use super::{
-    PromqlContext, label_usage::labels_dropped_at_root,
-    selector_loader::selector_load_data_from_datafusion,
+    PromqlContext,
+    label_usage::labels_dropped_at_root,
+    selector_loader::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
 };
 use crate::service::promql::{
     aggregations, binaries, functions, micros, rewrite::remove_filter_all,
@@ -515,7 +516,7 @@ impl Engine {
         selector: &VectorSelector,
         range: Option<Duration>,
     ) -> Result<Value> {
-        let metrics = match self.selector_load_data_inner(selector, range).await {
+        let mut metric_values = match self.selector_load_data_inner(selector, range).await {
             Ok(v) => v,
             Err(e) => {
                 log::error!(
@@ -527,12 +528,11 @@ impl Engine {
         };
 
         // no data, return immediately
-        if metrics.is_empty() {
+        if metric_values.is_empty() {
             return Ok(Value::None);
         }
 
         let start = std::time::Instant::now();
-        let mut metric_values = metrics.into_values().collect::<Vec<_>>();
         metric_values.par_iter_mut().for_each(|metric| {
             metric.samples.sort_unstable_by_key(|k| k.timestamp);
             if self.ctx.query_ctx.query_exemplars
@@ -559,7 +559,7 @@ impl Engine {
         &self,
         selector: &VectorSelector,
         range: Option<Duration>,
-    ) -> Result<HashMap<u64, RangeValue>> {
+    ) -> Result<Vec<RangeValue>> {
         let start_time = std::time::Instant::now();
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
         let offset_modifier = get_offset_modifier(selector.offset.clone());
@@ -770,26 +770,10 @@ impl Engine {
         let task_results =
             task_results.map_err(|e| DataFusionError::Plan(format!("task error: {e}")))?;
 
-        let mut metrics: HashMap<u64, RangeValue> = HashMap::default();
-        let task_results_len = task_results.len();
-        for task_result in task_results {
-            if task_results_len == 1 {
-                // only one ctx, no need to merge, just set it to metrics
-                metrics = task_result;
-                break;
-            }
-            for (key, value) in task_result {
-                if let Some(metric) = metrics.get_mut(&key) {
-                    metric.extend(value);
-                } else {
-                    metrics.insert(key, value);
-                }
-            }
-        }
-
         // check for super cluster
         #[cfg(feature = "enterprise")]
-        if self.ctx.query_ctx.is_super_cluster {
+        let metrics = if self.ctx.query_ctx.is_super_cluster {
+            let mut metrics = merge_loaded_metrics(task_results);
             let (metric, stats) = match super_rx.recv().await {
                 Some(Ok(ret)) => ret,
                 Some(Err(e)) => {
@@ -818,7 +802,13 @@ impl Engine {
             }
             let mut ctx_scan_stats = self.ctx.scan_stats.write().await;
             ctx_scan_stats.add(&stats);
-        }
+
+            metrics.into_values().collect()
+        } else {
+            collect_loaded_metrics(task_results)
+        };
+        #[cfg(not(feature = "enterprise"))]
+        let metrics = collect_loaded_metrics(task_results);
 
         log::info!(
             "[trace_id: {}] load data done for stream: {}, took: {} ms",
@@ -1257,6 +1247,64 @@ impl Engine {
     }
 }
 
+/// Discard the already-partitioned series hashes without rebuilding a global
+/// hash table. This is the common path when DataFusion creates one query
+/// context for the selected schema.
+fn flatten_partitioned_metrics(partitions: PartitionedMetrics) -> Vec<RangeValue> {
+    let metrics_count = partitions.iter().map(HashMap::len).sum();
+    let mut metrics = Vec::with_capacity(metrics_count);
+    for partition in partitions {
+        metrics.extend(partition.into_values());
+    }
+    metrics
+}
+
+fn flatten_loaded_metrics(metrics: LoadedMetrics) -> Vec<RangeValue> {
+    match metrics {
+        LoadedMetrics::Partitioned(partitions) => flatten_partitioned_metrics(partitions),
+        LoadedMetrics::Merged(metrics) => metrics.into_values().collect(),
+    }
+}
+
+/// A single DataFusion context is the common case and its series are already
+/// deduplicated, so flatten it; series from multiple contexts must be merged
+/// by series hash.
+fn collect_loaded_metrics(mut results: Vec<LoadedMetrics>) -> Vec<RangeValue> {
+    if results.len() == 1 {
+        flatten_loaded_metrics(results.pop().unwrap())
+    } else {
+        merge_loaded_metrics(results).into_values().collect()
+    }
+}
+
+/// Merge series that may occur in more than one DataFusion context. Contexts
+/// can have different partition counts, so this fallback deliberately merges
+/// by series hash instead of zipping partitions.
+fn merge_loaded_metrics(results: Vec<LoadedMetrics>) -> HashMap<u64, RangeValue> {
+    // Multiple contexts can contain the same high-cardinality series. Grow
+    // from the unique keys instead of reserving the sum of all context sizes.
+    let mut metrics: HashMap<u64, RangeValue> = HashMap::default();
+    for result in results {
+        let maps = match result {
+            LoadedMetrics::Partitioned(partitions) => partitions,
+            LoadedMetrics::Merged(metrics) => vec![metrics],
+        };
+        for map in maps {
+            for (hash, value) in map {
+                match metrics.entry(hash) {
+                    hashbrown::hash_map::Entry::Occupied(mut entry) => {
+                        entry.get_mut().extend(value)
+                    }
+                    hashbrown::hash_map::Entry::Vacant(entry) => {
+                        entry.insert(value);
+                    }
+                };
+            }
+        }
+    }
+    metrics
+}
+
 fn get_offset_modifier(offset: Option<Offset>) -> i64 {
     if let Some(offset) = offset {
         match offset {
@@ -1303,6 +1351,51 @@ mod tests {
         fn children(&self) -> &[promql_parser::parser::Expr] {
             &[]
         }
+    }
+
+    fn range_value(timestamp: i64, value: f64) -> RangeValue {
+        RangeValue {
+            labels: vec![],
+            samples: vec![Sample::new(timestamp, value)],
+            exemplars: None,
+            time_window: None,
+        }
+    }
+
+    #[test]
+    fn test_flatten_partitioned_metrics_preserves_all_series() {
+        let partitions = vec![
+            HashMap::from([(11, range_value(100, 1.0))]),
+            HashMap::from([(22, range_value(200, 2.0))]),
+        ];
+
+        let metrics = flatten_partitioned_metrics(partitions);
+        assert_eq!(metrics.len(), 2);
+        assert_eq!(
+            metrics
+                .iter()
+                .map(|metric| metric.samples.len())
+                .sum::<usize>(),
+            2
+        );
+    }
+
+    #[test]
+    fn test_merge_partitioned_metrics_extends_series_across_contexts() {
+        // Deliberately use different partition counts: separate DataFusion
+        // contexts are not required to have identical physical plans.
+        let results = vec![
+            LoadedMetrics::Partitioned(vec![HashMap::from([(11, range_value(100, 1.0))])]),
+            LoadedMetrics::Partitioned(vec![
+                HashMap::new(),
+                HashMap::from([(11, range_value(200, 2.0)), (22, range_value(300, 3.0))]),
+            ]),
+        ];
+
+        let metrics = merge_loaded_metrics(results);
+        assert_eq!(metrics.len(), 2);
+        assert_eq!(metrics[&11].samples.len(), 2);
+        assert_eq!(metrics[&22].samples.len(), 1);
     }
 
     #[test]

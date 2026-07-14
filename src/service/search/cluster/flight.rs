@@ -51,27 +51,25 @@ use {
     o2_enterprise::enterprise::search::{WorkGroup, admission},
 };
 
-use crate::{
-    handler::grpc::flight::visitor::get_peak_memory_from_ctx,
-    service::{
-        db::enrichment_table,
-        search::{
-            SearchResult,
-            datafusion::{
-                exec::{DataFusionContextBuilder, register_udf},
-                optimizer::{
-                    context::{
-                        PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext,
-                    },
-                    create_physical_plan, generate_analyzer_rules, generate_optimizer_rules,
-                    generate_physical_optimizer_rules,
+use crate::service::{
+    db::enrichment_table,
+    search::{
+        SearchResult,
+        datafusion::{
+            exec::{DataFusionContextBuilder, register_udf},
+            optimizer::{
+                context::{
+                    PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext,
                 },
-                table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
+                create_physical_plan, generate_analyzer_rules, generate_optimizer_rules,
+                generate_physical_optimizer_rules,
             },
-            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-            sql::Sql,
-            utils::{ScanStatsVisitor, check_query_default_limit_exceeded},
+            plan_metrics::get_peak_memory_from_ctx,
+            table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
         },
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        sql::Sql,
+        utils::{ScanStatsVisitor, check_query_default_limit_exceeded},
     },
 };
 

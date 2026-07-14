@@ -44,8 +44,10 @@ use prost::Message;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
-    common::meta::ingestion::{IngestionStatus, StreamStatus},
-    handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    common::meta::{
+        http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+        ingestion::{IngestionStatus, StreamStatus},
+    },
     service::{
         format_stream_name,
         ingestion::{
