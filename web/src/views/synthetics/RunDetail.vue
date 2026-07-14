@@ -1016,7 +1016,7 @@ const statusBadgeVariant = computed(() =>
   isErrorRun.value ? "error-soft" : isFailed.value ? "error" : "success",
 );
 const statusIcon = computed(() =>
-  isErrorRun.value ? "error" : isFailed.value ? "cancel" : "check_circle",
+  isErrorRun.value ? "error" : isFailed.value ? "cancel" : "check-circle",
 );
 const statusLabel = computed(() =>
   isErrorRun.value ? "Error" : isFailed.value ? "Failed" : "Passed",
@@ -1043,7 +1043,7 @@ const statusChip = computed(() => {
   return {
     label: "Status",
     value: "Passed",
-    icon: "check_circle",
+    icon: "check-circle",
     colorClass: "text-[var(--o2-status-success-text)]",
   };
 });

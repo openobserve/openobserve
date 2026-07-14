@@ -145,7 +145,7 @@
             <OButton
               variant="outline"
               size="icon-sm"
-              class="w-12!"
+              class="w-8!"
               icon-left="refresh"
               :loading="loading"
               title="Refresh"
@@ -783,9 +783,9 @@ const statusTabs = computed(() => {
   const ms = enrichedMonitors.value
   const tabs = [
     { filter: 'all',      label: 'All',      count: ms.length },
-    { filter: 'up',       label: 'Up',       count: ms.filter(m => m.status === 'up').length },
-    { filter: 'degraded', label: 'Degraded', count: ms.filter(m => m.status === 'degraded').length },
-    { filter: 'down',     label: 'Down',     count: ms.filter(m => m.status === 'down').length },
+    { filter: 'up',       label: 'Passed',       count: ms.filter(m => m.status === 'up').length },
+    { filter: 'degraded', label: 'Warning', count: ms.filter(m => m.status === 'degraded').length },
+    { filter: 'down',     label: 'Failed',     count: ms.filter(m => m.status === 'down').length },
   ]
   const unknownCount = ms.filter(m => m.status === 'unknown').length
   if (unknownCount > 0) {
@@ -909,4 +909,3 @@ async function deleteMonitor(m: any) {
   }
 }
 </script>
-

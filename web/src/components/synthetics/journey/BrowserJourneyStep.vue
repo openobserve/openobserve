@@ -58,16 +58,16 @@ const ACTION_ICON_MAP: Record<StepAction, IconName> = {
 }
 
 const ACTION_LABEL_MAP: Record<StepAction, string> = {
-  navigate: 'NAVIGATE',
-  click: 'CLICK',
-  type: 'TYPE',
-  select: 'SELECT',
-  press: 'PRESS',
-  hover: 'HOVER',
-  scroll: 'SCROLL',
-  wait: 'WAIT',
-  assert: 'ASSERT',
-  screenshot: 'SCREENSHOT',
+  navigate: 'Navigate',
+  click: 'Click',
+  type: 'Type',
+  select: 'Select',
+  press: 'Press',
+  hover: 'Hover',
+  scroll: 'Scroll',
+  wait: 'Wait',
+  assert: 'Assert',
+  screenshot: 'Screenshot',
 }
 
 const ACTION_VALUE_LABEL_MAP: Record<string, string> = {
@@ -238,7 +238,7 @@ function toggleExpanded() {
     <div
       class="flex items-center gap-2 px-2 h-9 min-h-9 group relative"
       :class="[rowOpacityClass, { 'border-b border-[var(--o2-border-color)]': expanded }, showErrorCard && 'bg-[var(--color-badge-error-soft-bg)]']"
-      
+
     >
       <!-- Drag handle — visibility:hidden during replay to preserve layout -->
       <span
@@ -421,13 +421,14 @@ function toggleExpanded() {
     <!-- Inline editor (expanded) -->
     <div
       v-if="expanded"
-      class="pt-3 pb-3 px-8 flex flex-col gap-3"
+      class="pt-3 pb-3 px-8 flex flex-col gap-3 w-32!"
     >
       <!-- Action select -->
       <OSelect
         v-model="actionComputed"
         label="Action"
         :options="actionOptions"
+        class="w-[25rem]!"
         data-test="synthetics-journey-step-action-select"
       />
 
@@ -446,7 +447,7 @@ function toggleExpanded() {
             v-model="selectorTypeComputed"
             label="Selector type"
             :options="selectorTypeOptions"
-            class="w-32! shrink-0"
+            class="w-[25rem]! shrink-0"
             data-test="synthetics-journey-step-selector-type-select"
           />
           <OInput
