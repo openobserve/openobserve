@@ -31,13 +31,13 @@ import store from "../../test/unit/helpers/store";
 import { createI18n } from "vue-i18n";
 import { nextTick } from "vue";
 
-// ── Mock toast (replaces deprecated $q.notify) ──
+// ── Mock toast ──
 const mockToastFn = vi.fn().mockReturnValue(vi.fn());
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => mockToastFn(...args),
 }));
 
-// ── Mock confirm dialog (replaces deprecated $q.dialog) ──
+// ── Mock confirm dialog ──
 const mockConfirmFn = vi.fn().mockResolvedValue(true);
 vi.mock("@/composables/useConfirmDialog", () => ({
   useConfirmDialog: vi.fn(() => ({

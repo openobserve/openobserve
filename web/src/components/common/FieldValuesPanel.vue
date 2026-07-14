@@ -442,7 +442,7 @@ watch(
 );
 
 /**
- * Returns the Quasar colour token for a value's checkbox.
+ * Returns the colour token for a value's checkbox.
  * Excluded values (!=) render red ("negative") to visually distinguish them
  * from included values (=) which render the default blue ("primary").
  */

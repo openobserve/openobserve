@@ -267,7 +267,7 @@ describe("FunctionsToolbar", () => {
     await fullscreenButton.trigger("click");
 
     // Just verify that clicking the button doesn't throw an error
-    // The actual fullscreen behavior is handled by Quasar and the browser
+    // The actual fullscreen behavior is handled by the browser
     expect(fullscreenButton.exists()).toBe(true);
   });
 

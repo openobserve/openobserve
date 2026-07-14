@@ -527,7 +527,7 @@ describe("AlertSettings.vue", () => {
 
     // OSelect handles destination filtering internally via its searchable prop;
     // the filterDestinations method and filteredDestinations computed were removed
-    // from AlertSettings during the Quasar-to-O2 migration.
+    // from AlertSettings during the migration.
 
     it("should emit refresh destinations event", async () => {
       const refreshBtn = wrapper.find(".iconHoverBtn");

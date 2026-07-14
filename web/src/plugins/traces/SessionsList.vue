@@ -497,7 +497,7 @@ const tableColumns = computed(() => [
 
 function formatTimestamp(nanos: number): string {
   if (!nanos) return "—";
-  // Backend ships timestamps as nanoseconds — quasar's date wants ms.
+  // Backend ships timestamps as nanoseconds — formatDate wants ms.
   return formatDate(Math.floor(nanos / 1_000_000), "YYYY-MM-DD HH:mm:ss");
 }
 

@@ -5,7 +5,7 @@ export type { IconName };
 export interface IconProps {
   /**
    * Either an approved icon name from the registry, or an `img:<path>` reference
-   * to render an external image (Quasar-compat). To add a registry icon, update OIcon.icons.ts.
+   * to render an external image. To add a registry icon, update OIcon.icons.ts.
    */
   name: IconName | string;
   /**

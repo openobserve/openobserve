@@ -22,7 +22,7 @@ import {
   getConsumableRelativeTime,
   getRelativePeriod,
   isInvalidDate,
-  convertUnixToQuasarFormat,
+  convertUnixToDateFormat,
   convertDateToTimestamp,
 } from "./date";
 
@@ -401,10 +401,10 @@ describe("Date Utilities", () => {
     });
   });
 
-  describe("convertUnixToQuasarFormat", () => {
-    it("should convert unix microseconds to quasar format", () => {
+  describe("convertUnixToDateFormat", () => {
+    it("should convert unix microseconds to date format", () => {
       const unixMicros = 1672531200000000; // 2023-01-01 00:00:00 UTC in microseconds
-      const result = convertUnixToQuasarFormat(unixMicros);
+      const result = convertUnixToDateFormat(unixMicros);
       
       // Check that the result contains the expected date part
       expect(result).toContain("2023-01-01");
@@ -439,17 +439,17 @@ describe("Date Utilities", () => {
     });
 
     it("should handle zero microseconds", () => {
-      const result = convertUnixToQuasarFormat(0);
+      const result = convertUnixToDateFormat(0);
       expect(result).toBe("");
     });
 
     it("should return empty string for null/undefined", () => {
-      expect(convertUnixToQuasarFormat(null)).toBe("");
-      expect(convertUnixToQuasarFormat(undefined)).toBe("");
+      expect(convertUnixToDateFormat(null)).toBe("");
+      expect(convertUnixToDateFormat(undefined)).toBe("");
     });
 
     it("should handle errors gracefully", () => {
-      const result = convertUnixToQuasarFormat("invalid");
+      const result = convertUnixToDateFormat("invalid");
       
       expect(result).toBe("");
       

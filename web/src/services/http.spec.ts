@@ -46,15 +46,6 @@ vi.mock("@/utils/zincutils", () => ({
 
 vi.mock("axios");
 
-// Quasar is used inside http.ts — stub it to prevent errors
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: vi.fn(), dialog: vi.fn() }),
-  };
-});
-
 import config from "../aws-exports";
 import store from "../stores";
 import axios from "axios";

@@ -1909,7 +1909,7 @@ export class LogsPage {
         }
 
         const searchResult = this.page.locator(this.searchResultText);
-        // Quasar pagination buttons can be slow to respond on cloud — retry
+        // Pagination buttons can be slow to respond on cloud — retry
         // the click up to 3 times if the expected text doesn't appear.
         for (let attempt = 1; attempt <= 3; attempt++) {
             // OPagination forwards the parent data-test as `${parent}-page-{n}` for each page button.
@@ -3879,14 +3879,14 @@ export class LogsPage {
             await inputLocator.fill('');
         } else {
             // pressSequentially fires per-character input events that reliably
-            // trigger Quasar q-input's debounced update:model-value chain.
+            // trigger the q-input's debounced update:model-value chain.
             // force:true bypasses Monaco editor's <span class="highlight">code</span>
             // overlay that can intercept pointer events on the splitter panel.
             await inputLocator.click({ clickCount: 3, force: true });
             await inputLocator.pressSequentially(text, { delay: 30 });
         }
         // Wait deterministically for the input value to reflect the typed text —
-        // this confirms Quasar's debounced model-value chain has settled.
+        // this confirms the debounced model-value chain has settled.
         await expect(inputLocator).toHaveValue(text || '', { timeout: 5000 });
     }
 
@@ -4108,7 +4108,7 @@ export class LogsPage {
     }
 
     async expectSearchListVisible() {
-        // Post-migration: legacy `.search-list > :nth-child(1) > .text-left` (Quasar class)
+        // Post-migration: legacy `.search-list > :nth-child(1) > .text-left` (framework class)
         // is gone. SearchResult.vue exposes the result title as data-test="logs-search-result-title".
         return await expect(this.page.locator(this.searchResultTitle).first()).toBeVisible({ timeout: 15000 });
     }
@@ -5610,7 +5610,7 @@ export class LogsPage {
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
         await this.page.keyboard.press("Backspace");
         // Drive the editor through Monaco's executeEdits API instead of keystrokes —
-        // typing into the search bar is intercepted by Quasar's q-input which has a
+        // typing into the search bar is intercepted by the q-input which has a
         // debounced model-value chain that races the test's read. The Monaco model
         // commits synchronously through executeEdits.
         await this.page.evaluate(({ selector, text }) => {
@@ -9588,7 +9588,7 @@ export class LogsPage {
             if (isVisible) {
                 const parent = chartItem.locator('..');
                 // Prefer data-selected attribute (ChartSelection.vue exposes it on the <li>).
-                // Fall back to legacy bg-grey-3/5 (Quasar) and bg-gray-200/400 (Tailwind).
+                // Fall back to legacy bg-grey-3/5 (framework) and bg-gray-200/400 (Tailwind).
                 const dataSelected = await parent.getAttribute('data-selected');
                 if (dataSelected === 'true') {
                     testLogger.info(`Current chart type detected: ${chartType}`);
@@ -10498,10 +10498,10 @@ export class LogsPage {
     }
 
     /**
-     * Get Quasar time picker (fallback when absolute tab time input not available)
+     * Get time picker (fallback when absolute tab time input not available)
      * @returns {import('@playwright/test').Locator}
      */
-    getQuasarTimePicker() {
+    getTimePicker() {
         return this.page.locator('[data-test="datetime-time-picker"], [role="dialog"] [aria-label*="time" i]').first();
     }
 
