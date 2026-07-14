@@ -23,8 +23,10 @@ description: >-
   validate, or restyle any screen, component, header, table, list, dialog,
   drawer, form, field, or panel in the web frontend, or asks where a
   form/table/fetch should live, how to validate a form, how to add a keyboard
-  shortcut, or whether something belongs in a dialog or a drawer — even if they
-  don't mention these rules by name. If you are
+  shortcut, how to build a new reusable/common O2 component when nothing existing
+  fits (create one in web/src/lib instead of assembling divs and classes), or
+  whether something belongs in a dialog or a drawer — even if they don't mention
+  these rules by name. If you are
   about to type <template>, q-page, a page title, a hex color, a px value, or
   <style scoped>, this skill applies.
 ---
@@ -376,6 +378,14 @@ reason a missing **variant** becomes a new variant and a missing **token**
 becomes a registered token: the fix always lands in the shared thing, never as a
 private pile of classes at the call site.
 
+**How to actually build it** — the folder contract (`O{Name}.vue` +
+`.types.ts` + `.spec.ts`), families that ship together, headless-first with
+`reka-ui`, the no-UI-prop-leakage rule (`variant`/`size` only), strict TypeScript,
+token registration, the `OX` + `OFormX` form-wrapper pattern, and the
+Analysis → Design → Implement → Test → Validate workflow — is in
+[references/creating-components.md](references/creating-components.md). Read it
+before writing a new `O*` component.
+
 ---
 
 ## Choosing components & structure
@@ -549,6 +559,7 @@ markup — don't guess a prop name.
 | [references/forms-specialized.md](references/forms-specialized.md) | **Form + useOForm**, Color, Date, DateTimeRange, Time, File, Range, Slider |
 | [references/forms-validation.md](references/forms-validation.md) | **Validating a form: OForm + Zod schema, binding rules, submit/loading, conditional rendering, field arrays, testing** |
 | [references/keyboard-shortcuts.md](references/keyboard-shortcuts.md) | **Keyboard shortcuts: registry, `useShortcut`/`useShortcuts`, display via `OShortcut`/`shortcut-id`, cheatsheet** |
+| [references/creating-components.md](references/creating-components.md) | **Building a NEW O2 component: lib vs components, folder contract, families, headless-first (reka-ui), no-UI-prop-leakage, strict TS, tokens, form wrappers, workflow, testing** |
 | [references/overlay-navigation.md](references/overlay-navigation.md) | Dialog, Drawer, Dropdown, Popover, Tooltip · Pagination, Stepper, Tabs |
 | [references/feedback-data.md](references/feedback-data.md) | Banner, Toast (+ useToast), Spinner, Skeleton, InnerLoading · ProgressBar, Timeline, Tree · FieldList |
 
@@ -605,6 +616,7 @@ markup — don't guess a prop name.
 | Label–value detail rows | `OFieldList` (+ `OFieldRow`, `OFieldLabel`) | feedback-data |
 | Confirm / destructive prompt | `ConfirmDialog` + `useConfirmDialog` (app-level, `@/components` + `@/composables`) | — |
 | Add a keyboard shortcut | registry entry + `useShortcuts([{ id, handler }])`; display via `OShortcut`/`shortcut-id` | keyboard-shortcuts |
+| Build a NEW component (nothing fits) | new `O*` in `web/src/lib` (generic) or named component in `web/src/components` (app-specific) — never inline classes | **creating-components** |
 
 If a scenario isn't covered by anything above, re-check the reference files
 before assuming a component is missing — the list is complete as of this skill's
