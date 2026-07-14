@@ -540,6 +540,52 @@ describe("SpanBlock", () => {
     });
   });
 
+  describe("span event markers", () => {
+    it("positions events on the trace timeline and distinguishes exceptions", async () => {
+      await wrapper.setProps({
+        spanData: {
+          ...mockSpanData,
+          events: JSON.stringify([
+            {
+              _timestamp:
+                mockBaseTracePosition.startTimeUs +
+                mockBaseTracePosition.durationUs * 0.25,
+              name: "cache.miss",
+            },
+            {
+              _timestamp:
+                mockBaseTracePosition.startTimeUs +
+                mockBaseTracePosition.durationUs * 0.75,
+              name: "exception",
+              "exception.type": "TimeoutError",
+            },
+          ]),
+        },
+      });
+
+      const markers = wrapper.findAll('[data-test="span-event-marker"]');
+      expect(markers).toHaveLength(2);
+      expect(markers[0].attributes("style")).toContain("left: 25%");
+      expect(markers[0].attributes("data-event-type")).toBe("event");
+      expect(markers[1].attributes("style")).toContain("left: 75%");
+      expect(markers[1].attributes("data-event-type")).toBe("exception");
+      expect(markers[1].attributes("title")).toContain("TimeoutError");
+    });
+
+    it("ignores malformed event payloads", async () => {
+      await wrapper.setProps({
+        spanData: {
+          ...mockSpanData,
+          events: "not-json",
+        },
+      });
+
+      expect(wrapper.findAll('[data-test="span-event-marker"]')).toHaveLength(
+        0,
+      );
+    });
+  });
+
   describe("pre-selected span_id scroll behavior", () => {
     let scrollSpy: ReturnType<typeof vi.fn>;
     let originalScrollIntoView: any;

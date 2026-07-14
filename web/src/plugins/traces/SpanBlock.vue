@@ -70,6 +70,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
           />
         </div>
+        <button
+          v-for="eventMarker in eventMarkers"
+          :key="eventMarker.key"
+          type="button"
+          :style="{
+            position: 'absolute',
+            left: eventMarker.left + '%',
+            top: '50%',
+            width: '8px',
+            height: '8px',
+            padding: 0,
+            border: `1px solid ${store.state.theme === 'dark' ? '#1a1a1a' : '#ffffff'}`,
+            borderRadius: '50%',
+            backgroundColor: eventMarker.isException ? '#d32f2f' : '#f59e0b',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 2,
+          }"
+          :title="eventMarker.title"
+          :aria-label="eventMarker.title"
+          :data-event-type="eventMarker.isException ? 'exception' : 'event'"
+          data-test="span-event-marker"
+          @click.stop="selectSpan(span.spanId)"
+        />
         <div
           :style="{
             position: 'absolute',
@@ -162,6 +185,63 @@ export default defineComponent({
     const leftPosition = ref(0);
 
     const spanWidth = ref(0);
+
+    const eventMarkers = computed(() => {
+      const rawEvents = props.spanData?.events;
+      let events: Record<string, unknown>[] = [];
+
+      if (Array.isArray(rawEvents)) {
+        events = rawEvents;
+      } else if (typeof rawEvents === "string" && rawEvents.trim()) {
+        try {
+          const parsed = JSON.parse(rawEvents);
+          if (Array.isArray(parsed)) {
+            events = parsed;
+          }
+        } catch {
+          return [];
+        }
+      }
+
+      const traceStart = Number(props.baseTracePosition?.startTimeUs);
+      const traceDuration = Number(props.baseTracePosition?.durationUs);
+      if (
+        !Number.isFinite(traceStart) ||
+        !Number.isFinite(traceDuration) ||
+        traceDuration <= 0
+      ) {
+        return [];
+      }
+
+      return events.flatMap((event, index) => {
+        const timestamp = Number(event?._timestamp);
+        if (!Number.isFinite(timestamp)) {
+          return [];
+        }
+
+        const left = ((timestamp - traceStart) / traceDuration) * 100;
+        if (left < 0 || left > 100) {
+          return [];
+        }
+
+        const isException =
+          event.name === "exception" ||
+          Object.keys(event).some((key) => key.startsWith("exception."));
+        const eventName = String(event.name || "span event");
+        const exceptionType = String(event["exception.type"] || eventName);
+
+        return [
+          {
+            key: `${timestamp}-${index}`,
+            left,
+            isException,
+            title: isException
+              ? `Exception: ${exceptionType}`
+              : `Event: ${eventName}`,
+          },
+        ];
+      });
+    });
 
     const selectSpan = (spanId: string) => {
       emit("selectSpan", spanId);
@@ -300,6 +380,7 @@ export default defineComponent({
       onSpanHover,
       durationStyle,
       searchObj,
+      eventMarkers,
     };
   },
 });
