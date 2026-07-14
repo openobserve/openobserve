@@ -137,7 +137,8 @@ mod tests {
 
     #[test]
     #[cfg(not(feature = "enterprise"))]
+    #[allow(clippy::default_constructed_unit_structs)]
     fn test_searcher_default_calls_new() {
-        let _ = Searcher;
+        let _ = Searcher::default();
     }
 }

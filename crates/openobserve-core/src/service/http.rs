@@ -337,7 +337,6 @@ impl From<ProviderError> for Response {
 }
 
 #[cfg(feature = "enterprise")]
-#[cfg(feature = "enterprise")]
 impl From<RatelimitError> for Response {
     fn from(value: RatelimitError) -> Self {
         match value {

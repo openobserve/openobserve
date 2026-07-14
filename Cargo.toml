@@ -219,7 +219,6 @@ futures-core = "0.3.31"
 derive_more = { version = "2.1", features = ["full"] }
 brotli = "8.0.2"
 tokio-rustls.workspace = true
-roaring.workspace = true
 flight.workspace = true
 async-stream.workspace = true
 sourcemap = "9.3.2"
@@ -407,7 +406,6 @@ reqwest = { version = "0.13", default-features = false, features = [
     "query",
     "form",
 ] }
-roaring = "0.11.3"
 rquickjs = { version = "0.11.0", features = ["array-buffer", "classes"] }
 rustls = { version = "0.23", default-features = false, features = [
     "std",
