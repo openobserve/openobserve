@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Section 1: Service Configuration -->
       <div
         class="mb-3 rounded-lg overflow-hidden"
-        style="border: 1px solid var(--o2-border-color)"
+        style="border: 1px solid var(--color-card-glass-border)"
       >
         <div class="p-3 flex flex-col gap-3">
           <!-- Service name source banner -->
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="field in detectedServiceFields"
                     :key="field.name"
                     class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md font-mono text-xs font-medium"
-                    style="border: 1px solid var(--o2-border-color)"
+                    style="border: 1px solid var(--color-card-glass-border)"
                     :class="
                       store.state.theme === 'dark'
                         ? 'bg-gray-600 text-gray-100'
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="field in unseenServiceFields"
                     :key="field"
                     class="inline-flex items-center px-2.5 py-1 rounded-md border-dashed font-mono text-xs"
-                    style="border: 1px dashed var(--o2-border-color)"
+                    style="border: 1px dashed var(--color-card-glass-border)"
                     :class="
                       store.state.theme === 'dark'
                         ? 'text-gray-400'
@@ -369,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     )"
                     :key="fieldId"
                     class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-md text-xs font-medium transition-colors"
-                    style="border: 1px solid var(--o2-border-color)"
+                    style="border: 1px solid var(--color-card-glass-border)"
                     :class="
                       store.state.theme === 'dark'
                         ? 'bg-gray-700 text-gray-100 shadow-sm'
@@ -475,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div
                   class="flex flex-wrap items-center gap-2 pt-2"
-                  style="border-top: 1px solid var(--o2-border-color)"
+                  style="border-top: 1px solid var(--color-card-glass-border)"
                 >
                   <OSelect
                     ref="addFieldSelectRef"
@@ -557,12 +557,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="workloadDetectedGroups.length > 0"
         class="mb-3 rounded-lg overflow-hidden"
-        style="border: 1px solid var(--o2-border-color)"
+        style="border: 1px solid var(--color-card-glass-border)"
       >
         <!-- Section header -->
         <div
           class="px-4 py-3 flex items-center gap-2"
-          style="border-bottom: 1px solid var(--o2-border-color)"
+          style="border-bottom: 1px solid var(--color-card-glass-border)"
         >
           <OIcon name="radar" size="sm" class="text-teal-6" />
           <span class="font-bold text-sm">Workload Detection</span>
@@ -641,7 +641,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-for="alias in resolvedTrackedAliases"
                   :key="alias.id"
                   class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-md text-xs font-medium transition-colors"
-                  style="border: 1px solid var(--o2-border-color)"
+                  style="border: 1px solid var(--color-card-glass-border)"
                   :class="
                     store.state.theme === 'dark'
                       ? 'bg-gray-700 text-gray-100 shadow-sm'
@@ -762,7 +762,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Environment Tabs (Chrome-style) -->
         <div
           class="flex items-end gap-0 px-4"
-          style="border-bottom: 1px solid var(--o2-border-color)"
+          style="border-bottom: 1px solid var(--color-card-glass-border)"
         >
           <div
             v-for="env in detectedEnvironments"
@@ -779,7 +779,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             :style="
               activeEnvironment === env.key
-                ? 'margin-bottom: -1px; padding-bottom: 9px; background-color: var(--o2-card-bg-solid); border-color: var(--o2-border-color);'
+                ? 'margin-bottom: -1px; padding-bottom: 9px; background-color: var(--color-card-glass-solid); border-color: var(--color-card-glass-border);'
                 : ''
             "
             @click="activeEnvironment = env.key"

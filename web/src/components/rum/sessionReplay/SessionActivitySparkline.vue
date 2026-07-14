@@ -181,12 +181,12 @@ const ariaLabel = computed(() => {
   border-radius: 0.0625rem;
 
   &--filled {
-    background: var(--o2-primary-color);
+    background: var(--color-accent);
     opacity: 0.4;
   }
 
   &--empty {
-    background: var(--o2-border-color);
+    background: var(--color-card-glass-border);
     opacity: 0.6;
   }
 }
@@ -198,11 +198,11 @@ const ariaLabel = computed(() => {
   flex-shrink: 0;
 
   &--error {
-    background: var(--o2-severity-error-color);
+    background: var(--color-severity-error-color);
   }
 
   &--frustration {
-    background: var(--o2-severity-warning-color);
+    background: var(--color-severity-warning-color);
   }
 }
 </style>

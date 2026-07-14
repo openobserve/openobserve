@@ -577,6 +577,6 @@ export default defineComponent({
 
 <style>
 .dashboard-list li:hover:not(.selected-item) {
-  background-color: var(--o2-hover-gray);
+  background-color: var(--color-hover-gray);
 }
 </style>

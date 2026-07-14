@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-gray-500 font-bold text-[0.8125rem]">
               Existing URLs ({{ formData.urlJobs.length }})
             </div>
-            <div class="rounded-md border border-[var(--o2-border-color)] bg-gray-50 p-2 flex flex-col gap-1">
+            <div class="rounded-md border border-[var(--color-card-glass-border)] bg-gray-50 p-2 flex flex-col gap-1">
               <div v-for="(job, index) in formData.urlJobs" :key="job.id">
                 <div class="flex items-center gap-2">
                   <span class="font-medium text-gray-400 text-xs">{{ Number(index) + 1 }}.</span>

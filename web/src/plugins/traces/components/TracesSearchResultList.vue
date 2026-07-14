@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="traces-search-result-list h-auto! flex flex-col bg-[var(--o2-card-bg-solid)]"
+    class="traces-search-result-list h-auto! flex flex-col bg-[var(--color-card-glass-solid)]"
   >
     <!-- ════════════════════ Empty State ════════════════════ -->
     <TracesNoEventsState

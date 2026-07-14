@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full service-identity-config mt-2 bg-(--o2-card-bg)">
+  <div class="w-full service-identity-config mt-2 bg-(--color-card-glass-bg)">
     <!-- Loading State -->
     <div v-if="loading" class="flex justify-center py-8">
       <OSpinner size="sm" />

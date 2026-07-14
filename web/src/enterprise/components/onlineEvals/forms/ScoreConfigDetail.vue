@@ -367,7 +367,7 @@ function formatTimestamp(microsOrMs: number): string {
 .scd-kv dt {
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
 .scd-kv dd {

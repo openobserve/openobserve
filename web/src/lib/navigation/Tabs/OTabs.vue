@@ -269,7 +269,7 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
     <TabsList as-child :loop="true">
       <div
         ref="tablistRef"
-        :class="['o-tabs flex flex-col gap-0.5 relative p-1', alignClasses[align], { 'border-b border-solid border-[var(--o2-border-color)]': bordered }]"
+        :class="['o-tabs flex flex-col gap-0.5 relative p-1', alignClasses[align], { 'border-b border-solid border-[var(--color-card-glass-border)]': bordered }]"
         @dragstart="onTabDragStart"
         @dragover="onTabDragOver"
         @drop="onTabDrop"
@@ -289,7 +289,7 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
     as-child
     @update:model-value="(v) => onTabClick(v as string | number)"
   >
-    <div :class="['flex flex-row items-stretch', { 'border-b border-solid border-[var(--o2-border-color)]': bordered }]">
+    <div :class="['flex flex-row items-stretch', { 'border-b border-solid border-[var(--color-card-glass-border)]': bordered }]">
       <!-- Left arrow -->
       <button
         v-show="hasOverflow"

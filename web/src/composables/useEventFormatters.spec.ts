@@ -138,11 +138,11 @@ describe("useEventFormatters", () => {
     });
 
     it("returns info color class for status 301", () => {
-      expect(formatters.getStatusColorClass(301)).toBe("text-[var(--o2-info)]");
+      expect(formatters.getStatusColorClass(301)).toBe("text-[var(--color-info)]");
     });
 
     it("returns warning color class for status 404", () => {
-      expect(formatters.getStatusColorClass(404)).toBe("text-[var(--o2-warning)]");
+      expect(formatters.getStatusColorClass(404)).toBe("text-[var(--color-warning)]");
     });
 
     it("returns negative color class for status 500", () => {

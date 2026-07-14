@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :limits="[200, 1400]"
         unit="px"
         class="w-full h-full"
-        separatorClass="bg-[var(--o2-border-color)] w-[1px]! hover:bg-[var(--color-theme-accent)]"
+        separatorClass="bg-[var(--color-card-glass-border)] w-[1px]! hover:bg-[var(--color-theme-accent)]"
       >
         <template #before>
           <VideoPlayer

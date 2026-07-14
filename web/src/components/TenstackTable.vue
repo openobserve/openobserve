@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="col in pivotRowColumns"
               :key="'rh_' + col.name"
               :rowspan="pivotHeaderLevels.length"
-              class="cursor-pointer px-2 text-center font-semibold align-middle whitespace-nowrap py-[5px] [border-right:1px_solid_var(--o2-pivot-header-border)] [border-bottom:1px_solid_var(--o2-pivot-header-border)] bg-(--o2-sticky-col-header-bg)"
+              class="cursor-pointer px-2 text-center font-semibold align-middle whitespace-nowrap py-[5px] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-(--color-sticky-col-header-bg)"
               :style="getStickyColumnStyle(col) as any"
               @click="handlePivotSort(col.name)"
             >
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="xs"
                 class="ml-1 pivot-sort-icon"
                 :class="{
-                  'pivot-sort-active text-[var(--o2-primary-color)]': pivotSortState.sortBy === col.name,
+                  'pivot-sort-active text-[var(--color-accent)]': pivotSortState.sortBy === col.name,
                 }"
               />
             </th>
@@ -103,8 +103,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="px-2"
               :class="[
                 level.isLeaf
-                  ? 'text-center font-medium text-[0.85em] align-middle py-[5px] [border-right:1px_solid_var(--o2-pivot-header-border)] [border-bottom:1px_solid_var(--o2-pivot-header-border)] bg-(--o2-sticky-col-header-bg)'
-                  : 'text-center font-semibold align-middle whitespace-nowrap py-[5px] [border-right:1px_solid_var(--o2-pivot-header-border)] [border-bottom:1px_solid_var(--o2-pivot-header-border)] bg-(--o2-sticky-col-header-bg)',
+                  ? 'text-center font-medium text-[0.85em] align-middle py-[5px] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-(--color-sticky-col-header-bg)'
+                  : 'text-center font-semibold align-middle whitespace-nowrap py-[5px] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-(--color-sticky-col-header-bg)',
                 {
                   'pivot-section-border':
                     cell.hasBorder && !(stickyColTotals && cell._isTotalHeader),
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="xs"
                 class="ml-1 pivot-sort-icon"
                 :class="{
-                  'pivot-sort-active text-[var(--o2-primary-color)]':
+                  'pivot-sort-active text-[var(--color-accent)]':
                     pivotSortState.sortBy === cell._sortColumn,
                 }"
               />
@@ -278,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test-sort-state="active"
                       :data-test-sort-direction="sortOrder"
                       size="sm"
-                      class="text-[var(--o2-primary-color)]"
+                      class="text-[var(--color-accent)]"
                     />
                     <OIcon
                       v-else
@@ -511,7 +511,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr
             v-for="r in SKEL_ROW_COUNT"
             :key="`skel-${r}`"
-            class="o2-skel-row flex items-center w-full opacity-0 h-[29px] bg-(--o2-log-table-row-bg) border-b border-(--o2-log-table-row-border) [animation:o2-skel-row-in_320ms_ease-out_forwards] motion-reduce:opacity-100 motion-reduce:animate-none"
+            class="o2-skel-row flex items-center w-full opacity-0 h-[29px] bg-(--color-log-table-row-bg) border-b border-(--color-log-table-row-border) [animation:o2-skel-row-in_320ms_ease-out_forwards] motion-reduce:opacity-100 motion-reduce:animate-none"
             :style="{ animationDelay: `${(r - 1) * 40}ms` }"
           >
             <!-- No columns yet (first paint) — full-width shimmer bar -->
@@ -1754,7 +1754,7 @@ const getStickyTotalHeaderForPivot = (cell: any) => {
     "min-width": `${width}px`,
     "max-width": `${width}px`,
     // Opaque background so scrolled body content doesn't bleed through
-    "background-color": "var(--o2-sticky-col-header-bg)",
+    "background-color": "var(--color-sticky-col-header-bg)",
     "box-shadow": "-4px 0 8px rgba(0, 0, 0, 0.15)",
     "white-space": "normal",
     "word-break": "break-word",

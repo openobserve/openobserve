@@ -19,11 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex-[0_0_calc(32%-0.625rem)] flex flex-col gap-2 overflow-y-auto overflow-x-clip" style="height: calc(100vh - 302px); position: sticky; top: 0;">
     <!-- Preview Section -->
     <div
-      class="collapsible-section card-container preview-section flex flex-col transition-all duration-300 bg-(--o2-card-bg) rounded-md shadow-[0_0_5px_1px_var(--o2-hover-shadow)] border border-(--o2-border-color)"
+      class="collapsible-section card-container preview-section flex flex-col transition-all duration-300 bg-(--color-card-glass-bg) rounded-md shadow-[0_0_5px_1px_var(--color-hover-shadow)] border border-(--color-card-glass-border)"
       :style="previewSectionStyle"
     >
       <div
-        class="flex items-center justify-between px-4 py-3 cursor-pointer shrink-0 border-b border-[var(--o2-border-color,rgba(0,0,0,0.08))] transition-all duration-200 rounded-t-md select-none hover:bg-black/4 active:bg-black/[0.06]"
+        class="flex items-center justify-between px-4 py-3 cursor-pointer shrink-0 border-b border-[var(--color-card-glass-border,rgba(0,0,0,0.08))] transition-all duration-200 rounded-t-md select-none hover:bg-black/4 active:bg-black/[0.06]"
         @click="togglePreview"
       >
         <div class="flex items-center gap-2">
@@ -81,11 +81,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Summary Section -->
     <div
-      class="collapsible-section card-container flex flex-col transition-all duration-300 bg-(--o2-card-bg) rounded-md shadow-[0_0_5px_1px_var(--o2-hover-shadow)] border border-(--o2-border-color)"
+      class="collapsible-section card-container flex flex-col transition-all duration-300 bg-(--color-card-glass-bg) rounded-md shadow-[0_0_5px_1px_var(--color-hover-shadow)] border border-(--color-card-glass-border)"
       :style="summarySectionStyle"
     >
       <div
-        class="flex items-center justify-between px-4 py-3 cursor-pointer shrink-0 border-b border-[var(--o2-border-color,rgba(0,0,0,0.08))] transition-all duration-200 rounded-t-md select-none hover:bg-black/4 active:bg-black/[0.06]"
+        class="flex items-center justify-between px-4 py-3 cursor-pointer shrink-0 border-b border-[var(--color-card-glass-border,rgba(0,0,0,0.08))] transition-all duration-200 rounded-t-md select-none hover:bg-black/4 active:bg-black/[0.06]"
         @click="toggleSummary"
       >
         <span class="text-sm font-semibold">{{ t('alerts.summary.title') }}</span>

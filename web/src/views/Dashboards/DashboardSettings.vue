@@ -153,7 +153,7 @@ export default defineComponent({
 }
 
 .functions-tabs .o-tabs--vertical .o-tab--active {
-  color: var(--o2-tab-text-color);
+  color: var(--color-tab-text-color);
   background-color: var(--color-theme-tab-bg);
 }
 

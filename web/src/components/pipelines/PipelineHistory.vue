@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 row.is_partial !== undefined
               "
               :name="row.is_partial ? 'warning' : 'check-circle'"
-              :class="row.is_partial ? 'text-[var(--o2-warning)]' : 'text-[var(--color-status-positive)]'"
+              :class="row.is_partial ? 'text-[var(--color-warning)]' : 'text-[var(--color-status-positive)]'"
               size="xs"
             >
               <OTooltip
@@ -374,7 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :name="
                         selectedRow.is_partial ? 'warning' : 'check-circle'
                       "
-                      :class="['mr-1', selectedRow.is_partial ? 'text-[var(--o2-warning)]' : 'text-[var(--color-status-positive)]']"
+                      :class="['mr-1', selectedRow.is_partial ? 'text-[var(--color-warning)]' : 'text-[var(--color-status-positive)]']"
                       size="xs"
                     />
                     {{ selectedRow.is_partial ? "Partial" : "Complete" }}

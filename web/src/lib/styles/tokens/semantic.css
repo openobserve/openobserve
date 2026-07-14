@@ -52,6 +52,11 @@
 
   /* Overlay scrim — semi-transparent backdrop */
   --color-overlay-scrim: color-mix(in srgb, var(--color-grey-950) 50%, transparent);
+
+  /* Accent — brand-primary color for accent borders/icons/rings. Flips one
+     shade lighter in dark mode (600→400, see dark.css) so it stays legible
+     on dark surfaces. Replaces the legacy primary-color token. */
+  --color-accent: var(--color-primary-600);
 }
 
 /* ── Register ALL semantic tokens for Tailwind utilities ── */
@@ -87,6 +92,9 @@
 
   /* Overlay scrim */
   --color-overlay-scrim: var(--color-overlay-scrim);
+
+  /* Accent */
+  --color-accent: var(--color-accent);
 
   /* Brand / Primary (re-exports from base.css) */
   --color-primary-50:  var(--color-primary-50);
@@ -132,7 +140,7 @@
    Static values below are the light-mode DEFAULT theme; theme.ts
    overrides these via inline style when a custom accent color is
    picked or dark mode is active. Consolidates the legacy
-   --o2-theme-color / --o2-dark-theme-color pair (theme.ts already set
+   light + dark theme-color tokens (theme.ts already set
    both to the same live value in dark mode) into one source. */
 :root {
   --color-theme-accent: #3F7994;
@@ -146,7 +154,7 @@
   --color-theme-body-bg-secondary: rgba(89, 155, 174, 0.4);
   --color-theme-header-menu-bg: rgba(255, 255, 255, 0.5);
 
-  /* Shared hover + surface accent (was --o2-hover-accent's own formula) */
+  /* Shared hover + surface accent (shared hover/surface accent formula) */
   --color-interactive-hover-bg: color-mix(in srgb, var(--color-theme-accent) 15%, white);
 
   /* Status/semantic colors driven by utils/theme.ts (O2 Signature default
@@ -160,7 +168,7 @@
 }
 
 /* ── Domain data-viz: label chips (field-value type chips) ──
-   Renamespaced from --o2-label-chip-* (Bucket D). See dark.css for dark
+   Domain label-chip palette (field-value type chips). See dark.css for dark
    overrides; component.css's @theme inline registers these for Tailwind. */
 :root {
   --color-label-chip-ip-bg:      #F2FCF3;
@@ -197,200 +205,81 @@
   --color-label-chip-pattern-text: #2E55A3;
 }
 
-/* ── Legacy semantic tokens (_variables.scss light mode) ── */
+/* ── Quasar / Tailwind compat vars (light) ── */
 :root {
-  --o2-theme-mode: white;
-  --o2-primary-background: var(--color-surface-base);
-  --o2-secondary-background: var(--color-surface-panel);
-  --o2-muted-background: var(--color-surface-subtle);
-  --o2-text-heading:     var(--color-text-heading);
-  --o2-text-primary:     var(--color-text-heading);
-  --o2-text-body:        var(--color-text-body);
-  --o2-text-secondary:   var(--color-text-secondary);
-  --o2-text-caption:     var(--color-text-caption);
-  --o2-text-label:       var(--color-text-label);
-  --o2-text-muted:       var(--color-text-muted);
-  --o2-text-placeholder: var(--color-text-placeholder);
-  --o2-text-link:        var(--color-text-link);
-  --o2-text-link-hover:  var(--color-text-link-hover);
-  --o2-text-code:        var(--color-text-code);
-  --o2-text-inverse:     var(--color-text-inverse);
-  --o2-text-4: var(--color-text-heading);
-  --o2-text-2: var(--color-text-secondary);
-  --o2-text-1: var(--color-text-caption);
-  --o2-text-3: var(--color-text-label);
-  --o2-card-background: var(--color-surface-base);
-  --o2-card-text: var(--color-card-text);
-  --o2-popover-background: var(--color-surface-overlay);
-  --o2-popover-text: var(--color-text-primary);
-  --o2-code-bg: var(--color-code-bg);
-  --o2-border: var(--color-border-default);
-  --o2-border-input: var(--color-input-border);
-  --o2-primary-color: var(--color-primary-600);
-  --o2-primary-foreground: var(--color-button-primary-foreground);
-  --o2-hover-accent: var(--color-interactive-hover-bg);
-  --o2-destructive-foreground: #FFFFFF;
-  --o2-focus-ring: #282D5D;
-  --o2-hover-shadow: #dddddd;
-  --o2-hover-gray: color-mix(in srgb, var(--color-theme-accent) 2%, rgb(244, 244, 244));
-  --o2-bg-gray: color-mix(in srgb, var(--color-theme-accent) 10%, rgb(237, 237, 237));
-  --o2-scrollbar-track-bg: rgba(0, 0, 0, 0.01);
-  --o2-scrollbar-track-hover-bg: rgba(0, 0, 0, 0.01);
-  --o2-scrollbar-thumb-bg: color-mix(in srgb, #3F7994 20%, white);
-  --o2-scrollbar-thumb-hover-bg: white;
-  --o2-scrollbar-thumb-active-bg: white;
-  --o2-theme-color: var(--color-theme-accent);
-  --o2-dark-theme-color: var(--color-theme-accent);
-  --o2-body-primary-bg: var(--color-theme-body-bg-primary);
-  --o2-body-secondary-bg: var(--color-theme-body-bg-secondary);
-  --o2-primary-btn-bg: var(--color-button-primary);
-  --o2-primary-btn-text: var(--color-button-primary-foreground);
-  --o2-toggle-track-bg: color-mix(in srgb, var(--color-theme-accent) 90%, white);
-  --o2-toggle-track-off-bg: color-mix(in srgb, var(--color-theme-accent) 30%, white);
-  --o2-card-bg: rgba(255, 255, 255, 0.8);
-  --o2-card-bg-solid: rgba(255, 255, 255);
-  --o2-header-menu-bg: var(--color-theme-header-menu-bg);
-  --o2-border-color: rgba(0, 0, 0, 0.12);
-  --o2-border-2: var(--color-border-subtle);
-  --o2-box-shadow: 0px 0px rgba(0, 0, 0, 0.2), 0 0.063rem 0.063rem rgba(0, 0, 0, 0.14), 0 3px 0.063rem -3px rgba(0, 0, 0, 0.12);
-  --o2-menu-gradient-start: var(--color-theme-menu-gradient-start);
-  --o2-menu-gradient-end: var(--color-theme-menu-gradient-end);
-  --o2-menu-border-color: rgba(89, 155, 174, 0.6);
-  --o2-menu-color: var(--color-theme-menu-color);
-  --o2-table-header-bg: var(--color-theme-table-header-bg);
-  --o2-sticky-col-header-bg: #E0E0E0;
-  --o2-pivot-header-border: rgba(0, 0, 0, 0.15);
-  --o2-table-actions-bg: white;
-  --o2-log-table-row-bg: #ffffff;
-  --o2-log-table-row-alt-bg: #f7f8fa;
-  --o2-log-table-row-hover: #eff1fd;
-  --o2-log-table-row-border: #e4e6ec;
-  --o2-log-table-header-bg: #f1f3f7;
-  --o2-log-table-text: #27282e;
-  --o2-tab-bg: var(--color-theme-tab-bg);
-  --o2-tab-text-color: #19191E;
-  --o2-inactive-tab-bg: var(--color-theme-tab-bg-inactive);
-  --o2-actions-column-shawdow: rgba(0, 0, 0, 0.1);
   --q-primary: var(--color-theme-accent);
-  --o2-icon-color: #808080;
-  --o2-icon-color-dark: #5e5e5e;
-  --o2-json-key: #B71C1C;
-  --o2-json-string: #047857;
-  --o2-json-number: #2563EB;
-  --o2-json-boolean: #6D28D9;
-  --o2-json-null: #6B7280;
-  --o2-json-object: #4B5563;
-  --o2-input-label-text-color: var(--color-input-label);
   --tw-border-style: #e5e7eb;
-  --o2-section-header-bg: color-mix(in srgb, var(--color-theme-accent) 3%, rgb(247, 247, 247));
-  --o2-tag-grey-1: #E2E8F0;
-  --o2-tag-grey-2: #eaebec;
-  --o2-wildcard-header-blue-bg: #F5F8FE;
-  --o2-wildcard-header-blue-text: #2E55A3;
-  --o2-wildcard-header-green-bg: #F2FCF3;
-  --o2-wildcard-header-green-text: #208A3C;
-  --o2-wildcard-header-orange-bg: #FFF4EB;
-  --o2-wildcard-header-orange-text: #A14916;
-  --o2-wildcard-header-purple-bg: #FAF5FF;
-  --o2-wildcard-header-purple-text: #643CB8;
-  --o2-wildcard-header-grey-bg: #F7F8FA;
-  --o2-wildcard-header-grey-text: #5A5D6B;
-  --o2-wildcard-bar-blue: #88ADF7;
-  --o2-wildcard-bar-green: #55A76A;
-  --o2-wildcard-bar-orange: #E56D17;
-  --o2-wildcard-bar-purple: #834DF0;
-  --o2-wildcard-bar-grey: #818594;
-  --o2-label-chip-ip-bg:      var(--color-label-chip-ip-bg);
-  --o2-label-chip-ip-text:    var(--color-label-chip-ip-text);
-  --o2-label-chip-ipv4-bg:    var(--color-label-chip-ipv4-bg);
-  --o2-label-chip-ipv4-text:  var(--color-label-chip-ipv4-text);
-  --o2-label-chip-ipv6-bg:    var(--color-label-chip-ipv6-bg);
-  --o2-label-chip-ipv6-text:  var(--color-label-chip-ipv6-text);
-  --o2-label-chip-method-bg:  var(--color-label-chip-method-bg);
-  --o2-label-chip-method-text: var(--color-label-chip-method-text);
-  --o2-label-chip-url-bg:     var(--color-label-chip-url-bg);
-  --o2-label-chip-url-text:   var(--color-label-chip-url-text);
-  --o2-label-chip-num-bg:     var(--color-label-chip-num-bg);
-  --o2-label-chip-num-text:   var(--color-label-chip-num-text);
-  --o2-label-chip-float-bg:   var(--color-label-chip-float-bg);
-  --o2-label-chip-float-text: var(--color-label-chip-float-text);
-  --o2-label-chip-hex-bg:     var(--color-label-chip-hex-bg);
-  --o2-label-chip-hex-text:   var(--color-label-chip-hex-text);
-  --o2-label-chip-ts-bg:      var(--color-label-chip-ts-bg);
-  --o2-label-chip-ts-text:    var(--color-label-chip-ts-text);
-  --o2-label-chip-date-bg:    var(--color-label-chip-date-bg);
-  --o2-label-chip-date-text:  var(--color-label-chip-date-text);
-  --o2-label-chip-time-bg:    var(--color-label-chip-time-bg);
-  --o2-label-chip-time-text:  var(--color-label-chip-time-text);
-  --o2-label-chip-id-bg:      var(--color-label-chip-id-bg);
-  --o2-label-chip-id-text:    var(--color-label-chip-id-text);
-  --o2-label-chip-email-bg:   var(--color-label-chip-email-bg);
-  --o2-label-chip-email-text: var(--color-label-chip-email-text);
-  --o2-label-chip-str-bg:     var(--color-label-chip-str-bg);
-  --o2-label-chip-str-text:   var(--color-label-chip-str-text);
-  --o2-label-chip-default-bg: var(--color-label-chip-default-bg);
-  --o2-label-chip-default-text: var(--color-label-chip-default-text);
-  --o2-label-chip-pattern-bg: var(--color-label-chip-pattern-bg);
-  --o2-label-chip-pattern-text: var(--color-label-chip-pattern-text);
-  --o2-dashboard-placeholder-bg: #B3BDF1;
-  --o2-field-type-string-bg: oklch(95% 0.052 163.051);
-  --o2-field-type-string-text: oklch(59.6% 0.145 163.225);
-  --o2-field-type-boolean-bg: #e74c3c;
-  --o2-field-type-boolean-text: #fff;
-  --o2-field-type-float-bg: oklch(94.6% 0.033 307.174);
-  --o2-field-type-float-text: oklch(55.8% 0.288 302.321);
-  --o2-field-type-number-bg: oklch(95.4% 0.038 75.164);
-  --o2-field-type-number-text: oklch(64.6% 0.222 41.116);
-  --o2-field-type-timestamp-bg: oklch(93.2% 0.032 255.585);
-  --o2-field-type-timestamp-text: oklch(54.6% 0.245 262.881);
-  --o2-trace-surface: #FFFFFF;
-  --o2-trace-border: #E8ECF0;
-  --o2-trace-text-primary: #19191E;
-  --o2-trace-text-secondary: #5A5D6B;
-  --o2-trace-hover: #F7F8FA;
-  --o2-trace-selected: #F5F8FE;
-  --o2-latency-p99: #de6d17;
-  --o2-latency-p95: #0a4ce8;
-  --o2-cancel-query-bg: #f67a7a;
-  --o2-error-tag-bg: #f9d3d3;
-  --o2-error-tag-text: #e74c3c;
-  --o2-status-success-text: var(--color-status-success-text);
-  --o2-status-success-bg: var(--color-status-success-bg);
-  --o2-status-info-text: #588CF3;
-  --o2-status-info-bg: #EDF3FF;
-  --o2-status-warning-text: #E56D17;
-  --o2-status-warning-bg: #FFF4EB;
-  --o2-status-error-text: var(--color-status-error-text);
-  --o2-status-error-bg: var(--color-status-error-bg);
-  /* Log-severity colors — MUST stay aligned with STATUS_COLORS in
-     src/utils/logs/statusParser.ts (row spines / severity accents, so RUM
-     sessions match the logs page). */
-  --o2-severity-error-color: #EF5350;
-  --o2-severity-warning-color: #FB8C00;
-  --o2-status-neutral-text: #6C707E;
-  --o2-status-neutral-bg: #F7F8FA;
-  --o2-span-kind-client-text: #588CF3;
-  --o2-span-kind-client-bg: #EDF3FF;
-  --o2-span-kind-server-text: #208A3C;
-  --o2-span-kind-server-bg: #F2FCF3;
-  --o2-span-kind-producer-text: #7444D4;
-  --o2-span-kind-producer-bg: #EFE5FF;
-  --o2-span-kind-consumer-text: #058B90;
-  --o2-span-kind-consumer-bg: #DAF4F5;
-  --o2-span-kind-internal-text: #6C707E;
-  --o2-span-kind-internal-bg: #E8ECF0;
-  --o2-positive: var(--color-status-positive);
-  --o2-negative: var(--color-status-negative);
-  --o2-warning: #DF9303;
-  --o2-info: #4682FA;
-  --o2-gray: #818594;
-  --o2-service-health-healthy: #52c41a;
-  --o2-service-health-degraded: #faad14;
-  --o2-service-health-warning: #fa8c16;
-  --o2-service-health-critical: #f5222d;
 }
 
 /* ── Legacy aliases (_legacy-variables.scss) ── */
 :root {
   --navbar-height: 36px;
+}
+
+/* ── Domain data-viz & migrated color tokens ── */
+:root {
+  --color-actions-column-shawdow: rgba(0, 0, 0, 0.1);
+  --color-bg-gray: color-mix(in srgb, var(--color-theme-accent) 10%, rgb(237, 237, 237));
+  --color-card-glass-border: rgba(0, 0, 0, 0.12);
+  --color-cancel-query-bg: #f67a7a;
+  --color-card-glass-bg: rgba(255, 255, 255, 0.8);
+  --color-card-glass-solid: rgba(255, 255, 255);
+  --color-dashboard-placeholder-bg: #B3BDF1;
+  --color-error-tag-bg: #f9d3d3;
+  --color-error-tag-text: #e74c3c;
+  --color-field-type-boolean-bg: #e74c3c;
+  --color-field-type-boolean-text: #fff;
+  --color-field-type-float-bg: oklch(94.6% 0.033 307.174);
+  --color-field-type-float-text: oklch(55.8% 0.288 302.321);
+  --color-field-type-number-bg: oklch(95.4% 0.038 75.164);
+  --color-field-type-number-text: oklch(64.6% 0.222 41.116);
+  --color-field-type-string-bg: oklch(95% 0.052 163.051);
+  --color-field-type-string-text: oklch(59.6% 0.145 163.225);
+  --color-field-type-timestamp-bg: oklch(93.2% 0.032 255.585);
+  --color-field-type-timestamp-text: oklch(54.6% 0.245 262.881);
+  --color-focus-ring: #282D5D;
+  --color-gray: #818594;
+  --color-hover-gray: color-mix(in srgb, var(--color-theme-accent) 2%, rgb(244, 244, 244));
+  --color-hover-shadow: #dddddd;
+  --color-icon-color: #808080;
+  --color-icon-color-dark: #5e5e5e;
+  --color-info: #4682FA;
+  --color-json-boolean: #6D28D9;
+  --color-json-key: #B71C1C;
+  --color-json-null: #6B7280;
+  --color-json-number: #2563EB;
+  --color-json-object: #4B5563;
+  --color-json-string: #047857;
+  --color-latency-p95: #0a4ce8;
+  --color-log-table-header-bg: #f1f3f7;
+  --color-log-table-row-bg: #ffffff;
+  --color-log-table-row-border: #e4e6ec;
+  --color-log-table-row-hover: #eff1fd;
+  --color-pivot-header-border: rgba(0, 0, 0, 0.15);
+  --color-section-header-bg: color-mix(in srgb, var(--color-theme-accent) 3%, rgb(247, 247, 247));
+  --color-service-health-critical: #f5222d;
+  --color-service-health-degraded: #faad14;
+  --color-service-health-healthy: #52c41a;
+  --color-service-health-warning: #fa8c16;
+  --color-severity-error-color: #EF5350;
+  --color-severity-warning-color: #FB8C00;
+  --color-status-info-bg: #EDF3FF;
+  --color-status-info-text: #588CF3;
+  --color-status-neutral-text: #6C707E;
+  --color-status-warning-bg: #FFF4EB;
+  --color-status-warning-text: #E56D17;
+  --color-sticky-col-header-bg: #E0E0E0;
+  --color-tab-text-color: #19191E;
+  --color-table-actions-bg: white;
+  --color-trace-border: #E8ECF0;
+  --color-trace-hover: #F7F8FA;
+  --color-trace-selected: #F5F8FE;
+  --color-trace-surface: #FFFFFF;
+  --color-trace-text-primary: #19191E;
+  --color-trace-text-secondary: #5A5D6B;
+  --color-warning: #DF9303;
+  --color-wildcard-bar-blue: #88ADF7;
+  --color-wildcard-bar-green: #55A76A;
+  --color-wildcard-bar-orange: #E56D17;
+  --color-wildcard-bar-purple: #834DF0;
 }

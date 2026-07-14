@@ -449,8 +449,8 @@ export default defineComponent({
   border: 2px solid transparent !important;
   background:
     linear-gradient(
-        var(--o2-ai-input-bg, #ffffff),
-        var(--o2-ai-input-bg, #ffffff)
+        var(--color-ai-input-bg, #ffffff),
+        var(--color-ai-input-bg, #ffffff)
       )
       padding-box,
     linear-gradient(90deg, #f59e0b, #ec4899, #7b61ff) border-box !important;
@@ -461,11 +461,11 @@ export default defineComponent({
 }
 
 .home-ai-panel .unified-input-box {
-  --o2-ai-input-bg: #ffffff;
+  --color-ai-input-bg: #ffffff;
 }
 
 .dark .home-ai-panel .unified-input-box {
-  --o2-ai-input-bg: #191919;
+  --color-ai-input-bg: #191919;
   box-shadow:
     0 2px 4px rgba(0, 0, 0, 0.45),
     0 8px 22px -2px rgba(0, 0, 0, 0.55),

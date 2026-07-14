@@ -96,7 +96,7 @@ export function useStickyColumns(props: any, store: any) {
             position: sticky !important;
             left: ${offset}px !important;
             z-index: 4 !important;
-            background-color: var(--o2-sticky-col-header-bg) !important;
+            background-color: var(--color-sticky-col-header-bg) !important;
             box-shadow: ${shadow} !important;
           }
           ${scope} tbody td:nth-child(${colIndex + 1}).sticky-column {
@@ -116,7 +116,7 @@ export function useStickyColumns(props: any, store: any) {
             right: ${rightOffset}px !important;
             z-index: 4 !important;
             min-width: ${TOTAL_COL_WIDTH}px !important;
-            background-color: var(--o2-sticky-col-header-bg) !important;
+            background-color: var(--color-sticky-col-header-bg) !important;
             box-shadow: ${shadow} !important;
           }
         `;

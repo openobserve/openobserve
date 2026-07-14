@@ -92,7 +92,7 @@ function formatTime(ts: string): string {
 
 <template>
   <div
-    class="flex flex-col h-full text-base w-[15em] shrink-0 border-r border-r-[0.0625em] border-(--o2-border-color) bg-(--o2-card-bg) overflow-hidden"
+    class="flex flex-col h-full text-base w-[15em] shrink-0 border-r border-r-[0.0625em] border-(--color-card-glass-border) bg-(--color-card-glass-bg) overflow-hidden"
     :class="store.state.theme === 'dark' ? 'hch-dark' : 'hch-light'"
   >
     <!-- Header -->
@@ -215,7 +215,7 @@ function formatTime(ts: string): string {
     </div>
 
     <!-- Clear all -->
-    <div v-if="history.length > 0" class="shrink-0 py-[0.375em] px-2 border-t border-t-[0.0625em] border-t-(--o2-border-color)">
+    <div v-if="history.length > 0" class="shrink-0 py-[0.375em] px-2 border-t border-t-[0.0625em] border-t-(--color-card-glass-border)">
       <OButton variant="ghost-subtle" :block="true" @click="clearAll">
         <svg
           width="0.875em"

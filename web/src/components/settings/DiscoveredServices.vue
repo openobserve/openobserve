@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex flex-col w-full h-full bg-(--o2-card-bg) discovered-services"
+    class="flex flex-col w-full h-full bg-(--color-card-glass-bg) discovered-services"
     :class="{ 'ds-dark': store.state.theme === 'dark' }"
   >
     <!-- Loading State -->

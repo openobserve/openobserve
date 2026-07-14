@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 { selected: destinationType === destType.value },
                 store.state.theme === 'dark'
                   ? 'border-[#424242] bg-[#1e1e1e] hover:border-[#5d9cec] hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]'
-                  : 'border-[var(--color-border-default)] bg-white hover:border-[var(--o2-border-color)] hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
+                  : 'border-[var(--color-border-default)] bg-white hover:border-[var(--color-card-glass-border)] hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
               ]"
               @click="form.setFieldValue('destination_type', destType.value)"
             >
@@ -1290,13 +1290,13 @@ defineExpose({
 
 <style>
 .destination-type-card.selected {
-  border-color: var(--o2-border-color);
+  border-color: var(--color-card-glass-border);
   background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
   box-shadow: 0 4px 16px rgba(25, 118, 210, 0.2);
 }
 
 .destination-type-card.selected .card-icon {
-  color: var(--o2-border-color);
+  color: var(--color-card-glass-border);
 }
 
 .destination-type-card.selected .card-label {

@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               data-test="traces-search-bar-cancel-btn"
               :title="t('search.cancel')"
-              class="p-0 h-[1.875rem]! [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] text-xs! font-medium! leading-4! px-1! py-0! w-[5.875rem]! whitespace-normal break-words text-center bg-(--o2-cancel-query-bg)! text-(--color-button-primary-foreground)! element-box-shadow ![border-radius:0.375rem_0_0_0.375rem]"
+              class="p-0 h-[1.875rem]! [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] text-xs! font-medium! leading-4! px-1! py-0! w-[5.875rem]! whitespace-normal break-words text-center bg-(--color-cancel-query-bg)! text-(--color-button-primary-foreground)! element-box-shadow ![border-radius:0.375rem_0_0_0.375rem]"
               @click="cancelQueryData"
               >{{ t("search.cancel") }}</OButton
             >
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="isLoading"
                   :class="[
                     config.isEnterprise == 'true' && isLoading
-                      ? 'bg-(--o2-cancel-query-bg)! text-(--color-button-primary-foreground)!'
+                      ? 'bg-(--color-cancel-query-bg)! text-(--color-button-primary-foreground)!'
                       : 'bg-(--color-button-primary)! text-(--color-button-primary-foreground)! hover:opacity-90 hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
                     '![border-radius:0_0.375rem_0.375rem_0]',
                   ]"

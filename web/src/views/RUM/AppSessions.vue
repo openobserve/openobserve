@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="[
                   'border',
                   'solid',
-                  'border-[var(--o2-border-color)]',
+                  'border-[var(--color-card-glass-border)]',
                   'p-[0.25rem]',
                   'rounded-[0.375rem]',
                   'overflow-y-auto',
@@ -310,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       name="play-circle-filled"
                       size="md"
-                      class="cursor-pointer session-play-icon text-[var(--o2-icon-color)] hover:text-[var(--color-button-primary)]"
+                      class="cursor-pointer session-play-icon text-[var(--color-icon-color)] hover:text-[var(--color-button-primary)]"
                     />
                   </template>
                   <template #cell-session="{ row }">
@@ -363,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }}</span>
                       <small
                         v-if="row.is_bounce"
-                        class="text-[var(--o2-status-warning-text)]"
+                        class="text-[var(--color-status-warning-text)]"
                         data-test="rum-app-sessions-bounced-text"
                       >{{ t("rum.bounced").toLowerCase() }}</small>
                       <small
@@ -1454,9 +1454,9 @@ const formatSessionDuration = (ms?: number) => {
 // Spine colors match the logs page severity colors (statusParser STATUS_COLORS)
 // so "error red" reads the same across modules.
 const getSessionStatusColor = (row: any) => {
-  if ((row.error_count || 0) > 0) return "var(--o2-severity-error-color)";
+  if ((row.error_count || 0) > 0) return "var(--color-severity-error-color)";
   if ((row.frustration_count || 0) > 0)
-    return "var(--o2-severity-warning-color)";
+    return "var(--color-severity-warning-color)";
   return undefined;
 };
 

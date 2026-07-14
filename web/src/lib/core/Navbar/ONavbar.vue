@@ -214,6 +214,6 @@ function handleKeydown(event: KeyboardEvent) {
 
 /* Right border only in dark mode — light mode uses shadow on the content card */
 :global(.body--dark) .o2-navbar-scroll {
-  border-right: 1px solid var(--o2-border-color);
+  border-right: 1px solid var(--color-card-glass-border);
 }
 </style>

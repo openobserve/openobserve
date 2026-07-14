@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="ghost"
         size="icon-sm"
-        class="pointer-events-auto backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.2)] !border-2 !border-[var(--o2-primary-color)] !text-[var(--o2-primary-color)] !bg-white/95 dark:!bg-[rgba(30,30,30,0.9)]"
+        class="pointer-events-auto backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.2)] !border-2 !border-[var(--color-accent)] !text-[var(--color-accent)] !bg-white/95 dark:!bg-[rgba(30,30,30,0.9)]"
         data-test="anomaly-summary-scroll-btn"
         @click="scrollToBottom"
       >

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex flex-col h-full">
     <div
-      class="flex justify-start items-center pl-3 pr-2 h-[2rem] border-b border-solid border-b-[var(--o2-border-color)] bg-surface-panel"
+      class="flex justify-start items-center pl-3 pr-2 h-[2rem] border-b border-solid border-b-[var(--color-card-glass-border)] bg-surface-panel"
       data-test="trace-details-sidebar-header"
     >
       <div
@@ -563,7 +563,7 @@ class="h-5! text-[0.75rem]!">
           <!-- Table View -->
           <div
             v-else
-            class="flex-1 overflow-hidden tab-content-dynamic-height border-1 border-solid border-[var(--o2-border-color)]"
+            class="flex-1 overflow-hidden tab-content-dynamic-height border-1 border-solid border-[var(--color-card-glass-border)]"
             :class="
               isLLMSpan && llmMetrics && span.gen_ai_response_model
                 ? '[height:calc(100vh-312px)]'
@@ -636,7 +636,7 @@ class="h-5! text-[0.75rem]!">
             </div>
             <!-- TenstackTable for events -->
             <div
-              class="flex-1 traces-events-table-container overflow-hidden tab-content-dynamic-height border-1 border-solid border-[var(--o2-border-color)] rounded"
+              class="flex-1 traces-events-table-container overflow-hidden tab-content-dynamic-height border-1 border-solid border-[var(--color-card-glass-border)] rounded"
               :class="
                 isLLMSpan && llmMetrics && span.gen_ai_response_model
                   ? '[height:calc(100vh-312px)]'
@@ -702,7 +702,7 @@ class="h-5! text-[0.75rem]!">
         <OTabPanel name="links">
           <div v-if="spanLinks.length" class="overflow-auto max-h-[20rem]">
             <table
-              class="trace-detail-tab-table border border-solid border-[var(--o2-border-color)] w-full"
+              class="trace-detail-tab-table border border-solid border-[var(--color-card-glass-border)] w-full"
               data-test="trace-details-sidebar-links-table"
             >
               <thead
@@ -1089,12 +1089,12 @@ export default defineComponent({
 
     // JSON syntax highlighting colors - using CSS variables for theme-aware colors
     const themeColors = {
-      key: "var(--o2-json-key)",
-      stringValue: "var(--o2-json-string)",
-      numberValue: "var(--o2-json-number)",
-      booleanValue: "var(--o2-json-boolean)",
-      nullValue: "var(--o2-json-null)",
-      objectValue: "var(--o2-json-object)",
+      key: "var(--color-json-key)",
+      stringValue: "var(--color-json-string)",
+      numberValue: "var(--color-json-number)",
+      booleanValue: "var(--color-json-boolean)",
+      nullValue: "var(--color-json-null)",
+      objectValue: "var(--color-json-object)",
     };
 
     const highlightTextMatch = (text: string, query: string): string => {
@@ -1202,9 +1202,9 @@ export default defineComponent({
         size: 200,
         meta: {
           headerClass:
-            "border-b border-r border-b-[var(--o2-border-color)]",
+            "border-b border-r border-b-[var(--color-card-glass-border)]",
           cellClass:
-            "border-r border-b-[var(--o2-border-color)] text-[var(--o2-json-key)]",
+            "border-r border-b-[var(--color-card-glass-border)] text-[var(--color-json-key)]",
         },
       },
       {
@@ -1214,8 +1214,8 @@ export default defineComponent({
         size: 400,
         meta: {
           slot: true,
-          headerClass: "border-b border-b-[var(--o2-border-color)]",
-          cellClass: "border-b-[var(--o2-border-color)] p-0!",
+          headerClass: "border-b border-b-[var(--color-card-glass-border)]",
+          cellClass: "border-b-[var(--color-card-glass-border)] p-0!",
         },
       },
     ];
@@ -1396,8 +1396,8 @@ export default defineComponent({
             ),
           meta: {
             headerClass:
-              "border-b border-r border-b-[var(--o2-border-color)]",
-            cellClass: "border-r border-b-[var(--o2-border-color)]",
+              "border-b border-r border-b-[var(--color-card-glass-border)]",
+            cellClass: "border-r border-b-[var(--color-card-glass-border)]",
           },
         });
         allKeys.delete(tsCol);
@@ -1424,8 +1424,8 @@ export default defineComponent({
           },
           meta: {
             headerClass:
-              "border-b border-r border-b-[var(--o2-border-color)]",
-            cellClass: "border-r border-b-[var(--o2-border-color)]",
+              "border-b border-r border-b-[var(--color-card-glass-border)]",
+            cellClass: "border-r border-b-[var(--color-card-glass-border)]",
           },
         });
       });
@@ -2654,7 +2654,7 @@ body.body--dark .trace-details-toolbar-container .provider-badge {
   flex: 1;
   height: 100%;
   max-height: calc(100% - 1.625rem);
-  border: 1px solid var(--o2-border-color);
+  border: 1px solid var(--color-card-glass-border);
   border-radius: 4px;
   padding: 0.75rem;
   overflow-y: auto;

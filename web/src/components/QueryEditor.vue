@@ -11,7 +11,7 @@
     <div
       v-if="isAIMode"
       :data-test="`${dataTestPrefix}-ai-input-bar`"
-      :class="['bg-[linear-gradient(135deg,rgba(139,92,246,0.05)_0%,rgba(236,72,153,0.05)_100%)] border-b border-b-(--o2-border-color) h-9 flex items-center gap-2 px-2 shrink-0 z-10', props.hasExpandButton && 'pr-10']"
+      :class="['bg-[linear-gradient(135deg,rgba(139,92,246,0.05)_0%,rgba(236,72,153,0.05)_100%)] border-b border-b-(--color-card-glass-border) h-9 flex items-center gap-2 px-2 shrink-0 z-10', props.hasExpandButton && 'pr-10']"
     >
       <!-- Show streaming status with spinner + stop button -->
       <template v-if="isGenerating">

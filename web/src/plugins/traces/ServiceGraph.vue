@@ -34,7 +34,7 @@
       <!-- Legends (horizontal) -->
       <div
         data-test="service-graph-legends"
-        class="flex flex-row items-center gap-3 p-[0.325rem] rounded border border-[var(--o2-border-color)]!"
+        class="flex flex-row items-center gap-3 p-[0.325rem] rounded border border-[var(--color-card-glass-border)]!"
       >
         <div
           data-test="sg-legend"
@@ -1830,23 +1830,23 @@ export default defineComponent({
   flex: none;
 }
 .sg-health-ring--healthy {
-  border-color: var(--o2-service-health-healthy);
+  border-color: var(--color-service-health-healthy);
 }
 .sg-health-ring--degraded {
-  border-color: var(--o2-service-health-degraded);
+  border-color: var(--color-service-health-degraded);
 }
 .sg-health-ring--warning {
-  border-color: var(--o2-service-health-warning);
+  border-color: var(--color-service-health-warning);
 }
 .sg-health-ring--critical {
-  border-color: var(--o2-service-health-critical);
+  border-color: var(--color-service-health-critical);
 }
 
 /* Node-size legend rings: two sizes, both the "healthy" hue (size, not health,
    is what this legend communicates). */
 .sg-size-ring {
   border-radius: 9999px;
-  border: 2px solid var(--o2-service-health-healthy);
+  border: 2px solid var(--color-service-health-healthy);
   background: transparent;
   flex-shrink: 0;
 }

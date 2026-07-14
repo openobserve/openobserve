@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           size="icon-xs-circle"
                           :title="`duration >= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
                           @click.stop="addSearchTerm(`duration>='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
-                          class="o2-custom-button-hover ml-[0.25rem]! border! border-[var(--o2-border-color)]!"
+                          class="o2-custom-button-hover ml-[0.25rem]! border! border-[var(--color-card-glass-border)]!"
                         >
                           <OIcon name="arrow-forward-ios" size="sm" class="h-[0.5rem]! w-[0.5rem]!" />
                         </OButton>
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           size="icon-xs-circle"
                           :title="`duration <= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
                           @click.stop="addSearchTerm(`duration<='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
-                          class="o2-custom-button-hover mr-[0.625rem]! border! border-[var(--o2-border-color)]! ml-auto!"
+                          class="o2-custom-button-hover mr-[0.625rem]! border! border-[var(--color-card-glass-border)]! ml-auto!"
                         >
                           <OIcon name="arrow-back-ios" size="sm" class="h-[0.5rem]! w-[0.5rem]!" />
                         </OButton>

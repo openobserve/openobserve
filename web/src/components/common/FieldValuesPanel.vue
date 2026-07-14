@@ -32,13 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Filter mode toggle + selection count -->
     <div
       v-if="showMultiSelect"
-      class="filter-mode-bar flex items-center justify-between px-2 py-1 border-b border-(--o2-border-color)"
+      class="filter-mode-bar flex items-center justify-between px-2 py-1 border-b border-(--color-card-glass-border)"
       data-test="field-values-panel-filter-mode-bar"
     >
       <div class="flex items-center gap-1 ">
         <span
           v-if="selectedValues.length > 0"
-          class="selection-count text-3! text-[0.625rem] font-medium text-[var(--o2-primary-color)]"
+          class="selection-count text-3! text-[0.625rem] font-medium text-[var(--color-accent)]"
           data-test="field-values-panel-selection-count"
         >
           {{ selectedValues.length }} selected
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="filter-mode-toggle flex border border-[var(--o2-border-color)] rounded overflow-hidden"
+        class="filter-mode-toggle flex border border-[var(--color-card-glass-border)] rounded overflow-hidden"
         data-test="field-values-panel-filter-mode-toggle"
       >
         <OButton
@@ -184,10 +184,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- View more values / loading more indicator -->
     <div
       v-if="isLoadingMore || (fieldValues?.hasMore && !fieldValues?.isLoading)"
-      class="w-full flex justify-center border-t border-(--o2-border-color) pt-1 px-1"
+      class="w-full flex justify-center border-t border-(--color-card-glass-border) pt-1 px-1"
     >
       <button
-        class="inline-flex items-center gap-1 bg-transparent border-0 text-(--o2-primary-color) text-[0.6875rem] font-[inherit] py-0.5 px-1 cursor-pointer rounded-[0.1875rem] transition-opacity duration-150 hover:opacity-80 hover:bg-(--color-interactive-hover-bg) disabled:opacity-50 disabled:cursor-default"
+        class="inline-flex items-center gap-1 bg-transparent border-0 text-(--color-accent) text-[0.6875rem] font-[inherit] py-0.5 px-1 cursor-pointer rounded-[0.1875rem] transition-opacity duration-150 hover:opacity-80 hover:bg-(--color-interactive-hover-bg) disabled:opacity-50 disabled:cursor-default"
         :disabled="isLoadingMore"
         @click="handleLoadMoreClick"
         :data-test="`log-search-subfield-load-more-${fieldName}`"

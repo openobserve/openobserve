@@ -42,15 +42,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class="flex items-center gap-2 flex-wrap justify-center mb-8">
-        <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--o2-border-color,rgba(0,0,0,0.1)) rounded-[20px] py-1 px-3">
+        <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--color-card-glass-border,rgba(0,0,0,0.1)) rounded-[20px] py-1 px-3">
           <OIcon name="receipt-long" size="xs" />
           {{ t("billing.billingGroup.chipConsolidatedBill") }}
         </span>
-        <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--o2-border-color,rgba(0,0,0,0.1)) rounded-[20px] py-1 px-3">
+        <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--color-card-glass-border,rgba(0,0,0,0.1)) rounded-[20px] py-1 px-3">
           <OIcon name="lock" size="xs" />
           {{ t("billing.billingGroup.chipPlanManaged") }}
         </span>
-        <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--o2-border-color,rgba(0,0,0,0.1)) rounded-[20px] py-1 px-3">
+        <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--color-card-glass-border,rgba(0,0,0,0.1)) rounded-[20px] py-1 px-3">
           <OIcon name="description" size="xs" />
           {{ t("billing.billingGroup.chipNoInvoices") }}
         </span>
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <trial-period class="mb-3" currentPage="billing"></trial-period>
     <!-- AI Credits card -->
     <div v-if="aiUsage" class="grid grid-cols-1 gap-4 w-full mb-4">
-      <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 shadow-none transition-shadow duration-200 hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)] dark:bg-[var(--color-surface-base)] dark:border-[var(--color-border-default)]">
+      <div class="bg-(--color-card-glass-bg) border border-(--color-card-glass-border) rounded-lg p-4 shadow-none transition-shadow duration-200 hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)] dark:bg-[var(--color-surface-base)] dark:border-[var(--color-border-default)]">
         <div class="min-h-full rounded-lg transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] text-center flex flex-col justify-between">
           <div class="flex flex-col justify-between">
             <div class="flex justify-between items-center">

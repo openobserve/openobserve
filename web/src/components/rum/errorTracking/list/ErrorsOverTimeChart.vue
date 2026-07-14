@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <small
         v-if="spikeCaption"
-        class="text-right font-semibold text-[var(--o2-severity-error-color)]"
+        class="text-right font-semibold text-[var(--color-severity-error-color)]"
         data-test="rum-errors-over-time-chart-spike-caption"
         >{{ spikeCaption }}</small
       >
@@ -116,8 +116,8 @@ const chartOptions = computed(() => {
   // Read the theme so token colors are re-resolved when it flips —
   // getComputedStyle alone is not reactive.
   void store.state.theme;
-  const errorColor = resolveToken("--o2-severity-error-color", "#EF5350");
-  const warningColor = resolveToken("--o2-severity-warning-color", "#FB8C00");
+  const errorColor = resolveToken("--color-severity-error-color", "#EF5350");
+  const warningColor = resolveToken("--color-severity-warning-color", "#FB8C00");
   const labels = props.buckets.map((bucket) =>
     format(new Date(Math.floor(bucket.ts / 1000)), labelFormat.value),
   );

@@ -3,7 +3,7 @@
     <div class="pb-1 flex justify-start px-3 copy-log-btn">
       <app-tabs
         v-if="filteredTabs.length"
-        class="mb-[0.375rem] logs-json-preview-tabs mr-2 border border-solid border-[var(--o2-border-color)] rounded-[0.25rem] text-[]"
+        class="mb-[0.375rem] logs-json-preview-tabs mr-2 border border-solid border-[var(--color-card-glass-border)] rounded-[0.25rem] text-[]"
         data-test="logs-json-preview-tabs"
         :tabs="filteredTabs"
         v-model:active-tab="activeTab"

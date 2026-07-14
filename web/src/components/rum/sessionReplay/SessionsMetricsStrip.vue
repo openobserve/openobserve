@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="metric-card flex flex-col items-start gap-0.5 text-left rounded-lg border p-3 transition-colors"
       :class="
         card.key === activeCard
-          ? 'border-[var(--o2-primary-color)]'
+          ? 'border-[var(--color-accent)]'
           : 'border-border-default'
       "
       :aria-pressed="card.key === activeCard"
@@ -151,7 +151,7 @@ const cards = computed(() => [
     value: props.errorSessions.toLocaleString(),
     valueClass:
       props.errorSessions > 0
-        ? "text-[var(--o2-severity-error-color)]"
+        ? "text-[var(--color-severity-error-color)]"
         : "text-[var(--color-text-heading)]",
     rate: rate(props.errorSessions),
     ...deltaCaption(props.errorsDelta, t("rum.sessionsWithErrors")),
@@ -163,7 +163,7 @@ const cards = computed(() => [
     value: props.frustratedSessions.toLocaleString(),
     valueClass:
       props.frustratedSessions > 0
-        ? "text-[var(--o2-severity-warning-color)]"
+        ? "text-[var(--color-severity-warning-color)]"
         : "text-[var(--color-text-heading)]",
     rate: rate(props.frustratedSessions),
     ...deltaCaption(props.frustratedDelta, t("rum.rageDeadClicks")),
@@ -197,13 +197,13 @@ const cards = computed(() => [
 
 <style scoped lang="scss">
 .metric-card {
-  background: var(--o2-card-bg);
+  background: var(--color-card-glass-bg);
 
   &:not(:disabled) {
     cursor: pointer;
 
     &:hover {
-      border-color: var(--o2-primary-color);
+      border-color: var(--color-accent);
     }
   }
 

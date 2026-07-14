@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="showTabs"
         v-model="activeAnalysisType"
         dense
-        class="border-b border-solid border-[var(--o2-border-color)] text-[var(--color-text-caption)]! insights-dashboard-tabs"
+        class="border-b border-solid border-[var(--color-card-glass-border)] text-[var(--color-text-caption)]! insights-dashboard-tabs"
         align="left"
       >
         <OTab
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- Sidebar Header with collapse button -->
                 <div
-                  class="px-3 py-2 flex items-center justify-between shrink-0 border-b border-solid border-[var(--o2-border-color)]"
+                  class="px-3 py-2 flex items-center justify-between shrink-0 border-b border-solid border-[var(--color-card-glass-border)]"
                 >
                   <span class="font-semibold text-sm">Dimensions</span>
                   <OButton
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- Search Input -->
                 <div
-                  class="p-[0.625rem] border-solid border-[var(--o2-border-color)]"
+                  class="p-[0.625rem] border-solid border-[var(--color-card-glass-border)]"
                 >
                   <OSearchInput
                     v-model="dimensionSearchText"
@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Selected Count Footer -->
                 <div
-                  class="p-3 border-t border-solid border-[var(--o2-border-color)] o2-table-footer-title"
+                  class="p-3 border-t border-solid border-[var(--color-card-glass-border)] o2-table-footer-title"
                 >
                   {{ selectedDimensions.length }}
                   {{ t("latencyInsights.dimensionsSelected") }}

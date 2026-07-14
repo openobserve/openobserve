@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="built-in-patterns-container card-container h-full flex flex-col">
     <!-- Search and Filter Bar -->
-    <div class="filters-bar p-3 shrink-0 border-b border-(--o2-border-color)">
+    <div class="filters-bar p-3 shrink-0 border-b border-(--color-card-glass-border)">
       <div class="flex gap-3">
         <div class="w-full col-md-6">
           <OSearchInput

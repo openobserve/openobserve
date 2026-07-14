@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="toc-container" class="px-2 pt-4 pb-2 flex flex-col h-full overflow-hidden">
     <div
       data-test="toc-section-container"
-      class="overflow-hidden flex flex-col flex-1 border border-[var(--o2-border-color)] rounded-md"
+      class="overflow-hidden flex flex-col flex-1 border border-[var(--color-card-glass-border)] rounded-md"
     >
       <!-- Header -->
       <div

@@ -107,11 +107,11 @@ const route = computed(() => routeFromUrl(props.issue.view_url));
   font-weight: var(--font-semibold);
 
   &--unhandled {
-    color: var(--o2-severity-error-color);
+    color: var(--color-severity-error-color);
   }
 
   &--handled {
-    color: var(--o2-severity-warning-color);
+    color: var(--color-severity-warning-color);
   }
 }
 </style>

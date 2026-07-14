@@ -1,6 +1,6 @@
 ﻿<template>
   <div
-    class="chat-container w-full h-full flex flex-col overflow-hidden rounded-md text-[var(--q-primary-text)] bg-[var(--o2-card-bg-solid)] [box-shadow:0_0_5px_1px_var(--o2-hover-shadow)]"
+    class="chat-container w-full h-full flex flex-col overflow-hidden rounded-md text-[var(--q-primary-text)] bg-[var(--color-card-glass-solid)] [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
     :class="[
       { 'chat-open': isOpen },
       store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
@@ -366,7 +366,7 @@
                           block.pendingConfirmation
                             ? block.tool === 'navigation_action'
                               ? 'text-[var(--o2-primary)]'
-                              : 'text-[var(--o2-warning)]'
+                              : 'text-[var(--color-warning)]'
                             : block.success === false
                               ? 'text-[var(--color-status-negative)]'
                               : 'text-[var(--color-status-positive)]'
@@ -6140,7 +6140,7 @@ export default defineComponent({
 }
 
 .chat-container .message .feedback-buttons .feedback-selected {
-  color: var(--o2-primary-color);
+  color: var(--color-accent);
   opacity: 1;
 }
 

@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-col h-full overflow-hidden"
     >
       <!-- Trace detail header -->
-      <div class="flex items-center gap-1 px-2 py-1.5 border-b border-solid border-[var(--o2-border-color)]">
+      <div class="flex items-center gap-1 px-2 py-1.5 border-b border-solid border-[var(--color-card-glass-border)]">
         <OButton
           variant="ghost"
           size="xs"
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <button
             v-if="selectedTrace.metadata?.start_time && props.startTime > 0"
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-(--color-surface-accent) text-[var(--color-text-body)] whitespace-nowrap cursor-pointer hover:bg-[var(--o2-border-color)]"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-(--color-surface-accent) text-[var(--color-text-body)] whitespace-nowrap cursor-pointer hover:bg-[var(--color-card-glass-border)]"
             :title="t('rum.seekToMoment')"
             data-test="rum-player-traces-tab-seek-btn"
             @click="seekToTrace(selectedTrace)"

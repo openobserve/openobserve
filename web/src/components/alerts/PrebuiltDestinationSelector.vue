@@ -21,14 +21,14 @@ limitations under the License. -->
         :key="type.id"
         data-test="destination-type-card"
         :data-type="type.id"
-        class="destination-card group/dest-card relative py-5 px-3 border-2 border-[var(--o2-border-color)] rounded-xl cursor-pointer transition-all duration-300 [min-height:7.5rem] flex flex-col hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] hover:border-[var(--o2-primary-color)]"
-        :class="selectedType === type.id ? 'selected border-[var(--o2-primary-color)] bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]' : 'bg-[var(--o2-card-bg)]'"
+        class="destination-card group/dest-card relative py-5 px-3 border-2 border-[var(--color-card-glass-border)] rounded-xl cursor-pointer transition-all duration-300 [min-height:7.5rem] flex flex-col hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] hover:border-[var(--color-accent)]"
+        :class="selectedType === type.id ? 'selected border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]' : 'bg-[var(--color-card-glass-bg)]'"
         @click="selectType(type.id)"
       >
         <!-- Card Content -->
         <div class="card-content flex flex-col items-center text-center h-full relative">
           <!-- Icon/Image -->
-          <div data-test="destination-type-icon" class="mb-2 text-[var(--o2-icon-color)] group-[.selected]/dest-card:text-[var(--o2-primary-color)]">
+          <div data-test="destination-type-icon" class="mb-2 text-[var(--color-icon-color)] group-[.selected]/dest-card:text-[var(--color-accent)]">
             <img
               v-if="type.image"
               :src="type.image"
@@ -66,12 +66,12 @@ limitations under the License. -->
       <div
         data-test="destination-type-card"
         data-type="custom"
-        class="destination-card custom-card group/dest-card relative py-5 px-3 border-2 border-[var(--o2-border-color)] border-dashed rounded-xl cursor-pointer transition-all duration-300 [min-height:7.5rem] flex flex-col hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] hover:border-[var(--o2-primary-color)]"
-        :class="selectedType === 'custom' ? 'selected border-[var(--o2-primary-color)] bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]' : 'bg-[var(--o2-card-bg)]'"
+        class="destination-card custom-card group/dest-card relative py-5 px-3 border-2 border-[var(--color-card-glass-border)] border-dashed rounded-xl cursor-pointer transition-all duration-300 [min-height:7.5rem] flex flex-col hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] hover:border-[var(--color-accent)]"
+        :class="selectedType === 'custom' ? 'selected border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]' : 'bg-[var(--color-card-glass-bg)]'"
         @click="selectType('custom')"
       >
         <div class="card-content flex flex-col items-center text-center h-full relative">
-          <div data-test="destination-type-icon" class="mb-2 text-[var(--o2-icon-color)] group-[.selected]/dest-card:text-[var(--o2-primary-color)]">
+          <div data-test="destination-type-icon" class="mb-2 text-[var(--color-icon-color)] group-[.selected]/dest-card:text-[var(--color-accent)]">
             <OIcon name="settings" size="md" />
           </div>
           <div data-test="destination-type-name" class="card-title text-[0.8125rem] font-medium mt-1 mb-0 text-[var(--color-text-primary)] [line-height:1.3] text-center">

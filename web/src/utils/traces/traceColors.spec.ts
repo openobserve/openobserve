@@ -255,14 +255,14 @@ describe("traceColors", () => {
 
   describe("traceUIColors", () => {
     it("should have expected CSS variable keys", () => {
-      expect(traceUIColors.surface).toBe("var(--o2-trace-surface)");
-      expect(traceUIColors.border).toBe("var(--o2-trace-border)");
-      expect(traceUIColors.textPrimary).toBe("var(--o2-trace-text-primary)");
+      expect(traceUIColors.surface).toBe("var(--color-trace-surface)");
+      expect(traceUIColors.border).toBe("var(--color-trace-border)");
+      expect(traceUIColors.textPrimary).toBe("var(--color-trace-text-primary)");
       expect(traceUIColors.textSecondary).toBe(
-        "var(--o2-trace-text-secondary)",
+        "var(--color-trace-text-secondary)",
       );
-      expect(traceUIColors.hover).toBe("var(--o2-trace-hover)");
-      expect(traceUIColors.selected).toBe("var(--o2-trace-selected)");
+      expect(traceUIColors.hover).toBe("var(--color-trace-hover)");
+      expect(traceUIColors.selected).toBe("var(--color-trace-selected)");
     });
   });
 

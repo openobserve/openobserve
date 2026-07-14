@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : depth === 1
                     ? spanDimensions.height / 2 + 'px'
                     : spanDimensions.height + 'px',
-                borderLeft: '1.5px solid var(--o2-border-color)',
+                borderLeft: '1.5px solid var(--color-card-glass-border)',
                 pointerEvents: 'none',
                 zIndex: 1,
               }"
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               width: (spans as any[])[virtualRow.index].hasChildSpans
                 ? (spanDimensions?.gap ?? 15) / 2 + 'px'
                 : (spanDimensions?.gap ?? 15) + 5 + 'px',
-              borderTop: '1.5px solid var(--o2-border-color)',
+              borderTop: '1.5px solid var(--color-card-glass-border)',
               pointerEvents: 'none',
               zIndex: 1,
             }"
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="(spans as any[])[virtualRow.index].hasChildSpans"
-                  class="span-count-box min-w-5 h-5 py-0 px-1 rounded-full border flex items-center justify-center text-[0.7rem] font-semibold mr-1 transition-colors duration-200 cursor-pointer border-(--o2-border-color)! relative"
+                  class="span-count-box min-w-5 h-5 py-0 px-1 rounded-full border flex items-center justify-center text-[0.7rem] font-semibold mr-1 transition-colors duration-200 cursor-pointer border-(--color-card-glass-border)! relative"
                   :style="{
                     color: (spans as any[])[virtualRow.index].style.color,
                   }"
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       left: '0.5rem',
                       bottom: '-6px',
                       height: '5px',
-                      borderLeft: '1.5px solid var(--o2-border-color)',
+                      borderLeft: '1.5px solid var(--color-card-glass-border)',
                       pointerEvents: 'none',
                       zIndex: 1,
                     }"
@@ -819,13 +819,13 @@ export default defineComponent({
         };
       if (code < 400)
         return {
-          text: "var(--o2-status-info-text)",
-          bg: "var(--o2-status-info-bg)",
+          text: "var(--color-status-info-text)",
+          bg: "var(--color-status-info-bg)",
         };
       if (code < 500)
         return {
-          text: "var(--o2-status-warning-text)",
-          bg: "var(--o2-status-warning-bg)",
+          text: "var(--color-status-warning-text)",
+          bg: "var(--color-status-warning-bg)",
         };
       return {
         text: "var(--color-status-error-text)",

@@ -586,12 +586,12 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
 }
 
 .groups-scroll-container::-webkit-scrollbar-thumb {
-  background: var(--o2-primary-color);
+  background: var(--color-accent);
   border-radius: 4px;
 }
 
 .groups-scroll-container::-webkit-scrollbar-thumb:hover {
-  background: var(--o2-primary-dark, var(--o2-primary-color));
+  background: var(--o2-primary-dark, var(--color-accent));
 }
 
 .field-chips-container::-webkit-scrollbar {
@@ -603,7 +603,7 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
 }
 
 .field-chips-container::-webkit-scrollbar-thumb {
-  background: var(--o2-primary-color);
+  background: var(--color-accent);
   border-radius: 3px;
 }
 

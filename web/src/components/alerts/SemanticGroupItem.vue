@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="semantic-group-item p-3 mb-2 rounded-lg transition-all duration-200 w-full max-w-full bg-(--o2-card-bg) border border-(--o2-border-color,rgba(0,0,0,0.12))">
+  <div class="semantic-group-item p-3 mb-2 rounded-lg transition-all duration-200 w-full max-w-full bg-(--color-card-glass-bg) border border-(--color-card-glass-border,rgba(0,0,0,0.12))">
     <div class="grid grid-cols-[200px_1fr_auto] gap-4 items-start w-full overflow-hidden">
       <!-- Left Column: Display Name only (ID is internal/read-only) -->
       <div class="flex flex-col gap-1 min-w-0 justify-center">

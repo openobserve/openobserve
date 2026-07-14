@@ -53,7 +53,7 @@
         </div>
 
         <!-- ── Vertical divider ── -->
-        <div class="w-px bg-(--o2-border-color) shrink-0"></div>
+        <div class="w-px bg-(--color-card-glass-border) shrink-0"></div>
 
         <!-- ── Right: Live Results ── -->
         <div class="flex-1 overflow-y-auto py-5 pl-5 pr-6">
@@ -108,7 +108,7 @@
                   </div>
                 </div>
               </div>
-              <div class="py-3 px-[14px] rounded-lg bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.02)] border border-(--o2-border-color)">
+              <div class="py-3 px-[14px] rounded-lg bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.02)] border border-(--color-card-glass-border)">
                 <div class="text-[11px] font-semibold opacity-55 mb-[6px]">
                   {{ t("modelPricing.troubleshootingTitle") }}
                 </div>
@@ -152,7 +152,7 @@
               </div>
 
               <!-- Priority flow -->
-              <div class="py-3 px-[14px] border border-(--o2-border-color) rounded-lg bg-[rgba(0,0,0,0.015)] dark:bg-[rgba(255,255,255,0.02)]">
+              <div class="py-3 px-[14px] border border-(--color-card-glass-border) rounded-lg bg-[rgba(0,0,0,0.015)] dark:bg-[rgba(255,255,255,0.02)]">
                 <div class="text-[10px] font-semibold opacity-40 mb-2">
                   {{ t("modelPricing.matchPriority") }}
                 </div>
@@ -165,7 +165,7 @@
                       <OIcon name="arrow-forward" size="xs" />
                     </div>
                     <div
-                      class="flex items-center gap-[5px] py-[5px] px-[10px] rounded-md border border-(--o2-border-color) text-[11px] font-medium bg-transparent"
+                      class="flex items-center gap-[5px] py-[5px] px-[10px] rounded-md border border-(--color-card-glass-border) text-[11px] font-medium bg-transparent"
                       :class="{
                         'border-[#16a34a] bg-[rgba(22,163,74,0.06)] font-bold dark:bg-[rgba(22,163,74,0.1)]': step.key === winnerSource,
                         'opacity-40': step.key !== winnerSource,
@@ -189,8 +189,8 @@
               </div>
 
               <!-- Tier + cost card -->
-              <div class="border border-(--o2-border-color) rounded-lg overflow-hidden">
-                <div class="py-3 px-[14px] bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.03)] border-b border-(--o2-border-color)">
+              <div class="border border-(--color-card-glass-border) rounded-lg overflow-hidden">
+                <div class="py-3 px-[14px] bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.03)] border-b border-(--color-card-glass-border)">
                   <div>
                     <div class="text-[13px] font-bold">
                       {{ testResult.tier || "Default" }}
@@ -213,7 +213,7 @@
                 </div>
 
                 <div class="text-xs" v-if="pricingRows.length > 0">
-                  <div class="grid gap-2 py-[7px] px-[14px] border-b border-(--o2-border-color) bg-[rgba(0,0,0,0.015)] dark:bg-[rgba(255,255,255,0.02)] [grid-template-columns:1.5fr_1fr]">
+                  <div class="grid gap-2 py-[7px] px-[14px] border-b border-(--color-card-glass-border) bg-[rgba(0,0,0,0.015)] dark:bg-[rgba(255,255,255,0.02)] [grid-template-columns:1.5fr_1fr]">
                     <span class="text-[10px] font-semibold opacity-40">{{ t("modelPricing.usageType") }}</span>
                     <span class="text-[10px] font-semibold opacity-40 text-right">{{
                       t("modelPricing.pricePerMTokens")

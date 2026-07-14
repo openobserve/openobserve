@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="w-full! justify-start! px-3! py-1.5! h-auto! rounded-md! gap-2! font-normal!"
       >
         <template #icon-left>
-          <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-[var(--o2-section-header-bg)] text-[var(--color-text-secondary)] shrink-0">
+          <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-[var(--color-section-header-bg)] text-[var(--color-text-secondary)] shrink-0">
             <OIcon name="help" size="sm" />
           </span>
         </template>

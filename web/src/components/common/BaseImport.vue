@@ -556,7 +556,7 @@ export default defineComponent({
      keeps a right-side gap. The height comes from flex (flex-1 min-h-0) so the
      editor grows to fill the pane instead of a brittle calc(100vh - Npx). */
   width: calc(100% - 1rem);
-  border: 1px solid var(--o2-border-color);
+  border: 1px solid var(--color-card-glass-border);
   border-radius: 0.375rem;
   overflow: hidden;
 }

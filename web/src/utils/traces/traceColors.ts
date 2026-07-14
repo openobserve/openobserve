@@ -185,12 +185,12 @@ export const getAllSpanColors = (
  * Trace UI color utilities
  */
 export const traceUIColors = {
-  surface: "var(--o2-trace-surface)",
-  border: "var(--o2-trace-border)",
-  textPrimary: "var(--o2-trace-text-primary)",
-  textSecondary: "var(--o2-trace-text-secondary)",
-  hover: "var(--o2-trace-hover)",
-  selected: "var(--o2-trace-selected)",
+  surface: "var(--color-trace-surface)",
+  border: "var(--color-trace-border)",
+  textPrimary: "var(--color-trace-text-primary)",
+  textSecondary: "var(--color-trace-text-secondary)",
+  hover: "var(--color-trace-hover)",
+  selected: "var(--color-trace-selected)",
 };
 
 /**

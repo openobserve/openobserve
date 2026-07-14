@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="tag-input-container" class="w-full h-full">
     <div
       data-test="tag-input-wrapper"
-      class="tag-input-wrapper relative flex flex-col px-[5px] py-0 border border-(--o2-border-color,rgba(0,0,0,0.12)) rounded bg-(--o2-card-bg) min-h-14 h-full w-full max-w-full cursor-text transition-colors duration-300 overflow-hidden"
+      class="tag-input-wrapper relative flex flex-col px-[5px] py-0 border border-(--color-card-glass-border,rgba(0,0,0,0.12)) rounded bg-(--color-card-glass-bg) min-h-14 h-full w-full max-w-full cursor-text transition-colors duration-300 overflow-hidden"
       :class="{ 'has-content': hasContent }"
     >
       <label

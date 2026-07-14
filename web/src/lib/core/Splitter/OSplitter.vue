@@ -31,7 +31,7 @@
         'select-none',
         'relative',
         'z-10',
-        'focus:outline-2 focus:outline-(--o2-primary-color) focus:-outline-offset-2',
+        'focus:outline-2 focus:outline-(--color-accent) focus:-outline-offset-2',
         disable ? 'cursor-default! opacity-50' : '',
         horizontal ? 'h-px w-full cursor-row-resize' : 'h-full cursor-col-resize',
         separatorClass

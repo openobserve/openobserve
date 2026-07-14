@@ -396,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   </div>
     <!-- Action Buttons — flow inline at the end of the constrained column. -->
-    <div class="flex items-center justify-between gap-2 pt-4 mt-2 border-t border-(--o2-border-color)">
+    <div class="flex items-center justify-between gap-2 pt-4 mt-2 border-t border-(--color-card-glass-border)">
       <!-- Unsaved-changes indicator: makes it obvious the in-card edits (domains, policies,
            allow/block emails) are staged until Save is clicked. -->
       <div
@@ -407,7 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <span
           class="inline-block w-2 h-2 rounded-full shrink-0"
-          style="background: var(--o2-primary-color)"
+          style="background: var(--color-accent)"
         ></span>
         {{ t('common.unsavedChanges') }}
       </div>

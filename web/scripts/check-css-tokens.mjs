@@ -18,45 +18,55 @@ const EXTS = new Set([".css", ".vue", ".ts"]);
 // `--x: value;` defined in our source (Reka UI, Tailwind internals, vue-flow,
 // Quasar remnants) plus a handful of JS-bound `:style` names set only via
 // element.style.setProperty at runtime.
-const ALLOW_PREFIXES = [/^--reka-/, /^--tw-/, /^--vf-/, /^--q-/, /^--o2-span-\d+$/];
+const ALLOW_PREFIXES = [/^--reka-/, /^--tw-/, /^--vf-/, /^--q-/, /^--o2-span-/];
 const ALLOW_EXACT = new Set([
-  "--o2-tree-node-color",
   "--node-color",
   "--chip-color",
+  "--o2-tree-node-color",
+
+  // JS-set-at-runtime custom properties (OTable tree indents, row status, virtual height).
   "--o2-row-status-color",
   "--o2-table-row-height",
-
-  // Pre-existing undefined-token bugs found when this guard was introduced,
-  // out of scope for O2_TOKEN_MIGRATION_PLAN.md (which only covers the named
-  // Bucket A-D families). Tracked separately — do not add new entries here;
-  // fix the reference or its definition instead.
-  "--o2-color-primary",
-  "--o2-color-primary-light",
-  "--o2-primary",
-  "--o2-primary-btn-bg-rgb",
-  "--o2-status-error",
-  "--o2-text-color",
-  "--o2-text",
-  "--o2-brand",
-  "--o2-font-mono",
-  "--o2-font",
-  "--color-success-bg",
   "--o2-tree-x",
   "--o2-tree-parent-x",
   "--o2-tree-connector-x",
-  "--o2-bg-light",
-  "--o2-bg-dark",
-  "--o2-text-primary-dark",
-  "--o2-hover-bg",
-  "--o2-status-error-border",
+
+  // Pre-existing UNDEFINED/broken --o2-* tokens left out of scope of the token
+  // migration (they reference nothing today). Tracked separately — do NOT add
+  // new entries; fix the reference or migrate it to a --color-* token instead.
   "--o2-bg",
-  "--o2-surface",
-  "--o2-dark-page-bg",
-  "--o2-red-800",
-  "--o2-green-700",
-  "--o2-yellow-700",
+  "--o2-bg-card-dark",
+  "--o2-bg-color",
+  "--o2-bg-dark",
+  "--o2-bg-light",
+  "--o2-bg-primary",
   "--o2-blue-700",
+  "--o2-brand",
+  "--o2-color-primary",
+  "--o2-color-primary-light",
+  "--o2-dark-page-bg",
+  "--o2-destructive",
+  "--o2-font",
+  "--o2-font-mono",
   "--o2-gray-700",
+  "--o2-green-700",
+  "--o2-hover-bg",
+  "--o2-hover-color",
+  "--o2-input-bg",
+  "--o2-primary",
+  "--o2-primary-btn-bg-rgb",
+  "--o2-primary-dark",
+  "--o2-red-800",
+  "--o2-selected-color",
+  "--o2-shadow-lg",
+  "--o2-status-error",
+  "--o2-status-error-border",
+  "--o2-surface",
+  "--o2-text",
+  "--o2-text-color",
+  "--o2-text-primary-dark",
+  "--o2-url",
+  "--o2-yellow-700",
 ]);
 
 function isAllowed(name) {

@@ -578,7 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div v-if="activeMainTab == 'configuration'">
                   <div class="w-full h-full overflow-y-auto p-4 flex flex-col gap-4">
                     <!-- Configuration Settings Card -->
-                    <div class="rounded-lg border border-[var(--o2-border-color)] divide-y divide-[var(--o2-border-color)]">
+                    <div class="rounded-lg border border-[var(--color-card-glass-border)] divide-y divide-[var(--color-card-glass-border)]">
 
                       <!-- Data Retention -->
                       <div v-if="showDataRetention" class="flex flex-col gap-1 p-3">
@@ -2692,7 +2692,7 @@ export default defineComponent({
 .indexDetailsContainer .o2-schema-table {
   border-radius: 0.5rem;
   position: relative;
-  border: 0.0625rem solid var(--o2-border-color);
+  border: 0.0625rem solid var(--color-card-glass-border);
 }
 
 .indexDetailsContainer .o2-schema-table thead tr {

@@ -652,8 +652,8 @@ export default defineComponent({
 
 <style>
 /* Graph Legend popover — appears on hover of the info-icon-btn wrapper.
-   Background/text use explicit colors per theme because `--o2-popover-background`
-   and `--o2-text-primary` both resolve to `#F0F1F2` in dark mode, which gave
+   Background/text use explicit colors per theme because the popover-background
+   and text-primary tokens both resolve to `#F0F1F2` in dark mode, which gave
    us a white card with invisible (same-color) text. */
 
 /* Dark-mode overrides — using both signals so it works regardless of which

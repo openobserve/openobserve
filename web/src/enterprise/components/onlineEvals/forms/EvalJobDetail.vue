@@ -44,7 +44,7 @@
            consistent. Pinned band (shrink-0) with a bottom divider; the cards
            below carry their own chrome via Tailwind. -->
       <section
-        class="flex-shrink-0 grid grid-cols-4 gap-[0.625rem] px-5 py-4 border-b border-b-[var(--color-dialog-header-border,var(--o2-border))]"
+        class="flex-shrink-0 grid grid-cols-4 gap-[0.625rem] px-5 py-4 border-b border-b-[var(--color-dialog-header-border,var(--color-border-default))]"
       >
         <!-- While the KPI query is in flight, show skeleton tiles in place of
              the cards (matches the LLM Insights dashboard pattern). -->
@@ -970,7 +970,7 @@ function relativeTime(timestampMs: number): string {
 .jd-kv dt {
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
 .jd-kv dd {
@@ -984,7 +984,7 @@ function relativeTime(timestampMs: number): string {
 // bordered, neutral surface + header bar) so condition rendering is consistent
 // across drawers.
 .jd-codeblock {
-  border: 0.0625rem solid var(--color-dialog-header-border, var(--o2-border));
+  border: 0.0625rem solid var(--color-dialog-header-border, var(--color-border-default));
   border-radius: 0.5rem;
   overflow: hidden;
   background: color-mix(
@@ -999,7 +999,7 @@ function relativeTime(timestampMs: number): string {
   align-items: center;
   justify-content: space-between;
   padding: 0.375rem 0.625rem;
-  border-bottom: 0.0625rem solid var(--color-dialog-header-border, var(--o2-border));
+  border-bottom: 0.0625rem solid var(--color-dialog-header-border, var(--color-border-default));
   background: color-mix(
     in srgb,
     var(--color-text-secondary) 6%,
@@ -1010,7 +1010,7 @@ function relativeTime(timestampMs: number): string {
 .jd-codeblock__label {
   font-size: 0.6875rem;
   font-weight: 500;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
 .jd-codeblock__content {
@@ -1102,7 +1102,7 @@ function relativeTime(timestampMs: number): string {
 
 .jd-scorers__icon--unknown {
   background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
 .jd-scorers__main {
@@ -1141,7 +1141,7 @@ function relativeTime(timestampMs: number): string {
 
 .jd-scorers__version {
   font-size: 0.6875rem;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
 .jd-scorers__produces {
@@ -1149,13 +1149,13 @@ function relativeTime(timestampMs: number): string {
   align-items: center;
   gap: 0.375rem;
   font-size: 0.75rem;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
   flex-wrap: wrap;
 }
 
 .jd-scorers__produces-icon {
   flex-shrink: 0;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
   opacity: 0.7;
 }
 
@@ -1170,11 +1170,11 @@ function relativeTime(timestampMs: number): string {
 
 .jd-scorers__produces-type,
 .jd-scorers__produces-range {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
 .jd-scorers__sep {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
   opacity: 0.5;
 }
 
@@ -1183,7 +1183,7 @@ function relativeTime(timestampMs: number): string {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
 .jd-scorers__cta-label {
@@ -1217,14 +1217,14 @@ function relativeTime(timestampMs: number): string {
   display: inline-flex;
   align-items: center;
   gap: 0.3125rem;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
 .jd-status-cell__dot {
   width: 0.375rem;
   height: 0.375rem;
   border-radius: 50%;
-  background: var(--color-text-secondary, var(--o2-text-secondary));
+  background: var(--color-text-secondary, var(--color-text-secondary));
 }
 
 .jd-status-cell--success {

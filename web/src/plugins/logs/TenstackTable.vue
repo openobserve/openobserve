@@ -245,7 +245,7 @@ class="mr-1" />
         <tr
           v-for="r in SKEL_ROW_COUNT"
           :key="`skel-${r}`"
-          class="logs-skel-row flex items-center w-full opacity-0 h-[29px] bg-(--o2-log-table-row-bg) border-b border-(--o2-log-table-row-border)"
+          class="logs-skel-row flex items-center w-full opacity-0 h-[29px] bg-(--color-log-table-row-bg) border-b border-(--color-log-table-row-border)"
           :style="{ animationDelay: `${(r - 1) * 40}ms` }"
         >
           <!-- No columns loaded yet (first page load) — full-width shimmer bar -->
@@ -325,10 +325,10 @@ class="mr-1" />
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'bg-(--color-table-row-selected-bg)'
                 : !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                  ? 'log-row-base bg-(--o2-log-table-row-bg)'
+                  ? 'log-row-base bg-(--color-log-table-row-bg)'
                   : '',
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? 'table-row-hover table-row-focus focus-visible:outline-none transition-[background-color,box-shadow] duration-[120ms] [transition-timing-function:ease-in-out] border-b-(--o2-log-table-row-border)!'
+                ? 'table-row-hover table-row-focus focus-visible:outline-none transition-[background-color,box-shadow] duration-[120ms] [transition-timing-function:ease-in-out] border-b-(--color-log-table-row-border)!'
                 : '',
             ]"
             @click="
@@ -1287,8 +1287,8 @@ defineExpose({
 
 .table-row-hover:hover,
 .table-row-focus:focus-visible {
-  background-color: var(--o2-log-table-row-hover) !important;
-  box-shadow: inset 3px 0 0 var(--o2-primary-color) !important;
+  background-color: var(--color-log-table-row-hover) !important;
+  box-shadow: inset 3px 0 0 var(--color-accent) !important;
 }
 
 /* Fix: OButton base class (relative) overrides absolute passed via props.

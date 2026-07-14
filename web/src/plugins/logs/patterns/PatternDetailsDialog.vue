@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex gap-3">
             <div class="w-1/2">
               <OCard
-                class="bg-[var(--o2-card-bg-solid)] border border-solid border-[var(--o2-border-color)]"
+                class="bg-[var(--color-card-glass-solid)] border border-solid border-[var(--color-card-glass-border)]"
               >
                 <OCardSection class="p-[0.375rem]">
                   <div
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OCard>
             </div>
             <div class="w-1/2">
-              <OCard class="bg-[var(--o2-card-bg-solid)] border border-solid border-[var(--o2-border-color)]">
+              <OCard class="bg-[var(--color-card-glass-solid)] border border-solid border-[var(--color-card-glass-border)]">
                 <OCardSection class="p-[0.375rem]">
                   <div
                     class="text-xs"
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.patternVariablesHeader") }}
           </div>
           <div
-            class="px-2.5 py-1.5 rounded border-l-4 border-solid border-l-[var(--o2-primary-color)]"
+            class="px-2.5 py-1.5 rounded border-l-4 border-solid border-l-[var(--color-accent)]"
             :class="
               store.state.theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'
             "
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.patternTemplate") }}
           </div>
           <div
-            class="px-2.5 py-1.5 font-mono text-[0.8125rem] leading-[1.6] rounded border-l-4 border-solid border-l-[var(--o2-primary-color)] break-all flex flex-wrap items-baseline gap-x-[2px] gap-y-[2px]"
+            class="px-2.5 py-1.5 font-mono text-[0.8125rem] leading-[1.6] rounded border-l-4 border-solid border-l-[var(--color-accent)] break-all flex flex-wrap items-baseline gap-x-[2px] gap-y-[2px]"
             :class="
               store.state.theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'
             "
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-global-filter="false"
             :default-columns="false"
             :max-height="undefined"
-            class="w-full border border-solid border-[var(--o2-border-color)]"
+            class="w-full border border-solid border-[var(--color-card-glass-border)]"
           >
             <template #cell-name="{ row }">
               <div class="text-left text-weight-bold text-primary">

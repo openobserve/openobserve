@@ -712,7 +712,7 @@ describe("TenstackTable", () => {
       wrapper = mountTable();
       const resizer = wrapper.find(".resizer");
       expect(resizer.exists()).toBe(true);
-      expect(resizer.classes()).not.toContain("hover:bg-[var(--o2-border-color)]");
+      expect(resizer.classes()).not.toContain("hover:bg-[var(--color-card-glass-border)]");
     });
   });
 

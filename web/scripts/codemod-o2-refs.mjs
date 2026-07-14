@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC_DIR = join(__dirname, "..", "src");
 const MAP = JSON.parse(readFileSync(join(__dirname, "o2-token-map.json"), "utf8"));
-const FLAT_MAP = { ...MAP.bucketA, ...MAP.bucketB, ...MAP.bucketC, ...MAP.bucketD_labelChip };
+const FLAT_MAP = { ...MAP.migrate };
 delete FLAT_MAP._comment;
 
 const EXTS = new Set([".vue", ".ts", ".css"]);

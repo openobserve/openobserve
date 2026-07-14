@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expansion="multiple"
       :expanded-ids="expandedExceptionIds"
       @update:expanded-ids="expandedExceptionIds = $event"
-      class="trace-detail-tab-table w-full border border-solid border-[var(--o2-border-color)] tab-content-dynamic-height"
+      class="trace-detail-tab-table w-full border border-solid border-[var(--color-card-glass-border)] tab-content-dynamic-height"
     >
       <template #cell-@timestamp="{ row }">
         <span>{{ formatTimestamp(row) }}</span>

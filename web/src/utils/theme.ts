@@ -134,8 +134,8 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
   }
 
   if (isDarkMode) {
-    // Apply dark mode theme color (single source — legacy --o2-theme-color /
-    // --o2-dark-theme-color both alias to this now, so one write covers both)
+    // Apply dark mode theme color (single source — the light + dark theme-color
+    // tokens were consolidated into one --color-theme-accent, so one write covers both)
     const rgbaColor = hexToRgba(themeColor, 10);
     document.body.style.setProperty('--color-theme-accent', rgbaColor);
 

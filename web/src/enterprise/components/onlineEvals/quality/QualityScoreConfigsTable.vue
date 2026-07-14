@@ -1,6 +1,6 @@
 <template>
   <section class="flex flex-col gap-[10px] min-h-0 flex-1" data-test="quality-score-configs-overview">
-    <div v-if="isLoading && rows.length === 0" class="flex flex-col items-center gap-2 py-8 px-3 border border-dashed border-[var(--color-dialog-header-border,var(--o2-border))] rounded-md text-center text-[var(--color-text-secondary)]">
+    <div v-if="isLoading && rows.length === 0" class="flex flex-col items-center gap-2 py-8 px-3 border border-dashed border-[var(--color-dialog-header-border,var(--color-border-default))] rounded-md text-center text-[var(--color-text-secondary)]">
       <OSpinner size="sm" />
       <span>{{ t("onlineEvals.quality.loading") }}</span>
     </div>

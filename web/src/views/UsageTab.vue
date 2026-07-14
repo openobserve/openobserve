@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Streams overview section -->
       <div
-        class="rounded p-4 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
+        class="rounded p-4 bg-[var(--color-card-glass-bg)] border border-[var(--color-card-glass-border)]"
         role="region"
         aria-label="Streams overview section"
       >
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Tiles -->
         <div class="grid [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))] gap-3">
-          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]">
+          <div class="[border-radius:0.325rem] border border-[var(--color-card-glass-border)]">
             <div
               class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--color-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--color-status-success-text)]"
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--color-status-success-bg)] border border-[var(--color-card-glass-border)] text-[var(--color-status-success-text)]"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 2.89% from last
                   week
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]">
+          <div class="[border-radius:0.325rem] border border-[var(--color-card-glass-border)]">
             <div
               class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--color-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--color-status-success-text)]"
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--color-status-success-bg)] border border-[var(--color-card-glass-border)] text-[var(--color-status-success-text)]"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 2.89% from last
                   week
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]">
+          <div class="[border-radius:0.325rem] border border-[var(--color-card-glass-border)]">
             <div
               class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--color-status-error-bg)] border border-[var(--o2-border-color)] text-[var(--color-status-error-text)]"
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--color-status-error-bg)] border border-[var(--color-card-glass-border)] text-[var(--color-status-error-text)]"
                 >
                   <OIcon name="arrow-downward" size="xs" /> 2.89% from last
                   week
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]" v-if="config.isCloud == 'false'">
+          <div class="[border-radius:0.325rem] border border-[var(--color-card-glass-border)]" v-if="config.isCloud == 'false'">
             <div
               class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--color-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--color-status-success-text)]"
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--color-status-success-bg)] border border-[var(--color-card-glass-border)] text-[var(--color-status-success-text)]"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 2.89% from last
                   week
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]" v-if="config.isCloud == 'false'">
+          <div class="[border-radius:0.325rem] border border-[var(--color-card-glass-border)]" v-if="config.isCloud == 'false'">
             <div
               class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--color-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--color-status-success-text)]"
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--color-status-success-bg)] border border-[var(--color-card-glass-border)] text-[var(--color-status-success-text)]"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 0.00% from last
                   week
@@ -244,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex flex-col gap-4 w-full">
           <div class="flex-1 flex min-w-0 w-full">
             <div
-              class="rounded p-4 w-full bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] text-center flex flex-col justify-between"
+              class="rounded p-4 w-full bg-[var(--color-card-glass-bg)] border border-[var(--color-card-glass-border)] text-center flex flex-col justify-between"
               role="article"
               aria-label="Functions count statistics"
             >
@@ -305,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="flex-1 flex min-w-0 w-full">
             <div
-              class="rounded p-4 w-full bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] text-center flex flex-col justify-between"
+              class="rounded p-4 w-full bg-[var(--color-card-glass-bg)] border border-[var(--color-card-glass-border)] text-center flex flex-col justify-between"
               role="article"
               aria-label="Dashboards count statistics"
             >
@@ -367,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Alerts chart -->
         <div
-          class="rounded p-4 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] flex flex-col min-h-0"
+          class="rounded p-4 bg-[var(--color-card-glass-bg)] border border-[var(--color-card-glass-border)] flex flex-col min-h-0"
           role="region"
           aria-label="Alerts overview section"
         >
@@ -446,7 +446,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Pipelines chart -->
         <div
-          class="rounded p-4 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] flex flex-col min-h-0"
+          class="rounded p-4 bg-[var(--color-card-glass-bg)] border border-[var(--color-card-glass-border)] flex flex-col min-h-0"
           role="region"
           aria-label="Pipelines overview section"
         >
@@ -1204,14 +1204,14 @@ watch(orgId, (newVal, oldVal) => {
 
 .view-button-light:focus-visible,
 .view-button-dark:focus-visible {
-  outline: 2px solid var(--o2-focus-ring);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
   border-radius: 0.25rem;
 }
 
 a:focus-visible,
 button:focus-visible {
-  outline: 2px solid var(--o2-focus-ring);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 

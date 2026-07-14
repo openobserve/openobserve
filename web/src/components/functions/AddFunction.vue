@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :limits="[30, 100]"
           class="overflow-hidden w-full"
           :horizontal="false"
-          separator-class="w-[0.0625rem] bg-[var(--o2-border-color)]"
+          separator-class="w-[0.0625rem] bg-[var(--color-card-glass-border)]"
         >
           <template v-slot:before>
             <div class="px-2 pt-2 pb-3 card-container h-full flex flex-col min-h-0">
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-show="expandState.functions"
-                    class="border solid border-[var(--o2-border-color)] mb-[0.375rem] relative flex-1 min-h-0"
+                    class="border solid border-[var(--color-card-glass-border)] mb-[0.375rem] relative flex-1 min-h-0"
                   >
                     <!-- Unified Query Editor (with built-in AI bar) -->
                     <unified-query-editor

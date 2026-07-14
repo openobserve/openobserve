@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="catalogContainerRef"
-    class="services-catalog h-full! flex flex-col bg-[var(--o2-card-bg-solid)] card-container px-[0.625rem] relative overflow-hidden"
+    class="services-catalog h-full! flex flex-col bg-[var(--color-card-glass-solid)] card-container px-[0.625rem] relative overflow-hidden"
   >
     <!-- Toolbar: stream selector (width-matched to the rail below) + search
          (width-matched to the table below) + status pills. The stream selector
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-if="statusCounts.critical > 0">
           <div
-            class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded text-[0.75rem] font-medium bg-[color-mix(in_srgb,var(--o2-service-health-critical)_12%,transparent)] text-[var(--o2-service-health-critical)]"
+            class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded text-[0.75rem] font-medium bg-[color-mix(in_srgb,var(--color-service-health-critical)_12%,transparent)] text-[var(--color-service-health-critical)]"
             data-test="services-catalog-pill-critical"
           >
             <span>{{ statusCounts.critical }}</span>
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-if="statusCounts.warning > 0">
           <div
-            class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded text-[0.75rem] font-medium bg-[color-mix(in_srgb,var(--o2-service-health-warning)_12%,transparent)] text-[var(--o2-service-health-warning)]"
+            class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded text-[0.75rem] font-medium bg-[color-mix(in_srgb,var(--color-service-health-warning)_12%,transparent)] text-[var(--color-service-health-warning)]"
             data-test="services-catalog-pill-warning"
           >
             <span>{{ statusCounts.warning }}</span>
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-if="statusCounts.degraded > 0">
           <div
-            class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded text-[0.75rem] font-medium bg-[color-mix(in_srgb,var(--o2-service-health-degraded)_12%,transparent)] text-[var(--o2-service-health-degraded)]"
+            class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded text-[0.75rem] font-medium bg-[color-mix(in_srgb,var(--color-service-health-degraded)_12%,transparent)] text-[var(--color-service-health-degraded)]"
             data-test="services-catalog-pill-degraded"
           >
             <span>{{ statusCounts.degraded }}</span>
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- Status legend -->
       <!-- <div
-        class="ml-auto flex items-center gap-3 px-[0.625rem] py-[0.325rem] rounded border border-[var(--o2-border-color)]"
+        class="ml-auto flex items-center gap-3 px-[0.625rem] py-[0.325rem] rounded border border-[var(--color-card-glass-border)]"
         data-test="services-catalog-status-legend"
       >
         <span
@@ -843,11 +843,11 @@ const categoryUnhealthyCounts = computed<Record<TypeFilter, number>>(() => {
 function tabStatusColorVar(filter: TypeFilter): string {
   switch (categoryWorstStatus.value[filter]) {
     case "critical":
-      return "var(--o2-service-health-critical)";
+      return "var(--color-service-health-critical)";
     case "warning":
-      return "var(--o2-service-health-warning)";
+      return "var(--color-service-health-warning)";
     case "degraded":
-      return "var(--o2-service-health-degraded)";
+      return "var(--color-service-health-degraded)";
     default:
       return "";
   }
@@ -908,10 +908,10 @@ function deriveStatus(
 }
 
 function statusBadgeClass(status: string): string {
-  if (status === "critical") return "text-(--o2-service-health-critical)";
-  if (status === "warning") return "text-(--o2-service-health-warning)";
-  if (status === "degraded") return "text-(--o2-service-health-degraded)";
-  return "text-(--o2-service-health-healthy)";
+  if (status === "critical") return "text-(--color-service-health-critical)";
+  if (status === "warning") return "text-(--color-service-health-warning)";
+  if (status === "degraded") return "text-(--color-service-health-degraded)";
+  return "text-(--color-service-health-healthy)";
 }
 
 function errorRateClass(rate: number): string {

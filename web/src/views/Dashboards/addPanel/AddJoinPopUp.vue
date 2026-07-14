@@ -100,7 +100,7 @@
         Performing
         <span
           class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold"
-          style="background-color: color-mix(in srgb, var(--o2-primary-color) 15%, transparent); color: var(--o2-primary-color);"
+          style="background-color: color-mix(in srgb, var(--color-accent) 15%, transparent); color: var(--color-accent);"
         >{{ joinTypeLabel }} Join</span> between
         <span class="font-semibold">{{ mainStream }}</span> and
         <span class="font-semibold">{{ modelValue.stream }}</span>

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="py-2 px-4 shrink-0 bg-[var(--o2-bg-gray)] text-sm"
+    class="py-2 px-4 shrink-0 bg-[var(--color-bg-gray)] text-sm"
     data-test="pattern-statistics"
     :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
   >

@@ -32,10 +32,6 @@
   --color-button-secondary-active: var(--color-primary-100);
   --color-button-secondary-disabled: var(--color-surface-panel);
   --color-button-secondary-focus-ring: var(--color-primary-400);
-  /* Legacy compat aliases — kept until Stage 5 deletion; no known consumer */
-  --o2-secondary-btn-bg: var(--color-button-secondary);
-  --o2-secondary-btn-text: var(--color-button-secondary-foreground);
-  --o2-secondary-btn-border: var(--color-button-secondary-border);
 
   /* Button — outline */
   --color-button-outline-text: var(--color-text-primary);
@@ -1455,13 +1451,13 @@
   right: 0;
   z-index: 1;
   width: 150px;
-  box-shadow: -2px 0px 2px 0 var(--o2-actions-column-shawdow) !important;
+  box-shadow: -2px 0px 2px 0 var(--color-actions-column-shawdow) !important;
 }
 .o2-table td:last-child.actions-column {
-  background-color: var(--o2-table-actions-bg);
+  background-color: var(--color-table-actions-bg);
 }
 .o2-table tr td {
-  border-bottom: 1px solid var(--o2-border-color) !important;
+  border-bottom: 1px solid var(--color-card-glass-border) !important;
 }
 .o2-table-header-sticky thead {
   position: sticky;
@@ -1618,11 +1614,11 @@ label:not(.o-input-label) {
 }
 
 .card-container {
-  background-color: var(--o2-card-bg);
+  background-color: var(--color-card-glass-bg);
 }
 
 .el-border {
-  border: 0.063rem solid var(--o2-border-color);
+  border: 0.063rem solid var(--color-card-glass-border);
 }
 
 .el-border-radius {
@@ -2107,7 +2103,7 @@ body.body--dark [data-destructive-icon="true"]:hover {
   z-index: 1;
   width: 100%;
   margin-top: auto;
-  background-color: var(--o2-card-bg-solid);
+  background-color: var(--color-card-glass-solid);
 }
 
 .warning-text {
@@ -2904,7 +2900,7 @@ body.body--dark .rca-report-content {
 
   .index-table {
     .schema-field-toggle {
-      border: 1px solid var(--o2-border-color);
+      border: 1px solid var(--color-card-glass-border);
       border-radius: 0.325rem;
       background-color: transparent;
       line-height: 10px;
@@ -2994,8 +2990,8 @@ body.body--dark .rca-report-content {
     min-width: 0;
     display: flex;
     flex-direction: column;
-    border-left: 1px solid var(--o2-border-color);
-    border-bottom: 1px solid var(--o2-border-color);
+    border-left: 1px solid var(--color-card-glass-border);
+    border-bottom: 1px solid var(--color-card-glass-border);
   }
 
   &__bars {
@@ -3128,15 +3124,15 @@ body.body--dark .rca-report-content {
   height: fit-content;
   overflow: hidden;
   border: none;
-  border-top: 1px solid var(--o2-border-color);
-  border-left: 1px solid var(--o2-border-color);
-  border-right: 1px solid var(--o2-border-color);
+  border-top: 1px solid var(--color-card-glass-border);
+  border-left: 1px solid var(--color-card-glass-border);
+  border-right: 1px solid var(--color-card-glass-border);
 
   .o2-tab {
     width: fit-content !important;
     padding: 0.25rem 0.5rem !important;
     font-size: 12px !important;
-    border-bottom: 3px solid var(--o2-border-color) !important;
+    border-bottom: 3px solid var(--color-card-glass-border) !important;
   }
 
   .active {
@@ -3241,8 +3237,8 @@ body.body--dark .rca-report-content {
 
 .searchdetaildialog .o2-schema-table {
   thead th {
-    border-right: 1px solid var(--o2-border-color);
-    border-bottom: 1px solid var(--o2-border-color);
+    border-right: 1px solid var(--color-card-glass-border);
+    border-bottom: 1px solid var(--color-card-glass-border);
 
     &:last-child {
       border-right: none;
@@ -3250,8 +3246,8 @@ body.body--dark .rca-report-content {
   }
 
   tbody td {
-    border-right: 1px solid var(--o2-border-color);
-    border-bottom: 1px solid var(--o2-border-color);
+    border-right: 1px solid var(--color-card-glass-border);
+    border-bottom: 1px solid var(--color-card-glass-border);
 
     &:last-child {
       border-right: none;
@@ -3325,7 +3321,7 @@ body.body--dark .rca-report-content {
 .load-more-container {
   margin-top: 12px;
   padding: 12px;
-  border-top: 1px solid var(--o2-border-color);
+  border-top: 1px solid var(--color-card-glass-border);
   background-color: rgba(0, 0, 0, 0.02);
   border-radius: 4px;
 }
@@ -3416,7 +3412,7 @@ button.date-time-button {
   min-height: 1.5rem !important;
   width: 1.45rem !important;
   padding: 0 !important;
-  border: 0.0626rem solid var(--o2-border-color) !important;
+  border: 0.0626rem solid var(--color-card-glass-border) !important;
   border-radius: 0.25rem !important;
   transition: all 0.2s ease;
   margin: 0;
@@ -3503,8 +3499,8 @@ button.date-time-button {
 }
 
 .result-bar {
-  border-bottom: 1px solid var(--o2-border-color);
-  background: var(--o2-card-bg);
+  border-bottom: 1px solid var(--color-card-glass-border);
+  background: var(--color-card-glass-bg);
 }
 
 .pagination-block {
@@ -3805,11 +3801,11 @@ button.date-time-button {
 }
 
 .syntax-guide-button-dark {
-  border: 0.0625rem solid var(--o2-border-color) !important;
+  border: 0.0625rem solid var(--color-card-glass-border) !important;
 }
 
 .dark-theme .syntax-guide-in-toolbar {
-  border: 0.0625rem solid var(--o2-border-color) !important;
+  border: 0.0625rem solid var(--color-card-glass-border) !important;
 }
 
 .syntax-guide-title {
@@ -3934,7 +3930,7 @@ button.date-time-button {
   text-align: left;
 
   .column-actions {
-    background: var(--o2-log-table-header-bg);
+    background: var(--color-log-table-header-bg);
   }
 
   &:hover {
@@ -3984,7 +3980,7 @@ button.date-time-button {
   justify-content: center;
   padding: 0 0.175rem;
   margin-left: 0.25rem;
-  border: 0.0625rem solid var(--o2-border-color);
+  border: 0.0625rem solid var(--color-card-glass-border);
   border-radius: 0.375rem;
   transition: all 0.2s ease;
   cursor: pointer;
@@ -3995,7 +3991,7 @@ button.date-time-button {
 }
 
 .dark-theme .toolbar-toggle-container {
-  border: 0.0625rem solid var(--o2-border-color);
+  border: 0.0625rem solid var(--color-card-glass-border);
 }
 
 .toolbar-icon-in-toggle {
@@ -4113,7 +4109,7 @@ button.date-time-button {
 }
 
 .warning {
-  color: var(--o2-warning);
+  color: var(--color-warning);
 }
 
 .ai-hover-btn:hover img {
@@ -4184,31 +4180,31 @@ button.date-time-button {
 .spitter-container {
   width: 100%;
   height: 100%;
-  background-color: var(--o2-card-bg);
+  background-color: var(--color-card-glass-bg);
   border-radius: 0.375rem;
   overflow: auto;
   flex: 10000 1 0%;
 }
 
 .alert-field-highlight {
-  border: 0.125rem solid var(--o2-primary-color) !important;
+  border: 0.125rem solid var(--color-accent) !important;
   border-radius: 0.25rem;
   transition: border 0.3s ease;
 }
 
 .warning-msg {
-  background-color: var(--o2-status-warning-bg);
+  background-color: var(--color-status-warning-bg);
   padding: 0.313rem;
   border-radius: 0.313rem;
 }
 
 .displayDiv .vue-grid-item.vue-grid-placeholder {
-  background: var(--o2-dashboard-placeholder-bg) !important;
+  background: var(--color-dashboard-placeholder-bg) !important;
 }
 
 .dashboard-chart-border {
-  border-right: 0.03rem solid var(--o2-border-color);
-  border-bottom: 0.03rem solid var(--o2-border-color);
+  border-right: 0.03rem solid var(--color-card-glass-border);
+  border-bottom: 0.03rem solid var(--color-card-glass-border);
 }
 
 /* Single source of truth for the count/label shown in a listing-table footer

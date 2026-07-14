@@ -96,10 +96,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   { selected: selectedProvider === provider.value },
                   store.state.theme === 'dark'
                     ? 'bg-[#1e1e1e] border-[#424242] hover:border-[#5d9cec] hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]'
-                    : 'bg-white border-(--color-border-default) hover:border-(--o2-border-color) hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
+                    : 'bg-white border-(--color-border-default) hover:border-(--color-card-glass-border) hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
                 ]"
                 :style="selectedProvider === provider.value && store.state.theme !== 'dark'
-                  ? 'border-color: var(--o2-border-color); background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%); box-shadow: 0 4px 16px rgba(25,118,210,0.2);'
+                  ? 'border-color: var(--color-card-glass-border); background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%); box-shadow: 0 4px 16px rgba(25,118,210,0.2);'
                   : selectedProvider === provider.value && store.state.theme === 'dark'
                   ? 'border-color: #5d9cec; background: linear-gradient(135deg, #1a3a52 0%, #1e1e1e 100%); box-shadow: 0 4px 16px rgba(93,156,236,0.25);'
                   : ''"
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else
                   :name="provider.icon"
                   size="lg"
-                  class="mb-2 text-[#666] [transition:color_0.3s_ease] group-[.selected]/card:text-(--o2-border-color) dark:group-[.selected]/card:text-[#5d9cec]"
+                  class="mb-2 text-[#666] [transition:color_0.3s_ease] group-[.selected]/card:text-(--color-card-glass-border) dark:group-[.selected]/card:text-[#5d9cec]"
                 />
                 <div class="text-[13px] font-medium text-center [line-height:1.3] mt-1 text-[var(--color-text-primary)] group-[.selected]/card:text-[#333333] dark:group-[.selected]/card:text-white">{{ provider.label }}</div>
                 <div

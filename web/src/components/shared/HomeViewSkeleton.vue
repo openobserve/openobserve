@@ -9,7 +9,7 @@
     <!-- 1st section - Streams container -->
     <div
       data-test="home-view-skeleton-streams-container"
-      class="feature-card bg-(--tile-bg) border-[0.0625rem] border-(--o2-border-color) rounded-lg p-4"
+      class="feature-card bg-(--tile-bg) border-[0.0625rem] border-(--color-card-glass-border) rounded-lg p-4"
     >
       <!-- Header -->
       <div data-test="home-view-skeleton-streams-header" class="flex justify-between items-center mb-4">
@@ -22,7 +22,7 @@
 
       <!-- Tiles using same grid as HomeView -->
       <div class="tiles-grid grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))">
-        <div v-for="n in 5" :key="n" data-test="home-view-skeleton-tile" class="rounded-[0.325rem] border-[0.0625rem] border-(--o2-border-color)">
+        <div v-for="n in 5" :key="n" data-test="home-view-skeleton-tile" class="rounded-[0.325rem] border-[0.0625rem] border-(--color-card-glass-border)">
           <div
             class="tile-content h-full p-4 rounded-lg gap-2 rounded text-center flex flex-col justify-between bg-(--tile-bg) border border-(--tile-border) text-(--text-primary)"
             :class="

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full h-full px-2 bg-(--o2-card-bg) flex flex-col">
+  <div class="w-full h-full px-2 bg-(--color-card-glass-bg) flex flex-col">
     <!-- Scrollable content area -->
     <div class="flex-1 overflow-y-auto pr-2">
       <div class="mb-6">

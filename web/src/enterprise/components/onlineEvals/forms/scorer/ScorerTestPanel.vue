@@ -1,6 +1,6 @@
 <template>
   <aside class="eval-form-page__side eval-form-page__side--test p-0">
-    <section class="eval-test-panel min-h-full p-5 bg-(--color-surface-base) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)]">
+    <section class="eval-test-panel min-h-full p-5 bg-(--color-surface-base) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--color-hover-shadow)]">
       <!-- Header -->
       <div class="flex flex-col gap-1">
         <h3 class="m-0 text-(--color-text-heading) text-sm font-bold">{{ t("onlineEvals.scorer.testPanel.title") }}</h3>

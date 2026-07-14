@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="justify-between w-full py-px px-1 border-t border-(--o2-border-color) bg-(--o2-card-bg)"
+    class="justify-between w-full py-px px-1 border-t border-(--color-card-glass-border) bg-(--color-card-glass-bg)"
     :class="showSchemaToggle || showQuickMode ? 'flex' : ''"
   >
     <!-- Schema Toggle Buttons -->

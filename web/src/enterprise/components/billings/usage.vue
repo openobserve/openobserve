@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- tab-info-section -->
       <!-- this will be unlocked when we get the actionscripts , rum sessions , error tracking from BE -->
         <div v-if="false" class="grid grid-cols-3 gap-4 w-full">
-            <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
+            <div class="bg-(--color-card-glass-bg) border border-(--color-card-glass-border) rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
               <div class="flex flex-col justify-between rounded-[0.325rem] h-full gap-4 ">
               <!-- Top Section (60%) -->
               <div class="flex flex-col justify-between">
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
             </div>
-            <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
+            <div class="bg-(--color-card-glass-bg) border border-(--color-card-glass-border) rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
               <div class="flex flex-col justify-between rounded-[0.325rem] h-full gap-4 ">
               <!-- Top Section (60%) -->
               <div class="flex flex-col justify-between">
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
             </div>
-            <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
+            <div class="bg-(--color-card-glass-bg) border border-(--color-card-glass-border) rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
               <div class="flex flex-col justify-between rounded-[0.325rem] h-full gap-4 ">
               <!-- Top Section (60%) -->
               <div class="flex flex-col justify-between">
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="tile in usageTiles"
             :key="tile.key"
             data-test="billings-usage-tile"
-            class="usage-tile bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg px-3 py-3 flex flex-col gap-2 transition-shadow duration-200 ease-in-out hover:shadow-sm"
+            class="usage-tile bg-(--color-card-glass-bg) border border-(--color-card-glass-border) rounded-lg px-3 py-3 flex flex-col gap-2 transition-shadow duration-200 ease-in-out hover:shadow-sm"
           >
             <div class="flex items-center justify-between gap-2">
               <div
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="usageStreamEnabled"
         data-test="usage-daily-chart"
-        class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 mt-4"
+        class="bg-(--color-card-glass-bg) border border-(--color-card-glass-border) rounded-lg p-4 mt-4"
       >
         <div class="text-(length:--text-sm) font-semibold text-(--color-text-heading) mb-2">
           {{ t("billing.usageTrends.dailyUsage") }}
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-if="usageStreamMissing"
             data-test="usage-waiting-for-data"
-            class="usage-daily-chart__waiting absolute inset-0 bg-(--o2-card-bg)"
+            class="usage-daily-chart__waiting absolute inset-0 bg-(--color-card-glass-bg)"
           >
             <OEmptyState
               size="block"
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OEmptyState
         v-else
         data-test="usage-enable-cta"
-        class="mt-4 border border-(--o2-border-color) rounded-lg bg-(--o2-card-bg)"
+        class="mt-4 border border-(--color-card-glass-border) rounded-lg bg-(--color-card-glass-bg)"
         size="block"
         illustration="wave-bars"
         :title="t('billing.usageTrends.enableTitle')"
@@ -1154,7 +1154,7 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
 .usage-tile__icon {
   height: 1.75rem;
   width: 1.75rem;
-  background: var(--o2-bg-gray);
+  background: var(--color-bg-gray);
 }
 
 /* PanelSchemaRenderer fills its container and needs an explicit height, or the

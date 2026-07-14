@@ -44,8 +44,8 @@ export function useEventFormatters() {
   const getStatusColorClass = (statusCode: number): string => {
     if (!statusCode) return "text-gray-500";
     if (statusCode >= 200 && statusCode < 300) return "text-[var(--color-status-positive)]";
-    if (statusCode >= 300 && statusCode < 400) return "text-[var(--o2-info)]";
-    if (statusCode >= 400 && statusCode < 500) return "text-[var(--o2-warning)]";
+    if (statusCode >= 300 && statusCode < 400) return "text-[var(--color-info)]";
+    if (statusCode >= 400 && statusCode < 500) return "text-[var(--color-warning)]";
     return "text-[var(--color-status-negative)]";
   };
 

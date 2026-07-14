@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="flex flex-col shadow-none border border-(--o2-border-color) bg-(--o2-card-bg) rounded-lg w-full h-full dark:bg-(--color-surface-base) dark:border-(--color-border-default)">
+  <OCard class="flex flex-col shadow-none border border-(--color-card-glass-border) bg-(--color-card-glass-bg) rounded-lg w-full h-full dark:bg-(--color-surface-base) dark:border-(--color-border-default)">
     <div class="flex items-center justify-between px-3 py-2">
       <div>
         <h3 class="pt-2 text-base font-semibold leading-6 text-(--color-text-heading) m-0">

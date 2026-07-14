@@ -37,20 +37,20 @@ const info = computed(() => {
   if (t === "boolean")
     return {
       label: "B",
-      color: "var(--o2-field-type-boolean-bg)",
-      textColor: "var(--o2-field-type-boolean-text)",
+      color: "var(--color-field-type-boolean-bg)",
+      textColor: "var(--color-field-type-boolean-text)",
     };
   if (t.includes("float"))
     return {
       label: "~",
-      color: "var(--o2-field-type-float-bg)",
-      textColor: "var(--o2-field-type-float-text)",
+      color: "var(--color-field-type-float-bg)",
+      textColor: "var(--color-field-type-float-text)",
     };
   if (t.includes("int") || t.includes("uint"))
     return {
       label: "#",
-      color: "var(--o2-field-type-number-bg)",
-      textColor: "var(--o2-field-type-number-text)",
+      color: "var(--color-field-type-number-bg)",
+      textColor: "var(--color-field-type-number-text)",
     };
   if (
     t.includes("timestamp") ||
@@ -60,13 +60,13 @@ const info = computed(() => {
   )
     return {
       label: "T",
-      color: "var(--o2-field-type-timestamp-bg)",
-      textColor: "var(--o2-field-type-timestamp-text)",
+      color: "var(--color-field-type-timestamp-bg)",
+      textColor: "var(--color-field-type-timestamp-text)",
     };
   return {
     label: "S",
-    color: "var(--o2-field-type-string-bg)",
-    textColor: "var(--o2-field-type-string-text)",
+    color: "var(--color-field-type-string-bg)",
+    textColor: "var(--color-field-type-string-text)",
   };
 });
 </script>

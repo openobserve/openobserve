@@ -32,14 +32,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Left Pane: SQL Query -->
         <template #before>
           <section class="flex flex-col overflow-hidden bg-(--color-surface-base) h-full">
-            <header class="shrink-0 flex items-center gap-2 h-11 px-4 bg-(--o2-card-bg) border-b border-solid border-(--o2-border-color)">
+            <header class="shrink-0 flex items-center gap-2 h-11 px-4 bg-(--color-card-glass-bg) border-b border-solid border-(--color-card-glass-border)">
               <div class="flex items-center gap-2">
                 <OIcon name="code" size="sm" class="text-(--color-text-secondary)" />
                 <h3 class="text-(length:--text-sm) font-(--font-semibold) text-(--color-text-heading) m-0 tracking-[0.01em]">SQL Query</h3>
               </div>
             </header>
             <div class="flex-1 overflow-y-auto p-4">
-              <pre class="sql-query-text [font-family:var(--font-mono)] text-[0.8125rem] leading-[1.6] m-0 py-3.5 px-4 whitespace-pre-wrap wrap-break-word bg-(--color-code-bg) border border-solid border-(--o2-border-color) rounded-md text-(--color-text-code) min-h-full box-border"><code class="[font-family:inherit] text-inherit bg-transparent p-0">{{ sqlQuery }}</code></pre>
+              <pre class="sql-query-text [font-family:var(--font-mono)] text-[0.8125rem] leading-[1.6] m-0 py-3.5 px-4 whitespace-pre-wrap wrap-break-word bg-(--color-code-bg) border border-solid border-(--color-card-glass-border) rounded-md text-(--color-text-code) min-h-full box-border"><code class="[font-family:inherit] text-inherit bg-transparent p-0">{{ sqlQuery }}</code></pre>
             </div>
           </section>
         </template>
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Pane: Explain/Analyze Results -->
         <template #after>
           <section class="flex flex-col overflow-hidden bg-(--color-surface-base) h-full">
-            <header class="shrink-0 flex items-center gap-2 h-11 px-4 bg-(--o2-card-bg) border-b border-solid border-(--o2-border-color)">
+            <header class="shrink-0 flex items-center gap-2 h-11 px-4 bg-(--color-card-glass-bg) border-b border-solid border-(--color-card-glass-border)">
               <h3 class="text-(length:--text-sm) font-(--font-semibold) text-(--color-text-heading) m-0 tracking-[0.01em]">
                 {{
                   showAnalyzeResults
@@ -93,8 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mb-3"
               />
 
-              <div class="plan-surface flex-1 flex flex-col bg-(--o2-card-bg) border border-solid border-(--o2-border-color) rounded-lg overflow-hidden">
-                <div class="px-4 py-2.5 border-b border-solid border-(--o2-border-color) bg-(--color-surface-base)">
+              <div class="plan-surface flex-1 flex flex-col bg-(--color-card-glass-bg) border border-solid border-(--color-card-glass-border) rounded-lg overflow-hidden">
+                <div class="px-4 py-2.5 border-b border-solid border-(--color-card-glass-border) bg-(--color-surface-base)">
                   <span class="text-(length:--text-xs) font-(--font-semibold) tracking-[0.06em] uppercase text-(--color-text-label)">{{ t("search.executionPlan") }}</span>
                 </div>
                 <div class="flex-1 overflow-y-auto py-3 px-4">
@@ -112,8 +112,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- EXPLAIN view (tabs for logical/physical) -->
             <div v-else class="flex-1 overflow-y-auto flex flex-col p-4 gap-3">
-              <div class="plan-surface flex-1 flex flex-col bg-(--o2-card-bg) border border-solid border-(--o2-border-color) rounded-lg overflow-hidden">
-                <div class="border-b border-solid border-(--o2-border-color) px-2">
+              <div class="plan-surface flex-1 flex flex-col bg-(--color-card-glass-bg) border border-solid border-(--color-card-glass-border) rounded-lg overflow-hidden">
+                <div class="border-b border-solid border-(--color-card-glass-border) px-2">
                   <OTabs v-model="activeTab" dense align="left">
                     <OTab name="logical" :label="t('search.logicalPlan')" />
                     <OTab name="physical" :label="t('search.physicalPlan')" />
@@ -649,13 +649,13 @@ export default defineComponent({
   top: 0;
   bottom: 0;
   width: 1px;
-  background-color: var(--o2-border-color);
+  background-color: var(--color-card-glass-border);
   transform: translateX(-50%);
   transition: background-color 0.2s ease, width 0.2s ease;
 }
 
 .query-plan-splitter:hover::before {
-  background-color: var(--o2-primary-color);
+  background-color: var(--color-accent);
   width: 2px;
 }
 </style>

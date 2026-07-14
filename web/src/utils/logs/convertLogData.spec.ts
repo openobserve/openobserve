@@ -34,8 +34,7 @@ describe("convertLogData.ts", () => {
     Object.defineProperty(window, "getComputedStyle", {
       value: () => ({
         getPropertyValue: (prop: string) => {
-          if (prop === "--o2-theme-color") return "#7A80C2";
-          if (prop === "--o2-dark-theme-color") return "#5A60A2";
+          if (prop === "--color-theme-accent") return "#7A80C2";
           return "";
         },
       }),
@@ -215,8 +214,8 @@ describe("convertLogData.ts", () => {
       Object.defineProperty(window, "getComputedStyle", {
         value: (el: Element) => ({
           getPropertyValue: (prop: string) => {
-            if (el === document.body && prop === "--o2-dark-theme-color") return "#5A60A2";
-            if (prop === "--o2-theme-color") return "#7A80C2";
+            if (el === document.body && prop === "--color-theme-accent") return "#5A60A2";
+            if (prop === "--color-theme-accent") return "#7A80C2";
             return "";
           },
         }),

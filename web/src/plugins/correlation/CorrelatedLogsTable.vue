@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Header with Inline Filters -->
     <div
       v-if="!props.hideDimensionFilters"
-      class="correlation-controls p-0 border-b border-solid border-[var(--o2-border-color)] bg-[var(--o2-card-bg)]"
+      class="correlation-controls p-0 border-b border-solid border-[var(--color-card-glass-border)] bg-[var(--color-card-glass-bg)]"
     >
       <!-- Dimension Filters Bar with Pending/Apply Pattern -->
       <template v-if="!isLoading || hasResults">
@@ -80,7 +80,7 @@ class="mr-1" />
               <div class="column-visibility-list min-w-62.5 max-h-100 overflow-y-auto">
                 <!-- Select All / Deselect All -->
                 <ODropdownItem
-                  class="border-b border-solid border-[var(--o2-border-color)]"
+                  class="border-b border-solid border-[var(--color-card-glass-border)]"
                   data-test="select-all-columns"
                   @select="(e) => { e.preventDefault(); toggleSelectAll(); }"
                 >
@@ -270,7 +270,7 @@ class="mr-1" />
         <!-- Pagination bar -->
         <div
           v-if="hasResults && totalPages > 1"
-          class="flex items-center justify-between px-4 py-2 border-t border-solid border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] text-xs shrink-0"
+          class="flex items-center justify-between px-4 py-2 border-t border-solid border-[var(--color-card-glass-border)] bg-[var(--color-card-glass-bg)] text-xs shrink-0"
           data-test="correlated-logs-pagination"
         >
           <span class="opacity-60">
@@ -1297,8 +1297,8 @@ const unifiedChips = computed<DimensionChip[]>(() =>
 }
 
 .correlation-controls {
-  background-color: var(--o2-card-bg);
-  border-bottom: 1px solid var(--o2-border-color);
+  background-color: var(--color-card-glass-bg);
+  border-bottom: 1px solid var(--color-card-glass-border);
 }
 
 .light-theme {

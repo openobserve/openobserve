@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <query-editor
               ref="errorQueryEditorRef"
               editor-id="rum-errors-query-editor"
-              :class="['border', 'solid', 'border-[var(--o2-border-color)]', 'p-[0.25rem]', 'rounded-[0.375rem]', 'overflow-y-auto', errorEditorHeight]"
+              :class="['border', 'solid', 'border-[var(--color-card-glass-border)]', 'p-[0.25rem]', 'rounded-[0.375rem]', 'overflow-y-auto', errorEditorHeight]"
               v-model:query="errorTrackingState.data.editorValue"
               :debounce-time="300"
               :keywords="effectiveKeywords"
@@ -646,8 +646,8 @@ const handleRowClick = (row: any) => {
 // colors as the sessions table, for cross-page consistency.
 const getIssueStatusColor = (row: any) => {
   if (row.error_handling === "handled")
-    return "var(--o2-severity-warning-color)";
-  return "var(--o2-severity-error-color)";
+    return "var(--color-severity-warning-color)";
+  return "var(--color-severity-error-color)";
 };
 
 function restoreUrlQueryParams() {

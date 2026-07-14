@@ -7,17 +7,40 @@ import prettier from "eslint-plugin-prettier";
 import cypress from "eslint-plugin-cypress";
 import fs from "fs";
 
-// Bans the legacy --o2-* CSS custom-property vocabulary anywhere in a .vue
+// Bans the legacy --o2-* CSS custom-property vocabulary anywhere in a .vue/.ts
 // file's raw text — catches Tailwind arbitrary-value usages in templates
-// (e.g. class="bg-[var(--o2-card-bg)]") that stylelint's <style>-block
-// parser (postcss-html) can't see. See O2_TOKEN_MIGRATION_PLAN.md §7b.
-// WARN for now (Stage 0 freeze); flips to "error" once the Stage 3/4 codemod
-// removes all existing usages (Stage 5).
+// (e.g. class="bg-[var(--o2-card-bg)]"), <style> blocks, and JS string literals.
+// This is the enforcing gate for the --o2- ban (stylelint can't allowlist values).
+//
+// ALLOWLIST: a fixed set of pre-existing UNDEFINED/broken --o2-* tokens that were
+// left out of scope of the token migration (they reference nothing, or are set at
+// runtime by JS — OTable tree indents, row-status). They are tracked separately and
+// MUST NOT grow. Everything else is a hard error. Do NOT add well-defined tokens here.
+const O2_ALLOWLIST = new Set([
+  // pre-existing undefined/broken tokens (render as unset today; out of scope)
+  "--o2-bg", "--o2-bg-card-dark", "--o2-bg-color", "--o2-bg-dark",
+  "--o2-bg-light", "--o2-bg-primary", "--o2-blue-700", "--o2-brand", "--o2-color-primary",
+  "--o2-color-primary-light", "--o2-dark-page-bg", "--o2-destructive", "--o2-font",
+  "--o2-font-mono", "--o2-gray-700", "--o2-green-700", "--o2-hover-bg", "--o2-hover-color",
+  "--o2-input-bg", "--o2-primary", "--o2-primary-btn-bg-rgb", "--o2-primary-dark",
+  "--o2-red-800", "--o2-selected-color", "--o2-shadow-lg", "--o2-status-error",
+  "--o2-status-error-border", "--o2-surface", "--o2-text", "--o2-text-color",
+  "--o2-text-primary-dark", "--o2-url", "--o2-yellow-700",
+  // JS-set-at-runtime custom properties (OTable tree indents, row status, virtual height)
+  "--o2-row-status-color", "--o2-table-row-height",
+  "--o2-tree-x", "--o2-tree-parent-x", "--o2-tree-connector-x",
+]);
+// dynamic span/trace color palette built via `var(--o2-span-${n})` — undefined bug,
+// tracked separately (see the trace-color follow-up task).
+const O2_ALLOW_PREFIXES = [/^--o2-span-/];
+
 const noLegacyO2Tokens = {
   rules: {
     "no-legacy-o2-tokens": {
       meta: { type: "problem", docs: { description: "Ban legacy --o2-* CSS custom properties" } },
       create(context) {
+        const allowed = (name) =>
+          O2_ALLOWLIST.has(name) || O2_ALLOW_PREFIXES.some((re) => re.test(name));
         return {
           Program() {
             const sourceCode = context.sourceCode ?? context.getSourceCode();
@@ -25,6 +48,7 @@ const noLegacyO2Tokens = {
             const re = /--o2-[A-Za-z0-9-]+/g;
             let match;
             while ((match = re.exec(text))) {
+              if (allowed(match[0])) continue;
               const start = match.index;
               const end = start + match[0].length;
               context.report({
@@ -82,7 +106,7 @@ export default [
       "local": noLegacyO2Tokens,
     },
     rules: {
-      "local/no-legacy-o2-tokens": ["warn"],
+      "local/no-legacy-o2-tokens": ["error"],
       // Disable noisy rules inherited from recommended configs
       "prettier/prettier": "off",
       "no-unused-vars": "off",

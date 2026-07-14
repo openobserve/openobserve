@@ -4,14 +4,14 @@
 -->
 <template>
   <div
-    class="flame-graph-view flex flex-col h-full bg-white w-full bg-[var(--o2-card-bg)]!"
+    class="flame-graph-view flex flex-col h-full bg-white w-full bg-[var(--color-card-glass-bg)]!"
     style="min-height: 400px; height: 100%"
   >
     <!-- Upper area: controls + ruler + chart -->
     <div class="flex flex-col flex-1" style="min-height: 0">
       <!-- Controls Bar -->
       <div
-        class="px-6 py-3 border-b border-[var(--color-border-default)] flex items-center justify-between bg-[var(--o2-card-bg)]!"
+        class="px-6 py-3 border-b border-[var(--color-border-default)] flex items-center justify-between bg-[var(--color-card-glass-bg)]!"
       >
         <div class="flex items-center space-x-4">
           <div
@@ -36,7 +36,7 @@
       >
         <!-- Timeline Ruler — stays fixed above the scrollable chart -->
         <div
-          class="relative bg-[var(--o2-card-bg)] select-none flex-shrink-0"
+          class="relative bg-[var(--color-card-glass-bg)] select-none flex-shrink-0"
           style="height: 1.5rem"
         >
           <!-- Static tick labels -->
@@ -138,7 +138,7 @@
     <!-- Resize handle -->
     <div
       v-if="sidebarVisible"
-      class="h-1 cursor-row-resize bg-[var(--color-border-default)] hover:bg-[var(--o2-primary-color)] flex-shrink-0 transition-colors"
+      class="h-1 cursor-row-resize bg-[var(--color-border-default)] hover:bg-[var(--color-accent)] flex-shrink-0 transition-colors"
       style="min-height: 4px"
       data-test="flame-graph-resizer"
       @mousedown="startResize"
@@ -148,7 +148,7 @@
     <div
       v-if="sidebarVisible"
       data-test="trace-details-flame-graph-sidebar"
-      class="border-t border-t-solid border-t-[var(--o2-border-color)] bg-[var(--o2-card-bg)]! flex-shrink-0 overflow-hidden"
+      class="border-t border-t-solid border-t-[var(--color-card-glass-border)] bg-[var(--color-card-glass-bg)]! flex-shrink-0 overflow-hidden"
       :style="{ height: bottomPanelHeight + 'px' }"
     >
       <TraceDetailsSidebar

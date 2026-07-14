@@ -138,7 +138,7 @@ const getFormattedDate = (timestamp: number) =>
     top: 0.25rem;
     bottom: 0.25rem;
     width: 1px;
-    background: var(--o2-border-color);
+    background: var(--color-card-glass-border);
   }
 }
 
@@ -149,22 +149,22 @@ const getFormattedDate = (timestamp: number) =>
   width: 0.5625rem;
   height: 0.5625rem;
   border-radius: 9999px;
-  border: 1px solid var(--o2-border-color);
+  border: 1px solid var(--color-card-glass-border);
 
   &--default {
-    background: var(--o2-card-bg, var(--o2-border-color));
+    background: var(--color-card-glass-bg, var(--color-card-glass-border));
   }
 
   &--error {
-    background: var(--o2-severity-error-color);
-    border-color: var(--o2-severity-error-color);
+    background: var(--color-severity-error-color);
+    border-color: var(--color-severity-error-color);
   }
 }
 
 .event-timeline__item--error {
   background: color-mix(
     in srgb,
-    var(--o2-severity-error-color) 6%,
+    var(--color-severity-error-color) 6%,
     transparent
   );
   border-radius: 0.375rem;

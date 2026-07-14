@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Current Window -->
-      <div class="flex flex-row justify-between items-start min-h-27.5 px-3 py-2 bg-[var(--o2-card-bg)]"
+      <div class="flex flex-row justify-between items-start min-h-27.5 px-3 py-2 bg-[var(--color-card-glass-bg)]"
         :class="store.state.theme === 'dark' ? 'border border-[#343434]' : 'border border-[#e6e6e6]'">
         <div class="multi-window-text w-auto text-left font-bold text-sm leading-6 align-middle" :class="store.state.theme === 'dark' ? 'text-white' : 'text-[#3d3d3d]'">
           {{ t('alerts.compareWithPast.currentWindow') }}
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="(picker, index) in localMultiTimeRange"
         :key="picker.uuid"
         class="reference-window-container flex flex-row justify-between items-start min-h-27.5 mt-2 px-3 py-2"
-        :class="store.state.theme === 'dark' ? ['bg-[var(--o2-card-bg)]', 'border', 'border-[#343434]'] : ['bg-[var(--o2-card-bg)]', 'border', 'border-[#e6e6e6]']"
+        :class="store.state.theme === 'dark' ? ['bg-[var(--color-card-glass-bg)]', 'border', 'border-[#343434]'] : ['bg-[var(--color-card-glass-bg)]', 'border', 'border-[#e6e6e6]']"
       >
         <div class="multi-window-text w-auto text-left font-bold text-sm leading-6 align-middle" :class="store.state.theme === 'dark' ? 'text-white' : 'text-[#3d3d3d]'">
           {{ t('alerts.compareWithPast.referenceWindow') }} {{ index + 1 }}

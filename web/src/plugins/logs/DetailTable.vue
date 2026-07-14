@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="_rowKey"
             pagination="none"
             :default-columns="false"
-            class="o2-table o2-row-md o2-schema-table log-detail-source-table w-full border border-solid border-[var(--o2-border-color)]"
+            class="o2-table o2-row-md o2-schema-table log-detail-source-table w-full border border-solid border-[var(--color-card-glass-border)]"
             :class="store.state.theme === 'dark' && 'dark'"
           >
             <template #cell-field="{ row, value }">

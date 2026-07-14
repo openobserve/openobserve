@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="relative w-full h-full flex flex-col" v-bind="$attrs">
     <div
       data-test="query-editor"
-      class="logs-query-editor flex-1 min-h-0 bg-(--o2-card-bg)"
+      class="logs-query-editor flex-1 min-h-0 bg-(--color-card-glass-bg)"
       ref="editorRef"
       :id="editorId"
     />
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showAiIcon && !disableAi"
       variant="sidebar-toggle"
       size="icon-toolbar"
-      class="absolute! top-2 right-2 z-10 bg-(--o2-bg-primary) border border-(--o2-border-color) transition-all duration-200 hover:bg-(--color-button-outline-hover-bg) hover:border-[var(--o2-color-primary)]"
+      class="absolute! top-2 right-2 z-10 bg-(--o2-bg-primary) border border-(--color-card-glass-border) transition-all duration-200 hover:bg-(--color-button-outline-hover-bg) hover:border-[var(--o2-color-primary)]"
       :class="nlpMode ? 'bg-[var(--o2-color-primary-light)] border-[var(--o2-color-primary)]' : ''"
       @click="toggleNlpMode"
       data-test="query-editor-ai-icon-btn"
@@ -1259,7 +1259,7 @@ export default defineComponent({
   width: 56.25rem; /* 900px - matches O2 AI Assistant max-width */
   max-width: calc(100% - 2rem);
   max-height: 31.25rem;
-  background: var(--o2-card-bg);
+  background: var(--color-card-glass-bg);
   border-radius: 0.5rem; /* 8px - matches O2 message border-radius */
   border: 2px solid #8b5cf6; /* O2 AI Assistant purple border */
   padding: 0.75rem; /* 12px - matches O2 message padding */

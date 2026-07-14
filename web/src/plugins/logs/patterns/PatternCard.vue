@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex border-b border-[var(--color-border-default)] cursor-pointer hover:bg-[var(--o2-hover-gray)] relative py-1 transition-colors duration-150 ease-in-out"
+    class="flex border-b border-[var(--color-border-default)] cursor-pointer hover:bg-[var(--color-hover-gray)] relative py-1 transition-colors duration-150 ease-in-out"
     :class="wrap ? 'items-start' : 'items-center'"
     @click="$emit('click', pattern, index)"
     :data-test="`pattern-card-${index}`"

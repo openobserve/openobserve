@@ -198,17 +198,17 @@ const ariaLabel = computed(() =>
   border-radius: 0.0625rem;
 
   &--unhandled {
-    background: var(--o2-severity-error-color);
+    background: var(--color-severity-error-color);
     opacity: 0.55;
   }
 
   &--handled {
-    background: var(--o2-severity-warning-color);
+    background: var(--color-severity-warning-color);
     opacity: 0.55;
   }
 
   &--empty {
-    background: var(--o2-border-color);
+    background: var(--color-card-glass-border);
     opacity: 0.6;
   }
 }
@@ -217,7 +217,7 @@ const ariaLabel = computed(() =>
   font-style: italic;
 
   &--spike {
-    color: var(--o2-severity-error-color);
+    color: var(--color-severity-error-color);
     font-style: normal;
     font-weight: var(--font-semibold);
   }

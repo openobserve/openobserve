@@ -125,7 +125,7 @@ const cards = computed(() => {
         kpis.crashFreePct === null ? "—" : `${kpis.crashFreePct.toFixed(1)}%`,
       valueClass:
         kpis.crashFreePct !== null && kpis.crashFreePct < CRASH_FREE_FAIR_MIN
-          ? "text-[var(--o2-severity-error-color)]"
+          ? "text-[var(--color-severity-error-color)]"
           : "",
       caption: t("rum.sessionsHitError", {
         errorSessions: addCommasToNumber(kpis.errorSessions),
@@ -149,7 +149,7 @@ const cards = computed(() => {
       label: t("rum.newIssues"),
       value: String(kpis.newIssues),
       valueClass:
-        kpis.newIssues > 0 ? "text-[var(--o2-severity-error-color)]" : "",
+        kpis.newIssues > 0 ? "text-[var(--color-severity-error-color)]" : "",
       caption: kpis.deployVersion
         ? t("rum.firstSeenSinceDeploy", { version: kpis.deployVersion })
         : t("rum.firstSeenInWindow"),

@@ -18,14 +18,14 @@
               style="
                 background: color-mix(
                   in srgb,
-                  var(--o2-primary-color) 12%,
+                  var(--color-accent) 12%,
                   transparent
                 );
               "
             >
               <OIcon
                 name="key"
-                class="text-[var(--o2-primary-color)] w-4 h-4"
+                class="text-[var(--color-accent)] w-4 h-4"
               />
             </div>
             <div>
@@ -114,7 +114,7 @@
               data-test="shortcut-cheatsheet-module"
             >
               <span
-                class="text-[12px] font-semibold tracking-wide text-[var(--o2-primary-color)]"
+                class="text-[12px] font-semibold tracking-wide text-[var(--color-accent)]"
               >
                 {{ m.title }}
               </span>
@@ -124,7 +124,7 @@
             <template v-for="sec in m.sections" :key="sec.title">
               <div
                 v-if="m.sections.length > 1"
-                class="text-[10px] font-semibold uppercase tracking-wider text-[var(--o2-primary-color)] pt-2 pb-1 px-1"
+                class="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-accent)] pt-2 pb-1 px-1"
                 data-test="shortcut-cheatsheet-category"
               >
                 {{ sec.title }}
@@ -187,7 +187,7 @@
               data-test="shortcut-cheatsheet-module"
             >
               <span
-                class="text-[12px] font-semibold tracking-wide text-[var(--o2-primary-color)]"
+                class="text-[12px] font-semibold tracking-wide text-[var(--color-accent)]"
               >
                 {{ m.title }}
               </span>
@@ -197,7 +197,7 @@
             <template v-for="sec in m.sections" :key="sec.title">
               <div
                 v-if="m.sections.length > 1"
-                class="text-[10px] font-semibold uppercase tracking-wider text-[var(--o2-primary-color)] pt-2 pb-1 px-1"
+                class="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-accent)] pt-2 pb-1 px-1"
                 data-test="shortcut-cheatsheet-category"
               >
                 {{ sec.title }}

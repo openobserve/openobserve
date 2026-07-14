@@ -70,7 +70,7 @@
  * a placeholder on the Monaco query editor (logs, traces, RUM sessions,
  * RUM error tracking, alerts). Mirrors Monaco's rendered text (monospace,
  * same line height) so the placeholder reads as the future typed query.
- * --o2-text-placeholder is theme-paired, so no dark override is needed.
+ * The placeholder text token is theme-paired, so no dark override is needed.
  */
 .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
   font-family: monospace;
