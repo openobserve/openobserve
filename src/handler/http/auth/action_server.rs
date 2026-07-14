@@ -46,6 +46,7 @@ fn validate_action_server_token(auth_header: Option<&str>) -> bool {
     decoded_str == expected_token
 }
 
+#[allow(clippy::items_after_test_module)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -72,7 +73,7 @@ mod tests {
     fn test_validate_valid_base64_non_utf8_returns_false() {
         // base64 of non-UTF8 bytes: 0xFF 0xFE
         let encoded =
-            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &[0xFF, 0xFE]);
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, [0xFF, 0xFE]);
         let header = format!("Basic {encoded}");
         // non-UTF8 decoded string → returns false
         assert!(!validate_action_server_token(Some(&header)));

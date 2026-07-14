@@ -383,7 +383,7 @@ mod tests {
 
     #[test]
     fn test_flight_service_impl_default() {
-        let _impl = FlightServiceImpl::default();
+        let _impl = FlightServiceImpl;
     }
 
     #[test]

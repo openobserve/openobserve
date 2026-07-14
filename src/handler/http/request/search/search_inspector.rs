@@ -601,13 +601,15 @@ mod tests {
 
     #[test]
     fn test_sort_events_by_timestamp_clears_identifying_fields() {
-        let mut event = SearchInspectorFields::default();
-        event.trace_id = Some("trace-123".to_string());
-        event.search_role = Some("follower".to_string());
-        event.cluster = Some("cluster-a".to_string());
-        event.region = Some("us-east-1".to_string());
-        event.node_name = Some("node-1".to_string());
-        event.timestamp = Some("1000".to_string());
+        let event = SearchInspectorFields {
+            trace_id: Some("trace-123".to_string()),
+            search_role: Some("follower".to_string()),
+            cluster: Some("cluster-a".to_string()),
+            region: Some("us-east-1".to_string()),
+            node_name: Some("node-1".to_string()),
+            timestamp: Some("1000".to_string()),
+            ..Default::default()
+        };
 
         let result = sort_events_by_timestamp(vec![event]);
         let e = &result[0];
@@ -620,10 +622,14 @@ mod tests {
 
     #[test]
     fn test_sort_events_by_timestamp_orders_ascending() {
-        let mut e1 = SearchInspectorFields::default();
-        e1.timestamp = Some("2000".to_string());
-        let mut e2 = SearchInspectorFields::default();
-        e2.timestamp = Some("1000".to_string());
+        let e1 = SearchInspectorFields {
+            timestamp: Some("2000".to_string()),
+            ..Default::default()
+        };
+        let e2 = SearchInspectorFields {
+            timestamp: Some("1000".to_string()),
+            ..Default::default()
+        };
 
         let result = sort_events_by_timestamp(vec![e1, e2]);
         assert_eq!(result[0].timestamp, Some("1000".to_string()));
