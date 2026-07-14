@@ -66,5 +66,6 @@ const selectedLocations = computed({
     >
       {{ t('synthetics.locations.empty') }}
     </div>
+    </div>
   </div>
 </template>
