@@ -98,6 +98,6 @@ mod tests {
 
     #[test]
     fn test_trace_server_default() {
-        let _server = TraceServer::default();
+        let _server = TraceServer;
     }
 }

@@ -93,6 +93,6 @@ mod tests {
 
     #[test]
     fn test_metrics_server_default() {
-        let _server = MetricsServer::default();
+        let _server = MetricsServer;
     }
 }

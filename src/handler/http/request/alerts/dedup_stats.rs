@@ -112,6 +112,7 @@ pub async fn get_dedup_summary(Path(org_id): Path<String>) -> Response {
         .unwrap()
 }
 
+#[allow(clippy::items_after_test_module)]
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -31,19 +31,8 @@ use crate::{
         models::pipelines::{PipelineBulkEnableRequest, PipelineBulkEnableResponse, PipelineList},
         request::{BulkDeleteRequest, BulkDeleteResponse},
     },
-    service::{db::pipeline::PipelineError, pipeline},
+    service::pipeline,
 };
-
-impl From<PipelineError> for Response {
-    fn from(value: PipelineError) -> Self {
-        match value {
-            PipelineError::InfraError(err) => MetaHttpResponse::internal_error(err),
-            PipelineError::NotFound(_) => MetaHttpResponse::not_found(value),
-            PipelineError::Modified(_) => MetaHttpResponse::conflict(value),
-            error => MetaHttpResponse::bad_request(error),
-        }
-    }
-}
 
 /// CreatePipeline
 

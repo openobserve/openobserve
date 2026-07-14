@@ -61,7 +61,7 @@ const NOMAP_SERVICE = `e2e-smap-nomap-${RUN_ID}`;
 // in an in-process LRU keyed by the exact (service, version, env) params of
 // each request, and delete_group only evicts exact-key matches — a pre-delete
 // translation under a different param combination keeps resolving from stale
-// cache forever (see CACHE in src/service/db/sourcemaps.rs).
+// cache forever (see CACHE in src/core/src/service/db/sourcemaps.rs).
 const DELMAP_SERVICE = `e2e-smap-del-${RUN_ID}`;
 const VERSION = '1.0.0-e2e';
 const ENV = 'e2e';
