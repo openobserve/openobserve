@@ -49,6 +49,15 @@ export const COL = {
   price:        110,
   defaultModel: 180,
   version:      100,
+  // Synthetic monitoring
+  responseTime: 90,
+  uptime:       130,
+  locations:    120,
+  interval:     72,
+  steps:        72,
+  assertions:   90,
+  lastCheck:    100,
+  history:      180,
 } as const;
 
 // ── Column Definition ────────────────────────────────────────────

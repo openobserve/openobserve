@@ -82,6 +82,7 @@
           @delete-selected="openBulkDeleteConfirm"
           @move-selected="moveMultipleMonitors"
           @navigate-to-folder="(id) => { searchAcrossFolders = false; updateActiveFolderId(id) }"
+          @empty-action="(actionId) => { if (actionId === 'create') openCreate() }"
         >
           <!-- Toolbar content rendered inside OTable's toolbar bar -->
           <template #toolbar>

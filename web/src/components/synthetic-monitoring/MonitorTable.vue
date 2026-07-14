@@ -18,6 +18,7 @@
     :empty-message="emptyMessage"
     :data-test="dataTest"
     :horizontal-scroll="true"
+    show-index
     @row-click="(row: any) => emit('row-click', row)"
   >
     <!-- Toolbar slots (passthrough to parent) -->
@@ -28,49 +29,62 @@
       <slot name="toolbar-trailing" />
     </template>
 
-    <!-- Status dot -->
+    <!-- Status badge -->
     <template #cell-status="{ row }">
-      <span :class="dotCls((row as any).status)" />
+      <OBadge :variant="resolveBadge('serviceStatus', (row as any).status).variant" :dot="true" size="sm">
+        {{ resolveBadge('serviceStatus', (row as any).status).label }}
+      </OBadge>
     </template>
 
     <!-- Monitor name -->
     <template #cell-name="{ row }">
-      <div class="text-sm font-semibold truncate">{{ (row as any).name }}</div>
+      <div class="flex items-center gap-1.5 min-w-0 overflow-hidden">
+        <span class="truncate">{{ (row as any).name || '—' }}</span>
+      </div>
+      <OTooltip
+        v-if="(row as any).name"
+        :content="(row as any).name"
+        content-class="max-w-[400px] whitespace-normal break-words text-xs"
+      />
     </template>
 
     <!-- URL / Endpoint -->
     <template #cell-url="{ row }">
-      <div class="text-xs font-mono text-text-code truncate">{{ (row as any).url }}</div>
+      <span class="truncate">{{ (row as any).url || '—' }}</span>
     </template>
 
     <!-- HTTP Method badge (API mode) -->
     <template #cell-method="{ row }">
-      <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-xs font-bold font-mono" :class="methodCls((row as any).method)">{{ (row as any).method }}</span>
+      <OBadge :variant="resolveBadge('httpMethod', (row as any).method).variant" size="sm">
+        {{ String((row as any).method).toUpperCase() }}
+      </OBadge>
     </template>
 
     <!-- Steps count (Browser mode) -->
     <template #cell-steps="{ row }">
-      <span class="text-secondary">{{ (row as any).steps }} steps</span>
+      <span class="truncate">{{ (row as any).steps ? `${(row as any).steps} ${t('synthetics.table.stepsSuffix')}` : '—' }}</span>
     </template>
 
     <!-- Assertions count (API mode) -->
     <template #cell-assertions="{ row }">
-      <span class="text-secondary">{{ (row as any).assertions }} checks</span>
+      <span class="truncate">{{ (row as any).assertions ? `${(row as any).assertions} ${t('synthetics.table.checksSuffix')}` : '—' }}</span>
     </template>
 
     <!-- Folder name (cross-folder search mode) — click navigates sidebar to that folder -->
     <template #cell-folder_name="{ row }">
-      <button
-        class="text-xs text-text-link cursor-pointer bg-transparent border-0 p-0 hover:underline"
+      <div
+        class="cursor-pointer"
         @click.stop="emit('navigate-to-folder', (row as any).folderId)"
       >
-        {{ (row as any).folder_name ?? '—' }}
-      </button>
+        {{ (row as any).folder_name || '—' }}
+      </div>
     </template>
 
     <!-- Type badge (monitors mode) -->
     <template #cell-type="{ row }">
-      <OBadge :variant="typeBadgeVariant((row as any).type)" size="sm">{{ formatType((row as any).type) }}</OBadge>
+      <OBadge :variant="resolveBadge('syntheticType', (row as any).type).variant" size="sm">
+        {{ resolveBadge('syntheticType', (row as any).type).label }}
+      </OBadge>
     </template>
 
     <!-- History sparkbars -->
@@ -89,7 +103,12 @@
 
     <!-- Response time -->
     <template #cell-responseTime="{ row }">
-      <span :class="'font-mono text-sm font-semibold ' + rtCls((row as any).responseTime)">{{ (row as any).responseTime ?? '—' }}</span>
+      <span
+        v-if="(row as any).responseTime"
+        class="font-mono text-sm font-semibold"
+        :class="parseFloat((row as any).responseTime) < 300 ? 'text-success-600' : parseFloat((row as any).responseTime) < 1000 ? 'text-warning-600' : 'text-error-600'"
+      >{{ (row as any).responseTime }}</span>
+      <span v-else class="text-sm">—</span>
     </template>
 
     <!-- Uptime with progress bar -->
@@ -121,12 +140,12 @@
 
     <!-- Interval (monitors mode) -->
     <template #cell-interval="{ row }">
-      <span class="text-secondary">{{ (row as any).interval }}</span>
+      <span class="truncate">{{ (row as any).interval || '—' }}</span>
     </template>
 
     <!-- Last check -->
     <template #cell-lastCheck="{ row }">
-      <span class="text-secondary">{{ (row as any).lastCheck }}</span>
+      <span class="truncate">{{ (row as any).lastCheck || '—' }}</span>
     </template>
 
     <!-- Row actions -->
@@ -136,40 +155,43 @@
         <div
           v-if="props.toggleLoadingMap[(row as any).id]"
           class="flex items-center justify-center w-7 h-8"
-          :title="(row as any).enabled ? 'Pausing…' : 'Enabling…'"
           :data-test="`${dataTest}-toggle-spinner`"
         >
           <OSpinner size="xs" />
+          <OTooltip side="bottom" :content="(row as any).enabled ? 'Pausing…' : 'Enabling…'" />
         </div>
         <OButton
           v-else
           :variant="(row as any).enabled ? 'ghost-destructive' : 'ghost'"
           size="icon-sm"
           :icon-left="(row as any).enabled ? 'pause' : 'play-arrow'"
-          :title="(row as any).enabled ? 'Pause' : 'Enable'"
           :data-test="`${dataTest}-${(row as any).enabled ? 'pause' : 'enable'}-btn`"
           @click.stop="emit('toggle-enabled', row)"
-        />
+        >
+          <OTooltip side="bottom" :content="(row as any).enabled ? t('synthetics.table.pause') : t('synthetics.table.enable')" />
+        </OButton>
 
         <!-- Edit -->
         <OButton
           variant="ghost"
           size="icon-sm"
           icon-left="edit"
-          title="Edit"
           :data-test="`${dataTest}-edit-btn`"
           @click.stop="emit('edit', row)"
-        />
+        >
+          <OTooltip side="bottom" :content="t('synthetics.table.edit')" />
+        </OButton>
 
         <!-- Duplicate -->
         <OButton
           variant="ghost"
           size="icon-sm"
           icon-left="content-copy"
-          title="Duplicate"
           :data-test="`${dataTest}-duplicate-btn`"
           @click.stop="emit('duplicate', row)"
-        />
+        >
+          <OTooltip side="bottom" :content="t('synthetics.table.duplicate')" />
+        </OButton>
 
         <!-- More menu: Trigger + Delete -->
         <ODropdown>
@@ -178,17 +200,18 @@
               variant="ghost"
               size="icon-sm"
               icon-left="more-vert"
-              title="More"
               :data-test="`${dataTest}-more-btn`"
               @click.stop
-            />
+            >
+              <OTooltip side="bottom" :content="t('synthetics.table.more')" />
+            </OButton>
           </template>
 
           <ODropdownItem :data-test="`${dataTest}-run-item`" @select="emit('run', row)">
             <template #icon-left>
               <OIcon name="sound-sampler" size="sm" />
             </template>
-            Trigger
+            {{ t('synthetics.table.trigger') }}
           </ODropdownItem>
 
           <ODropdownSeparator />
@@ -201,15 +224,26 @@
             <template #icon-left>
               <OIcon name="delete" size="sm" />
             </template>
-            Delete
+            {{ t('synthetics.table.delete') }}
           </ODropdownItem>
         </ODropdown>
       </div>
     </template>
 
+    <!-- Empty state -->
+    <template #empty>
+      <OEmptyState
+        size="hero"
+        preset="no-synthetic-monitors"
+        :description="t('synthetics.table.noResults')"
+        :data-test="`${dataTest}-empty-state`"
+        @action="(id: string) => emit('empty-action', id)"
+      />
+    </template>
+
     <!-- Footer with count + bulk action buttons -->
     <template #bottom>
-      <div class="flex items-center gap-2 px-4 py-2">
+      <div class="flex w-full justify-between items-center h-[48px]">
         <span class="text-sm text-secondary">{{ data.length }} {{ footerTitle }}</span>
         <template v-if="localSelectedIds.length > 0">
           <OButton
@@ -219,7 +253,7 @@
             @click="emit('move-selected')"
           >
             <OIcon name="drive-file-move" size="sm" />
-            <span class="ml-1">Move</span>
+            <span class="ml-1">{{ t('synthetics.table.move') }}</span>
           </OButton>
           <OButton
             variant="outline-destructive"
@@ -228,7 +262,7 @@
             @click="emit('delete-selected')"
           >
             <OIcon name="delete" size="sm" />
-            <span class="ml-1">Delete</span>
+            <span class="ml-1">{{ t('synthetics.table.delete') }}</span>
           </OButton>
         </template>
       </div>
@@ -275,8 +309,10 @@
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import OTable from '@/lib/core/Table/OTable.vue'
 import type { OTableColumnDef } from '@/lib/core/Table/OTable.types'
+import { COL } from '@/lib/core/Table/OTable.types'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OBadge from '@/lib/core/Badge/OBadge.vue'
@@ -285,6 +321,9 @@ import OSpinner from '@/lib/feedback/Spinner/OSpinner.vue'
 import ODropdown from '@/lib/overlay/Dropdown/ODropdown.vue'
 import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue'
 import ODropdownSeparator from '@/lib/overlay/Dropdown/ODropdownSeparator.vue'
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
+import OEmptyState from '@/lib/core/EmptyState/OEmptyState.vue'
+import { resolveBadge } from '@/lib/core/Badge/badgeGroups'
 
 type Mode = 'monitors' | 'browser' | 'api'
 
@@ -319,7 +358,10 @@ const emit = defineEmits<{
   'delete-selected': []
   'move-selected': []
   'navigate-to-folder': [folderId: string]
+  'empty-action': [actionId: string]
 }>()
+
+const { t } = useI18n()
 
 const localSelectedIds = computed({
   get: () => props.selectedIds ?? [],
@@ -329,98 +371,97 @@ const localSelectedIds = computed({
 // ── Column definitions per mode ─────────────────────────────────────
 
 const STATUS_COL: OTableColumnDef = {
-  id: 'status', header: '', accessorKey: 'status',
-  size: 36, minSize: 36, sortable: false,
-  meta: { align: 'center', cellClass: 'px-0' },
+  id: 'status', header: t('synthetics.table.status'), accessorKey: 'status',
+  size: COL.status, minSize: 72, sortable: true,
+  meta: { align: 'left' },
 }
 const NAME_COL: OTableColumnDef = {
-  id: 'name', header: 'Check', accessorKey: 'name',
-  size: 200, minSize: 120, sortable: true, hideable: true,
+  id: 'name', header: t('synthetics.table.check'), accessorKey: 'name',
+  size: COL.name, minSize: 120, sortable: true, hideable: true,
   meta: { isName: true, flex: true },
 }
 const TEST_NAME_COL: OTableColumnDef = {
-  id: 'name', header: 'Test name', accessorKey: 'name',
-  size: 200, minSize: 120, sortable: true, hideable: true,
+  id: 'name', header: t('synthetics.table.testName'), accessorKey: 'name',
+  size: COL.name, minSize: 120, sortable: true, hideable: true,
   meta: { isName: true, flex: true },
 }
 const URL_COL: OTableColumnDef = {
-  id: 'url', header: 'URL', accessorKey: 'url',
-  size: 220, minSize: 140, sortable: false, hideable: true,
+  id: 'url', header: t('synthetics.table.url'), accessorKey: 'url',
+  size: COL.url, minSize: 140, sortable: false, hideable: true,
 }
 const ENDPOINT_COL: OTableColumnDef = {
-  id: 'url', header: 'Endpoint', accessorKey: 'url',
-  size: 240, minSize: 140, sortable: false, hideable: true,
+  id: 'url', header: t('synthetics.table.endpoint'), accessorKey: 'url',
+  size: COL.url, minSize: 140, sortable: false, hideable: true,
 }
 const TYPE_COL: OTableColumnDef = {
-  id: 'type', header: 'Type', accessorKey: 'type',
-  size: 88, minSize: 72, sortable: true, hideable: true,
+  id: 'type', header: t('synthetics.table.type'), accessorKey: 'type',
+  size: COL.type, minSize: 72, sortable: true, hideable: true,
 }
 const HISTORY_COL: OTableColumnDef = {
-  id: 'history', header: 'Status · Last 24h', accessorKey: 'history',
-  size: 180, minSize: 140, sortable: false, hideable: true,
+  id: 'history', header: t('synthetics.table.history'), accessorKey: 'history',
+  size: COL.history, minSize: 140, sortable: false, hideable: true,
 }
 const RESPONSE_TIME_COL: OTableColumnDef = {
-  id: 'responseTime', header: 'Response', accessorKey: 'responseTime',
-  size: 90, minSize: 72, sortable: true, meta: { align: 'right' }, hideable: true,
+  id: 'responseTime', header: t('synthetics.table.response'), accessorKey: 'responseTime',
+  size: COL.responseTime, minSize: 72, sortable: true, meta: { align: 'right' }, hideable: true,
 }
 const PAGE_LOAD_COL: OTableColumnDef = {
-  id: 'responseTime', header: 'Page load', accessorKey: 'responseTime',
-  size: 110, minSize: 80, sortable: true, meta: { align: 'right' }, hideable: true,
+  id: 'responseTime', header: t('synthetics.table.pageLoad'), accessorKey: 'responseTime',
+  size: COL.responseTime, minSize: 80, sortable: true, meta: { align: 'right' }, hideable: true,
 }
 const P50_COL: OTableColumnDef = {
-  id: 'responseTime', header: 'P50', accessorKey: 'responseTime',
-  size: 80, minSize: 64, sortable: true, meta: { align: 'right' }, hideable: true,
+  id: 'responseTime', header: t('synthetics.table.p50'), accessorKey: 'responseTime',
+  size: COL.responseTime, minSize: 64, sortable: true, meta: { align: 'right' }, hideable: true,
 }
 const UPTIME_COL: OTableColumnDef = {
-  id: 'uptime', header: 'Uptime 7d', accessorKey: 'uptime',
-  size: 130, minSize: 100, sortable: true, meta: { align: 'right' }, hideable: true,
+  id: 'uptime', header: t('synthetics.table.uptime'), accessorKey: 'uptime',
+  size: COL.uptime, minSize: 100, sortable: true, meta: { align: 'right' }, hideable: true,
 }
 const LOCATIONS_COL: OTableColumnDef = {
-  id: 'locations', header: 'Locations', accessorKey: 'locations',
-  size: 120, minSize: 90, sortable: false, hideable: true,
+  id: 'locations', header: t('synthetics.table.locations'), accessorKey: 'locations',
+  size: COL.locations, minSize: 90, sortable: false, hideable: true,
 }
 const INTERVAL_COL: OTableColumnDef = {
-  id: 'interval', header: 'Interval', accessorKey: 'interval',
-  size: 72, minSize: 60, sortable: false, hideable: true,
+  id: 'interval', header: t('synthetics.table.interval'), accessorKey: 'interval',
+  size: COL.interval, minSize: 60, sortable: false, hideable: true,
 }
 const LAST_CHECK_COL: OTableColumnDef = {
-  id: 'lastCheck', header: 'Last check', accessorKey: 'lastCheck',
-  size: 90, minSize: 72, sortable: false, hideable: true,
+  id: 'lastCheck', header: t('synthetics.table.lastCheck'), accessorKey: 'lastCheck',
+  size: COL.lastCheck, minSize: 72, sortable: false, hideable: true,
 }
 const LAST_RUN_COL: OTableColumnDef = {
-  id: 'lastCheck', header: 'Last check', accessorKey: 'lastCheck',
-  size: 100, minSize: 72, sortable: false, hideable: true,
+  id: 'lastCheck', header: t('synthetics.table.lastCheck'), accessorKey: 'lastCheck',
+  size: COL.lastCheck, minSize: 72, sortable: false, hideable: true,
 }
 const STEPS_COL: OTableColumnDef = {
-  id: 'steps', header: 'Steps', accessorKey: 'steps',
-  size: 72, minSize: 60, sortable: false, hideable: true,
+  id: 'steps', header: t('synthetics.table.steps'), accessorKey: 'steps',
+  size: COL.steps, minSize: 60, sortable: false, hideable: true,
 }
 const METHOD_COL: OTableColumnDef = {
-  id: 'method', header: 'Method', accessorKey: 'method',
-  size: 64, minSize: 56, sortable: false, hideable: true,
+  id: 'method', header: t('synthetics.table.method'), accessorKey: 'method',
+  size: COL.method, minSize: 56, sortable: false, hideable: true,
 }
 const ASSERTIONS_COL: OTableColumnDef = {
-  id: 'assertions', header: 'Assertions', accessorKey: 'assertions',
-  size: 90, minSize: 72, sortable: false, hideable: true,
+  id: 'assertions', header: t('synthetics.table.assertions'), accessorKey: 'assertions',
+  size: COL.assertions, minSize: 72, sortable: false, hideable: true,
 }
 const ACTIONS_COL: OTableColumnDef = {
   id: 'actions', header: '', accessorKey: 'id',
   size: 160, minSize: 160, sortable: false, isAction: true,
 }
 const FOLDER_COL: OTableColumnDef = {
-  id: 'folder_name', header: 'Folder', accessorKey: 'folder_name',
-  size: 120, minSize: 90, sortable: true, hideable: true,
+  id: 'folder_name', header: t('synthetics.table.folder'), accessorKey: 'folder_name',
+  size: COL.folder, minSize: 90, sortable: true, hideable: true,
 }
 
 const columns = computed<OTableColumnDef[]>(() => {
   let cols: OTableColumnDef[]
-  console.log(props.mode);
   if (props.mode === 'browser') {
-    cols = [STATUS_COL, TEST_NAME_COL, URL_COL, STEPS_COL, HISTORY_COL, PAGE_LOAD_COL, UPTIME_COL, LAST_RUN_COL, ACTIONS_COL]
+    cols = [TEST_NAME_COL, URL_COL, STEPS_COL, HISTORY_COL, PAGE_LOAD_COL, UPTIME_COL, LAST_RUN_COL, STATUS_COL, ACTIONS_COL]
   } else if (props.mode === 'api') {
-    cols = [STATUS_COL, TEST_NAME_COL, METHOD_COL, ENDPOINT_COL, ASSERTIONS_COL, HISTORY_COL, P50_COL, UPTIME_COL, LAST_RUN_COL, ACTIONS_COL]
+    cols = [TEST_NAME_COL, METHOD_COL, ENDPOINT_COL, ASSERTIONS_COL, HISTORY_COL, P50_COL, UPTIME_COL, LAST_RUN_COL, STATUS_COL, ACTIONS_COL]
   } else {
-    cols = [STATUS_COL, NAME_COL, URL_COL, TYPE_COL, RESPONSE_TIME_COL, LOCATIONS_COL, INTERVAL_COL, LAST_CHECK_COL, ACTIONS_COL]
+    cols = [NAME_COL, URL_COL, TYPE_COL, STATUS_COL, RESPONSE_TIME_COL, LOCATIONS_COL, INTERVAL_COL, LAST_CHECK_COL, ACTIONS_COL]
   }
   if (props.showFolderColumn) {
     const nameIdx = cols.findIndex(c => c.id === 'name')
@@ -428,46 +469,6 @@ const columns = computed<OTableColumnDef[]>(() => {
   }
   return cols
 })
-
-// ── Utilities ────────────────────────────────────────────────────────
-
-const rtCls = (rt: string | null) => {
-  if (!rt) return 'text-error-600'
-  const v = parseFloat(rt)
-  return v < 300 ? 'text-success-600' : v < 1000 ? 'text-amber-600' : 'text-error-600'
-}
-
-const dotCls = (status: string): string => {
-  const map: Record<string, string> = {
-    up: 'size-[9px] rounded-full shrink-0 bg-success-500 shadow-[0_0_0_3px_var(--color-success-500)/0.15]',
-    degraded: 'size-[9px] rounded-full shrink-0 bg-warning-500 shadow-[0_0_0_3px_var(--color-warning-500)/0.15]',
-    down: 'size-[9px] rounded-full shrink-0 bg-error-500 shadow-[0_0_0_3px_var(--color-error-500)/0.15]',
-    unknown: 'size-[9px] rounded-full shrink-0 bg-neutral-400 shadow-[0_0_0_3px_var(--color-neutral-400)/0.15]',
-  }
-  return map[status.toLowerCase()] ?? map.unknown
-}
-
-const methodCls = (method: string): string => {
-  const map: Record<string, string> = {
-    get: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
-    post: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300',
-    put: 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300',
-    delete: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
-  }
-  return map[method.toLowerCase()] ?? 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
-}
-
-const typeBadgeVariant = (type: string): string => {
-  const map: Record<string, string> = {
-    HTTP: 'blue-soft', BROWSER: 'purple-soft', API: 'success-soft',
-    TCP: 'orange-soft', PING: 'default-soft', DNS: 'amber-soft',
-  }
-  return map[type.toUpperCase()] ?? 'default-soft'
-}
-
-const formatType = (type: string): string => {
-  return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase()
-}
 
 // ── Locations tooltip ─────────────────────────────────────────────────
 

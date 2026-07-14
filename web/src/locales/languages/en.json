@@ -200,6 +200,12 @@
       "action": "New alert",
       "actionDesc": "Define a condition to monitor"
     },
+    "noMonitors": {
+      "title": "Create your first monitor",
+      "description": "Synthetic monitors check your endpoints and browser flows on a schedule. Set one up to start monitoring.",
+      "action": "New monitor",
+      "actionDesc": "Define a synthetic check to monitor"
+    },
     "noIncidents": {
       "title": "No active incidents",
       "description": "Incidents are created when an alert triggers — none have fired yet. Once you have alerts in place, any triggered incidents will appear here."
@@ -339,7 +345,8 @@
       "evalJobs": "evaluation jobs",
       "scoreConfigs": "score configs",
       "pipelineHistory": "pipeline history",
-      "regexPatterns": "regex patterns"
+      "regexPatterns": "regex patterns",
+      "monitors": "monitors"
     }
   },
   "common": {
@@ -6284,7 +6291,39 @@
       "passed": "Passed",
       "failed": "Failed",
       "warning": "Warning",
-      "error": "Error"
+      "error": "Error",
+      "steps": {
+        "title": "Cross-run step analysis",
+        "noFailures": "All steps passing",
+        "noFlakySteps": "No flaky steps detected",
+        "noRecentFailures": "No recent step failures",
+        "failedSteps": "Failed Steps",
+        "failedStepsDescription": "Which step fails most often",
+        "slowestSteps": "Slowest Steps",
+        "slowestStepsDescription": "Which step is the bottleneck",
+        "stepName": "Step Name",
+        "failRate": "Fail Rate",
+        "flakyRate": "Flaky Rate",
+        "avgDuration": "Avg Duration",
+        "trend": "Trend",
+        "browser": "Browser",
+        "location": "Location",
+        "expand": "Expand",
+        "flakiestSteps": "Flakiest Steps",
+        "flakiestStepsDescription": "Steps ranked by flaky occurrences",
+        "flakyCount": "Flaky Count",
+        "recentFailures": "Recent Step Failures",
+        "recentFailuresDescription": "Latest step failure instances",
+        "step": "Step",
+        "status": "Status",
+        "flaky": "Flaky",
+        "run": "Run",
+        "stepDurationTrend": "Step Duration Trend",
+        "stepDurationTrendDescription": "Average step duration over time",
+        "byBrowser": "Fail rate by browser",
+        "byLocation": "Fail rate by location",
+        "others": "Others"
+      }
     },
     "scheduleAlert": {
       "title": "Schedule & Alerting",
@@ -6356,6 +6395,37 @@
         "onFail": "On fail",
         "off": "Off"
       }
+    },
+    "table": {
+      "status": "Status",
+      "check": "Check",
+      "testName": "Test name",
+      "url": "URL",
+      "endpoint": "Endpoint",
+      "type": "Type",
+      "history": "Status · Last 24h",
+      "response": "Response",
+      "pageLoad": "Page load",
+      "p50": "P50",
+      "uptime": "Uptime 7d",
+      "locations": "Locations",
+      "interval": "Interval",
+      "lastCheck": "Last check",
+      "steps": "Steps",
+      "method": "Method",
+      "assertions": "Assertions",
+      "stepsSuffix": "steps",
+      "checksSuffix": "checks",
+      "noResults": "No monitors found.",
+      "folder": "Folder",
+      "pause": "Pause",
+      "enable": "Enable",
+      "edit": "Edit",
+      "duplicate": "Duplicate",
+      "more": "More",
+      "trigger": "Trigger",
+      "delete": "Delete",
+      "move": "Move"
     }
   },
   "shortcuts": {
