@@ -436,7 +436,9 @@ describe("MetricCard (ported to @/lib)", () => {
           )
           .exists(),
       ).toBe(true);
-      expect(wrapper.text()).toContain("No data");
+      // The dashboards' own copy (`panel.noData`) — the card shows the SAME
+      // inline empty state a dashboard panel does.
+      expect(wrapper.text()).toContain("No Data");
     });
 
     it("renders the chart when the preview has series", () => {
@@ -478,9 +480,12 @@ describe("MetricCard (ported to @/lib)", () => {
       wrapper = createWrapper();
 
       expect(wrapper.props()).not.toHaveProperty("rowsView");
-      // Header band, footer, and the badge in the footer where it cannot
-      // truncate the name it describes.
-      expect(wrapper.find(".bg-surface-subtle").exists()).toBe(true);
+      // Header bar (the dashboard panel bar's box — untinted, bordered),
+      // footer, and the badge in the footer where it cannot truncate the name
+      // it describes.
+      expect(wrapper.find(".min-h-7.border-b.border-border-subtle").exists()).toBe(
+        true,
+      );
       expect(
         wrapper
           .find('[data-test="metrics-explorer-card-badge-node_cpu_seconds_total"]')

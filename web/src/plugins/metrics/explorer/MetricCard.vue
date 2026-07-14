@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="root"
-    class="group relative flex flex-col h-full overflow-hidden border border-border-default rounded-md px-3 py-2 bg-surface-panel hover:border-primary focus-within:border-primary"
+    class="group relative flex flex-col h-full overflow-hidden border border-border-default rounded-md hover:border-primary focus-within:border-primary"
     role="group"
     :aria-label="
       t('metrics.explorer.card.ariaLabel', {
@@ -34,29 +34,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          text stays selectable. Still fully keyboard reachable: the action bar
          reveals on `focus-within`, so tabbing lands on Refresh / Configure /
          Pin / Open. -->
-    <!-- The header gets its own tinted band, so the title reads as panel chrome
-         rather than as the top of the chart. Full-bleed via
-         negative margins (the card carries px-3 py-2); the root's
-         `overflow-hidden` clips the band to the card's rounded corners, so it
-         needs no radius of its own.
+    <!-- EXACTLY the dashboard panel bar's box (PanelContainer's
+         dashboard-panel-bar): same min-height, padding and bottom border, no
+         tint — measured side by side, a card header and a panel header are now
+         indistinguishable.
 
          Identical in both views: rows view is grid view with a single, wider
          column, not a different card. -->
     <div
-      class="relative flex items-center gap-2 min-w-0 -mx-3 -mt-2 mb-1 px-3 py-1 bg-surface-subtle border-b border-border-subtle"
+      class="relative flex items-center gap-2 min-w-0 min-h-7 py-1 px-2 border-b border-border-subtle"
     >
       <!-- The name gets the full header width; the type badge sits in the
            footer, where it cannot truncate the name it describes. -->
       <div class="flex items-center gap-1.5 min-w-0">
-        <!-- Semibold: the name is the one thing on the card the eye scans for, and
-             at 12px monospace on a subtle header it was the same weight as the
-             footer's metadata. -->
+        <!-- EXACTLY the dashboard panel title's classes (PanelContainer's
+             dashboard-panel-header): same size, weight, tracking and token, so
+             a card's title and the panel it becomes read identically. Mono
+             semibold looked like a different COLOR at this size — denser
+             glyphs, same grey-900. -->
         <span
-          class="font-mono font-semibold text-xs overflow-hidden text-ellipsis whitespace-nowrap text-text-primary"
+          class="whitespace-nowrap overflow-hidden text-ellipsis text-[0.8125rem] font-medium text-(--color-text-primary) tracking-[0.02em]"
           :title="card.name"
           >{{ card.name }}</span
         >
       </div>
+
+      <!-- Last Refreshed — the SAME element the dashboard panel bar carries
+           (PanelErrorButtons): 🕑 with the relative tooltip, in the header, at
+           the right. A card restored from cache says how old its data really
+           is instead of passing it off as live. -->
+      <span
+        v-if="preview?.lastTriggeredAt"
+        class="lastRefreshedAt ml-auto text-[smaller] whitespace-nowrap overflow-hidden text-ellipsis shrink-0"
+        :data-test="`metrics-explorer-card-last-refreshed-${card.name}`"
+      >
+        <span class="text-[smaller] mr-0.5">
+          🕑
+          <OTooltip side="bottom" align="end">
+            <template #content
+              >Last Refreshed:
+              <RelativeTime :timestamp="preview.lastTriggeredAt"
+            /></template>
+          </OTooltip>
+        </span>
+        <RelativeTime
+          :timestamp="preview.lastTriggeredAt"
+          :full-time-prefix="t('metrics.explorer.card.lastRefreshedPrefix')"
+        />
+      </span>
 
       <!-- Visible on focus as well as hover: a hover-only affordance is not
            keyboard reachable. Touch devices have no hover, so it stays visible
@@ -77,8 +102,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            Anchoring means the two cannot drift apart if the band's padding ever
            changes. -->
       <div
-        class="absolute inset-y-0 right-2 z-10 flex items-center gap-0.5 rounded pl-2 bg-surface-subtle invisible group-hover:visible group-focus-within:visible [@media(hover:none)]:visible"
+        class="absolute inset-y-0 right-2 z-10 flex items-center gap-0.5 rounded pl-2 bg-surface-base invisible group-hover:visible group-focus-within:visible [@media(hover:none)]:visible"
       >
+        <!-- The bar lands exactly where the in-flow clock sits, so it carries
+             its OWN copy — hovering must not make "how old is this data"
+             unreadable, it is half the reason to look at the card. -->
+        <span
+          v-if="preview?.lastTriggeredAt"
+          class="lastRefreshedAt text-[smaller] whitespace-nowrap mr-1"
+        >
+          <span class="text-[smaller] mr-0.5">🕑</span>
+          <RelativeTime
+            :timestamp="preview.lastTriggeredAt"
+            :full-time-prefix="t('metrics.explorer.card.lastRefreshedPrefix')"
+          />
+        </span>
+
         <!-- OTooltip goes INSIDE the button, not around it: nested, it binds
              its own hover listeners to its parent element. That is what the
              rest of the app does (583 of 590 usages) and it reads more cleanly
@@ -181,7 +220,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="relative mt-1 flex-1 min-h-0">
+    <!-- Flush to the frame, like a panel body — the chart's own converter
+         margins are the only inset, same as dashboards. -->
+    <div class="relative flex-1 min-h-0">
+      <!-- The SAME loader a dashboard panel shows (PanelSchemaRenderer): a thin
+           progress bar over the body, with whatever chart is already there kept
+           visible beneath it. The card has no chunk-level progress to report,
+           so the bar runs at its indeterminate floor with the shimmer. -->
+      <LoadingProgress
+        :loading="preview?.status === 'loading'"
+        :loading-progress-percentage="0"
+      />
+
       <!-- Unsupported: a placeholder rather than a wrong chart. The open-in-
            editor icon still works, so the metric stays explorable. -->
       <div
@@ -273,43 +323,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
+      <!-- First load: blank body under the progress bar, exactly like a
+           dashboard panel's first load. (The trailing skeleton below stays for
+           IDLE cards — the below-the-fold not-yet-queried state a dashboard
+           panel does not have.) -->
       <div
         v-else-if="preview?.status === 'loading' && !preview.results.length"
         class="h-full"
         :data-test="`metrics-explorer-card-skeleton-${card.name}`"
-      >
-        <OSkeleton type="rect" animation="wave" class="h-full w-full" />
-      </div>
+      />
 
       <!-- Has data, but `rate()` could not make a point out of it — fewer than two
            samples in its window. Deliberately NOT the "No data" tile: the metric
            is populated, and saying otherwise is what used to hide it from the grid
            entirely. The hint carries the actual remedy, which is the user's to
            choose (a wider range, or a shorter scrape interval). -->
-      <div
+      <!-- The same inline OEmptyState a dashboard panel shows for no data
+           (PanelSchemaRenderer) — same component, same icon, same i18n key.
+           The old hatched grey band read as a different design language. -->
+      <OEmptyState
         v-else-if="isSparse"
-        class="flex flex-col items-center justify-center gap-1.5 h-full px-2 text-[11px] opacity-65 rounded text-text-secondary bg-[repeating-linear-gradient(45deg,rgba(128,128,128,0.08),rgba(128,128,128,0.08)_6px,transparent_6px,transparent_12px)]"
+        size="inline"
+        icon="show-chart"
+        :backdrop="false"
+        class="h-full"
         :data-test="`metrics-explorer-card-sparse-${card.name}`"
       >
-        <span class="inline-flex flex-col items-center gap-1.5 cursor-help">
-          <OTooltip
-            :content="t('metrics.explorer.card.sparseHint')"
-            content-class="whitespace-pre-line"
-            max-width="320px"
-            :delay="200"
-          />
-          <OIcon name="scatter-plot" size="sm" />
-          <span class="text-center">{{ t("metrics.explorer.card.sparse") }}</span>
-        </span>
-      </div>
+        <template #title>
+          <span class="inline-flex items-center gap-1 cursor-help">
+            <OTooltip
+              :content="t('metrics.explorer.card.sparseHint')"
+              content-class="whitespace-pre-line"
+              max-width="320px"
+              :delay="200"
+            />
+            {{ t("metrics.explorer.card.sparse") }}
+          </span>
+        </template>
+      </OEmptyState>
 
-      <div
+      <OEmptyState
         v-else-if="isEmpty"
-        class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] opacity-65 rounded text-text-secondary bg-[repeating-linear-gradient(45deg,rgba(128,128,128,0.08),rgba(128,128,128,0.08)_6px,transparent_6px,transparent_12px)]"
+        size="inline"
+        icon="bar-chart"
+        :title="t('panel.noData')"
+        :backdrop="false"
+        class="h-full"
         :data-test="`metrics-explorer-card-nodata-${card.name}`"
-      >
-        {{ t("metrics.explorer.noData") }}
-      </div>
+      />
 
       <!-- The CONVERSION failed — the query succeeded, so the preview is
            status "done" and none of the error branches above catch it. Without
@@ -404,7 +465,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="flex items-center justify-between gap-2 text-[10px] mt-0.5">
+    <!-- The footer pads itself now that the frame is flush, mirroring how the
+         panel bar pads itself. -->
+    <div class="flex items-center justify-between gap-2 text-[10px] px-2 py-1">
       <!-- The function actually in effect, so a ⚙ override is visible on the
            card rather than silently identical to the default. -->
       <span class="opacity-70 text-text-secondary truncate">{{
@@ -425,21 +488,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :delay="200"
           />
           <OIcon name="running-with-errors" size="xs" />
-        </span>
-
-        <!-- Last Refreshed, exactly as a dashboard panel reports it: a card
-             restored from cache says how old its data really is, instead of
-             passing it off as live. -->
-        <span
-          v-if="preview?.lastTriggeredAt"
-          class="inline-flex items-center opacity-70 text-text-secondary whitespace-nowrap"
-          :data-test="`metrics-explorer-card-last-refreshed-${card.name}`"
-        >
-          <span class="mr-0.5">🕑</span>
-          <RelativeTime
-            :timestamp="preview.lastTriggeredAt"
-            :full-time-prefix="t('metrics.explorer.card.lastRefreshedPrefix')"
-          />
         </span>
 
         <span class="opacity-70 text-text-secondary">{{ unitLabel }}</span>
@@ -473,6 +521,8 @@ import RelativeTime from "@/components/common/RelativeTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import {
@@ -520,6 +570,8 @@ export default defineComponent({
     OButton,
     OIcon,
     OSkeleton,
+    OEmptyState,
+    LoadingProgress,
     OTooltip,
   },
   props: {

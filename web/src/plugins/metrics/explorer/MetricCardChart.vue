@@ -48,7 +48,6 @@ import * as echarts from "echarts/core";
 import { toZonedTime } from "date-fns-tz";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
-import { CARD_AREA_FILL_OPACITY } from "@/utils/metrics/metricPalette";
 
 export default defineComponent({
   name: "MetricCardChart",
@@ -225,38 +224,6 @@ export default defineComponent({
             appendToBody: true,
             confine: true,
           };
-          // Cards are dense: strip the chrome the converter adds for full panels.
-          options.legend = { show: false };
-
-          // `containLabel: true` already reserves room for the axis labels, so
-          // these margins sit OUTSIDE them. Anything but a hairline here is
-          // dead space — a left of 44 was pushing the plot ~90px in on a 368px
-          // card and eating roughly half the drawable area.
-          options.grid = {
-            ...(options.grid ?? {}),
-            top: 6,
-            right: 8,
-            bottom: 2,
-            left: 2,
-            containLabel: true,
-          };
-
-          // Smaller, fewer ticks: a card is not a panel, and 5 y-labels on a
-          // 120px-tall chart is mostly ink.
-          const axisLabel = { fontSize: 10, hideOverlap: true };
-          if (options.yAxis && !Array.isArray(options.yAxis)) {
-            options.yAxis.axisLabel = {
-              ...(options.yAxis.axisLabel ?? {}),
-              ...axisLabel,
-            };
-            options.yAxis.splitNumber = 3;
-          }
-          if (options.xAxis && !Array.isArray(options.xAxis)) {
-            options.xAxis.axisLabel = {
-              ...(options.xAxis.axisLabel ?? {}),
-              ...axisLabel,
-            };
-          }
 
           pinTimeAxis(options);
 
@@ -311,14 +278,6 @@ export default defineComponent({
                 fontSize: 9,
                 hideOverlap: true,
               };
-            }
-          } else {
-            for (const series of options.series ?? []) {
-              series.areaStyle = {
-                ...(series.areaStyle ?? {}),
-                opacity: CARD_AREA_FILL_OPACITY,
-              };
-              series.symbol = "none";
             }
           }
         }
