@@ -74,17 +74,12 @@
            the drawer chrome owns the entire identification block;
            the inner panel no longer renders its own title row. -->
       <template #header-right>
-        <span
-          class="qpd-type inline-flex py-0 px-1 rounded-[2px] font-bold text-[13px] leading-[1.4] tracking-[0.02em]"
-          :class="{
-            'bg-[color-mix(in_srgb,var(--color-indigo-500)_14%,transparent)] text-indigo-700': detailDataType === 'numeric',
-            'bg-[color-mix(in_srgb,var(--color-purple-600)_14%,transparent)] text-purple-700': detailDataType === 'categorical',
-            'bg-[color-mix(in_srgb,var(--color-success-600)_14%,transparent)] text-success-700': detailDataType === 'boolean',
-          }"
+        <OTag
+          v-if="detailDataType === 'numeric' || detailDataType === 'categorical' || detailDataType === 'boolean'"
+          type="evalDataType"
+          :value="detailDataType"
           data-test="quality-detail-type-badge"
-        >
-          {{ shortType(detailDataType) }}
-        </span>
+        />
         <span
           v-if="selectedConfig?.version"
           class="qpd-version ml-[6px] text-[11px] text-text-secondary [font-variant-numeric:tabular-nums]"
@@ -132,6 +127,7 @@ import QualityScoreConfigsTable from "./quality/QualityScoreConfigsTable.vue";
 import QualityDetailPanel from "./quality/QualityDetailPanel.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import type { AgentFilterSelection } from "./utils/agentFilterSql";
 
@@ -333,14 +329,4 @@ const detailDrawerOpen = computed<boolean>({
     if (!open) clearSelection();
   },
 });
-
-// Used by the drawer header's #header-right slot — same mapping the
-// detail panel used for its in-panel badge so type/version chrome looks
-// identical, just relocated into the drawer header.
-function shortType(type: string): string {
-  if (type === "numeric") return "Num";
-  if (type === "categorical") return "Cat";
-  if (type === "boolean") return "Bool";
-  return "—";
-}
 </script>
