@@ -2,7 +2,7 @@
   // OpenCode configuration for this repo's CI agents.
   // - e2e-ci-* agents: used by .github/workflows/e2e-council.yml for CI test-generation, on DeepSeek.
   // - ai-review-* agents: used by scripts/ai-review/run-review.mjs (dispatched via `opencode serve`)
-  //   for PR code review, on GLM-5.2 (Z.ai).
+  //   for PR code review, on DeepSeek-V4-Pro (max reasoning effort).
   // Docs: https://opencode.ai/docs/  — verify provider shape against current docs at build time.
   "$schema": "https://opencode.ai/config.json",
 
@@ -18,20 +18,6 @@
         "deepseek-v4-pro": {
           "name": "DeepSeek-V4-Pro",
           "limit": { "context": 1048576, "output": 262144 }
-        }
-      }
-    },
-    "zai": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Z.AI",
-      "options": {
-        "baseURL": "https://api.z.ai/api/paas/v4",
-        "apiKey": "{env:GLM_API_KEY}"
-      },
-      "models": {
-        "glm-5.2": {
-          "name": "GLM-5.2",
-          "limit": { "context": 1000000, "output": 131072 }
         }
       }
     }
@@ -93,7 +79,7 @@
     // so a newly added tool doesn't silently become available by omission.
     "ai-review-security": {
       "mode": "primary",
-      "model": "zai/glm-5.2",
+      "model": "deepseek/deepseek-v4-pro",
       "variant": "max",
       "tools": {
         "read": true, "glob": true, "grep": true,
@@ -103,7 +89,7 @@
     },
     "ai-review-code-quality": {
       "mode": "primary",
-      "model": "zai/glm-5.2",
+      "model": "deepseek/deepseek-v4-pro",
       "variant": "max",
       "tools": {
         "read": true, "glob": true, "grep": true,
@@ -113,7 +99,7 @@
     },
     "ai-review-performance": {
       "mode": "primary",
-      "model": "zai/glm-5.2",
+      "model": "deepseek/deepseek-v4-pro",
       "variant": "max",
       "tools": {
         "read": true, "glob": true, "grep": true,
@@ -123,7 +109,7 @@
     },
     "ai-review-documentation": {
       "mode": "primary",
-      "model": "zai/glm-5.2",
+      "model": "deepseek/deepseek-v4-pro",
       "variant": "max",
       "tools": {
         "read": true, "glob": true, "grep": true,
@@ -133,7 +119,7 @@
     },
     "ai-review-release": {
       "mode": "primary",
-      "model": "zai/glm-5.2",
+      "model": "deepseek/deepseek-v4-pro",
       "variant": "max",
       "tools": {
         "read": true, "glob": true, "grep": true,
@@ -143,7 +129,7 @@
     },
     "ai-review-coordinator": {
       "mode": "primary",
-      "model": "zai/glm-5.2",
+      "model": "deepseek/deepseek-v4-pro",
       "variant": "max",
       "tools": {
         "read": true, "glob": true, "grep": true,

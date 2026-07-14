@@ -32,7 +32,7 @@ const NOISE_GENERATED_MARKERS = ["@generated", "auto-generated", "DO NOT EDIT", 
 // ─── Agent definitions ─────────────────────────────────────────────────────
 // Model/agent execution is delegated to `opencode serve` (see OpencodeServer below).
 // Each key here maps to an agent of the same name (`ai-review-<key>`) registered in
-// opencode.jsonc, all running GLM-5.2 at max reasoning effort with read-only repo tools.
+// opencode.jsonc, all running DeepSeek-V4-Pro at max reasoning effort with read-only repo tools.
 const AGENTS = {
   security: {
     name: "Security Reviewer",
@@ -476,7 +476,7 @@ function assessRiskTier(filteredDiff) {
   return "full";
 }
 
-// ─── LLM calls (via `opencode serve`, GLM-5.2 max effort) ─────────────────
+// ─── LLM calls (via `opencode serve`, DeepSeek-V4-Pro max effort) ─────────
 //
 // Each reviewer/coordinator is a named agent in opencode.jsonc (ai-review-*), running
 // read-only against the checked-out repo via OpencodeServer + callOpencode below. Unlike
@@ -496,8 +496,8 @@ class OpencodeServer {
     if (this.starting) return this.starting;
 
     this.starting = (async () => {
-      const apiKey = process.env.GLM_API_KEY;
-      if (!apiKey) throw new Error("GLM_API_KEY not set");
+      const apiKey = process.env.DEEPSEEK_API_KEY_E2E;
+      if (!apiKey) throw new Error("DEEPSEEK_API_KEY_E2E not set");
 
       const proc = spawn("opencode", ["serve", "--hostname", "127.0.0.1", "--port", "0"], {
         cwd: resolve(__dirname, "../.."),
@@ -578,8 +578,8 @@ function extractText(parts) {
 async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGENT_TIMEOUT_MS, traceOptions = {}) {
   const llmSpan = TRACE.startSpan("gen_ai.chat", {
     "gen_ai.operation.name": traceOptions.operationName || "chat",
-    "gen_ai.system": "zai",
-    "gen_ai.request.model": "glm-5.2",
+    "gen_ai.system": "deepseek",
+    "gen_ai.request.model": "deepseek-v4-pro",
     "gen_ai.request.reasoning_effort": "max",
     "ai.agent.key": traceOptions.agentKey,
     "ai.agent.name": traceOptions.agentName,
@@ -619,7 +619,7 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           agent: agentName,
-          model: { providerID: "zai", modelID: "glm-5.2" },
+          model: { providerID: "deepseek", modelID: "deepseek-v4-pro" },
           variant: "max",
           system: truncatedSystem,
           parts: [{ type: "text", text: truncatedUser }],
@@ -649,11 +649,11 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
         "gen_ai.completion.0.content": text,
         "gen_ai.completion.0.content_length": text.length,
         "gen_ai.response.id": responseId,
-        "gen_ai.response.model": "glm-5.2",
+        "gen_ai.response.model": "deepseek-v4-pro",
       });
       TRACE.endSpan(llmSpan, {
         "gen_ai.response.id": responseId,
-        "gen_ai.response.model": "glm-5.2",
+        "gen_ai.response.model": "deepseek-v4-pro",
         "gen_ai.response.text_length": text.length,
       });
       return { text, responseId };
@@ -705,18 +705,18 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
     "ai.agent.key": agentKey,
     "ai.agent.name": agentDef.name,
     "gen_ai.agent.name": agentDef.name,
-    "gen_ai.system": "zai",
-    "gen_ai.request.model": "glm-5.2",
+    "gen_ai.system": "deepseek",
+    "gen_ai.request.model": "deepseek-v4-pro",
   }, parentSpan);
 
-  const hasGlm = Boolean(process.env.GLM_API_KEY);
-  if (!hasGlm) {
-    console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — GLM_API_KEY not set`);
+  const hasDeepseek = Boolean(process.env.DEEPSEEK_API_KEY_E2E);
+  if (!hasDeepseek) {
+    console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — DEEPSEEK_API_KEY_E2E not set`);
     TRACE.endSpan(reviewerSpan, {
       "review.skipped": true,
-      "review.error": "GLM_API_KEY not set",
+      "review.error": "DEEPSEEK_API_KEY_E2E not set",
     });
-    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: "GLM_API_KEY not set", genAIResponseId: "" };
+    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: "DEEPSEEK_API_KEY_E2E not set", genAIResponseId: "" };
   }
 
   const systemPrompt = readPrompt("shared-rules.md");
@@ -749,7 +749,7 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
 
   const fullSystem = `${systemPrompt}\n\n${agentPrompt}`;
 
-  console.log(`[${isoNow()}] Starting ${agentDef.name} (zai/glm-5.2, ${agentDef.opencodeAgent})`);
+  console.log(`[${isoNow()}] Starting ${agentDef.name} (deepseek/deepseek-v4-pro, ${agentDef.opencodeAgent})`);
   const start = Date.now();
 
   try {
@@ -877,14 +877,14 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
     "ai.agent.key": "coordinator",
     "ai.agent.name": "Coordinator",
     "gen_ai.agent.name": "Coordinator",
-    "gen_ai.system": "zai",
-    "gen_ai.request.model": "glm-5.2",
+    "gen_ai.system": "deepseek",
+    "gen_ai.request.model": "deepseek-v4-pro",
     "review.risk_tier": tier,
     "review.findings": agentResults.reduce((sum, r) => sum + r.findings.length, 0),
     "review.failed_agents": agentResults.filter(r => r.error).length,
   }, parentSpan);
 
-  console.log(`[${isoNow()}] Running coordinator (zai/glm-5.2, ${coordinatorAgent})`);
+  console.log(`[${isoNow()}] Running coordinator (deepseek/deepseek-v4-pro, ${coordinatorAgent})`);
 
   try {
     const completion = await callOpencode(coordinatorAgent, `${sharedRules}\n\n${coordinatorPrompt}`, userPrompt, AGENT_TIMEOUT_MS, {
@@ -1068,28 +1068,28 @@ async function main() {
     console.log(`[${isoNow()}] AI Code Review started for PR #${prNumber}`);
     console.log(`[${isoNow()}] Repository: ${process.env.GITHUB_REPOSITORY}`);
 
-    const hasGlm = Boolean(process.env.GLM_API_KEY);
-    if (!hasGlm) {
+    const hasDeepseek = Boolean(process.env.DEEPSEEK_API_KEY_E2E);
+    if (!hasDeepseek) {
       outcome = "misconfigured";
       TRACE.setSpanAttributes(rootSpan, {
         "review.skipped": true,
-        "review.skip_reason": "missing_glm_api_key",
+        "review.skip_reason": "missing_deepseek_api_key",
       });
       // A missing key is a CI/secrets misconfiguration, not a "nothing to review" case —
       // fail loudly (non-zero exit) instead of warn+return, so review coverage silently
       // dropping to zero can't slip by as a green check. Also post to the PR so it's
       // visible without digging into Actions logs.
-      const message = "GLM_API_KEY is not set. AI Code Review did not run for this PR — this is a CI misconfiguration, not a skip.";
+      const message = "DEEPSEEK_API_KEY_E2E is not set. AI Code Review did not run for this PR — this is a CI misconfiguration, not a skip.";
       console.error(`[${isoNow()}] ${message}`);
       try {
-        postReviewComment(prNumber, `${REVIEW_MARKER}\n## AI Code Review\n\n### Decision: error\n\n⚠️ ${message} Please confirm the \`GLM_API_KEY\` secret is provisioned.`);
+        postReviewComment(prNumber, `${REVIEW_MARKER}\n## AI Code Review\n\n### Decision: error\n\n⚠️ ${message} Please confirm the \`DEEPSEEK_API_KEY_E2E\` secret is provisioned.`);
       } catch (postErr) {
         console.error(`[${isoNow()}] Also failed to post the misconfiguration notice: ${postErr.message}`);
       }
       throw new Error(message);
     }
 
-    console.log(`[${isoNow()}] GLM (via opencode serve): configured`);
+    console.log(`[${isoNow()}] DeepSeek (via opencode serve): configured`);
 
     // 1. Get PR diff
     console.log(`[${isoNow()}] Fetching PR diff...`);

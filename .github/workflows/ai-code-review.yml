@@ -99,7 +99,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
           FORCE_FULL: ${{ steps.skip.outputs.force_full }}
-          GLM_API_KEY: ${{ secrets.GLM_API_KEY }}
+          DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
           O2_TRACE_INGEST_URL: ${{ secrets.O2_TRACE_INGEST_URL }}
           O2_TRACE_ORG: ${{ secrets.O2_TRACE_ORG }}
           O2_TRACE_USERNAME: ${{ secrets.O2_TRACE_USERNAME }}
