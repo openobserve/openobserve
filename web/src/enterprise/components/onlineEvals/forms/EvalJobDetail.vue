@@ -3,27 +3,12 @@
     :open="open"
     side="right"
     :width="70"
-    :title="t('onlineEvals.job.detail.eyebrow')"
+    :title="row?.name"
+    :title-data-test="'eval-job-detail-name-badge'"
+    :sub-title="t('onlineEvals.job.detail.eyebrow')"
     data-test="eval-job-detail"
     @update:open="handleOpenChange"
   >
-    <!-- Header: module label as the title + the job name as a blue chip,
-         mirroring the Alert History drawer. -->
-    <template #header-left>
-      <span
-        v-if="row.name"
-        :class="[
-          'font-semibold text-[1.125rem] px-2 py-1 rounded-md ml-2 min-w-0 truncate',
-          store.state.theme === 'dark'
-            ? 'text-blue-400 bg-blue-900/50'
-            : 'text-blue-600 bg-blue-50',
-        ]"
-        data-test="eval-job-detail-name-badge"
-      >
-        {{ row.name }}
-        <OTooltip v-if="row.name" :content="row.name" />
-      </span>
-    </template>
 
     <!-- Body: the KPI strip + tab bar stay pinned; only the tab content scrolls. -->
     <div class="flex flex-col h-full min-h-0">
@@ -68,22 +53,22 @@
           v-for="card in kpiCards"
           v-else
           :key="card.label"
-          class="rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
+          class="rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--color-surface-base)] border border-[var(--color-border-default)] transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
         >
           <div
-            class="kpi-label text-[0.7rem] leading-normal font-semibold mb-[0.25rem]"
+            class="kpi-label text-[0.7rem] leading-normal font-semibold mb-[0.25rem] text-[var(--color-text-secondary)]"
           >
             {{ card.label }}
           </div>
           <div class="flex items-baseline gap-[0.2rem]">
             <span
-              class="text-[1.4rem] font-bold leading-none text-[var(--o2-text-primary)]"
+              class="text-[1.4rem] font-bold leading-none text-[var(--color-grey-600)]"
             >
               {{ card.value }}
             </span>
             <span
               v-if="card.unit"
-              class="text-[0.8rem] font-semibold text-[var(--o2-text-secondary)]"
+              class="text-[0.8rem] font-semibold text-[var(--color-text-secondary)]"
             >
               {{ card.unit }}
             </span>
@@ -1243,19 +1228,19 @@ function relativeTime(timestampMs: number): string {
 }
 
 .jd-status-cell--success {
-  color: var(--o2-status-success-text, #2e7d32);
+  color: var(--color-status-success-text);
 }
 .jd-status-cell--success .jd-status-cell__dot {
-  background: var(--o2-status-success-text, #2e7d32);
+  background: var(--color-status-success-text);
 }
 
 .jd-status-cell--error,
 .jd-status-cell--timeout {
-  color: var(--o2-status-error-text, #c62828);
+  color: var(--color-status-error-text);
 }
 .jd-status-cell--error .jd-status-cell__dot,
 .jd-status-cell--timeout .jd-status-cell__dot {
-  background: var(--o2-status-error-text, #c62828);
+  background: var(--color-status-error-text);
 }
 
 .jd-status-cell--skipped .jd-status-cell__dot {

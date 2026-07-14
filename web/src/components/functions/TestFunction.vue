@@ -270,7 +270,7 @@
             class="text-orange-400"
           />
           <div
-            class="text-[15px] text-gray-600"
+            class="text-[15px]"
             :class="
               store.state.theme === 'dark'
                 ? 'text-gray-200'
@@ -633,7 +633,7 @@ const getResults = async () => {
     .search({
       org_identifier: store.state.selectedOrganization.identifier,
       query,
-      page_type: "logs",
+      page_type: selectedStream.value.type,
     })
     .then((res: any) => {
       expandState.value.stream = false;

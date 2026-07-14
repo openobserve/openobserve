@@ -64,6 +64,17 @@ pub async fn process_token(
 
     let user_email = res.0.user_email.to_owned();
 
+    // System-wide blocklist — external identities are (re)provisioned here (SSO login AND the
+    // `/token` exchange). Deny early, before any create/update, so a blocked SSO principal cannot
+    // reappear on the next login. Everything provisioned in this fn is `is_external: true`.
+    if matches!(
+        o2_enterprise::enterprise::domain_management::evaluate_cached(&user_email).await,
+        o2_enterprise::enterprise::domain_management::meta::AccessDecision::Deny
+    ) {
+        log::warn!("Blocked external identity denied at token processing: {user_email}");
+        return Err(anyhow::anyhow!("User is blocked"));
+    }
+
     let name = match dec_token.claims.get("name") {
         None => res.0.user_email.to_owned(),
         Some(name) => name.as_str().unwrap().to_string(),
@@ -875,11 +886,20 @@ pub async fn check_and_add_to_org(
         }
     }
 
-    // Check if the user is part of any organization
+    // Check if the user is part of any organization. Exclude orgs that are
+    // pending_deletion/deleting: they are hidden + blocked everywhere, so if a
+    // user's ONLY org is being deleted we must treat them as having no org and
+    // create a fresh default one — otherwise the org-list API returns empty and
+    // the UI is stuck on a blank screen / login loop.
     let org_users = list_org_users_by_user(user_email).await;
     if org_users.is_err() {
         log::error!("Error fetching orgs for user: {}", user_email);
     }
+    let org_users = org_users.map(|orgs| {
+        orgs.into_iter()
+            .filter(|o| !crate::service::db::org_status::is_blocked(&o.org_id))
+            .collect::<Vec<_>>()
+    });
 
     let (org_name, role) = match org_users {
         Ok(existing_orgs) if !existing_orgs.is_empty() => (

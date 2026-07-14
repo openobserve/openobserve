@@ -165,4 +165,75 @@ describe("OSelect", () => {
     await flushPromises();
     expect(wrapper.emitted("create")).toBeFalsy();
   });
+
+  describe("trigger keyboard focus behavior", () => {
+    // The listbox-mode trigger must expose role="combobox" so the global
+    // shortcut manager's isInputFocused() guard treats a focused select as a
+    // text-entry widget — otherwise single-letter page shortcuts (logs "s",
+    // "r", "h") fire while the select has focus inside a dialog.
+    it("should expose role=combobox on the listbox trigger", () => {
+      wrapper = mount(OSelect, {
+        props: {
+          searchable: true,
+          options: [{ label: "Option A", value: "a" }],
+        },
+      });
+      const trigger = wrapper.find("button");
+      expect(trigger.attributes("role")).toBe("combobox");
+      expect(trigger.attributes("aria-expanded")).toBe("false");
+    });
+
+    it("should open the dropdown and seed the filter when a printable key is pressed on the closed trigger", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: {
+          searchable: true,
+          options: [
+            { label: "sample", value: "s1" },
+            { label: "other", value: "o1" },
+          ],
+        },
+      });
+      await wrapper.find("button").trigger("keydown", { key: "s" });
+      await flushPromises();
+
+      const input = document.body.querySelector(
+        'input[placeholder="Search..."]',
+      ) as HTMLInputElement | null;
+      expect(input).not.toBeNull();
+      expect(input!.value).toBe("s");
+    });
+
+    it("should not open the dropdown when a modifier combo is pressed on the trigger", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: {
+          searchable: true,
+          options: [{ label: "sample", value: "s1" }],
+        },
+      });
+      await wrapper.find("button").trigger("keydown", { key: "s", ctrlKey: true });
+      await flushPromises();
+      expect(
+        document.body.querySelector('input[placeholder="Search..."]'),
+      ).toBeNull();
+    });
+
+    it("should stop propagation of printable keys so page-level shortcuts never fire", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: {
+          searchable: true,
+          options: [{ label: "sample", value: "s1" }],
+        },
+      });
+      const docSpy = vi.fn();
+      document.addEventListener("keydown", docSpy);
+      (wrapper.find("button").element as HTMLElement).dispatchEvent(
+        new KeyboardEvent("keydown", { key: "s", bubbles: true, cancelable: true }),
+      );
+      document.removeEventListener("keydown", docSpy);
+      expect(docSpy).not.toHaveBeenCalled();
+    });
+  });
 });

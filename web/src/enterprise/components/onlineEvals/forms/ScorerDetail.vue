@@ -3,27 +3,12 @@
     :open="open"
     side="right"
     :width="70"
-    :title="t('onlineEvals.scorer.detail.eyebrow')"
+    :title="row?.name"
+    :title-data-test="'scorer-detail-name-badge'"
+    :sub-title="t('onlineEvals.scorer.detail.eyebrow')"
     data-test="scorer-detail"
     @update:open="handleOpenChange"
   >
-    <!-- Header: module label as the title + the scorer name as a blue chip,
-         mirroring the Alert History drawer. -->
-    <template #header-left>
-      <span
-        v-if="row.name"
-        :class="[
-          'font-semibold text-[1.125rem] px-2 py-1 rounded-md ml-2 min-w-0 truncate',
-          store.state.theme === 'dark'
-            ? 'text-blue-400 bg-blue-900/50'
-            : 'text-blue-600 bg-blue-50',
-        ]"
-        data-test="scorer-detail-name-badge"
-      >
-        {{ row.name }}
-        <OTooltip v-if="row.name" :content="row.name" />
-      </span>
-    </template>
 
     <!-- Body: the KPI strip + tab bar stay pinned; only the tab content scrolls. -->
     <div class="flex flex-col h-full min-h-0">
@@ -68,22 +53,22 @@
           v-for="card in kpiCards"
           v-else
           :key="card.label"
-          class="rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
+          class="rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--color-surface-base)] border border-[var(--color-border-default)] transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
         >
           <div
-            class="kpi-label text-[0.7rem] leading-normal font-semibold mb-[0.25rem]"
+            class="kpi-label text-[0.7rem] leading-normal font-semibold mb-[0.25rem] text-[var(--color-text-secondary)]"
           >
             {{ card.label }}
           </div>
           <div class="flex items-baseline gap-[0.2rem]">
             <span
-              class="text-[1.4rem] font-bold leading-none text-[var(--o2-text-primary)]"
+              class="text-[1.4rem] font-bold leading-none text-[var(--color-grey-600)]"
             >
               {{ card.value }}
             </span>
             <span
               v-if="card.unit"
-              class="text-[0.8rem] font-semibold text-[var(--o2-text-secondary)]"
+              class="text-[0.8rem] font-semibold text-[var(--color-text-secondary)]"
             >
               {{ card.unit }}
             </span>
@@ -393,7 +378,6 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -981,10 +965,10 @@ function relativeTime(timestampMs: number): string {
   font-weight: 600;
   background: color-mix(
     in srgb,
-    var(--o2-status-success-text, #2e7d32) 14%,
+    var(--color-status-success-text) 14%,
     transparent
   );
-  color: var(--o2-status-success-text, #2e7d32);
+  color: var(--color-status-success-text);
 }
 
 .sd-versions__meta {
@@ -1009,19 +993,19 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd-status-cell--success {
-  color: var(--o2-status-success-text, #2e7d32);
+  color: var(--color-status-success-text);
 }
 .sd-status-cell--success .sd-status-cell__dot {
-  background: var(--o2-status-success-text, #2e7d32);
+  background: var(--color-status-success-text);
 }
 
 .sd-status-cell--error,
 .sd-status-cell--timeout {
-  color: var(--o2-status-error-text, #c62828);
+  color: var(--color-status-error-text);
 }
 .sd-status-cell--error .sd-status-cell__dot,
 .sd-status-cell--timeout .sd-status-cell__dot {
-  background: var(--o2-status-error-text, #c62828);
+  background: var(--color-status-error-text);
 }
 
 .sd-status-cell--skipped .sd-status-cell__dot {

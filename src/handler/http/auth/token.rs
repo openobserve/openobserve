@@ -28,8 +28,7 @@ pub async fn token_validator(
     req_data: &RequestData,
     auth_info: &AuthExtractor,
 ) -> Result<AuthValidationResult, AuthError> {
-    use super::validator::check_permissions;
-    use crate::common::utils::auth::V2_API_PREFIX;
+    use crate::{common::utils::auth::V2_API_PREFIX, service::authz::check_permissions};
 
     let user;
     let keys = get_dex_jwks().await;
@@ -67,6 +66,21 @@ pub async fn token_validator(
         Ok(res) => {
             let user_id = &res.0.user_email;
             if res.0.is_valid {
+                // System-wide blocklist. This path validates Dex-issued session tokens (the UI
+                // `access_token: "session …"` cookie flow), which are EXTERNAL SSO identities by
+                // construction — so a blocked email must be denied on EVERY request, not only at
+                // login. Placed before user/permission resolution so it covers all endpoints and
+                // the special-allow arms (invites, org list, MCP) too.
+                if matches!(
+                    o2_enterprise::enterprise::domain_management::evaluate_cached(user_id).await,
+                    o2_enterprise::enterprise::domain_management::meta::AccessDecision::Deny
+                ) {
+                    log::warn!(
+                        "Blocked external identity denied at session token validation: {user_id}"
+                    );
+                    return Err(AuthError::Unauthorized("Unauthorized Access".to_string()));
+                }
+
                 // for member sub i.e. invitation, we must check user directly from db, because
                 // the else-arm here will check if user is present in given org. However before
                 // accepting the invitation, user will not be added to the org,
@@ -206,27 +220,6 @@ pub async fn token_validator(
             }
         }
         Err(err) => Err(AuthError::Unauthorized(err.to_string())),
-    }
-}
-
-#[cfg(feature = "enterprise")]
-pub async fn get_user_name_from_token(auth_str: &str) -> Option<String> {
-    let keys = get_dex_jwks().await;
-    match jwt::verify_decode_token(
-        auth_str.strip_prefix("Bearer").unwrap().trim(),
-        &keys,
-        &get_dex_config().client_id,
-        false,
-        true,
-    ) {
-        Ok(res) => {
-            if res.0.is_valid {
-                Some(res.0.user_email)
-            } else {
-                None
-            }
-        }
-        Err(_) => None,
     }
 }
 

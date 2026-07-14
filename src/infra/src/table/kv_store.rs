@@ -108,3 +108,14 @@ pub async fn clear() -> Result<(), errors::Error> {
     Entity::delete_many().exec(client).await?;
     Ok(())
 }
+
+/// Deletes all KV entries belonging to the given org.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(())
+}

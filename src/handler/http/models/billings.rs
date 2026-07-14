@@ -16,17 +16,11 @@
 //! These models define the schemas of HTTP request and response JSON bodies in
 //! billings API endpoints.
 
-use std::collections::HashMap;
-
-use o2_enterprise::enterprise::{
-    cloud::billings::{
-        self as cloud_billings,
-        org_usage::{OrgUsageEvent, UsageResultUnit},
-    },
-    metering::MeteringEventName,
-};
+use o2_enterprise::enterprise::cloud::billings as cloud_billings;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+pub use crate::service::org_usage::{GetOrgUsageResponseBody, OrgUserData};
 
 #[derive(Debug, Deserialize)]
 pub struct CheckoutSessionDetailRequestQuery {
@@ -62,68 +56,6 @@ impl From<cloud_billings::CustomerBilling> for ListSubscriptionResponseBody {
             subscription_type: value.subscription_type.to_string(),
             customer_id: value.customer_id,
             provider,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, ToSchema)]
-pub struct GetOrgUsageResponseBody {
-    pub data: Vec<OrgUserData>,
-    pub range: String,
-    pub start_time: i64,
-    pub end_time: i64,
-}
-
-impl GetOrgUsageResponseBody {
-    pub fn convert_to_unit(&mut self, unit: &str) {
-        let target_unit = unit.to_ascii_lowercase();
-        for usage_data in self.data.iter_mut() {
-            let current_unit = usage_data.unit.to_ascii_lowercase();
-            match (current_unit.as_str(), target_unit.as_str()) {
-                ("gb", "mb") => {
-                    usage_data.value *= 1024.0;
-                    usage_data.unit = "MB".to_string();
-                }
-                ("mb", "gb") => {
-                    usage_data.value /= 1024.0;
-                    usage_data.unit = "GB".to_string();
-                }
-                _ => {}
-            }
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, ToSchema, Default)]
-pub struct OrgUserData {
-    pub event: String,
-    pub value: f64,
-    pub cost: Option<f64>,
-    pub unit: String,
-}
-
-impl OrgUserData {
-    pub fn from_query_result(
-        value: cloud_billings::org_usage::OrgUsageQueryResult,
-        price_map: &HashMap<String, f64>,
-    ) -> Self {
-        let ev = match value.event {
-            OrgUsageEvent::UsageEvent(ev) => ev.into(),
-            OrgUsageEvent::DataRetentionUsageEvent(_) => MeteringEventName::DataRetention,
-        };
-        let name = ev.to_string();
-        let cost = price_map.get(&name);
-
-        let amt = match value.unit {
-            UsageResultUnit::MB => value.size / 1024.0,
-            UsageResultUnit::GB | UsageResultUnit::Count => value.size,
-        };
-        let cost = cost.map(|v| v * amt);
-        Self {
-            event: value.event.to_string(),
-            value: value.size,
-            unit: value.unit.to_string(),
-            cost,
         }
     }
 }

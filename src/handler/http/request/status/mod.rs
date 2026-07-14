@@ -608,7 +608,7 @@ pub async fn cache_status() -> impl IntoResponse {
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    // Config caches from src/common/infra/config.rs
+    // Config caches from src/core/src/common/infra/config.rs
     let (len, cap, mem_size) = crate::common::infra::config::KVS.stats();
     stats.insert(
         "KVS_CACHE",
@@ -756,7 +756,7 @@ pub async fn cache_status() -> impl IntoResponse {
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    // File list caches (2) from src/service/db/file_list/mod.rs
+    // File list caches (2) from src/core/src/service/db/file_list/mod.rs
     let (len, cap, mem_size) = crate::service::db::file_list::DELETED_FILES.stats();
     stats.insert(
         "DELETED_FILES",
@@ -769,7 +769,8 @@ pub async fn cache_status() -> impl IntoResponse {
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    // Organization streams cache from src/service/db/compact/organization.rs line 21
+    // Organization streams cache from
+    // src/core/src/service/db/compact/organization.rs line 21
     let (len, cap, mem_size) = crate::service::db::compact::organization::STREAMS.stats();
     stats.insert(
         "COMPACT_ORGANIZATION_STREAMS",
@@ -1243,6 +1244,58 @@ pub async fn refresh_token_with_dex(
                     .header(header::CONTENT_TYPE, "application/json")
                     .body(Body::from("\"access token is empty\""))
                     .unwrap();
+            }
+
+            // Blocklist: a refresh must not resurrect a blocked user. Decode the freshly minted
+            // access token; if the identity is blocked, deny WITHOUT minting a session and clear
+            // the auth cookie, so the FE's 401 → /dex_refresh → retry loop terminates
+            // at the login page.
+            {
+                let keys = get_dex_jwks().await;
+                let refreshed_email = verify_decode_token(
+                    &access_token,
+                    &keys,
+                    &get_dex_config().client_id,
+                    false,
+                    true,
+                )
+                .ok()
+                .map(|ver| ver.0.user_email);
+                let blocked = match &refreshed_email {
+                    Some(email) => matches!(
+                        o2_enterprise::enterprise::domain_management::evaluate_cached(email).await,
+                        o2_enterprise::enterprise::domain_management::meta::AccessDecision::Deny
+                    ),
+                    None => false,
+                };
+                if blocked {
+                    let email = refreshed_email.unwrap_or_default();
+                    log::warn!("Blocked external identity denied at token refresh: {email}");
+                    audit_message.response_meta.http_response_code = 401;
+                    audit_message._timestamp = now_micros();
+                    audit(audit_message).await;
+
+                    let conf = get_config();
+                    let cleared = base64::encode(&json::to_string(&AuthTokens::default()).unwrap());
+                    let mut auth_cookie = Cookie::new("auth_tokens", cleared);
+                    auth_cookie.set_expires(
+                        time::OffsetDateTime::now_utc()
+                            + time::Duration::seconds(conf.auth.cookie_max_age),
+                    );
+                    auth_cookie.set_http_only(true);
+                    auth_cookie.set_secure(conf.auth.cookie_secure_only);
+                    auth_cookie.set_path("/");
+                    if conf.auth.cookie_same_site_lax {
+                        auth_cookie.set_same_site(SameSite::Lax);
+                    } else {
+                        auth_cookie.set_same_site(SameSite::None);
+                    }
+                    return Response::builder()
+                        .status(StatusCode::UNAUTHORIZED)
+                        .header(header::SET_COOKIE, auth_cookie.to_string())
+                        .body(Body::empty())
+                        .unwrap();
+                }
             }
 
             // store session_id in cluster co-ordinator

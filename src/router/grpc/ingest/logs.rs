@@ -94,6 +94,6 @@ mod tests {
 
     #[test]
     fn test_logs_server_default() {
-        let _server = LogsServer::default();
+        let _server = LogsServer;
     }
 }

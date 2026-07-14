@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(skeletonWidth, n) in SKELETON_WIDTHS"
         :key="n"
-        class="pattern-skel-row flex items-center border-b border-[var(--o2-border-color)] relative opacity-0 h-8 bg-[var(--o2-log-table-row-bg,transparent)]"
+        class="pattern-skel-row flex items-center border-b border-[var(--color-table-row-divider)] relative opacity-0 h-8 bg-[var(--o2-log-table-row-bg,transparent)]"
         :style="{ animationDelay: `${n * 40}ms` }"
       >
         <!-- Left accent bar -->

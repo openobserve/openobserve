@@ -73,24 +73,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <p class="text-gray-400">
                 Create a new organization with AWS Marketplace billing
               </p>
-              <OInput
-                v-model="newOrgName"
-                data-test="aws-marketplace-org-name"
-                label="Organization Name"
-                class="mb-3"
-                :error="!!orgNameError"
-                :error-message="orgNameError"
-                @update:model-value="orgNameError = ''"
-              />
-              <OButton
-                data-test="aws-marketplace-create-link-btn"
-                variant="primary"
-                size="sm-action"
-                block
-                @click="createNewOrgWithAws"
-                :loading="isProcessing"
-                :disabled="!newOrgName"
-              >Create &amp; Link</OButton>
+              <OForm
+                id="aws-create-org-form"
+                :schema="awsCreateOrgSchema"
+                :default-values="awsCreateOrgDefaults()"
+                @submit="createNewOrgWithAws"
+                v-slot="{ isSubmitting }"
+              >
+                <OFormInput
+                  name="newOrgName"
+                  data-test="aws-marketplace-org-name"
+                  label="Organization Name"
+                  required
+                  class="mb-3"
+                />
+                <OButton
+                  data-test="aws-marketplace-create-link-btn"
+                  type="submit"
+                  variant="primary"
+                  size="sm-action"
+                  block
+                  :loading="isSubmitting"
+                >Create &amp; Link</OButton>
+              </OForm>
             </OCardSection>
           </OCard>
 
@@ -104,22 +109,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <p class="text-gray-400">
                 Link AWS billing to an existing organization
               </p>
-              <OSelect
-                v-model="selectedOrg"
-                :options="eligibleOrganizations"
-                labelKey="name"
-                valueKey="identifier"
-                label="Select Organization"
-                class="mb-3"
-              />
-              <OButton
-                variant="primary"
-                size="sm-action"
-                block
-                @click="linkToExistingOrg"
-                :loading="isProcessing"
-                :disabled="!selectedOrg"
-              >Link AWS Billing</OButton>
+              <OForm
+                id="aws-link-org-form"
+                :schema="awsLinkOrgSchema"
+                :default-values="awsLinkOrgDefaults()"
+                @submit="linkToExistingOrg"
+                v-slot="{ isSubmitting }"
+              >
+                <OFormSelect
+                  name="selectedOrg"
+                  :options="eligibleOrganizations"
+                  label-key="name"
+                  value-key="identifier"
+                  label="Select Organization"
+                  required
+                  class="mb-3"
+                />
+                <OButton
+                  type="submit"
+                  variant="primary"
+                  size="sm-action"
+                  block
+                  :loading="isSubmitting"
+                >Link AWS Billing</OButton>
+              </OForm>
             </OCardSection>
           </OCard>
         </div>
@@ -184,15 +197,26 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import awsMarketplace from "@/services/awsMarketplace";
 import organizationsService from "@/services/organizations";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import {
+  makeAwsCreateOrgSchema,
+  awsCreateOrgDefaults,
+  makeAwsLinkOrgSchema,
+  awsLinkOrgDefaults,
+  type AwsCreateOrgForm,
+  type AwsLinkOrgForm,
+} from "./AwsMarketplaceSetup.schema";
+// NOTE: the old `toast` import was removed — the empty-selection guard is now
+// schema-driven (z.string().min(1)), not an imperative toast.
 
 type SetupState =
   | "select_org"
@@ -205,19 +229,20 @@ type SetupState =
 
 export default defineComponent({
   name: "AwsMarketplaceSetup",
-  components: { OButton, OSpinner, OInput, OSelect,
+  components: { OButton, OSpinner, OForm, OFormInput, OFormSelect,
     OIcon, OCard, OCardSection,
 },
   setup() {
     const store = useStore();
     const router = useRouter();
+    const { t } = useI18n();
+
+    // Factory-built so the required messages resolve through i18n.
+    const awsCreateOrgSchema = makeAwsCreateOrgSchema(t);
+    const awsLinkOrgSchema = makeAwsLinkOrgSchema(t);
 
     const state = ref<SetupState>("select_org");
     const errorMessage = ref("");
-    const isProcessing = ref(false);
-    const newOrgName = ref("");
-    const orgNameError = ref("");
-    const selectedOrg = ref<{ identifier: string; name: string } | null>(null);
     const eligibleOrganizations = ref<{ identifier: string; name: string }[]>(
       []
     );
@@ -268,50 +293,41 @@ export default defineComponent({
       }
     };
 
-    const createNewOrgWithAws = async () => {
-      if (!newOrgName.value) {
-        orgNameError.value = "Please enter an organization name";
-        return;
-      }
-
-      isProcessing.value = true;
+    // Plain async @submit handler — the schema already gated `value.newOrgName`
+    // (required), so no imperative empty-check is needed. The Save spinner is
+    // form-driven (OForm awaits this handler).
+    const createNewOrgWithAws = async (value: AwsCreateOrgForm) => {
       state.value = "processing";
 
       try {
         // Create the organization
         const orgRes = await organizationsService.create({
-          name: newOrgName.value,
+          name: value.newOrgName,
         });
 
         const orgId = orgRes.data.identifier;
 
         // Link AWS Marketplace subscription
-        await linkSubscription(orgId);
+        await linkSubscription(orgId, value.newOrgName);
       } catch (error: any) {
         console.error("Failed to create organization:", error);
         state.value = "error";
         errorMessage.value =
           error.response?.data?.message || "Failed to create organization";
-        isProcessing.value = false;
       }
     };
 
-    const linkToExistingOrg = async () => {
-      if (!selectedOrg.value) {
-        toast({
-          variant: "error",
-          message: "Please select an organization",
-        });
-        return;
-      }
-
-      isProcessing.value = true;
+    // `value.selectedOrg` is the org identifier (OSelect value-key="identifier").
+    const linkToExistingOrg = async (value: AwsLinkOrgForm) => {
       state.value = "processing";
 
-      await linkSubscription(selectedOrg.value.identifier);
+      const org = eligibleOrganizations.value.find(
+        (o) => o.identifier === value.selectedOrg,
+      );
+      await linkSubscription(value.selectedOrg, org?.name ?? value.selectedOrg);
     };
 
-    const linkSubscription = async (orgId: string) => {
+    const linkSubscription = async (orgId: string, orgLabel: string) => {
       try {
         const response = await awsMarketplace.linkSubscription(
           orgId,
@@ -328,7 +344,7 @@ export default defineComponent({
           state.value = "pending_activation";
 
           // Start polling for activation status
-          startPolling(orgId, response.data.customer_identifier);
+          startPolling(orgId, response.data.customer_identifier, orgLabel);
         } else {
           throw new Error(response.data.message || "Link subscription failed");
         }
@@ -337,11 +353,14 @@ export default defineComponent({
         state.value = "error";
         errorMessage.value =
           error.response?.data?.message || "Failed to link AWS subscription";
-        isProcessing.value = false;
       }
     };
 
-    const startPolling = (orgId: string, customerIdentifier: string) => {
+    const startPolling = (
+      orgId: string,
+      customerIdentifier: string,
+      orgLabel: string,
+    ) => {
       let attempts = 0;
       const maxAttempts = 60; // 5 minutes at 5 second intervals
 
@@ -359,12 +378,11 @@ export default defineComponent({
           if (status === "active") {
             if (pollInterval) clearInterval(pollInterval);
             state.value = "success";
-            isProcessing.value = false;
 
             // Update selected org in store
             const orgData = {
               identifier: orgId,
-              label: newOrgName.value || selectedOrg.value?.name || orgId,
+              label: orgLabel || orgId,
               user_email: store.state.userInfo?.email,
             };
             useLocalOrganization(orgData);
@@ -372,13 +390,11 @@ export default defineComponent({
           } else if (status === "payment_failed") {
             if (pollInterval) clearInterval(pollInterval);
             state.value = "payment_failed";
-            isProcessing.value = false;
           } else if (attempts >= maxAttempts) {
             if (pollInterval) clearInterval(pollInterval);
             state.value = "error";
             errorMessage.value =
               "Activation timeout. Please contact support if the issue persists.";
-            isProcessing.value = false;
           }
         } catch (error) {
           console.error("Poll error:", error);
@@ -398,19 +414,21 @@ export default defineComponent({
     const resetAndRetry = () => {
       state.value = "select_org";
       errorMessage.value = "";
-      isProcessing.value = false;
     };
 
     return {
       store,
       state,
       errorMessage,
-      isProcessing,
-      newOrgName,
-      orgNameError,
-      selectedOrg,
       eligibleOrganizations,
       getImageURL,
+      // Schemas + typed default factories must be returned from setup() so the
+      // Options-API template can resolve `:schema` / `:default-values`
+      // (a module-level import would be out of the template's scope).
+      awsCreateOrgSchema,
+      awsCreateOrgDefaults,
+      awsLinkOrgSchema,
+      awsLinkOrgDefaults,
       createNewOrgWithAws,
       linkToExistingOrg,
       goToDashboard,

@@ -224,6 +224,7 @@ const search = {
     run_id,
     tab_id,
     tab_name,
+    signal,
   }: {
     org_identifier: string;
     query: string;
@@ -239,6 +240,12 @@ const search = {
     run_id?: string;
     tab_id?: string;
     tab_name?: string;
+    /**
+     * Aborts the request. The metrics explorer cancels preview queries on
+     * scroll-away, filter change and dialog close; `useCancelQuery` cannot help
+     * there, since it only cancels registered server-side trace ids.
+     */
+    signal?: AbortSignal;
   }) => {
     const use_cache = (window as any).use_cache !== undefined
       ? (window as any).use_cache
@@ -256,7 +263,9 @@ const search = {
     if (run_id) url += `&run_id=${run_id}`;
     if (tab_id) url += `&tab_id=${tab_id}`;
     if (tab_name) url += `&tab_name=${encodeURIComponent(tab_name)}`;
-    return http().get(url);
+    // Only pass a config object when there is actually a signal, so callers
+    // that don't cancel keep the exact single-argument call they had before.
+    return signal ? http().get(url, { signal }) : http().get(url);
   },
   metrics_query: ({
     org_identifier,

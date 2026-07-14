@@ -23,10 +23,10 @@ publish = false
 
 [features]
 default = []
-enterprise = []
-vectorscan = []
-cloud = []
-vortex = ["config/vortex"]
+enterprise = ["openobserve-core/enterprise"]
+vectorscan = ["openobserve-core/vectorscan"]
+cloud = ["openobserve-core/cloud"]
+vortex = ["config/vortex", "openobserve-core/vortex"]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = [
@@ -219,10 +219,10 @@ futures-core = "0.3.31"
 derive_more = { version = "2.1", features = ["full"] }
 brotli = "8.0.2"
 tokio-rustls.workspace = true
-roaring.workspace = true
 flight.workspace = true
 async-stream.workspace = true
 sourcemap = "9.3.2"
+openobserve-core = { path = "src/core" }
 
 [dev-dependencies]
 expect-test.workspace = true
@@ -233,6 +233,7 @@ rcgen = "0.14.4"
 
 [workspace]
 members = [
+    "src/core",
     "src/config",
     "src/infra",
     "src/ingester",
@@ -258,6 +259,11 @@ proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
 flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
+o2_dex = { path = "src/enterprise-stubs/o2_dex" }
+o2_enterprise = { path = "src/enterprise-stubs/o2_enterprise", default-features = false }
+o2_openfga = { path = "src/enterprise-stubs/o2_openfga" }
+vortex = { path = "src/enterprise-stubs/vortex" }
+vortex-datafusion = { path = "src/enterprise-stubs/vortex-datafusion" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
 axum = { version = "0.8", features = ["macros", "multipart", "tracing"] }
@@ -301,6 +307,7 @@ async-stream = "0.3"
 async-trait = "0.1"
 async-recursion = "1.0"
 aws-config = "1.8"
+aws-credential-types = "1.2.14"
 aws-sdk-sns = { version = "1.97", default-features = false, features = [
     "behavior-version-latest",
     "default-https-client",
@@ -399,7 +406,6 @@ reqwest = { version = "0.13", default-features = false, features = [
     "query",
     "form",
 ] }
-roaring = "0.11.3"
 rquickjs = { version = "0.11.0", features = ["array-buffer", "classes"] }
 rustls = { version = "0.23", default-features = false, features = [
     "std",
