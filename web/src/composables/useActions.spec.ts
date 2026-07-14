@@ -41,10 +41,6 @@ vi.mock("vuex", () => ({
   useStore: () => mockStore,
 }));
 
-vi.mock("quasar", () => ({
-  useQuasar: vi.fn(),
-}));
-
 import useActions from "./useActions";
 import actionService from "@/services/action_scripts";
 

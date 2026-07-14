@@ -6,7 +6,7 @@ export type ToastVariant =
   | "loading"
   | "default"
 
-// Positions mirror Quasar's subset actually used in the codebase
+// Positions cover the subset actually used in the codebase
 export type ToastPosition =
   | "top-center"
   | "top-right"

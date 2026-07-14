@@ -42,13 +42,6 @@ vi.mock("vue-router", () => ({
   useRoute: () => mockRouter.currentRoute.value,
 }));
 
-// Mock Quasar — kept as safety net for any transitive dependency that might need it.
-// Does NOT use importOriginal() since quasar has been removed from the project.
-vi.mock("quasar", () => ({
-  useQuasar: () => ({ notify: vi.fn() }),
-  copyToClipboard: vi.fn(),
-}));
-
 describe("Custom Component", () => {
   let wrapper: any = null;
 

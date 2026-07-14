@@ -804,7 +804,7 @@ export default defineComponent({
         let period = getPeriodLabel.value.toLowerCase();
         let periodValue = relativeValue.value;
 
-        // quasar does not support arithmetic on weeks. convert to days.
+        // arithmetic on weeks is not supported; convert to days.
         if (relativePeriod.value === "w") {
           period = "days";
           periodValue = periodValue * 7;

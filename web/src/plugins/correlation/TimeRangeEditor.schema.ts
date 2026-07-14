@@ -3,8 +3,8 @@
 // Validation schema for TimeRangeEditor.vue — the module's cross-field refine
 // exemplar. Built via a factory so messages stay i18n-driven (pass `t`).
 //
-// Restored from the Quasar BEFORE baseline (the hand-rolled validateStartTime /
-// validateEndTime become a single superRefine):
+// The hand-rolled validateStartTime / validateEndTime are combined into a
+// single superRefine:
 //   • When selectedWindow === "custom", BOTH custom times are required
 //     (`!v` → t("validation.required")), AND start < end
 //     (start: t("correlation.logs.timeRange.startBeforeEnd");

@@ -17,9 +17,6 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick, ref } from "vue";
 
-// Quasar was removed entirely — no Quasar plugin mock required.
-// (Dialog.create / exportFile no longer used in the component.)
-
 // Mock all the heavy dependencies
 vi.mock("@/composables/dashboard/usePanelDataLoader", () => ({
   usePanelDataLoader: vi.fn(() => ({
@@ -608,22 +605,12 @@ describe("PanelSchemaRenderer", () => {
   });
 
   describe("Download Functionality", () => {
-    let mockExportFile: any;
     let mockShowErrorNotification: any;
     let mockShowPositiveNotification: any;
 
     beforeEach(() => {
-      mockExportFile = vi.fn().mockReturnValue(true);
       mockShowErrorNotification = vi.fn();
       mockShowPositiveNotification = vi.fn();
-
-      vi.doMock("quasar", async (importOriginal) => {
-        const actual = await importOriginal();
-        return {
-          ...actual,
-          exportFile: mockExportFile,
-        };
-      });
     });
 
     it("should have downloadDataAsCSV method", () => {
@@ -688,7 +675,7 @@ describe("PanelSchemaRenderer", () => {
       // Mock the data for the component
       wrapper.vm.data = { value: mockPromQLData };
 
-      // Mock the quasar exportFile function to return true
+      // Mock the exportFile function to return true
       const originalExportFile = vi.fn().mockReturnValue(true);
 
       // Mock showPositiveNotification

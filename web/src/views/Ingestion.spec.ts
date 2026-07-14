@@ -23,8 +23,6 @@ import organizationsService from "@/services/organizations";
 import apiKeysService from "@/services/api_keys";
 import segment from "@/services/segment_analytics";
 
-// Install Quasar plugins
-
 // Mock services with default resolved values
 vi.mock("@/services/organizations", () => ({
   default: {
@@ -101,7 +99,7 @@ vi.mock("@/aws-exports", () => ({
   }
 }));
 
-// Mock clipboard and toast (replaces deprecated Quasar mock)
+// Mock clipboard and toast
 const mockNotify = vi.fn();
 
 vi.mock("@/utils/clipboard", () => ({

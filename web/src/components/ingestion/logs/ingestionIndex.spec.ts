@@ -51,11 +51,6 @@ vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: vi.fn().mockResolvedValue(true),
 }));
 
-// Keep a simple quasar mock to prevent import errors from transitive dependencies
-vi.mock("quasar", () => ({
-  copyToClipboard: vi.fn(),
-}));
-
 const mockCopyToClipboardOptions = {
   successMessage: "Content Copied Successfully!",
   errorMessage: "Error while copy content.",
