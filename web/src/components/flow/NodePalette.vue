@@ -119,7 +119,7 @@ export default {
 /* ── Header: "Nodes" title with a purple underline spanning the column
       (matches the pipeline editor's purple accent bar) ───────────────────── */
 .np-header {
-  color: #1f2937;
+  color: var(--color-grey-800);
   border-bottom: 2px solid #8b5cf6;
 }
 .body--dark .np-header {

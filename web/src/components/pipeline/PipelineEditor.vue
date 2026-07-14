@@ -1228,7 +1228,7 @@ const cleanupPipelinesContextProvider = () => {
 .o2vf_node .o2vf_node_input,
 .o2vf_node .vue-flow__node-input {
   border: 1px solid #60a5fa;
-  color: #1f2937;
+  color: var(--color-grey-800);
   border-radius: 12px;
   background: rgba(239, 246, 255, 0.8);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
@@ -1258,7 +1258,7 @@ const cleanupPipelinesContextProvider = () => {
   min-height: 36px;
   padding: 8px 16px;
   border: 1px solid rgba(74, 222, 128, 0.4);
-  color: #1f2937;
+  color: var(--color-grey-800);
   border-radius: 8px;
   background: rgba(240, 253, 244, 0.9);
   box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
@@ -1285,7 +1285,7 @@ const cleanupPipelinesContextProvider = () => {
 .o2vf_node .o2vf_node_default,
 .o2vf_node .vue-flow__node-default {
   border: 1px solid #f59e0b;
-  color: #1f2937;
+  color: var(--color-grey-800);
   border-radius: 12px;
   background: rgba(255, 251, 235, 0.8);
   box-shadow: 0 4px 12px rgba(217, 119, 6, 0.1);

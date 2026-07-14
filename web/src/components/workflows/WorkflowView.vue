@@ -138,17 +138,17 @@ onBeforeUnmount(() => {
 .workflow-view-tooltip .vue-flow__node-input {
   border: 1px solid #60a5fa;
   background: rgba(239, 246, 255, 0.8);
-  color: #1f2937;
+  color: var(--color-grey-800);
 }
 .workflow-view-tooltip .vue-flow__node-default {
   border: 1px solid #f59e0b;
   background: rgba(255, 251, 235, 0.8);
-  color: #1f2937;
+  color: var(--color-grey-800);
 }
 .workflow-view-tooltip .vue-flow__node-output {
   border: 1px solid rgba(74, 222, 128, 0.6);
   background: rgba(240, 253, 244, 1);
-  color: #1f2937;
+  color: var(--color-grey-800);
 }
 
 /* Handle dots — coloured ring + darker inner dot (matches the canvas). */
@@ -157,7 +157,7 @@ onBeforeUnmount(() => {
   height: 16px !important;
   border: 3px solid rgba(255, 255, 255, 0.9);
   border-radius: 50% !important;
-  background: #6b7280;
+  background: var(--color-grey-500);
 }
 .workflow-view-tooltip .handle_input { background: #dbeafe !important; }
 .workflow-view-tooltip .handle_output { background: #dcfce7 !important; }

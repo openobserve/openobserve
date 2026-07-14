@@ -95,7 +95,7 @@ const getNodeColor = (ioType) => {
     output: "#22c55e", // Green
     default: "#f59e0b", // Orange/Amber
   };
-  return colorMap[ioType] || "#6b7280";
+  return colorMap[ioType] || "var(--color-grey-500)";
 };
 
 // Function to update edge colors on node hover
@@ -107,12 +107,12 @@ const updateEdgeColors = (nodeId, color, reset = false) => {
           // Reset to default color
           edge.style = {
             ...edge.style,
-            stroke: "#6b7280",
+            stroke: "var(--color-grey-500)",
             strokeWidth: 2,
           };
           edge.markerEnd = {
             ...edge.markerEnd,
-            color: "#6b7280",
+            color: "var(--color-grey-500)",
           };
         } else {
           // Apply node color to both edge and arrow
@@ -458,7 +458,7 @@ function getIcon(data, ioType) {
   border-radius: 50%;
   border: 2px dashed var(--o2-border-strong, #d9dce4);
   background: #fff;
-  color: #6b7280;
+  color: var(--color-grey-500);
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -486,7 +486,7 @@ function getIcon(data, ioType) {
   height: 16px !important;
   border: 3px solid rgba(255, 255, 255, 0.9);
   border-radius: 50% !important;
-  background: #6b7280;
+  background: var(--color-grey-500);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease;
 }
@@ -500,7 +500,7 @@ function getIcon(data, ioType) {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #374151;
+  background: var(--color-grey-700);
   transition: all 0.3s ease;
 }
 

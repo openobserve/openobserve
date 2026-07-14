@@ -182,21 +182,21 @@ defineExpose({ vueFlowRef });
    output=green (same VueFlow node types). */
 .o2vf_node .vue-flow__node-input {
   border: 1px solid #60a5fa;
-  color: #1f2937;
+  color: var(--color-grey-800);
   border-radius: 12px;
   background: rgba(239, 246, 255, 0.8);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
 }
 .o2vf_node .vue-flow__node-default {
   border: 1px solid #f59e0b;
-  color: #1f2937;
+  color: var(--color-grey-800);
   border-radius: 12px;
   background: rgba(255, 251, 235, 0.8);
   box-shadow: 0 4px 12px rgba(245, 158, 11, 0.1);
 }
 .o2vf_node .vue-flow__node-output {
   border: 1px solid rgba(74, 222, 128, 0.6);
-  color: #1f2937;
+  color: var(--color-grey-800);
   border-radius: 12px;
   background: rgba(240, 253, 244, 1);
   box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
@@ -213,7 +213,7 @@ defineExpose({ vueFlowRef });
   height: 16px !important;
   border: 3px solid rgba(255, 255, 255, 0.9);
   border-radius: 50% !important;
-  background: #6b7280;
+  background: var(--color-grey-500);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease;
 }
@@ -226,7 +226,7 @@ defineExpose({ vueFlowRef });
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #374151;
+  background: var(--color-grey-700);
   transition: all 0.3s ease;
 }
 .handle_input { background: #dbeafe !important; }

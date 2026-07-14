@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
    </div>
 
    <!-- Edge deletion help notification -->
-   <div v-if="showEdgeHelpNotification" class="edge-help-notification tw:absolute tw:top-5 tw:left-1/2 tw:-translate-x-1/2 tw:z-[1000] tw:bg-white tw:text-[#374151] tw:py-[10px] tw:px-4 tw:rounded-lg tw:text-sm tw:shadow-[0_4px_20px_rgba(0,0,0,0.15)] tw:border tw:border-[#e5e7eb] tw:flex tw:items-center tw:dark:bg-(--o2-primary-background) tw:dark:text-[#f3f4f6] tw:dark:border-[#374151] tw:dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] tw:[animation:slideDown_0.3s_ease-out]">
+   <div v-if="showEdgeHelpNotification" class="edge-help-notification tw:absolute tw:top-5 tw:left-1/2 tw:-translate-x-1/2 tw:z-[1000] tw:bg-white tw:text-[var(--color-grey-700)] tw:py-[10px] tw:px-4 tw:rounded-lg tw:text-sm tw:shadow-[0_4px_20px_rgba(0,0,0,0.15)] tw:border tw:border-[var(--color-border-default)] tw:flex tw:items-center tw:dark:bg-(--o2-primary-background) tw:dark:text-[#f3f4f6] tw:dark:border-[var(--color-grey-700)] tw:dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] tw:[animation:slideDown_0.3s_ease-out]">
      <OIcon name="info" class="tw:mr-1" size="sm" />
      Press Backspace/Delete to remove the edge
    </div>

@@ -337,7 +337,7 @@ const onOpenChange = (open: boolean) => {
 .io-content-box {
   flex: 1;
   min-height: 0;
-  border: 1px solid var(--o2-border-color, #e5e7eb);
+  border: 1px solid var(--o2-border-color, var(--color-border-default));
   border-radius: 4px;
   overflow: hidden;
   background-color: var(--o2-code-bg);

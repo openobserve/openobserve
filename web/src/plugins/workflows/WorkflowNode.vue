@@ -216,6 +216,25 @@ const nodeIcon = computed(() => {
   return img ? `img:${img}` : meta.value?.icon || "help";
 });
 
+// Tint this node's outgoing edge with its role colour on hover, and reset to the
+// resting grey on leave — pipeline parity (mirrors CustomNode.updateEdgeColors).
+// Reset grey references makeEdge's EDGE_COLOR token so a hovered-then-reset edge
+// matches a freshly-added one. (var() resolves for both the stroke and the SVG
+// arrowhead marker.)
+const RESET_EDGE_COLOR = "var(--color-grey-500)";
+const NODE_ROLE_COLOR: Record<string, string> = {
+  input: "#3b82f6", // blue (trigger)
+  default: "#f59e0b", // amber (logic)
+  output: "#22c55e", // green (action)
+};
+const updateEdgeColors = (nodeId: string, color: string) => {
+  workflowObj.currentSelectedWorkflow.edges?.forEach((edge: any) => {
+    if (edge.source !== nodeId) return;
+    edge.style = { ...edge.style, stroke: color, strokeWidth: 2 };
+    edge.markerEnd = { ...edge.markerEnd, color };
+  });
+};
+
 // Hover-action visibility (pipeline pattern): a short delay before hiding, and
 // the action buttons cancel the hide while hovered — so moving the cursor from
 // the node onto the delete button doesn't make it vanish.
@@ -226,8 +245,10 @@ const handleNodeHover = () => {
     hideButtonsTimeout = null;
   }
   showButtons.value = true;
+  updateEdgeColors(props.id, NODE_ROLE_COLOR[meta.value?.ioType || "default"] || RESET_EDGE_COLOR);
 };
 const handleNodeLeave = () => {
+  updateEdgeColors(props.id, RESET_EDGE_COLOR);
   hideButtonsTimeout = setTimeout(() => {
     showButtons.value = false;
   }, 200);
@@ -298,7 +319,7 @@ const openResult = () => {
   color: #fff;
 }
 .wf-test-skipped {
-  background: #9ca3af;
+  background: var(--color-grey-400);
   color: #fff;
   cursor: help;
 }
@@ -348,7 +369,7 @@ const openResult = () => {
   border-radius: 50%;
   border: 2px dashed var(--o2-border-strong, #d9dce4);
   background: #fff;
-  color: #6b7280;
+  color: var(--color-grey-500);
   display: grid;
   place-items: center;
   cursor: pointer;

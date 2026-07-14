@@ -20,10 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // from a specific handle; pipelines don't).
 import { MarkerType } from "@vue-flow/core";
 
-// Resting edge colour — matches the pipeline's hover-reset stroke
-// (CustomNode.updateEdgeColors), so a freshly-added edge looks the same as the
-// rest of the graph instead of VueFlow's default grey.
-const EDGE_COLOR = "#6b7280";
+// Resting edge colour — the shared grey token. var() resolves for both the edge
+// stroke and the SVG arrowhead marker fill, so we reference the token rather than
+// hardcoding its value. Matches the node handles + the pipeline's hover-reset
+// stroke (CustomNode.updateEdgeColors) so all edges look uniform.
+const EDGE_COLOR = "var(--color-grey-500)";
 
 export const makeEdge = (
   source: string,
