@@ -1,57 +1,16 @@
 ﻿<template>
-  <div
-    class="scd-scrim fixed inset-0 bg-[rgba(0,0,0,0.32)] z-[1010] flex justify-end [animation:scd-fade_0.18s_ease-out]"
-    role="dialog"
-    aria-modal="true"
-    @click.self="$emit('close')"
+  <ODrawer
+    :open="open"
+    side="right"
+    size="lg"
+    :title="row?.name"
+    title-data-test="score-config-detail-name-badge"
+    :sub-title="t('onlineEvals.scoreConfig.detail.eyebrow')"
+    data-test="score-config-detail"
+    @update:open="handleOpenChange"
   >
-    <aside
-      class="scd w-[560px] max-w-[92vw] h-full bg-card-bg border-l border-dialog-header-border flex flex-col [animation:scd-slide_0.22s_ease-out]"
-      @click.stop
-      data-test="score-config-detail"
-    >
-      <!-- Header: eyebrow + title + status meta + close -->
-      <header class="flex items-start gap-2.5 px-5 pt-4 pb-3.5 border-b border-dialog-header-border bg-card-bg shrink-0">
-        <div class="flex-1 min-w-0 flex flex-col gap-1">
-          <div class="flex items-center gap-2 flex-nowrap">
-            <span class="font-semibold text-[11px] leading-[1.4] tracking-[0.02em] text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.eyebrow") }}</span>
-            <span
-              v-if="row.name"
-              :class="[
-                'font-semibold px-2 py-1 rounded-md inline-block',
-                store.state.theme === 'dark'
-                  ? 'text-blue-400 bg-blue-900/50'
-                  : 'text-blue-600 bg-blue-50',
-              ]"
-            >
-              {{ row.name }}
-              <OTooltip
-                v-if="row.name && row.name.length > 35"
-                :content="row.name"
-                side="top"
-              />
-            </span>
-          </div>
-        </div>
-        <button
-          type="button"
-          class="scd__close shrink-0 bg-transparent border-0 p-1 rounded cursor-pointer text-text-secondary"
-          :aria-label="t('onlineEvals.scoreConfig.detail.close')"
-          data-test="score-config-detail-close-btn"
-          @click="$emit('close')"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
-          >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-      </header>
-
+    <!-- Body: the tab bar stays pinned; only the tab content scrolls. -->
+    <div class="flex flex-col h-full min-h-0">
       <!-- Tab strip -->
       <OTabs
         :model-value="activeTab"
@@ -202,18 +161,17 @@
           </ul>
         </template>
       </div>
-    </aside>
-  </div>
+    </div>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import type { ScoreConfig, Scorer } from "@/services/online-evals.service";
@@ -221,8 +179,6 @@ import {
   dataTypeOf,
   entityId,
 } from "../utils/evalEntity";
-
-const store = useStore();
 
 const props = defineProps<{
   row: ScoreConfig;
@@ -236,6 +192,15 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+
+// Drawer open state — starts open (the parent mounts this only when a score
+// config row is selected). ODrawer's update:open(false) — via ×, Escape, or
+// overlay click — forwards `close` to the parent, which unmounts us.
+const open = ref(true);
+function handleOpenChange(value: boolean) {
+  open.value = value;
+  if (!value) emit("close");
+}
 type TabId = "overview" | "versions" | "usedBy";
 const activeTab = ref<TabId>("overview");
 
@@ -348,21 +313,6 @@ function formatTimestamp(microsOrMs: number): string {
 </script>
 
 <style>
-@keyframes scd-fade {
-  from { background: rgba(0, 0, 0, 0); }
-  to   { background: rgba(0, 0, 0, 0.32); }
-}
-
-@keyframes scd-slide {
-  from { transform: translateX(100%); }
-  to   { transform: translateX(0); }
-}
-
-.scd__close:hover {
-  background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
-  color: var(--color-text-primary, currentColor);
-}
-
 /* scd-kv dt/dd — descendant selectors, cannot inline */
 .scd-kv dt {
   font-size: 0.75rem;
