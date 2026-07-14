@@ -166,7 +166,9 @@ async fn get_file_data(source_cluster: &str, path: &str) -> Result<bytes::Bytes,
     ))
 }
 
-async fn get_inputs_file_data(errors: &WorkflowRunErrors) -> Result<bytes::Bytes, anyhow::Error> {
+pub async fn get_inputs_file_data(
+    errors: &WorkflowRunErrors,
+) -> Result<bytes::Bytes, anyhow::Error> {
     let path = get_inputs_file_path(&errors.org_id, &errors.workflow_id, &errors.run_id);
     if errors.cluster == config::get_cluster_name() {
         let get_res = infra::storage::get("", &path).await?;
@@ -453,8 +455,9 @@ async fn execute_workflow(
 pub async fn get_workflow_errors(
     org_id: &str,
     wid: &str,
-) -> Result<Vec<WorkflowRunErrors>, anyhow::Error> {
-    let res = workflows::list_errors_for_workflow(org_id, wid).await?;
+    run_id: &str,
+) -> Result<Option<WorkflowRunErrors>, anyhow::Error> {
+    let res = workflows::get_errors_for_run(org_id, wid, run_id).await?;
     Ok(res)
 }
 

@@ -28,7 +28,7 @@ use crate::{
     handler::http::extractors::Headers,
     service::{
         search as SearchService,
-        workflows::{self, WorkflowTriggerType},
+        workflows::{self, InputMap, WorkflowTriggerType},
     },
 };
 
@@ -80,6 +80,12 @@ struct WorkflowHistoryRow {
     source_id: String,
     #[serde(default)]
     run_id: String,
+}
+
+#[derive(Serialize)]
+pub struct WorkflowErrorResponse {
+    errors: Option<WorkflowRunErrors>,
+    data: Option<InputMap>,
 }
 
 /// CreateWorkflow
@@ -321,7 +327,7 @@ pub async fn test_workflow(
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/workflows/{id}/errors",
+    path = "/{org_id}/workflows/{id}/errors/{run_id}",
     context_path = "/api",
     tag = "Workflows",
     operation_id = "listWorkflowErrors",
@@ -342,11 +348,44 @@ pub async fn test_workflow(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
     )
 )]
-pub async fn get_workflow_errors(Path((org_id, workflow_id)): Path<(String, String)>) -> Response {
-    match workflows::get_workflow_errors(&org_id, &workflow_id).await {
-        Ok(v) => MetaHttpResponse::json(WorkflowErrorList { errors: v }),
-        Err(e) => MetaHttpResponse::bad_request(e),
-    }
+pub async fn get_workflow_errors(
+    Path((org_id, workflow_id, run_id)): Path<(String, String, String)>,
+) -> Response {
+    let errors = match workflows::get_workflow_errors(&org_id, &workflow_id, &run_id).await {
+        Ok(v) => v,
+        Err(e) => return MetaHttpResponse::bad_request(e),
+    };
+
+    let errors = match errors {
+        Some(v) => v,
+        None => {
+            return MetaHttpResponse::json(WorkflowErrorResponse {
+                errors: None,
+                data: None,
+            });
+        }
+    };
+
+    let data = match crate::service::workflows::get_inputs_file_data(&errors).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error getting input file data for {org_id}/{workflow_id}/{run_id}");
+            return MetaHttpResponse::internal_error(e);
+        }
+    };
+
+    let data: InputMap = match serde_json::from_slice(&data) {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error deserializing input file data for {org_id}/{workflow_id}/{run_id}");
+            return MetaHttpResponse::internal_error(e);
+        }
+    };
+
+    MetaHttpResponse::json(WorkflowErrorResponse {
+        errors: Some(errors),
+        data: Some(data),
+    })
 }
 
 /// RetryWorkflowRun

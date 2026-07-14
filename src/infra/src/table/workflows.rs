@@ -125,24 +125,7 @@ pub async fn get_by_org_wid(
     Ok(ret)
 }
 
-pub async fn list_errors_for_workflow(
-    org_id: &str,
-    wid: &str,
-) -> Result<Vec<WorkflowRunErrors>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let entities = workflow_errors::Entity::find()
-        .filter(workflow_errors::Column::OrgId.eq(org_id))
-        .filter(workflow_errors::Column::WorkflowId.eq(wid))
-        .all(client)
-        .await?;
-    let mut ret = Vec::with_capacity(entities.len());
-    for e in entities {
-        ret.push(e.try_into()?);
-    }
-    Ok(ret)
-}
-
-pub async fn list_errors_for_workflow_run(
+pub async fn get_errors_for_run(
     org_id: &str,
     wid: &str,
     run_id: &str,
@@ -156,12 +139,19 @@ pub async fn list_errors_for_workflow_run(
         .await?;
 
     let ret = res.map(|v| v.try_into()).transpose()?;
+
     Ok(ret)
 }
 
-pub async fn get_error_for_run(run_id: &str) -> Result<Option<WorkflowRunErrors>, anyhow::Error> {
+pub async fn list_errors_for_workflow_run(
+    org_id: &str,
+    wid: &str,
+    run_id: &str,
+) -> Result<Option<WorkflowRunErrors>, anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = workflow_errors::Entity::find()
+        .filter(workflow_errors::Column::OrgId.eq(org_id))
+        .filter(workflow_errors::Column::WorkflowId.eq(wid))
         .filter(workflow_errors::Column::RunId.eq(run_id))
         .one(client)
         .await?;
