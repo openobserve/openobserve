@@ -336,6 +336,35 @@ class EnrichmentPage {
         await this.listPage.waitFor({ state: 'visible', timeout: 20000 });
     }
 
+    /**
+     * Deep-navigate to the enrichment tables page WITH the org in the URL and
+     * verify it stuck. navigateToBase passes the org on the ROOT url, whose
+     * redirect to /web/ DROPS the query param — the app then falls back to the
+     * user's default org (EXPIRED1 on alpha), so tables get created in the
+     * wrong org and their URL jobs fail ("not an ingester"). Deep /web/ URLs
+     * keep the param and update the active org (same pattern as
+     * js-transform-type.spec.js's _meta navigation).
+     */
+    async gotoEnrichmentTablesWithOrg() {
+        const org = process.env.ORGNAME;
+        await this.page.goto(
+            `${process.env.ZO_BASE_URL}/web/pipeline/enrichment-tables?org_identifier=${org}`,
+            { waitUntil: 'domcontentloaded' },
+        );
+        await this.listPage.waitFor({ state: 'visible', timeout: 20000 });
+        // Guard: the active org must be the target org — menu links always carry
+        // the ACTIVE org's identifier, so assert on one of them.
+        const activeOrg = await this.page.evaluate(() => {
+            const link = document.querySelector('a[href*="org_identifier="]');
+            const m = link ? link.getAttribute('href').match(/org_identifier=([^&]+)/) : null;
+            return m ? m[1] : null;
+        });
+        if (activeOrg && activeOrg !== org) {
+            throw new Error(`Active org is ${activeOrg}, expected ${org} — org switch did not stick`);
+        }
+        testLogger.info(`Enrichment tables page loaded with active org ${org}`);
+    }
+
     async navigateToAddEnrichmentTable() {
         // This method is already in pipelinesPage, so we'll delegate to it
         // We'll use pageManager.pipelinesPage.navigateToAddEnrichmentTable() in tests
@@ -1117,9 +1146,35 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // Fill URL input
         await this.fillUrlInput(csvUrl);
 
-        // Click Save button (wait for it to be actionable)
+        // Pre-save checks: both fields must hold their exact values before we
+        // submit — OInput can re-render and swallow a racing fill(), which
+        // would create the table with a mangled name/URL.
+        await expect(this.nameField).toHaveValue(tableName, { timeout: 5000 });
+        await expect(this.urlField).toHaveValue(csvUrl, { timeout: 5000 });
+        // Save must be visible AND enabled (form validation passed) before clicking.
+        await this.addSaveBtn.waitFor({ state: 'visible', timeout: 5000 });
+        await expect(this.addSaveBtn).toBeEnabled({ timeout: 5000 });
+        testLogger.debug('Pre-save checks passed (name, url, save enabled)');
+
+        // Click Save and hard-verify the create API accepted the job — a
+        // rejected create (4xx/5xx) must fail HERE with the backend's reason,
+        // not later as a mysterious missing-row/schema-btn timeout.
+        const createRespPromise = this.page.waitForResponse(
+            (resp) => /\/api\/[^/]+\/enrichment_tables\/[^/?]+\/url/.test(resp.url()) && resp.request().method() === 'POST',
+            { timeout: 15000 },
+        ).catch(() => null);
         await this.addSaveBtn.click();
         testLogger.debug('Save button clicked');
+        const createResp = await createRespPromise;
+        if (createResp) {
+            testLogger.info(`Enrichment URL create responded HTTP ${createResp.status()} for ${tableName}`);
+            if (!createResp.ok()) {
+                const body = await createResp.text().catch(() => '');
+                throw new Error(`Enrichment table create rejected: HTTP ${createResp.status()} — ${body.slice(0, 300)}`);
+            }
+        } else {
+            testLogger.warn('Create response not observed within 15s — falling back to form-close check');
+        }
 
         // Wait for save to complete
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -2205,7 +2260,66 @@ abc, err = get_enrichment_table_record("${fileName}", {
      * @param {number} pollInterval - Time between polls in ms (default 5000)
      * @returns {Promise<{completed: boolean, hasFailed: boolean, buttonCount: number}>}
      */
-    async waitForUrlJobToFinish(tableName, maxAttempts = 15, pollInterval = 5000) {
+    /**
+     * Read the authoritative aggregate URL-job status for a table straight from
+     * the backend status API (same source the UI uses), avoiding races where the
+     * row buttons briefly mis-render during the processing->completed transition.
+     * @returns {Promise<'completed'|'failed'|'processing'|'pending'|null>}
+     */
+    async getUrlJobStatus(tableName) {
+        return await this.page.evaluate(async (name) => {
+            const org = new URLSearchParams(location.search).get('org_identifier');
+            if (!org) return null;
+            try {
+                const r = await fetch(`/api/${org}/enrichment_tables/status`, { credentials: 'include' });
+                if (!r.ok) return null;
+                const j = await r.json();
+                const data = j.data || j;
+                const entry = data[name];
+                if (!entry) return null;
+                const jobs = Array.isArray(entry) ? entry : [entry];
+                if (jobs.some((x) => x.status === 'failed')) return 'failed';
+                if (jobs.some((x) => x.status === 'processing')) return 'processing';
+                if (jobs.some((x) => x.status === 'pending')) return 'pending';
+                if (jobs.length && jobs.every((x) => x.status === 'completed')) return 'completed';
+                return 'pending';
+            } catch (e) {
+                return null;
+            }
+        }, tableName);
+    }
+
+    /**
+     * Re-execute a failed URL job with its stored URL — the product's own
+     * "reload / retry failed jobs" action (AddEnrichmentTable.vue reload mode:
+     * url='', retry=true, replace_failed=false). Used to ride out transient
+     * backend URL-fetch blips (the fetch itself is external, and the backend
+     * already retries 3x internally before marking a job failed).
+     * @returns {Promise<number|null>} HTTP status of the reload request
+     */
+    async reloadFailedUrlJob(tableName) {
+        return await this.page.evaluate(async (name) => {
+            const org = new URLSearchParams(location.search).get('org_identifier');
+            if (!org) return null;
+            try {
+                const r = await fetch(
+                    `/api/${org}/enrichment_tables/${name}/url?append=false&resume=false&retry=true`,
+                    {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: '', replace_failed: false }),
+                    },
+                );
+                return r.status;
+            } catch (e) {
+                return null;
+            }
+        }, tableName);
+    }
+
+    async waitForUrlJobToFinish(tableName, maxAttempts = 15, pollInterval = 5000, retryOnFailure = false, maxFailureRetries = 3) {
+        let failureRetries = 0;
         testLogger.info(`Waiting for URL job to finish: ${tableName} (max ${maxAttempts} attempts)`);
 
         for (let i = 0; i < maxAttempts; i++) {
@@ -2223,21 +2337,64 @@ abc, err = get_enrichment_table_record("${fileName}", {
                 continue;
             }
 
-            // Check for warning icon (failed job)
-            const hasWarningIcon = await this.isWarningIconVisibleInRow(tableName);
-            if (hasWarningIcon) {
-                testLogger.info(`Job failed (warning icon visible) - attempt ${i + 1}`);
-                return { completed: true, hasFailed: true, buttonCount: 0 };
-            }
-
-            // Check button count as indicator job is done
-            const buttonCount = await this.getTableRowButtonCount(tableName);
-            if (buttonCount >= 2) {
-                testLogger.info(`Job finished - ${buttonCount} buttons visible`);
+            // Authoritative decision from the backend status API (same source the
+            // UI uses). This removes the old `buttonCount >= 2` false-positive
+            // (a FAILED job shows edit+delete = 2 buttons) AND any button-render
+            // race during the processing->completed transition.
+            const apiStatus = await this.getUrlJobStatus(tableName);
+            if (apiStatus === 'completed') {
+                const buttonCount = await this.getTableRowButtonCount(tableName);
+                testLogger.info(`Job completed (status API) - ${buttonCount} buttons - attempt ${i + 1}`);
                 return { completed: true, hasFailed: false, buttonCount };
             }
+            if (apiStatus === 'failed') {
+                // Surface the backend error_message + job URL in the test log —
+                // without this a failed job only shows up as a downstream
+                // selector timeout, which is misleading to triage.
+                try {
+                    const detail = await this.page.evaluate(async (name) => {
+                        const org = new URLSearchParams(location.search).get('org_identifier');
+                        const r = await fetch(`/api/${org}/enrichment_tables/status`, { credentials: 'include' });
+                        const j = await r.json(); const d = j.data || j; const e = d[name];
+                        const jobs = Array.isArray(e) ? e : [e];
+                        return jobs.map((x) => ({ status: x.status, url: x.url, err: x.error_message, retries: x.retry_count }));
+                    }, tableName);
+                    testLogger.info(`URL-job failure detail for ${tableName}: ${JSON.stringify(detail)}`);
+                } catch (e) { /* logging only */ }
+                // Transient backend URL-fetch failure: re-execute the job (product's
+                // own reload/retry) and keep polling, rather than failing the test on
+                // an external blip. Only when the caller opts in (e.g. the schema-view
+                // test); tests that EXPECT a failure (schema-mismatch) pass retryOnFailure=false.
+                if (retryOnFailure && failureRetries < maxFailureRetries) {
+                    failureRetries += 1;
+                    const rc = await this.reloadFailedUrlJob(tableName);
+                    testLogger.info(`Job failed - reload-retry ${failureRetries}/${maxFailureRetries} (reload HTTP ${rc}) - attempt ${i + 1}`);
+                    continue;
+                }
+                testLogger.info(`Job failed (status API) after ${failureRetries} reload-retries - attempt ${i + 1}`);
+                return { completed: true, hasFailed: true, buttonCount: 0 };
+            }
+            if (apiStatus === 'processing' || apiStatus === 'pending') {
+                testLogger.info(`Job ${apiStatus} (status API) - attempt ${i + 1}/${maxAttempts}`);
+                continue;
+            }
 
-            testLogger.info(`Waiting for job - attempt ${i + 1}/${maxAttempts} (${buttonCount} buttons visible)`);
+            // API unreachable/unknown — fall back to button-state inference:
+            //   completed -> explore+schema+edit+delete; failed -> edit+delete; processing -> delete
+            const schemaVisible = await this.getRowSchemaBtn(tableName).isVisible({ timeout: 1000 }).catch(() => false);
+            if (schemaVisible) {
+                const buttonCount = await this.getTableRowButtonCount(tableName);
+                testLogger.info(`Job completed (schema btn visible) - ${buttonCount} buttons - attempt ${i + 1}`);
+                return { completed: true, hasFailed: false, buttonCount };
+            }
+            const hasWarningIcon = await this.isWarningIconVisibleInRow(tableName);
+            const editVisible = await this.getRowEditBtn(tableName).isVisible({ timeout: 500 }).catch(() => false);
+            if (hasWarningIcon || editVisible) {
+                testLogger.info(`Job failed (fallback: warning=${hasWarningIcon}, edit-only) - attempt ${i + 1}`);
+                return { completed: true, hasFailed: true, buttonCount: editVisible ? 2 : 0 };
+            }
+
+            testLogger.info(`Waiting for job (processing/pending) - attempt ${i + 1}/${maxAttempts}`);
         }
 
         testLogger.warn(`Job did not complete within ${maxAttempts} attempts`);
