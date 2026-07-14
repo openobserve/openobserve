@@ -157,16 +157,54 @@ const groupFieldCount = computed(() => {
 });
 
 // ---------------------------------------------------------------------------
+// Groups that still have at least one field matching the active search term.
+// Computed from the full (pre-collapse) field set so a collapsed group whose
+// matching field rows have been filtered out is still recognised as a match.
+// Returns null when there is no active search (every group is a match).
+// ---------------------------------------------------------------------------
+
+const searchMatchedGroups = computed<Set<string> | null>(() => {
+  const term = props.search?.trim().toLowerCase();
+  if (!term) return null;
+  const matched = new Set<string>();
+  for (const row of annotatedFields.value) {
+    if (
+      !row.isGroup &&
+      row.group &&
+      String(row.name ?? "").toLowerCase().includes(term)
+    ) {
+      matched.add(row.group);
+    }
+  }
+  return matched;
+});
+
+// ---------------------------------------------------------------------------
 // Visible fields — collapse filter
+//
+// A collapsed group keeps its header but drops its field rows. Because the
+// downstream OFieldList decides whether to keep a group header during a search
+// by looking for matching child rows, we must stamp the header with
+// `matchesSearch` here — otherwise a collapsed group whose only match is hidden
+// would lose its header too, making the field unreachable until page refresh.
 // ---------------------------------------------------------------------------
 
 const visibleFields = computed(() =>
-  annotatedFields.value.filter((row: any) => {
-    if (row.isGroup) return true;
-    const group = row.group;
-    if (group && expandGroupRows.value[group] === false) return false;
-    return true;
-  }),
+  annotatedFields.value
+    .filter((row: any) => {
+      if (row.isGroup) return true;
+      const group = row.group;
+      if (group && expandGroupRows.value[group] === false) return false;
+      return true;
+    })
+    .map((row: any) => {
+      if (!row.isGroup) return row;
+      const matched = searchMatchedGroups.value;
+      return {
+        ...row,
+        matchesSearch: matched ? matched.has(row.group) : true,
+      };
+    }),
 );
 
 // ---------------------------------------------------------------------------

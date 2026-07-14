@@ -24,6 +24,7 @@ pub mod kv_store;
 pub mod model_pricing;
 pub mod online_eval_jobs;
 pub mod org_ai_toolsets;
+pub mod org_cleanup_tasks;
 pub mod org_ingestion_tokens;
 pub mod org_storage_providers;
 pub mod org_users;

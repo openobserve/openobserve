@@ -26,11 +26,10 @@ use config::{
 };
 #[cfg(feature = "enterprise")]
 use o2_dex::config::get_config as get_dex_config;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::license::block_feature_for_report_failure;
-#[cfg(feature = "enterprise")]
-use o2_openfga::config::get_config as get_openfga_config;
 
+#[cfg(feature = "enterprise")]
+pub use crate::common::utils::auth::get_user_email_from_auth_str;
+pub use crate::service::authz::{check_permissions, list_objects_for_user};
 use crate::{
     common::{
         infra::config::ORG_INGESTION_TOKENS,
@@ -43,7 +42,7 @@ use crate::{
             },
         },
         utils::{
-            auth::{AuthExtractor, V2_API_PREFIX, get_hash, is_root_user},
+            auth::{AuthExtractor, V2_API_PREFIX, get_hash, get_user_details, is_root_user},
             redirect_response::RedirectResponseBuilder,
         },
     },
@@ -220,6 +219,22 @@ pub async fn validate_token(token: &str, org_id: &str) -> Result<(), AuthError> 
             "User associated with this token not found".to_string(),
         )),
     }
+}
+
+/// System-wide domain-management blocklist check.
+///
+/// Denies **external SSO identities** (users AND SSO/token service accounts) that are on the
+/// blocklist — covering UI/API session tokens, external static tokens, and passcode ingestion. The
+/// `is_external` short-circuit means native/internal principals (incl. root, which is internal)
+/// skip the cache lookup entirely. Kept as one helper so the validator call sites stay identical.
+#[cfg(feature = "enterprise")]
+async fn blocked_external(user: &config::meta::user::User) -> bool {
+    use o2_enterprise::enterprise::domain_management::{self, meta::AccessDecision};
+    user.is_external
+        && matches!(
+            domain_management::evaluate_cached(&user.email).await,
+            AccessDecision::Deny
+        )
 }
 
 pub async fn validate_credentials(
@@ -408,6 +423,17 @@ pub async fn validate_credentials(
         }
     }
     let user = user.unwrap();
+
+    // System-wide blocklist — deny external SSO identities before any token/password branch, so it
+    // also covers external service-account static tokens and ingestion. Native/internal untouched.
+    #[cfg(feature = "enterprise")]
+    if blocked_external(&user).await {
+        log::warn!(
+            "Blocked external identity attempted API/ingest access: {}",
+            user.email
+        );
+        return Ok(TokenValidationResponse::default());
+    }
 
     // Check token authentication first (before native login restrictions)
     // This allows service accounts (including SRE agents) and all users to use API tokens
@@ -626,6 +652,16 @@ pub async fn validate_credentials_ext(
         return Ok(TokenValidationResponse::default());
     }
     let user = user.unwrap();
+
+    // System-wide blocklist — this is the `auth_ext` / passcode-ingestion path. Deny blocked
+    // external SSO service accounts here too. This fn is already enterprise-gated.
+    if blocked_external(&user).await {
+        log::warn!(
+            "Blocked external identity attempted passcode/ingest access: {}",
+            user.email
+        );
+        return Ok(TokenValidationResponse::default());
+    }
 
     let hashed_pass = get_hash(
         &format!(
@@ -935,6 +971,18 @@ pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResul
             Ok(_res) => {
                 // Get user from token to set user_id header
                 if let Some(user) = users::get_user_by_token(org_id_end_point[0], token).await {
+                    // System-wide blocklist — a blocked external SSO identity's RUM token must not
+                    // ingest. The rum_token is a separate credential (embedded in browser JS), so
+                    // it bypasses validate_credentials; check it here too.
+                    // Native/internal untouched.
+                    #[cfg(feature = "enterprise")]
+                    if blocked_external(&user).await {
+                        log::warn!(
+                            "Blocked external identity attempted RUM ingest access: {}",
+                            user.email
+                        );
+                        return Err(AuthError::Unauthorized("Unauthorized Access".to_string()));
+                    }
                     Ok(AuthValidationResult {
                         user_email: user.email,
                         user_role: Some(user.role),
@@ -1037,53 +1085,6 @@ async fn oo_validator_internal(
     }
 }
 
-#[cfg(feature = "enterprise")]
-pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
-    if auth_str.starts_with("Basic") {
-        let decoded = match base64::decode(auth_str.strip_prefix("Basic").unwrap().trim()) {
-            Ok(val) => val,
-            Err(_) => return None,
-        };
-
-        match get_user_details(decoded) {
-            Some(value) => Some(value.0),
-            None => None,
-        }
-    } else if auth_str.starts_with("Bearer") {
-        super::token::get_user_name_from_token(auth_str).await
-    } else if auth_str.starts_with("{\"auth_ext\":") {
-        let auth_tokens: AuthTokensExt =
-            config::utils::json::from_str(auth_str).unwrap_or_default();
-        if chrono::Utc::now().timestamp() - auth_tokens.request_time > auth_tokens.expires_in {
-            None
-        } else {
-            let decoded = match base64::decode(
-                auth_tokens
-                    .auth_ext
-                    .strip_prefix("auth_ext")
-                    .unwrap()
-                    .trim(),
-            ) {
-                Ok(val) => val,
-                Err(_) => return None,
-            };
-            match get_user_details(decoded) {
-                Some(value) => Some(value.0),
-                None => None,
-            }
-        }
-    } else {
-        None
-    }
-}
-
-fn get_user_details(decoded: impl AsRef<[u8]>) -> Option<(String, String)> {
-    let credentials = str::from_utf8(decoded.as_ref()).ok()?;
-    credentials
-        .split_once(':')
-        .map(|(u, p)| (u.to_string(), p.to_string()))
-}
-
 /// Validates the authentication information in the incoming request and returns the result if
 /// valid, or an error if invalid.
 ///
@@ -1118,107 +1119,6 @@ pub async fn validator_proxy_url(
 ) -> Result<AuthValidationResult, AuthError> {
     let path_prefix = "/proxy/";
     oo_validator_internal(req_data, auth_info, path_prefix).await
-}
-
-#[cfg(feature = "enterprise")]
-pub(crate) async fn check_permissions(
-    user_id: &str,
-    auth_info: AuthExtractor,
-    role: UserRole,
-    _is_external: bool,
-) -> bool {
-    use crate::common::infra::config::ORG_USERS;
-
-    if !get_openfga_config().enabled {
-        return true;
-    }
-
-    if block_feature_for_report_failure().await {
-        return true;
-    }
-
-    let object_str = auth_info.o2_type;
-    log::debug!("Role of user {user_id} is {role:#?}");
-    let role = if role.eq(&UserRole::Root) {
-        // root user should have access to everything , bypass check in openfga
-        return true;
-    } else {
-        format!("{role}")
-    };
-
-    let org_id = &auth_info.org_id;
-
-    // When checking against META_ORG, look up the user's role there
-    let effective_role = if org_id == config::META_ORG_ID {
-        match ORG_USERS.get(&format!("{}/{user_id}", config::META_ORG_ID)) {
-            Some(user) => user.role.to_string(),
-            None => role,
-        }
-    } else {
-        role
-    };
-
-    o2_openfga::authorizer::authz::is_allowed(
-        org_id,
-        user_id,
-        &auth_info.method,
-        &object_str,
-        &auth_info.parent_id,
-        &effective_role,
-        auth_info.use_all_org,
-        auth_info.use_self_context,
-        auth_info.use_self_parent,
-    )
-    .await
-}
-
-#[cfg(not(feature = "enterprise"))]
-pub(crate) async fn check_permissions(
-    _user_id: &str,
-    _auth_info: AuthExtractor,
-    _role: UserRole,
-    _is_external: bool,
-) -> bool {
-    true
-}
-
-#[cfg(feature = "enterprise")]
-async fn list_objects(
-    user_id: &str,
-    permission: &str,
-    object_type: &str,
-    org_id: &str,
-    role: &str,
-) -> Result<Vec<String>, anyhow::Error> {
-    o2_openfga::authorizer::authz::list_objects(user_id, permission, object_type, org_id, role)
-        .await
-}
-
-#[cfg(feature = "enterprise")]
-pub(crate) async fn list_objects_for_user(
-    org_id: &str,
-    user_id: &str,
-    permission: &str,
-    object_type: &str,
-) -> Result<Option<Vec<String>>, AuthError> {
-    let openfga_config = get_openfga_config();
-    if !is_root_user(user_id) && openfga_config.enabled && openfga_config.list_only_permitted {
-        let role = match users::get_user(Some(org_id), user_id).await {
-            Some(user) => user.role.to_string(),
-            None => "".to_string(),
-        };
-        match list_objects(user_id, permission, object_type, org_id, &role).await {
-            Ok(resp) => {
-                log::debug!(
-                    "list_objects_for_user for user {user_id} from {org_id} org returns: {resp:#?}"
-                );
-                Ok(Some(resp))
-            }
-            Err(_) => Err(AuthError::Forbidden("Unauthorized Access".to_string())),
-        }
-    } else {
-        Ok(None)
-    }
 }
 
 /// Helper function to extract the relative path after the base URI and path prefix

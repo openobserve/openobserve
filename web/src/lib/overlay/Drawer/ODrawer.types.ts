@@ -54,6 +54,12 @@ export interface DrawerProps {
   title?: string;
 
   /**
+   * Optional data-test attribute rendered on the structured title element,
+   * so consumers using the `title`/`subTitle` props keep a stable test hook.
+   */
+  titleDataTest?: string;
+
+  /**
    * Whether to render a built-in × close button in the header.
    * Only applies when `persistent` is false.
    * @default true

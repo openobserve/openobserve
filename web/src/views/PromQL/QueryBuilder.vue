@@ -1,18 +1,17 @@
 <template>
   <div
     data-test="promql-query-builder"
-    class="px-2.5 max-w-350 mx-auto h-[calc(100vh-50px)] overflow-auto"
+    class="h-[calc(100vh-50px)] flex flex-col overflow-hidden"
   >
+    <AppPageHeader
+      title="PromQL Query Builder"
+      subtitle="Build and test PromQL queries visually"
+      icon="query-stats"
+      class="shrink-0 px-4 border-b border-border-default"
+    />
+    <div class="flex-1 overflow-auto px-2.5">
+      <div class="max-w-350 mx-auto py-2.5">
     <OCard>
-      <OCardSection role="header">
-        <div class="text-2xl font-semibold">PromQL Query Builder</div>
-        <div class="text-sm font-medium text-gray-400">
-          Build and test PromQL queries visually
-        </div>
-      </OCardSection>
-
-      <OSeparator />
-
       <OCardSection role="body">
         <!-- Query Builder Section -->
         <div class="flex flex-col gap-5">
@@ -86,6 +85,8 @@
         </OCard>
       </OCardSection>
     </OCard>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -100,6 +101,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OCard from "@/lib/core/Card/OCard.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";

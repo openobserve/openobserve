@@ -48,6 +48,8 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use vector_enrichment::TableRegistry;
 
+#[cfg(feature = "enterprise")]
+use crate::service::{http::map_error_to_http_response, self_reporting::audit};
 use crate::{
     common::{
         meta::search::{AuditContext, SearchResultType},
@@ -60,11 +62,6 @@ use crate::{
             HistogramIntervalVisitor, validate_and_adjust_histogram_interval,
         },
     },
-};
-#[cfg(feature = "enterprise")]
-use crate::{
-    handler::http::request::search::error_utils::map_error_to_http_response,
-    service::self_reporting::audit,
 };
 
 pub mod cache;

@@ -21,12 +21,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <AppPageHeader
       :title="t('alerts.history')"
+      title-data-test="alerts-history-title"
       :back="{ onClick: goBack, dataTest: 'alert-history-back-btn' }"
       class="shrink-0 px-4 border-b border-border-default"
     >
-      <template #title>
-        <span data-test="alerts-history-title">{{ t("alerts.history") }}</span>
-      </template>
       <template #actions>
         <DateTime
           ref="dateTimeRef"

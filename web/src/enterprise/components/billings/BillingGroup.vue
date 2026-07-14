@@ -315,23 +315,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('billing.billingGroup.inviteTitle')"
       :primary-button-label="t('billing.billingGroup.sendInvite')"
       :secondary-button-label="t('billing.billingGroup.cancel')"
-      :primary-button-disabled="!inviteOrgId || sending"
+      form-id="billing-group-invite-form"
       data-test="org-group-invite-dialog"
       @update:open="showInviteDialog = $event"
-      @click:primary="sendInvite"
       @click:secondary="showInviteDialog = false"
     >
-      <div class="p-4">
-        <OInput
-          v-model="inviteOrgId"
-          class="showLabelOnTop mt-4"
-          :label="t('billing.billingGroup.inviteOrgIdLabel')"
-          :placeholder="t('billing.billingGroup.inviteOrgIdPlaceholder')"
-          data-test="org-group-invite-input"
-          autofocus
-          @keyup.enter="sendInvite"
-        />
-      </div>
+      <OForm
+        id="billing-group-invite-form"
+        :schema="billingGroupInviteSchema"
+        :default-values="billingGroupInviteDefaults()"
+        @submit="sendInvite"
+      >
+        <div class="p-4">
+          <OFormInput
+            name="inviteOrgId"
+            class="showLabelOnTop mt-4"
+            :label="t('billing.billingGroup.inviteOrgIdLabel')"
+            :placeholder="t('billing.billingGroup.inviteOrgIdPlaceholder')"
+            data-test="org-group-invite-input"
+            required
+            autofocus
+          />
+        </div>
+      </OForm>
     </ODrawer>
   </div>
 </template>
@@ -352,7 +358,8 @@ import BillingService from "@/services/billings";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -363,6 +370,11 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
+import {
+  makeBillingGroupInviteSchema,
+  billingGroupInviteDefaults,
+  type BillingGroupInviteForm,
+} from "./BillingGroup.schema";
 
 interface BillingGroupMember {
   id: number;
@@ -390,7 +402,7 @@ interface BillingGroupInvite {
 
 export default defineComponent({
   name: "BillingGroup",
-  components: { OTag, OButton, OIcon, OInput, OSpinner, OTable, OUserCell, ODrawer, OTooltip, AppTabs },
+  components: { OTag, OButton, OIcon, OForm, OFormInput, OSpinner, OTable, OUserCell, ODrawer, OTooltip, AppTabs },
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -399,14 +411,18 @@ export default defineComponent({
     const membership = ref<BillingGroupMember | null>(null);
     const members = ref<BillingGroupMember[]>([]);
     const invites = ref<BillingGroupInvite[]>([]);
-    const inviteOrgId = ref("");
-    const sending = ref(false);
     const actioningToken = ref("");
     const showInviteDialog = ref(false);
     const superFilter = ref("all");
 
     const currentOrg = computed(
       () => store.state.selectedOrganization.identifier
+    );
+
+    // inviteOrgId is OForm-owned; the schema gates required + same-org.
+    const billingGroupInviteSchema = makeBillingGroupInviteSchema(
+      t,
+      () => currentOrg.value,
     );
 
     const goToUsage = () => {
@@ -669,18 +685,13 @@ export default defineComponent({
       }
     };
 
-    const sendInvite = async () => {
-      const target = inviteOrgId.value.trim();
-      if (!target || sending.value) return;
-      if (target === currentOrg.value) {
-        toast({
-          variant: "error",
-          message: t("billing.billingGroup.inviteSameOrg"),
-          timeout: 5000,
-        });
-        return;
-      }
-      sending.value = true;
+    // @submit handler — the schema already gated the empty + same-org cases, so
+    // there is no imperative guard here. Loading is form-driven (the ODrawer
+    // footer Save auto-spins while OForm awaits this) and double-submit is
+    // guarded by the form. The drawer body unmounts on close, so the next open
+    // re-seeds a blank field via `:default-values` (no manual clear).
+    const sendInvite = async (value: BillingGroupInviteForm) => {
+      const target = value.inviteOrgId.trim();
       try {
         await BillingService.send_billing_group_invite(currentOrg.value, target);
         toast({
@@ -688,7 +699,6 @@ export default defineComponent({
           message: t("billing.billingGroup.inviteSent"),
           timeout: 5000,
         });
-        inviteOrgId.value = "";
         showInviteDialog.value = false;
         await loadAll();
       } catch (e: any) {
@@ -697,8 +707,6 @@ export default defineComponent({
           message: e?.response?.data?.message || e.message,
           timeout: 5000,
         });
-      } finally {
-        sending.value = false;
       }
     };
 
@@ -754,8 +762,9 @@ export default defineComponent({
       role,
       membership,
       members,
-      inviteOrgId,
-      sending,
+      // Returned from setup() so the Options-API template resolves `:schema`.
+      billingGroupInviteSchema,
+      billingGroupInviteDefaults,
       actioningToken,
       showInviteDialog,
       superFilter,

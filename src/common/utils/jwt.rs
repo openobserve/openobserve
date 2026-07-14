@@ -154,6 +154,20 @@ pub(crate) fn verify_decode_token(
 }
 
 #[cfg(feature = "enterprise")]
+pub async fn get_user_name_from_token(auth_str: &str) -> Option<String> {
+    let keys = o2_dex::service::auth::get_dex_jwks().await;
+    let result = verify_decode_token(
+        auth_str.strip_prefix("Bearer")?.trim(),
+        &keys,
+        &o2_dex::config::get_config().client_id,
+        false,
+        true,
+    )
+    .ok()?;
+    result.0.is_valid.then_some(result.0.user_email)
+}
+
+#[cfg(feature = "enterprise")]
 #[cfg(test)]
 mod tests {
     use super::*;

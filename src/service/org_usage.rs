@@ -16,15 +16,76 @@
 use std::collections::HashMap;
 
 use config::utils::json;
-use o2_enterprise::enterprise::cloud::billings::{
-    self, MeteringProvider,
-    org_usage::{self, OrgUsageQueryResult, RangeUnit},
+use o2_enterprise::enterprise::{
+    cloud::billings::{
+        self, MeteringProvider,
+        org_usage::{self, OrgUsageEvent, OrgUsageQueryResult, RangeUnit, UsageResultUnit},
+    },
+    metering::MeteringEventName,
 };
+use serde::Serialize;
+use utoipa::ToSchema;
 
-use crate::{
-    handler::http::models::billings::{GetOrgUsageResponseBody, OrgUserData},
-    service::self_reporting::search::get_usage,
-};
+use crate::service::self_reporting::search::get_usage;
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct GetOrgUsageResponseBody {
+    pub data: Vec<OrgUserData>,
+    pub range: String,
+    pub start_time: i64,
+    pub end_time: i64,
+}
+
+impl GetOrgUsageResponseBody {
+    pub fn convert_to_unit(&mut self, unit: &str) {
+        let target_unit = unit.to_ascii_lowercase();
+        for usage_data in &mut self.data {
+            match (
+                usage_data.unit.to_ascii_lowercase().as_str(),
+                target_unit.as_str(),
+            ) {
+                ("gb", "mb") => {
+                    usage_data.value *= 1024.0;
+                    usage_data.unit = "MB".to_string();
+                }
+                ("mb", "gb") => {
+                    usage_data.value /= 1024.0;
+                    usage_data.unit = "GB".to_string();
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema, Default)]
+pub struct OrgUserData {
+    pub event: String,
+    pub value: f64,
+    pub cost: Option<f64>,
+    pub unit: String,
+}
+
+impl OrgUserData {
+    pub fn from_query_result(value: OrgUsageQueryResult, price_map: &HashMap<String, f64>) -> Self {
+        let event = match value.event {
+            OrgUsageEvent::UsageEvent(event) => event.into(),
+            OrgUsageEvent::DataRetentionUsageEvent(_) => MeteringEventName::DataRetention,
+        };
+        let cost = price_map
+            .get(&event.to_string())
+            .map(|price| match value.unit {
+                UsageResultUnit::MB => price * (value.size / 1024.0),
+                UsageResultUnit::GB | UsageResultUnit::Count => price * value.size,
+            });
+        Self {
+            event: value.event.to_string(),
+            value: value.size,
+            unit: value.unit.to_string(),
+            cost,
+        }
+    }
+}
 
 pub async fn get_org_usage(
     parent_org: &str,
@@ -40,22 +101,19 @@ pub async fn get_org_usage(
     {
         // if subscription is present, and stripe is provider , and range is cycle and subscription
         // id is present, we will try to get the cycle based usage
-        if let Some(b) = billings.first() {
-            if b.provider == MeteringProvider::Stripe
-                && let Some(id) = &b.subscription_id
-            {
-                pricing_map =
-                    o2_enterprise::enterprise::cloud::billings::get_pricing_map(id).await?;
-                if usage_range.unit == RangeUnit::Cycle {
-                    let sub =
-                        o2_enterprise::enterprise::cloud::billings::get_stripe_subscription(id)
-                            .await?;
+        if let Some(b) = billings.first()
+            && b.provider == MeteringProvider::Stripe
+            && let Some(id) = &b.subscription_id
+        {
+            pricing_map = o2_enterprise::enterprise::cloud::billings::get_pricing_map(id).await?;
+            if usage_range.unit == RangeUnit::Cycle {
+                let sub =
+                    o2_enterprise::enterprise::cloud::billings::get_stripe_subscription(id).await?;
 
-                    let end = sub.current_period_end;
-                    let diff = sub.current_period_end - sub.current_period_start;
-                    cycle_details = Some((end, diff));
-                    log::info!("using end {end} diff {diff} for org {org_id} for usage query")
-                }
+                let end = sub.current_period_end;
+                let diff = sub.current_period_end - sub.current_period_start;
+                cycle_details = Some((end, diff));
+                log::info!("using end {end} diff {diff} for org {org_id} for usage query")
             }
         }
     }

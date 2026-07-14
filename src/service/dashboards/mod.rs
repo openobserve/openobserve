@@ -1105,7 +1105,7 @@ async fn filter_permitted_dashboards(
             Ok(Some(user)) => user.role,
             _ => return Err(DashboardError::UserNotFound),
         };
-        let permitted = crate::handler::http::auth::validator::check_permissions(
+        let permitted = crate::service::authz::check_permissions(
             user_id,
             AuthExtractor {
                 org_id: org_id.to_string(),
@@ -1134,7 +1134,7 @@ async fn filter_permitted_dashboards(
     // to see the dashboard. This is used to check if the user has permission to see a specific
     // dashboard.
 
-    let permitted_objects = crate::handler::http::auth::validator::list_objects_for_user(
+    let permitted_objects = crate::service::authz::list_objects_for_user(
         org_id,
         user_id,
         "GET_INDIVIDUAL_FROM_ROLE",

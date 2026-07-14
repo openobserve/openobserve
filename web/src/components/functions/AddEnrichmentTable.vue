@@ -22,19 +22,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Standard app header: back tile + title (Save/Cancel stay in the footer). -->
     <AppPageHeader
       :title="isUpdating ? t('function.updateEnrichmentTable') : t('function.addEnrichmentTable')"
+      title-data-test="add-enrichment-table-title"
       :back="{
         label: t('function.enrichmentTables'),
         onClick: () => $emit('cancel:hideform'),
         dataTest: 'add-enrichment-table-back-btn',
       }"
       class="-mx-2.5 px-4 border-b border-border-default mb-2 shrink-0"
-    >
-      <template #title>
-        <span data-test="add-enrichment-table-title">{{
-          isUpdating ? t("function.updateEnrichmentTable") : t("function.addEnrichmentTable")
-        }}</span>
-      </template>
-    </AppPageHeader>
+    />
 
     <!-- Form content -->
     <div class="card-container flex-1 min-h-0 mb-2 flex flex-col overflow-y-auto p-4">

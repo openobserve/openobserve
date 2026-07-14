@@ -389,8 +389,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- end v-if="!showImportModelPricingPage" -->
 
     <!-- Pricing detail side panel -->
-    <ODrawer data-test="model-pricing-list-pricing-drawer" v-model:open="showPricingDialog" :width="30" title="Hello">
-      <template #header-left>
+    <ODrawer
+      data-test="model-pricing-list-pricing-drawer"
+      v-model:open="showPricingDialog"
+      :width="30"
+      :title="pricingDialogRow?.match_pattern"
+      :title-data-test="'model-pricing-drawer-title'"
+      :sub-title="t('modelPricing.modelDetails')"
+    >
+      <!-- Source (built-in / inherited / custom) indicator trails on the right. -->
+      <template #header-right>
         <span
             v-if="getSource(pricingDialogRow) === 'built_in'"
             class="shrink-0 cursor-default inline-flex"
