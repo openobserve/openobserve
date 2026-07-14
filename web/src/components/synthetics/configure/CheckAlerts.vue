@@ -92,7 +92,7 @@ const silenceMinutes = computed({
       <!-- ── Retries ────────────────────────────────────────────────────── -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2 flex-nowrap">
-          <span class="text-sm text-[var(--color-text-body)] whitespace-nowrap w-32">{{ t('synthetics.scheduleAlert.retriesOnFailure') }}</span>
+          <label class="text-sm font-medium text-[var(--color-text-label)] whitespace-nowrap w-32">{{ t('synthetics.scheduleAlert.retriesOnFailure') }}</label>
           <OInput
             v-model="retries"
             type="number"
@@ -100,10 +100,10 @@ const silenceMinutes = computed({
             placeholder="0"
             data-test="synthetics-check-alerts-retries-input"
           />
-          <span class="text-sm text-[var(--color-text-body)] whitespace-nowrap">{{ t('synthetics.scheduleAlert.retriesOnFailureSuffix') }}</span>
+          <span class="text-sm text-[var(--color-text-label)] whitespace-nowrap">{{ t('synthetics.scheduleAlert.retriesOnFailureSuffix') }}</span>
         </div>
         <div class="flex items-center gap-2 flex-nowrap">
-          <span class="text-sm text-[var(--color-text-body)] whitespace-nowrap w-32">{{ t('synthetics.scheduleAlert.retryDelay') }}</span>
+          <label class="text-sm font-medium text-[var(--color-text-label)] whitespace-nowrap w-32">{{ t('synthetics.scheduleAlert.retryDelay') }}</label>
           <OInput
             v-model="retryDelayMs"
             type="number"
@@ -111,12 +111,12 @@ const silenceMinutes = computed({
             placeholder="0"
             data-test="synthetics-check-alerts-retry-delay-input"
           />
-          <span class="text-sm text-[var(--color-text-body)] whitespace-nowrap">{{ t('synthetics.scheduleAlert.retryDelaySuffix') }}</span>
+          <span class="text-sm text-[var(--color-text-label)] whitespace-nowrap">{{ t('synthetics.scheduleAlert.retryDelaySuffix') }}</span>
         </div>
 
         <!-- ── Failure threshold ────────────────────────────────────────── -->
         <div class="flex items-center gap-2 flex-nowrap">
-          <span class="text-sm text-[var(--color-text-body)] whitespace-nowrap w-32">{{ t('synthetics.scheduleAlert.alertedIfFails') }}</span>
+          <label class="text-sm font-medium text-[var(--color-text-label)] whitespace-nowrap w-32">{{ t('synthetics.scheduleAlert.alertedIfFails') }}</label>
           <OInput
             v-model="failureThreshold"
             type="number"
@@ -124,13 +124,13 @@ const silenceMinutes = computed({
             placeholder="1"
             data-test="synthetics-check-alerts-failure-threshold-input"
           />
-          <span class="text-sm text-[var(--color-text-body)] whitespace-nowrap">{{ t('synthetics.scheduleAlert.alertedIfFailsSuffix') }}</span>
+          <span class="text-sm text-[var(--color-text-label)] whitespace-nowrap">{{ t('synthetics.scheduleAlert.alertedIfFailsSuffix') }}</span>
         </div>
       </div>
 
       <!-- ── Destinations ───────────────────────────────────────────────── -->
       <div>
-        <label class="text-sm font-medium text-[var(--color-text-label)] mb-2 block">
+        <label class="text-sm font-medium text-[var(--color-text-label)] mb-1 block">
           {{ t('synthetics.scheduleAlert.destinations') }} *
         </label>
         <div class="flex items-center gap-1">
@@ -183,7 +183,7 @@ const silenceMinutes = computed({
             />
           </div>
           <div
-            class="flex justify-center items-center text-[var(--color-text-muted)] pl-2 h-7 text-sm"
+            class="flex justify-center items-center text-[var(--color-text-label)] pl-2 h-7 text-sm"
           >
             {{ t('synthetics.scheduleAlert.minutes') }}
           </div>

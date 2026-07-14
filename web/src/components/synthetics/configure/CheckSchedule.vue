@@ -183,7 +183,7 @@ const startTime = computed({
       <div class="flex items-end gap-8 flex-wrap">
         <!-- Frequency -->
         <div>
-          <label class="text-sm font-medium text-[var(--color-text-label)] mb-2 block">
+          <label class="text-sm font-medium text-[var(--color-text-label)] mb-1 block">
             {{ t('synthetics.scheduleAlert.frequency') }}
           </label>
           <OToggleGroup
