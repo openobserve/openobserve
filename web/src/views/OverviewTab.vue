@@ -13,7 +13,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="overview-tab flex flex-col gap-0 pt-[0.625rem] pr-[0.875rem] pb-[0.625rem] pl-[0.625rem] h-full overflow-y-auto text-(--o2-text-primary)">
+  <div class="overview-tab flex flex-col gap-0 pt-[0.625rem] pr-[0.875rem] pb-[0.625rem] pl-[0.625rem] h-full overflow-y-auto text-(--color-text-heading)">
     <!-- Header: refresh + time picker -->
     <div class="flex justify-end mb-4">
       <div class="flex items-center gap-2">
@@ -43,18 +43,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mb-5"
     >
       <div class="flex items-center justify-between mb-2 pl-1">
-        <div class="text-sm font-medium tracking-[0.01em] text-(--o2-text-primary)">
+        <div class="text-sm font-medium tracking-[0.01em] text-(--color-text-heading)">
           {{ t('overview.activeIncidents') }}
           <OTag type="countChip" value="warning">{{ incidentsTotal }}</OTag>
-          <span v-if="incidentsTotal > incidents.length" class="ml-2 text-xs font-normal text-(--o2-text-muted) align-middle">{{ t('overview.showingOf', { shown: incidents.length, total: incidentsTotal }) }}</span>
+          <span v-if="incidentsTotal > incidents.length" class="ml-2 text-xs font-normal text-(--color-text-muted) align-middle">{{ t('overview.showingOf', { shown: incidents.length, total: incidentsTotal }) }}</span>
         </div>
-        <button class="text-xs font-medium text-(--o2-primary-color) bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToIncidentList">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-(--color-primary-600) bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToIncidentList">{{ t('overview.viewAll') }} →</button>
       </div>
-      <div class="flex flex-col border border-[0.0625em] border-(--o2-border-color) rounded-[0.375rem] overflow-hidden">
+      <div class="flex flex-col border border-[0.0625em] border-(--color-border-default) rounded-[0.375rem] overflow-hidden">
         <div
           v-for="inc in incidents"
           :key="inc.id"
-          class="ov-alert-row ov-table-row flex items-center gap-3 py-[0.625rem] px-[0.875rem] bg-(--o2-card-bg-solid) transition-[background] duration-150 hover:bg-(--o2-hover-gray)"
+          class="ov-alert-row ov-table-row flex items-center gap-3 py-[0.625rem] px-[0.875rem] bg-(--color-surface-base) transition-[background] duration-150 hover:bg-(--color-table-row-hover-bg)"
           :class="incidentRowClass(inc.severity)"
         >
           <span class="shrink-0 flex items-center" :class="incidentIconClass(inc.severity)">
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </svg>
           </span>
           <div class="flex-1 min-w-0">
-            <div class="text-sm font-medium text-(--o2-text-primary) flex items-center flex-wrap gap-1">
+            <div class="text-sm font-medium text-(--color-text-heading) flex items-center flex-wrap gap-1">
               <OTag type="severity" :value="(inc.severity || 'p4').toLowerCase()" />
               {{ inc.title || t('overview.untitledIncident') }}
               <template v-if="inc.group_values && Object.keys(inc.group_values).length > 0">
@@ -80,9 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div class="flex items-center shrink-0 gap-[0.3rem] whitespace-nowrap w-48">
-            <span class="text-xs text-(--o2-text-muted) min-w-[4.5rem]">{{ relativeTime_(inc.first_alert_at) }}</span>
-            <span class="text-xs text-(--o2-text-muted)">·</span>
-            <span class="text-xs font-normal text-(--o2-text-primary)">{{ inc.alert_count }} alerts</span>
+            <span class="text-xs text-(--color-text-muted) min-w-[4.5rem]">{{ relativeTime_(inc.first_alert_at) }}</span>
+            <span class="text-xs text-(--color-text-muted)">·</span>
+            <span class="text-xs font-normal text-(--color-text-secondary)">{{ inc.alert_count }} alerts</span>
           </div>
           <span class="ov-investigate-hover shrink-0 whitespace-nowrap">
             <OButton
@@ -100,18 +100,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- SERVICES (enterprise only — needs service graph data) -->
     <section v-if="isEnterpriseOrCloud && services.length > 0" class="mb-5">
       <div class="flex items-center justify-between mb-2 pl-1">
-        <div class="text-sm font-medium tracking-[0.01em] text-(--o2-text-primary)">
+        <div class="text-sm font-medium tracking-[0.01em] text-(--color-text-heading)">
           {{ t('overview.services') }}
           <OTag type="countChip" value="warning">{{ services.length }}</OTag>
-          <span v-if="servicePanelVisible && selectedService" class="text-xs font-normal text-(--o2-text-muted) ml-1">
-            — viewing <strong class="font-semibold text-(--o2-text-primary)">{{ selectedService.label ?? selectedService.id }}</strong>
+          <span v-if="servicePanelVisible && selectedService" class="text-xs font-normal text-(--color-text-muted) ml-1">
+            — viewing <strong class="font-semibold text-(--color-text-heading)">{{ selectedService.label ?? selectedService.id }}</strong>
           </span>
         </div>
-        <button class="text-xs font-medium text-(--o2-primary-color) bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToServiceGraph">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-(--color-primary-600) bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToServiceGraph">{{ t('overview.viewAll') }} →</button>
       </div>
       <div class="flex items-stretch gap-2">
         <button
-          class="shrink-0 w-6 flex items-center justify-center cursor-pointer border border-[0.0625em] border-(--o2-border-color) rounded-lg bg-(--o2-card-bg-solid) text-(--o2-text-secondary) shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all duration-150 hover:not-disabled:bg-(--o2-hover-gray) hover:not-disabled:text-(--o2-text-primary) hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] hover:not-disabled:-translate-y-px active:not-disabled:translate-y-0 active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] disabled:opacity-25 disabled:cursor-not-allowed disabled:shadow-none"
+          class="shrink-0 w-6 flex items-center justify-center cursor-pointer border border-[0.0625em] border-(--color-border-default) rounded-lg bg-(--color-surface-base) text-(--color-text-secondary) shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all duration-150 hover:not-disabled:bg-(--color-table-row-hover-bg) hover:not-disabled:text-(--color-text-heading) hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] hover:not-disabled:-translate-y-px active:not-disabled:translate-y-0 active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] disabled:opacity-25 disabled:cursor-not-allowed disabled:shadow-none"
           :disabled="!svcScrollCanLeft"
           @click="scrollServices(-1)"
         >
@@ -123,18 +123,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="svc in services"
           :key="svc.id"
-          class="py-3 px-[0.875rem] rounded-[0.375rem] border border-[0.0625em] border-(--o2-border-color) bg-(--o2-card-bg-solid) transition-[background] duration-150 basis-40 grow-0 shrink-0 min-w-40 max-w-40 cursor-pointer hover:bg-(--o2-hover-gray)"
-          :class="[serviceCardClass(svc), { 'bg-(--o2-hover-gray) outline outline-[0.125em] outline-(--o2-primary-color) [outline-offset:-0.0625em]': selectedService?.id === svc.id && servicePanelVisible }]"
-          @click="goToService(svc)"
+          class="py-3 px-[0.875rem] rounded-[0.375rem] border border-[0.0625em] border-(--color-border-default) bg-(--color-surface-base) transition-[background] duration-150 basis-40 grow-0 shrink-0 min-w-40 max-w-40 cursor-pointer hover:bg-(--color-table-row-hover-bg)"
+          :class="[serviceCardClass(svc), { 'bg-(--color-table-row-hover-bg) outline outline-[0.125em] outline-(--color-primary-600) [outline-offset:-0.0625em]': selectedService?.id === svc.id && servicePanelVisible }]"
+          @click="openServicePanel(svc)"
         >
           <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-medium text-(--o2-text-primary) flex-1 min-w-0 block overflow-hidden text-ellipsis whitespace-nowrap cursor-default" :title="svc.label ?? svc.id">{{ svc.label }}</span>
+            <span class="text-sm font-medium text-(--color-text-heading) flex-1 min-w-0 block overflow-hidden text-ellipsis whitespace-nowrap cursor-default" :title="svc.label ?? svc.id">{{ svc.label }}</span>
             <span class="inline-flex items-center shrink-0 ml-1">
               <OButton
                 variant="ghost-muted"
                 size="icon"
-                :title="t('overview.viewLatencyCharts')"
-                @click="openServicePanel(svc, $event)"
+                :title="t('traces.servicesCatalog.viewTraces')"
+                @click="goToService(svc, $event)"
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
                   <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
@@ -145,26 +145,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex flex-col gap-1 mt-2">
             <div class="flex items-baseline justify-between gap-2">
-              <span class="text-[0.625rem] font-semibold tracking-[0.06em] uppercase text-(--o2-text-muted)">{{ t('overview.colErrorRate') }}</span>
-              <span class="text-sm font-medium text-(--o2-text-primary)" :class="svc.errorFlag ? 'text-(--o2-status-error-text)' : ''">
+              <span class="text-[0.6875rem] font-semibold tracking-[0.04em] text-(--color-text-secondary)">{{ t('overview.colErrorRate') }}</span>
+              <span class="text-sm font-medium text-(--color-text-body)" :class="svc.errorFlag ? 'text-(--color-error-600)' : ''">
                 {{ svc.error_rate != null ? svc.error_rate.toFixed(1) + '%' : '—' }}
               </span>
             </div>
             <div class="flex items-baseline justify-between gap-2">
-              <span class="text-[0.625rem] font-semibold tracking-[0.06em] uppercase text-(--o2-text-muted)">{{ t('overview.colLatency') }}</span>
-              <span class="text-sm font-medium text-(--o2-text-primary)" :class="svc.latencyFlag ? 'text-(--o2-status-warning-text)' : ''">
+              <span class="text-[0.6875rem] font-semibold tracking-[0.04em] text-(--color-text-secondary)">{{ t('overview.colLatency') }}</span>
+              <span class="text-sm font-medium text-(--color-text-body)" :class="svc.latencyFlag ? 'text-(--color-warning-700)' : ''">
                 {{ svc.latencyMultiplier ? svc.latencyMultiplier + 'x' : '—' }}
               </span>
             </div>
             <div class="flex items-baseline justify-between gap-2">
-              <span class="text-[0.625rem] font-semibold tracking-[0.06em] uppercase text-(--o2-text-muted)">{{ t('overview.colReqs') }}</span>
-              <span class="text-sm font-medium text-(--o2-text-primary)">{{ formatReqRate(svc.requests) }}</span>
+              <span class="text-[0.6875rem] font-semibold tracking-[0.04em] text-(--color-text-secondary)">{{ t('overview.colReqs') }}</span>
+              <span class="text-sm font-medium text-(--color-text-body)">{{ formatReqRate(svc.requests) }}</span>
             </div>
           </div>
         </div>
         </div>
         <button
-          class="shrink-0 w-6 flex items-center justify-center cursor-pointer border border-[0.0625em] border-(--o2-border-color) rounded-lg bg-(--o2-card-bg-solid) text-(--o2-text-secondary) shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all duration-150 hover:not-disabled:bg-(--o2-hover-gray) hover:not-disabled:text-(--o2-text-primary) hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] hover:not-disabled:-translate-y-px active:not-disabled:translate-y-0 active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] disabled:opacity-25 disabled:cursor-not-allowed disabled:shadow-none"
+          class="shrink-0 w-6 flex items-center justify-center cursor-pointer border border-[0.0625em] border-(--color-border-default) rounded-lg bg-(--color-surface-base) text-(--color-text-secondary) shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all duration-150 hover:not-disabled:bg-(--color-table-row-hover-bg) hover:not-disabled:text-(--color-text-heading) hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] hover:not-disabled:-translate-y-px active:not-disabled:translate-y-0 active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] disabled:opacity-25 disabled:cursor-not-allowed disabled:shadow-none"
           :disabled="!svcScrollCanRight"
           @click="scrollServices(1)"
         >
@@ -196,17 +196,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ACTIVE ANOMALIES -->
     <section v-if="anomalies.length > 0" class="mb-5">
       <div class="flex items-center justify-between mb-2 pl-1">
-        <div class="text-sm font-medium tracking-[0.01em] text-(--o2-text-primary)">
+        <div class="text-sm font-medium tracking-[0.01em] text-(--color-text-heading)">
           {{ t('overview.activeAnomalies') }}
           <OTag type="countChip" value="warning">{{ anomalies.length }}</OTag>
         </div>
-        <button class="text-xs font-medium text-(--o2-primary-color) bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAnomalies">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-(--color-primary-600) bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAnomalies">{{ t('overview.viewAll') }} →</button>
       </div>
       <div class="flex flex-col gap-[0.375rem]">
         <div
           v-for="item in anomalies"
           :key="item.id"
-          class="ov-alert-row flex items-center gap-3 py-[0.625rem] px-[0.875rem] rounded-[0.375rem] border border-[0.0625em] border-(--o2-border-color) bg-(--o2-card-bg-solid) transition-[background] duration-150 hover:bg-(--o2-hover-gray)"
+          class="ov-alert-row flex items-center gap-3 py-[0.625rem] px-[0.875rem] rounded-[0.375rem] border border-[0.0625em] border-(--color-border-default) bg-(--color-surface-base) transition-[background] duration-150 hover:bg-(--color-table-row-hover-bg)"
           :class="severityRowClass(item.severity)"
         >
           <span class="shrink-0 flex items-center" :class="severityIconClass(item.severity)">
@@ -215,10 +215,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </svg>
           </span>
           <div class="flex-1 min-w-0">
-            <div class="text-sm font-medium text-(--o2-text-primary) flex items-center flex-wrap gap-1 [row-gap:0.25rem]">
+            <div class="text-sm font-medium text-(--color-text-heading) flex items-center flex-wrap gap-1 [row-gap:0.25rem]">
               {{ item.title }}
-              <span class="text-xs text-(--o2-text-muted) font-normal mx-[0.1rem]">·</span>
-              <span class="text-xs text-(--o2-text-muted) font-normal">{{ item.description }}</span>
+              <span class="text-xs text-(--color-text-muted) font-normal mx-[0.1rem]">·</span>
+              <span class="text-xs text-(--color-text-muted) font-normal">{{ item.description }}</span>
             </div>
           </div>
           <span class="ov-investigate-hover shrink-0 whitespace-nowrap">
@@ -237,21 +237,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- RECENT EVENTS (alert firing feed) -->
     <section v-if="recentEvents.length > 0" class="mb-5">
       <div class="flex items-center justify-between mb-2 pl-1">
-        <div class="text-sm font-medium tracking-[0.01em] text-(--o2-text-primary)">
+        <div class="text-sm font-medium tracking-[0.01em] text-(--color-text-heading)">
           {{ t('overview.recentEvents') }}
           <OTag type="countChip" value="warning">{{ recentEvents.length }}</OTag>
         </div>
-        <button class="text-xs font-medium text-(--o2-primary-color) bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAlertList">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-(--color-primary-600) bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAlertList">{{ t('overview.viewAll') }} →</button>
       </div>
-      <div class="flex flex-col gap-0 border border-[0.0625em] border-(--o2-border-color) rounded-[0.375rem] overflow-hidden bg-(--o2-card-bg-solid)">
+      <div class="flex flex-col gap-0 border border-[0.0625em] border-(--color-border-default) rounded-[0.375rem] overflow-hidden bg-(--color-surface-base)">
         <div
           v-for="ev in recentEvents"
           :key="ev.id"
-          class="ov-event-row flex items-center gap-3 py-2 px-[0.875rem] border-b border-b-[0.0625em] border-b-(--o2-border-color) text-[0.8125rem] transition-[background] duration-150 hover:bg-(--o2-hover-gray)"
+          class="ov-event-row flex items-center gap-3 py-2 px-[0.875rem] border-b border-b-[0.0625em] border-b-(--color-border-default) text-[0.8125rem] transition-[background] duration-150 hover:bg-(--color-table-row-hover-bg)"
         >
           <OTag type="eventStatus" :value="ev.typeLabel" class="shrink-0" />
-          <span class="font-medium text-(--o2-text-primary) whitespace-nowrap min-w-[7.5em] max-w-[12.5em] overflow-hidden text-ellipsis">{{ ev.service }}</span>
-          <span class="flex-1 text-(--o2-text-muted) truncate">{{ ev.description }}</span>
+          <span class="font-medium text-(--color-text-heading) whitespace-nowrap min-w-[7.5em] max-w-[12.5em] overflow-hidden text-ellipsis">{{ ev.service }}</span>
+          <span class="flex-1 text-(--color-text-muted) truncate">{{ ev.description }}</span>
           <OTag
             v-if="ev.failCount > 1"
             type="countChip"
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="shrink-0"
             :title="`Failed ${ev.failCount} times in this window`"
           >×{{ ev.failCount }}</OTag>
-          <span class="shrink-0 text-(--o2-text-muted) text-xs whitespace-nowrap">{{ ev.timeAgo }}</span>
+          <span class="shrink-0 text-(--color-text-muted) text-xs whitespace-nowrap">{{ ev.timeAgo }}</span>
         </div>
       </div>
     </section>
@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <!-- View alerts -->
         <button v-if="showAlertsCard" type="button" class="ov-action-card group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-(--color-border-default) bg-(--color-surface-base) shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-(--color-primary-400) hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-alerts-card" @click="goToAlertList">
-          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-(--o2-status-warning-bg) text-(--o2-status-warning-text) group-hover:bg-(--o2-primary-color) group-hover:text-(--o2-primary-foreground)">
+          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-(--color-warning-50) text-(--color-warning-700) group-hover:bg-(--color-primary-600) group-hover:text-(--color-text-inverse)">
             <OIcon name="notifications" size="md" />
           </span>
           <span class="flex-1 min-w-0 flex flex-col gap-[0.125rem]">
@@ -288,7 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </button>
         <!-- Explore logs -->
         <button v-if="showLogsCard" type="button" class="ov-action-card group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-(--color-border-default) bg-(--color-surface-base) shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-(--color-primary-400) hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-logs-card" @click="goToLogs">
-          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-(--o2-status-info-bg) text-(--o2-status-info-text) group-hover:bg-(--o2-primary-color) group-hover:text-(--o2-primary-foreground)">
+          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-(--color-info-50) text-(--color-info-700) group-hover:bg-(--color-primary-600) group-hover:text-(--color-text-inverse)">
             <OIcon name="search" size="md" />
           </span>
           <span class="flex-1 min-w-0 flex flex-col gap-[0.125rem]">
@@ -299,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </button>
         <!-- Explore traces -->
         <button v-if="showTracesCard" type="button" class="ov-action-card group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-(--color-border-default) bg-(--color-surface-base) shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-(--color-primary-400) hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-traces-card" @click="goToTraces">
-          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-(--o2-status-info-bg) text-(--o2-status-info-text) group-hover:bg-(--o2-primary-color) group-hover:text-(--o2-primary-foreground)">
+          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-(--color-info-50) text-(--color-info-700) group-hover:bg-(--color-primary-600) group-hover:text-(--color-text-inverse)">
             <OIcon name="account-tree" size="md" />
           </span>
           <span class="flex-1 min-w-0 flex flex-col gap-[0.125rem]">
@@ -754,38 +754,38 @@ const shortDimKey = (key: string): string =>
 
 const severityRowClass = (severity: string) =>
   severity === "critical"
-    ? "border-l-[0.1875em] border-l-(--o2-negative)"
-    : "border-l-[0.1875em] border-l-(--o2-warning)";
+    ? "border-l-[0.1875em] border-l-(--color-error-600)"
+    : "border-l-[0.1875em] border-l-(--color-warning-600)";
 
 const severityIconClass = (severity: string) =>
-  severity === "critical" ? "text-(--o2-negative)" : "text-(--o2-warning)";
+  severity === "critical" ? "text-(--color-error-600)" : "text-(--color-warning-600)";
 
 const incidentRowClass = (severity: string) => {
   const s = (severity ?? "").toLowerCase();
-  if (s === "p1") return "border-l-(--o2-negative)";
-  if (s === "p2") return "border-l-(--o2-warning)";
-  return "border-l-(--o2-status-info-text)";
+  if (s === "p1") return "border-l-(--color-error-600)";
+  if (s === "p2") return "border-l-(--color-warning-600)";
+  return "border-l-(--color-info-700)";
 };
 
 const incidentIconClass = (severity: string) => {
   const s = (severity ?? "").toLowerCase();
-  if (s === "p1") return "text-(--o2-negative)";
-  if (s === "p2") return "text-(--o2-warning)";
-  return "text-(--o2-status-info-text)";
+  if (s === "p1") return "text-(--color-error-600)";
+  if (s === "p2") return "text-(--color-warning-600)";
+  return "text-(--color-info-700)";
 };
 
 const severityBadgeClass = (sev: string): string => {
   const s = (sev || "p4").toLowerCase();
-  if (s === "p1") return "bg-(--o2-status-error-bg) text-(--o2-status-error-text) border border-[0.0625em] border-(--o2-negative)";
-  if (s === "p2") return "bg-(--o2-status-warning-bg) text-(--o2-status-warning-text) border border-[0.0625em] border-(--o2-warning)";
-  if (s === "p3") return "bg-(--o2-status-warning-bg) text-(--o2-status-warning-text) border border-[0.0625em] border-(--o2-warning)";
-  return "bg-(--o2-status-info-bg) text-(--o2-status-info-text) border border-[0.0625em] border-(--o2-status-info-text)";
+  if (s === "p1") return "bg-(--color-error-50) text-(--color-error-600) border border-[0.0625em] border-(--color-error-600)";
+  if (s === "p2") return "bg-(--color-warning-50) text-(--color-warning-700) border border-[0.0625em] border-(--color-warning-600)";
+  if (s === "p3") return "bg-(--color-warning-50) text-(--color-warning-700) border border-[0.0625em] border-(--color-warning-600)";
+  return "bg-(--color-info-50) text-(--color-info-700) border border-[0.0625em] border-(--color-info-700)";
 };
 
 const serviceCardClass = (svc: any) => {
-  if (svc.errorFlag && svc.error_rate >= 5) return "border-l-[0.1875em] border-l-(--o2-negative)";
-  if (svc.errorFlag || svc.latencyFlag) return "border-l-[0.1875em] border-l-(--o2-warning)";
-  return "border-l-[0.1875em] border-l-(--o2-positive)";
+  if (svc.errorFlag && svc.error_rate >= 5) return "border-l-[0.1875em] border-l-(--color-error-600)";
+  if (svc.errorFlag || svc.latencyFlag) return "border-l-[0.1875em] border-l-(--color-warning-600)";
+  return "border-l-[0.1875em] border-l-(--color-success-600)";
 };
 
 // ── Navigation ───────────────────────────────────────────────────────────────
@@ -795,7 +795,10 @@ const goToAlert = (item: any) => {
   showAlertHistoryDrawer.value = true;
 };
 
-const goToService = (svc: any) => {
+const goToService = (svc: any, e?: MouseEvent) => {
+  // Fired from the per-card info-icon button — stop it bubbling to the card
+  // click (which opens the latency/info side panel).
+  e?.stopPropagation();
   let filter = `service_name = '${svc.label ?? svc.id}'`;
   if (svc.errorFlag) filter += ` AND span_status = 'ERROR'`;
 
@@ -816,8 +819,9 @@ const goToService = (svc: any) => {
   router.push({ name: "traces", query });
 };
 
-const openServicePanel = (svc: any, e: MouseEvent) => {
-  e.stopPropagation(); // don't also trigger goToService
+const openServicePanel = (svc: any, _e?: MouseEvent) => {
+  // The card's own click handler (behaviour swapped with the info icon):
+  // clicking the card body opens the latency/info side panel.
   selectedService.value = svc;
   servicePanelVisible.value = true;
 };
@@ -908,7 +912,7 @@ watch(isIncidentsEnabled, (enabled) => {
   border-left-width: 0.1875em !important;
   border-top: none !important;
   border-right: none !important;
-  border-bottom: 0.0625em solid var(--o2-border-color) !important;
+  border-bottom: 0.0625em solid var(--color-border-default) !important;
 }
 .ov-table-row:last-child {
   border-bottom: none !important;
@@ -939,5 +943,5 @@ watch(isIncidentsEnabled, (enabled) => {
 /* Overview scrollbar styling — pseudo-elements. */
 .overview-tab::-webkit-scrollbar { width: 0.375em; }
 .overview-tab::-webkit-scrollbar-track { background: transparent; }
-.overview-tab::-webkit-scrollbar-thumb { background: var(--o2-border-color); border-radius: 0.1875em; }
+.overview-tab::-webkit-scrollbar-thumb { background: var(--color-border-default); border-radius: 0.1875em; }
 </style>

@@ -496,6 +496,25 @@ export const BADGE_GROUPS = {
     fallback: { variant: "primary" },
   },
 
+  // Prometheus metric TYPE — the classifying badge on the Metrics Explorer's
+  // cards, the ⚙ function dialog and anywhere else a metric's kind is shown.
+  // One hue per kind, matching the explorer's palette (metricPalette.ts):
+  // Counter blue, Gauge green, Histogram purple, Summary orange, Other grey.
+  metricType: {
+    mode: "plain",
+    shape: "rounded",
+    // xs: this badge lives in dense card footers and dialog headers.
+    size: "xs",
+    values: {
+      counter: { variant: "blue-soft", label: "Counter" },
+      gauge: { variant: "success-soft", label: "Gauge" },
+      histogram: { variant: "purple-soft", label: "Histogram" },
+      summary: { variant: "orange-soft", label: "Summary" },
+      other: { variant: "default-soft", label: "Other" },
+    },
+    fallback: { variant: "default-soft", label: "Other" },
+  },
+
   // Metric/info chip — trace & thread toolbar chips (Service/Duration/Cost/Steps…)
   // that carry icon + label + value in the slot and get their accent from scoped
   // CSS (.toolbar-chip/.thread-chip/.llm-chip). Uniform neutral base; pill + sm.

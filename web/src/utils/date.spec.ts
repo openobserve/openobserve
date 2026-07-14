@@ -411,6 +411,33 @@ describe("Date Utilities", () => {
       expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
     });
 
+    it("renders the format it is given, so callers stop reimplementing it", () => {
+      // This function used to exist SIX times over — here, in formatters.ts, and
+      // inline in four components — and the copies had drifted into three
+      // different output formats behind the same name. The format is a parameter
+      // now, and these are the two the components ask for.
+      const unixMicros = 1672531200000000; // 2023-01-01T00:00:00Z
+
+      // schema.vue: a retention window, so a date with no time.
+      expect(convertUnixToQuasarFormat(unixMicros, "DD-MM-YYYY")).toBe(
+        "01-01-2023",
+      );
+      // AlertList.vue: an instant, with no timezone suffix.
+      expect(convertUnixToQuasarFormat(unixMicros, "YYYY-MM-DD HH:mm:ss")).toBe(
+        "2023-01-01 00:00:00",
+      );
+      // Everyone else: the default.
+      expect(convertUnixToQuasarFormat(unixMicros)).toBe(
+        convertUnixToQuasarFormat(unixMicros, "YYYY-MM-DDTHH:mm:ssZ"),
+      );
+    });
+
+    it("returns empty for a falsy timestamp whatever the format", () => {
+      expect(convertUnixToQuasarFormat(0, "DD-MM-YYYY")).toBe("");
+      expect(convertUnixToQuasarFormat(null as any, "DD-MM-YYYY")).toBe("");
+      expect(convertUnixToQuasarFormat(undefined as any)).toBe("");
+    });
+
     it("should handle zero microseconds", () => {
       const result = convertUnixToQuasarFormat(0);
       expect(result).toBe("");
