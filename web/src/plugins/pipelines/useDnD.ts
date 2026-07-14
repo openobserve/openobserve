@@ -77,8 +77,12 @@ const defaultObject = {
   previousNodeOptions:<any>[],
   userSelectedNode:<any>{},
   userClickedNode : <any>{},
-  pipelineNameError: false,
-  pipelineNameErrorMessage: "",
+  // Realtime streams already used by other pipelines. Populated once when the
+  // editor mounts (PipelineEditor): first with the in-flight request promise,
+  // then with its resolved array. The Stream node drawer `await`s whichever it
+  // finds, so a node drag never issues its own pipelines/streams request.
+  // `null` = the editor hasn't started the fetch yet (true fallback only).
+  usedStreams:<any>null,
 };
 
 const pipelineObj = reactive(Object.assign({}, defaultObject));

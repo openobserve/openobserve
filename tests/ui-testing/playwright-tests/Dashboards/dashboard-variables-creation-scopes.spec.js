@@ -66,7 +66,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Cleanup
@@ -103,7 +103,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // Wait for panel to be added to dashboard and panel editor to close
     await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
     // Wait for panel editor dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 10000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for settings button to be available (indicates panel editor has closed)
     await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 15000 });
@@ -173,7 +173,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Cleanup
@@ -277,7 +277,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Cleanup
@@ -329,7 +329,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for dashboard to be fully loaded after closing settings
@@ -341,7 +341,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // Wait for tab content to load
     await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible", timeout: 5000 });
     // Ensure no dialogs are open before adding panel
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardCreate.addPanel();
@@ -356,7 +356,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // Wait for panel to be added to dashboard and panel editor to close
     await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
     // Wait for panel editor dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 10000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for settings button to be available (indicates panel editor has closed)
     await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 15000 });
@@ -431,7 +431,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Cleanup
@@ -548,7 +548,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Cleanup
@@ -780,7 +780,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for dashboard to be fully loaded after closing settings
@@ -791,7 +791,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // Wait for tab content to load
     await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible", timeout: 5000 });
     // Ensure no dialogs are open before adding panel
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Go to add panel
@@ -866,7 +866,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for dashboard to be fully loaded after closing settings

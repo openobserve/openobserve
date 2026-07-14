@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md p-0 o2-custom-bg"
+  <div class="p-0 o2-custom-bg"
     style="
       height: calc(100vh - 48px);
       min-height: inherit;
@@ -24,22 +24,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <AppPageHeader
+      :title="destination ? t('alert_destinations.updateTitle') : t('alert_destinations.addTitle')"
+      title-data-test="add-destination-title"
       :back="{
         label: t('alert_destinations.header'),
         onClick: () => emit('cancel:hideform'),
       }"
-      class="card-container px-3 border-b border-border-default"
+      class="px-3 border-b border-border-default"
       style="flex-shrink: 0"
     >
-      <template #title>
-        <span data-test="add-destination-title">
-          {{
-            destination
-              ? t("alert_destinations.updateTitle")
-              : t("alert_destinations.addTitle")
-          }}
-        </span>
-      </template>
     </AppPageHeader>
     <div
       class="card-container py-2"

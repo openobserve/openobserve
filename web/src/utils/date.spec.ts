@@ -22,7 +22,7 @@ import {
   getConsumableRelativeTime,
   getRelativePeriod,
   isInvalidDate,
-  convertUnixToQuasarFormat,
+  convertUnixToDateFormat,
   convertDateToTimestamp,
 } from "./date";
 
@@ -401,34 +401,58 @@ describe("Date Utilities", () => {
     });
   });
 
-  describe("convertUnixToQuasarFormat", () => {
-    it("should convert unix microseconds to quasar format", () => {
+  describe("convertUnixToDateFormat", () => {
+    it("should convert unix microseconds to date format", () => {
       const unixMicros = 1672531200000000; // 2023-01-01 00:00:00 UTC in microseconds
-      const result = convertUnixToQuasarFormat(unixMicros);
+      const result = convertUnixToDateFormat(unixMicros);
       
       // Check that the result contains the expected date part
       expect(result).toContain("2023-01-01");
       expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
     });
 
+    it("renders the format it is given, so callers stop reimplementing it", () => {
+      // This function used to exist SIX times over — here, in formatters.ts, and
+      // inline in four components — and the copies had drifted into three
+      // different output formats behind the same name. The format is a parameter
+      // now, and these are the two the components ask for.
+      const unixMicros = 1672531200000000; // 2023-01-01T00:00:00Z
+
+      // schema.vue: a retention window, so a date with no time.
+      expect(convertUnixToDateFormat(unixMicros, "DD-MM-YYYY")).toBe(
+        "01-01-2023",
+      );
+      // AlertList.vue: an instant, with no timezone suffix.
+      expect(convertUnixToDateFormat(unixMicros, "YYYY-MM-DD HH:mm:ss")).toBe(
+        "2023-01-01 00:00:00",
+      );
+      // Everyone else: the default.
+      expect(convertUnixToDateFormat(unixMicros)).toBe(
+        convertUnixToDateFormat(unixMicros, "YYYY-MM-DDTHH:mm:ssZ"),
+      );
+    });
+
+    it("returns empty for a falsy timestamp whatever the format", () => {
+      expect(convertUnixToDateFormat(0, "DD-MM-YYYY")).toBe("");
+      expect(convertUnixToDateFormat(null as any, "DD-MM-YYYY")).toBe("");
+      expect(convertUnixToDateFormat(undefined as any)).toBe("");
+    });
+
     it("should handle zero microseconds", () => {
-      const result = convertUnixToQuasarFormat(0);
+      const result = convertUnixToDateFormat(0);
       expect(result).toBe("");
     });
 
     it("should return empty string for null/undefined", () => {
-      expect(convertUnixToQuasarFormat(null)).toBe("");
-      expect(convertUnixToQuasarFormat(undefined)).toBe("");
+      expect(convertUnixToDateFormat(null)).toBe("");
+      expect(convertUnixToDateFormat(undefined)).toBe("");
     });
 
     it("should handle errors gracefully", () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const result = convertUnixToQuasarFormat("invalid");
+      const result = convertUnixToDateFormat("invalid");
       
       expect(result).toBe("");
-      expect(consoleSpy).toHaveBeenCalledWith("Error converting unix to quasar format");
       
-      consoleSpy.mockRestore();
     });
   });
 
@@ -467,13 +491,10 @@ describe("Date Utilities", () => {
     });
 
     it("should handle errors gracefully", () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const result = convertDateToTimestamp("invalid-date", "invalid-time", "UTC");
       
       expect(result).toEqual({ timestamp: 0, offset: 0 });
-      expect(consoleSpy).toHaveBeenCalledWith("Error converting date to timestamp");
       
-      consoleSpy.mockRestore();
     });
 
     it("should handle edge cases", () => {

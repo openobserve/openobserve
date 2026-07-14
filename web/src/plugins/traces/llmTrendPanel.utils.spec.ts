@@ -3,7 +3,7 @@
 // Tests for the small pure helpers that LLMTrendPanel uses for axis
 // labels, table cells and the gap-fill bucket math. Extracted into a
 // utils module so they can be tested without mounting the SFC (which
-// pulls in echarts / quasar at mount time).
+// pulls in echarts at mount time).
 
 import { describe, it, expect } from "vitest";
 import {

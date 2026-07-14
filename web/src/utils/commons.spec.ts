@@ -78,12 +78,6 @@ vi.mock("./dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((data) => data),
 }));
 
-vi.mock("quasar", () => ({
-  date: {
-    subtractFromDate: vi.fn((date, obj) => new Date(date.getTime() - 3600000)),
-  },
-}));
-
 // Mock moment globally
 global.moment = vi.fn((date) => ({
   format: vi.fn((format) => {
@@ -1312,6 +1306,84 @@ describe("Commons Utility Functions", () => {
       await deleteFolderByIdByType(mockStore, folderId, type);
 
       expect(commonService.delete_Folder).toHaveBeenCalledWith("test-org", type, folderId);
+    });
+
+    // The dashboards module keeps a second, legacy folder list
+    // (organizationData.folders) consumed by SelectFolderDropdown and the
+    // move-dashboard dialogs. The *ByType mutations must refresh it too, or a
+    // folder created from the shared sidebar rail never shows up in the
+    // new-dashboard folder select until a full page reload.
+    describe("legacy dashboards folder list sync", () => {
+      const newFolderList = {
+        data: {
+          list: [
+            { folderId: "default", name: "Default", description: "Default" },
+            { folderId: "zzzz", name: "zzzz", description: "" },
+          ],
+        },
+      };
+
+      beforeEach(() => {
+        (commonService.list_Folders as any).mockResolvedValue(newFolderList);
+        (dashboardService.list_Folders as any).mockResolvedValue(newFolderList);
+      });
+
+      it("createFolderByType('dashboards') refreshes the legacy folders list too", async () => {
+        (commonService.new_Folder as any).mockResolvedValue({
+          data: { folderId: "zzzz" },
+        });
+
+        await createFolderByType(mockStore, { name: "zzzz" }, "dashboards");
+
+        // byType list refreshed for the sidebar rail…
+        expect(mockStore.dispatch).toHaveBeenCalledWith("setFoldersByType", {
+          dashboards: newFolderList.data.list,
+        });
+        // …AND the legacy list refreshed for SelectFolderDropdown.
+        expect(dashboardService.list_Folders).toHaveBeenCalledWith("test-org");
+        expect(mockStore.dispatch).toHaveBeenCalledWith(
+          "setFolders",
+          newFolderList.data.list,
+        );
+      });
+
+      it("updateFolderByType('dashboards') refreshes the legacy folders list too", async () => {
+        (commonService.edit_Folder as any).mockResolvedValue({ success: true });
+
+        await updateFolderByType(mockStore, "zzzz", { name: "zzzz2" }, "dashboards");
+
+        expect(dashboardService.list_Folders).toHaveBeenCalledWith("test-org");
+        expect(mockStore.dispatch).toHaveBeenCalledWith(
+          "setFolders",
+          newFolderList.data.list,
+        );
+      });
+
+      it("deleteFolderByIdByType('dashboards') refreshes the legacy folders list too", async () => {
+        (commonService.delete_Folder as any).mockResolvedValue({ success: true });
+
+        await deleteFolderByIdByType(mockStore, "zzzz", "dashboards");
+
+        expect(dashboardService.list_Folders).toHaveBeenCalledWith("test-org");
+        expect(mockStore.dispatch).toHaveBeenCalledWith(
+          "setFolders",
+          newFolderList.data.list,
+        );
+      });
+
+      it("does NOT touch the legacy dashboards list for other types", async () => {
+        (commonService.new_Folder as any).mockResolvedValue({
+          data: { folderId: "alert-folder" },
+        });
+
+        await createFolderByType(mockStore, { name: "alert folder" }, "alerts");
+
+        expect(dashboardService.list_Folders).not.toHaveBeenCalled();
+        expect(mockStore.dispatch).not.toHaveBeenCalledWith(
+          "setFolders",
+          expect.anything(),
+        );
+      });
     });
   });
 

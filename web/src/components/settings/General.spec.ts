@@ -20,7 +20,7 @@ import i18n from "@/locales";
 import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
-// Mock toast (replaces Quasar $q.notify)
+// Mock toast
 // vi.hoisted ensures mockToast is initialized before the vi.mock factory runs
 const { mockToast } = vi.hoisted(() => ({
   mockToast: vi.fn(() => vi.fn()),
@@ -144,31 +144,9 @@ const createWrapper = (props = {}, options = {}) => {
         store: mockStore,
       },
       stubs: {
-        OForm: {
-          template:
-            '<form data-test-stub="o-form" @submit.prevent=\'$emit("submit", $event)\'><slot></slot></form>',
-          emits: ["submit"],
-        },
-        OInput: {
-          template: `<input
-            data-test-stub='o-input'
-            :data-test='$attrs["data-test"]'
-            :value='modelValue'
-            @input='$emit("update:modelValue", Number($event.target.value))'
-            :type='type'
-            :min='min'
-            :placeholder='placeholder'
-          />`,
-          props: [
-            "modelValue",
-            "type",
-            "min",
-            "placeholder",
-            "error",
-            "errorMessage",
-          ],
-          emits: ["update:modelValue"],
-        },
+        // OForm / OFormInput / OInput are intentionally NOT stubbed so the real
+        // schema validation runs (per the migration playbook: at least one path
+        // must mount the real <OForm>).
         OButton: {
           template: `<button
             data-test-stub='o-button'
@@ -317,33 +295,33 @@ describe("General", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should initialize with organization settings values", () => {
+    it("should seed the form defaults from organization settings", () => {
       const wrapper = createWrapper();
-
-      expect(wrapper.vm.scrapeIntereval).toBe(30);
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.vm.form.state.values.scrape_interval).toBe(30);
     });
   });
 
   describe("Form inputs", () => {
-    it("should update scrape interval value", async () => {
+    it("should keep the scrape interval and max series inputs (data-tests preserved)", () => {
       const wrapper = createWrapper();
-      const scrapeInput = wrapper.find('[data-test-stub="o-input"]');
-
-      await scrapeInput.setValue("45");
-      expect(wrapper.vm.scrapeIntereval).toBe(45);
+      expect(
+        wrapper.find('[data-test="general-settings-scrape-interval"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="general-settings-max-series-per-query"]')
+          .exists(),
+      ).toBe(true);
     });
   });
 
-  describe("Form submission", () => {
+  describe("Form submission (real OForm)", () => {
     it("should save organization settings successfully", async () => {
       const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
 
-      // Set the scrape interval in the component
-      wrapper.vm.scrapeIntereval = 30;
-      await wrapper.vm.$nextTick();
-
-      const form = wrapper.find('[data-test-stub="o-form"]');
-      await form.trigger("submit");
+      await form.vm.form.handleSubmit();
       await nextTick();
 
       // The dispatch is called with the spread of existing organizationSettings plus scrape_interval
@@ -371,8 +349,8 @@ describe("General", () => {
       });
 
       const wrapper = createWrapper();
-      const form = wrapper.find('[data-test-stub="o-form"]');
-      await form.trigger("submit");
+      const form = wrapper.findComponent({ name: "OForm" });
+      await form.vm.form.handleSubmit();
       await nextTick();
 
       expect(mockToast).toHaveBeenCalledWith({
@@ -385,8 +363,8 @@ describe("General", () => {
       mockOrganizations.post_organization_settings.mockRejectedValue({});
 
       const wrapper = createWrapper();
-      const form = wrapper.find('[data-test-stub="o-form"]');
-      await form.trigger("submit");
+      const form = wrapper.findComponent({ name: "OForm" });
+      await form.vm.form.handleSubmit();
       await nextTick();
 
       expect(mockToast).toHaveBeenCalledWith({
@@ -776,11 +754,13 @@ describe("General", () => {
       await nextTick();
       expect(wrapper.vm.showColorPicker).toBe(true);
 
-      // second ODialog is the color picker
+      // Select the color-picker dialog by title (order-independent — other dialogs
+      // like the delete-org confirmation also exist in the template).
       const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
-      const closeBtn = dialogs[dialogs.length - 1].find(
-        '[data-test-stub="o-dialog-primary"]',
+      const colorDialog = dialogs.find(
+        (d) => d.attributes("data-title") === "Pick Custom Color",
       );
+      const closeBtn = colorDialog.find('[data-test-stub="o-dialog-primary"]');
       await closeBtn.trigger("click");
       await nextTick();
 
@@ -800,10 +780,12 @@ describe("General", () => {
     it("forwards title and size to the color picker ODialog", () => {
       const wrapper = createWrapper();
       const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
-      const colorDialog = dialogs[dialogs.length - 1];
+      // Select by title (order-independent — the delete-org confirmation dialog also
+      // exists and would otherwise be the last dialog in the template).
+      const colorDialog = dialogs.find(
+        (d) => d.attributes("data-title") === "Pick Custom Color",
+      );
       expect(colorDialog.attributes("data-size")).toBe("xs");
-      // title comes from i18n: "Pick Custom Color"
-      expect(colorDialog.attributes("data-title")).toBe("Pick Custom Color");
       expect(colorDialog.attributes("data-primary-label")).toBe("Close");
     });
   });
@@ -831,19 +813,100 @@ describe("General", () => {
     });
   });
 
-  describe("Form validation", () => {
-    it("should validate scrape interval is required", () => {
+  describe("Form validation (real OForm)", () => {
+    it("blocks submit and does NOT save when scrape interval is empty (restored required rule)", async () => {
       const wrapper = createWrapper();
-      const scrapeInput = wrapper.findComponent({ name: "OInput" });
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("scrape_interval", "");
 
-      if (scrapeInput.exists()) {
-        // OInput uses error/errorMessage props instead of rules
-        // Validation happens in the onSubmit handler, not declaratively
-        expect(scrapeInput.props("error")).toBeDefined();
-      } else {
-        // Fallback: verify component has validation logic
-        expect(wrapper.vm.scrapeIntereval).toBeDefined();
-      }
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(form.vm.form.state.isValid).toBe(false);
+      expect(
+        mockOrganizations.post_organization_settings,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("blocks submit when scrape interval is negative", async () => {
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("scrape_interval", -5);
+
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(form.vm.form.state.isValid).toBe(false);
+      expect(
+        mockOrganizations.post_organization_settings,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("allows a scrape interval of 0", async () => {
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("scrape_interval", 0);
+
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(
+        mockOrganizations.post_organization_settings,
+      ).toHaveBeenCalled();
+    });
+
+    it("blocks submit when max series per query is below 1000 (restored optional range rule)", async () => {
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("max_series_per_query", 500);
+
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(form.vm.form.state.isValid).toBe(false);
+      expect(
+        mockOrganizations.post_organization_settings,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("blocks submit when max series per query is above 1000000", async () => {
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("max_series_per_query", 2000000);
+
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(form.vm.form.state.isValid).toBe(false);
+      expect(
+        mockOrganizations.post_organization_settings,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("keeps max series per query OPTIONAL — empty value saves", async () => {
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      // default is null (empty) — should still submit
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(
+        mockOrganizations.post_organization_settings,
+      ).toHaveBeenCalled();
+    });
+
+    it("submits a valid in-range max series per query", async () => {
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("max_series_per_query", 50000);
+
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "setOrganizationSettings",
+        expect.objectContaining({ max_series_per_query: 50000 }),
+      );
     });
   });
 
@@ -878,17 +941,13 @@ describe("General", () => {
   });
 
   describe("Accessibility", () => {
-    it("should have proper form labels", () => {
+    it("should render the scrape interval as a number input", () => {
       const wrapper = createWrapper();
-      const scrapeInput = wrapper.findComponent({ name: "OInput" });
-
-      if (scrapeInput.exists()) {
-        // OInput has proper aria attributes or associated labels
-        expect(scrapeInput.props("type")).toBeDefined();
-      } else {
-        // Fallback: verify component has proper structure
-        expect(wrapper.exists()).toBe(true);
-      }
+      const input = wrapper.find(
+        '[data-test="general-settings-scrape-interval"] input',
+      );
+      expect(input.exists()).toBe(true);
+      expect(input.attributes("type")).toBe("number");
     });
   });
 
@@ -897,8 +956,9 @@ describe("General", () => {
       mockStore.state.organizationData.organizationSettings = null;
       const wrapper = createWrapper();
 
-      // Component uses default values when organizationSettings is null
-      expect(wrapper.vm.scrapeIntereval).toBe(15); // default from component
+      // The form falls back to the default scrape_interval (15) from the schema defaults.
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.vm.form.state.values.scrape_interval).toBe(15);
     });
 
     it("should handle upload when not enterprise", async () => {

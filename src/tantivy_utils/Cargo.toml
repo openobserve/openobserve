@@ -10,7 +10,7 @@ default = []
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
-bitflags = "2.11"
+bitflags.workspace = true
 byteorder.workspace = true
 bytes.workspace = true
 config.workspace = true

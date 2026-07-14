@@ -14,28 +14,18 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="rounded-md p-0 o2-custom-bg"
+  <div class="p-0 o2-custom-bg"
     style="height: calc(100vh - 48px); min-height: inherit"
   >
     <AppPageHeader
+      :title="isUpdatingTemplate ? t('alert_templates.updateTitle') : isClone ? t('alert_templates.cloneTitle') : t('alert_templates.addTitle')"
+      title-data-test="add-template-title"
       :back="{
         label: t('alert_templates.header'),
         onClick: () => emit('cancel:hideform'),
       }"
-      class="card-container px-3 border-b border-border-default"
-    >
-      <template #title>
-        <span data-test="add-template-title">
-          <template v-if="isUpdatingTemplate">{{
-            t("alert_templates.updateTitle")
-          }}</template>
-          <template v-else-if="isClone">{{
-            t("alert_templates.cloneTitle")
-          }}</template>
-          <template v-else>{{ t("alert_templates.addTitle") }}</template>
-        </span>
-      </template>
-    </AppPageHeader>
+      class="px-3 border-b border-border-default"
+    />
 
     <OSplitter
       v-model="splitterModel"

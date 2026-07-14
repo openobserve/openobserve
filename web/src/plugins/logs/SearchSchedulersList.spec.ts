@@ -67,6 +67,11 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 // Mock date utils
 vi.mock("@/utils/date", () => ({
   formatDate: vi.fn((date: any, format: string) => "2024-01-01T10:00:00Z"),
+  // The component imports this now instead of re-declaring it; the shared
+  // implementation is tested in date.spec.ts, so here we only assert the wiring.
+  convertUnixToDateFormat: vi.fn((us: any) =>
+    us ? "2024-01-01T10:00:00Z" : "",
+  ),
 }));
 
 // Mock utils
@@ -418,29 +423,29 @@ describe("SearchSchedulersList Component", () => {
     });
   });
 
-  describe("Unix to Quasar Format Conversion", () => {
-    it("should convert unix timestamp to quasar format", () => {
-      const result = wrapper.vm.convertUnixToQuasarFormat(1609459200000000);
+  describe("Unix to Date Format Conversion", () => {
+    it("should convert unix timestamp to date format", () => {
+      const result = wrapper.vm.convertUnixToDateFormat(1609459200000000);
       expect(result).toBe("2024-01-01T10:00:00Z");
     });
 
     it("should handle zero timestamp", () => {
-      const result = wrapper.vm.convertUnixToQuasarFormat(0);
+      const result = wrapper.vm.convertUnixToDateFormat(0);
       expect(result).toBe("");
     });
 
     it("should handle undefined timestamp", () => {
-      const result = wrapper.vm.convertUnixToQuasarFormat(undefined);
+      const result = wrapper.vm.convertUnixToDateFormat(undefined);
       expect(result).toBe("");
     });
 
     it("should handle null timestamp", () => {
-      const result = wrapper.vm.convertUnixToQuasarFormat(null);
+      const result = wrapper.vm.convertUnixToDateFormat(null);
       expect(result).toBe("");
     });
 
     it("should handle string timestamp", () => {
-      const result = wrapper.vm.convertUnixToQuasarFormat("1609459200000000");
+      const result = wrapper.vm.convertUnixToDateFormat("1609459200000000");
       expect(result).toBe("2024-01-01T10:00:00Z");
     });
   });
@@ -830,7 +835,7 @@ describe("SearchSchedulersList Component", () => {
 
     it("should have data processing utilities", () => {
       expect(typeof wrapper.vm.calculateDuration).toBe('function');
-      expect(typeof wrapper.vm.convertUnixToQuasarFormat).toBe('function');
+      expect(typeof wrapper.vm.convertUnixToDateFormat).toBe('function');
     });
   });
 

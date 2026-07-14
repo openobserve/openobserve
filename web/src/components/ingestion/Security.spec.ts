@@ -3,7 +3,6 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import Security from "@/components/ingestion/Security.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { useQuasar } from "quasar";
 
 
 // Mock services
@@ -33,20 +32,6 @@ vi.mock("vue-router", () => ({
   useRouter: () => mockRouter,
   useRoute: () => mockRouter.currentRoute.value,
 }));
-
-// Mock Quasar
-const mockQuasar = {
-  notify: vi.fn()
-};
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    useQuasar: () => mockQuasar,
-    copyToClipboard: vi.fn()
-  };
-});
 
 describe("Security Component", () => {
   let wrapper: any = null;

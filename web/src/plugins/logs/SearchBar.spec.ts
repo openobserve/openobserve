@@ -1349,12 +1349,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
       regionFilter: "",
       favoriteViews: [],
       localSavedViews: [],
-      
-      // Mock Quasar
-      $q: {
-        notify: vi.fn(),
-      },
-      
+
+      notify: vi.fn(),
+
       // Mock emit
       $emit: vi.fn(),
       
@@ -1388,7 +1385,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
       
       handleUpdateSavedView: vi.fn((item) => {
         if (componentInstance.searchObj.data.stream.selectedStream.length === 0) {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             type: "negative",
             message: "No stream available to update save view.",
           });
@@ -1417,7 +1414,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
       downloadRangeData: vi.fn(() => {
         let initNumber = parseInt(componentInstance.downloadCustomInitialNumber);
         if (initNumber < 0) {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             message: "Initial number must be positive number.",
             color: "negative",
             position: "bottom",
@@ -1511,7 +1508,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
       
       downloadLogs: vi.fn(async (data, format) => {
         if (data.length === 0) {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             type: "negative",
             message: "No data available to download.",
           });
@@ -1528,7 +1525,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
           : componentInstance.savedFunctionSelectedName.name;
           
         if (content.trim() === "") {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             type: "warning",
             message: "The function field must contain a value and cannot be left empty.",
           });
@@ -1537,7 +1534,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
         
         const pattern = /^[a-zA-Z][a-zA-Z0-9_]*$/;
         if (!pattern.test(fnName)) {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             type: "negative",
             message: "Function name is not valid.",
           });
@@ -1556,7 +1553,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
       
       populateFunctionImplementation: vi.fn((fnValue, flag = false) => {
         if (flag) {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             type: "positive",
             message: `${fnValue.name} function applied successfully.`,
             timeout: 3000,
@@ -1569,7 +1566,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
       fnSavedFunctionDialog: vi.fn(() => {
         const content = componentInstance.searchObj.data.tempFunctionContent;
         if (content === "") {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             type: "negative",
             message: "No function definition found.",
           });
@@ -1615,7 +1612,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
       
       fnSavedView: vi.fn(() => {
         if (componentInstance.searchObj.data.stream.selectedStream.length === 0) {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             type: "negative",
             message: "No stream available to save view.",
           });
@@ -1627,7 +1624,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
       
       applySavedView: vi.fn(async (item) => {
         // Mock apply saved view logic
-        componentInstance.$q.notify({
+        componentInstance.notify({
           message: `${item.view_name} view applied successfully.`,
           color: "positive",
           position: "bottom",
@@ -1639,7 +1636,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
         if (componentInstance.isSavedViewAction === "create") {
           if (componentInstance.savedViewName === "" || 
               !/^[A-Za-z0-9 \-\_]+$/.test(componentInstance.savedViewName)) {
-            componentInstance.$q.notify({
+            componentInstance.notify({
               message: "Please provide valid view name.",
               color: "negative",
               position: "bottom",
@@ -1652,7 +1649,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
       }),
       
       deleteSavedViews: vi.fn(async () => {
-        componentInstance.$q.notify({
+        componentInstance.notify({
           message: "View deleted successfully.",
           color: "positive",
           position: "bottom",
@@ -1670,7 +1667,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
       
       createSavedViews: vi.fn((viewName) => {
         if (viewName.trim() === "") {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             message: "Please provide valid view name.",
             color: "negative",
             position: "bottom",
@@ -1679,7 +1676,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
           return;
         }
         
-        componentInstance.$q.notify({
+        componentInstance.notify({
           message: "View created successfully.",
           color: "positive",
           position: "bottom",
@@ -1688,7 +1685,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
       }),
       
       updateSavedViews: vi.fn((viewID, viewName) => {
-        componentInstance.$q.notify({
+        componentInstance.notify({
           message: "View updated successfully.",
           color: "positive",
           position: "bottom",
@@ -1697,7 +1694,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
       }),
       
       shareLink: vi.fn(async () => {
-        componentInstance.$q.notify({
+        componentInstance.notify({
           type: "positive",
           message: "Link Copied Successfully!",
           timeout: 5000,
@@ -1742,7 +1739,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
       handleFavoriteSavedView: vi.fn((row, flag) => {
         if (!flag) {
           if (componentInstance.favoriteViews.length >= 10) {
-            componentInstance.$q.notify({
+            componentInstance.notify({
               message: "You can only save 10 views.",
               color: "info",
               position: "bottom",
@@ -1751,7 +1748,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
             return;
           }
           componentInstance.favoriteViews.push(row.view_id);
-          componentInstance.$q.notify({
+          componentInstance.notify({
             message: "View added to favorites.",
             color: "positive",
             position: "bottom",
@@ -1762,7 +1759,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
           if (index > -1) {
             componentInstance.favoriteViews.splice(index, 1);
           }
-          componentInstance.$q.notify({
+          componentInstance.notify({
             message: "View removed from favorites.",
             color: "positive",
             position: "bottom",
@@ -1817,7 +1814,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
         if (value === "visualize" && 
             !componentInstance.searchObj.meta.sqlMode && 
             componentInstance.searchObj.data.stream.selectedStream.length > 1) {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             type: "negative",
             message: "Please enable SQL mode or select a single stream to use timechart",
           });
@@ -1828,7 +1825,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
       
       addJobScheduler: vi.fn(async () => {
         if (componentInstance.searchObj.meta.jobId !== "") {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             type: "negative",
             message: "Job Already Scheduled , please change some parameters to schedule new job",
             timeout: 3000,
@@ -1838,7 +1835,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
         
         if (componentInstance.searchObj.meta.jobRecords > 100000 || 
             componentInstance.searchObj.meta.jobRecords <= 0) {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             type: "negative",
             message: "Job Scheduler should be between 1 and 100000",
             timeout: 3000,
@@ -1881,7 +1878,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
       }),
       
       updateActionSelection: vi.fn((item) => {
-        componentInstance.$q.notify({
+        componentInstance.notify({
           message: `${item?.name} action applied successfully`,
           timeout: 3000,
           color: "secondary",
@@ -1948,7 +1945,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     componentInstance.handleUpdateSavedView(item);
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "No stream available to update save view.",
     });
@@ -1989,7 +1986,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     componentInstance.downloadRangeData();
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "Initial number must be positive number.",
       color: "negative",
       position: "bottom",
@@ -2035,7 +2032,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it.skip("should notify when no data to download", async () => {
     await componentInstance.downloadLogs([], "csv");
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "No data available to download.",
     });
@@ -2046,7 +2043,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     componentInstance.searchObj.data.tempFunctionContent = "";
     componentInstance.saveFunction();
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "warning",
       message: "The function field must contain a value and cannot be left empty.",
     });
@@ -2058,7 +2055,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     componentInstance.savedFunctionName = "123invalid";
     componentInstance.saveFunction();
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "Function name is not valid.",
     });
@@ -2069,7 +2066,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     const fnValue = { name: "testFunc", function: "content" };
     componentInstance.populateFunctionImplementation(fnValue, true);
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "positive",
       message: "testFunc function applied successfully.",
       timeout: 3000,
@@ -2082,7 +2079,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     componentInstance.searchObj.data.tempFunctionContent = "";
     componentInstance.fnSavedFunctionDialog();
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "No function definition found.",
     });
@@ -2114,7 +2111,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     componentInstance.searchObj.data.stream.selectedStream = [];
     componentInstance.fnSavedView();
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "No stream available to save view.",
     });
@@ -2125,7 +2122,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     componentInstance.savedViewName = "invalid@name!";
     componentInstance.handleSavedView();
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "Please provide valid view name.",
       color: "negative",
       position: "bottom",
@@ -2148,7 +2145,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     componentInstance.handleFavoriteSavedView({ view_id: "new_view" }, false);
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "You can only save 10 views.",
       color: "info",
       position: "bottom",
@@ -2212,7 +2209,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     componentInstance.onLogsVisualizeToggleUpdate("visualize");
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "Please enable SQL mode or select a single stream to use timechart",
     });
@@ -2224,7 +2221,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     await componentInstance.addJobScheduler();
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "Job Already Scheduled , please change some parameters to schedule new job",
       timeout: 3000,
@@ -2238,7 +2235,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     await componentInstance.addJobScheduler();
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "Job Scheduler should be between 1 and 100000",
       timeout: 3000,
@@ -2296,7 +2293,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     const item = { name: "testAction" };
     componentInstance.updateActionSelection(item);
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "testAction action applied successfully",
       timeout: 3000,
       color: "secondary",
@@ -2452,7 +2449,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should notify error for empty view name after trim", () => {
     componentInstance.createSavedViews("   ");
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "Please provide valid view name.",
       color: "negative",
       position: "bottom",
@@ -2464,7 +2461,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should create view with valid name", () => {
     componentInstance.createSavedViews("Valid View Name");
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "View created successfully.",
       color: "positive",
       position: "bottom",
@@ -2476,7 +2473,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should show success notification on link copy", async () => {
     await componentInstance.shareLink();
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "positive",
       message: "Link Copied Successfully!",
       timeout: 5000,
@@ -2489,7 +2486,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     await componentInstance.applySavedView(item);
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "Test View view applied successfully.",
       color: "positive",
       position: "bottom",
@@ -2513,7 +2510,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     const fnValue = { name: "testFunc", function: "content" };
     componentInstance.populateFunctionImplementation(fnValue, false);
     
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
     expect(componentInstance.searchObj.data.tempFunctionName).toBe("testFunc");
     expect(componentInstance.searchObj.data.tempFunctionContent).toBe("content");
   });
@@ -2573,7 +2570,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     expect(componentInstance.isSavedViewAction).toBe("create");
     expect(componentInstance.savedViewName).toBe("");
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 136: handleSavedView with valid name
@@ -2593,7 +2590,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     componentInstance.handleSavedView();
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "Please provide valid view name.",
       color: "negative",
       position: "bottom",
@@ -2628,7 +2625,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     componentInstance.handleFavoriteSavedView(row, false);
     
     expect(componentInstance.favoriteViews).toContain("view123");
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "View added to favorites.",
       color: "positive",
       position: "bottom",
@@ -2645,7 +2642,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     expect(componentInstance.favoriteViews).not.toContain("view123");
     expect(componentInstance.favoriteViews).toContain("view456");
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "View removed from favorites.",
       color: "positive",
       position: "bottom",
@@ -2718,7 +2715,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     componentInstance.onLogsVisualizeToggleUpdate("visualize");
     
     expect(componentInstance.searchObj.meta.logsVisualizeToggle).toBe("visualize");
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 149: addJobScheduler with zero job records
@@ -2728,7 +2725,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     await componentInstance.addJobScheduler();
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "Job Scheduler should be between 1 and 100000",
       timeout: 3000,
@@ -2743,7 +2740,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     await componentInstance.addJobScheduler();
     
     // Should not show any error notifications
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 151: selectTransform with null item
@@ -2848,7 +2845,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     componentInstance.saveFunction();
     
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 162: fnSavedFunctionDialog with content
@@ -2857,7 +2854,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     componentInstance.fnSavedFunctionDialog();
     
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 163: filterFn with empty search value
@@ -3104,7 +3101,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     componentInstance.saveFunction();
     
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 184: saveFunction with whitespace-only content
@@ -3113,7 +3110,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     componentInstance.saveFunction();
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "warning",
       message: "The function field must contain a value and cannot be left empty.",
     });
@@ -3125,7 +3122,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     componentInstance.fnSavedFunctionDialog();
     
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 186: Complex search object manipulation
@@ -3208,7 +3205,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     await componentInstance.addJobScheduler();
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "Job Scheduler should be between 1 and 100000",
       timeout: 3000,
@@ -3222,7 +3219,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     await componentInstance.addJobScheduler();
     
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 194: onLogsVisualizeToggleUpdate with SQL mode enabled
@@ -3233,7 +3230,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     componentInstance.onLogsVisualizeToggleUpdate("visualize");
     
     expect(componentInstance.searchObj.meta.logsVisualizeToggle).toBe("visualize");
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 195: onLogsVisualizeToggleUpdate with single stream
@@ -3244,7 +3241,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     componentInstance.onLogsVisualizeToggleUpdate("visualize");
     
     expect(componentInstance.searchObj.meta.logsVisualizeToggle).toBe("visualize");
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test: onLogsVisualizeToggleUpdate from build mode to visualize mode (PR #10758)
@@ -3257,7 +3254,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
 
     // PR #10758: simplified condition allows switching to visualize from any mode
     expect(componentInstance.searchObj.meta.logsVisualizeToggle).toBe("visualize");
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test: onLogsVisualizeToggleUpdate from patterns mode to visualize mode (PR #10758)
@@ -3270,7 +3267,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
 
     // PR #10758: simplified condition allows switching to visualize from any mode
     expect(componentInstance.searchObj.meta.logsVisualizeToggle).toBe("visualize");
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 196: handleRunQueryFn with logs mode
@@ -3295,7 +3292,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should handle null item in action selection", () => {
     componentInstance.updateActionSelection(null);
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "undefined action applied successfully",
       timeout: 3000,
       color: "secondary",
@@ -3307,7 +3304,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     const item = { id: "123" };
     componentInstance.updateActionSelection(item);
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "undefined action applied successfully",
       timeout: 3000,
       color: "secondary",
@@ -3432,7 +3429,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     componentInstance.handleFavoriteSavedView({ view_id: "view10" }, false);
     
     expect(componentInstance.favoriteViews).toHaveLength(10);
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "View added to favorites.",
       color: "positive",
       position: "bottom",
@@ -3447,7 +3444,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     componentInstance.handleFavoriteSavedView({ view_id: "nonexistent" }, true);
     
     expect(componentInstance.favoriteViews).toEqual(["view1", "view2"]);
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "View removed from favorites.",
       color: "positive",
       position: "bottom",
@@ -3493,7 +3490,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 214: Multiple notification scenarios
   it("should handle multiple notification scenarios", () => {
     // Clear any previous calls and reset state
-    componentInstance.$q.notify.mockClear();
+    componentInstance.notify.mockClear();
     componentInstance.searchObj.data.tempFunctionContent = "";
     componentInstance.savedFunctionName = "";
     componentInstance.isSavedFunctionAction = "create";
@@ -3506,7 +3503,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     componentInstance.savedFunctionName = "123invalid";
     componentInstance.saveFunction();
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledTimes(2);
+    expect(componentInstance.notify).toHaveBeenCalledTimes(2);
   });
 
   // Test 215: Edge case for buildStreamQuery with undefined values
@@ -3538,7 +3535,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should handle shareLink method execution", async () => {
     const result = await componentInstance.shareLink();
     
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "positive",
       message: "Link Copied Successfully!",
       timeout: 5000,

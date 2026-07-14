@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     secondary-button-variant="outline"
     :neutral-button-label="pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
     neutral-button-variant="outline-destructive"
-    @click:primary="saveCondition"
+    form-id="condition-form"
     @click:secondary="openCancelDialog"
     @click:neutral="openDeleteDialog"
     @keydown.stop
@@ -55,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
 
 
+    <OForm id="condition-form" :form="form">
     <div class="w-full rounded-lg px-3 stream-routing-container">
       <div>
         <div
@@ -82,6 +83,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @input:update="(name, field) => onInputUpdate(name, field)"
             />
             <div v-else class="p-3 text-gray-400">Loading conditions...</div>
+          </div>
+          <!-- Schema error for the bridged FilterGroup model (no OForm* field to
+               render it, so surface the form-level `conditions` error here). -->
+          <div
+            v-if="conditionsError"
+            class="text-xs text-input-error-text mt-1"
+            data-test="add-condition-error"
+          >
+            {{ conditionsError }}
           </div>
           <div
             class="note-container bg-[#f9f290] text-[#2d3748] w-full rounded-md p-3 my-3 flex flex-col gap-2"
@@ -133,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+    </OForm>
   </div>
   </ODrawer>
   <confirm-dialog
@@ -156,6 +167,10 @@ import {
 import { useI18n } from "vue-i18n";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import { makeConditionSchema, type ConditionForm } from "./Condition.schema";
 import {
   getTimezoneOffset,
   getUUID,
@@ -167,8 +182,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../../ConfirmDialog.vue";
-import useQuery from "@/composables/useQuery";
-import searchService from "@/services/search";
 import { convertDateToTimestamp } from "@/utils/date";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -221,8 +234,6 @@ const store = useStore();
 
 const { getStream, getStreams } = useStreams();
 
-const { buildQueryPayload } = useQuery();
-
 const emit = defineEmits(["update:node", "cancel:hideform", "delete:node"]);
 
 const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });
@@ -242,10 +253,6 @@ const isUpdating = ref(false);
 
 const filteredColumns: any = ref([]);
 
-const isValidSqlQuery = ref(true);
-
-const validateSqlQueryPromise = ref<Promise<unknown>>();
-
 const scheduledAlertRef = ref<any>(null);
 
 const filteredStreams: Ref<any[]> = ref([]);
@@ -253,8 +260,6 @@ const filteredStreams: Ref<any[]> = ref([]);
 const indexOptions = ref([]);
 
 const originalStreamFields: Ref<any[]> = ref([]);
-
-const isValidName: Ref<boolean> = ref(true);
 
 const isAggregationEnabled = ref(false);
 
@@ -449,6 +454,45 @@ watch(
   },
 );
 
+// ── OForm wiring (Rule ③ OWNER pattern) ──────────────────────────────────────
+// This component OWNS <OForm> and needs to read the form-level `conditions`
+// error to surface it under the FilterGroup, so it creates the form here with
+// useOForm and reads it reactively via form.useStore — a SINGLE source of truth
+// (no mirror ref, no store.subscribe). The composite FilterGroup has no OForm*
+// equivalent, so its model (`conditionGroup`) is bridged INTO the form as the
+// `conditions` field via a DIRECT form.setFieldValue from the FilterGroup's own
+// change handlers (updateGroup / removeConditionGroup / onInputUpdate) — NOT a
+// watch on a local-ref mirror (Rule ③). The schema's superRefine
+// ("at least one condition") then gates submit (R3/R4).
+const conditionDefaults = computed((): ConditionForm => ({
+  conditions: conditionGroup.value,
+}));
+
+const form = useOForm<ConditionForm>({
+  defaultValues: conditionDefaults.value,
+  schema: makeConditionSchema(t),
+  onSubmit: () => saveCondition(),
+});
+
+// Bridge the composite child's model into the form's `conditions` field. Called
+// from the FilterGroup change handlers (the control's own handlers).
+const syncConditionsToForm = () => {
+  form.setFieldValue("conditions", conditionGroup.value, {
+    dontUpdateMeta: true,
+  });
+};
+
+// Surface the form-level `conditions` error (no OForm* field renders it) — a
+// reactive view of the SAME form, no mirror.
+const conditionsErrors = form.useStore(
+  (s: any) => s.fieldMeta?.conditions?.errors ?? [],
+);
+const conditionsError = computed(() =>
+  conditionsErrors.value.length
+    ? String(firstFieldError(conditionsErrors.value))
+    : "",
+);
+
 const filterColumns = (options: any[], val: String, update: Function) => {
   let filteredOptions: any[] = [];
   if (val === "") {
@@ -469,12 +513,6 @@ const filterColumns = (options: any[], val: String, update: Function) => {
 const filterStreams = (val: string, update: any) => {
   filteredStreams.value = filterColumns(indexOptions.value, val, update);
 };
-
-const isValidStreamName = computed(() => {
-  const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
-  // Check if the role name is valid
-  return roleNameRegex.test(streamRoute.value?.name);
-});
 
 const updateStreamFields = async (streamName: any, streamType: any) => {
   let streamCols: any = [];
@@ -606,6 +644,7 @@ const updateGroup = (updatedGroup: any) => {
 
   // Extract the updated value back
   conditionGroup.value = tempContext.formData.query_condition.conditions;
+  syncConditionsToForm();
 };
 
 const removeConditionGroup = (targetGroupId: string) => {
@@ -627,10 +666,14 @@ const removeConditionGroup = (targetGroupId: string) => {
 
   // Extract the updated value back
   conditionGroup.value = tempContext.formData.query_condition.conditions;
+  syncConditionsToForm();
 };
 
-const onInputUpdate = (name: string, field: any) => {
-  // Handle input updates from FilterCondition component
+const onInputUpdate = (_name?: string, _field?: any) => {
+  // FilterGroup mutates the passed `conditionGroup` in place and emits this on
+  // every field edit — bridge the live model into the form so the schema's
+  // superRefine sees column/operator changes (Rule ③ direct-handler bridge).
+  syncConditionsToForm();
 };
 
 const closeDialog = () => {
@@ -667,25 +710,12 @@ const openCancelDialog = () => {
   }
 };
 
+// @submit handler — OForm only calls it once the schema passes (at least one
+// condition via superRefine over the bridged `conditions` field), so the schema
+// gates the save (the old imperative hasValidConditions toast is gone). Reads
+// the live `conditionGroup` (the bridged source of truth).
 const saveCondition = async () => {
   try {
-    // V2: Check if there are any valid conditions (use 'conditions' array)
-    const conditionsArray = (conditionGroup.value as any).conditions || [];
-    const hasValidConditions = conditionsArray.some((item: any) => {
-      // Check for nested groups (V2 format)
-      if (item.filterType === "group" && item.conditions) return true;
-      // Check for valid conditions
-      return item.column && item.operator;
-    });
-
-    if (!hasValidConditions) {
-      toast({
-        variant: "error",
-        message: "Please add at least one condition",
-      });
-      return;
-    }
-
     // V2: Send directly to backend (no transformation needed)
     // The conditionGroup is already in V2 format which matches backend
     let conditionData = {
@@ -757,41 +787,6 @@ const deleteRoute = () => {
   emit("cancel:hideform");
 };
 
-const validateSqlQuery = () => {
-  const query = buildQueryPayload({
-    sqlMode: true,
-    streamName: streamRoute.value.name as string,
-  });
-
-  delete query.aggs;
-
-  query.query.sql = streamRoute.value.query_condition?.sql || "";
-
-  validateSqlQueryPromise.value = new Promise((resolve, reject) => {
-    searchService
-      .search({
-        org_identifier: store.state.selectedOrganization.identifier,
-        query,
-        page_type: "logs",
-      })
-      .then((res: any) => {
-        isValidSqlQuery.value = true;
-        resolve("");
-      })
-      .catch((err: any) => {
-        if (err.response.data.code === 500) {
-          isValidSqlQuery.value = false;
-          toast({
-            variant: "error",
-            message: "Invalid SQL Query : " + err.response.data.message,
-          });
-          reject("");
-        } else isValidSqlQuery.value = true;
-
-        resolve("");
-      });
-  });
-};
 </script>
 
 <style>

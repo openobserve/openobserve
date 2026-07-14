@@ -17,7 +17,10 @@ import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import ModelPricingEditor from "./ModelPricingEditor.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import i18n from "@/locales";
+import { makeModelPricingSchema } from "./ModelPricingEditor.schema";
 
 
 // Service mocks
@@ -29,16 +32,6 @@ vi.mock("@/services/model_pricing", () => ({
     update: vi.fn(),
   },
 }));
-
-// useQuasar mock
-const mockNotify = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: mockNotify }),
-  };
-});
 
 // Toast mock
 const mockToastFn = vi.fn();
@@ -127,14 +120,17 @@ const ODialogStub = {
 // OButton stub — keeps clicks working and the slot content rendered
 const OButtonStub = {
   name: "OButton",
-  props: ["variant", "size", "active", "disabled", "loading"],
+  props: ["variant", "size", "active", "disabled", "loading", "type"],
   emits: ["click"],
+  // Mirror the real OButton default (type="button") so stubbed buttons inside
+  // the <OForm> don't accidentally submit it on click.
   template: `
     <button
       data-test-stub="o-button"
       :data-variant="variant"
       :data-size="size"
       :data-active="String(active)"
+      :type="type || 'button'"
       :disabled="disabled || loading"
       @click="$emit('click', $event)"
     >
@@ -221,6 +217,28 @@ const createWrapper = (overrides: { query?: Record<string, any> } = {}) => {
   });
 };
 
+// ── Field-array test helpers: drive the real form (tiers/prices are now
+//    form-owned; values are PER-MILLION rows). ──────────────────────────────
+// OWNER pattern: the component creates the form via useOForm and exposes it as
+// `form` (handed to <OForm :form="form">) — read it directly, not via a ref.
+const getForm = (wrapper: any) => (wrapper.vm as any).form;
+const row = (key: string, value: number) => ({ key, value });
+const tier = (overrides: Record<string, any> = {}) => ({
+  name: "Default",
+  condition: null,
+  prices: [] as any[],
+  draftKey: "",
+  draftValue: 0,
+  ...overrides,
+});
+// Seed a valid form: name + pattern + a default tier with one non-zero price.
+const fillValid = (wrapper: any, tiers?: any[]) => {
+  const form = getForm(wrapper);
+  form.setFieldValue("name", "GPT 4o");
+  form.setFieldValue("match_pattern", "gpt-4o");
+  form.setFieldValue("tiers", tiers ?? [tier({ prices: [row("input", 1)] })]);
+};
+
 describe("ModelPricingEditor.vue", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -287,14 +305,15 @@ describe("ModelPricingEditor.vue", () => {
   });
 
   describe("Initial state", () => {
-    it("initializes the model with a single default tier", async () => {
+    it("initializes the form with a single default tier (no prices, no condition)", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      const vm = wrapper.vm as any;
-      expect(vm.model.tiers).toHaveLength(1);
-      expect(vm.model.tiers[0].name).toBe("Default");
-      expect(vm.model.tiers[0].condition).toBeNull();
-      expect(vm.addState).toHaveLength(1);
+      await nextTick();
+      const tiers = (wrapper.vm as any).formTiers;
+      expect(tiers).toHaveLength(1);
+      expect(tiers[0].name).toBe("Default");
+      expect(tiers[0].condition).toBeNull();
+      expect(tiers[0].prices).toEqual([]);
     });
 
     it("loads existing models on mount for shadow-conflict detection", async () => {
@@ -319,159 +338,256 @@ describe("ModelPricingEditor.vue", () => {
     });
   });
 
-  describe("Validation: nameError computed", () => {
-    it("requires a model name", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect((wrapper.vm as any).nameError).toBe("Model name is required");
+  // The name/match_pattern rules moved from computed refs into the co-located
+  // Zod schema; test the schema directly (messages resolve via the real i18n).
+  describe("Schema validation: name", () => {
+    const schema = makeModelPricingSchema(i18n.global.t as any);
+    const nameIssue = (name: string) => {
+      const res = schema.safeParse({ name, match_pattern: "gpt" });
+      return res.success
+        ? ""
+        : res.error.issues.find((iss: any) => iss.path[0] === "name")?.message ?? "";
+    };
+
+    it("requires a model name", () => {
+      expect(nameIssue("")).toBe("Model name is required");
     });
 
-    it("rejects names over 256 chars", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      (wrapper.vm as any).model.name = "a".repeat(257);
-      await nextTick();
-      expect((wrapper.vm as any).nameError).toBe("Model name must be 256 characters or fewer");
+    it("rejects names over 256 chars", () => {
+      expect(nameIssue("a".repeat(257))).toBe(
+        "Model name must be 256 characters or fewer",
+      );
     });
 
-    it("clears name error for a valid name", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      (wrapper.vm as any).model.name = "Valid Name";
-      await nextTick();
-      expect((wrapper.vm as any).nameError).toBe("");
-    });
-  });
-
-  describe("Validation: regexError computed", () => {
-    it("requires a match pattern", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect((wrapper.vm as any).regexError).toBe("Match pattern is required");
-    });
-
-    it("rejects patterns over 512 chars", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      (wrapper.vm as any).model.match_pattern = "a".repeat(513);
-      await nextTick();
-      expect((wrapper.vm as any).regexError).toBe("Match pattern must be 512 characters or fewer");
-    });
-
-    it("reports an invalid regex with the parser error message", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      (wrapper.vm as any).model.match_pattern = "([";
-      await nextTick();
-      expect((wrapper.vm as any).regexError).toContain("Invalid regex:");
-    });
-
-    it("strips Rust-style inline flags before validating", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      // (?i) is not valid in JS RegExp but the component strips it
-      (wrapper.vm as any).model.match_pattern = "(?i)gpt-4";
-      await nextTick();
-      expect((wrapper.vm as any).regexError).toBe("");
-    });
-
-    it("clears the error for valid patterns", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      (wrapper.vm as any).model.match_pattern = "gpt-.*";
-      await nextTick();
-      expect((wrapper.vm as any).regexError).toBe("");
+    it("accepts a valid name", () => {
+      expect(nameIssue("Valid Name")).toBe("");
     });
   });
 
-  describe("Tier management", () => {
-    it("addTier appends a conditional tier with default condition", async () => {
+  describe("Schema validation: match_pattern", () => {
+    const schema = makeModelPricingSchema(i18n.global.t as any);
+    const patternIssue = (match_pattern: string) => {
+      const res = schema.safeParse({ name: "X", match_pattern });
+      return res.success
+        ? ""
+        : res.error.issues.find((iss: any) => iss.path[0] === "match_pattern")
+            ?.message ?? "";
+    };
+
+    it("requires a match pattern", () => {
+      expect(patternIssue("")).toBe("Match pattern is required");
+    });
+
+    it("rejects patterns over 512 chars", () => {
+      expect(patternIssue("a".repeat(513))).toBe(
+        "Match pattern must be 512 characters or fewer",
+      );
+    });
+
+    it("reports an invalid regex with the parser error message", () => {
+      expect(patternIssue("([")).toContain("Invalid regex:");
+    });
+
+    it("strips Rust-style inline flags before validating", () => {
+      // (?i) is not valid in JS RegExp but the schema strips it
+      expect(patternIssue("(?i)gpt-4")).toBe("");
+    });
+
+    it("accepts a valid pattern", () => {
+      expect(patternIssue("gpt-.*")).toBe("");
+    });
+  });
+
+  describe("Schema validation: price-row key", () => {
+    const schema = makeModelPricingSchema(i18n.global.t as any);
+    // Isolate the committed price-row key rule (path tiers[i].prices[j].key).
+    const keyIssue = (key: string) => {
+      const res = schema.safeParse({
+        name: "X",
+        match_pattern: "gpt",
+        tiers: [
+          { name: "Default", condition: null, prices: [{ key, value: 1 }] },
+        ],
+      });
+      return res.success
+        ? ""
+        : res.error.issues.find(
+            (iss: any) =>
+              iss.path[0] === "tiers" &&
+              iss.path[2] === "prices" &&
+              iss.path[4] === "key",
+          )?.message ?? "";
+    };
+
+    it("rejects a pure-integer price key", () => {
+      expect(keyIssue("123")).toBe("Usage key cannot be a pure integer");
+    });
+
+    it("rejects a price key that contains spaces", () => {
+      expect(keyIssue("input tokens")).toBe(
+        "Usage key must not contain spaces",
+      );
+    });
+
+    it("accepts a valid alphanumeric price key", () => {
+      expect(keyIssue("input")).toBe("");
+    });
+
+    it("ignores an empty price key (blank/draft row)", () => {
+      expect(keyIssue("")).toBe("");
+    });
+  });
+
+  describe("Schema validation (real OForm)", () => {
+    it("blocks submit and calls neither create nor update when name/pattern are empty", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+
+      const form = (wrapper.vm as any).form;
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(form.state.isValid).toBe(false);
+      expect(mockService.create).not.toHaveBeenCalled();
+      expect(mockService.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Tier management (field-array)", () => {
+    it("addTier appends a conditional tier with a default condition", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       (wrapper.vm as any).addTier();
-      const vm = wrapper.vm as any;
-      expect(vm.model.tiers).toHaveLength(2);
-      expect(vm.model.tiers[1].condition).toEqual({
+      await nextTick();
+      const tiers = (wrapper.vm as any).formTiers;
+      expect(tiers).toHaveLength(2);
+      expect(tiers[1].condition).toEqual({
         usage_key: "input",
         operator: "gt",
         value: 200000,
       });
-      expect(vm.addState).toHaveLength(2);
     });
 
     it("removeTier removes the tier at the given index", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       (wrapper.vm as any).addTier();
+      await nextTick();
       (wrapper.vm as any).removeTier(1);
-      expect((wrapper.vm as any).model.tiers).toHaveLength(1);
-      expect((wrapper.vm as any).addState).toHaveLength(1);
+      await nextTick();
+      expect((wrapper.vm as any).formTiers).toHaveLength(1);
     });
 
-    it("hides the remove button on the only tier (just one tier rendered)", async () => {
+    it("hides the remove button on the only tier", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       const outlineDestructive = wrapper
         .findAll('[data-test-stub="o-button"]')
         .filter((b) => b.attributes("data-variant") === "outline-destructive");
-      // No tier remove buttons when only the default tier exists (only price-row delete buttons would have this variant — empty prices means no rows)
+      // No tier remove buttons when only the default tier exists (and the default
+      // tier starts with no price rows → no price-delete buttons either).
       expect(outlineDestructive.length).toBe(0);
     });
   });
 
-  describe("Pricing template helpers", () => {
-    it("applyTemplate seeds the tier with template keys and zero defaults", async () => {
+  describe("Pricing template helpers (field-array)", () => {
+    it("applyTemplate seeds the tier rows with template keys and zero defaults", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      const tier = (wrapper.vm as any).model.tiers[0];
-      (wrapper.vm as any).applyTemplate(tier, ["input", "output"]);
-      expect(tier.prices).toEqual({ input: 0, output: 0 });
+      (wrapper.vm as any).applyTemplate(0, ["input", "output"]);
+      await nextTick();
+      const prices = (wrapper.vm as any).formTiers[0].prices;
+      expect(prices.map((r: any) => r.key)).toEqual(["input", "output"]);
+      expect(prices.every((r: any) => r.value === 0)).toBe(true);
     });
 
     it("applyTemplate preserves existing values for matching keys", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      const tier = (wrapper.vm as any).model.tiers[0];
-      tier.prices = { input: 0.5, foo: 1 };
-      (wrapper.vm as any).applyTemplate(tier, ["input", "output"]);
-      expect(tier.prices).toEqual({ input: 0.5, output: 0 });
+      getForm(wrapper).setFieldValue("tiers", [
+        tier({ prices: [row("input", 0.5), row("foo", 1)] }),
+      ]);
+      await nextTick();
+      (wrapper.vm as any).applyTemplate(0, ["input", "output"]);
+      await nextTick();
+      const prices = (wrapper.vm as any).formTiers[0].prices;
+      expect(prices.map((r: any) => [r.key, r.value])).toEqual([
+        ["input", 0.5],
+        ["output", 0],
+      ]);
     });
 
     it("clearTemplate removes the supplied keys from a tier", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      const tier = (wrapper.vm as any).model.tiers[0];
-      tier.prices = { input: 0.1, output: 0.2, foo: 0.3 };
-      (wrapper.vm as any).clearTemplate(tier, ["input", "output"]);
-      expect(tier.prices).toEqual({ foo: 0.3 });
+      getForm(wrapper).setFieldValue("tiers", [
+        tier({ prices: [row("input", 0.1), row("output", 0.2), row("foo", 0.3)] }),
+      ]);
+      await nextTick();
+      (wrapper.vm as any).clearTemplate(0, ["input", "output"]);
+      await nextTick();
+      const prices = (wrapper.vm as any).formTiers[0].prices;
+      expect(prices.map((r: any) => r.key)).toEqual(["foo"]);
     });
 
-    it("isTemplateActive returns true when prices match the template keys exactly", async () => {
+    it("isTemplateActive returns true when rows match the template keys exactly", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      const tier = { prices: { input: 0, output: 0 } };
-      expect((wrapper.vm as any).isTemplateActive(tier, ["input", "output"])).toBe(true);
+      getForm(wrapper).setFieldValue("tiers", [
+        tier({ prices: [row("input", 0), row("output", 0)] }),
+      ]);
+      await nextTick();
+      expect((wrapper.vm as any).isTemplateActive(0, ["input", "output"])).toBe(true);
     });
 
-    it("isTemplateActive returns false when prices do not match the template", async () => {
+    it("isTemplateActive returns false when rows do not match the template", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      const tier = { prices: { input: 0 } };
-      expect((wrapper.vm as any).isTemplateActive(tier, ["input", "output"])).toBe(false);
-      const tier2 = { prices: { input: 0, output: 0, foo: 0 } };
-      expect((wrapper.vm as any).isTemplateActive(tier2, ["input", "output"])).toBe(false);
+      getForm(wrapper).setFieldValue("tiers", [tier({ prices: [row("input", 0)] })]);
+      await nextTick();
+      expect((wrapper.vm as any).isTemplateActive(0, ["input", "output"])).toBe(false);
     });
   });
 
   describe("Price entry helpers", () => {
-    it("updatePrice and deletePrice mutate tier.prices", async () => {
+    it("addPrice commits the draft row into the tier and clears the draft", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      const tier: any = { prices: { input: 1 } };
-      (wrapper.vm as any).updatePrice(tier, "output", 2);
-      expect(tier.prices).toEqual({ input: 1, output: 2 });
-      (wrapper.vm as any).deletePrice(tier, "input");
-      expect(tier.prices).toEqual({ output: 2 });
+      getForm(wrapper).setFieldValue("tiers", [
+        tier({ draftKey: "input", draftValue: 5 }),
+      ]);
+      await nextTick();
+      (wrapper.vm as any).addPrice(0);
+      await nextTick();
+      const t = (wrapper.vm as any).formTiers[0];
+      expect(t.prices.map((r: any) => [r.key, r.value])).toEqual([["input", 5]]);
+      expect(t.draftKey).toBe("");
+      expect(t.draftValue).toBe(0);
+    });
+
+    it("addPrice is a no-op when the draft key is empty", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      getForm(wrapper).setFieldValue("tiers", [
+        tier({ draftKey: "  ", draftValue: 5 }),
+      ]);
+      await nextTick();
+      (wrapper.vm as any).addPrice(0);
+      await nextTick();
+      expect((wrapper.vm as any).formTiers[0].prices).toHaveLength(0);
+    });
+
+    it("removePrice removes the row at the given index", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      getForm(wrapper).setFieldValue("tiers", [
+        tier({ prices: [row("a", 1), row("b", 2)] }),
+      ]);
+      await nextTick();
+      (wrapper.vm as any).removePrice(0, 0);
+      await nextTick();
+      const prices = (wrapper.vm as any).formTiers[0].prices;
+      expect(prices.map((r: any) => r.key)).toEqual(["b"]);
     });
 
     it("toPerMillion / fromPerMillion are inverses for non-zero", async () => {
@@ -505,119 +621,22 @@ describe("ModelPricingEditor.vue", () => {
     });
   });
 
-  describe("addPrice", () => {
-    it("returns true and is a no-op when the key is empty", async () => {
+  describe("previewEntries (field-array)", () => {
+    it("appends a pending row when the draft has a key", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      const tier: any = { prices: {} };
-      (wrapper.vm as any).addState[0] = { key: "  ", value: 5 };
-      const result = (wrapper.vm as any).addPrice(tier, 0);
-      expect(result).toBe(true);
-      expect(tier.prices).toEqual({});
-    });
-
-    it("rejects keys that are pure integers and notifies", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const tier: any = { prices: {} };
-      (wrapper.vm as any).addState[0] = { key: "123", value: 1 };
-      const result = (wrapper.vm as any).addPrice(tier, 0);
-      expect(result).toBe(false);
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error", message: "Usage key cannot be a pure integer" }),
-      );
-    });
-
-    it("rejects keys containing spaces and notifies", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const tier: any = { prices: {} };
-      (wrapper.vm as any).addState[0] = { key: "input tokens", value: 1 };
-      const result = (wrapper.vm as any).addPrice(tier, 0);
-      expect(result).toBe(false);
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error", message: "Usage key must not contain spaces" }),
-      );
-    });
-
-    it("commits the pending entry and resets addState", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const tier: any = { prices: {} };
-      (wrapper.vm as any).addState[0] = { key: "input", value: 1 }; // 1 per million
-      const result = (wrapper.vm as any).addPrice(tier, 0);
-      expect(result).toBe(true);
-      expect(tier.prices.input).toBeCloseTo(0.000001);
-      expect((wrapper.vm as any).addState[0]).toEqual({ key: "", value: 0 });
-    });
-  });
-
-  describe("renamePriceByIndex", () => {
-    it("renames the key at the same position preserving order and value", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const tier: any = { prices: { a: 1, b: 2, c: 3 } };
-      (wrapper.vm as any).renamePriceByIndex(tier, 1, "B");
-      expect(Object.keys(tier.prices)).toEqual(["a", "B", "c"]);
-      expect(tier.prices.B).toBe(2);
-    });
-
-    it("is a no-op when newKey equals oldKey", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const tier: any = { prices: { a: 1 } };
-      (wrapper.vm as any).renamePriceByIndex(tier, 0, "a");
-      expect(tier.prices).toEqual({ a: 1 });
-    });
-
-    it("notifies and aborts when the new key fails validation", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const tier: any = { prices: { a: 1 } };
-      (wrapper.vm as any).renamePriceByIndex(tier, 0, "1");
-      expect(tier.prices).toEqual({ a: 1 });
-      expect(mockToastFn).toHaveBeenCalled();
-    });
-
-    it("ignores out-of-range indices", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const tier: any = { prices: { a: 1 } };
-      (wrapper.vm as any).renamePriceByIndex(tier, 5, "x");
-      expect(tier.prices).toEqual({ a: 1 });
-    });
-  });
-
-  describe("priceEntries + previewEntries", () => {
-    it("priceEntries returns stable IDs per index", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const tier: any = { prices: { a: 1, b: 2 } };
-      const first = (wrapper.vm as any).priceEntries(tier);
-      const second = (wrapper.vm as any).priceEntries(tier);
-      expect(first[0].stableId).toBe(second[0].stableId);
-      expect(first[1].stableId).toBe(second[1].stableId);
-    });
-
-    it("previewEntries appends a pending row when addState has a key", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const tier = (wrapper.vm as any).model.tiers[0];
-      tier.prices = { input: 0.000001 };
-      (wrapper.vm as any).addState[0] = { key: "output", value: 2 };
-      const preview = (wrapper.vm as any).previewEntries(tier, 0);
+      const t = tier({ prices: [row("input", 1)], draftKey: "output", draftValue: 2 });
+      const preview = (wrapper.vm as any).previewEntries(t);
       expect(preview).toHaveLength(2);
       const pending = preview.find((p: any) => p.key === "output");
-      expect(pending.stableId).toBe(-1);
+      expect(pending.pending).toBe(true);
     });
 
-    it("previewEntries does not duplicate when pending key already exists", async () => {
+    it("does not duplicate when the draft key already exists in the rows", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      const tier = (wrapper.vm as any).model.tiers[0];
-      tier.prices = { input: 0.000001 };
-      (wrapper.vm as any).addState[0] = { key: "input", value: 99 };
-      const preview = (wrapper.vm as any).previewEntries(tier, 0);
+      const t = tier({ prices: [row("input", 1)], draftKey: "input", draftValue: 99 });
+      const preview = (wrapper.vm as any).previewEntries(t);
       expect(preview).toHaveLength(1);
       expect(preview[0].key).toBe("input");
     });
@@ -694,24 +713,26 @@ describe("ModelPricingEditor.vue", () => {
   });
 
   describe("save flow — validation guards", () => {
-    it("does not call the API when name/regex are invalid", async () => {
+    it("does not call the API when name/pattern are invalid (schema-gated submit)", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      // both fields empty by default — invalid
-      await (wrapper.vm as any).save();
+      // both fields empty by default — invalid; submit through the real form.
+      const form = getForm(wrapper);
+      await form.handleSubmit();
+      await flushPromises();
+      expect(form.state.isValid).toBe(false);
       expect(mockService.create).not.toHaveBeenCalled();
       expect(mockService.update).not.toHaveBeenCalled();
-      // touched flags are flipped so errors render
-      expect((wrapper.vm as any).nameTouched).toBe(true);
-      expect((wrapper.vm as any).patternTouched).toBe(true);
     });
 
-    it("warns when default tier has no prices and aborts", async () => {
+    it("warns when the default tier has no prices and aborts", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      (wrapper.vm as any).model.name = "M";
-      (wrapper.vm as any).model.match_pattern = "gpt";
-      await (wrapper.vm as any).save();
+      // valid name/pattern, but a default tier with NO price rows
+      fillValid(wrapper, [tier({ prices: [] })]);
+      await nextTick();
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
       expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({
           variant: "error",
@@ -721,14 +742,15 @@ describe("ModelPricingEditor.vue", () => {
       expect(mockService.create).not.toHaveBeenCalled();
     });
 
-    it("warns when a pending row has a value but no key", async () => {
+    it("warns when a draft row has a value but no key", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      (wrapper.vm as any).model.name = "M";
-      (wrapper.vm as any).model.match_pattern = "gpt";
-      (wrapper.vm as any).model.tiers[0].prices = { input: 0.001 };
-      (wrapper.vm as any).addState[0] = { key: "", value: 5 };
-      await (wrapper.vm as any).save();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1000)], draftKey: "", draftValue: 5 }),
+      ]);
+      await nextTick();
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
       expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({
           variant: "error",
@@ -738,21 +760,22 @@ describe("ModelPricingEditor.vue", () => {
       expect(mockService.create).not.toHaveBeenCalled();
     });
 
-    it("rejects a non-default tier whose condition.usage_key is a pure integer", async () => {
+    it("blocks submit when a non-default tier's condition.usage_key is a pure integer (schema)", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      (wrapper.vm as any).model.name = "M";
-      (wrapper.vm as any).model.match_pattern = "gpt";
-      (wrapper.vm as any).model.tiers[0].prices = { input: 0.001 };
-      (wrapper.vm as any).addTier();
-      (wrapper.vm as any).model.tiers[1].condition.usage_key = "42";
-      await (wrapper.vm as any).save();
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "error",
-          message: expect.stringContaining("Usage key cannot be a plain number"),
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1000)] }),
+        tier({
+          name: "Tier 2",
+          condition: { usage_key: "42", operator: "gt", value: 1 },
+          prices: [],
         }),
-      );
+      ]);
+      await nextTick();
+      const form = getForm(wrapper);
+      await form.handleSubmit();
+      await flushPromises();
+      expect(form.state.isValid).toBe(false);
       expect(mockService.create).not.toHaveBeenCalled();
     });
   });
@@ -761,10 +784,9 @@ describe("ModelPricingEditor.vue", () => {
     it("calls create when there is no model id and notifies success", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      (wrapper.vm as any).model.name = "GPT 4o";
-      (wrapper.vm as any).model.match_pattern = "gpt-4o";
-      (wrapper.vm as any).model.tiers[0].prices = { input: 0.001 };
-      await (wrapper.vm as any).save();
+      fillValid(wrapper);
+      await nextTick();
+      await getForm(wrapper).handleSubmit();
       await flushPromises();
       expect(mockService.create).toHaveBeenCalledWith(
         "test-org",
@@ -774,6 +796,59 @@ describe("ModelPricingEditor.vue", () => {
         expect.objectContaining({ variant: "success", message: "Model pricing saved" }),
       );
       expect(mockRouterPush).toHaveBeenCalled();
+    });
+
+    it("converts per-million rows back to a per-token price map", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      // 1000 per-million → 0.001 per-token
+      fillValid(wrapper, [tier({ prices: [row("input", 1000)] })]);
+      await nextTick();
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+      const payload = mockService.create.mock.calls[0][1];
+      expect(payload.tiers[0].prices.input).toBeCloseTo(0.001);
+    });
+
+    it("sends the exact API tier shape (keys + types) and leaks no draft/helper fields", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      // A tier with a committed row AND a draft row: the draft must be committed
+      // into `prices`, and the form-only draftKey/draftValue must NOT leak into
+      // the payload (the {...value} regression ④b guards against).
+      fillValid(wrapper, [
+        tier({
+          prices: [row("input", 1000)],
+          draftKey: "output",
+          draftValue: 2000,
+        }),
+      ]);
+      await nextTick();
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      expect(mockService.create).toHaveBeenCalledTimes(1);
+      const payload = mockService.create.mock.calls[0][1];
+
+      // top-level scalars — exact value + correct type
+      expect(typeof payload.name).toBe("string");
+      expect(payload.name).toBe("GPT 4o");
+      expect(typeof payload.match_pattern).toBe("string");
+      expect(payload.match_pattern).toBe("gpt-4o");
+      expect(Array.isArray(payload.tiers)).toBe(true);
+
+      // EXACT tier shape — only {condition, name, prices}; NO draftKey/draftValue leak
+      const t0 = payload.tiers[0];
+      expect(Object.keys(t0).sort()).toEqual(["condition", "name", "prices"]);
+      expect(t0.condition).toBeNull(); // default (first) tier
+      expect(typeof t0.name).toBe("string");
+
+      // prices is a per-token MAP of numbers (committed row + committed draft)
+      expect(Object.keys(t0.prices).sort()).toEqual(["input", "output"]);
+      expect(typeof t0.prices.input).toBe("number");
+      expect(typeof t0.prices.output).toBe("number");
+      expect(t0.prices.input).toBeCloseTo(0.001); // 1000 per-million → per-token
+      expect(t0.prices.output).toBeCloseTo(0.002); // 2000 per-million → per-token
     });
 
     it("calls update when the model has an id", async () => {
@@ -788,7 +863,7 @@ describe("ModelPricingEditor.vue", () => {
       });
       const wrapper = createWrapper({ query: { id: "abc" } });
       await flushPromises();
-      await (wrapper.vm as any).save();
+      await getForm(wrapper).handleSubmit();
       await flushPromises();
       expect(mockService.update).toHaveBeenCalledWith(
         "test-org",
@@ -800,12 +875,15 @@ describe("ModelPricingEditor.vue", () => {
     it("clears the condition on the default tier before saving", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      (wrapper.vm as any).model.name = "M";
-      (wrapper.vm as any).model.match_pattern = "gpt";
-      (wrapper.vm as any).model.tiers[0].prices = { input: 0.001 };
-      // simulate a stale condition on the default tier
-      (wrapper.vm as any).model.tiers[0].condition = { usage_key: "x", operator: "gt", value: 0 };
-      await (wrapper.vm as any).save();
+      // a stale condition on the default tier — should be nulled on save
+      fillValid(wrapper, [
+        tier({
+          prices: [row("input", 1000)],
+          condition: { usage_key: "x", operator: "gt", value: 0 },
+        }),
+      ]);
+      await nextTick();
+      await getForm(wrapper).handleSubmit();
       await flushPromises();
       expect(mockService.create).toHaveBeenCalledWith(
         "test-org",
@@ -817,13 +895,14 @@ describe("ModelPricingEditor.vue", () => {
       );
     });
 
-    it("auto-commits a pending row before saving", async () => {
+    it("auto-commits a draft row before saving", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      (wrapper.vm as any).model.name = "M";
-      (wrapper.vm as any).model.match_pattern = "gpt";
-      (wrapper.vm as any).addState[0] = { key: "input", value: 1 };
-      await (wrapper.vm as any).save();
+      fillValid(wrapper, [
+        tier({ prices: [], draftKey: "input", draftValue: 1 }),
+      ]);
+      await nextTick();
+      await getForm(wrapper).handleSubmit();
       await flushPromises();
       expect(mockService.create).toHaveBeenCalled();
       const payload = mockService.create.mock.calls[0][1];
@@ -846,10 +925,9 @@ describe("ModelPricingEditor.vue", () => {
       });
       const wrapper = createWrapper();
       await flushPromises();
-      (wrapper.vm as any).model.name = "Mine";
-      (wrapper.vm as any).model.match_pattern = "gpt-4o";
-      (wrapper.vm as any).model.tiers[0].prices = { input: 0.001 };
-      await (wrapper.vm as any).save();
+      fillValid(wrapper);
+      await nextTick();
+      await getForm(wrapper).handleSubmit();
       await flushPromises();
       expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -867,10 +945,9 @@ describe("ModelPricingEditor.vue", () => {
       });
       const wrapper = createWrapper();
       await flushPromises();
-      (wrapper.vm as any).model.name = "M";
-      (wrapper.vm as any).model.match_pattern = "gpt";
-      (wrapper.vm as any).model.tiers[0].prices = { input: 0.001 };
-      await (wrapper.vm as any).save();
+      fillValid(wrapper);
+      await nextTick();
+      await getForm(wrapper).handleSubmit();
       await flushPromises();
       expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -878,7 +955,9 @@ describe("ModelPricingEditor.vue", () => {
           message: expect.stringContaining("server boom"),
         }),
       );
-      expect((wrapper.vm as any).saving).toBe(false);
+      // Loading is form-driven: after the awaited submit settles (even on
+      // error), TanStack's isSubmitting resets — no manual `saving` flag.
+      expect(getForm(wrapper).state.isSubmitting).toBe(false);
     });
 
     it("suppresses 403 error notification (handled globally)", async () => {
@@ -887,10 +966,9 @@ describe("ModelPricingEditor.vue", () => {
       });
       const wrapper = createWrapper();
       await flushPromises();
-      (wrapper.vm as any).model.name = "M";
-      (wrapper.vm as any).model.match_pattern = "gpt";
-      (wrapper.vm as any).model.tiers[0].prices = { input: 0.001 };
-      await (wrapper.vm as any).save();
+      fillValid(wrapper);
+      await nextTick();
+      await getForm(wrapper).handleSubmit();
       await flushPromises();
       const negativeCalls = mockToastFn.mock.calls.filter(
         ([arg]) => arg && arg.variant === "error",
@@ -900,18 +978,21 @@ describe("ModelPricingEditor.vue", () => {
   });
 
   describe("Footer save button state", () => {
-    it("is disabled when name or regex error is present", async () => {
+    it("stays enabled even when name/pattern are invalid (R3 — validation is schema-driven)", async () => {
       const wrapper = createWrapper();
       await flushPromises();
+      // Both fields empty (invalid) — the Save button is NOT disabled; the
+      // schema blocks the actual submit instead.
       const saveBtn = wrapper.find('[data-test="model-pricing-editor-save-btn"]');
-      expect(saveBtn.attributes("disabled")).toBeDefined();
+      expect(saveBtn.attributes("disabled")).toBeUndefined();
     });
 
     it("is enabled when name and pattern are valid", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      (wrapper.vm as any).model.name = "valid";
-      (wrapper.vm as any).model.match_pattern = "gpt-.*";
+      const form = (wrapper.vm as any).form;
+      form.setFieldValue("name", "valid");
+      form.setFieldValue("match_pattern", "gpt-.*");
       await nextTick();
       const saveBtn = wrapper.find('[data-test="model-pricing-editor-save-btn"]');
       expect(saveBtn.attributes("disabled")).toBeUndefined();
@@ -919,7 +1000,7 @@ describe("ModelPricingEditor.vue", () => {
   });
 
   describe("Edit-mode hydration", () => {
-    it("hydrates the model from the service and seeds tier conditions", async () => {
+    it("hydrates the form from the service, converts prices to rows, and seeds tier conditions", async () => {
       mockService.get.mockResolvedValue({
         data: {
           id: "abc",
@@ -935,11 +1016,22 @@ describe("ModelPricingEditor.vue", () => {
       });
       const wrapper = createWrapper({ query: { id: "abc" } });
       await flushPromises();
-      const tiers = (wrapper.vm as any).model.tiers;
+      await nextTick();
+
+      // The loaded scalar values are seeded into the form.
+      const form = getForm(wrapper);
+      expect(form.state.values.name).toBe("Existing");
+      expect(form.state.values.match_pattern).toBe("gpt-.*");
+
+      // tiers converted to per-million ROW shape; condition defaulted on tier 2.
+      const tiers = (wrapper.vm as any).formTiers;
       expect(tiers).toHaveLength(2);
+      // 0.001 per-token → 1000 per-million
+      expect(tiers[0].prices.map((r: any) => [r.key, r.value])).toEqual([
+        ["input", 1000],
+      ]);
+      expect(tiers[0].condition).toBeNull();
       expect(tiers[1].condition).toEqual({ usage_key: "input", operator: "gt", value: 0 });
-      expect((wrapper.vm as any).nameTouched).toBe(true);
-      expect((wrapper.vm as any).patternTouched).toBe(true);
     });
 
     it("notifies and continues when get() rejects with non-403", async () => {
@@ -954,6 +1046,136 @@ describe("ModelPricingEditor.vue", () => {
           message: expect.stringContaining("load fail"),
         }),
       );
+    });
+  });
+
+  // Regression: deleting a non-last price row must not leave the OTHER rows'
+  // rendered inputs showing stale/shifted values. The form DATA was always
+  // correct (the preview read it fine); the bug was a v-for :key (stable id) vs
+  // index-based field-name mismatch, so reused field components kept stale name
+  // bindings on a middle delete.
+  describe("Price row delete — rendered inputs stay in sync (field-array keying)", () => {
+    // Read each price-KEY field's rendered value (the OInput model-value =
+    // the bound field's value). If the field component is bound to the wrong
+    // path after a delete, this surfaces it (form data alone would not).
+    const renderedPriceKeys = (wrapper: any) =>
+      wrapper
+        .findAllComponents(OFormInput)
+        .filter((c: any) => /\.prices\[\d+\]\.key$/.test(c.props("name") || ""))
+        .map((c: any) => c.findComponent(OInput).props("modelValue"));
+
+    it("removing the FIRST of four price rows leaves the other three inputs showing the correct keys", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      getForm(wrapper).setFieldValue("tiers", [
+        tier({
+          prices: [
+            row("input", 1),
+            row("output", 2),
+            row("cache_read_input_tokens", 3),
+            row("output_reasoning_tokens", 4),
+          ],
+        }),
+      ]);
+      await nextTick();
+      await flushPromises();
+
+      // sanity — all four rendered in order
+      expect(renderedPriceKeys(wrapper)).toEqual([
+        "input",
+        "output",
+        "cache_read_input_tokens",
+        "output_reasoning_tokens",
+      ]);
+
+      (wrapper.vm as any).removePrice(0, 0); // delete "input"
+      await nextTick();
+      await flushPromises();
+
+      // form data is correct (only "input" removed)
+      expect(
+        (wrapper.vm as any).formTiers[0].prices.map((p: any) => p.key),
+      ).toEqual(["output", "cache_read_input_tokens", "output_reasoning_tokens"]);
+
+      // the RENDERED inputs must match the data — not shifted, not blank
+      expect(renderedPriceKeys(wrapper)).toEqual([
+        "output",
+        "cache_read_input_tokens",
+        "output_reasoning_tokens",
+      ]);
+    });
+
+    const renderedTierNames = (wrapper: any) =>
+      wrapper
+        .findAllComponents(OFormInput)
+        .filter((c: any) => /^tiers\[\d+\]\.name$/.test(c.props("name") || ""))
+        .map((c: any) => c.findComponent(OInput).props("modelValue"));
+
+    it("removing a MIDDLE tier keeps the remaining tiers' name inputs correct", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      getForm(wrapper).setFieldValue("tiers", [
+        tier({ name: "Default", prices: [row("input", 1)] }),
+        tier({
+          name: "Tier B",
+          condition: { usage_key: "input", operator: "gt", value: 100 },
+        }),
+        tier({
+          name: "Tier C",
+          condition: { usage_key: "input", operator: "gt", value: 200 },
+        }),
+      ]);
+      await nextTick();
+      await flushPromises();
+
+      expect(renderedTierNames(wrapper)).toEqual(["Default", "Tier B", "Tier C"]);
+
+      (wrapper.vm as any).removeTier(1); // delete "Tier B"
+      await nextTick();
+      await flushPromises();
+
+      expect((wrapper.vm as any).formTiers.map((t: any) => t.name)).toEqual([
+        "Default",
+        "Tier C",
+      ]);
+      expect(renderedTierNames(wrapper)).toEqual(["Default", "Tier C"]);
+    });
+
+    it("edit-mode renders prices in the SAME order the API returns them (frontend does not reorder)", async () => {
+      mockService.get.mockResolvedValue({
+        data: {
+          id: "m1",
+          name: "GPT",
+          match_pattern: "gpt-4o",
+          enabled: true,
+          tiers: [
+            {
+              name: "Default",
+              condition: null,
+              // API returns this exact key order
+              prices: {
+                input: 0.0000001,
+                output: 0,
+                cache_read_input_tokens: 0,
+                output_reasoning_tokens: 0,
+              },
+            },
+          ],
+        },
+      });
+      const wrapper = createWrapper({ query: { id: "m1" } });
+      await flushPromises();
+      await nextTick();
+
+      // modelToForm preserves the map's key order exactly — no sort, no reverse
+      expect(
+        (wrapper.vm as any).formTiers[0].prices.map((p: any) => p.key),
+      ).toEqual([
+        "input",
+        "output",
+        "cache_read_input_tokens",
+        "output_reasoning_tokens",
+      ]);
     });
   });
 });

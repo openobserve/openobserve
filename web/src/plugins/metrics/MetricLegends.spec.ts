@@ -20,8 +20,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { createRouter, createWebHistory } from "vue-router";
 
-// Install Quasar plugins
-
 /**
  * Helper to query the dropdown theme wrapper div. The migrated component
  * places the theme class on the first child <div> of the ODropdown default

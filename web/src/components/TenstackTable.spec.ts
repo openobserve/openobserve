@@ -43,11 +43,6 @@ vi.mock("@tanstack/vue-virtual", () => ({
   }),
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return { ...actual, debounce: (fn: any) => fn };
-});
-
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: mockCopyToClipboard,
 }));
@@ -690,11 +685,15 @@ describe("TenstackTable", () => {
       expect(resizers.length).toBeGreaterThan(0);
     });
 
-    it("should give the resizer an always-visible border-color background", () => {
+    it("should give the resizer an always-visible border-color line", () => {
       wrapper = mountTable();
       const resizer = wrapper.find(".resizer");
       expect(resizer.exists()).toBe(true);
-      expect(resizer.classes()).toContain("bg-[var(--o2-border-color)]!");
+      // The visible divider is now a short inner line (matches the OTable
+      // column separator): a child element painted with the border token.
+      const line = resizer.find("div");
+      expect(line.exists()).toBe(true);
+      expect(line.classes()).toContain("bg-[var(--color-border-default)]");
     });
 
     it("should not carry a transparent background class on the resizer", () => {
@@ -851,7 +850,7 @@ describe("TenstackTable", () => {
       expect(style).toContain("min-height: 70px");
     });
 
-    it("should render column labels from Quasar column format", () => {
+    it("should render column labels from legacy column format", () => {
       wrapper = mountTable({
         columns: dashboardColumns,
         rows: dashboardRows,

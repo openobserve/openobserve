@@ -68,6 +68,7 @@ const ODrawerStub = {
     open: { type: Boolean, default: false },
     size: { type: String, default: undefined },
     title: { type: String, default: undefined },
+    titleDataTest: { type: String, default: undefined },
     subTitle: { type: String, default: undefined },
     persistent: { type: Boolean, default: false },
     showClose: { type: Boolean, default: true },
@@ -95,6 +96,8 @@ const ODrawerStub = {
       :data-persistent="String(!!persistent)"
       :data-show-close="String(!!showClose)"
     >
+      <span v-if="title" :data-test="titleDataTest">{{ title }}</span>
+      <span v-if="subTitle" data-test="o-drawer-sub-title">{{ subTitle }}</span>
       <slot name="header" />
       <slot name="header-left" />
       <slot name="header-right" />
@@ -482,16 +485,16 @@ describe("Schema Component Tests", () => {
       expect(result).toBe("25-12-2023");
     });
 
-    // Test 23: convertUnixToQuasarFormat function
+    // Test 23: convertUnixToDateFormat function
     it("should convert unix timestamp correctly", () => {
       const unixMicroseconds = 1703505000000000; // 2023-12-25
-      const result = wrapper.vm.convertUnixToQuasarFormat(unixMicroseconds);
+      const result = wrapper.vm.convertUnixToDateFormat(unixMicroseconds);
       expect(result).toMatch(/\d{2}-\d{2}-\d{4}/);
     });
 
-    // Test 24: convertUnixToQuasarFormat with empty input
+    // Test 24: convertUnixToDateFormat with empty input
     it("should handle empty unix timestamp", () => {
-      const result = wrapper.vm.convertUnixToQuasarFormat("");
+      const result = wrapper.vm.convertUnixToDateFormat("");
       expect(result).toBe("");
     });
 

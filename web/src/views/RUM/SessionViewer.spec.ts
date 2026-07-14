@@ -181,7 +181,7 @@ describe("SessionViewer.vue", () => {
     });
 
     it('should render the "Go Back" navigation button', () => {
-      const backBtn = wrapper.find('[title="Go Back"]');
+      const backBtn = wrapper.find('[data-test="session-viewer-back-btn"]');
       expect(backBtn.exists()).toBe(true);
     });
 
@@ -222,7 +222,7 @@ describe("SessionViewer.vue", () => {
   describe("navigation", () => {
     it("should call router.back() when Go Back button is clicked", async () => {
       const backSpy = vi.spyOn(router, "back");
-      const backBtn = wrapper.find('[title="Go Back"]');
+      const backBtn = wrapper.find('[data-test="session-viewer-back-btn"]');
       expect(backBtn.exists()).toBe(true);
       await backBtn.trigger("click");
       expect(backSpy).toHaveBeenCalledTimes(1);

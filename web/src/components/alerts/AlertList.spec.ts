@@ -57,8 +57,6 @@ import AlertService from "@/services/alerts";
 import TemplateService from "@/services/alert_templates";
 import DestinationService from "@/services/alert_destination";
 
-// Ensure Quasar plugin
-
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
@@ -809,7 +807,7 @@ describe("AlertList - micro validations", () => {
   it("pageSize has a default value", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
-    // OTable-based component uses pageSize ref instead of Quasar pagination object
+    // OTable-based component uses pageSize ref instead of a pagination object
     expect(typeof wrapper.vm.pageSize).toBe("number");
     expect(wrapper.vm.pageSize).toBeGreaterThan(0);
   });

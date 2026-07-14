@@ -50,10 +50,12 @@ document.body.appendChild(node);
 // the events the test suite drives state through.
 const ODrawerStub = {
   name: "ODrawer",
-  props: ["open", "width", "showClose", "persistent", "size", "title", "subTitle"],
+  props: ["open", "width", "showClose", "persistent", "size", "title", "titleDataTest", "subTitle"],
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
     <div data-test-stub="o-drawer" :data-open="open">
+      <span v-if="title" :data-test="titleDataTest">{{ title }}</span>
+      <span v-if="subTitle" data-test-stub="o-drawer-sub-title">{{ subTitle }}</span>
       <div data-test-stub="o-drawer-header"><slot name="header" /></div>
       <div data-test-stub="o-drawer-header-left"><slot name="header-left" /></div>
       <div data-test-stub="o-drawer-header-right"><slot name="header-right" /></div>
@@ -179,7 +181,7 @@ describe("AlertHistoryDrawer.vue", () => {
     try {
       wrapper?.unmount();
     } catch {
-      // Quasar teleported components can throw during unmount in jsdom
+      // Teleported components can throw during unmount in jsdom
     }
   });
 

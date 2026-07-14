@@ -259,6 +259,17 @@ pub async fn clear() -> Result<(), errors::Error> {
     Ok(())
 }
 
+/// Deletes all re_pattern stream map entries belonging to the given org.
+pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
+    let _lock = get_lock().await;
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::delete_many()
+        .filter(Column::Org.eq(org))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

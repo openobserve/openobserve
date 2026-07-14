@@ -29,16 +29,6 @@ vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: vi.fn().mockResolvedValue(true),
 }));
 
-// Mock quasar — no importOriginal() since quasar was removed from the project
-const mockQuasar = {
-  notify: vi.fn(),
-};
-
-vi.mock("quasar", () => ({
-  useQuasar: () => mockQuasar,
-  copyToClipboard: vi.fn(),
-}));
-
 // Mock router
 const mockRouter = {
   currentRoute: {
@@ -57,7 +47,7 @@ vi.mock("vue-router", () => ({
 
 import IngestRum from "@/components/ingestion/rum/Index.vue";
 
-// Helper to build mount options with O2 component stubs (not Quasar stubs)
+// Helper to build mount options with O2 component stubs
 function buildMountOptions() {
   return {
     props: {
@@ -260,7 +250,7 @@ describe("IngestRum Component", () => {
   // The component imports copyToClipboard from @/utils/clipboard and passes
   // successMessage / errorMessage / timeout options. Notifications are handled
   // internally by the clipboard utility — the component does NOT call
-  // $q.notify directly. Segment analytics only fire on copy success.
+  // notify directly. Segment analytics only fire on copy success.
   // ─────────────────────────────────────────────────────────────────────────
   describe("copyToClipboardFn", () => {
     const expectedOptions = {

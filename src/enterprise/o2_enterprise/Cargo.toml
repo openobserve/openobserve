@@ -1,0 +1,15 @@
+[package]
+name = "o2_enterprise"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+publish = false
+
+[features]
+default = []
+cloud = []
+vectorscan = []
+vortex = []
+
+[lib]
+path = "lib.rs"

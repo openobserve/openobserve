@@ -159,6 +159,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               enableColumnReorder && table.getState().columnOrder.length
                 ? 'cursor-move!'
                 : '',
+              // Header-row chrome via centralized token utilities (same tokens
+              // OTable uses): background band + full-width underline on the row
+              // so it spans past the last column.
+              'bg-[var(--color-table-header-bg)] border-b border-[var(--color-grey-300)]',
             ]"
             :style="{
               width:
@@ -168,7 +172,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? tableRowSize + 'px'
                     : table.getTotalSize() + 'px',
               minWidth: '100%',
-              background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
             }"
             tag="tr"
             @start="(event) => handleDragStart(event)"
@@ -210,22 +213,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : '',
                 ]"
               >
+                <!-- Column separator / resize handle. Separator LINE renders on
+                     EVERY column (even non-resizable) for continuous dividers;
+                     drag + hover accent only when resizable. -->
                 <div
-                  v-if="header.column.getCanResize()"
-                  @dblclick="header.column.resetSize()"
+                  @dblclick="
+                    header.column.getCanResize() && header.column.resetSize()
+                  "
                   @mousedown.self.prevent.stop="
-                    header.getResizeHandler()?.($event)
+                    header.column.getCanResize() &&
+                      header.getResizeHandler()?.($event)
                   "
                   @touchstart.self.prevent.stop="
-                    header.getResizeHandler()?.($event)
+                    header.column.getCanResize() &&
+                      header.getResizeHandler()?.($event)
                   "
                   :class="[
-                    'resizer',
-                    'bg-[var(--o2-border-color)]!',
-                    header.column.getIsResizing() ? 'isResizing' : '',
+                    'absolute right-0 top-0 h-full w-2 flex items-center justify-end select-none touch-none z-10 group/resizer',
+                    header.column.getCanResize() ? 'resizer cursor-col-resize' : '',
                   ]"
-                  class="right-0 absolute w-1 h-full cursor-col-resize"
-                />
+                >
+                  <div
+                    :class="[
+                      'rounded-full transition-all duration-150',
+                      header.column.getIsResizing()
+                        ? 'w-0.5 h-full bg-[var(--color-table-resize-handle)]'
+                        : 'w-px h-4 bg-[var(--color-border-default)] group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
+                    ]"
+                  />
+                </div>
                 <div
                   v-if="!header.isPlaceholder"
                   :data-test="`o2-table-th-sort-${header.id}`"
@@ -237,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       header.column.getToggleSortingHandler(),
                     )
                   "
-                  class="overflow-hidden whitespace-nowrap text-ellipsis! tracking-[0.06rem] text-[var(--o2-text-2)] text-[0.85rem]"
+                  class="overflow-hidden whitespace-nowrap text-ellipsis! text-[var(--color-table-header-text)] text-xs font-medium capitalize"
                 >
                   <FlexRender
                     :render="header.column.columnDef.header"
@@ -312,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Search box — always visible at top -->
                       <div
                         class="px-2 pb-1"
-                        style="border-bottom: 1px solid rgba(128, 128, 128, 0.2)"
+                        style="border-bottom: 1px solid var(--color-table-row-divider)"
                       >
                         <OInput
                           v-model="colFilterSearch[header.column.id]"
@@ -359,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </ul>
 
                       <!-- Clear filter — always visible at bottom -->
-                      <div style="border-top: 1px solid rgba(128, 128, 128, 0.2)">
+                      <div style="border-top: 1px solid var(--color-table-row-divider)">
                         <div
                           class="px-3 py-1.5 text-xs cursor-pointer opacity-70 hover:bg-[var(--color-surface-panel)]"
                           @click.stop="clearColFilter(header.column.id)"
@@ -409,12 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <td
               :colspan="columnOrder.length"
-              class="font-bold"
-              :style="{
-                background:
-                  store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
-                opacity: 0.7,
-              }"
+              class="font-bold bg-[var(--color-table-header-bg)] opacity-70"
             >
               <slot name="loading" />
             </td>
@@ -500,7 +511,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr
             v-for="r in SKEL_ROW_COUNT"
             :key="`skel-${r}`"
-            class="flex items-center w-full opacity-0 border-b border-b-[var(--o2-tag-grey-1)] h-7 [animation:o2-skel-row-in_320ms_ease-out_forwards] motion-reduce:opacity-100 motion-reduce:animate-none"
+            class="o2-skel-row flex items-center w-full opacity-0 h-[29px] bg-(--o2-log-table-row-bg) border-b border-(--o2-log-table-row-border) [animation:o2-skel-row-in_320ms_ease-out_forwards] motion-reduce:opacity-100 motion-reduce:animate-none"
             :style="{ animationDelay: `${(r - 1) * 40}ms` }"
           >
             <!-- No columns yet (first paint) — full-width shimmer bar -->
@@ -509,7 +520,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="w-full px-4 overflow-hidden"
             >
               <span
-                class="inline-block h-3 rounded-md [background:linear-gradient(90deg,var(--color-grey-100)_0%,rgba(255,255,255,0.65)_50%,var(--color-grey-100)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] dark:[background:linear-gradient(90deg,var(--color-grey-600)_0%,rgba(255,255,255,0.03)_50%,var(--color-grey-600)_100%)] motion-reduce:animate-none"
+                class="o2-skel-pill inline-block h-3 rounded-md"
                 :style="{ width: `${skelCellWidth(r - 1, 0)}%` }"
                 aria-hidden="true"
               />
@@ -524,7 +535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :style="skelTdStyle(header, c)"
               >
                 <span
-                  class="inline-block h-3 rounded-md [background:linear-gradient(90deg,var(--color-grey-100)_0%,rgba(255,255,255,0.65)_50%,var(--color-grey-100)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] dark:[background:linear-gradient(90deg,var(--color-grey-600)_0%,rgba(255,255,255,0.03)_50%,var(--color-grey-600)_100%)] motion-reduce:animate-none"
+                  class="o2-skel-pill inline-block h-3 rounded-md"
                   :style="{
                     width:
                       c === 0
@@ -569,8 +580,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="row.id"
               :data-index="idx"
               :ref="(node: any) => measureDashboardRow(node)"
-              class="dashboard-data-row cursor-pointer hover:bg-[var(--o2-hover-gray)]"
-              :class="{ 'border-b': !usesSeparateBorders }"
+              class="dashboard-data-row cursor-pointer hover:bg-[var(--color-table-row-hover-bg)]"
+              :class="{ 'border-b border-[var(--color-table-row-divider)]': !usesSeparateBorders }"
               data-test="dashboard-data-row"
               tabindex="0"
               @click="handleDataRowClick(row.original, idx as number, $event)"
@@ -770,7 +781,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 formattedRows?.[virtualRow.index]?.original?.isExpandedRow
               "
               :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
-              class="absolute flex w-max items-center justify-start border-b border-b-[var(--o2-tag-grey-1)] cursor-pointer hover:bg-[var(--o2-hover-gray)] transition-colors duration-150 ease-in-out"
+              class="absolute flex w-max items-center justify-start border-b border-b-[var(--color-table-row-divider)] cursor-pointer hover:bg-[var(--color-table-row-hover-bg)] transition-colors duration-150 ease-in-out"
               :class="[
                 defaultColumns &&
                 !wrap &&
@@ -783,9 +794,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ] === highlightTimestamp &&
                 !(formattedRows[virtualRow.index]?.original as any)
                   ?.isExpandedRow
-                  ? store.state.theme === 'dark'
-                    ? 'bg-zinc-700'
-                    : 'bg-zinc-300'
+                  ? 'bg-(--color-table-row-selected-bg)'
                   : '',
                 !(formattedRows[virtualRow.index]?.original as any)
                   ?.isExpandedRow
@@ -1299,7 +1308,7 @@ const props = defineProps({
     type: Object as PropType<Record<string, string> | undefined>,
     default: undefined,
   },
-  /** Returns Quasar/Tailwind class(es) for a given row.
+  /** Returns CSS class(es) for a given row.
    *  Use 'oz-table__row--error' to trigger the red left-border error variant. */
   rowClass: {
     type: Function as PropType<
@@ -1495,7 +1504,7 @@ const { isFTSColumn } = useTextHighlighter();
 const { processedResults, processHitsInChunks } = useLogsHighlighter();
 
 // ── Dashboard: sticky columns composable ─────────────────────────────────────
-// useStickyColumns reads props.columns (Quasar-format when useVirtualScroll=false).
+// useStickyColumns reads props.columns (legacy column format when useVirtualScroll=false).
 const { getStickyColumnStyle, tableId } = useStickyColumns(props, store);
 const getSortingHandler = (e: Event, fn: any) => {
   return fn(e);
@@ -1536,7 +1545,7 @@ const tableRows = shallowRef<any[]>([...(props.rows ?? [])]);
 // Invalidate unique-values filter cache whenever rows are replaced
 watch(tableRows, () => { uniqueValuesCache.value = new Map(); });
 
-// ── Dashboard: convert Quasar column defs → TanStack ColumnDef[] ─────────────
+// ── Dashboard: convert legacy column defs → TanStack ColumnDef[] ─────────────
 const dashboardColumns = computed<ColumnDef<unknown, any>[] | null>(() => {
   if (props.useVirtualScroll || !props.columns) return null;
   return (props.columns as any[])
@@ -1562,8 +1571,8 @@ const dashboardColumns = computed<ColumnDef<unknown, any>[] | null>(() => {
         _isRowField: col._isRowField,
         _isTotalColumn: col._isTotalColumn,
         _totalColRightIndex: col._totalColRightIndex,
-        _col: col, // reference to original Quasar column for style helpers
-        sortable: col.sortable, // mirrors Quasar column flag — drives sort icon visibility
+        _col: col, // reference to original source column for style helpers
+        sortable: col.sortable, // mirrors the source column flag — drives sort icon visibility
       },
     }));
 });
@@ -1588,7 +1597,7 @@ const usesSeparateBorders = computed(
 
 // Dashboard virtual scroll: enabled when not using logs virtual scroll and not paginated.
 // Uses spacer rows + @tanstack/vue-virtual to render only visible rows (matching
-// the old Quasar QTable :virtual-scroll behaviour).
+// the old table's :virtual-scroll behaviour).
 // Disabled when `wrap` is true — wrapped rows have highly variable heights
 // (29-81px) that cause large total-height jumps during scroll, which manifests
 // as visible flicker. Rendering all rows in DOM is acceptable for dashboard
@@ -1721,7 +1730,7 @@ const getStickyTotalColumnStyle = (col: any) => {
     width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     "min-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     "max-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
-    "background-color": store.state.theme === "dark" ? "#565656" : "#E0E0E0",
+    "background-color": "var(--color-table-header-bg)",
     "box-shadow": "-4px 0 8px rgba(0, 0, 0, 0.15)",
     "white-space": "normal",
     "word-break": "break-word",
@@ -2590,5 +2599,22 @@ defineExpose({
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ── Loading skeleton pill (uses OTable skeleton tokens from lib/styles/tokens) ── */
+.o2-skel-pill {
+  background: linear-gradient(
+    90deg,
+    var(--color-skeleton-base)     0%,
+    var(--color-skeleton-highlight) 50%,
+    var(--color-skeleton-base)     100%
+  );
+  background-size: 200% 100%;
+  animation: o2-skel-shimmer 1.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .o2-skel-row  { opacity: 1; animation: none; }
+  .o2-skel-pill { animation: none; }
 }
 </style>

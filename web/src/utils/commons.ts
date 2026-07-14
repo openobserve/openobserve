@@ -72,7 +72,7 @@ export function getConsumableDateTime(dateObj: any) {
 
     let period = "";
     let periodValue = 0;
-    // quasar does not support arithmetic on weeks. convert to days.
+    // arithmetic on weeks is not supported; convert to days.
 
     if (dateObj.relative.period.label.toLowerCase() == "weeks") {
       period = "days";
@@ -998,6 +998,12 @@ export const deleteFolderById = async (store: any, folderId: any) => {
   }
 };
 
+const refreshFolderLists = (store: any, type: any) =>
+  Promise.all([
+    getFoldersListByType(store, type),
+    ...(type === "dashboards" ? [getFoldersList(store)] : []),
+  ]);
+
 export const deleteFolderByIdByType = async (store: any, folderId: any, type: any) => {
   try {
     await commonService.delete_Folder(
@@ -1005,7 +1011,7 @@ export const deleteFolderByIdByType = async (store: any, folderId: any, type: an
       type,
       folderId,
     );
-    await getFoldersListByType(store, type);
+    await refreshFolderLists(store, type);
   } catch (error) {
     throw error;
   }
@@ -1034,7 +1040,7 @@ export const createFolderByType = async (store: any, data: any, type: any) => {
       type,
       data,
     );
-    await getFoldersListByType(store,type);
+    await refreshFolderLists(store, type);
     return newFolder;
   } catch (error) {
     throw error;
@@ -1065,7 +1071,7 @@ export const updateFolderByType = async (store: any, folderId: any, data: any, t
       folderId,
       data,
     );
-    await getFoldersListByType(store, type);
+    await refreshFolderLists(store, type);
   } catch (error) {
     throw error;
   }

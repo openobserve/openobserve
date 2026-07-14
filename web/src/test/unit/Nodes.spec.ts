@@ -63,7 +63,6 @@ const i18n = createI18n({
 
 describe("Nodes.vue", () => {
   let wrapper: any;
-  let notifyMock: any;
 
   const setupFilterTestData = () => {
     const testData = [
@@ -180,17 +179,9 @@ describe("Nodes.vue", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     
-    notifyMock = vi.fn();
-    const $q = {
-      notify: notifyMock
-    };
-
     wrapper = mount(Nodes, {
       global: {
         plugins: [store, i18n],
-        mocks: {
-          $q
-        },
         stubs: {
           QTablePagination: true,
           NoData: true,
@@ -585,7 +576,7 @@ describe("Nodes.vue", () => {
   });
 
   // Test 28: getData success case
-  // The component uses toast() from @/lib/feedback/Toast/useToast (not $q.notify).
+  // The component uses toast() from @/lib/feedback/Toast/useToast.
   it("should handle successful data fetch", async () => {
     const mockResponse = { data: mockNodesData };
     vi.mocked(CommonService.list_nodes).mockResolvedValue(mockResponse);
@@ -619,12 +610,9 @@ describe("Nodes.vue", () => {
     const mockError = { status: 403 };
     vi.mocked(CommonService.list_nodes).mockRejectedValue(mockError);
     
-    // Mock the $q.notify method
+    // Mock the notify method
     const notifyMock = vi.fn();
-    wrapper.vm.$q = {
-      notify: notifyMock
-    };
-    
+
     await wrapper.vm.getData();
     
     // Should not call notify for 403 errors (silent handling)
