@@ -495,7 +495,7 @@ describe("MetricCard (ported to @/lib)", () => {
     });
   });
 
-  it("renders no <q- component (Quasar is gone from this repo)", () => {
+  it("renders no legacy <q- component", () => {
     wrapper = createWrapper();
     expect(wrapper.html()).not.toContain("<q-");
   });
