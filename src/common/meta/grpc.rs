@@ -13,20 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod authz;
-pub mod grpc;
-pub mod http;
-pub mod ingestion;
-pub mod loki;
-pub mod maxmind;
-pub mod middleware_data;
-pub mod organization;
-pub mod proxy;
-pub mod saved_view;
-pub mod search;
-pub mod service;
-pub mod service_account;
-pub mod stream;
-pub mod telemetry;
-pub mod traces;
-pub mod user;
+use opentelemetry::propagation::Extractor;
+
+pub struct MetadataMap<'a>(pub &'a tonic::metadata::MetadataMap);
+
+impl Extractor for MetadataMap<'_> {
+    fn get(&self, key: &str) -> Option<&str> {
+        self.0.get(key).and_then(|metadata| metadata.to_str().ok())
+    }
+
+    fn keys(&self) -> Vec<&str> {
+        self.0
+            .keys()
+            .map(|key| match key {
+                tonic::metadata::KeyRef::Ascii(value) => value.as_str(),
+                tonic::metadata::KeyRef::Binary(value) => value.as_str(),
+            })
+            .collect()
+    }
+}

@@ -4724,6 +4724,9 @@
     "search": "Ação de pesquisa",
     "timezone": "Fuso horário",
     "zipFileRequired": "O arquivo ZIP é necessário!",
+    "fieldRequired": "O campo é obrigatório!",
+    "nameInvalidChars": "Caracteres como :, ?, /, # e espaços não são permitidos.",
+    "invalidMethodName": "Nome de método inválido. Deve começar com uma letra ou sublinhado. Use apenas letras, números e sublinhados.",
     "zipFile": "Arquivo ZIP",
     "frequency": "Frequência"
   },

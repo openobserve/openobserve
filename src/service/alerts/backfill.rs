@@ -21,6 +21,20 @@ use utoipa::ToSchema;
 
 use crate::service::db;
 
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct BackfillRequest {
+    /// Start time in microseconds
+    pub start_time: i64,
+    /// End time in microseconds
+    pub end_time: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chunk_period_minutes: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delay_between_chunks_secs: Option<i64>,
+    #[serde(default)]
+    pub delete_before_backfill: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct BackfillJobStatus {
     pub job_id: String,
@@ -527,7 +541,7 @@ pub async fn resume_backfill_job(org_id: &str, job_id: &str) -> Result<(), anyho
 pub async fn update_backfill_job(
     org_id: &str,
     job_id: &str,
-    req: crate::handler::http::request::pipelines::backfill::BackfillRequest,
+    req: BackfillRequest,
 ) -> Result<(), anyhow::Error> {
     // Fetch existing config from backfill_jobs table
     let existing_config = db::backfill::get(org_id, job_id).await?;
