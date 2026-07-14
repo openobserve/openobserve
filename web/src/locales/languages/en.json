@@ -5759,7 +5759,7 @@
         "type": "Type",
         "rangeValues": "Range / values",
         "healthy": "Healthy",
-        "activeVersion": "version",
+        "activeVersion": "Version",
         "usedBy": "Used by",
         "created": "Created",
         "actions": "Actions"
