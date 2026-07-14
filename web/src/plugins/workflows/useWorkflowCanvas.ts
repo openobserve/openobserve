@@ -91,14 +91,7 @@ export const WORKFLOW_NODE_TYPES: Record<string, WorkflowNodeMeta> = {
     icon: "code",
     ioType: "default",
   },
-  // Serialized node_type is `destination` — the backend NodeData::Destination
-  // ({ destination_id, template_override }), where `destination_id` is the
-  // Pipeline (remote) Destination's NAME. Added to `is_workflow_node()` (commit
-  // "feat: add destination as a workflow node"); save-time validation checks the
-  // destination exists and `is_pipeline_destination()`.
-  //
-  // `ioType: "output"` — the destination is a terminal *leaf* (green, no output
-  // handle / hover-`+`).
+  // `destination_id` holds the Pipeline (remote) Destination's name.
   destination: {
     category: "action",
     kindKey: "workflow.node.kindAction",
@@ -163,21 +156,6 @@ export const WORKFLOW_TRIGGER_TYPES: WorkflowTriggerType[] = [
   },
 ];
 
-// Accent colour per category (hex mirrors the design tokens; used for handle /
-// edge colouring where a raw value is needed).
-export const categoryColor = (category?: WorkflowNodeCategory): string => {
-  switch (category) {
-    case "trigger":
-      return "#e0891d"; // amber
-    case "logic":
-      return "#4f6bed"; // blue / indigo
-    case "action":
-      return "#1f9d63"; // green
-    default:
-      return "#6b7280";
-  }
-};
-
 const defaultDialog = {
   show: false,
   name: "",
@@ -219,11 +197,8 @@ const defaultObject = {
   deleteConfirm: { show: false, nodeId: "" },
   // Test run state. `show` toggles the small input popup (sample payload +
   // run-from). `input`/`fromNode` persist across opens. `result` holds the last
-  // run outcome — `{ errors: {nodeId: NodeErrors}, ranNodeIds: string[] }` — read
-  // by each WorkflowNode to render its ✓ / error badge on the canvas. `progress`
-  // drives the staged reveal after a run — `{ order: string[], index: number }` —
-  // so nodes light up one-by-one down the graph instead of all at once (the API
-  // is a fast batch; the stagger makes the run feel live). Null when idle/settled.
+  // run outcome — `{ errors: {nodeId: NodeErrors}, ranNodeIds, blockedNodeIds }` —
+  // read by each WorkflowNode to render its ✓ / ✗ / ⊘ badge on the canvas.
   testRun: {
     show: false,
     input: "",
@@ -233,7 +208,6 @@ const defaultObject = {
     // sentinel never lands here or on the API payload.
     fromNode: "",
     result: <any>null,
-    progress: <any>null,
     // Per-node Input/Output result drawer (opened by clicking a node's badge).
     resultDrawer: { show: false, nodeId: "" },
   },
@@ -247,30 +221,19 @@ const workflowObj = reactive(Object.assign({}, defaultObject));
 
 export { workflowObj };
 
-// ── Test-result staged playback ─────────────────────────────────────────────
-// The Test API is a fast batch, so revealing every node's status at once feels
-// like nothing ran. Instead we walk the ran nodes in graph order and settle each
-// one after a short beat — a "running" spinner on the current step, ✓/✗ on the
-// ones behind it — so the run reads as flowing through the workflow.
-let playbackTimer: any = null;
-const PLAYBACK_STEP_MS = 450;
-
-export const stopTestPlayback = () => {
-  if (playbackTimer) {
-    clearTimeout(playbackTimer);
-    playbackTimer = null;
-  }
-  workflowObj.testRun.progress = null;
-};
-
-// Reveal order for the ran nodes. Workflows enforce one incoming edge per node
-// (see onConnect), so the graph is a TREE rooted at the trigger (or from_node) —
-// a plain BFS from the root visits every parent before its children, which is all
-// the reveal needs. (No topo sort: reconvergence, the only shape BFS gets wrong,
-// can't exist in a tree.)
-// ── Shared graph helpers (used by the reveal here + the Test dialog) ─────────
+// ── Shared graph helpers ─────────────────────────────────────────────────────
+// Workflows enforce one incoming edge per node (see onConnect), so the graph is
+// a TREE rooted at the trigger (or from_node) — a plain BFS from the root visits
+// every parent before its children (no topo sort needed; reconvergence, the only
+// shape BFS gets wrong, can't exist in a tree). Used by the Test dialog's
+// "Run From" ordering and the run-scope helpers below.
 // Children adjacency map from edges (handles both {source,target} and
-// {sourceNode,targetNode} edge shapes).
+// {sourceNode,targetNode} edge shapes). Leaf nodes (no outgoing edge) are absent
+// from the map — callers read it as `children.get(id) ?? []`.
+//
+// Example — for Trigger → Function → Destination:
+//   edges: [{ source: "t", target: "f" }, { source: "f", target: "d" }]
+//   returns: Map { "t" => ["f"], "f" => ["d"] }   // "d" is a leaf → not a key
 export const buildChildrenMap = (edges: any[]): Map<string, string[]> => {
   const children = new Map<string, string[]>();
   for (const e of edges || []) {
@@ -287,6 +250,10 @@ export const buildChildrenMap = (edges: any[]): Map<string, string[]> => {
 // Workflows enforce one incoming edge per node → the graph is a TREE, so BFS
 // visits every parent before its children (no topo sort needed). Nodes not
 // reached from the start are appended so nothing silently drops.
+//
+// Example — for Trigger(t) → Function(f) → Destination(d):
+//   flowOrderedNodeIds(nodes, edges)         => ["t", "f", "d"]  // from trigger
+//   flowOrderedNodeIds(nodes, edges, "f")    => ["f", "d"]       // run-from "f"
 export const flowOrderedNodeIds = (
   nodes: any[],
   edges: any[],
@@ -311,7 +278,11 @@ export const flowOrderedNodeIds = (
   return order;
 };
 
-// `startIds` + everything downstream of them.
+// `startIds` + everything downstream of them (a Set; the starts are included).
+//
+// Example — for Trigger(t) → Function(f) → Destination(d):
+//   reachableFrom(edges, ["f"])   => Set { "f", "d" }   // "f" and downstream
+//   reachableFrom(edges, ["t"])   => Set { "t", "f", "d" }
 export const reachableFrom = (
   edges: any[],
   startIds: string[],
@@ -330,21 +301,6 @@ export const reachableFrom = (
   return reached;
 };
 
-// Reveal order = the flow order (from the run's start node) filtered to the
-// nodes that actually ran.
-const orderedRunNodes = (ranNodeIds: string[]): string[] => {
-  const wf = workflowObj.currentSelectedWorkflow;
-  const ran = new Set(ranNodeIds);
-  const ordered = flowOrderedNodeIds(
-    wf.nodes || [],
-    wf.edges || [],
-    workflowObj.testRun.fromNode || undefined,
-  ).filter((id) => ran.has(id));
-  // safety: any ran id the traversal didn't cover still resolves
-  for (const id of ranNodeIds) if (!ordered.includes(id)) ordered.push(id);
-  return ordered;
-};
-
 // Nodes downstream of (but not including) the errored nodes — they can't be
 // confirmed as passed (records may not have reached them), so they show a
 // neutral "not verified" badge rather than a ✓.
@@ -359,9 +315,10 @@ const downstreamOfErrorNodes = (errorIds: string[]): string[] => {
 };
 
 // Run the workflow Test (from the Test dialog or a node's Replay button) and
-// kick off the staged reveal. Shared so both entry points behave identically.
-// The backend returns errors only — the step drawer (error nodes only) derives
-// its input/output from `errors`, so there's no per-node node_io to carry.
+// store the result so each WorkflowNode paints its ✓ / ✗ / ⊘ badge. Shared so
+// both entry points behave identically. The backend returns errors only — the
+// step drawer (error nodes only) derives its input/output from `errors`, so
+// there's no per-node node_io to carry.
 export const executeTestRun = async (opts: {
   orgId: string;
   inputs: any[];
@@ -376,44 +333,20 @@ export const executeTestRun = async (opts: {
       from_node: opts.fromNode || undefined,
     });
     const errors = res.data?.errors || {};
+    // Which nodes ran: from a replay, `fromNode` + everything downstream;
+    // otherwise the whole graph.
     const ranNodeIds = opts.fromNode
       ? [...reachableFrom(wf.edges || [], [opts.fromNode])]
       : (wf.nodes || []).map((n: any) => n.id);
-    startTestPlayback({
+    workflowObj.testRun.result = {
       errors,
       ranNodeIds,
       blockedNodeIds: downstreamOfErrorNodes(Object.keys(errors)),
-    });
+    };
     return { ok: true };
   } catch (e: any) {
     return { ok: false, error: e?.response?.data?.message };
   }
-};
-
-// Stash the result, then advance `progress.index` down the ordered nodes.
-export const startTestPlayback = (result: {
-  errors: Record<string, any>;
-  ranNodeIds: string[];
-  blockedNodeIds?: string[];
-}) => {
-  stopTestPlayback();
-  workflowObj.testRun.result = result;
-  const order = orderedRunNodes(result.ranNodeIds);
-  if (!order.length) return;
-  workflowObj.testRun.progress = { order, index: 0 };
-  const step = () => {
-    const p = workflowObj.testRun.progress;
-    if (!p) return;
-    if (p.index >= p.order.length - 1) {
-      workflowObj.testRun.progress = null; // last node settled → all badges final
-      playbackTimer = null;
-      return;
-    }
-    p.index += 1;
-    playbackTimer = setTimeout(step, PLAYBACK_STEP_MS);
-  };
-  // brief beat so the popup close settles before the first step lights up
-  playbackTimer = setTimeout(step, 300);
 };
 
 // Load a workflow (a list row or API result) into the shared editor state,
@@ -549,8 +482,7 @@ export default function useWorkflowCanvas() {
     wf.edges = wf.edges.filter(
       (e: any) => e.source !== nodeId && e.target !== nodeId,
     );
-    // The graph changed — prior Test badges (and any in-flight reveal) are stale.
-    stopTestPlayback();
+    // The graph changed — prior Test badges are stale.
     workflowObj.testRun.result = null;
     if (workflowObj.currentSelectedNodeData?.id === nodeId) {
       workflowObj.currentSelectedNodeData = null;
@@ -721,8 +653,7 @@ export default function useWorkflowCanvas() {
     workflowObj.isEditNode = false;
     workflowObj.dialog.expand = false;
     workflowObj.dialog.show = false;
-    // The graph changed — prior Test badges (and any in-flight reveal) are stale.
-    stopTestPlayback();
+    // The graph changed — prior Test badges are stale.
     workflowObj.testRun.result = null;
     if (workflowObj.isEditWorkflow) workflowObj.dirtyFlag = true;
   }
@@ -768,13 +699,11 @@ export default function useWorkflowCanvas() {
     workflowObj.dirtyFlag = false;
     workflowObj.nodesChange = false;
     workflowObj.edgesChange = false;
-    stopTestPlayback();
     workflowObj.testRun = {
       show: false,
       input: "",
       fromNode: "",
       result: null,
-      progress: null,
       resultDrawer: { show: false, nodeId: "" },
     };
   }

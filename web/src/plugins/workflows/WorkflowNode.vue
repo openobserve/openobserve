@@ -64,25 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
-      <!-- Test result badge — staged reveal after a run: queued (dot) → running
-           (spinner) → passed (green tick) / errored (red, hover for messages).
-           Mirrors the pipeline function error badge. -->
+      <!-- Test result badge — passed (green tick) / not-verified (grey) / errored
+           (red, hover for messages, click to open the step drawer). -->
       <div
-        v-if="testStatus === 'pending'"
-        class="wf-test-badge wf-test-pending"
-        :data-test="`workflow-node-${data?.node_type}-test-pending`"
-      >
-        <span class="wf-test-dot"></span>
-      </div>
-      <div
-        v-else-if="testStatus === 'running'"
-        class="wf-test-badge wf-test-running"
-        :data-test="`workflow-node-${data?.node_type}-test-running`"
-      >
-        <span class="wf-test-spinner"></span>
-      </div>
-      <div
-        v-else-if="testStatus === 'ok'"
+        v-if="testStatus === 'ok'"
         class="wf-test-badge wf-test-ok wf-test-pop"
         :data-test="`workflow-node-${data?.node_type}-test-ok`"
       >
@@ -182,32 +167,16 @@ const { t } = useI18n();
 const { editNode, requestDeleteNode, openStepPicker } = useWorkflowCanvas();
 
 // Test result badge state — read from the last Test run. Null (no run, or this
-// node was skipped for a `from_node` run) → no badge. During the staged reveal a
-// node is "pending" (queued) then "running" (spinner) before it settles to its
-// final "ok" / "error".
+// node wasn't part of a `from_node` run) → no badge. A node passes (✓) only when
+// it ran, has no error, AND no upstream node errored — otherwise it's "skipped"
+// (not verified), since the backend gives us errors only, not per-node success.
 const testResult = computed<any>(() => workflowObj.testRun?.result);
-// Final (settled) status. A node passes (✓) only when it ran, has no error, AND
-// no upstream node errored — otherwise it's "skipped" (not verified), since the
-// backend gives us errors only, not per-node success.
-const finalStatus = (): "ok" | "error" | "skipped" => {
+const testStatus = computed<"ok" | "error" | "skipped" | null>(() => {
   const r = testResult.value;
+  if (!r || !r.ranNodeIds?.includes(props.id)) return null;
   if (r.errors?.[props.id]) return "error";
   if (r.blockedNodeIds?.includes(props.id)) return "skipped";
   return "ok";
-};
-const testStatus = computed<
-  "pending" | "running" | "ok" | "error" | "skipped" | null
->(() => {
-  const r = testResult.value;
-  if (!r || !r.ranNodeIds?.includes(props.id)) return null;
-  const prog = workflowObj.testRun?.progress;
-  if (prog) {
-    const pos = prog.order.indexOf(props.id);
-    if (pos > prog.index) return "pending";
-    if (pos === prog.index) return "running";
-    // pos < index → already settled; fall through to the final status
-  }
-  return finalStatus();
 });
 // NodeErrors.errors serializes as an array of [message, value?] tuples.
 const errorMessages = computed<string[]>(() => {
@@ -307,33 +276,7 @@ const openResult = () => {
   z-index: 16;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
 }
-.wf-test-pending {
-  background: #fff;
-  border-color: #d1d5db;
-}
-.wf-test-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #9ca3af;
-}
-.wf-test-running {
-  background: #6366f1;
-}
-.wf-test-spinner {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.45);
-  border-top-color: #fff;
-  animation: wf-spin 0.7s linear infinite;
-}
-@keyframes wf-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-/* settle pop when a node resolves to ✓ / ✗ */
+/* pop when a node's badge appears */
 .wf-test-pop {
   animation: wf-pop 0.22s ease;
 }
