@@ -1145,6 +1145,93 @@ jobs:
             fi
           fi
 
+  # Kinora upload — its own job for clean isolation (alongside report_openobserve and
+  # upload_testdino). Downloads the raw blob reports and merges them locally so trace.zip
+  # attachments resolve on THIS runner, then uploads the run (+ traces) to the self-hosted
+  # Kinora dashboard and updates a single sticky PR comment. Fully non-fatal.
+  report_kinora:
+    timeout-minutes: 20
+    name: Report to Kinora
+    needs: [ui_integration_tests, merge_reports]
+    if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' && vars.UPLOAD_TO_KINORA != 'false' }}
+    runs-on:
+      labels: eks-openobserve-standard-4
+    permissions:
+      contents: read
+      actions: read          # download the blob-report artifacts
+      pull-requests: write   # upsert the single sticky Kinora comment on PRs
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install project dependencies
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'  # merge-reports needs no browsers
+        run: cd tests/ui-testing && npm ci
+
+      - name: Download blob reports from GitHub Actions Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: tests/ui-testing/all-blob-reports
+          pattern: blob-report-*-attempt-${{ github.run_attempt }}
+
+      - name: Merge blobs and upload to Kinora
+        id: kinora
+        continue-on-error: true
+        env:
+          KINORA_TOKEN: ${{ secrets.KINORA_TOKEN }}
+          KINORA_URL: ${{ secrets.KINORA_URL }}
+          KINORA_PROJECT: openobserve-e2e
+        run: |
+          cd tests/ui-testing
+          if [ ! -d all-blob-reports ] || [ -z "$(ls -A all-blob-reports 2>/dev/null)" ]; then
+            echo "::notice::No blob reports found — skipping Kinora upload (tests may have been skipped)."
+            exit 0
+          fi
+          # Merge locally so attachment (trace.zip) paths resolve on this runner.
+          PLAYWRIGHT_JSON_OUTPUT_NAME=kinora-report.json \
+            npx playwright merge-reports --reporter json ./all-blob-reports > /dev/null
+          echo "::group::Uploading to Kinora ($KINORA_PROJECT)"
+          OUT=$(npx --yes @kinora/cli upload kinora-report.json \
+                  --project "$KINORA_PROJECT" \
+                  --git-repo-url "https://github.com/${{ github.repository }}" 2>&1) || true
+          echo "$OUT"
+          echo "::endgroup::"
+          RUN_ID=$(printf '%s\n' "$OUT" | grep -oiE 'run [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1 | awk '{print $2}')
+          if [ -n "$RUN_ID" ]; then
+            RUN_URL="${KINORA_URL%/}/projects/$KINORA_PROJECT/runs/$RUN_ID"
+            echo "run_url=$RUN_URL" >> "$GITHUB_OUTPUT"
+            echo "::notice::Kinora run: $RUN_URL"
+          else
+            echo "::warning::Kinora upload did not return a run id (see log above)."
+          fi
+
+      - name: Upsert Kinora report comment on PR
+        if: ${{ github.event_name == 'pull_request' && steps.kinora.outputs.run_url != '' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ steps.kinora.outputs.run_url }}
+        run: |
+          MARKER="<!-- kinora-report -->"
+          BODY=$(printf '%s\n### 📊 Kinora report\nPlaywright run uploaded to Kinora — **[View run in Kinora](%s)**\n\n<sub>Updated for `%s` · run attempt %s. This comment updates in place on every push (no new comments).</sub>' \
+            "$MARKER" "$RUN_URL" "${HEAD_SHA:0:9}" "${{ github.run_attempt }}")
+          CID=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+                  -q ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -1)
+          if [ -n "$CID" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$CID" -f body="$BODY" >/dev/null && echo "Updated existing Kinora comment ($CID)."
+          else
+            gh api -X POST "repos/$REPO/issues/$PR_NUMBER/comments" -f body="$BODY" >/dev/null && echo "Posted new Kinora comment."
+          fi
+
   # TestDino upload — its own job so it never gates playwright_summary. Only runs when tests
   # failed (and uploads enabled); consumes the merged report via artifact.
   upload_testdino:
