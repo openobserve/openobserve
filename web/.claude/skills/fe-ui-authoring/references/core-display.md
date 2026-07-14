@@ -355,7 +355,7 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
 - `estimateSize` (number, default `40` — estimated per-item height in px)
 - `overscan` (number, default `5` — extra items rendered above/below the viewport)
 - `scrollTarget` (`HTMLElement | null` — external scroll container; omit/`null` to use the internal one)
-- `height` (string — CSS height of the internal container, e.g. `"400px"` / `"50vh"`; default `"100%"`, used only when `scrollTarget` is unset)
+- `height` (string — CSS height of the internal container, e.g. `"25rem"` / `"50vh"` (never `px`); default `"100%"`, used only when `scrollTarget` is unset)
 - `dynamicRowHeight` (boolean, default `false` — per-element ResizeObserver measurement for variable heights)
 
 **Slots:** `default` (scoped — receives `{ item: T, index: number }`; the positioning wrapper is provided for you)

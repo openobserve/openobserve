@@ -6,10 +6,13 @@ description: >-
   to existing ones. Enforce five house rules the moment you write Vue/template
   markup: (1) use AppPageHeader for every page/module header, (2) build UI from
   O2 library components in web/src/lib — never raw Quasar or bare HTML controls
-  when an O2 equivalent exists, (3) no hardcoded px — size with rem/%/vh/vw or
-  Tailwind's rem-based scale, (4) no scoped-CSS blocks and no inline style="",
-  (5) never hardcode colors/sizes — use registered design tokens, and register a
-  new token in the token CSS if one is missing. It also settles the recurring
+  when an O2 equivalent exists, (3) no hardcoded px anywhere — including inside
+  Tailwind class arbitrary values ([320px]) — size with rem/%/vh/vw or Tailwind's
+  rem-based scale, (4) no scoped-CSS blocks and no inline style="", (5) never
+  hardcode colors/sizes — use the modern registered --color-* design tokens and
+  register a new --color-* token if one is missing; the legacy --o2-* token
+  vocabulary is BANNED (never write var(--o2-*), never define one, never add a
+  .body--dark block — migrate any --o2-* you touch to its --color-* equivalent). It also settles the recurring
   structural decisions: use OTable for any tabular data, follow the
   view → service → Vuex/local-ref layering for fetching list data, choose the
   right form container (ConfirmDialog vs ODialog vs ODrawer vs a full in-page
@@ -135,10 +138,12 @@ feature, not a limitation.
   `rounded`/`color`/`flat` prop to reshape it; those overrides don't exist by
   design (see [§ Working with O2 components](#working-with-o2-components)).
 - **If no O2 equivalent exists:** do NOT drop to a bare `<div>`/`<button>` to
-  fake it. Keep the existing Quasar component (or native element) in place and
-  flag that a new O2 component is needed — build it following the patterns of the
-  neighboring components in `web/src/lib`. An unstyled `div` is worse than an
-  honest `q-btn`.
+  fake it, and do NOT hand-assemble the element from utility classes. When
+  migrating, keep the existing Quasar component (or native element) in place and
+  flag that a new O2 component is needed. When building **new** UI, create a
+  reusable component instead — see
+  [§ No component fits? Build a reusable one](#no-component-fits-build-a-reusable-one--dont-assemble-raw-classes).
+  An unstyled `div` is worse than an honest `q-btn`.
 
 ### 3. No hardcoded `px`
 
@@ -161,10 +166,13 @@ utilities usually removes the temptation entirely.
 **How.**
 - Reach for a Tailwind utility first (`tw:` prefix in this project). The numeric
   scale is `0.25rem`-based: `2 → 0.5rem`, `4 → 1rem`, etc.
-- Need an exact value not on the scale? Use a rem arbitrary value:
-  `tw:h-[1.375rem]`, not `tw:h-[22px]`.
-- **The only accepted `px` is a `1px` hairline border/divider.** Everything else
-  is a smell.
+- Need an exact value not on the scale? Use a **rem** arbitrary value:
+  `tw:h-[1.375rem]`, never `tw:h-[22px]`. This applies **inside class strings**
+  too — a `px` unit in a Tailwind arbitrary value (`w-[320px]`, `text-[13px]`,
+  `gap-[6px]`) is just as banned as a `px` in a `style=""`. Convert to rem
+  (divide by 16: `320px → 20rem`, `22px → 1.375rem`, `6px → 0.375rem`).
+- **The only accepted `px` is a `1px` hairline border/divider.** Every other `px`
+  — inline, in a `<style>` block, or in a class arbitrary value — is a smell.
 
 ### 4. No scoped CSS, no inline styles
 
@@ -204,17 +212,17 @@ first, then use it.
 
 **Why.** Tokens are what make the app theme-aware. A literal `#fff` is invisible
 in dark mode and can't be retuned globally; a token (`text-text-primary`,
-`bg-surface-base`, `var(--o2-*)`) resolves to the right value in both themes and
-changes everywhere at once when design updates it. Hardcoding a color is opting a
-single element out of theming permanently.
+`bg-surface-base`, `var(--color-*)`) resolves to the right value in both themes
+and changes everywhere at once when design updates it. Hardcoding a color is
+opting a single element out of theming permanently.
 
 **How — using tokens.**
-- Prefer Tailwind token utilities generated from the design tokens:
-  `tw:bg-surface-base`, `tw:text-text-primary`, `tw:border-border-default`,
+- Prefer Tailwind token utilities generated from the **modern `--color-*`** design
+  tokens: `tw:bg-surface-base`, `tw:text-text-primary`, `tw:border-border-default`,
   `tw:bg-tabs-active-bg`, etc. Grep existing views for the names in use.
-- In the rare case you need the raw variable, use the CSS custom property:
-  `var(--o2-text-primary)`, `var(--color-surface-base)` — theme-aware by
-  construction.
+- In the rare case you need the raw variable, use the modern CSS custom property:
+  `var(--color-text-primary)`, `var(--color-surface-base)` — theme-aware by
+  construction. **Only `--color-*`** — see the `--o2-*` ban below.
 
 **How — registering a NEW token (when none fits).** The token system is
 plain CSS (Tailwind v4), no SCSS. Files live in
@@ -224,12 +232,12 @@ via `web/src/styles/tailwind.css`:
 | File | Holds |
 | --- | --- |
 | `base.css` | raw palette primitives (`--color-grey-*`, radius, shadow) + fonts |
-| `semantic.css` | semantic/intent tokens (light `:root`) + legacy `--o2-*` light values |
-| `component.css` | per-component tokens |
-| `dark.css` | **all** dark-mode overrides |
+| `semantic.css` | semantic/intent `--color-*` tokens (light `:root`) |
+| `component.css` | per-component `--color-*` tokens |
+| `dark.css` | **all** dark-mode overrides (under `.dark`) |
 
 To add a token (do all three steps, or dark mode / Tailwind utilities silently
-break):
+break) — the new token **must** be a `--color-*` name:
 
 1. **Light value** — add it in the appropriate `:root { … }` block (usually
    `semantic.css` for a general token, `component.css` for a component-scoped
@@ -239,12 +247,32 @@ break):
    file's `@theme inline { … }` block so Tailwind emits utilities for it:
    `--color-surface-raised: var(--color-surface-raised);` — the `inline` keyword
    is what lets the runtime dark override still win.
-3. **Dark override** — add the dark value in `dark.css` under the dark selector
-   (`:root.dark, .dark :root, .dark { … }`, and the legacy `.body--dark` block if
-   it's an `--o2-*` token).
+3. **Dark override** — add the dark value in `dark.css` under the modern dark
+   selector **only**: `:root.dark, .dark :root, .dark { … }`. Do **not** add a
+   `.body--dark` block — that is the legacy `--o2-*` path and is being removed.
 
 Then use it as a utility (`tw:bg-surface-raised`) or `var(--color-surface-raised)`.
 Never inline the literal you would have registered.
+
+**⛔ The `--o2-*` token vocabulary is banned — never use it, never add to it.**
+There are two token vocabularies in this codebase: the modern `--color-*` set
+(registered in `@theme inline`, drives Tailwind utilities, proper `.dark`
+overrides) and a legacy `--o2-*` set (Quasar-era, `var()`-only, its own drifting
+`.body--dark` values). The legacy set is **being deleted** — see
+[`web/O2_TOKEN_MIGRATION_PLAN.md`](../../../O2_TOKEN_MIGRATION_PLAN.md), which adds
+stylelint + ESLint rules that **fail the build** on any `--o2-*`. Therefore:
+
+- **Never write `var(--o2-*)`** anywhere — not in a `<style>` block, not in a
+  Tailwind arbitrary value (`bg-[var(--o2-card-bg)]`), not in a `:style` binding.
+  Use the `--color-*` equivalent or a token utility.
+- **Never define a new `--o2-*`** token, and never add a `.body--dark` override.
+  New tokens are `--color-*` only, dark values under `.dark`.
+- **If you touch code that still references an `--o2-*` token**, migrate it to its
+  `--color-*` equivalent as you go (the mapping is in `O2_TOKEN_MIGRATION_PLAN.md`
+  §5 / `web/scripts/o2-token-map.json` — e.g. `--o2-text-primary` →
+  `--color-text-primary`, `--o2-border` → `--color-border-default`,
+  `--o2-primary-background` → `--color-surface-base`). If a mapping is genuinely
+  unclear, flag it rather than leaving the `--o2-*`.
 
 ---
 
@@ -315,6 +343,38 @@ write `store.state.appTheme === 'dark' ? … : …` conditionals, dark-only clas
 or duplicate styles for dark mode around an O2 component. If something looks
 wrong in dark mode, the fix is a token value in `dark.css`, not a per-component
 conditional.
+
+### No component fits? Build a reusable one — don't assemble raw classes
+
+When you need a UI element and **no existing component matches it**, the answer
+is to **create a new reusable component**, not to hand-assemble a
+`<div class="…">` block at the call site. A bag of divs + utility classes is
+invisible to the design system: it can't be reused, it drifts the moment someone
+copies it, and it's where inconsistency and one-off `px`/color hacks creep back
+in. If a pattern is worth building once, it's worth building as a component.
+
+Decide where it lives:
+
+- **Generic, app-agnostic primitive** (a new kind of button, a stat tile, a
+  labeled value, a badge variant, an icon chip — no store/router/i18n/API
+  inside) → build it in **`web/src/lib/<group>/<Name>/`** as an `O*` component,
+  following the neighboring components' conventions: an `O{Name}.types.ts`, a
+  `.spec.ts`, tokens for all colors, `variant`/`size` props for visual
+  differences (never appearance props), dark mode via tokens, `data-test`s. If
+  it belongs to a family, ship the family together. Then add it to the catalog so
+  the next person finds it.
+- **Reusable but app-specific composition** (composes O2 components with app data
+  or logic — e.g. a stream picker that fetches streams) → build it as a named
+  component in **`web/src/components/…`**, itself made of O2 components. Still a
+  real component with a name and props, not inline markup.
+
+The trigger is simple: *if you're about to write a self-contained UI element —
+especially one you'd repeat — stop and make it a component.* Inline utility
+classes are for **layout/composition** of components (flex, grid, gap, spacing),
+never for reconstructing a component the library should own. This is the same
+reason a missing **variant** becomes a new variant and a missing **token**
+becomes a registered token: the fix always lands in the shared thing, never as a
+private pile of classes at the call site.
 
 ---
 
@@ -561,6 +621,10 @@ considering the UI done:
 - [ ] Page/module header is `AppPageHeader` (not a hand-built header bar).
 - [ ] Every interactive control is an O2 component if one exists in
       `web/src/lib` — no stray `q-*` or bare HTML controls with an O2 equivalent.
+- [ ] A self-contained/repeated UI element with no matching component was
+      **built as a reusable component** (generic → `O*` in `web/src/lib`;
+      app-specific → named component in `web/src/components`), not hand-assembled
+      from `<div>` + utility classes. Classes are for layout only.
 - [ ] Tabular data uses `OTable` with `OTableColumnDef[]` columns (never
       `q-table`); server mode only for backend-paginated data.
 - [ ] Data fetched through a domain service (`src/services`), not raw `http` in
@@ -575,12 +639,17 @@ considering the UI done:
       manual `useLoading`/`:loading` and Save is not disabled on invalid.
 - [ ] Payload built with explicit keys (not `{ ...value }`); numeric inputs
       coerced. Field arrays use `:key="index"` + a non-last-row delete test.
-- [ ] Zero `px` values (except a `1px` hairline). Sizes use rem / % / vh / vw or
-      Tailwind's rem scale.
+- [ ] Zero `px` values (except a `1px` hairline) — including inside class
+      arbitrary values (`w-[320px]`, `text-[13px]`). Sizes use rem / % / vh / vw
+      or Tailwind's rem scale.
 - [ ] No `<style scoped>` block added. No `style="…"` attribute added.
-- [ ] No literal colors anywhere. Colors come from token utilities / `var(--o2-*)`.
-- [ ] Any new color/size needed was **registered as a token** (light + `@theme
-      inline` + dark) before use.
+- [ ] No literal colors anywhere. Colors come from `--color-*` token utilities /
+      `var(--color-*)`.
+- [ ] **No `--o2-*` anywhere** — no `var(--o2-*)`, no new `--o2-*` definition, no
+      `.body--dark` block. Any `--o2-*` in code you touched was migrated to its
+      `--color-*` equivalent.
+- [ ] Any new color/size needed was **registered as a `--color-*` token** (light
+      `:root` + `@theme inline` + dark under `.dark`) before use.
 - [ ] `data-test` on every interactive and key output element, pattern
       `<module>-<filename>-<descriptor>` (see the project FE rules).
 - [ ] New component uses `<script setup lang="ts">`, no `// @ts-nocheck`.
@@ -591,9 +660,13 @@ considering the UI done:
 Don't quietly break a rule — the fix is almost always "extend the shared thing,
 not the call site":
 
-- Missing O2 component → keep the current Quasar/HTML element in place, flag that
-  a new O2 component is needed, and build it following the neighboring components
-  in `web/src/lib`. Never substitute a bare `<div>`.
+- Missing O2 component → **build a new reusable component**, don't reconstruct it
+  from divs + classes at the call site. Generic primitive → a new `O*` in
+  `web/src/lib`; app-specific composition → a named component in
+  `web/src/components`. When *migrating* an existing element and can't build it
+  yet, keep the current Quasar/HTML element in place and flag it. Never
+  substitute a bare `<div>`. See
+  [§ No component fits?](#no-component-fits-build-a-reusable-one--dont-assemble-raw-classes).
 - Missing O2 variant → add the variant to the component source, then use it.
 - Missing token → register it in the token CSS (rule 5), then use it.
 - `AppPageHeader` can't express the header → change `AppPageHeader`, not the page.
