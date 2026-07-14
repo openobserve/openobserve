@@ -12,6 +12,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 use axum::{
     Json,
     http::StatusCode,
@@ -69,6 +70,8 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>)
             )),
         )
             .into_response(),
+        // A JSON deserialization failure means the client sent a malformed
+        // request body, so surface it as 400 rather than a 500 server error.
         errors::Error::SerdeJsonError(_) => (
             StatusCode::BAD_REQUEST,
             [(ERROR_HEADER, err.to_string())],

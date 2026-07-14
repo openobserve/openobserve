@@ -51,6 +51,8 @@ impl<'n> TreeNodeVisitor<'n> for MetricsVisitor {
     }
 }
 
+/// Get the peak memory from the SessionContext's memory pool.
+/// This should be called after the query execution to get the peak memory usage.
 pub fn get_peak_memory_from_ctx(ctx: &SessionContext) -> Arc<AtomicUsize> {
     ctx.runtime_env()
         .memory_pool

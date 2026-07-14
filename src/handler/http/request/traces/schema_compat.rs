@@ -40,7 +40,6 @@ pub(crate) use crate::service::traces::schema_compat::{
     REQUIRED_LLM_FIELDS,
 };
 
-/// Sentinel column whose presence indicates the new `gen_ai_*` schema.
 /// Column names that vary between the new and legacy LLM schemas.
 ///
 /// `Default` returns the new-schema names so call sites that don't care about
