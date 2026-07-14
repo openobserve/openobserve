@@ -68,8 +68,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            (red, hover for messages, click to open the step drawer). -->
       <div
         v-if="testStatus === 'ok'"
-        class="wf-test-badge wf-test-ok wf-test-pop"
+        class="wf-test-badge wf-test-ok wf-test-pop nodrag"
         :data-test="`workflow-node-${data?.node_type}-test-ok`"
+        @pointerdown.stop
+        @click.stop
       >
         <OIcon name="check" size="xs" />
       </div>
