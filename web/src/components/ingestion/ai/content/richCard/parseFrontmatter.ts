@@ -26,7 +26,7 @@ export interface ParsedFrontmatter {
   body: string;
 }
 
-const FRONTMATTER_RE = /^﻿?---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
+const FRONTMATTER_RE = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
 export function parseFrontmatter(md: string): ParsedFrontmatter {
   const match = FRONTMATTER_RE.exec(md);

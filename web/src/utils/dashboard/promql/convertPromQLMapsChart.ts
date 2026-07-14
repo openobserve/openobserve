@@ -41,8 +41,7 @@ export class MapsConverter implements PromQLChartConverter {
     const aggregation = config.aggregation || "last";
 
     // Get label names for location name
-    const nameLabel =
-      config.name_label || "name" || "location" || "country" || "region";
+    const nameLabel = config.name_label || "name";
 
     const locationValueMap = new Map<string, number[]>();
     const errors: string[] = [];

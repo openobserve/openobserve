@@ -27,5 +27,5 @@ module.exports = function (ctx) {
         ['vite-plugin-monaco-editor', { /* ..options.. */ }]
       ]
     },
-  },
+  };
 }

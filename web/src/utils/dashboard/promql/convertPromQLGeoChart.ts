@@ -47,9 +47,9 @@ export class GeoConverter implements PromQLChartConverter {
     const aggregation = config.aggregation || "last";
 
     // Get label names for geo coordinates
-    const latLabel = config.lat_label || "latitude" || "lat";
-    const lonLabel = config.lon_label || "longitude" || "lon";
-    const weightLabel = config.weight_label || "weight" || "value";
+    const latLabel = config.lat_label || "latitude";
+    const lonLabel = config.lon_label || "longitude";
+    const weightLabel = config.weight_label || "weight";
 
     const geoData: any[] = [];
     const errors: string[] = [];

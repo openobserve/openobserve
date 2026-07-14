@@ -17,6 +17,19 @@ const gitignore = fs.existsSync(".gitignore")
   : [];
 
 export default [
+  // Global ignores — must be a standalone entry (no `files` key) so they apply
+  // to every config object, including js.configs.recommended. Vendored/minified
+  // assets and build output are not lintable source.
+  {
+    ignores: [
+      "**/*.min.js",
+      "packages/rrweb-player/**",
+      "dist/**",
+      "coverage/**",
+      "node_modules/**",
+      ".vscode/**",
+    ],
+  },
   js.configs.recommended,
   ...vue.configs["flat/essential"],
   {

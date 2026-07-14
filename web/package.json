@@ -21,9 +21,11 @@
     "build-only": "vite build",
     "build-only-alpha1": "vite build --mode=alpha1",
     "build-only-cloud-prod": "vite build --mode=production",
-    "type-check": "vue-tsc --noEmit -p tsconfig.vitest.json --composite false",
+    "type-check": "NODE_OPTIONS=--max-old-space-size=8192 vue-tsc --noEmit -p tsconfig.vitest.json --composite false",
+    "type-check:app": "NODE_OPTIONS=--max-old-space-size=8192 vue-tsc --noEmit -p tsconfig.app.json --composite false",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
-    "lint:ci": "eslint \"src/**/*.vue\" --no-fix"
+    "lint:ci": "eslint \"src/**/*.vue\" --no-fix",
+    "lint:errors": "eslint \"src/**/*.{js,ts,vue}\" --no-fix --quiet"
   },
   "dependencies": {
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",

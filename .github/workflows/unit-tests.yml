@@ -166,10 +166,55 @@ jobs:
         working-directory: web
         run: ./coverage.sh check
 
+  ui_code_quality:
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_ui_changes == 'true'
+    runs-on:
+      labels: ubicloud-standard-8
+    permissions:
+      contents: read
+
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: ESLint (any error fails; warnings are allowed)
+        working-directory: web
+        run: npm run lint:errors
+
+      # The codebase has a large pre-existing type-error backlog, so a hard
+      # `vue-tsc` gate is not yet possible. Instead, ratchet: fail only when a
+      # change INCREASES the error count above the committed baseline. Lower
+      # web/typecheck-error-baseline.txt as the backlog shrinks.
+      - name: Type-check ratchet (no new errors vs baseline)
+        working-directory: web
+        run: |
+          COUNT=$(npm run --silent type-check:app 2>&1 | grep -c "error TS" || true)
+          BASELINE=$(cat typecheck-error-baseline.txt)
+          echo "TypeScript errors: $COUNT (baseline: $BASELINE)"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::This change introduces new TypeScript errors ($COUNT > $BASELINE). Run 'npm run type-check:app' in web/ to see them."
+            exit 1
+          fi
+          if [ "$COUNT" -lt "$BASELINE" ]; then
+            echo "::notice::TypeScript error count dropped to $COUNT — lower web/typecheck-error-baseline.txt to lock in the progress."
+          fi
+
   unit_tests_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [check_changes, backend_unit_tests, ui_unit_tests]
+    needs: [check_changes, backend_unit_tests, ui_unit_tests, ui_code_quality]
     if: always()
     steps:
       - name: Check test results
@@ -190,6 +235,13 @@ jobs:
             echo "UI tests passed or skipped"
           else
             echo "UI tests failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.ui_code_quality.result }}" == "success" ] || [ "${{ needs.ui_code_quality.result }}" == "skipped" ]; then
+            echo "UI code quality passed or skipped"
+          else
+            echo "UI code quality failed"
             exit 1
           fi
 

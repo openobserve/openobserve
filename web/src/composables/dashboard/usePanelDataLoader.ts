@@ -65,8 +65,9 @@ export const usePanelDataLoader = (
   regionClusterParams?: any,
   allowAnnotationsAPI?: any,
 ) => {
+  const PANEL_DATA_LOADER_DEBUG = false;
   const log = (...args: any[]) => {
-    if (false) {
+    if (PANEL_DATA_LOADER_DEBUG) {
       console.log(panelSchema?.value?.title + ": ", ...args);
     }
   };

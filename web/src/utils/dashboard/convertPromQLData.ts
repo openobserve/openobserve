@@ -854,6 +854,7 @@ export const convertPromQLData = async (
           }
         }
       }
+      // falls through — unknown resultType has no series to build
       case "gauge": {
         // we doesnt required to hover timeseries for gauge chart
         isTimeSeriesFlag = false;

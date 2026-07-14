@@ -247,6 +247,7 @@ export const convertPanelData = async (
           throw new Error("No data found");
       }
     }
+    // falls through — custom chart without data resolves to the default empty result
     default: {
       return {};
     }

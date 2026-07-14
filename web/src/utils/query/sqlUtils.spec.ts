@@ -740,9 +740,9 @@ describe("sqlUtils", () => {
 
   describe("formatValue function (internal)", () => {
     it("should handle null values", () => {
-      // Testing the internal formatValue function behavior through addLabelToSQlQuery
-      expect(null == null).toBe(true);
-      expect(undefined == null).toBe(true);
+      // Testing the internal formatValue function behavior directly
+      expect(formatValue(null)).toBe(null);
+      expect(formatValue(undefined)).toBe(undefined);
     });
 
     it("should handle string values with quotes", () => {
