@@ -27,8 +27,11 @@ description: >-
   drawer, form, field, or panel in the web frontend, or asks where a
   form/table/fetch should live, how to validate a form, how to add a keyboard
   shortcut, how to build a new reusable/common O2 component when nothing existing
-  fits (create one in web/src/lib instead of assembling divs and classes), or
-  whether something belongs in a dialog or a drawer — even if they don't mention
+  fits (create one in web/src/lib instead of assembling divs and classes),
+  whether something belongs in a dialog or a drawer, or where a new page should be
+  listed in navigation — the left-rail menu, a Settings/IAM sub-menu, or a
+  hover-flyout — how to register its route, and how to gate it for cloud /
+  enterprise / RBAC — even if they don't mention
   these rules by name. If you are
   about to type <template>, q-page, a page title, a hex color, a px value, or
   <style scoped>, this skill applies.
@@ -240,6 +243,13 @@ opting a single element out of theming permanently.
 - Prefer **token-backed Tailwind utilities**: `text-text-primary`,
   `bg-surface-base`, `bg-surface-subtle`, `border-border-default`,
   `text-text-secondary`, `text-text-muted` — theme-aware by construction.
+- **Don't write the arbitrary-value form when a utility exists** —
+  `bg-surface-base`, not `bg-[var(--color-surface-base)]` (they compile to
+  identical CSS; the utility name is the token minus `--color-`). Arbitrary
+  `[var(--color-x)]` / `(--color-x)` is only for a token with **no** utility
+  (a var-only domain token not in `@theme inline`, e.g.
+  `bg-[var(--color-card-glass-bg)]`) or a **load-bearing fallback**. Details +
+  the two exceptions in [references/design-tokens.md](references/design-tokens.md).
 - When a raw variable is unavoidable, use the modern CSS custom property
   `var(--color-*)` (e.g. in a bound `:style` for a computed value).
 - **Only `--color-*` tokens** — see the `--o2-*` ban below.
@@ -302,19 +312,38 @@ screen on the same rhythm: `gap-2` = 0.5rem, `gap-4` = 1rem, `gap-5` = 1.25rem,
 
 ### Listing Pages (OTable, Lists, Grids)
 
-- Page container: `class="flex flex-col gap-6 p-6"` — one padding, one gap for
-  the whole page. Sections (header, table) sit as direct children.
-- Action columns: keep tight — `class="flex gap-1"` around small icon buttons.
-  Don't bloat rows with wide gaps.
-- Headers use `AppPageHeader` — no custom title styling.
+A listing/table page is **full-bleed**, not a padded card. The real skeleton
+(full recipe in [references/page-recipes.md](references/page-recipes.md)):
+
+```
+flex flex-col h-full p-0                              ← page root, NO page padding
+  AppPageHeader   shrink-0 px-4 border-b border-border-default   ← header owns the padding
+  <div>          card-container flex-1 min-h-0 overflow-hidden   ← table wrapper, NO padding
+    OTable :frame="false"
+```
+
+- **No `gap-6 p-6` page container** for a listing page — that inset breaks the
+  flush table. The **header** carries `px-4` (+ a `border-b`); the **table
+  wrapper** carries none, so rows run **flush to the content edges**. Reserve
+  `p-6`/`gap-6` for form/detail views.
+- **Fixed height:** `h-full` + `flex flex-col` (root), `shrink-0` (header),
+  `flex-1 min-h-0 overflow-hidden` (table wrapper). The `min-h-0` is what makes
+  the table body scroll instead of the whole page.
+- **No border or background around the table.** Pass `:frame="false"` on the
+  `<OTable>` and reuse the existing `card-container` class for the surface —
+  don't add a bordered or `bg-*` box (it double-frames the borderless table).
+- **Filters + search go in the `#toolbar` slot** (set
+  `:show-global-filter="false"`); **refresh** goes in `#toolbar-trailing`; the
+  **column-visibility toggle is auto-injected** between them. Never put the search
+  box in the header `#actions` — only the primary **New/Add/Import** actions live
+  there.
+- **Empty state is one `OEmptyState`** in `#empty` with a `preset` + `:filtered`
+  prop — it swaps to "No results found" + Clear-filters automatically when a
+  search/filter is active (don't hand-render two empty blocks).
+- Action columns: keep tight — `class="flex items-center gap-1"` around small
+  icon buttons. Headers use `AppPageHeader` (description via the `subtitle` prop).
 - Table columns: left-align text, center-align toggles/badges/counts (via the
   column `meta.align`).
-- **No border or background around the table.** The table renders flush — no
-  outer box. Pass `:frame="false"` on the `<OTable>` (its default, but be
-  explicit) and don't wrap it in a bordered or `bg-*` card. A parent border or
-  background double-frames it. See the **Tables → OTable** rule below for detail.
-- Search + refresh + new: group in the header `#actions` slot with
-  `class="flex items-center gap-2"`. Never wrap the search input in its own card.
 
 ### Dialog Spacing (`ODialog`)
 
@@ -526,24 +555,37 @@ differently on every screen.
 Lay out a whole page from a recipe, not from scratch — full recipes in
 [references/page-recipes.md](references/page-recipes.md). The essentials:
 
-- **Every page** = `AppPageHeader` on top (primary New/Add action in `#actions`)
-  + a body in a `flex flex-col min-h-0` container.
+- **Every page** = `AppPageHeader` on top (primary New/Add action in `#actions`).
+- **A listing/table page is full-bleed**, laid out as a full-height flex column
+  where the **header carries the padding** and the **table runs flush** to the
+  content edges — root `flex flex-col h-full p-0`, header
+  `shrink-0 px-4 border-b border-border-default`, table wrapper
+  `card-container flex-1 min-h-0 overflow-hidden` around `<OTable :frame="false">`.
+  **Not** a `gap-6 p-6` padded container (that's for form/detail views).
 - **A listing/table page always carries three toolbar affordances** on its
   `OTable` — don't ship a list without them:
-  - **Search** — built-in `show-global-filter` (+ `v-model:global-filter`), or a
-    custom `OInput` in the `#toolbar` slot for server-driven search.
-  - **Refresh** — an `OButton size="icon-sm" icon-left="refresh" :loading` in the
-    `#toolbar-trailing` slot, wired to the fetch fn, with a tooltip carrying the
-    `r` shortcut.
-  - **Column show/hide toggle** — `OTable` renders it **automatically** when
-    `:persist-columns="true"` + a stable `table-id` + at least one non-action
-    column marked `hideable: true` are all present. Omit any of the three and the
-    button silently won't appear.
+  - **Search (+ filters)** — put the search box and any filter controls
+    (`OToggleGroup`, dropdowns) together in the `#toolbar` slot with
+    `:show-global-filter="false"`. Only a search-only list with no other filters
+    uses the built-in `show-global-filter` + `v-model:global-filter`.
+  - **Refresh** — an `OButton variant="outline" size="icon-sm" icon-left="refresh"
+    :loading` in the `#toolbar-trailing` slot, wired to the fetch fn, with a
+    tooltip carrying the `r` shortcut.
+  - **Column show/hide toggle** — `OTable` **auto-injects** it (between `#toolbar`
+    and `#toolbar-trailing`) when `:persist-columns="true"` + a stable `table-id` +
+    at least one non-action column marked `hideable: true` are all present. Omit
+    any of the three and the button silently won't appear.
 - **Hide non-essential columns by default** via `:column-visibility="{ id: false }"`
   (keep name/status visible; hide timestamps/ids/counts) — the user can re-show
   them and the choice persists per `table-id`.
-- Provide `#empty`/`#error` states, put row actions in an `isAction` column, and
-  register `n`/`/`/`r` shortcuts.
+- **Empty state = one `OEmptyState`** in `#empty` with a `preset` + `:filtered`
+  prop; it swaps to "No results found" + Clear-filters automatically when search/a
+  filter is active. Provide `#error` too if fetch can fail. Put row actions in an
+  `isAction` column, register `n`/`/`/`r` shortcuts.
+- **Register the page in navigation** (route + rail item / Settings sub-page /
+  flyout child) and **gate it** for the right env/role — a page that renders but
+  isn't wired into the nav is unreachable. Full how-to in
+  [references/navigation-menus.md](references/navigation-menus.md).
 
 ### Tables → `OTable`
 
@@ -610,6 +652,53 @@ view (src/views)
 **Why.** The layer boundary is what lets a second screen reuse a fetch, lets a
 test mock a service, and keeps the store from silting up with ephemeral state. A
 component that calls axios directly can't be reused or tested without a network.
+
+### Registering a new page in navigation
+
+**What.** A new page isn't reachable until it's (1) registered as a **route** and
+(2) surfaced in **exactly one** navigation surface, and (3) **gated** for the
+right environment and role. All three are data-driven — never hand-roll a
+`<router-link>` sidebar entry or a bespoke menu. Full how-to (file paths, data
+shapes, gating expressions, checklists) in
+[references/navigation-menus.md](references/navigation-menus.md).
+
+**How — pick the surface by what the page is:**
+
+| The page is… | Surface | Edit |
+| --- | --- | --- |
+| A top-level product area | plain **left-rail item** | `linksList` in `web/src/layouts/MainLayout.vue` |
+| One of several related data destinations | **hover-flyout child** under a rail group | `NAV_GROUPS` in `web/src/lib/core/Navbar/navGroups.ts` |
+| An admin/config screen | **Settings sub-page** (SectionRail) | `settingsItems` in `web/src/components/settings/index.vue` |
+| An access-control screen | **IAM sub-page** (SectionRail) | `web/src/views/IdentityAccessManagement.vue` |
+
+And always: a **route** in the composable that owns the domain
+(`composables/shared/router.ts` for core pages, `useManagementRoutes.ts` for
+Settings, `useEnterpriseRoutes.ts` for IAM, `enterprise/composables/router.ts` for
+cloud/enterprise-only), with a lazy `component`, `meta.title`, and
+`beforeEnter: routeGuard`.
+
+**How — gating (mandatory, keep in sync).** Decide where the page appears using
+the build flags `config.isEnterprise` / `config.isCloud` (from
+`web/src/aws-exports.ts`, string `"true"`/`"false"`) and runtime flags in
+`store.state.zoConfig.*` (`rbac_enabled`, `actions_enabled`, `meta_org`, …). The
+canonical expression is:
+
+```js
+const isFeatureEnabled = computed(() =>
+  (config.isEnterprise == "true" || config.isCloud == "true") &&
+  Boolean(store.state.zoConfig?.<flag>));
+```
+
+The **route condition**, the **nav entry's gate** (a `gate` key in `navGroups.ts`
+or a `visible:` expression on a SectionRail item), and the page's own SectionRail
+`visible` must all express the **same** rule — otherwise the nav offers a link the
+page hides. Menu items also respect `zoConfig.custom_hide_menus`.
+
+**Why.** Every navigation surface reads from one data file so the whole IA is
+decidable in one place and stays consistent; the gating rules keep a cloud- or
+enterprise-only page from leaking into OSS builds (or an RBAC page appearing
+without RBAC). A hand-rolled sidebar link bypasses the flyout reshaping, the
+`router.hasRoute` dead-link filtering, and the gate mirroring — and drifts.
 
 ### Forms: dialog vs drawer vs full page
 
@@ -721,7 +810,8 @@ markup — don't guess a prop name.
 | [references/keyboard-shortcuts.md](references/keyboard-shortcuts.md) | **Keyboard shortcuts: registry, `useShortcut`/`useShortcuts`, display via `OShortcut`/`shortcut-id`, cheatsheet** |
 | [references/creating-components.md](references/creating-components.md) | **Building a NEW O2 component: lib vs components, folder contract, families, headless-first (reka-ui), no-UI-prop-leakage, strict TS, tokens, form wrappers, workflow, testing** |
 | [references/design-tokens.md](references/design-tokens.md) | **Design tokens: using `--color-*`, the token files, registering a new token, the `--o2-*` ban + full `--o2-*` → `--color-*` migration map** |
-| [references/page-recipes.md](references/page-recipes.md) | **Whole-page layouts: the listing/table page (header + OTable with mandatory search · refresh · column-visibility toggle, default-hidden columns) and the detail/editor page** |
+| [references/page-recipes.md](references/page-recipes.md) | **Whole-page layouts: the listing/table page (full-height flush skeleton, mandatory search · refresh · column-visibility toggle, filtered-vs-first-run empty state) and the detail/editor page** |
+| [references/navigation-menus.md](references/navigation-menus.md) | **Registering a new page in navigation: the route composables, the left-rail item (`linksList`), Settings/IAM sub-pages (`SectionRail`), hover-flyout children (`navGroups.ts`), and cloud/enterprise/RBAC gating** |
 | [references/overlay-navigation.md](references/overlay-navigation.md) | Dialog, Drawer, Dropdown, Popover, Tooltip · Pagination, Stepper, Tabs |
 | [references/feedback-data.md](references/feedback-data.md) | Banner, Toast (+ useToast), Spinner, Skeleton, InnerLoading · ProgressBar, Timeline, Tree · FieldList |
 
@@ -779,6 +869,7 @@ markup — don't guess a prop name.
 | Confirm / destructive prompt | `ConfirmDialog` + `useConfirmDialog` (app-level, `@/components` + `@/composables`) | — |
 | Add a keyboard shortcut | registry entry + `useShortcuts([{ id, handler }])`; display via `OShortcut`/`shortcut-id` | keyboard-shortcuts |
 | Build a NEW component (nothing fits) | new `O*` in `web/src/lib` (generic) or named component in `web/src/components` (app-specific) — never inline classes | **creating-components** |
+| Add a new page to the nav / menu / settings sub-menu | route composable + `linksList` / `navGroups.ts` / `settingsItems`, gated by env/role | **navigation-menus** |
 
 If a scenario isn't covered by anything above, re-check the reference files
 before assuming a component is missing — the list is complete as of this skill's
@@ -801,10 +892,23 @@ considering the UI done:
       from `<div>` + utility classes. Classes are for layout only.
 - [ ] Tabular data uses `OTable` with `OTableColumnDef[]` columns (never
       `q-table`); server mode only for backend-paginated data.
-- [ ] Listing page has all three toolbar affordances: **search**, **refresh**
+- [ ] Listing page uses the **full-height flush skeleton** (root
+      `flex flex-col h-full p-0`, header `shrink-0 px-4 border-b`, table wrapper
+      `card-container flex-1 min-h-0 overflow-hidden`, `OTable :frame="false"`) —
+      not a `p-6` padded container; table runs flush.
+- [ ] Listing page has all three toolbar affordances: **search + filters**
+      (`#toolbar`, `:show-global-filter="false"`), **refresh**
       (`#toolbar-trailing`, wired to fetch), and the **column show/hide toggle**
       (`:persist-columns` + `table-id` + a `hideable` column). Non-essential
-      columns hidden by default via `:column-visibility`; `#empty` state present.
+      columns hidden by default via `:column-visibility`.
+- [ ] Empty state is a single `OEmptyState` with a `preset` + **`:filtered`**
+      (search/filter active) + `@action` resetting on `clear-filters`; `#error` if
+      fetch can fail.
+- [ ] Page is **registered in navigation** (route + one of rail item / Settings
+      sub-page / flyout child) and **gated** for env/role
+      (`config.isEnterprise` / `config.isCloud` / `zoConfig.*`), with the route,
+      nav-entry gate, and SectionRail `visible` all in sync
+      (see [navigation-menus.md](references/navigation-menus.md)).
 - [ ] Data fetched through a domain service (`src/services`), not raw `http` in
       the component; shared data in Vuex, ephemeral data in local refs.
 - [ ] Form container matches weight: confirm → `ConfirmDialog`, short form →

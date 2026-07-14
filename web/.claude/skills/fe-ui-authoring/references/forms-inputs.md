@@ -425,7 +425,7 @@ Used standalone to accept a secret token with reveal/copy controls. Not inside `
 ```vue
 <!-- web/src/components/common/SecretInput.vue -->
 <template>
-  <div class="tw:flex tw:gap-2 tw:items-end">
+  <div class="flex gap-2 items-end">
     <OInput
       :type="revealed ? 'text' : 'password'"
       :model-value="modelValue"
@@ -436,7 +436,7 @@ Used standalone to accept a secret token with reveal/copy controls. Not inside `
       @update:model-value="$emit('update:modelValue', $event)"
       :data-test="dataTest"
     />
-    <div class="tw:flex tw:gap-1">
+    <div class="flex gap-1">
       <OButton
         variant="ghost"
         size="sm"
@@ -507,7 +507,7 @@ const copyToClipboard = async () => {
 **To use inside a form** (if needed later), wire it via the form's `setFieldValue` — don't build an `OFormSecretInput`:
 ```vue
 <OForm :schema="schema" :default-values="defaults" @submit="save">
-  <div class="tw:space-y-2">
+  <div class="space-y-2">
     <label>{{ t('field.token') }}</label>
     <SecretInput
       :model-value="formInputs.token"

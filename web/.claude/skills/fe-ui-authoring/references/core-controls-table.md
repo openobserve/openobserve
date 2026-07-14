@@ -143,7 +143,7 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 **Emits:** `update:modelValue` (`value: number`)
 **Example:**
 ```vue
-<OSplitter v-model="splitPos" :limits="[20, 80]" class="tw:h-full">
+<OSplitter v-model="splitPos" :limits="[20, 80]" class="h-full">
   <template #before><QueryList /></template>
   <template #after><ResultPane /></template>
 </OSplitter>
@@ -385,7 +385,7 @@ For renders not covered by prebuilt cells, use a slot template `#cell-{id}`:
   </template>
 
   <template #cell-actions="{ row }">
-    <div class="tw:flex tw:gap-1">
+    <div class="flex gap-1">
       <OButton variant="ghost" size="sm" icon-left="edit" @click="edit(row)" />
       <OButton variant="ghost" size="sm" icon-left="delete" @click="remove(row)" />
     </div>

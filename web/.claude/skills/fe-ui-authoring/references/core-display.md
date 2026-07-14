@@ -108,7 +108,7 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 **Emits:** none
 **Example:**
 ```vue
-<OCard class="tw:w-full">
+<OCard class="w-full">
   <OCardSection role="header">Title</OCardSection>
   <OSeparator />
   <OCardSection role="body">Content</OCardSection>

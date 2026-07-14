@@ -66,7 +66,7 @@ async function onSubmit(value: StreamForm) {
     <OFormInput name="name" :label="t('stream.name')" required />
     <OFormInput name="retention" type="number" :label="t('stream.retention')" />
 
-    <div class="tw:flex tw:gap-2 tw:mt-4">
+    <div class="flex gap-2 mt-4">
       <OButton variant="outline" size="sm-action" @click="$emit('cancel')">
         {{ t("common.cancel") }}
       </OButton>
@@ -228,7 +228,7 @@ When a form lives inside an `ODialog` or `ODrawer`, always use the overlay's
 <ODialog :open="showDialog" @update:open="showDialog = $event">
   <OForm :schema="schema" @submit="onSubmit">
     <OFormInput name="title" />
-    <div class="tw:flex tw:gap-2">
+    <div class="flex gap-2">
       <OButton variant="outline" @click="showDialog = false">Cancel</OButton>
       <OButton variant="primary" type="submit">Save</OButton>
     </div>
@@ -427,8 +427,8 @@ export const notificationChannelDefaults = (): NotificationChannelForm => ({
 
       <!-- Non-schema field: reusable SecretInput (custom component) -->
       <!-- Wired via v-model bridge — auth_token is schema-owned, SecretInput is dumb -->
-      <div class="tw:space-y-2">
-        <label class="tw:text-sm tw:font-medium">{{ t('notificationChannels.authToken') }}</label>
+      <div class="space-y-2">
+        <label class="text-sm font-medium">{{ t('notificationChannels.authToken') }}</label>
         <SecretInput
           :model-value="formInputs.auth_token"
           @update:model-value="formInputs.auth_token = $event"
@@ -437,15 +437,15 @@ export const notificationChannelDefaults = (): NotificationChannelForm => ({
       </div>
 
       <!-- Dynamic field array: custom headers (map ↔ array conversion at edit/submit) -->
-      <div class="tw:space-y-3">
-        <div class="tw:flex tw:justify-between">
-          <label class="tw:text-sm tw:font-medium">{{ t("notificationChannels.headers") }}</label>
+      <div class="space-y-3">
+        <div class="flex justify-between">
+          <label class="text-sm font-medium">{{ t("notificationChannels.headers") }}</label>
           <OButton variant="ghost" size="sm" icon-left="add" type="button" @click="addHeader">
             {{ t("notificationChannels.addHeader") }}
           </OButton>
         </div>
         <!-- Rendered as array of {key, value} rows; converted to map for schema at submit -->
-        <div v-for="(header, idx) in headers" :key="idx" class="tw:flex tw:gap-2">
+        <div v-for="(header, idx) in headers" :key="idx" class="flex gap-2">
           <OInput v-model="header.key" :placeholder="t('notificationChannels.headerKey')" />
           <OInput v-model="header.value" :placeholder="t('notificationChannels.headerValue')" />
           <OButton variant="ghost" size="sm" icon-left="delete" type="button" @click="removeHeader(idx)" />

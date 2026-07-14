@@ -210,7 +210,7 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
   <template #trigger>
     <OButton variant="outline" icon="filter">Filters</OButton>
   </template>
-  <div class="tw:flex tw:flex-col tw:gap-2 tw:p-3">
+  <div class="flex flex-col gap-2 p-3">
     <OSelect v-model="status" :options="statusOptions" label="Status" />
     <OInput v-model="search" label="Contains" />
   </div>

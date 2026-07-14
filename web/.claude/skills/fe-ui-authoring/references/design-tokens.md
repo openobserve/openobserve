@@ -18,12 +18,37 @@ set. The legacy **`--o2-*`** set is banned (see the bottom of this file).
 
 ## Using tokens
 
-- **Prefer Tailwind token utilities** generated from the `--color-*` tokens:
-  `tw:bg-surface-base`, `tw:text-text-primary`, `tw:border-border-default`,
-  `tw:bg-button-primary`, `tw:bg-tabs-active-bg`, etc. Grep existing views for the
-  names already in use.
-- **Need the raw variable** (in a CSS file, or a rare `:style` binding)? Use the
-  modern custom property only: `var(--color-text-primary)`,
+- **Prefer the token-backed Tailwind utility** generated from the `--color-*`
+  token — bare, **no `tw:` prefix** (the prefix was removed from this project;
+  `tw:bg-surface-base` no longer resolves): `bg-surface-base`, `text-text-primary`,
+  `border-border-default`, `bg-button-primary`, `bg-tabs-active-bg`. Grep existing
+  views for the names already in use.
+- **Don't hand-write the arbitrary-value form when a utility exists.** Every
+  `--color-*` token registered in an `@theme inline` block (all the
+  semantic/component tokens) emits the full set of utilities, so the utility is
+  guaranteed to exist and compiles to the **identical** CSS — the arbitrary value
+  is just noisier. The utility name is the token minus the `--color-` prefix:
+  ```html
+  <!-- avoid --> <div class="bg-[var(--color-surface-base)] text-[var(--color-text-primary)] border-[var(--color-border-default)]">
+  <!-- prefer --> <div class="bg-surface-base text-text-primary border-border-default">
+  ```
+  (`--color-text-primary` → `text-text-primary`, `--color-surface-base` →
+  `bg-surface-base`, `--color-border-default` → `border-border-default`.) This also
+  covers the v4 shorthand `bg-(--color-x)` — same rule, use `bg-x`.
+- **Arbitrary `[var(--color-x)]` in a class is acceptable in only two cases:**
+  1. the token has **no registered utility** — a var-only token defined in a plain
+     `:root {}` and *not* re-declared in an `@theme inline` block (most domain /
+     data-viz tokens: `bg-[var(--color-card-glass-bg)]`,
+     `text-[var(--color-span-kind-client-text)]`); or
+  2. you need a **load-bearing fallback** —
+     `border-[var(--color-dialog-header-border,var(--color-border-default))]`, where
+     the first token is defined in only one theme so the fallback actually renders.
+
+  Otherwise, use the utility. (If you find yourself reaching for an arbitrary value
+  for a token that *should* be a first-class utility, register it in `@theme inline`
+  — see below — rather than scattering `[var(--color-x)]`.)
+- **Need the raw variable** (in a CSS file, or a rare `:style` binding for a
+  computed value)? Use the modern custom property only: `var(--color-text-primary)`,
   `var(--color-surface-base)`. Never `var(--o2-*)`.
 - **Never a literal** — no hex / `rgb()` / `rgba()` / `hsl()` / named colors in a
   component, and no magic `px` dimensions. (Literal hex is allowed in exactly one
@@ -70,7 +95,7 @@ utilities silently break. The new token **must** be a `--color-*` name.
    :root.dark, .dark :root, .dark { --color-surface-raised: var(--color-grey-800); }
    ```
 
-Then use it as a utility (`tw:bg-surface-raised`) or `var(--color-surface-raised)`.
+Then use it as a utility (`bg-surface-raised`) or `var(--color-surface-raised)`.
 Never inline the literal you would have registered.
 
 ## The `--o2-*` ban

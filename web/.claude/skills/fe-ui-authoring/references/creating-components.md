@@ -79,7 +79,7 @@ The shared context (its `InjectionKey`) is defined in the root member's `.types.
 For ARIA-complex behavior (Dialog, Drawer, Tabs, Select, Popover, Combobox, Dropdown, Tooltip — focus traps, listbox keyboard nav, floating positioning), build on **`reka-ui`** primitives rather than hand-rolling ARIA. `ODialog`, `OSelect`, `OSelectGroup`/`OSelectItem` all import from `reka-ui` today.
 
 - Forms use **`@tanstack/vue-form`** (via `OForm`) — see §8.
-- Reka primitives are **unstyled** — all appearance still comes from O2 tokens + `tw:` utilities. Never import a Reka theme CSS.
+- Reka primitives are **unstyled** — all appearance still comes from O2 tokens + bare Tailwind utilities. Never import a Reka theme CSS.
 - Simple components (Badge, Separator, a plain button) need **no** reka — don't add it just to add it.
 - **`reka-ui` and `@tanstack/vue-form` are the only approved headless libs.** Never install another (or pull a new reka behavior you're unsure about) without explicit user confirmation.
 
@@ -109,8 +109,8 @@ Implement variants as a computed class map keyed by the variant/size value (no C
 
 ```ts
 const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
-  primary: "tw:bg-button-primary tw:text-button-primary-foreground tw:hover:bg-button-primary-hover",
-  ghost:   "tw:bg-transparent tw:text-button-ghost-text tw:hover:bg-button-ghost-hover-bg",
+  primary: "bg-button-primary text-button-primary-foreground hover:bg-button-primary-hover",
+  ghost:   "bg-transparent text-button-ghost-text hover:bg-button-ghost-hover-bg",
 };
 ```
 
@@ -153,9 +153,9 @@ Two-way binding uses the standard `modelValue` prop + `update:modelValue` emit (
 (Full token guide, registration steps, and the `--o2-*` → `--color-*` map:
 [design-tokens.md](design-tokens.md).)
 
-- **Colors: only the modern `--color-*` tokens.** Reach them through `tw:` token utilities (`tw:bg-surface-panel`, `tw:text-text-primary`, `tw:bg-button-primary`) or `var(--color-*)` in a CSS file. The legacy `--o2-*` vocabulary is **banned** — never use it, never define it, and never add a `.body--dark` block.
-- **No hardcoded px anywhere** — including inside Tailwind arbitrary values. `tw:w-[320px]` is banned. Use the rem-based scale (`tw:w-80`, `tw:h-10`, `tw:px-4`) or `rem` / `%` / `vh` / `vw`. `1px` hairline borders are the only exception.
-- **No `var(--*)` in `.vue` templates** and **no hex in components** — go through `tw:` token utilities.
+- **Colors: only the modern `--color-*` tokens.** Reach them through token utilities (`bg-surface-panel`, `text-text-primary`, `bg-button-primary`) or `var(--color-*)` in a CSS file. The legacy `--o2-*` vocabulary is **banned** — never use it, never define it, and never add a `.body--dark` block.
+- **No hardcoded px anywhere** — including inside Tailwind arbitrary values. `w-[320px]` is banned. Use the rem-based scale (`w-80`, `h-10`, `px-4`) or `rem` / `%` / `vh` / `vw`. `1px` hairline borders are the only exception.
+- **No `var(--*)` in `.vue` templates** and **no hex in components** — go through token utilities.
 
 Token files live in `web/src/lib/styles/tokens/`:
 
@@ -187,7 +187,7 @@ Then add a dark override in `dark.css` **only if** the token uses base-palette v
 }
 ```
 
-> The registration is Tailwind v4 `@theme inline`, so `--color-mywidget-bg` becomes usable as `tw:bg-mywidget-bg`. Use RTL logical utilities (`tw:ps-*`/`tw:pe-*`, `tw:rounded-s-*`/`tw:rounded-e-*`).
+> The registration is Tailwind v4 `@theme inline`, so `--color-mywidget-bg` becomes usable as `bg-mywidget-bg`. Use RTL logical utilities (`ps-*`/`pe-*`, `rounded-s-*`/`rounded-e-*`).
 
 ---
 
@@ -213,7 +213,7 @@ Ordered, but lightweight. **No code before analysis.**
 
 1. **Analysis** — confirm the component doesn't already exist in `lib/`; if you're replacing a Quasar element, grep every usage/prop/slot/variant across `web/src/` and list them. The goal: enumerate every real visual pattern so the variant set covers them all.
 2. **Design** — from the analysis, define the minimal `variant`/`size`/state prop set (§5), scope the full family (§3), and write the `.types.ts` contract first. Every observed visual pattern must map to a named variant or be an intentionally dropped prop.
-3. **Implement** — write the `.vue` with `tw:` token utilities and the computed variant map; register any new tokens (§7); reach for `reka-ui` on ARIA-complex behavior (§4). Add a `data-test` (`<module>-<file>-<descriptor>`, kebab-case) to every interactive/key element.
+3. **Implement** — write the `.vue` with token utilities and the computed variant map; register any new tokens (§7); reach for `reka-ui` on ARIA-complex behavior (§4). Add a `data-test` (`<module>-<file>-<descriptor>`, kebab-case) to every interactive/key element.
 4. **Test** — write the `.spec.ts` (§10).
 5. **Validate** — run the checklist: no banned props, no px, no hex, no `var(--*)` in template, no `--o2-*`, family complete, dark mode reads correctly, a11y (keyboard + focus ring + ARIA) verified.
 
@@ -249,7 +249,7 @@ describe("OButton", () => {
 
   it("should apply the ghost variant classes", () => {
     const wrapper = mount(OButton, { props: { variant: "ghost" } });
-    expect(wrapper.classes().join(" ")).toContain("tw:bg-transparent");
+    expect(wrapper.classes().join(" ")).toContain("bg-transparent");
   });
 });
 ```
