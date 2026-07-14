@@ -164,7 +164,7 @@ function removeCookie(index: number) {
             data-test="synthetics-check-auth-network-username-input"
           />
           <div>
-            <label class="text-sm font-medium text-[var(--color-text-label)] mb-1 block">
+            <label class="text-sm font-medium text-[var(--color-text-body)] mb-1 block">
               {{ t('synthetics.authNetwork.password') }}
               <OBadge variant="default-soft" size="sm" class="ml-1">{{ t('synthetics.authNetwork.secret') }}</OBadge>
             </label>
@@ -182,7 +182,7 @@ function removeCookie(index: number) {
       <OSeparator />
 
       <div class="flex flex-col gap-3">
-        <h4 class="text-sm font-medium text-[var(--color-text-label)]">{{ t('synthetics.authNetwork.variables') }}</h4>
+        <h4 class="text-sm font-medium text-[var(--color-text-body)]">{{ t('synthetics.authNetwork.variables') }}</h4>
 
         <ul v-if="variables.length" class="flex flex-col gap-2">
           <li
@@ -255,7 +255,7 @@ function removeCookie(index: number) {
         <OSeparator />
 
         <div class="flex flex-col gap-3">
-          <h4 class="text-sm font-medium text-[var(--color-text-label)]">{{ t('synthetics.authNetwork.customHeaders') }}</h4>
+          <h4 class="text-sm font-medium text-[var(--color-text-body)]">{{ t('synthetics.authNetwork.customHeaders') }}</h4>
           <ul v-if="headers.length" class="flex flex-col gap-2">
             <li
               v-for="(header, index) in headers"
@@ -304,7 +304,7 @@ function removeCookie(index: number) {
         <OSeparator />
 
         <div class="flex flex-col gap-3">
-          <h4 class="text-sm font-medium text-[var(--color-text-label)]">{{ t('synthetics.authNetwork.preSetCookies') }}</h4>
+          <h4 class="text-sm font-medium text-[var(--color-text-body)]">{{ t('synthetics.authNetwork.preSetCookies') }}</h4>
           <ul v-if="cookies.length" class="flex flex-col gap-2">
             <li
               v-for="(cookie, index) in cookies"

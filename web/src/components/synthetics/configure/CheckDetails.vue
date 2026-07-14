@@ -122,7 +122,7 @@ function handleTagKeydown(event: KeyboardEvent) {
       />
 
       <div>
-        <label class="text-sm font-medium text-[var(--color-text-label)] mb-1 block">{{ t('synthetics.checkDetails.tags') }}</label>
+        <label class="text-sm font-medium text-[var(--color-text-body)] mb-1 block">{{ t('synthetics.checkDetails.tags') }}</label>
         <div class="flex items-center gap-2 mb-2">
           <OInput
             v-model="tagInput"

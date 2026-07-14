@@ -35,7 +35,7 @@ const screenshot = computed({
     <div class="px-3 py-2 flex flex-col gap-4">
 
       <div class="flex items-center gap-4">
-        <label class="text-sm font-medium text-[var(--color-text-label)] w-24 shrink-0">{{ t('synthetics.capture.screenshot') }}</label>
+        <label class="text-sm font-medium text-[var(--color-text-body)] w-24 shrink-0">{{ t('synthetics.capture.screenshot') }}</label>
         <OSelect
           v-model="screenshot"
           :options="captureOptions"
