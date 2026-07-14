@@ -83,7 +83,7 @@ function toggle(browserId: string, deviceId: string) {
 
 <template>
   <div
-    class="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-card-bg)] mb-4"
+    class="rounded-lg border border-[var(--color-border-default)] mb-4"
     data-test="synthetics-check-browser-devices"
   >
     <div class="flex items-center border-b border-[var(--color-border-default)] py-[10px] px-3">

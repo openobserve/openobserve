@@ -80,7 +80,7 @@ const silenceMinutes = computed({
 </script>
 
 <template>
-  <div class="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-card-bg)] mb-4">
+  <div class="rounded-lg border border-[var(--color-border-default)] mb-4">
     <div class="flex items-center border-b border-[var(--color-border-default)] py-[10px] px-3">
       <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-primary-600)]" />
       <h3 class="text-base font-semibold text-[var(--color-text-heading)]">
