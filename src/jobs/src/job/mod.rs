@@ -38,7 +38,6 @@ mod cipher;
 mod cloud;
 mod compactor;
 pub mod config_watcher;
-mod file_downloader;
 mod file_list_dump;
 pub(crate) mod files;
 mod flatten_compactor;
@@ -58,8 +57,10 @@ mod service_graph;
 mod session_cleanup;
 mod stats;
 
-pub use file_downloader::{download_from_node, queue_download};
-pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
+pub use crate::service::{
+    enrichment_table::geoip::MMDB_INIT_NOTIFIER,
+    file_downloader::{download_from_node, queue_download},
+};
 
 #[cfg(feature = "enterprise")]
 async fn patch_sre_readonly_alerts_incidents() {
@@ -812,7 +813,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(alert_manager::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(alert_grouping::process_expired_batches());
-    tokio::task::spawn(file_downloader::run());
+    tokio::task::spawn(crate::service::file_downloader::run());
     // Note: Service discovery extraction runs automatically during parquet file processing
     // See src/core/src/job/files/parquet.rs:queue_services_from_data_file for
     // implementation
