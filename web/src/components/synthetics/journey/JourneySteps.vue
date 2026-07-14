@@ -22,7 +22,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import { ACTION_LABELS, ACTION_ICONS } from "@/constants/synthetics";
 
 // ── Re-export StepDotState for consumers ──────────────────────────
 export type StepDotState = "pending" | "active" | "pass" | "fail" | "skip";
@@ -96,53 +96,14 @@ defineSlots<{
   empty: () => any;
 }>();
 
-// ── Action maps (reused from BrowserJourneyStep.vue) ──────────────
-type StepAction =
-  | "navigate"
-  | "click"
-  | "type"
-  | "select"
-  | "press"
-  | "hover"
-  | "scroll"
-  | "wait"
-  | "assert"
-  | "screenshot";
-
-const ACTION_ICON_MAP: Record<string, IconName> = {
-  navigate: "open-in-browser",
-  click: "ads-click",
-  type: "keyboard",
-  select: "checklist",
-  press: "keyboard",
-  hover: "touch-app",
-  scroll: "swap-vert",
-  wait: "hourglass-empty",
-  assert: "fact-check",
-  screenshot: "photo-camera",
-};
-
-const ACTION_LABEL_MAP: Record<string, string> = {
-  navigate: "Navigate",
-  click: "Click",
-  type: "Type",
-  select: "Select",
-  press: "Press",
-  hover: "Hover",
-  scroll: "Scroll",
-  wait: "Wait",
-  assert: "Assert",
-  screenshot: "Screenshot",
-};
-
-function actionIcon(row: TData): IconName {
+function actionIcon(row: TData): string {
   const action: string = row[props.actionKey] ?? "";
-  return (ACTION_ICON_MAP[action] as IconName) ?? "ads-click";
+  return ACTION_ICONS[action] ?? "ads-click";
 }
 
 function actionLabel(row: TData): string {
   const action: string = row[props.actionKey] ?? "";
-  return ACTION_LABEL_MAP[action] ?? action.charAt(0).toUpperCase() + action.slice(1);
+  return ACTION_LABELS[action] ?? action.charAt(0).toUpperCase() + action.slice(1);
 }
 
 function stepName(row: TData): string {

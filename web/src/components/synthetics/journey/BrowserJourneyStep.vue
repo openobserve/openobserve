@@ -2,8 +2,16 @@
 // Copyright 2026 OpenObserve Inc.
 import { computed, ref } from 'vue'
 import { copyToClipboard } from '@/utils/clipboard'
-import type { BrowserStep, StepAction, SelectorType, StepReplayResult, WireStep } from '@/types/synthetics'
-import type { IconName } from '@/lib/core/Icon/OIcon.icons'
+import type { BrowserStep, SelectorType, StepReplayResult, WireStep } from '@/types/synthetics'
+import {
+  ACTION_ICONS,
+  ACTION_LABELS,
+  SELECTOR_ACTIONS,
+  VALUE_ACTIONS,
+  VALUE_LABELS,
+  SELECTOR_TYPE_OPTIONS,
+  actionOptions,
+} from '@/constants/synthetics'
 
 /**
  * Replay status dot states.
@@ -43,58 +51,15 @@ const emit = defineEmits<{
   'retry-replay': []
 }>()
 
-// Action icon map — all values must be valid IconName keys
-const ACTION_ICON_MAP: Record<StepAction, IconName> = {
-  navigate: 'open-in-browser',
-  click: 'ads-click',
-  type: 'keyboard',
-  select: 'checklist',
-  press: 'keyboard',
-  hover: 'touch-app',
-  scroll: 'swap-vert',
-  wait: 'hourglass-empty',
-  assert: 'fact-check',
-  screenshot: 'photo-camera',
-}
-
-const ACTION_LABEL_MAP: Record<StepAction, string> = {
-  navigate: 'Navigate',
-  click: 'Click',
-  type: 'Type',
-  select: 'Select',
-  press: 'Press',
-  hover: 'Hover',
-  scroll: 'Scroll',
-  wait: 'Wait',
-  assert: 'Assert',
-  screenshot: 'Screenshot',
-}
-
-const ACTION_VALUE_LABEL_MAP: Record<string, string> = {
-  navigate: 'URL',
-  type: 'Text to type',
-  select: 'Option',
-  press: 'Key',
-  scroll: 'To (px or selector)',
-  wait: 'Duration (ms)',
-  assert: 'Expected',
-}
-
-const SELECTOR_ACTIONS: StepAction[] = ['click', 'type', 'select', 'hover', 'assert']
-const VALUE_ACTIONS: StepAction[] = ['navigate', 'type', 'select', 'press', 'scroll', 'wait', 'assert']
-
-const actionOptions = (Object.keys(ACTION_LABEL_MAP) as StepAction[]).map((a) => ({
-  label: ACTION_LABEL_MAP[a],
-  value: a,
-}))
-
-const selectorTypeOptions: { label: string; value: SelectorType }[] = [
-  { label: 'CSS', value: 'CSS' },
-  { label: 'XPath', value: 'XPath' },
-  { label: 'Text', value: 'Text' },
-  { label: 'TestID', value: 'TestID' },
-  { label: 'Role', value: 'Role' },
-]
+// ── Computed from shared constants ──────────────────────────────────
+const selectorTypeOptions = SELECTOR_TYPE_OPTIONS
+const actionIcon = computed(() => ACTION_ICONS[props.step.action])
+const actionLabel = computed(() => ACTION_LABELS[props.step.action])
+const displayName = computed(() => props.step.name || actionLabel.value)
+const selectorPreview = computed(() => props.step.selector || props.step.value || '')
+const showSelector = computed(() => SELECTOR_ACTIONS.includes(props.step.action))
+const showValue = computed(() => VALUE_ACTIONS.includes(props.step.action))
+const valueLabel = computed(() => VALUE_LABELS[props.step.action] || 'Value')
 
 function update(patch: Partial<BrowserStep>) {
   // Patch edited fields into wire instead of clearing it, so replay still has
@@ -112,18 +77,10 @@ function update(patch: Partial<BrowserStep>) {
   emit('update:step', { ...props.step, wire, ...patch })
 }
 
-const actionIcon = computed(() => ACTION_ICON_MAP[props.step.action])
-const actionLabel = computed(() => ACTION_LABEL_MAP[props.step.action])
-const displayName = computed(() => props.step.name || actionLabel.value)
-const selectorPreview = computed(() => props.step.selector || props.step.value || '')
-const showSelector = computed(() => SELECTOR_ACTIONS.includes(props.step.action))
-const showValue = computed(() => VALUE_ACTIONS.includes(props.step.action))
-const valueLabel = computed(() => ACTION_VALUE_LABEL_MAP[props.step.action] || 'Value')
-
 // Computed getters/setters for inline editor fields
 const actionComputed = computed({
   get: () => props.step.action,
-  set: (v: StepAction) => update({ action: v }),
+  set: (v: BrowserStep['action']) => update({ action: v }),
 })
 
 const nameComputed = computed({

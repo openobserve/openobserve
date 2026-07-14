@@ -14,6 +14,16 @@ import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue'
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import JourneySteps from './JourneySteps.vue'
+import {
+  ACTION_LABELS,
+  SELECTOR_ACTIONS as SELECTOR_ACTIONS_CONST,
+  VALUE_ACTIONS as VALUE_ACTIONS_CONST,
+  VALUE_LABELS,
+  SELECTOR_TYPE_OPTIONS,
+  actionOptions,
+  VALUE_WIDTH_MAP,
+  VALUE_TOOLTIP_MAP,
+} from '@/constants/synthetics'
 
 const props = defineProps<{
   modelValue: BrowserStep[]
@@ -316,50 +326,16 @@ function dotStateForRow(row: BrowserStep): StepDotState | undefined {
 }
 
 // ── Inline editor helpers ──────────────────────────────────────────────────
-const SELECTOR_ACTIONS: BrowserStep['action'][] = ['click', 'type', 'select', 'hover', 'assert']
-const VALUE_ACTIONS: BrowserStep['action'][] = ['navigate', 'type', 'select', 'press', 'scroll', 'wait', 'assert']
-const selectorActions = SELECTOR_ACTIONS
-const valueActions = VALUE_ACTIONS
-
-const ACTION_LABEL_MAP: Record<string, string> = {
-  navigate: 'Navigate', click: 'Click', type: 'Type', select: 'Select',
-  press: 'Press', hover: 'Hover', scroll: 'Scroll', wait: 'Wait',
-  assert: 'Assert', screenshot: 'Screenshot',
-}
-
-const VALUE_LABEL_MAP: Record<string, string> = {
-  navigate: 'URL', type: 'Text to type', select: 'Option', press: 'Key',
-  scroll: 'To (px or selector)', wait: 'Duration (ms)', assert: 'Expected',
-}
-
-const actionOptions = (Object.keys(ACTION_LABEL_MAP) as BrowserStep['action'][]).map((a) => ({
-  label: ACTION_LABEL_MAP[a],
-  value: a,
-}))
-
-const selectorTypeOptions = [
-  { label: 'CSS', value: 'CSS' },
-  { label: 'XPath', value: 'XPath' },
-  { label: 'Text', value: 'Text' },
-  { label: 'TestID', value: 'TestID' },
-  { label: 'Role', value: 'Role' },
-]
+const selectorActions = SELECTOR_ACTIONS_CONST
+const valueActions = VALUE_ACTIONS_CONST
+const selectorTypeOptions = SELECTOR_TYPE_OPTIONS
 
 function valueActionLabel(action: string): string {
-  return VALUE_LABEL_MAP[action] || 'Value'
-}
-
-const VALUE_WIDTH_MAP: Record<string, string> = {
-  wait: 'w-50!',
+  return VALUE_LABELS[action] || 'Value'
 }
 
 function valueWidthClass(action: string): string {
   return VALUE_WIDTH_MAP[action] || 'w-152!'
-}
-
-const VALUE_TOOLTIP_MAP: Record<string, string> = {
-  press: 'Press a keyboard key by its key name, e.g. "Enter", "Tab", "Escape", "ArrowDown".',
-  assert: 'Assertion expression, e.g. "text=Hello" or "visible" to check element visibility.',
 }
 
 function valueTooltip(action: string): string | undefined {
