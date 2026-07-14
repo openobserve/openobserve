@@ -34,6 +34,7 @@ const defaultObject = {
   runQuery: false,
   loading: false,
   loadingStream: false,
+  searchApplied: false,
 
   config: {
     splitterModel: 20,
@@ -87,6 +88,7 @@ const defaultObject = {
     serviceColors: {} as any,
     redirectedFromLogs: false,
     searchApplied: false,
+    lastRunAt: undefined as number | undefined,
     metricsRangeFilters: new Map<
       string,
       { panelTitle: string; start: number; end: number }

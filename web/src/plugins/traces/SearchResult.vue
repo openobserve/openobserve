@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="
           searchObj.data.stream.selectedStream.value &&
           !searchObj.data.errorMsg?.trim()?.length &&
-          (searchObj as any).searchApplied
+          searchObj.searchApplied
         "
         ref="sectionHeaderRef"
         data-test="traces-section-header"
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right: Refresh → Insights → rows per page → pagination (same sequence as logs) -->
         <div class="inline-flex items-center border border-[var(--o2-border-color)] rounded-md px-1 h-6 mr-1 overflow-hidden">
           <ORefreshButton
-            :last-run-at="(searchObj.meta as any).lastRunAt"
+            :last-run-at="searchObj.meta.lastRunAt"
             :loading="searchObj.loading"
             :disabled="searchObj.loading"
             @click="$emit('run-query')"
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-show="searchObj.meta.showHistogram"
             v-if="
               searchObj.data.stream.selectedStream.value &&
-              (searchObj as any).searchApplied
+              searchObj.searchApplied
             "
             ref="metricsDashboardRef"
             :streamName="searchObj.data.stream.selectedStream.value"
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :filter="searchObj.data.editorValue"
             :streamFields="searchObj.data.stream.selectedStreamFields"
             :show="
-              (searchObj as any).searchApplied &&
+              searchObj.searchApplied &&
               !searchObj.data.errorMsg?.trim()?.length
             "
             @time-range-selected="onMetricsTimeRangeSelected"
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             !!(
               searchObj.data.stream.selectedStream.value &&
               !searchObj.data.errorMsg?.trim()?.length &&
-              (searchObj as any).searchApplied
+              searchObj.searchApplied
             )
           "
           :current-page="searchObj.data.resultGrid.currentPage + 1"
@@ -321,8 +321,8 @@ export default defineComponent({
     watch(
       () => searchObj.loading,
       (loading, wasLoading) => {
-        if (wasLoading && !loading && (searchObj as any).searchApplied) {
-          (searchObj.meta as any).lastRunAt = Date.now();
+        if (wasLoading && !loading && searchObj.searchApplied) {
+          searchObj.meta.lastRunAt = Date.now();
         }
       },
     );

@@ -259,13 +259,13 @@ const filterReports = () => {
   // filter reports based on the selected tab
   // If reports are cached, show only cached reports
   if (scheduledActiveTab.value === "cached") {
-    formattedReports.value = (
-      scheduledReports.value as ScheduledDashboardReport[]
-    ).filter((report) => report.isCached);
+    formattedReports.value = scheduledReports.value.filter(
+      (report) => report.isCached,
+    );
   } else {
-    formattedReports.value = (
-      scheduledReports.value as ScheduledDashboardReport[]
-    ).filter((report) => !report.isCached);
+    formattedReports.value = scheduledReports.value.filter(
+      (report) => !report.isCached,
+    );
   }
 
   formattedReports.value = formattedReports.value.map(

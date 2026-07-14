@@ -645,7 +645,7 @@ export default defineComponent({
       return Object.entries(rowData.value).map(([field, value]) => ({
         _rowKey: "field_" + field,
         field,
-        value,
+        value: value as string | number | boolean,
       }));
     });
 

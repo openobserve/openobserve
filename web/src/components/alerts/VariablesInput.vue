@@ -108,7 +108,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 
 interface AlertVariable {
-  uuid: string;
+  uuid?: string;
+  id?: string;
   key: string;
   value: string;
 }

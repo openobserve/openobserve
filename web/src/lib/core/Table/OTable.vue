@@ -99,7 +99,7 @@ const columnIds = computed(() => props.columns.map((c) => c.id));
 //   "pageSize"  → match the table's pageSize (Stripe / Vercel style).
 //                 Skeleton fills the page; can feel excessive when the
 //                 real dataset turns out to be small.
-const SKELETON_ROW_STRATEGY: "fixed" | "pageSize" = "fixed";
+const SKELETON_ROW_STRATEGY = "fixed" as "fixed" | "pageSize";
 const FIXED_SKELETON_ROWS = 8;
 
 const skeletonRowCount = computed(() => {

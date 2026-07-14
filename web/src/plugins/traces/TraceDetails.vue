@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-center space-x-4 w-fit!">
             <!-- Back button -->
             <OButton
-              v-if="mode === 'standalone' && showBackButton"
+              v-if="isStandaloneMode && showBackButton"
               data-test="trace-details-back-btn"
               variant="ghost-muted"
               size="icon-xs"
@@ -328,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Apply filters button (standalone mode, right side) -->
             <OButton
-              v-if="mode === 'standalone' && areFiltersAdded"
+              v-if="isStandaloneMode && areFiltersAdded"
               data-test="trace-details-apply-filters-btn-right"
               variant="outline"
               size="xs"
@@ -357,7 +357,7 @@ size="xs"
 
             <!-- Share button (standalone mode) -->
             <share-button
-              v-if="mode === 'standalone' && showShareButton"
+              v-if="isStandaloneMode && showShareButton"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
               variant="outline"
@@ -367,7 +367,7 @@ size="xs"
 
             <!-- Close button -->
             <OButton
-              v-if="mode === 'standalone' && showCloseButton"
+              v-if="isStandaloneMode && showCloseButton"
               data-test="trace-details-close-btn"
               variant="ghost"
               size="icon-xs"
@@ -1280,6 +1280,7 @@ export default defineComponent({
 
     // ── Filter-from-trace-details state ──────────────────────────────────────
     const areFiltersAdded = ref(false);
+    const isStandaloneMode = computed(() => props.mode === "standalone");
     const showFilterPopover = ref(false);
     const filterDialogReady = ref(false);
     const localEditorValue = ref("");
@@ -2896,6 +2897,7 @@ export default defineComponent({
       handleDAGNodeClick,
       // Filter-from-trace-details
       areFiltersAdded,
+      isStandaloneMode,
       showFilterPopover,
       filterDialogReady,
       localEditorValue,

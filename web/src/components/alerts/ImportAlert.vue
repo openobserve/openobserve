@@ -245,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       valueKey="value"
                       @update:model-value="(val) => {
                         userSelectedOrgId[index] = val;
-                        updateOrgId((val as any)?.value || val, index);
+                        updateOrgId(((val as unknown as { value?: string })?.value || val) as string, index);
                       }"
                     />
                   </div>

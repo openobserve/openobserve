@@ -1506,9 +1506,9 @@ export default defineComponent({
       spanDetails.attrs.span_kind = getSpanKind(spanDetails.attrs.span_kind);
 
       try {
-        spanDetails.events = JSON.parse(props.span.events || "[]").map(
-          (event: any) => event,
-        );
+        spanDetails.events = JSON.parse(
+          (props.span.events as unknown as string) || "[]",
+        ).map((event: any) => event);
       } catch (_e: any) {
         console.log(_e);
         spanDetails.events = [];

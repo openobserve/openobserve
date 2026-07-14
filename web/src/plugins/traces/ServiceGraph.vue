@@ -1698,7 +1698,7 @@ export default defineComponent({
         const res = (await getStreams("traces", false, false)) as {
           list?: { name: string }[];
         };
-        if (res?.list?.length && res.list.length > 0) {
+        if (res?.list && res.list.length > 0) {
           availableStreams.value = res.list.map((stream) => stream.name);
         }
       } catch (e) {

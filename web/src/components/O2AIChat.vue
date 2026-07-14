@@ -5533,7 +5533,7 @@ export default defineComponent({
     ) => {
       // Show details for failed tools, successful tools with summary, tools with context data, or tools with response
       if (block.success === false) return true;
-      if (block.success !== false && block.summary) return true;
+      if (block.summary) return true;
       if (block.response) return true;
       return getToolCallDisplayData(block.context) !== null;
     };

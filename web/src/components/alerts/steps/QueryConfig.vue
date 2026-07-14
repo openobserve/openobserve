@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="shouldShowTabs" class="mb-2 flex items-center justify-between">
         <OToggleGroup
           :model-value="localTab"
-          @update:model-value="updateTab($event as string)"
+          @update:model-value="updateTab($event as 'sql' | 'promql' | 'custom')"
           data-test="step2-query-tabs"
         >
           <OToggleGroupItem
@@ -850,7 +850,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Query Editor Dialog -->
     <QueryEditorDialog
       v-model="viewSqlEditor"
-      :tab="localTab"
+      :tab="(localTab as 'sql' | 'promql')"
       :sqlQuery="localSqlQuery"
       :promqlQuery="localPromqlQuery"
       :vrlFunction="vrlFunctionContent"
@@ -1015,7 +1015,7 @@ export default defineComponent({
     const checkEveryFrequencyError = ref('');
     const promqlOperatorError = ref('');
     const promqlValueError = ref('');
-    const pendingTab = ref<string | null>(null);
+    const pendingTab = ref<"sql" | "promql" | "custom" | null>(null);
 
     // Field refs for focus manager
     const customPreviewRef = ref(null);
@@ -1572,7 +1572,7 @@ export default defineComponent({
       return props.isRealTime === "false";
     });
 
-    const updateTab = (tab: string) => {
+    const updateTab = (tab: "sql" | "promql" | "custom") => {
       const hasComparisonWindow = props.multiTimeRange?.length > 0;
 
       // Check if switching to custom or promql while multi-windows are present
