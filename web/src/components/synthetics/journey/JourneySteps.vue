@@ -296,7 +296,9 @@ function handleUpdateExpanded(ids: string[]) {
         </span>
 
         <!-- Action label badge -->
-        <OBadge variant="default" size="sm">{{ actionLabel(row) }}</OBadge>
+        <div class="w-24!">
+            <OBadge variant="default" size="sm">{{ actionLabel(row) }}</OBadge>
+        </div>
 
         <!-- Step display name -->
         <span class="text-sm text-[var(--o2-text-body)] flex-1 truncate min-w-0">
