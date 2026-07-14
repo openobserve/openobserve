@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   renderer.
 -->
 <template>
-  <div ref="chartPanelRef" class="metric-card-chart">
+  <div ref="chartPanelRef" class="w-full h-full">
     <ChartRenderer
       v-if="chartData.options"
       :data="chartData"
@@ -343,10 +343,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.metric-card-chart {
-  width: 100%;
-  height: 100%;
-}
-</style>

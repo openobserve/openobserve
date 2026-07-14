@@ -310,12 +310,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex-1 min-w-0 overflow-y-auto p-3"
         data-test="metrics-explorer-scroll"
       >
-        <div v-if="grid.loading.value" class="explorer-state">
+        <div v-if="grid.loading.value" class="flex flex-col items-center justify-center gap-2.5 h-3/5 opacity-80">
           <OSpinner size="lg" />
           <span>{{ t("metrics.explorer.loading") }}</span>
         </div>
 
-        <div v-else-if="grid.loadError.value" class="explorer-state">
+        <div v-else-if="grid.loadError.value" class="flex flex-col items-center justify-center gap-2.5 h-3/5 opacity-80">
           <OIcon name="error-outline" size="lg" class="text-error-600" />
           <span>{{ grid.loadError.value }}</span>
           <OButton
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
 
-        <div v-else-if="!grid.cards.value.length" class="explorer-state">
+        <div v-else-if="!grid.cards.value.length" class="flex flex-col items-center justify-center gap-2.5 h-3/5 opacity-80">
           <OIcon name="show-chart" size="lg" />
           <span>{{ t("metrics.explorer.noMetrics") }}</span>
           <a
@@ -1400,14 +1400,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.explorer-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  height: 60%;
-  opacity: 0.8;
-}
-</style>
