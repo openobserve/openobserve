@@ -15,11 +15,16 @@ permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   update-sbom:
     name: Regenerate SBOMs
     runs-on:
       labels: ubicloud-standard-8
+    timeout-minutes: 30
 
     steps:
       - name: Clone the current repo
@@ -42,6 +47,14 @@ jobs:
           BRANCH_NAME="automated/sbom-update-$(date +%Y%m%d)"
           git checkout -b "$BRANCH_NAME"
           echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-05-20
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
       - name: Regenerate Rust SBOM
         run: |
@@ -105,7 +118,7 @@ jobs:
             --body-file /tmp/pr_body.md \
             --base main \
             --head "$BRANCH_NAME" \
-            --label "automated"
+            --label "auto-generated"
 
       - name: No changes needed
         if: steps.check.outputs.has_changes == 'false'
