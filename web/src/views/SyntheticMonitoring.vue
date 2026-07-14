@@ -1,18 +1,18 @@
 <template>
-  <div class="syn-root">
+  <div class="flex flex-col h-full overflow-hidden relative">
 
     <!-- PAGE HEADER -->
-    <div class="syn-page-header">
-      <div class="syn-page-title-wrap">
-        <div class="syn-page-icon">
+    <div class="flex items-center justify-between px-5 py-3 border-b border-border-default shrink-0 bg-surface-base">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-primary-600 dark:bg-white/10 bg-black/5">
           <OIcon name="radar" size="md" />
         </div>
         <div>
-          <div class="syn-title">Synthetic Checks</div>
-          <div class="syn-sub">Proactively monitor uptime, performance, and user journeys from global locations</div>
+          <div class="text-sm font-bold leading-tight">Synthetic Checks</div>
+          <div class="text-xs text-text-secondary mt-px">Proactively monitor uptime, performance, and user journeys from global locations</div>
         </div>
       </div>
-      <div class="syn-hdr-actions">
+      <div class="flex items-center gap-2.5">
         <OButton v-if="false" variant="ghost" size="sm" :class="{ 'geo-hdr-btn--alert': geoIssues.length }" @click="showIssuesModal = true">
           <template #icon-left><OIcon :name="geoIssues.length ? 'error' : 'check-circle'" size="xs" /></template>
           Active Issues
@@ -29,9 +29,9 @@
     </div>
 
     <!-- CONTENT AREA: sidebar + main -->
-    <div class="syn-content">
+    <div class="flex flex-1 overflow-hidden">
       <!-- LEFT SIDEBAR: folder navigation -->
-      <div class="syn-sidebar">
+      <div class="w-[14.375rem] shrink-0 border-r border-border-default overflow-y-auto">
         <FolderList
           type="synthetics"
           data-test="synthetic-monitoring-folder-list"
@@ -40,9 +40,9 @@
       </div>
 
       <!-- RIGHT MAIN: filter bar + table -->
-      <div class="syn-main">
+      <div class="flex-1 flex flex-col overflow-hidden min-w-0">
         <!-- Tab switcher (only visible when multi-type tests are enabled) -->
-        <div v-if="areMultiTypeTestEnabled" class="flex items-center gap-2 px-3 py-2 border-b border-[var(--o2-border-color)]">
+        <div v-if="areMultiTypeTestEnabled" class="flex items-center gap-2 px-3 py-2 border-b border-border-default">
           <OToggleGroup
             :model-value="activeTab"
             @update:model-value="(v) => { activeTab = v as string }"
@@ -52,7 +52,7 @@
             </OToggleGroupItem>
           </OToggleGroup>
           <template v-if="activeTab === 'private'">
-            <div class="tw:flex-1" />
+            <div class="flex-1" />
             <OButton variant="primary">
               <template #icon-left><OIcon name="add" size="sm" /></template>
               Add Location
@@ -93,8 +93,8 @@
                   @update:model-value="(v) => { statusFilter = v as string }"
                 >
                   <OToggleGroupItem v-for="s in statusTabs" :key="s.filter" :value="s.filter" size="sm">
-                    <span v-if="s.filter !== 'all'" class="syn-pill-dot" :class="'sdot-' + s.filter.toLowerCase()" />
-                    {{ s.label }} <span class="syn-pill-count">{{ s.count }}</span>
+                    <span v-if="s.filter !== 'all'" class="w-1.5 h-1.5 rounded-full shrink-0" :class="dotClass(s.filter)" />
+                    {{ s.label }} <span class="text-[0.6875rem] font-bold">{{ s.count }}</span>
                   </OToggleGroupItem>
                 </OToggleGroup>
               </template>
@@ -145,7 +145,7 @@
             <OButton
               variant="outline"
               size="icon-sm"
-              class="tw:w-12!"
+              class="w-12!"
               icon-left="refresh"
               :loading="loading"
               title="Refresh"
@@ -168,74 +168,79 @@
     <!-- Map dot tooltip -->
     <Teleport to="body">
       <div v-if="mapTip.show && mapTip.stat"
-        class="map-dot-tip"
+        class="fixed z-[9999] px-3 py-2.5 bg-gray-800 text-gray-100 rounded-xl text-xs min-w-[10.625rem] pointer-events-auto shadow-lg"
         :style="{ left: mapTip.x + 'px', top: mapTip.y + 'px' }"
         @mouseenter="keepMapTip"
         @mouseleave="hideMapTip">
-        <div class="stt-header">
-          <span class="stt-time">{{ mapTip.stat.flag }} {{ mapTip.stat.label }}</span>
-          <span class="stt-badge" :class="'stt-badge--'+mapTip.stat.health">
+        <div class="flex items-center justify-between gap-2.5 mb-1.5">
+          <span class="text-[0.6875rem] opacity-65 whitespace-nowrap">{{ mapTip.stat.flag }} {{ mapTip.stat.label }}</span>
+          <span class="text-[0.6875rem] font-bold px-2 py-0.5 rounded whitespace-nowrap"
+            :class="{
+              'bg-status-success-bg/70 text-status-success-text': mapTip.stat.health === 'up',
+              'bg-status-error-bg/70 text-status-error-text': mapTip.stat.health === 'down',
+              'bg-status-warning-bg/70 text-status-warning-text': mapTip.stat.health === 'deg',
+            }">
             {{ mapTip.stat.health === 'up' ? '✓ Healthy' : mapTip.stat.health === 'down' ? '✗ Outage' : '⚠ Degraded' }}
           </span>
         </div>
-        <div class="stt-divider"/>
-        <div class="map-tip-row"><span>Uptime</span><span class="map-tip-val">{{ mapTip.stat.uptime }}%</span></div>
-        <div class="map-tip-row"><span>Checks</span><span class="map-tip-val">{{ mapTip.stat.total }}</span></div>
-        <div v-if="mapTip.stat.downCt" class="map-tip-row"><span>Down</span><span class="map-tip-val c-r">{{ mapTip.stat.downCt }}</span></div>
-        <div v-if="mapTip.stat.degCt" class="map-tip-row"><span>Degraded</span><span class="map-tip-val c-a">{{ mapTip.stat.degCt }}</span></div>
-        <div class="map-tip-row"><span>City</span><span class="map-tip-val">{{ mapTip.stat.city }}</span></div>
+        <hr class="border-white/10 mb-2" />
+        <div class="flex justify-between gap-4 mt-1 text-[0.6875rem]"><span>Uptime</span><span class="font-semibold">{{ mapTip.stat.uptime }}%</span></div>
+        <div class="flex justify-between gap-4 mt-1 text-[0.6875rem]"><span>Checks</span><span class="font-semibold">{{ mapTip.stat.total }}</span></div>
+        <div v-if="mapTip.stat.downCt" class="flex justify-between gap-4 mt-1 text-[0.6875rem]"><span>Down</span><span class="font-semibold text-status-error-text">{{ mapTip.stat.downCt }}</span></div>
+        <div v-if="mapTip.stat.degCt" class="flex justify-between gap-4 mt-1 text-[0.6875rem]"><span>Degraded</span><span class="font-semibold text-status-warning-text">{{ mapTip.stat.degCt }}</span></div>
+        <div class="flex justify-between gap-4 mt-1 text-[0.6875rem]"><span>City</span><span class="font-semibold">{{ mapTip.stat.city }}</span></div>
       </div>
     </Teleport>
 
     <!-- Full Heatmap Modal -->
     <ODialog v-model:open="showHeatmapModal" title="Global Health Heatmap" :width="94">
       <template #header-right>
-        <div class="geo-modal-legend">
-          <span class="geo-leg-item"><span class="geo-leg-dot geo-leg-dot--up" /><span>Healthy</span></span>
-          <span class="geo-leg-item"><span class="geo-leg-dot geo-leg-dot--deg" /><span>Degraded</span></span>
-          <span class="geo-leg-item"><span class="geo-leg-dot geo-leg-dot--dn" /><span>Down</span></span>
+        <div class="flex items-center gap-3 ml-2 flex-1">
+          <span class="flex items-center gap-1.5 text-[0.6875rem] text-text-secondary"><span class="inline-block w-2 h-2 rounded-full shrink-0 bg-status-success-text" /><span>Healthy</span></span>
+          <span class="flex items-center gap-1.5 text-[0.6875rem] text-text-secondary"><span class="inline-block w-2 h-2 rounded-full shrink-0 bg-status-warning-text" /><span>Degraded</span></span>
+          <span class="flex items-center gap-1.5 text-[0.6875rem] text-text-secondary"><span class="inline-block w-2 h-2 rounded-full shrink-0 bg-status-error-text" /><span>Down</span></span>
         </div>
       </template>
-      <div class="geo-modal-body">
-        <div ref="heatmapChartEl" class="geo-echarts-map"></div>
+      <div class="flex-none h-[clamp(22.5rem,46vw,33.75rem)] overflow-hidden p-0">
+        <div ref="heatmapChartEl" class="w-full h-full"></div>
       </div>
     </ODialog>
 
     <!-- Active Issues Modal -->
     <ODialog v-model:open="showIssuesModal" size="sm">
       <template #header>
-        <OIcon :name="geoIssues.length ? 'error' : 'check-circle'" size="sm" :class="geoIssues.length ? 'c-r' : 'c-g'"/>
-        <span class="tw:text-base tw:font-semibold">Active Issues</span>
+        <OIcon :name="geoIssues.length ? 'error' : 'check-circle'" size="sm" :class="geoIssues.length ? 'text-status-error-text' : 'text-status-success-text'"/>
+        <span class="text-base font-semibold">Active Issues</span>
       </template>
-      <div class="issues-body">
+      <div class="flex-1 overflow-y-auto">
         <!-- All clear -->
         <template v-if="!geoIssues.length">
-          <div class="issues-clear">
-            <OIcon name="check-circle" size="lg" class="c-g"/>
-            <div style="font-weight:600;margin-top:8px">All regions healthy</div>
-            <div style="font-size:12px;color:var(--o2-tab-text-color);margin-top:4px">No active issues detected across all monitoring locations.</div>
+          <div class="flex flex-col items-center justify-center py-12 px-6 text-center">
+            <OIcon name="check-circle" size="lg" class="text-status-success-text"/>
+            <div class="font-semibold mt-2">All regions healthy</div>
+            <div class="text-xs text-text-secondary mt-1">No active issues detected across all monitoring locations.</div>
           </div>
         </template>
         <!-- Issue rows -->
         <template v-else>
-          <div v-if="geoLocStats.filter(s=>s.health!=='up').length >= 2" class="issues-banner">
+          <div v-if="geoLocStats.filter(s=>s.health!=='up').length >= 2" class="flex items-center gap-2 mx-4 mt-3 px-3 py-2 bg-status-warning-bg text-status-warning-text rounded-lg text-xs">
             <OIcon name="warning-amber" size="sm"/> {{ geoLocStats.filter(s=>s.health!=='up').length }} regions simultaneously affected — possible CDN or upstream incident
           </div>
-          <div class="issues-list">
-            <div v-for="issue in geoIssues" :key="issue.key" class="issues-row" :class="'issues-row--'+issue.level">
-              <div class="issues-row-left">
-                <span class="issues-dot" :class="issue.level==='error'?'issues-dot--down':'issues-dot--deg'"/>
+          <div class="px-4 pb-4 pt-2 flex flex-col gap-1.5">
+            <div v-for="issue in geoIssues" :key="issue.key" class="flex items-center justify-between px-3.5 py-3 rounded-xl border border-border-default" :class="issue.level==='error'?'bg-status-error-bg/5 border-status-error-text/20':'bg-status-warning-bg/5 border-status-warning-text/20'">
+              <div class="flex items-center gap-2.5">
+                <span class="w-2.5 h-2.5 rounded-full shrink-0" :class="issue.level==='error'?'bg-status-error-text':'bg-status-warning-text'"/>
                 <div>
-                  <div class="issues-loc">{{ issue.stat.flag }} {{ issue.stat.label }}</div>
-                  <div class="issues-city">{{ issue.stat.city }}</div>
+                  <div class="text-[0.8125rem] font-semibold">{{ issue.stat.flag }} {{ issue.stat.label }}</div>
+                  <div class="text-[0.6875rem] text-text-secondary mt-px">{{ issue.stat.city }}</div>
                 </div>
               </div>
-              <div class="issues-row-right">
-                <span class="issues-badge" :class="issue.level==='error'?'issues-badge--down':'issues-badge--deg'">
+              <div class="flex flex-col items-end gap-0.5">
+                <span class="text-[0.625rem] font-bold px-2 py-0.5 rounded-md whitespace-nowrap" :class="issue.level==='error'?'bg-status-error-bg text-status-error-text':'bg-status-warning-bg text-status-warning-text'">
                   {{ issue.level==='error' ? issue.stat.downCt + ' down' : issue.stat.degCt + ' degraded' }}
                 </span>
-                <div class="issues-uptime" :class="issue.level==='error'?'c-r':'c-a'">{{ issue.stat.uptime }}% uptime</div>
-                <div class="issues-total">{{ issue.stat.total }} checks</div>
+                <div class="text-xs font-bold" :class="issue.level==='error'?'text-status-error-text':'text-status-warning-text'">{{ issue.stat.uptime }}% uptime</div>
+                <div class="text-[0.625rem] text-text-secondary">{{ issue.stat.total }} checks</div>
               </div>
             </div>
           </div>
@@ -264,7 +269,7 @@
       @click:primary="saveDuplicate"
       @click:secondary="showDuplicateDialog = false"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:py-1">
+      <div class="flex flex-col gap-3 py-1">
         <OInput
           v-model="duplicateName"
           label="Name"
@@ -292,7 +297,7 @@
       @click:primary="bulkDeleteMonitors"
       @click:secondary="showBulkDeleteConfirm = false"
     >
-      <p class="tw:py-2">
+      <p class="py-2">
         Are you sure you want to delete {{ selectedMonitorIds.length }} monitor{{ selectedMonitorIds.length !== 1 ? 's' : '' }}? This action cannot be undone.
       </p>
     </ODialog>
@@ -408,6 +413,21 @@ function mapMonitor(m: ApiMonitor) {
 }
 
 type DisplayMonitor = ReturnType<typeof mapMonitor>
+
+function dotClass(status: string) {
+  const lower = status.toLowerCase()
+  return {
+    'bg-status-success-text': lower === 'up',
+    'bg-status-warning-text': lower === 'degraded',
+    'bg-status-error-text': lower === 'down',
+    'bg-text-muted': lower === 'unknown',
+  }
+}
+
+function cssVar(name: string, fallback: string): string {
+  if (typeof window === "undefined") return fallback;
+  return getComputedStyle(document.body).getPropertyValue(name).trim() || fallback;
+}
 
 // ── Data loading ───────────────────────────────────────────────────────
 // Start in loading state so the table shows the skeleton on first render
@@ -594,11 +614,21 @@ let heatmapChart: echarts.ECharts | null = null;
 let worldGeoRegistered = false;
 
 const getHeatmapOption = () => {
-  const isDark = document.body.classList.contains("body--dark");
-  const landColor   = isDark ? "#1d2f3f" : "#cdd5ae";
-  const borderCol   = isDark ? "#2d4560" : "#9faa80";
-  const oceanBg     = isDark ? "#0d1b2a" : "#c2ddf0";
-  const labelColor  = isDark ? "#cbd5e1" : "#334155";
+  // Read the theme so token colors are re-resolved when it flips.
+  void store.state.theme;
+  const landColor   = cssVar("--color-surface-subtle", "#e2e8f0");
+  const borderCol   = cssVar("--color-border-default", "#cbd5e1");
+  const oceanBg     = cssVar("--color-surface-base", "#f8fafc");
+  const labelColor  = cssVar("--color-text-primary", "#334155");
+  const upColor     = cssVar("--color-status-success-text", "#22c55e");
+  const downColor   = cssVar("--color-status-error-text", "#ef4444");
+  const degColor    = cssVar("--color-status-warning-text", "#f59e0b");
+  const upShadow    = cssVar("--color-status-success-text", "rgba(34,197,94,0.5)");
+  const downShadow  = cssVar("--color-status-error-text", "rgba(239,68,68,0.5)");
+  const degShadow   = cssVar("--color-status-warning-text", "rgba(245,158,11,0.5)");
+  const tooltipBg   = cssVar("--color-surface-overlay", "#ffffff");
+  const tooltipBorder = cssVar("--color-border-default", "#e2e8f0");
+  const labelBorderColor = cssVar("--color-surface-overlay", "#ffffff");
   return {
     backgroundColor: oceanBg,
     geo: {
@@ -618,12 +648,12 @@ const getHeatmapOption = () => {
       formatter: (params: any) => {
         if (!params.data) return "";
         const d = params.data;
-        const col = d.health === "up" ? "#22c55e" : d.health === "down" ? "#ef4444" : "#f59e0b";
+        const col = d.health === "up" ? upColor : d.health === "down" ? downColor : degColor;
         const label = d.health === "up" ? "Healthy" : d.health === "down" ? "Outage" : "Degraded";
         return `<div style="font-size:12px;line-height:1.7"><b>${d.flag} ${d.name}</b><br/><span style="color:${col}">${label}</span><br/>Uptime: ${d.uptime}%<br/>Checks: ${d.total}</div>`;
       },
-      backgroundColor: isDark ? "#1e2d3d" : "#ffffff",
-      borderColor:     isDark ? "#2d4560" : "#e2e8f0",
+      backgroundColor: tooltipBg,
+      borderColor: tooltipBorder,
       textStyle: { color: labelColor },
     },
     series: [{
@@ -640,11 +670,11 @@ const getHeatmapOption = () => {
         flag: s.flag,
       })),
       itemStyle: {
-        color: (params: any) => params.data.health === "up" ? "#22c55e" : params.data.health === "down" ? "#ef4444" : "#f59e0b",
+        color: (params: any) => params.data.health === "up" ? upColor : params.data.health === "down" ? downColor : degColor,
         borderColor: "rgba(255,255,255,0.8)",
         borderWidth: 2,
         shadowBlur: 12,
-        shadowColor: (params: any) => params.data.health === "up" ? "rgba(34,197,94,0.5)" : params.data.health === "down" ? "rgba(239,68,68,0.5)" : "rgba(245,158,11,0.5)",
+        shadowColor: (params: any) => params.data.health === "up" ? upShadow : params.data.health === "down" ? downShadow : degShadow,
       },
       label: {
         show: true,
@@ -654,7 +684,7 @@ const getHeatmapOption = () => {
         fontSize: 10,
         fontWeight: 600,
         color: labelColor,
-        textBorderColor: isDark ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.8)",
+        textBorderColor: labelBorderColor,
         textBorderWidth: 2,
       },
     }],
@@ -880,77 +910,3 @@ async function deleteMonitor(m: any) {
 }
 </script>
 
-<style scoped>
-/* ── ROOT — no hardcoded fallback colors; inherit dark/light from Quasar ── */
-.syn-root { display:flex; flex-direction:column; height:100%; overflow:hidden; position:relative; }
-
-/* ── PAGE HEADER ── */
-.syn-page-header     { display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid var(--o2-border-color); flex-shrink:0; background:var(--o2-card-background); }
-.syn-hdr-actions     { display:flex; align-items:center; gap:10px; }
-.syn-page-title-wrap { display:flex; align-items:center; gap:12px; }
-.syn-page-icon       { width:36px; height:36px; border-radius:9px; background:rgba(0,0,0,.07); display:flex; align-items:center; justify-content:center; flex-shrink:0; color: var(--o2-primary-color); }
-.body--dark .syn-page-icon { background:rgba(255,255,255,.1); }
-.syn-title           { font-size:14px; font-weight:700; line-height:1.2; }
-.syn-sub             { font-size:12px; color:var(--o2-tab-text-color); margin-top:1px; }
-
-/* ── CONTENT AREA ── */
-.syn-content { display:flex; flex:1; overflow:hidden; }
-.syn-sidebar { width:230px; flex-shrink:0; border-right:1px solid var(--o2-border-color); overflow-y:auto; }
-.syn-main    { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
-
-.syn-pill-count      { font-size:11px; font-weight:700; }
-.syn-pill-dot    { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
-.sdot-up         { background:#22c55e; }
-.sdot-degraded   { background:#f59e0b; }
-.sdot-down       { background:#ef4444; }
-.sdot-unknown    { background:#94a3b8; }
-
-/* ── COLOR HELPERS ── */
-.c-g { color:#15803d; } .body--dark .c-g { color:#4ade80; }
-.c-a { color:#d97706; } .body--dark .c-a { color:#fbbf24; }
-.c-r { color:#dc2626; } .body--dark .c-r { color:#f87171; }
-
-/* ── GEO MAP HEADER BUTTONS ── */
-.geo-hdr-btn--alert { border-color:rgba(239,68,68,.4); color:#dc2626; }
-.body--dark .geo-hdr-btn--alert { color:#f87171; border-color:rgba(239,68,68,.35); }
-.geo-hdr-badge { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; border-radius:9px; background:#ef4444; color:#fff; font-size:10px; font-weight:700; padding:0 4px; margin-left:2px; }
-
-/* ── GEO HEATMAP MODAL ── */
-.geo-echarts-map { width:100%; height:100%; }
-.geo-modal-legend { display:flex; align-items:center; gap:12px; margin-left:8px; flex:1; }
-.geo-leg-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--o2-tab-text-color); }
-.geo-leg-dot { display:inline-block; width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-.geo-leg-dot--up  { background: #22c55e; }
-.geo-leg-dot--deg { background: #f59e0b; }
-.geo-leg-dot--dn  { background: #ef4444; }
-.geo-modal-body { flex:none; height:clamp(360px,46vw,540px); overflow:hidden; padding:0; }
-
-/* ── MAP DOT FLOATING TOOLTIP ── */
-.map-dot-tip { position:fixed; z-index:9999; padding:10px 12px; background:#1e293b; color:#f1f5f9; border-radius:9px; font-size:12px; min-width:170px; pointer-events:auto; box-shadow:0 8px 24px rgba(0,0,0,.35); }
-.map-tip-row { display:flex; justify-content:space-between; gap:16px; margin-top:4px; font-size:11px; }
-.map-tip-val { font-weight:600; }
-
-/* ── ISSUES MODAL ── */
-.issues-body { flex:1; overflow-y:auto; }
-.issues-clear { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:48px 24px; text-align:center; }
-.issues-banner { display:flex; align-items:center; gap:8px; margin:12px 16px 0; padding:8px 12px; background:rgba(245,158,11,.1); border-radius:8px; font-size:12px; color:#d97706; }
-.body--dark .issues-banner { color:#fbbf24; background:rgba(245,158,11,.12); }
-.issues-list { padding:8px 16px 16px; display:flex; flex-direction:column; gap:6px; }
-.issues-row { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-radius:10px; border:1px solid var(--o2-border-color); }
-.issues-row--error { background:rgba(239,68,68,.04); border-color:rgba(239,68,68,.2); }
-.issues-row--warn  { background:rgba(245,158,11,.04); border-color:rgba(245,158,11,.2); }
-.issues-row-left { display:flex; align-items:center; gap:10px; }
-.issues-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
-.issues-dot--down { background:#ef4444; box-shadow:0 0 6px rgba(239,68,68,.6); }
-.issues-dot--deg  { background:#f59e0b; box-shadow:0 0 6px rgba(245,158,11,.6); }
-.issues-loc  { font-size:13px; font-weight:600; }
-.issues-city { font-size:11px; color:var(--o2-tab-text-color); margin-top:1px; }
-.issues-row-right { display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
-.issues-badge { font-size:10px; font-weight:700; padding:2px 8px; border-radius:5px; white-space:nowrap; }
-.issues-badge--down { background:rgba(239,68,68,.12); color:#dc2626; }
-.issues-badge--deg  { background:rgba(245,158,11,.12); color:#d97706; }
-.body--dark .issues-badge--down { color:#f87171; }
-.body--dark .issues-badge--deg  { color:#fbbf24; }
-.issues-uptime { font-size:12px; font-weight:700; }
-.issues-total  { font-size:10px; color:var(--o2-tab-text-color); }
-</style>
