@@ -309,9 +309,10 @@ screen on the same rhythm: `gap-2` = 0.5rem, `gap-4` = 1rem, `gap-5` = 1.25rem,
 - Headers use `AppPageHeader` — no custom title styling.
 - Table columns: left-align text, center-align toggles/badges/counts (via the
   column `meta.align`).
-- **No unnecessary backgrounds.** Don't wrap the table in a card or a
-  `bg-*` div — `OTable` owns its own frame and row hover. A parent background
-  just double-frames it.
+- **No border or background around the table.** The table renders flush — no
+  outer box. Pass `:frame="false"` on the `<OTable>` (its default, but be
+  explicit) and don't wrap it in a bordered or `bg-*` card. A parent border or
+  background double-frames it. See the **Tables → OTable** rule below for detail.
 - Search + refresh + new: group in the header `#actions` slot with
   `class="flex items-center gap-2"`. Never wrap the search input in its own card.
 
@@ -565,6 +566,15 @@ left) — never reintroduce one.
 - For user-facing lists, set `persist-columns` + a stable `tableId` so column
   sizing/visibility survive reloads. Custom rendering goes through the `#cell`
   slot; an actions column is an `isAction` column rendering O2 buttons.
+- **No outer border/frame.** A listing table renders **flush** — no box border
+  around it. `OTable`'s `frame` defaults to `false`, so a plain `<OTable>` is
+  already borderless; row-bottom dividers (`bordered`, default on) stay for
+  readability. Pass `:frame="false"` **explicitly** on listing tables to lock the
+  intent (the prop's doc-comment still says "default true", so being explicit
+  guards against drift). Only set `:frame="true"` for a table deliberately boxed
+  inside a card. And **never wrap the table in a bordered or `bg-*` container** —
+  that double-frames it. If you see a border "around" the table, remove the
+  parent's border/background; don't reach for a frame.
 
 **Why.** One table component means one behavior for sort, resize, pin, empty,
 loading, streaming, and dark mode. A hand-built `<table>` or a fresh `q-table`
