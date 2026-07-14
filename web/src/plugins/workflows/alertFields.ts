@@ -16,10 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Fields available to a workflow Condition. A workflow has no upstream stream
 // node (unlike a pipeline), so conditions branch on the fired-alert payload.
-// These mirror the canonical alert template variables
-// (see composables/alerts/useTemplatePreview.ts). The Condition form passes
-// them to FilterGroup as suggestions with `allow-custom-columns`, so users can
-// still type any field the payload carries (e.g. a stream field or label).
+// The backend flattens the `{ meta: {...} }` envelope, so the alert fields are
+// exposed to conditions as `meta_<field>` (e.g. `meta.alert_name` → the column
+// `meta_alert_name`) — confirmed with the backend. The Condition form passes
+// these to FilterGroup as suggestions with `allow-custom-columns`, so users can
+// still type any other flattened field the payload carries (e.g. a `data[]` row
+// column).
 
 export interface WorkflowFieldOption {
   label: string;
@@ -63,18 +65,21 @@ export const TRIGGER_META_VARS: TriggerOutputVar[] = [
   { ref: "meta.alert_end_time", type: "datetime", descKey: "workflow.triggerMeta.alertEndTime" },
 ];
 
+// All fields are `Utf8` for now — the flattened `meta` block is a string:string
+// map at this stage, so even numeric-looking fields (threshold/count/period,
+// timestamps) are exposed as strings. Revisit once the backend types the columns.
 export const ALERT_PAYLOAD_FIELDS: WorkflowFieldOption[] = [
-  { label: "alert_name", value: "alert_name", type: "Utf8" },
-  { label: "alert_type", value: "alert_type", type: "Utf8" },
-  { label: "alert_operator", value: "alert_operator", type: "Utf8" },
-  { label: "alert_threshold", value: "alert_threshold", type: "Int64" },
-  { label: "alert_count", value: "alert_count", type: "Int64" },
-  { label: "alert_period", value: "alert_period", type: "Int64" },
-  { label: "stream_name", value: "stream_name", type: "Utf8" },
-  { label: "stream_type", value: "stream_type", type: "Utf8" },
-  { label: "org_name", value: "org_name", type: "Utf8" },
-  { label: "alert_start_time", value: "alert_start_time", type: "Utf8" },
-  { label: "alert_end_time", value: "alert_end_time", type: "Utf8" },
-  { label: "alert_trigger_time", value: "alert_trigger_time", type: "Utf8" },
-  { label: "alert_url", value: "alert_url", type: "Utf8" },
+  { label: "meta_alert_name", value: "meta_alert_name", type: "Utf8" },
+  { label: "meta_alert_type", value: "meta_alert_type", type: "Utf8" },
+  { label: "meta_alert_operator", value: "meta_alert_operator", type: "Utf8" },
+  { label: "meta_alert_threshold", value: "meta_alert_threshold", type: "Utf8" },
+  { label: "meta_alert_count", value: "meta_alert_count", type: "Utf8" },
+  { label: "meta_alert_period", value: "meta_alert_period", type: "Utf8" },
+  { label: "meta_stream_name", value: "meta_stream_name", type: "Utf8" },
+  { label: "meta_stream_type", value: "meta_stream_type", type: "Utf8" },
+  { label: "meta_org_name", value: "meta_org_name", type: "Utf8" },
+  { label: "meta_alert_start_time", value: "meta_alert_start_time", type: "Utf8" },
+  { label: "meta_alert_end_time", value: "meta_alert_end_time", type: "Utf8" },
+  { label: "meta_alert_trigger_time", value: "meta_alert_trigger_time", type: "Utf8" },
+  { label: "meta_alert_url", value: "meta_alert_url", type: "Utf8" },
 ];

@@ -58,10 +58,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
               <span>{{ t("workflow.node.conditionNoteCustom") }}</span>
             </div>
-            <div class="tw:flex tw:items-start tw:gap-2">
-              <OIcon name="filter-alt" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-[#4f6bed]" />
-              <span>{{ t("workflow.node.conditionNoteFilter") }}</span>
-            </div>
           </div>
         </div>
       </template>
