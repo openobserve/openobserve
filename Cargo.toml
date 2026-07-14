@@ -23,14 +23,15 @@ publish = false
 
 [features]
 default = []
-enterprise = ["openobserve-core/enterprise"]
-vectorscan = ["openobserve-core/vectorscan"]
-cloud = ["openobserve-core/cloud"]
-vortex = ["config/vortex", "openobserve-core/vortex"]
+enterprise = ["openobserve-api/enterprise", "openobserve-core/enterprise"]
+vectorscan = ["openobserve-api/vectorscan", "openobserve-core/vectorscan"]
+cloud = ["openobserve-api/cloud", "openobserve-core/cloud"]
+vortex = ["config/vortex", "openobserve-api/vortex", "openobserve-core/vortex"]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = [
     "jemalloc",
+    "openobserve-api/profiling",
     "dep:tikv-jemalloc-ctl",
     "dep:tikv-jemalloc-sys",
     "dep:jemalloc_pprof",
@@ -222,6 +223,7 @@ tokio-rustls.workspace = true
 flight.workspace = true
 async-stream.workspace = true
 sourcemap = "9.3.2"
+openobserve-api = { path = "src/api" }
 openobserve-core = { path = "src/core" }
 
 [dev-dependencies]
@@ -233,6 +235,7 @@ rcgen = "0.14.4"
 
 [workspace]
 members = [
+    "src/api",
     "src/core",
     "src/config",
     "src/infra",
@@ -259,11 +262,12 @@ proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
 flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
-o2_dex = { path = "src/enterprise-stubs/o2_dex" }
-o2_enterprise = { path = "src/enterprise-stubs/o2_enterprise", default-features = false }
-o2_openfga = { path = "src/enterprise-stubs/o2_openfga" }
-vortex = { path = "src/enterprise-stubs/vortex" }
-vortex-datafusion = { path = "src/enterprise-stubs/vortex-datafusion" }
+o2_dex = { path = "src/enterprise/o2_dex" }
+o2_enterprise = { path = "src/enterprise/o2_enterprise", default-features = false }
+o2_openfga = { path = "src/enterprise/o2_openfga" }
+o2_ratelimit = { path = "src/enterprise/o2_ratelimit" }
+vortex = { path = "src/enterprise/vortex" }
+vortex-datafusion = { path = "src/enterprise/vortex-datafusion" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
 axum = { version = "0.8", features = ["macros", "multipart", "tracing"] }
