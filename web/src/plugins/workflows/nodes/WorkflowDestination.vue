@@ -49,9 +49,11 @@ const picker = ref<any>(null);
 const creating = ref(false);
 
 // Map the shared picker's { org_id, destination_name } into the workflow
-// destination shape { destination_id, template_override }.
-const submit = () => {
-  const payload = picker.value?.getPayload();
+// destination shape { destination_id, template_override }. The picker validates
+// through its zod schema (async), returning null when the field is empty — it
+// renders the error inline, so there's nothing to report here.
+const submit = async () => {
+  const payload = await picker.value?.submit();
   if (!payload) return null;
   return {
     destination_id: payload.destination_name,

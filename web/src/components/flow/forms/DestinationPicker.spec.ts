@@ -96,22 +96,27 @@ describe("DestinationPicker", () => {
   it("preselects initialName", async () => {
     const wrapper = createWrapper({ initialName: "sink-a" });
     await flushPromises();
-    expect((wrapper.vm as any).getPayload()).toMatchObject({ destination_name: "sink-a" });
+    await expect((wrapper.vm as any).submit()).resolves.toMatchObject({
+      destination_name: "sink-a",
+    });
   });
 
-  it("getPayload returns null and toasts when nothing is selected", async () => {
+  // The zod schema now gates the save: an empty selection fails validation, so
+  // submit() resolves null and OForm renders the error inline on the field
+  // (the old imperative "please select" toast is gone).
+  it("submit resolves null when nothing is selected", async () => {
     const wrapper = createWrapper();
     await flushPromises();
-    expect((wrapper.vm as any).getPayload()).toBeNull();
-    expect(mockToast).toHaveBeenCalledWith(
+    await expect((wrapper.vm as any).submit()).resolves.toBeNull();
+    expect(mockToast).not.toHaveBeenCalledWith(
       expect.objectContaining({ variant: "warning" }),
     );
   });
 
-  it("getPayload returns { org_id, destination_name } when selected", async () => {
+  it("submit resolves { org_id, destination_name } when selected", async () => {
     const wrapper = createWrapper({ initialName: "sink-a" });
     await flushPromises();
-    const payload = (wrapper.vm as any).getPayload();
+    const payload = await (wrapper.vm as any).submit();
     expect(payload.destination_name).toBe("sink-a");
     expect(payload.org_id).toBeDefined();
   });

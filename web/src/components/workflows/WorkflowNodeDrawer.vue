@@ -136,9 +136,11 @@ const readonlyBody = computed(() => meta.value?.category === "trigger");
 
 // Save: if a body form is mounted, ask it for its payload (null → invalid,
 // abort). Otherwise commit the staged node as-is (placeholder types).
-const onSave = () => {
+// Awaited because schema-validated bodies (the destination picker) resolve
+// asynchronously; a plain value from a sync body awaits straight through.
+const onSave = async () => {
   if (bodyComponent.value) {
-    const payload = bodyRef.value?.submit?.();
+    const payload = await bodyRef.value?.submit?.();
     if (payload == null) return;
     commitNode(payload);
     return;
