@@ -86,6 +86,8 @@ jobs:
           fi
           [[ "$PR" =~ ^[0-9]+$ ]] || { echo "::error::invalid PR number: $PR"; exit 1; }
           ACTOR=$(printf '%s' "$ACTOR" | tr -cd 'A-Za-z0-9-')   # GitHub login charset; defensive
+          # auto=true only on the merge path → forwarded to the engine, which then suppresses its
+          # sister-pair "waiting for merge" comment (partial merges stay silent).
           { echo "pr=$PR"; echo "dry=$DRY"; echo "actor=$ACTOR"; echo "auto=$AUTO"; } >> "$GITHUB_OUTPUT"
 
       - name: Dispatch the DocGen engine (o2-enterprise) via the org-admin PAT
