@@ -115,11 +115,13 @@ pub struct WorkflowErrorResponse {
 )]
 pub async fn save_workflow(
     Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
     Json(mut workflow): Json<Workflow>,
 ) -> Response {
     workflow.name = workflow.name.trim().to_lowercase();
     workflow.org_id = org_id;
     workflow.id = ider::generate();
+    workflow.created_by = user_email.user_id;
 
     let id = workflow.id.to_string();
     let name = workflow.name.clone();

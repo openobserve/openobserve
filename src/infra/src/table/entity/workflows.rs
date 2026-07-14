@@ -10,6 +10,7 @@ pub struct Model {
     pub org_id: String,
     pub created_at: i64,
     pub updated_at: i64,
+    pub created_by: String,
     pub enabled: bool,
     pub name: String,
     pub description: String,

@@ -57,6 +57,11 @@ fn create_workflows_table_statement() -> TableCreateStatement {
                 .big_integer()
                 .not_null(),
         )
+        .col(
+            ColumnDef::new(Workflows::CreatedBy)
+                .string_len(256)
+                .not_null(),
+        )
         .col(ColumnDef::new(Workflows::Enabled).boolean().not_null())
         .col(ColumnDef::new(Workflows::Name).string_len(256).not_null())
         .col(
@@ -81,6 +86,7 @@ enum Workflows {
     Edges,
     CreatedAt,
     UpdatedAt,
+    CreatedBy,
 }
 
 #[cfg(test)]
@@ -98,6 +104,7 @@ mod tests {
             "org_id" varchar(256) NOT NULL,
             "created_at" bigint NOT NULL,
             "updated_at" bigint NOT NULL,
+            "created_by" varchar(256) NOT NULL,
             "enabled" bool NOT NULL,
             "name" varchar(256) NOT NULL,
             "description" varchar(500) NOT NULL,
@@ -116,6 +123,7 @@ mod tests {
             "org_id" varchar(256) NOT NULL,
             "created_at" bigint NOT NULL,
             "updated_at" bigint NOT NULL,
+            "created_by" varchar(256) NOT NULL,
             "enabled" boolean NOT NULL,
             "name" varchar(256) NOT NULL,
             "description" varchar(500) NOT NULL,

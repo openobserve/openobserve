@@ -388,6 +388,7 @@ const buildPayload = () => {
     enabled: wf.enabled ?? true,
     created_at: wf.created_at || 0,
     updated_at: wf.updated_at || 0,
+    created_by: "",
     nodes: (wf.nodes || []).map(serializeNode),
     edges: wf.edges || [],
   };
