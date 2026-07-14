@@ -346,6 +346,14 @@ class EnrichmentPage {
      * js-transform-type.spec.js's _meta navigation).
      */
     async gotoEnrichmentTablesWithOrg() {
+        // The root-URL org-drop only happens on cloud/alpha (its redirect strips
+        // ?org_identifier). On localhost there is a single `default` org — the
+        // fix is unnecessary, and the extra full-page-goto churns the list header
+        // (add-btn detaches mid-click). Use the org-fix only where the bug exists;
+        // keep the original SPA nav (already green on main) elsewhere.
+        if (!isCloudEnvironment()) {
+            return this.navigateToEnrichmentTable();
+        }
         const org = process.env.ORGNAME;
         await this.page.goto(
             `${process.env.ZO_BASE_URL}/web/pipeline/enrichment-tables?org_identifier=${org}`,
