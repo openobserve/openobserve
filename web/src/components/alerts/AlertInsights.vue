@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="w-full h-full flex flex-col min-h-0">
     <AppPageHeader
       :title="t('alerts.insights.title')"
-      :back="{ onClick: goBack, dataTest: 'alert-insights-back-btn' }"
+      :back="{ label: t('alerts.header'), onClick: goBack, dataTest: 'alert-insights-back-btn' }"
       tabs-below
       class="shrink-0 px-4"
     >
@@ -285,6 +285,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import type { ToastOptions } from "@/lib/feedback/Toast/OToast.types";
 
 const router = useRouter();
 const route = useRoute();
@@ -324,7 +325,8 @@ const contextMenu = reactive({
   show: false,
   x: 0,
   y: 0,
-  value: 0,
+  // Holds either a numeric cell value or an alert-name string.
+  value: 0 as number | string,
   panelTitle: "",
   panelId: "",
 });
@@ -664,11 +666,12 @@ const formatFilterValue = (value: number): string => {
 
 // Action button methods
 const openDedupConfig = () => {
+  // `caption` predates OToast and is not rendered; cast keeps the object untouched.
   toast({
     variant: "info",
     message: `Opening dedup configuration for: ${selectedAlertForAction.value}`,
     caption: "This would navigate to alert edit page with dedup section focused",
-  });
+  } as ToastOptions);
 
   // TODO: Navigate to alert edit page with dedup section
   // router.push({
@@ -683,7 +686,7 @@ const editAlert = () => {
     variant: "info",
     message: `Editing alert: ${selectedAlertForAction.value}`,
     caption: "This would navigate to alert edit page",
-  });
+  } as ToastOptions);
 
   // TODO: Navigate to alert edit page
   // router.push({

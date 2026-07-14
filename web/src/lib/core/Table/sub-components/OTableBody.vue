@@ -29,7 +29,12 @@ const props = defineProps<{
   rowStyleFn?: (row: any) => Record<string, any>;
   loading?: boolean;
   /** Virtual scroll: virtual items from useTableVirtualization */
-  virtualRows?: { index: number; start: number; size: number; key: number }[];
+  virtualRows?: {
+    index: number;
+    start: number;
+    size: number;
+    key: number | string | bigint;
+  }[];
   /** Virtual scroll: total height of the virtual container */
   totalSize?: number;
   /** Virtual scroll: base offset for Firefox compatibility */
@@ -138,7 +143,7 @@ function getRowForIndex(index: number) {
 
     <OTableBodyRow
       v-for="virtualRow in virtualRows"
-      :key="virtualRow.key"
+      :key="(virtualRow.key as string | number)"
       :row="getRowForIndex(virtualRow.index)"
       :measure-el="measureElement"
       :table="table"

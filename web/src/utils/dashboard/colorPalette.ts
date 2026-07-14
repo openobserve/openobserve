@@ -184,8 +184,9 @@ const getSeriesHash = (seriesName: string, colorPalette: string[]) => {
 
 type SeriesBy = "last" | "min" | "max";
 
+// `values` may be a bare number from gauge callers; the try/catch below absorbs the non-array case
 const getSeriesValueBasedOnSeriesBy = (
-  values: any[],
+  values: any,
   seriesBy: SeriesBy,
 ): number | null => {
   try {
@@ -254,7 +255,8 @@ function getDomainPartitions(
 export const getSeriesColor = (
   colorCfg: ColorConfig | null,
   seriesName: string,
-  value: number[],
+  // PromQL converters pass raw string values or a single number; handled by getSeriesValueBasedOnSeriesBy
+  value: number | Array<number | string>,
   chartMin: number,
   chartMax: number,
   theme: string,

@@ -609,7 +609,7 @@ const closeDialog = () => {
 
 // Local state
 // Default to SQL tab if no tab is provided, otherwise use the provided tab
-const localTab = ref(props.tab || 'sql');
+const localTab = ref<'sql' | 'promql'>((props.tab || 'sql') as 'sql' | 'promql');
 const localSqlQuery = ref(props.sqlQuery);
 const localPromqlQuery = ref(props.promqlQuery);
 const vrlFunctionContent = ref(props.vrlFunction);
@@ -680,7 +680,7 @@ const runPromqlError = ref("");
 
 // Watch props
 watch(() => props.tab, (newVal) => {
-  localTab.value = newVal || 'sql';
+  localTab.value = (newVal || 'sql') as 'sql' | 'promql';
 });
 
 watch(() => props.sqlQuery, (newVal) => {
@@ -1094,7 +1094,7 @@ const handleFieldListEvent = (event: string, value: any) => {
 };
 
 // Determine available languages based on stream type
-const availableLanguages = computed(() => {
+const availableLanguages = computed<('sql' | 'promql')[]>(() => {
   // For metrics streams, only PromQL is available
   if (props.streamType === 'metrics') {
     return ['promql'];

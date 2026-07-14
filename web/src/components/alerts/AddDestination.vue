@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="destination-type-readonly"
                 >
                   <OIcon
-                    :name="getDestinationTypeIcon(formData.destination-type)"
+                    :name="getDestinationTypeIcon(formData.destination_type)"
                     size="md"
                     class="mr-2"
                   />
@@ -562,6 +562,7 @@ import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import { isPrebuiltType, detectPrebuiltTypeFromUrl } from "@/utils/prebuilt-templates";
+import type { PrebuiltTypeId } from "@/utils/prebuilt-templates/types";
 import PrebuiltDestinationForm from "./PrebuiltDestinationForm.vue";
 import PrebuiltDestinationSelector from "./PrebuiltDestinationSelector.vue";
 import DestinationTestResult from "./DestinationTestResult.vue";
@@ -575,7 +576,11 @@ const props = defineProps({
     default: [],
   },
   destination: {
-    type: Object as PropType<DestinationPayload | null>,
+    // Backend also returns `metadata` (JSON string or object) for prebuilt
+    // destinations; shared DestinationPayload does not declare it.
+    type: Object as PropType<
+      (DestinationPayload & { metadata?: string | Record<string, unknown> }) | null
+    >,
     default: null,
   },
   isAlerts: {
@@ -589,7 +594,13 @@ const outputFormats = ["json", "ndjson"];
 const store = useStore();
 const { t } = useI18n();
 const { track } = useReo();
-const formData: Ref<DestinationData> = ref({
+// Local narrowing of DestinationData: this form only ever holds a template
+// name string and a known destination-type union.
+type DestinationFormData = Omit<DestinationData, "destination_type" | "template"> & {
+  destination_type: PrebuiltTypeId | "custom" | "";
+  template: string;
+};
+const formData: Ref<DestinationFormData> = ref({
   name: "",
   url: "",
   method: "post",
@@ -693,7 +704,13 @@ const tabs = computed(() => {
 const destinationTypes = computed(() => {
   if (!props.isAlerts) return [];
 
-  const prebuiltTypes = availableTypes.value.map((type) => ({
+  const prebuiltTypes: {
+    value: PrebuiltTypeId | "custom";
+    label: string;
+    image: string | null;
+    icon: string;
+    description: string;
+  }[] = availableTypes.value.map((type) => ({
     value: type.id,
     label: type.name,
     image: `/src/assets/images/destinations/${type.icon}.png`,
@@ -766,7 +783,8 @@ const setupDestinationData = () => {
     formData.value.url = props.destination.url;
     formData.value.method = props.destination.method;
     formData.value.skip_tls_verify = props.destination.skip_tls_verify;
-    formData.value.template = props.destination.template;
+    // Backend always sends the template name as a string.
+    formData.value.template = props.destination.template as string;
     if (!props.destination.headers) formData.value.headers = {};
     formData.value.headers = props.destination.headers;
     formData.value.emails = (props.destination?.emails || []).join(", ");
@@ -796,7 +814,10 @@ const setupDestinationData = () => {
     }
     // Priority 2: Check if template starts with 'system-prebuilt-' AND destination structure matches
     // (Must have emails array for email, or specific prebuilt URL patterns for HTTP)
-    else if (props.destination.template?.startsWith("system-prebuilt-")) {
+    else if (
+      typeof props.destination.template === "string" &&
+      props.destination.template.startsWith("system-prebuilt-")
+    ) {
       const templateType = props.destination.template.replace(
         "system-prebuilt-",
         "",
@@ -815,7 +836,8 @@ const setupDestinationData = () => {
         // so the URL is the only reliable signal at this point.
         const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
         if (urlType && isPrebuiltType(urlType)) {
-          formData.value.destination_type = urlType;
+          // isPrebuiltType guarantees the union member; it is not a type guard.
+          formData.value.destination_type = urlType as PrebuiltTypeId;
         } else {
           // Has system template but URL doesn't match prebuilt patterns - it's custom
           formData.value.destination_type = "custom";
@@ -827,25 +849,31 @@ const setupDestinationData = () => {
     // Priority 3: Check if template starts with 'prebuilt_' (user templates)
     // Also verify the URL matches the prebuilt type to avoid misclassifying custom
     // destinations that happen to use a template with a prebuilt_ prefix.
-    else if (props.destination.template?.startsWith("prebuilt_")) {
+    else if (
+      typeof props.destination.template === "string" &&
+      props.destination.template.startsWith("prebuilt_")
+    ) {
       const extractedType = props.destination.template.replace("prebuilt_", "");
       if (isPrebuiltType(extractedType) && props.destination.url) {
         const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
-        formData.value.destination_type = urlType === extractedType ? extractedType : "custom";
+        formData.value.destination_type = urlType === extractedType ? (extractedType as PrebuiltTypeId) : "custom";
       } else {
-        formData.value.destination_type = isPrebuiltType(extractedType) ? extractedType : "custom";
+        formData.value.destination_type = isPrebuiltType(extractedType) ? (extractedType as PrebuiltTypeId) : "custom";
       }
     }
     // Priority 4: Check if template includes 'prebuilt' (legacy format)
     // Also verify the URL matches the prebuilt type (same guard as Priority 3).
-    else if (props.destination.template?.includes("prebuilt")) {
+    else if (
+      typeof props.destination.template === "string" &&
+      props.destination.template.includes("prebuilt")
+    ) {
       const parts = props.destination.template.split("-");
       const extractedType = parts[parts.length - 1];
       if (isPrebuiltType(extractedType) && props.destination.url) {
         const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
-        formData.value.destination_type = urlType === extractedType ? extractedType : "custom";
+        formData.value.destination_type = urlType === extractedType ? (extractedType as PrebuiltTypeId) : "custom";
       } else {
-        formData.value.destination_type = isPrebuiltType(extractedType) ? extractedType : "custom";
+        formData.value.destination_type = isPrebuiltType(extractedType) ? (extractedType as PrebuiltTypeId) : "custom";
       }
     }
     // Priority 5: Fallback to URL-based detection (for destinations created before metadata was added)
@@ -1083,7 +1111,7 @@ const getActionOptions = async () => {
 };
 
 // Select destination type (prebuilt or custom)
-const selectDestinationType = (type: string) => {
+const selectDestinationType = (type: PrebuiltTypeId | "custom") => {
   formData.value.destination_type = type;
 
   // Reset form data when switching types
@@ -1105,8 +1133,9 @@ const handleTestDestination = async () => {
   if (!isPrebuiltDestination.value) return;
 
   try {
+    // Guarded by isPrebuiltDestination above, so this is never "custom"/"".
     await testDestination(
-      formData.value.destination_type,
+      formData.value.destination_type as PrebuiltTypeId,
       prebuiltCredentials.value,
     );
   } catch (error) {
@@ -1123,8 +1152,9 @@ const showPreview = async () => {
     previewContent.value = "";
 
     // Fetch and generate preview
+    // Guarded by isPrebuiltDestination above, so this is never "custom"/"".
     const preview = await generatePreview(
-      formData.value.destination_type,
+      formData.value.destination_type as PrebuiltTypeId,
       prebuiltCredentials.value,
     );
     previewContent.value = preview;
@@ -1159,7 +1189,7 @@ const saveDestination = async () => {
       if (isUpdatingDestination.value) {
         // Update existing prebuilt destination
         await updateDestination(
-          formData.value.destination_type,
+          formData.value.destination_type as PrebuiltTypeId,
           props.destination.name, // original name
           formData.value.name, // potentially new name
           prebuiltCredentials.value,
@@ -1170,7 +1200,7 @@ const saveDestination = async () => {
       } else {
         // Create new prebuilt destination
         await createDestination(
-          formData.value.destination_type,
+          formData.value.destination_type as PrebuiltTypeId,
           formData.value.name,
           prebuiltCredentials.value,
           customHeaders, // custom headers

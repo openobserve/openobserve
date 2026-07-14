@@ -1036,7 +1036,7 @@ const fieldWidthClass = computed(() => {
     <template v-if="listboxModeEnabled">
       <PopoverRoot
         v-model:open="popoverOpen"
-        @update:open="(v) => emit(v ? 'open' : 'close')"
+        @update:open="(v) => (v ? emit('open') : emit('close'))"
       >
         <div
           ref="triggerWrapperRef"
@@ -1592,7 +1592,8 @@ const fieldWidthClass = computed(() => {
       @update:open="
         (v) => {
           selectOpen = v;
-          emit(v ? 'open' : 'close');
+          if (v) emit('open');
+          else emit('close');
         }
       "
     >

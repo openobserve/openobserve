@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         v-for="virtualRow in virtualRows"
-        :key="virtualRow.key"
+        :key="(virtualRow.key as string | number)"
         :style="{
           position: 'absolute',
           top: 0,

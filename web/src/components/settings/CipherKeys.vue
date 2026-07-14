@@ -289,7 +289,7 @@ export default defineComponent({
       selectedKeys.value = ids.map((id: any) => map.get(id)).filter(Boolean);
     };
 
-    const addCipherKey = (evt: any) => {
+    const addCipherKey = (evt?: MouseEvent) => {
       router.push({
         query: {
           action: "add",

@@ -393,8 +393,10 @@ import type {
 import { dataTypeOf, entityId } from "../utils/evalEntity";
 import {
   useScorerRuns,
+  type RunRow,
   type ScorerRunsWindow,
 } from "../composables/useScorerRuns";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
   ALL_AGENTS_VALUE,
   agentFilterKey,
@@ -646,7 +648,7 @@ async function refreshRuns() {
 }
 
 // — OTable column definitions —
-const runColumns = computed(() => [
+const runColumns = computed<OTableColumnDef<RunRow>[]>(() => [
   {
     id: "timestampMs",
     header: t("onlineEvals.scorer.detail.runs.col.time"),

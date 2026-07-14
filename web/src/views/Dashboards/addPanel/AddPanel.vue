@@ -1908,7 +1908,7 @@ export default defineComponent({
     };
   },
   methods: {
-    goBackToDashboardList(evt: any, row: any) {
+    goBackToDashboardList(evt?: any, row?: any) {
       this.goBack();
     },
   },

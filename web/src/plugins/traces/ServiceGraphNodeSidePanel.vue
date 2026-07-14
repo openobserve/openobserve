@@ -1675,7 +1675,8 @@ export default defineComponent({
 
     // ── Sorting state ──────────────────────────────────────────────────────
     const sortBy = ref<string>("");
-    const sortOrder = ref<"asc" | "desc">("");
+    // Starts as "" (no sort); consumers treat any non-"desc" value as ascending.
+    const sortOrder = ref<"asc" | "desc">("" as string as "asc" | "desc");
 
     function handleSortChange(field: string, order: "asc" | "desc") {
       sortBy.value = field;

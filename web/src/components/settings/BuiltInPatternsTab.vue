@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon name="error" style="width: 50px; height: 50px;" />
       <div class="mt-3 text-red-500">{{ error }}</div>
       <span class="mt-2">
-        <OButton variant="ghost-primary" size="sm" @click="fetchPatterns">
+        <OButton variant="ghost-primary" size="sm" @click="() => fetchPatterns()">
           {{ t("regex_patterns.try_again") }}
         </OButton>
       </span>
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTextarea
             :model-value="previewedPattern?.pattern"
             readonly
-            rows="3"
+            :rows="3"
           />
         </div>
 

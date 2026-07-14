@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig.meta_org &&
             usersDisplay == 'all'
           "
-          v-model="selectedOrg"
+          v-model="(selectedOrg as any)"
           :options="orgOptions"
           labelKey="label"
           valueKey="value"

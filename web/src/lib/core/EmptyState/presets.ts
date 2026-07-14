@@ -36,8 +36,8 @@ export type EmptyStateVariant =
 
 /** A rich action card (icon + title + description) shown in an empty state. */
 export interface EmptyStateAction {
-  /** Icon shown in the card. */
-  icon: IconName;
+  /** Icon shown in the card. `(string & {})` admits dynamic names while keeping autocomplete. */
+  icon: IconName | (string & {});
   /** i18n key for the card title. */
   titleKey: string;
   /** i18n key for the card description (optional). */

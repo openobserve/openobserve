@@ -10,7 +10,7 @@ import type {
   RelativeUnit,
   DateTimeMode,
 } from "./ODateTimeRange.types";
-import { computed, ref, useAttrs, watch } from "vue";
+import { computed, ref, useAttrs, watch, type Ref } from "vue";
 import {
   PopoverRoot,
   PopoverTrigger,
@@ -74,10 +74,11 @@ const popoverOpen = computed({
 
 // ── Staged state ───────────────────────────────────────────────
 const activeTab = ref<DateTimeMode>(props.disableRelative ? "absolute" : props.mode);
+// Cast: ref() deep-unwraps DateRange's class members structurally, breaking DateRange bindings
 const stagedRange = ref<DateRange>({
   start: props.startDate ? tryParseDate(props.startDate) : undefined,
   end: props.endDate ? tryParseDate(props.endDate) : undefined,
-} as DateRange);
+} as DateRange) as Ref<DateRange>;
 const stagedStartTime = ref(props.startTime);
 const stagedEndTime = ref(props.endTime);
 const stagedTimezone = ref(props.timezone ?? "");

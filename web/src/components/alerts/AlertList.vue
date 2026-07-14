@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex items-center gap-2 w-full">
                     <OToggleGroup
                       :model-value="activeTab"
-                      @update:model-value="(v) => { activeTab = v; filterAlertsByTab(); }"
+                      @update:model-value="(v) => { activeTab = v as string; filterAlertsByTab(); }"
                     >
                       <OToggleGroupItem value="all" size="sm" data-test="tab-all">
                         <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>

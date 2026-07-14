@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex flex-wrap mt-1 ml-1"
   >
     <div
-      v-for="(item, index) in variablesData.values"
+      v-for="(item, index) in variablesData.values as any[]"
       :key="item.name + index"
       :data-test="`dashboard-variable-${item.name}-container`"
     >
@@ -29,9 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="!item.hideOnDashboard"
           v-model="item.value"
           :variableItem="item"
-          @update:model-value="onVariablesValueUpdated(index)"
+          @update:model-value="onVariablesValueUpdated(Number(index))"
           :loadOptions="loadVariableOptions"
-          @search="onVariableSearch(index, $event)"
+          @search="onVariableSearch(Number(index), $event)"
           :data-test="`variable-selector-${item.name}`"
         />
       </div>
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label-position="inside"
           readonly
           :data-test="`variable-selector-${item.name}`"
-          @update:model-value="onVariablesValueUpdated(index)"
+          @update:model-value="onVariablesValueUpdated(Number(index))"
         />
       </div>
       <div v-else-if="item.type == 'textbox'" class="max-w-[40rem] min-w-37.5">
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="item.label || item.name"
           label-position="inside"
           :data-test="`variable-selector-${item.name}`"
-          @update:model-value="onVariablesValueUpdated(index)"
+          @update:model-value="onVariablesValueUpdated(Number(index))"
         />
       </div>
       <div v-else-if="item.type == 'custom'" class="max-w-[40rem] min-w-37.5">
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="mr-4 mt-1"
           v-model="item.value"
           :variableItem="item"
-          @update:model-value="onVariablesValueUpdated(index)"
+          @update:model-value="onVariablesValueUpdated(Number(index))"
           :data-test="`variable-selector-${item.name}`"
         />
       </div>
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="mr-4 mt-1"
           v-model="item.value"
           :variableItem="item"
-          @update:model-value="onVariablesValueUpdated(index)"
+          @update:model-value="onVariablesValueUpdated(Number(index))"
           :data-test="`variable-selector-${item.name}`"
         />
       </div>

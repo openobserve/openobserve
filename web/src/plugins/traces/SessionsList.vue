@@ -528,7 +528,7 @@ function ensureStreamsLoaded(): Promise<void> {
 async function loadTraceStreams() {
   streamsLoaded.value = false;
   try {
-    const res = await getStreams("traces", false, false);
+    const res: any = await getStreams("traces", false, false);
     const list = res?.list || [];
     const llmStreams = list.filter(
       (stream: any) => stream?.settings?.is_llm_stream !== false,

@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { PromQLResponse, ConversionContext } from "./shared/types";
+import {
+  PromQLResponse,
+  ConversionContext,
+  PromQLChartConverter,
+} from "./shared/types";
 import { processPromQLData } from "./shared/dataProcessor";
 import { TimeSeriesConverter } from "./convertPromQLTimeSeriesChart";
 import { PieConverter } from "./convertPromQLPieChart";
@@ -30,7 +34,7 @@ import { applyLegendConfiguration } from "../legendConfiguration";
  * Registry of all chart type converters
  * Each converter handles specific chart types and implements the PromQLChartConverter interface
  */
-const CONVERTER_REGISTRY = [
+const CONVERTER_REGISTRY: PromQLChartConverter[] = [
   new TimeSeriesConverter(),
   new PieConverter(),
   new TableConverter(),
@@ -154,7 +158,9 @@ export async function convertPromQLChartData(
   // For ECharts: check series length
   // For tables: check columns length
   const hasEChartsData = options?.series?.length > 0;
-  const hasTableData = options?.columns?.length > 0;
+  // Table converters attach `columns`, which isn't on the ECharts options union.
+  const hasTableData =
+    ((options as { columns?: unknown[] })?.columns?.length ?? 0) > 0;
 
   if (!hasEChartsData && !hasTableData) {
     console.warn("No series or columns found - returning empty chart");

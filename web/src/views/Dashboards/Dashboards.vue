@@ -509,7 +509,11 @@ import dashboardService from "../../services/dashboards";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import {
+  TABLE_INDEX_COL_SIZE,
+  COL,
+  type OTableColumnDef,
+} from "@/lib/core/Table/OTable.types";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useRoute, useRouter } from "vue-router";
@@ -524,7 +528,7 @@ import {
   getDashboard,
   getFoldersList,
   moveModuleToAnotherFolder,
-} from "../../utils/commons.ts";
+} from "../../utils/commons";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import useNotifications from "@/composables/useNotifications";
@@ -550,6 +554,19 @@ const AddDashboard = defineAsyncComponent(() => {
 const AddDashboardFromGitHub = defineAsyncComponent(() => {
   return import("@/components/dashboards/AddDashboardFromGitHub.vue");
 });
+
+// Migrated dashboard summary as stored in organizationData.allDashboardList.
+interface DashboardListItem {
+  version: number;
+  folderId: string;
+  folderName: string;
+  dashboardId: string;
+  title: string;
+  description: string;
+  role: string;
+  owner: string;
+  created: string;
+}
 
 export default defineComponent({
   name: "Dashboards",
@@ -699,7 +716,7 @@ export default defineComponent({
 
     let currentSearchAbortController = null;
     const columns = computed(() => {
-      const baseColumns = [
+      const baseColumns: OTableColumnDef<Record<string, any>>[] = [
         {
           id: "#",
           header: "#",
@@ -877,7 +894,10 @@ export default defineComponent({
             );
             filteredResults.value = toRaw(searchResults);
           } catch (error) {
-            if (!error.name === "AbortError") {
+            const name = error instanceof Error ? error.name : undefined;
+            // Pre-existing bug: the `!` makes this comparison always false.
+            // Preserved as-is; only the `any` cast is removed.
+            if ((!name as unknown) === "AbortError") {
               filteredResults.value = [];
               // Handle error state
             }
@@ -1022,7 +1042,7 @@ export default defineComponent({
         },
       });
     };
-    const dashboardList = ref([]);
+    const dashboardList = ref<DashboardListItem[]>([]);
     // Start in the loading state so the table shows the skeleton on first
     // render instead of briefly flashing the empty state before the fetch.
     const loading = ref(true);
@@ -1038,7 +1058,10 @@ export default defineComponent({
           store,
           activeFolderId.value ?? "default",
         );
-        dashboardList.value = response;
+        // getAllDashboards resolves void (it writes rows to the store); response
+        // is always undefined, so reflect the empty result on this write-only ref.
+        void response;
+        dashboardList.value = [];
       } catch (err) {
         showErrorNotification(err?.message || "Failed to load dashboards.");
       } finally {
@@ -1400,7 +1423,7 @@ export default defineComponent({
 
         selectedIds.value = [];
         // Refresh dashboards
-        await getDashboards(store, activeFolderId.value);
+        await getDashboards();
         // If the pinned dashboard was in the batch, re-read the (now cleared)
         // home_dashboard setting so the Home shortcut/pin updates immediately.
         if (bulkIncludedHome) {

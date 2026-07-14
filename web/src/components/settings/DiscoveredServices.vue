@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="retry-discovered-services-btn"
         variant="outline"
         size="sm-action"
-        @click="loadServices"
+        @click="() => loadServices()"
         icon-left="refresh"
       >
         {{ t("settings.correlation.retry") }}
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :persist-columns="true"
             table-id="settings-discovered-services"
             :show-global-filter="false"
-            expansion="multi"
+            expansion="multiple"
             :expand-on-row-click="(row: any) => row.__type === 'group'"
             :get-row-expansion-enabled="(row: any) => row.__type === 'group'"
             :keep-page-on-data-change="true"
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ).sort(([a], [b]) => a.localeCompare(b))"
                   :key="`${key}=${value}`"
                   :dim-key="key"
-                  :value="value"
+                  :value="String(value)"
                 />
                 <span
                   v-if="Object.keys(row.disambiguation).length === 0"
@@ -928,7 +928,6 @@ const doResetServices = async () => {
       message: t("settings.correlation.resetServicesSuccess", {
         count: deleted_count,
       }),
-      caption: note,
       timeout: 5000,
     });
 
@@ -937,7 +936,6 @@ const doResetServices = async () => {
     toast({
       variant: "error",
       message: t("settings.correlation.resetServicesFailed"),
-      caption: err?.message || String(err),
     });
   } finally {
     resetting.value = false;

@@ -148,7 +148,7 @@
             <OToggleGroup
               :model-value="collapseMode"
               class="w-full"
-              @update:model-value="(v) => setCollapseMode(v as string)"
+              @update:model-value="(v) => setCollapseMode(v as 'auto' | 'expanded' | 'collapsed')"
             >
               <OToggleGroupItem
                 v-for="m in (['auto', 'expanded', 'collapsed'] as const)"
@@ -890,6 +890,7 @@ export default defineComponent({
         x: number;
         y: number;
         name: string;
+        value: number;
       }> = [];
 
       // Robust child access — handles children(), _children, or childAt/childCount
@@ -1694,7 +1695,7 @@ export default defineComponent({
     // Load trace streams using the same method as the Traces search page
     const loadTraceStreams = async () => {
       try {
-        const res = await getStreams("traces", false, false);
+        const res: any = await getStreams("traces", false, false);
         if (res?.list?.length > 0) {
           availableStreams.value = res.list.map((stream: any) => stream.name);
         }

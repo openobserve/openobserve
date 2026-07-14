@@ -15,14 +15,14 @@
           v-if="condition.filterType === 'group'"
           :group="condition"
           :group-nested-index="groupNestedIndex + 1"
-          :group-index="index"
+          :group-index="Number(index)"
           :dashboard-variables-filter-items="dashboardVariablesFilterItems"
           :schema-options="schemaOptions"
           :load-filter-item="loadFilterItem"
           :dashboard-panel-data="dashboardPanelData"
           @add-condition="addConditionToGroup"
           @add-group="addGroupToGroup"
-          @remove-group="removeGroupFromNested(index)"
+          @remove-group="removeGroupFromNested(Number(index))"
           @logical-operator-change="emitLogicalOperatorChange"
         />
         <AddCondition
@@ -32,7 +32,7 @@
           :schema-options="schemaOptions"
           :load-filter-item="loadFilterItem"
           :dashboard-panel-data="dashboardPanelData"
-          @remove-condition="removeConditionFromGroup(index)"
+          @remove-condition="removeConditionFromGroup(Number(index))"
           @logical-operator-change="emitLogicalOperatorChange"
           :condition-index="index"
         />

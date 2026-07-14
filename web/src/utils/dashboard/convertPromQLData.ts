@@ -138,10 +138,9 @@ export const convertPromQLData = async (
 
       // Apply annotations if present (only for ECharts-based charts)
       if (annotations && annotations.length > 0 && panelSchema.type !== "table") {
-        const annotationResults = await getAnnotationsData(
+        const annotationResults = getAnnotationsData(
           annotations,
-          store,
-          panelSchema,
+          store.state.timezone,
         );
         if (annotationResults && result.options) {
           result.options.annotations = annotationResults;

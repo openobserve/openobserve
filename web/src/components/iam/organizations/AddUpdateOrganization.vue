@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="showLabelOnTop mt-2"
           :help-text="t('organization.nameHelpText')"
           data-test="org-name"
-          maxlength="100"
+          :maxlength="100"
         />
 
         <OFormCheckbox

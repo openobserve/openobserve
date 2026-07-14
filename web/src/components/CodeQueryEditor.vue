@@ -32,7 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="toggleNlpMode"
       data-test="query-editor-ai-icon-btn"
     >
-      <OIcon size="md">
+      <!-- name="" satisfies the required prop; empty name renders only the slot -->
+      <OIcon name="" size="md">
         <img :src="aiIcon" alt="AI" class="w-4.5 h-4.5" />
       </OIcon>
       <OTooltip side="top" align="center">

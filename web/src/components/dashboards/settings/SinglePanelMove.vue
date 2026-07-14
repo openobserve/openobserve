@@ -86,7 +86,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export default defineComponent({
   name: "SinglePanelMove",
   components: { AddTab, OButton, OSelect, ODialog, OTooltip, OIcon },
-  emits: ["update:ok", "update:cancel", "refresh"],
+  emits: ["update:ok", "update:cancel", "refresh", "update:modelValue"],
   props: ["title", "message", "modelValue"],
   setup(props, { emit }) {
     const { t } = useI18n();

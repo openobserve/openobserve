@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center gap-1.5 shrink-0">
               <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t('alerts.folder') }}</div>
               <InlineSelectFolderDropdown
-                :model-value="activeFolderId"
+                :model-value="(activeFolderId as string)"
                 type="alerts"
                 class="topbar-folder-select"
                 @update:model-value="updateActiveFolderId({ value: $event })"

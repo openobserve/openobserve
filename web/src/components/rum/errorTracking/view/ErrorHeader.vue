@@ -63,7 +63,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { defineProps } from "vue";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useI18n } from "vue-i18n";

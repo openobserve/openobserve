@@ -1135,6 +1135,7 @@ import incidentsService, {
 import streamService from "@/services/stream";
 import serviceStreamsApi, {
   buildChipDimensionsFromFilters,
+  type CorrelationResponse,
 } from "@/services/service_streams";
 import { getImageURL } from "@/utils/zincutils";
 import { marked } from 'marked';
@@ -1209,7 +1210,10 @@ export default defineComponent({
 
     const loading = ref(false);
     const updating = ref(false);
-    const incidentDetails = ref<IncidentWithAlerts | null>(null);
+    // Backend also returns a top-level correlation_reason not declared on IncidentWithAlerts.
+    const incidentDetails = ref<
+      (IncidentWithAlerts & { correlation_reason?: string }) | null
+    >(null);
     const triggers = ref<IncidentAlert[]>([]);
     const alerts = ref<any[]>([]);
 
@@ -1598,7 +1602,7 @@ export default defineComponent({
             console.warn(`[Fallback Correlation] Semantic group failed, scanning schema fields directly...`);
             const dimParts = dimId.split('-');
             
-            const schemaFieldsArray = Array.from(schemaFields).filter(f => !f.startsWith('_'));
+            const schemaFieldsArray = Array.from(schemaFields as Set<string>).filter(f => !f.startsWith('_'));
             for (const schemaField of schemaFieldsArray) {
               const fieldLower = schemaField.toLowerCase();
               const allPartsMatch = dimParts.every(part => fieldLower.includes(part.toLowerCase()));
@@ -1643,8 +1647,9 @@ export default defineComponent({
               metrics: streamType === 'metrics' ? [streamInfo] : [],
               traces: streamType === 'traces' ? [streamInfo] : [],
             },
+            // Extra marker consumed downstream; not part of CorrelationResponse.
             correlation_method: "frontend-fallback"
-          }
+          } as CorrelationResponse
         };
       } catch (fallbackError) {
         console.error("[Fallback Correlation] Failed to build fallback:", fallbackError);

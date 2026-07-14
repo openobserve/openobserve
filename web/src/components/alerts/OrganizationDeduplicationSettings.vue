@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="'organizationdeduplication-fingerprint-' + group.id + '-checkbox'"
             :key="group.id"
             :model-value="localConfig.alert_fingerprint_groups?.includes(group.id)"
-            @update:model-value="(val) => toggleFingerprintGroup(group.id, val)"
+            @update:model-value="(val) => toggleFingerprintGroup(group.id, val as boolean)"
             :label="`${group.display} (${group.id})`"
           />
           <div
@@ -239,11 +239,13 @@ const saveSettings = async () => {
 
   saving.value = true;
   try {
-    const rawWindow = localConfig.value.time_window_minutes;
+    // Input binding can leave "" here at runtime despite the numeric declared type.
+    const rawWindow: number | string | null | undefined =
+      localConfig.value.time_window_minutes;
     const configToSave = {
       ...localConfig.value,
       time_window_minutes:
-        rawWindow == null || rawWindow === "" || isNaN(Number(rawWindow))
+        rawWindow == null || String(rawWindow) === "" || isNaN(Number(rawWindow))
           ? null
           : Number(rawWindow),
     };

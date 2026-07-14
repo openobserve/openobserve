@@ -255,6 +255,8 @@ interface Function {
   description: string;
   stream: string;
   order: number;
+  trans_type?: number;
+  [key: string]: unknown;
 }
 
 interface Pipeline {

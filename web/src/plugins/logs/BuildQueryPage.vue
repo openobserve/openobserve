@@ -45,7 +45,6 @@ import {
   onMounted,
   defineAsyncComponent,
   provide,
-  defineExpose,
 } from "vue";
 import { useRouter } from "vue-router";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";

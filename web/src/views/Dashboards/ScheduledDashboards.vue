@@ -238,7 +238,9 @@ const formatReports = () => {
         created_at: convertUnixToQuasarFormat(report.created_at),
         orgId: report.org_id,
         isCached: !report?.destinations?.length,
-      });
+        // *_raw fields are used for sorting but aren't declared on the shared
+        // ScheduledDashboardReport interface (src/ts — not editable here).
+      } as unknown as ScheduledDashboardReport);
     });
 
   filterReports();

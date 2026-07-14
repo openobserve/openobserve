@@ -148,7 +148,7 @@ import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
-import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
+import SemanticFieldGroupsConfig, { type SemanticGroup } from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 import GroupHeader from "@/components/common/GroupHeader.vue";
 import alertsService from "@/services/alerts";
 import settingsService from "@/services/settings";
@@ -183,9 +183,9 @@ const loading = ref(true);
 const savingSemanticMappings = ref(false);
 const semanticSectionExpanded = ref(true);
 const howItWorksOpen = ref(false);
-const localSemanticGroups = ref<SemanticFieldGroup[]>([]);
+const localSemanticGroups = ref<SemanticGroup[]>([]);
 
-const handleSemanticGroupsUpdate = (groups: SemanticFieldGroup[]) => {
+const handleSemanticGroupsUpdate = (groups: SemanticGroup[]) => {
   localSemanticGroups.value = groups;
 };
 

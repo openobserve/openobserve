@@ -147,7 +147,7 @@ class="mt-px flex-shrink-0" />
 </template>
 
 <script lang="ts">
-import { defineComponent, type PropType } from "vue";
+import { computed, defineComponent, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -157,6 +157,7 @@ import OSelect from '@/lib/forms/Select/OSelect.vue';
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 
 export default defineComponent({
   name: "AnomalyAlerting",
@@ -171,7 +172,7 @@ export default defineComponent({
       required: true,
     },
     destinations: {
-      type: Array as PropType<any[]>,
+      type: Array as PropType<(SelectOption & { name: string })[]>,
       default: () => [],
     },
   },
@@ -182,6 +183,26 @@ export default defineComponent({
     const { t } = useI18n();
     const router = useRouter();
     const store = useStore();
+
+    // Dynamically decide how many chips to show based on text length.
+    // Restored from pre-refactor version; the template still depends on it.
+    const MAX_CHARS = 42;
+    const visibleChipCount = computed(() => {
+      const ids = props.config.alert_destination_ids;
+      if (!ids || ids.length === 0) return 0;
+      if (ids.length === 1) return 1;
+      // Resolve names from destinations list
+      const getName = (id: string) => {
+        const dest = props.destinations.find((d) => d.name === id);
+        return dest ? dest.name : id;
+      };
+      const firstLen = getName(ids[0]).length;
+      if (firstLen > MAX_CHARS) return 1;
+      const secondLen = getName(ids[1]).length;
+      // Show 2 chips if both fit within budget
+      if (firstLen + secondLen <= MAX_CHARS) return 2;
+      return 1;
+    });
 
     const openAddDestination = () => {
       const route = router.resolve({
@@ -195,6 +216,7 @@ export default defineComponent({
       t,
       store,
       openAddDestination,
+      visibleChipCount,
     };
   },
 });

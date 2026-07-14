@@ -268,6 +268,9 @@ const useSqlSuggestions = () => {
   const autoCompleteData = ref({
     fieldValues: {} as any, // { kubernetes_host: new Set([value1, value2]) }
     query: "",
+    // Top-level cursor index (set by SearchBar / query editors); read first, with
+    // position.cursorIndex kept as a legacy fallback.
+    cursorIndex: undefined as number | undefined,
     position: {
       cursorIndex: 0,
     },

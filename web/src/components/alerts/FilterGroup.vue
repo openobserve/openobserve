@@ -53,7 +53,7 @@
 
       <div v-if="isOpen" class="overflow-x-auto group-container" :class="store.state.theme === 'dark' ? 'dark-mode-group' : 'light-mode-group'">
         <!-- Items in group (V2 uses 'conditions' array) -->
-        <div class="ml-2 whitespace-nowrap " v-for="(item, index) in props.group.conditions" :key="index">
+        <div class="ml-2 whitespace-nowrap " v-for="(item, index) in props.group.conditions as any[]" :key="index">
           <FilterGroup
             v-if="isGroup(item)"
             :group="item"

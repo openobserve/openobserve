@@ -11,7 +11,7 @@
         :debounce="1000"
         data-test="dashboard-variable-adhoc-name-selector"
         placeholder="Enter Name"
-        @update:model-value="updateModelValueOfSelect(index, $event)"
+        @update:model-value="updateModelValueOfSelect(Number(index), $event)"
         class="flex-1"
       />
       <OSelect
@@ -32,7 +32,7 @@
         variant="ghost"
         size="icon"
         class="ml-1"
-        @click="removeField(index)"
+        @click="removeField(Number(index))"
         :data-test="`dashboard-variable-adhoc-close-${index}`"
         icon-left="close"
       >
@@ -121,6 +121,8 @@ export default defineComponent({
       adhocVariables,
       removeField,
       updateModelValueOfSelect,
+      // template's value-input @update:model-value calls emitValue directly
+      emitValue,
       store,
     };
   },

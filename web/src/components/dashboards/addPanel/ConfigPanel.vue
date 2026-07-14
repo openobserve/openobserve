@@ -557,7 +557,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(tab, index) in dashboardPanelData.data.queries"
               :key="index"
               :name="index"
-              :label="tab.tabName || (t('dashboard.queryLabel') + ' ' + (index + 1))"
+              :label="tab.tabName || (t('dashboard.queryLabel') + ' ' + (Number(index) + 1))"
               :data-test="`dashboard-config-query-tab-${index}`"
             >
             </OTab>

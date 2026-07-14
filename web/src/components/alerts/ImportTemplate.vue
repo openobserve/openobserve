@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :model-value="userSelectedTemplateTypes[index] || ''"
                       @update:model-value="(val) => {
                         userSelectedTemplateTypes[index] = val;
-                        updateTemplateType(val, index);
+                        updateTemplateType(val as string, index);
                       }"
                       :options="destinationTypes"
                       :label="'Template Type *'"

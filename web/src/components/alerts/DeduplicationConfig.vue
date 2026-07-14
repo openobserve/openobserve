@@ -132,11 +132,12 @@ interface DeduplicationConfig {
   };
 }
 
-interface FieldOption {
+// Type alias (not interface) so it satisfies SelectOption's index signature.
+type FieldOption = {
   label: string;
   value: string;
   type?: string;
-}
+};
 
 interface Props {
   modelValue?: DeduplicationConfig;

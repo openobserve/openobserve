@@ -463,7 +463,6 @@ export default defineComponent({
 
           // User chose to replace
           const loadingNotif = toast({
-            type: "ongoing",
             message: "Replacing dashboard...",
             timeout: 0,
             variant: "loading",
@@ -508,7 +507,6 @@ export default defineComponent({
 
         // No existing dashboard, proceed with import
         const loadingNotif = toast({
-          type: "ongoing",
           message: "Importing dashboard...",
           timeout: 0,
           variant: "loading",

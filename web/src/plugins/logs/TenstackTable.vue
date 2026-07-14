@@ -287,7 +287,10 @@ class="mr-1" />
         class="relative"
         :style="{ height: totalSize + 'px' }"
       >
-        <template v-for="virtualRow in virtualRows" :key="virtualRow.id">
+        <template
+          v-for="virtualRow in virtualRows"
+          :key="formattedRows[virtualRow.index]?.id"
+        >
           <tr
             :data-test="`logs-search-result-detail-${
               (tableRows[virtualRow.index] as any)[
@@ -515,6 +518,7 @@ import {
   FlexRender,
   type ColumnDef,
   type SortingState,
+  type TableOptionsWithReactiveData,
   useVueTable,
   getCoreRowModel,
   getSortedRowModel,
@@ -594,7 +598,8 @@ const props = defineProps({
     required: false,
   },
   selectedStreamFtsKeys: {
-    type: Array as PropType<StreamField[]>,
+    // Receives field-name strings (see SearchResult selectedStreamFullTextSearchKeys).
+    type: Array as PropType<string[]>,
     default: () => [],
   },
   selectedStreamFields: {
@@ -799,7 +804,9 @@ let table: any = useVueTable({
   },
   columnResizeMode,
   enableColumnResizing: true,
-});
+  // aggregationFns et al. are injected by TanStack's feature models at runtime;
+  // its option type marks them required, so assert the reactive-data shape.
+} as TableOptionsWithReactiveData<Record<string, unknown>>);
 
 const columnSizeVars = computed(() => {
   const headers = table?.getFlatHeaders();
@@ -879,7 +886,7 @@ const isResizingHeader = ref(false);
 
 const headerGroups = computed(() => table?.getHeaderGroups()[0]);
 
-const headers = computed(() => headerGroups.value.headers);
+const headers = computed<any[]>(() => headerGroups.value.headers);
 
 // Skeleton loading helpers — mirrors OTable shimmer pattern
 const SKEL_ROW_COUNT = 30;

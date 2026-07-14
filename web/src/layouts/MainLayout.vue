@@ -151,6 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
+import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import Header from "../components/Header.vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -360,7 +361,7 @@ export default defineComponent({
 
     let user = store.state.userInfo;
 
-    var linksList = ref([
+    var linksList = ref<NavItem[]>([
       {
         title: t("menu.home"),
         icon: "home",

@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedDestinationName[index] || ''"
                         @update:model-value="(val) => {
                           userSelectedDestinationName[index] = val;
-                          updateDestinationName(val, index);
+                          updateDestinationName(val as string, index);
                         }"
                         :label="'Destination Name *'"
                         class="showLabelOnTop"
@@ -167,8 +167,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="destination-import-template-input"
                         :model-value="userSelectedTemplates[index] || ''"
                         @update:model-value="(val) => {
-                          userSelectedTemplates[index] = val;
-                          updateDestinationTemplate(val, index);
+                          userSelectedTemplates[index] = val as string;
+                          updateDestinationTemplate(val as string, index);
                           templateErrors[index] = val ? '' : 'Field is required!';
                         }"
                         :options="filteredTemplates"
@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedEmails[index] || ''"
                         @update:model-value="(val) => {
                           userSelectedEmails[index] = val;
-                          updateDestinationEmails(val, index);
+                          updateDestinationEmails(val as string, index);
                         }"
                         :label="'Emails (comma separated) *'"
                         class="showLabelOnTop"
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedActionId[index] || ''"
                         @update:model-value="(val) => {
                           userSelectedActionId[index] = val;
-                          updateDestinationAction(val, index);
+                          updateDestinationAction(val as string, index);
                           actionErrors[index] = val ? '' : 'Field is required!';
                         }"
                         :options="filteredActions"
@@ -252,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedSkipTlsVerify[index] ?? false"
                         :label="t('alert_destinations.skip_tls_verify')"
                         class="mt-2"
-                        @update:model-value="updateSkipTlsVerify($event, index)"
+                        @update:model-value="updateSkipTlsVerify($event as boolean, index)"
                       />
                     </div>
                   </span>

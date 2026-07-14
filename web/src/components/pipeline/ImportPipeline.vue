@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :label="t('alerts.stream_name') + ' *'"
                         class="py-2 showLabelOnTop no-case"
                         @update:model-value="(val) => {
-                          userSelectedStreamName[index] = val;
+                          userSelectedStreamName[index] = val as string;
                           updateStreamFields(val, index);
                         }"
                         @search="handleDynamicStreamName($event, index)"

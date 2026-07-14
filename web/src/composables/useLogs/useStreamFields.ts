@@ -1228,15 +1228,16 @@ export const useStreamFields = () => {
         }
 
         let sizes: any;
+        // selectedStream array is coerced to its comma-joined string form as key
         if (
           searchObj.data.resultGrid.colSizes &&
           searchObj.data.resultGrid.colSizes.hasOwnProperty(
-            searchObj.data.stream.selectedStream,
+            searchObj.data.stream.selectedStream as unknown as string,
           )
         ) {
           sizes =
             searchObj.data.resultGrid.colSizes[
-              searchObj.data.stream.selectedStream
+              searchObj.data.stream.selectedStream as unknown as string
             ];
         }
 

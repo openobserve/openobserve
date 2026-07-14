@@ -1472,9 +1472,9 @@ const validateReportData = async (): Promise<boolean> => {
   if (formData.value.frequency.type === "cron") {
     try {
       cronError.value = "";
+      // cron-parser v5 dropped the `utc` option; parse validity is tz-independent here.
       CronExpressionParser.parse(frequency.value.cron, {
         currentDate: new Date(),
-        utc: true,
       });
       validateFrequency();
     } catch (err) {

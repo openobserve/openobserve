@@ -218,8 +218,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSeparator
             v-if="
               drilldown._isCrossLink &&
-              index > 0 &&
-              !drilldownArray[index - 1]._isCrossLink
+              Number(index) > 0 &&
+              !drilldownArray[Number(index) - 1]._isCrossLink
             "
           />
           <div
@@ -1390,7 +1390,7 @@ export default defineComponent({
 
     // ResizeObserver to detect chartPanelRef dimension changes
     let resizeObserver: ResizeObserver | null = null;
-    let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
+    let resizeTimeout: number | null = null;
 
     onMounted(() => {
       if (chartPanelRef.value) {

@@ -529,7 +529,16 @@ export default defineComponent({
     ];
 
     // Enterprise features list - all 21 features
-    const enterpriseFeatures = [
+    const enterpriseFeatures: {
+      name: string;
+      note: string;
+      icon: string;
+      link?: string;
+      requiresHA?: boolean;
+      beta?: boolean;
+      cloudOnly?: boolean;
+      cloudHidden?: boolean;
+    }[] = [
       {
         name: t("about.enterprise_offer.enterprise_features.single_sign_on.name"),
         note: t("about.enterprise_offer.enterprise_features.single_sign_on.note"),

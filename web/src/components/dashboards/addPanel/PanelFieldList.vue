@@ -174,7 +174,9 @@
               )
             "
             data-test="dashboard-add-filter-data"
-            @click.stop="addFilteredItem(row)"
+            @click.stop="
+              addFilteredItem(row as { name: string; stream: string })
+            "
           >
             +F
           </OButton>
@@ -238,7 +240,9 @@
               )
             "
             data-test="dashboard-add-filter-data"
-            @click.stop="addFilteredItem(row)"
+            @click.stop="
+              addFilteredItem(row as { name: string; stream: string })
+            "
           >
             +F
           </OButton>
@@ -279,7 +283,9 @@
             variant="ghost-neutral"
             size="chip"
             data-test="dashboard-add-filter-data"
-            @click.stop="addFilteredItem(row)"
+            @click.stop="
+              addFilteredItem(row as { name: string; stream: string })
+            "
           >
             +F
           </OButton>
@@ -343,7 +349,9 @@
               )
             "
             data-test="dashboard-add-filter-data"
-            @click.stop="addFilteredItem(row)"
+            @click.stop="
+              addFilteredItem(row as { name: string; stream: string })
+            "
           >
             +F
           </OButton>

@@ -241,7 +241,7 @@ watch(
       segmentsCount > 0 &&
       eventsCount > 0 &&
       relativeTime &&
-      relativeTime[0] > 0
+      Number(relativeTime[0]) > 0
     ) {
       // Clear any existing timer
       if (seekTimer !== null) {

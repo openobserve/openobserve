@@ -197,7 +197,7 @@
                 size="sm"
                 name="close"
                 style="cursor: pointer; flex-shrink: 0"
-                @click="() => removeVariableRow(index)"
+                @click="() => removeVariableRow(Number(index))"
                 :data-test="`dashboard-drilldown-variable-remove-${index}`"
               />
             </div>
@@ -379,13 +379,25 @@ export default defineComponent({
 
     // Bridge the Monaco logsQuery + cascade resets + array-row mutations into the
     // single form.
+    const setField = form.setFieldValue as (
+      name: string,
+      val: unknown,
+    ) => void;
     const setFormField = (name: string, val: unknown) => {
-      form.setFieldValue(name, val);
+      setField(name, val);
     };
+    // Casts: array-field helpers need real array paths; this facade writes by
+    // field keys don't survive DeepKeysOfType and resolve to `never`.
     const addVariableRow = () =>
-      form.pushFieldValue("data.variables", { name: "", value: "" });
+      (form.pushFieldValue as (field: string, value: unknown) => void)(
+        "data.variables",
+        { name: "", value: "" },
+      );
     const removeVariableRow = (index: number) =>
-      form.removeFieldValue("data.variables", index);
+      (form.removeFieldValue as (field: string, index: number) => void)(
+        "data.variables",
+        index,
+      );
 
     // Reactive READ of the form values (rule ③: form.useStore, NOT a local copy)
     // — drives the v-if (type/logsMode/folder/dashboard), the cascades, and the

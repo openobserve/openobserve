@@ -500,7 +500,7 @@ import pipelinesService from "@/services/pipelines";
 import http from "@/services/http";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const store = useStore();
@@ -552,7 +552,7 @@ const selectedRow = ref<any>(null);
 const errorMessage = ref<any>(null);
 
 // Table columns
-const columns = ref([
+const columns = ref<OTableColumnDef[]>([
   {
     id: "row_number",
     header: "#",

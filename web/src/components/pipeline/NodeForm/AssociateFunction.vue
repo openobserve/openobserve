@@ -176,12 +176,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   ref,
   type Ref,
+  type PropType,
   watch,
   nextTick,
   defineAsyncComponent,
   onMounted,
   computed,
 } from "vue";
+import type { SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -228,7 +230,7 @@ const props = defineProps({
     default: false,
   },
   functions: {
-    type: Array,
+    type: Array as PropType<SelectOptionInput[]>,
     required: true,
     default: () => {
       return [];

@@ -600,6 +600,7 @@ export default defineComponent({
       resetSelectedFields,
       // Field value fetching
       fieldValues,
+      defaultValuesCount,
       expandedFields,
       openFilterCreator,
       handleSearchFieldValues,

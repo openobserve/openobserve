@@ -1,14 +1,14 @@
 <!-- Flowchart.vue -->
 <script lang="ts" setup>
 import { ref } from "vue";
-import { VueFlow, Edge, MarkerType } from "@vue-flow/core";
+import { VueFlow, Edge, Node, MarkerType } from "@vue-flow/core";
 
 /* import the required styles */
 import "@vue-flow/core/dist/style.css";
 /* import the default theme (optional) */
 import "@vue-flow/core/dist/theme-default.css";
 
-const nodes = ref([
+const nodes = ref<Node[]>([
   { id: "1", type: "input", label: "Node 1", position: { x: 250, y: 5 } },
   { id: "2", label: "Node 2", position: { x: 100, y: 100 } },
   { id: "3", label: "Node 3", position: { x: 400, y: 100 } },

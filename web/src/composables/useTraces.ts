@@ -119,6 +119,7 @@ const defaultObject = {
       removeFilterField: "",
       functions: [],
       filters: [] as any[],
+      userDefinedSchema: [] as string[],
       fieldValues: {} as {
         [key: string | number]: {
           isLoading: boolean;
@@ -158,6 +159,10 @@ const defaultObject = {
         trace_id: string;
         trace_start_time: number;
         trace_end_time: number;
+        // Stamped on at runtime by TraceDetails' updateServiceColors: the
+        // per-service span counts derived from the span list.
+        service_name?: { service_name: string; count: number }[];
+        services?: Record<string, number>;
       } | null,
       traceId: "",
       spanList: [],
@@ -303,7 +308,7 @@ const useTraces = () => {
 
     const searchParams = new URLSearchParams();
     for (const [key, value] of Object.entries(queryParams)) {
-      searchParams.append(key, value);
+      searchParams.append(key, value as string);
     }
     const queryString = searchParams.toString();
 

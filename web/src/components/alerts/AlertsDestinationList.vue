@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #actions>
           <OToggleGroup
             :model-value="activeTab"
-            @update:model-value="(v) => { activeTab = v; }"
+            @update:model-value="(v) => { activeTab = v as 'all' | 'prebuilt' | 'custom'; }"
             data-test="destination-list-tabs"
           >
             <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">

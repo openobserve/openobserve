@@ -49,6 +49,7 @@ export interface HandoffVariant {
 const PROM_METRIC_NAME_RE = /^[a-zA-Z_:][a-zA-Z0-9_:]*$/;
 
 /** Characters `buildSelector` escapes but the query modeller does not. */
+// eslint-disable-next-line no-control-regex -- matching control chars is the intent
 const CONTROL_CHAR_RE = /[\u0000-\u001f\u007f]/;
 
 /**

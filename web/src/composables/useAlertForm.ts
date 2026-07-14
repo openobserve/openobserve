@@ -2034,7 +2034,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       callAlert
         .then((res: { data: any }) => {
           formData.value = { ...defaultAlertValue() };
-          emit("update:list", activeFolderId.value);
+          emit("update:list", activeFolderId.value as string);
           addAlertForm.value?.resetValidation();
           dismiss();
           toast({
@@ -2070,7 +2070,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       callAlert
         .then((res: { data: any }) => {
           formData.value = { ...defaultAlertValue() };
-          emit("update:list", activeFolderId.value);
+          emit("update:list", activeFolderId.value as string);
           addAlertForm.value?.resetValidation();
           dismiss();
           toast({

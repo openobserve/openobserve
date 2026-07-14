@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
-        <template #expansion="{ row }">
+        <template #expansion="{ row }: { row: PipelineRow }">
           <div
             v-if="row?.sql_query"
             data-test="scheduled-pipeline-expanded-content"
@@ -470,6 +470,11 @@ import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 const { t } = useI18n();
 const router = useRouter();
 
+// Row original data rendered by the pipelines table. Only the fields read in the
+// expansion slot are declared here; scheduled rows carry the derived SQL query.
+interface PipelineRow {
+  sql_query?: string;
+}
 
 const filterQuery = ref("");
 

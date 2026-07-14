@@ -1518,7 +1518,8 @@ export default defineComponent({
     const currentStreamingMessage = ref("");
     const currentTextSegment = ref(""); // Track current text segment (resets after each tool call)
     const showHistory = ref(false);
-    const chatHistory = ref<ChatHistoryEntry[]>([]);
+    // `model` is stored on persisted entries but missing from the shared interface
+    const chatHistory = ref<(ChatHistoryEntry & { model?: string })[]>([]);
     const currentChatId = ref<number | null>(null);
     const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
     const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
@@ -1632,6 +1633,7 @@ export default defineComponent({
       tool: string;
       message: string;
       context: Record<string, any>;
+      call_id?: string;
     } | null>(null);
 
     // Pending tool calls - stores tool calls that arrive before text content to avoid empty message boxes
@@ -4003,7 +4005,11 @@ export default defineComponent({
 
         // Add base64 encoded query
         if (target.query) {
-          queryParams.query = encodeForUrl(target.query);
+          queryParams.query = encodeForUrl(
+            typeof target.query === "string"
+              ? target.query
+              : JSON.stringify(target.query),
+          );
         }
 
         // Add VRL function if present
@@ -4022,33 +4028,36 @@ export default defineComponent({
       } else if (action.action === "navigate_direct") {
         // Direct navigation - build proper URLs based on resource type
         let path = action.target.path || `/${action.resource_type}`;
+        // navigate_direct always carries the record form of `query`
+        const targetQuery = action.target.query as
+          | Record<string, any>
+          | undefined;
         const queryParams: Record<string, string> = {
           org_identifier: store.state.selectedOrganization.identifier,
-          ...action.target.query,
+          ...targetQuery,
         };
 
         // Resource-type-specific URL handling
         if (action.resource_type === "alert") {
           path = "/alerts";
-          const alertId =
-            action.target.alert_id || action.target.query?.alert_id;
+          const alertId = action.target.alert_id || targetQuery?.alert_id;
           if (alertId) {
             // Navigate to specific alert with update action
             queryParams.action = "update";
             queryParams.alert_id = alertId;
-            queryParams.name = action.target.name || action.target.query?.name;
+            queryParams.name = action.target.name || targetQuery?.name;
           }
           queryParams.folder =
-            action.target.folder || action.target.query?.folder || "default";
+            action.target.folder || targetQuery?.folder || "default";
         } else if (action.resource_type === "dashboard") {
           // Dashboards use /dashboards/view path
           path = "/dashboards/view";
           queryParams.dashboard =
             action.target.dashboard_id ||
             action.target.dashboardId ||
-            action.target.query?.dashboardId;
+            targetQuery?.dashboardId;
           queryParams.folder =
-            action.target.folder || action.target.query?.folder || "default";
+            action.target.folder || targetQuery?.folder || "default";
           queryParams.tab = action.target.tab || "tab-1";
           queryParams.refresh = "Off";
           queryParams.period = "15m";
@@ -4057,10 +4066,8 @@ export default defineComponent({
           // Pipelines use /pipeline/pipelines/edit path
           path = "/pipeline/pipelines/edit";
           queryParams.id =
-            action.target.pipeline_id ||
-            action.target.id ||
-            action.target.query?.id;
-          queryParams.name = action.target.name || action.target.query?.name;
+            action.target.pipeline_id || action.target.id || targetQuery?.id;
+          queryParams.name = action.target.name || targetQuery?.name;
         }
 
         await router.push({ path, query: queryParams });
@@ -5519,15 +5526,22 @@ export default defineComponent({
       return Object.keys(data).length > 0 ? data : null;
     };
 
-    const hasToolCallDetails = (block: ContentBlock) => {
+    // `response` is stamped onto blocks by the stream handler but is not part
+    // of the shared ContentBlock interface.
+    const hasToolCallDetails = (
+      block: ContentBlock & { response?: Record<string, any> },
+    ) => {
       // Show details for failed tools, successful tools with summary, tools with context data, or tools with response
       if (block.success === false) return true;
-      if (block.success !== false && block.summary) return true;
+      if ((block.success as boolean | undefined) !== false && block.summary)
+        return true;
       if (block.response) return true;
       return getToolCallDisplayData(block.context) !== null;
     };
 
-    const formatToolCallMessage = (block: ContentBlock) => {
+    const formatToolCallMessage = (
+      block: ContentBlock & { response?: Record<string, any> },
+    ) => {
       // Show error message for failed tools
       // Tool-specific messages (both success and error)
       if (block.tool === "testFunction") {

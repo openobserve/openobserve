@@ -355,7 +355,8 @@ const onColumnReorder = (newOrder: string[]) => {
   searchObj.data.stream.selectedFields = newOrder.filter(
     (id) => id !== store.state.zoConfig.timestamp_column,
   );
-  updatedLocalLogFilterField(mode);
+  // useTraces only persists per traces/spans; other modes have no column state.
+  updatedLocalLogFilterField(mode as "traces" | "spans");
 };
 
 const onCloseColumn = (columnDef: any) => {
@@ -363,7 +364,7 @@ const onCloseColumn = (columnDef: any) => {
   const fieldIdx = searchObj.data.stream.selectedFields.indexOf(columnDef.id);
   if (fieldIdx !== -1) {
     searchObj.data.stream.selectedFields.splice(fieldIdx, 1);
-    updatedLocalLogFilterField(mode);
+    updatedLocalLogFilterField(mode as "traces" | "spans");
   }
   const colIdx = searchObj.data.resultGrid.columns.findIndex(
     (c: any) => c.id === columnDef.id,

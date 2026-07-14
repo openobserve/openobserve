@@ -440,6 +440,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import TraceServiceCell from "./components/TraceServiceCell.vue";
@@ -617,7 +618,7 @@ let currentTraceId: string | null = null;
 // sort-change; the catalog reorders `sortedServices` itself), so each sortable
 // column just sets `sortable: true`. The service-name column is the `flex`
 // filler so the table fills its container like the Dashboards name column.
-const tableColumns = computed(() => [
+const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
   {
     id: "service_name",
     hideable: true,
@@ -956,7 +957,7 @@ function getTimeRange(): { start_time: number; end_time: number } {
 // Load trace streams using the same method as the Traces search page
 const loadAvailableStreams = async () => {
   try {
-    const res = await getStreams("traces", false, false);
+    const res: any = await getStreams("traces", false, false);
     if (res?.list?.length > 0) {
       availableStreams.value = res.list.map((stream: any) => stream.name);
     }

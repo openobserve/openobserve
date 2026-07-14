@@ -39,11 +39,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeUnmount, computed } from "vue";
+import { defineComponent, ref, onBeforeUnmount, computed, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import OButton from "@/lib/core/Button/OButton.vue";
+import type { ButtonVariant, ButtonSize } from "@/lib/core/Button/OButton.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import shortURLService from "@/services/short_url";
@@ -65,12 +66,12 @@ export default defineComponent({
     },
     // OButton variant
     variant: {
-      type: String,
+      type: String as PropType<ButtonVariant>,
       default: "outline",
     },
     // OButton size
     size: {
-      type: String,
+      type: String as PropType<ButtonSize>,
       default: "icon-xs",
     },
     // Show "Share" label text next to icon

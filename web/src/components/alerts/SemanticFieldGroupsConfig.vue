@@ -156,7 +156,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 const store = useStore();
 const { t } = useI18n();
 
-interface SemanticGroup {
+export interface SemanticGroup {
   id: string;
   display: string;
   group?: string;

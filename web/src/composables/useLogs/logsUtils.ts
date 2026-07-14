@@ -86,6 +86,20 @@ export const removeFieldFromWhereAST = (
   return whereNode;
 };
 
+// node-sql-parser CTE entry: a named WITH clause whose statement is another AST node
+export interface ParsedSQLWithClause {
+  name?: unknown;
+  stmt?: ExtendedParsedSQLResult | Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+// node-sql-parser AST extras not covered by ParsedSQLResult (union chains, CTEs)
+export type ExtendedParsedSQLResult = ParsedSQLResult & {
+  // union chains continue recursively in the same shape
+  _next?: ExtendedParsedSQLResult | null;
+  with?: ParsedSQLWithClause[] | null;
+};
+
 export const logsUtils = () => {
   const { searchObj } = searchState();
   let parser: Parser | null = new Parser();
@@ -127,7 +141,7 @@ export const logsUtils = () => {
    * console.log(result.where);   // WHERE condition object
    * ```
    */
-  const fnParsedSQL = (queryString: string = ""): ParsedSQLResult => {
+  const fnParsedSQL = (queryString: string = ""): ExtendedParsedSQLResult => {
     try {
       const finalQueryString: string = queryString || searchObj.data.query;
       const filteredQuery: string = finalQueryString
@@ -135,9 +149,9 @@ export const logsUtils = () => {
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
 
-      const parsedQuery: ParsedSQLResult | null = parser?.astify(
+      const parsedQuery: ExtendedParsedSQLResult | null = parser?.astify(
         filteredQuery,
-      ) as unknown as ParsedSQLResult;
+      ) as unknown as ExtendedParsedSQLResult;
       return parsedQuery || DEFAULT_PARSED_RESULT;
 
       // return convertPostgreToMySql(parser.astify(filteredQuery));
@@ -580,16 +594,19 @@ export const logsUtils = () => {
       query["stream_type"] = searchObj.data.stream.streamType;
     }
 
+    // selectedStream is string[] in state; branches below defensively handle
+    // legacy string / { value } shapes that may still reach this code path
+    const selectedStream: string[] = searchObj.data.stream.selectedStream;
     if (
-      searchObj.data.stream.selectedStream.length > 0 &&
-      typeof searchObj.data.stream.selectedStream != "object"
+      selectedStream.length > 0 &&
+      typeof selectedStream != "object"
     ) {
-      query["stream"] = searchObj.data.stream.selectedStream.join(",");
+      query["stream"] = selectedStream.join(",");
     } else if (
-      typeof searchObj.data.stream.selectedStream == "object" &&
-      searchObj.data.stream.selectedStream.hasOwnProperty("value")
+      typeof selectedStream == "object" &&
+      selectedStream.hasOwnProperty("value")
     ) {
-      query["stream"] = searchObj.data.stream.selectedStream.value;
+      query["stream"] = (selectedStream as unknown as { value: string }).value;
     } else {
       query["stream"] = searchObj.data.stream.selectedStream.join(",");
     }

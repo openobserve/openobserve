@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-center space-x-4 w-fit!">
             <!-- Back button -->
             <OButton
-              v-if="mode === 'standalone' && showBackButton"
+              v-if="(mode as string) === 'standalone' && showBackButton"
               data-test="trace-details-back-btn"
               variant="ghost-muted"
               size="icon-xs"
@@ -328,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Apply filters button (standalone mode, right side) -->
             <OButton
-              v-if="mode === 'standalone' && areFiltersAdded"
+              v-if="(mode as string) === 'standalone' && areFiltersAdded"
               data-test="trace-details-apply-filters-btn-right"
               variant="outline"
               size="xs"
@@ -357,7 +357,7 @@ size="xs"
 
             <!-- Share button (standalone mode) -->
             <share-button
-              v-if="mode === 'standalone' && showShareButton"
+              v-if="(mode as string) === 'standalone' && showShareButton"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
               variant="outline"
@@ -367,7 +367,7 @@ size="xs"
 
             <!-- Close button -->
             <OButton
-              v-if="mode === 'standalone' && showCloseButton"
+              v-if="(mode as string) === 'standalone' && showCloseButton"
               data-test="trace-details-close-btn"
               variant="ghost"
               size="icon-xs"
@@ -510,7 +510,7 @@ size="sm">
             >
               <OSelect
                 data-test="trace-details-log-streams-select"
-                v-model="searchObj.data.traceDetails.selectedLogStreams"
+                v-model="(searchObj.data.traceDetails.selectedLogStreams as string[])"
                 :placeholder="t('search.selectLogStream')"
                 :options="filteredStreamOptions"
                 multiple
@@ -978,7 +978,10 @@ import { resolveSessionId } from "./traceDetails.utils";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
 import { buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
 import { useTracePatternTree } from "@/composables/useTracePatternTree";
-import { createTreeVisualizationEngine } from "@/utils/traces/treeVisualizationEngine";
+import {
+  createTreeVisualizationEngine,
+  type TreeVisualizationData,
+} from "@/utils/traces/treeVisualizationEngine";
 import { generateTracePatternTooltipContent } from "@/utils/traces/treeTooltipHelpers";
 import {
   SPAN_KIND_MAP,
@@ -1017,7 +1020,6 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
 import {
   TRACE_SERVICE_DETECTION_KEY,
   useSpanServiceDetection,
@@ -1657,11 +1659,12 @@ export default defineComponent({
         const chart = chartRendererRef.value?.chart;
         if (chart) {
           const { setupTraceNodeTooltips } = createTreeVisualizationEngine();
+          // Tooltip setup never calls getNodeLabel, so it is omitted here.
           tooltipCleanup = setupTraceNodeTooltips(chart, {
             treeData: patternTreeData.value,
             getNodeTooltip: getPatternNodeTooltip,
             getNodeErrorRate: getPatternNodeErrorRate
-          }, isDarkMode.value);
+          } as TreeVisualizationData, isDarkMode.value);
         }
       }, 300);
     }
@@ -1824,7 +1827,8 @@ export default defineComponent({
     });
 
     const selectedSpanId = computed(() => {
-      return searchObj.data.traceDetails.selectedSpanId;
+      // useTraces types this as the String wrapper; narrow to the primitive.
+      return searchObj.data.traceDetails.selectedSpanId as string | null;
     });
 
     const hoveredSpanId = ref("");
@@ -2064,22 +2068,21 @@ export default defineComponent({
     };
 
     const updateServiceColors = () => {
-      searchObj.data.traceDetails.selectedTrace.service_name.forEach(
-        (service: any) => {
-          if (!searchObj.meta.serviceColors[service.service_name]) {
-            if (serviceColorIndex.value >= colors.value.length)
-              generateNewColor();
+      // service_name / services are stamped onto selectedTrace at runtime (see
+      // useTraces type); non-null asserts preserve the existing unguarded access.
+      const selected = searchObj.data.traceDetails.selectedTrace!;
+      selected.service_name!.forEach((service) => {
+        if (!searchObj.meta.serviceColors[service.service_name]) {
+          if (serviceColorIndex.value >= colors.value.length)
+            generateNewColor();
 
-            searchObj.meta.serviceColors[service.service_name] =
-              colors.value[serviceColorIndex.value];
+          searchObj.meta.serviceColors[service.service_name] =
+            colors.value[serviceColorIndex.value];
 
-            serviceColorIndex.value++;
-          }
-          (searchObj.data.traceDetails.selectedTrace as any).services[
-            service.service_name
-          ] = service.count;
-        },
-      );
+          serviceColorIndex.value++;
+        }
+        selected.services![service.service_name] = service.count;
+      });
     };
 
     const showTraceDetailsError = () => {

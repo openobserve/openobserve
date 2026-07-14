@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       searchable
                       :placeholder="filter.name ? '' : 'Select Field'"
                       :title="filter.name || undefined"
-                      @update:model-value="filterUpdated(index, $event)"
+                      @update:model-value="filterUpdated(Number(index), $event)"
                       data-test="dashboard-query-values-filter-name-selector"
                       class="flex-2 min-w-0"
                     >
@@ -350,18 +350,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="index"
               class="flex"
             >
-              <span class="pt-3.5 w-6">{{ index + 1 }}</span>
+              <span class="pt-3.5 w-6">{{ Number(index) + 1 }}</span>
               <OFormInput
                 :name="`options[${index}].label`"
                 class="flex-1 mr-2"
                 :data-test="`dashboard-custom-variable-${index}-label`"
-                :placeholder="'Label ' + (index + 1)"
+                :placeholder="'Label ' + (Number(index) + 1)"
               />
               <OFormInput
                 :name="`options[${index}].value`"
                 class="flex-1 mr-2"
                 :data-test="`dashboard-custom-variable-${index}-value`"
-                :placeholder="'Value ' + (index + 1)"
+                :placeholder="'Value ' + (Number(index) + 1)"
               />
               <div class="flex w-12 item-center justify-center">
                 <OFormCheckbox
@@ -458,7 +458,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="variableData.multiSelect"
                     variant="ghost"
                     size="icon"
-                    @click="removeCustomValue(index)"
+                    @click="removeCustomValue(Number(index))"
                     :data-test="`dashboard-variable-custom-close-${index}`"
                     icon-left="close"
                   >
@@ -652,12 +652,20 @@ export default defineComponent({
 
     // Programmatic writes (cascades, edit-prefill, scope resets, array add/remove)
     // all go through the single form — never by mutating a mirror.
-    const setFormField = (name: string, val: unknown) =>
-      form.setFieldValue(name, val);
+    // Loose setter for dynamic/dotted field paths: this facade writes arbitrary
+    // form keys by string, so cast the method to a string-keyed signature (the
+    // form generic stays intact for the array helpers below).
+    const setField = form.setFieldValue as (
+      name: string,
+      val: unknown,
+    ) => void;
+    const setFormField = (name: string, val: unknown) => setField(name, val);
+    // `as never`: field paths are dynamic strings, so they can't satisfy the
+    // form's literal DeepKeys union; type-only cast, runtime unchanged.
     const formPush = (name: string, val: unknown) =>
-      form.pushFieldValue(name, val);
+      form.pushFieldValue(name as never, val as never);
     const formRemove = (name: string, index: number) =>
-      form.removeFieldValue(name, index);
+      form.removeFieldValue(name as never, index);
 
     // Reactive READS of the form values (rule ③: form.useStore, NOT a local copy).
     const formValues = form.useStore((s: any) => s.values);
@@ -671,7 +679,7 @@ export default defineComponent({
     // truth. (Nested writes must use setFormField with a dotted path.)
     const fieldView = (key: string) => ({
       get: () => formValues.value?.[key],
-      set: (v: unknown) => form.setFieldValue(key, v),
+      set: (v: unknown) => setField(key, v),
       enumerable: true,
     });
     const variableData: any = Object.defineProperties(
@@ -685,14 +693,14 @@ export default defineComponent({
         query_data: {
           get: () => formValues.value?.query_data ?? {},
           set: (v: unknown) => {
-            form.setFieldValue("query_data", v);
+            setField("query_data", v);
           },
           enumerable: true,
         },
         options: {
           get: () => formValues.value?.options ?? [],
           set: (v: unknown) => {
-            form.setFieldValue("options", v);
+            setField("options", v);
           },
           enumerable: true,
         },
@@ -702,7 +710,7 @@ export default defineComponent({
         customMultiSelectValue: {
           get: () => formValues.value?.customMultiSelectValue ?? [],
           set: (v: unknown) => {
-            form.setFieldValue("customMultiSelectValue", v);
+            setField("customMultiSelectValue", v);
           },
           enumerable: true,
         },

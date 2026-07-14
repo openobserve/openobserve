@@ -941,11 +941,11 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
 import {
   TRACE_SERVICE_DETECTION_KEY,
   useSpanServiceDetection,
 } from "@/utils/traces/useSpanServiceDetection";
+import type { Span } from "@/ts/interfaces/traces/span.types";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 
 // luxon equivalent of "MMM DD, YYYY HH:mm:ss.SSS Z" → e.g. "Jun 24, 2026 17:39:32.157 +0530"
@@ -2068,7 +2068,7 @@ export default defineComponent({
         props.span?.service_name ?? "",
         store.state.theme === "dark",
         props.span
-          ? getOrSetServiceColor(resolveSpanIdentity(props.span))
+          ? getOrSetServiceColor(resolveSpanIdentity(props.span as Span))
           : "#9e9e9e",
       ),
     );

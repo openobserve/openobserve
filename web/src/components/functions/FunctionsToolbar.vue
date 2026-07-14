@@ -124,6 +124,7 @@
 import {
   ref,
   computed,
+  type PropType,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -164,7 +165,7 @@ const props = defineProps({
     default: "0",
   },
   transformTypeOptions: {
-    type: Array,
+    type: Array as PropType<{ label: string; value: string | number }[]>,
     default: () => [],
   },
 });

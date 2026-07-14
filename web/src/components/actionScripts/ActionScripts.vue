@@ -370,6 +370,9 @@ export default defineComponent({
 
     const { getStreams } = useStreams();
 
+    // Clone-dialog bindings referenced by the template; nothing opens the dialog yet.
+    const showForm = ref(false);
+    const submitForm = () => {};
     const toBeCloneAlertName = ref("");
     const toBeCloneUUID = ref("");
     const toBeClonestreamType = ref("");
@@ -863,6 +866,10 @@ export default defineComponent({
       showDeleteDialogFn,
       maxRecordToReturn,
       showAddActionScriptDialog,
+      showForm,
+      submitForm,
+      updateStreams,
+      updateStreamName,
       toBeCloneAlertName,
       toBeCloneUUID,
       toBeClonestreamType,

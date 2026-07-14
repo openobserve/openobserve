@@ -62,11 +62,14 @@ export interface WebSocketSearchResponse {
       histogram_interval?: number;
       is_histogram_eligible?: boolean;
       converted_histogram_query?: string;
+      histogram_breakdown_field?: string | null;
     };
     streaming_aggs?: boolean;
     total?: number;
     time_offset?: string;
     traceId: string;
+    // streaming payloads carry the snake_case trace_id alongside declared traceId
+    trace_id?: string;
     type?: string;
   };
 }

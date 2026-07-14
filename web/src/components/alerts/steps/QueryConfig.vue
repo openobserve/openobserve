@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :placeholder="t('alerts.placeholders.selectColumn')"
                       :error="columnSelectError"
                       :class="['min-w-[140px] max-w-[200px]']"
-                      @update:model-value="columnSelectError = false; onLogMeasureColumnChange($event)"
+                      @update:model-value="columnSelectError = false; onLogMeasureColumnChange($event as string)"
                     />
                   </template>
 
@@ -591,7 +591,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ref="inlineQueryEditorRef"
                       data-test-prefix="alert-inline-sql"
                       :languages="localTab === 'promql' ? ['promql'] : ['sql']"
-                      :default-language="localTab"
+                      :default-language="(localTab as 'sql' | 'promql')"
                       :query="localTab === 'sql' ? localSqlQuery : localPromqlQuery"
                       editor-height="100%"
                       :disable-ai="!streamName"
@@ -1086,7 +1086,9 @@ export default defineComponent({
         updatePromqlQuery(newQuery);
       }
       autoCompleteData.value.query = newQuery;
-      autoCompleteData.value.cursorIndex = inlineQueryEditorRef.value?.getCursorIndex?.() ?? 0;
+      // NOTE: writes a top-level cursorIndex (composable declares position.cursorIndex);
+      // cast preserves existing runtime behavior.
+      (autoCompleteData.value as any).cursorIndex = inlineQueryEditorRef.value?.getCursorIndex?.() ?? 0;
       autoCompleteData.value.org = store.state.selectedOrganization.identifier;
       autoCompleteData.value.streamType = props.streamType;
       autoCompleteData.value.streamName = props.streamName;

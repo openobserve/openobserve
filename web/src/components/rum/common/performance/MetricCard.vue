@@ -71,11 +71,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useEventFormatters } from "@/composables/useEventFormatters";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 interface Props {
   label: string;
-  value: number | null | undefined;
+  value: string | number | null | undefined;
   unit?: string;
   icon?: string;
   status?: "good" | "needs-improvement" | "poor" | null;
@@ -100,15 +101,15 @@ const { formatResourceDuration } = useEventFormatters();
 const formattedValue = computed(() => {
   if (props.value == null) return "N/A";
 
-  // Auto-format duration values
+  // Auto-format duration values (unit-tagged values are always numeric)
   if (props.unit === "ns") {
     // Convert nanoseconds to milliseconds for formatting
-    const ms = props.value / 1000000;
+    const ms = Number(props.value) / 1000000;
     return formatResourceDuration(ms * 1000, false);
   }
 
   if (props.unit === "ms" || props.unit === "s") {
-    return formatResourceDuration(props.value, false);
+    return formatResourceDuration(Number(props.value), false);
   }
 
   // Format numbers with commas
@@ -165,11 +166,11 @@ const statusColorClass = computed(() => {
 
 const progressValue = computed(() => {
   if (props.value == null || !props.maxValue) return 0;
-  return Math.min((props.value / props.maxValue) * 1, 1);
+  return Math.min((Number(props.value) / props.maxValue) * 1, 1);
 });
-const progressVariant = computed(() => {
+const progressVariant = computed((): ProgressBarVariant => {
   if (!props.status) return "default";
-  const map: Record<string, string> = {
+  const map: Record<string, ProgressBarVariant> = {
     good: "default",
     "needs-improvement": "warning",
     poor: "danger",

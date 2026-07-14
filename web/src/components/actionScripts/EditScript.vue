@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             name="cron"
                             class="showLabelOnTop"
                             type="text"
-                            debounce="300"
+                            :debounce="300"
                             style="width: 100%"
                             :disabled="isEditingActionScript"
                             :readonly="isEditingActionScript"
@@ -489,7 +489,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
-import { useOForm } from "@/lib/forms/Form/useOForm";
+import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormFile from "@/lib/forms/File/OFormFile.vue";
@@ -637,9 +637,9 @@ const getCronError = (cron: string): string => {
   const value = String(cron ?? "").trim();
   if (!value) return "Invalid cron expression!";
   try {
+    // cron-parser v5 dropped the `utc` option; parse validity is tz-independent here.
     CronExpressionParser.parse(value, {
       currentDate: new Date(),
-      utc: true,
     });
   } catch {
     return "Invalid cron expression!";
@@ -741,7 +741,8 @@ watch(formType, (t) => {
 // whether to advance.
 const validateStepFields = async (fields: string[]): Promise<boolean> => {
   let valid = true;
-  for (const name of fields) {
+  // Field names are validated dynamically; cast to the form's DeepKeys union.
+  for (const name of fields as FormFieldPath<EditScriptForm>[]) {
     await form.validateField(name, "submit");
     const errors = form.getFieldMeta(name)?.errors ?? [];
     if (errors.length > 0) valid = false;

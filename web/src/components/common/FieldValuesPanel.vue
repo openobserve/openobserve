@@ -69,7 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="setFilterMode('include')"
           data-test="field-values-panel-include-mode-btn"
         >
-          <OIcon class="h-2.5! w-2.5! m-0.5!">
+          <!-- name="" → OIcon renders the slotted custom SVG -->
+          <OIcon name="" class="h-2.5! w-2.5! m-0.5!">
             <EqualIcon />
           </OIcon>
         </OButton>
@@ -82,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="setFilterMode('exclude')"
           data-test="field-values-panel-exclude-mode-btn"
         >
-          <OIcon class="h-2.5! w-2.5! m-0.5!">
+          <OIcon name="" class="h-2.5! w-2.5! m-0.5!">
             <NotEqualIcon />
           </OIcon>
         </OButton>
@@ -319,7 +320,13 @@ const displayValues = computed(() => {
   // No API values — fall back to synthetic entries for each selected value so
   // they remain visible and removable (count: null signals no data available).
   if (selectedValues.value.length > 0 && !props.fieldValues?.isLoading) {
-    return selectedValues.value.map((v) => ({ key: v, count: null as unknown as number, synthetic: true }));
+    return selectedValues.value.map(
+      (v): { key: string; count: number; label?: string; synthetic: boolean } => ({
+        key: v,
+        count: null as unknown as number,
+        synthetic: true,
+      }),
+    );
   }
 
   return [];

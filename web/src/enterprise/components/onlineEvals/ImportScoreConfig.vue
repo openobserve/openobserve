@@ -129,7 +129,7 @@ the Free Software Foundation, either version 3 of the License, or
                       v-model="categoriesFixers[err.itemIndex]"
                       label="Categories (comma-separated) *"
                       placeholder="good, ok, bad"
-                      @update:model-value="updateCategories(err.itemIndex, $event)"
+                      @update:model-value="updateCategories(err.itemIndex, $event as string)"
                     />
                   </div>
                 </span>
@@ -175,6 +175,7 @@ import { useI18n } from "vue-i18n";
 import BaseImport from "@/components/common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -255,14 +256,14 @@ function getBatch(): any[] | null {
   }
 }
 
-function updateName(itemIndex: number, value: string) {
+function updateName(itemIndex: number, value: string | number) {
   const arr = getBatch();
   if (!arr || !arr[itemIndex]) return;
   arr[itemIndex].name = value;
   syncEditor(arr);
 }
 
-function updateDataType(itemIndex: number, value: ScoreDataType) {
+function updateDataType(itemIndex: number, value: SelectModelValue) {
   const arr = getBatch();
   if (!arr || !arr[itemIndex]) return;
   arr[itemIndex].dataType = value;

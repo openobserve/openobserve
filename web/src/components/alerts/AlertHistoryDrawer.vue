@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :name="
                   isAnomaly
                     ? 'query-stats'
-                    : alertDetails.is-real-time
+                    : alertDetails.is_real_time
                       ? 'bolt'
                       : 'schedule'
                 "
@@ -790,7 +790,7 @@ const getRowClass = (row: any) => {
   return "";
 };
 
-const formatTimestamp = (timestamp: number) => {
+const formatTimestampRelative = (timestamp: number) => {
   if (!timestamp) return "N/A";
   const now = Date.now() * 1000; // microseconds
   const diff = now - timestamp;

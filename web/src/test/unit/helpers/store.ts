@@ -15,6 +15,28 @@
 
 import { createStore } from "vuex";
 
+// Mirror of the initial organizationData below; used by resetOrganizationData.
+const organizationObj = {
+  organizationPasscode: "",
+  allDashboardList: {},
+  rumToken: {
+    rum_token: "",
+  },
+  quotaThresholdMsg: "",
+  functions: [],
+  streams: {},
+  folders: [],
+  organizationSettings: {
+    scrape_interval: 15,
+    trace_id_field_name: "trace_id",
+    span_id_field_name: "span_id",
+  },
+  isDataIngested: false,
+  allDashboardData: {},
+  foldersByType: [],
+  allReportsListByFolderId: {},
+};
+
 const store = createStore({
   state: {
     API_ENDPOINT: "http://localhost:5080",

@@ -106,7 +106,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="handlePermissionChange(row, col)"
             />
           </template>
-          <template #expansion="{ row }">
+          <!-- expansion slot receives row.original (raw data), not the TanStack Row -->
+          <template #expansion="{ row }: { row: any }">
             <template v-if="row.entities">
               <PermissionsTable
                 :level="level + 1"

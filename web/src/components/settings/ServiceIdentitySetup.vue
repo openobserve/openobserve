@@ -1223,7 +1223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="dim.label + dimIdx"
                 class="flex-1 min-w-0 flex flex-col px-3"
                 :class="[
-                  dimIdx > 0
+                  Number(dimIdx) > 0
                     ? store.state.theme === 'dark'
                       ? 'border-l border-grey-8'
                       : 'border-l border-grey-3'

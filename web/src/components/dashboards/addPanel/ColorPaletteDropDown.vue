@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="`Panel color: ${dashboardPanelData.data.config.color.fixedColor[0]}`"
           :style="{ background: dashboardPanelData.data.config.color.fixedColor[0] }"
           data-test="dashboard-color-palette-swatch-btn"
-          @click="$refs.colorInput.click()"
+          @click="($refs.colorInput as HTMLInputElement).click()"
         />
         <input
           ref="colorInput"

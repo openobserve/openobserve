@@ -50,6 +50,7 @@ import type {
   PrebuiltTypeId,
   DestinationWithPrebuilt
 } from '@/utils/prebuilt-templates/types';
+import type { Destination } from '@/ts/interfaces/alert';
 
 // Store
 import { useStore } from 'vuex';
@@ -745,10 +746,10 @@ export function usePrebuiltDestinations() {
       isLoading.value = true;
 
       // Get existing destination
-      const existing = await alertDestinationService.get_by_name({
+      const existing = (await alertDestinationService.get_by_name({
         org_identifier: organizationIdentifier.value,
         destination_name: destinationName
-      });
+      })) as unknown as Destination;
 
       const config = getPrebuiltConfig(targetType);
       if (!config) {

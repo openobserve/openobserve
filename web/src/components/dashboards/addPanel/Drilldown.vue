@@ -28,7 +28,7 @@
           class="cursor-pointer pl-2.5 w-62.5 truncate"
           :data-test="`dashboard-addpanel-config-drilldown-name-${index}`"
         >
-          {{ index + 1 }}. {{ data.name }}
+          {{ Number(index) + 1 }}. {{ data.name }}
         </div>
         <OIcon
           class="mr-1 cursor-pointer"

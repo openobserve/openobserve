@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="showSchemaToggle">
       <OToggleGroup
         :model-value="useUserDefinedSchemas"
-        @update:model-value="$emit('toggle-schema', $event)"
+        @update:model-value="$emit('toggle-schema', $event as string)"
         :data-test="`${dataTestPrefix}-fields-list-user-defined-schema-toggle`"
         class="schema-field-toggle p-0 mt-1"
       >
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else-if="showQuickMode">
       <OToggleGroup
         :model-value="showOnlyInterestingFields"
-        @update:model-value="$emit('toggle-interesting-fields', $event)"
+        @update:model-value="$emit('toggle-interesting-fields', $event as boolean)"
         :data-test="`${dataTestPrefix}-fields-list-user-defined-schema-toggle`"
         class="schema-field-toggle"
       >

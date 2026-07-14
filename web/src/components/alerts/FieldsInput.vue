@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else>
       <div
-        v-for="(field, index) in fields as any"
+        v-for="(field, index) in fields as any[]"
         :key="field.uuid"
         class="flex justify-start items-end gap-2 pb-2"
         :data-test="`alert-conditions-${index + 1}`"
@@ -111,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, reactive } from "vue";
+import type { PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -125,7 +126,8 @@ const props = defineProps({
     required: true,
   },
   streamFields: {
-    type: Array,
+    // Heterogeneous option shapes across callers; OSelect normalizes at runtime.
+    type: Array as PropType<any[]>,
     default: () => [],
     required: true,
   },

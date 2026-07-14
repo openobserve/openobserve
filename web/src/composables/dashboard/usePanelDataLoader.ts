@@ -533,7 +533,7 @@ export const usePanelDataLoader = (
           // the HTTP status into `code` (searchError.ts), so the fallbacks were
           // unreachable — and code that cannot run is code that lies about what the
           // function above it does.
-          code: parsed.code ?? "",
+          code: String(parsed.code ?? ""),
         };
         break;
       }

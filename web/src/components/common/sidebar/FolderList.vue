@@ -225,7 +225,7 @@ export default defineComponent({
           await getFoldersListByType(store, props.type);
         }
         if(router.currentRoute.value.query.folder) {
-          activeFolderId.value = router.currentRoute.value.query.folder;
+          activeFolderId.value = router.currentRoute.value.query.folder as string;
         }
         else {
           activeFolderId.value = "default";
@@ -233,7 +233,7 @@ export default defineComponent({
       });
 
       watch(()=> router.currentRoute.value.query.folder, (newVal)=> {
-        activeFolderId.value = newVal || "default";
+        activeFolderId.value = (newVal as string) || "default";
       })
       const addFolder = () => {
       isFolderEditMode.value = false;

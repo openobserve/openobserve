@@ -34,10 +34,15 @@ import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import { rangesFromSqlParserDetail, rangesFromServerMessage } from "@/utils/query/sqlDiagnostics";
 
 export const useSearchResponseHandler = () => {
-  const { showErrorNotification, showCancelSearchNotification } =
-    useNotifications();
-  const { fnParsedSQL, hasAggregation, removeTraceId, updateUrlQueryParams } =
-    logsUtils();
+  const { showErrorNotification } = useNotifications();
+  // showCancelSearchNotification is defined in logsUtils, not useNotifications
+  const {
+    fnParsedSQL,
+    hasAggregation,
+    removeTraceId,
+    updateUrlQueryParams,
+    showCancelSearchNotification,
+  } = logsUtils();
 
   const { getHistogramTitle, generateHistogramData, resetHistogramWithError } =
     useHistogram();
@@ -545,7 +550,7 @@ export const useSearchResponseHandler = () => {
     isPagination: boolean,
     appendResult: boolean = false,
   ) => {
-    removeTraceId(response.content.trace_id);
+    removeTraceId(response.content.trace_id ?? "");
 
     if (searchObj.data.queryResults.aggs == null) {
       searchObj.data.queryResults.aggs = [];

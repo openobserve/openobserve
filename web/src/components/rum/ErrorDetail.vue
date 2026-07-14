@@ -50,7 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts" setup>
 import { formatDate } from "@/utils/date";
-import { defineProps } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 const props = defineProps({
   column: {

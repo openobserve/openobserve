@@ -2,7 +2,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { DateProps, DateEmits, DateSlots } from "./ODate.types";
-import { computed, ref, useAttrs, useId } from "vue";
+import { computed, ref, useAttrs, useId, type Ref } from "vue";
 import {
   DatePickerRoot,
   DatePickerField,
@@ -72,7 +72,10 @@ function tryParse(s: string | undefined): DateValue | undefined {
 const rekaValue = computed(() => tryParse(props.modelValue));
 
 // Staged selection for autoApply=false mode
-const stagedDate = ref<DateValue | undefined>(rekaValue.value);
+// Cast: ref() deep-unwraps DateValue's class type structurally, breaking DateValue bindings
+const stagedDate = ref<DateValue | undefined>(rekaValue.value) as Ref<
+  DateValue | undefined
+>;
 
 // What the calendar shows — staged when manual apply, live otherwise
 const calendarValue = computed(() =>

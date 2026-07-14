@@ -71,12 +71,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <span
                 v-else
-                @dblclick.stop.prevent="startEditQueryName(index, tab)"
+                @dblclick.stop.prevent="startEditQueryName(Number(index), tab)"
                 class="cursor-pointer select-none whitespace-nowrap"
                 style="font-size: 12px"
                 :title="'Double-click to rename'"
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
-              >{{ tab.tabName || ('Query ' + (index + 1)) }}</span>
+              >{{ tab.tabName || ('Query ' + (Number(index) + 1)) }}</span>
               <!-- Eye icon + its tooltip wrapped in a span so the tooltip's
                    trigger is scoped to JUST the icon, not the entire OTab. -->
               <span
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <OIcon
                 v-if="
-                  index > 0 ||
+                  Number(index) > 0 ||
                   (index === 0 && dashboardPanelData.data.queries.length > 1)
                 "
                 name="close"
@@ -582,7 +582,8 @@ export default defineComponent({
         updatePromQLQuery(query, event);
       } else {
         sqlAutoCompleteData.value.query = query;
-        sqlAutoCompleteData.value.cursorIndex =
+        // Top-level cursorIndex is intentional; useSuggestions reads it via `as any`.
+        (sqlAutoCompleteData.value as any).cursorIndex =
           queryEditorRef.value?.getCursorIndex();
         sqlAutoCompleteData.value.popup.open =
           queryEditorRef.value?.triggerAutoComplete;
@@ -777,7 +778,7 @@ export default defineComponent({
       dashboardPanelData.meta.errors.queryErrors = [];
     };
 
-    const onFunctionToggle = (value, event) => {
+    const onFunctionToggle = (value: any, event?: any) => {
       // OSwitch's @update:model-value calls this with only the value (no event),
       // so guard it.
       event?.stopPropagation();

@@ -316,7 +316,6 @@ import { ref, computed, watch, defineAsyncComponent, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
-import { formatTimeWithSuffix } from "@/utils/zincutils";
 import {
   useLatencyInsightsAnalysis,
   type LatencyInsightsConfig,
@@ -342,6 +341,8 @@ const RenderDashboardCharts = defineAsyncComponent(
 interface DurationFilter {
   start: number;
   end: number;
+  timeStart?: number;
+  timeEnd?: number;
 }
 
 interface RateFilter {
@@ -418,7 +419,7 @@ const dimensionSearchText = ref("");
 
 // Splitter configuration for dimension selector sidebar (using percentage)
 const splitterModel = ref(25); // 25% width for dimension selector (default)
-const splitterLimits = [0, 30]; // Min 0% (allow full collapse), Max 30%
+const splitterLimits: [number, number] = [0, 30]; // Min 0% (allow full collapse), Max 30%
 const lastSplitterPosition = ref(25); // Remember last position before collapse
 
 // Percentile change tracking - use variables manager's hasUncommittedChanges

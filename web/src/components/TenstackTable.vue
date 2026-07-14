@@ -532,7 +532,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="header.id"
                 class="px-2 overflow-hidden"
                 :class="c === 0 ? 'pl-4' : ''"
-                :style="skelTdStyle(header, c)"
+                :style="skelTdStyle(header, Number(c))"
               >
                 <span
                   class="o2-skel-pill inline-block h-3 rounded-md"
@@ -540,7 +540,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     width:
                       c === 0
                         ? `${SKEL_TIMESTAMP_PX}px`
-                        : `${skelCellWidth(r - 1, c)}%`,
+                        : `${skelCellWidth(r - 1, Number(c))}%`,
                   }"
                   aria-hidden="true"
                 />
@@ -1203,6 +1203,7 @@ import {
   type SortingState,
   type ColumnFiltersState,
   type Updater,
+  type TableOptionsWithReactiveData,
   useVueTable,
   getCoreRowModel,
   getSortedRowModel,
@@ -1988,7 +1989,7 @@ let table: any = useVueTable({
   },
   columnResizeMode,
   enableColumnResizing: true,
-});
+} as unknown as TableOptionsWithReactiveData<Record<string, unknown>>);
 
 const columnSizeVars = computed(() => {
   const headers = table?.getFlatHeaders();

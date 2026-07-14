@@ -131,8 +131,8 @@ export const formatLargeNumber = (number: number) => {
   }
 };
 
-export const formatSizeFromMB = (sizeInMB: string) => {
-  let size = parseFloat(sizeInMB);
+export const formatSizeFromMB = (sizeInMB: string | number) => {
+  let size = parseFloat(String(sizeInMB));
 
   if (isNaN(size)) {
     return "0 MB";

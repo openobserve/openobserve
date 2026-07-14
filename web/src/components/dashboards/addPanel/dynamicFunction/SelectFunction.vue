@@ -45,7 +45,7 @@
             <div class="flex flex-col flex-1 min-w-0">
               <div class="flex items-center gap-x-2">
                 <label :for="'arg-' + argIndex">{{
-                  getParameterLabel(fields.functionName, argIndex)
+                  getParameterLabel(fields.functionName, Number(argIndex))
                 }}</label>
               </div>
               <div class="flex items-start">
@@ -56,13 +56,13 @@
                   :options="
                     getSupportedTypeBasedOnFunctionNameAndIndex(
                       fields.functionName,
-                      argIndex,
+                      Number(argIndex),
                     )
                   "
                   icon-key="icon"
                   label-position="inside"
                   class="o2-custom-select-dashboard arg-type-select mr-0.5 w-fit! flex-none!"
-                  :required="isRequired(fields.functionName, argIndex)"
+                  :required="isRequired(fields.functionName, Number(argIndex))"
                   :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
                 >
                   <template #icon-left>
@@ -135,10 +135,10 @@
 
                 <!-- Remove argument button -->
                 <OButton
-                  v-if="canRemoveArgument(fields.functionName, argIndex)"
+                  v-if="canRemoveArgument(fields.functionName, Number(argIndex))"
                   variant="ghost"
                   size="icon"
-                  @click="removeArgument(argIndex)"
+                  @click="removeArgument(Number(argIndex))"
                   :data-test="`dashboard-function-dropdown-arg-remove-button-${argIndex}`"
                   icon-left="close"
                 >

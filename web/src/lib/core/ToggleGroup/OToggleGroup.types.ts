@@ -23,8 +23,10 @@ export type ToggleGroupVariant = "default" | "primary";
 export interface ToggleGroupProps {
   /** Whether one or multiple items can be active at a time */
   type?: ToggleGroupType;
-  /** Controlled active value(s) — use with v-model */
-  modelValue?: AcceptableValue | AcceptableValue[];
+  /** Controlled active value(s) — use with v-model. `boolean` is included because
+   *  some groups toggle between two boolean-valued items (reka-ui's AcceptableValue
+   *  omits boolean, but it round-trips fine at runtime). */
+  modelValue?: AcceptableValue | AcceptableValue[] | boolean;
   /** Disables all items in the group */
   disabled?: boolean;
   /** Layout axis for keyboard navigation */
@@ -38,7 +40,7 @@ export interface ToggleGroupProps {
 }
 
 export interface ToggleGroupEmits {
-  (e: "update:modelValue", value: AcceptableValue | AcceptableValue[]): void;
+  (e: "update:modelValue", value: AcceptableValue | AcceptableValue[] | boolean): void;
 }
 
 export interface ToggleGroupSlots {

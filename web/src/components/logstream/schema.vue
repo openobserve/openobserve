@@ -593,10 +593,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="max-w-[220px]"
                           @update:model-value="markFormDirty"
                         />
-                        <small v-if="dataRetentionDays > 0 && dataRetentionDays != ''">
+                        <!-- casts: number input can hold "" at runtime while cleared -->
+                        <small v-if="dataRetentionDays > 0 && (dataRetentionDays as any) != ''">
                           Global retention is {{ store.state.zoConfig.data_retention_days }} days
                         </small>
-                        <small v-if="dataRetentionDays <= 0 || dataRetentionDays == ''" class="text-[var(--o2-status-error-text)]">
+                        <small v-if="dataRetentionDays <= 0 || (dataRetentionDays as any) == ''" class="text-[var(--o2-status-error-text)]">
                           Retention period must be at least 1 day
                         </small>
                       </div>
@@ -946,7 +947,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import { COL } from "@/lib/core/Table/OTable.types";
+import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -1068,7 +1069,11 @@ export default defineComponent({
       (indexData.value.schema || []).map((f: any) => f.name).sort(),
     );
     const isDialogOpen = ref(false);
-    const patternAssociations = ref([]);
+    // Holds Record<field, PatternAssociation[]> after grouping, PatternAssociation[]
+    // transiently while saving — hence `any`.
+    const patternAssociations = ref<any>([]);
+    // Loading-toast dismisser created in getSchema; also used by setSchema.
+    let dismiss: () => void = () => {};
     const redDaysList = ref([]);
     const resultTotal = ref<number>(0);
     const perPageOptions: any = [
@@ -1279,7 +1284,8 @@ export default defineComponent({
       return store.state.zoConfig.user_defined_schemas_enabled;
     });
 
-    const markFormDirty = () => {
+    // Args are accepted (one caller passes row context) but unused.
+    const markFormDirty = (..._args: any[]) => {
       formDirtyFlag.value = true;
     };
     const deleteFields = async () => {
@@ -1289,7 +1295,8 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           indexData.value.name,
           indexData.value.stream_type,
-          selectedFields.value.map((field) => field.name),
+          // Cast: service signature mistypes `fields` as the empty tuple `[]`.
+          selectedFields.value.map((field: any) => field.name) as [],
         )
         .then(async (res) => {
           loadingState.value = false;
@@ -1351,12 +1358,12 @@ export default defineComponent({
       if (
         settings.partition_keys &&
         Object.values(settings.partition_keys).some(
-          (v) => !v.disabled && v.field === property.name,
+          (v: any) => !v.disabled && v.field === property.name,
         )
       ) {
         const [level, partition] = Object.entries(settings.partition_keys).find(
-          ([, partition]) => partition["field"] === property.name,
-        );
+          ([, partition]) => (partition as any)["field"] === property.name,
+        ) as [string, any];
 
         property.level = level;
 
@@ -1510,7 +1517,7 @@ export default defineComponent({
     };
 
     const getSchema = async () => {
-      const dismiss = toast({
+      dismiss = toast({
         variant: "loading",
         message: "Please wait while loading stats...",
               timeout: 0,
@@ -1916,7 +1923,7 @@ export default defineComponent({
       return filtered;
     };
 
-    const columns = [
+    const columns: OTableColumnDef<any>[] = [
       {
         id: "name",
         header: t("logStream.propertyName"),
@@ -1927,6 +1934,7 @@ export default defineComponent({
       },
       {
         id: "settings",
+        header: "",
         accessorFn: (row: any) => (row.isUserDefined ? 0 : 1),
         sortable: true,
         size: COL.method,
@@ -1963,7 +1971,7 @@ export default defineComponent({
         : []),
     ];
 
-    const redBtnColumns = [
+    const redBtnColumns: OTableColumnDef<any>[] = [
       {
         id: "start",
         header: t("logStream.extendedStartDate"),

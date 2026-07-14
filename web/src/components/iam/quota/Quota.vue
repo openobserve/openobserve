@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-role_name="{ row }">
             {{ row.role_name }}
           </template>
-          <template #expansion="{ row }">
+          <template #expansion="{ row }: { row: any }">
             <template v-for="(moduleRow, index) in filteredRoleLevelModuleRows" :key="index">
               <div v-if="!editTable" class="flex items-center px-6 py-1 text-sm border-b border-[var(--color-table-row-divider)]">
                 <span class="w-[200px]">{{ moduleRow.module_name }}</span>

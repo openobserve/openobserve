@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
     @mouseleave="
       (e) => {
-        if (e?.relatedTarget?.closest?.('.o2-echarts-tooltip')) return;
+        if ((e?.relatedTarget as Element | null)?.closest?.('.o2-echarts-tooltip')) return;
         // if hoveredSeriesState is not null then set -1
         if (hoveredSeriesState) hoveredSeriesState.setIndex(-1, -1, -1, null);
       }

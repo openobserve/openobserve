@@ -218,6 +218,17 @@ export interface StreamOption {
   value: string;
 }
 
+// Shape returned by useStreams' getStreams for a specific stream type.
+interface StreamListEntry {
+  name: string;
+}
+
+interface GetStreamsResponse {
+  name: string;
+  list: StreamListEntry[];
+  schema: boolean;
+}
+
 export interface JoinFieldReference {
   streamAlias: string;
   field: string;
@@ -449,10 +460,13 @@ export default defineComponent({
      */
     async function fetchStreamList(streamType: string): Promise<void> {
       try {
-        const response = await getStreams(streamType, false);
+        const response = (await getStreams(
+          streamType,
+          false,
+        )) as GetStreamsResponse;
 
         streamOptions.value = response.list.map(
-          (stream: any): StreamOption => ({
+          (stream: StreamListEntry): StreamOption => ({
             label: stream.name,
             value: stream.name,
           }),

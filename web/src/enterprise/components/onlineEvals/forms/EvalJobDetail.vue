@@ -466,8 +466,10 @@ import { normalizeJobFilterCondition } from "../utils/jobFilter";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import {
   useEvalJobRuns,
+  type JobRunRow,
   type JobRunsWindow,
 } from "../composables/useEvalJobRuns";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
   ALL_AGENTS_VALUE,
   agentFilterKey,
@@ -839,7 +841,7 @@ const kpiCards = computed<{ label: string; value: string; unit: string }[]>(
 );
 
 // — OTable column definitions —
-const runColumns = computed(() => [
+const runColumns = computed<OTableColumnDef<JobRunRow>[]>(() => [
   {
     id: "timestampMs",
     header: t("onlineEvals.job.detail.runs.col.time"),

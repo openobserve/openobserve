@@ -39,7 +39,7 @@
           >
             <span class="text-sm font-bold rounded-md"
                 :data-test="`query-inspector-query-name-${index}`">
-              {{ query.tabName || ('Query ' + (index + 1)) }}
+              {{ query.tabName || ('Query ' + (Number(index) + 1)) }}
             </span>
             <span
               class="bg-[var(--o2-body-primary-bg)] border border-[var(--o2-border-color)] text-[var(--o2-text-secondary)] text-[10px] font-bold px-2 py-0.5 rounded-md"

@@ -269,7 +269,6 @@ import OTime from "@/lib/forms/Time/OTime.vue";
 import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
-// @ts-nocheck
 import {
   ref,
   defineComponent,
@@ -280,7 +279,9 @@ import {
   onActivated,
   onBeforeUnmount,
   onBeforeMount,
+  type PropType,
 } from "vue";
+import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import {
   getImageURL,
   useLocalTimezone,
@@ -361,11 +362,11 @@ export default defineComponent({
       default: null,
     },
     menuAlign: {
-      type: String,
+      type: String as PropType<"center" | "start" | "end">,
       default: "end",
     },
     variant: {
-      type: String,
+      type: String as PropType<ButtonVariant>,
       default: "outline",
     },
   },
@@ -473,7 +474,7 @@ export default defineComponent({
       M: [744, 1488, 2232, 2976, 3720, 4464],
     };
 
-    let relativePeriodsMaxValue: object = ref({
+    let relativePeriodsMaxValue = ref<Record<string, number>>({
       s: 0,
       m: 0,
       h: 0,
@@ -608,7 +609,8 @@ export default defineComponent({
             : 15;
       }
 
-      relativeValue.value = parseInt(relativeValue.value);
+      // relativeValue can hold a string at runtime (text input); parseInt coerces
+      relativeValue.value = parseInt(relativeValue.value as unknown as string);
 
       if (props.autoApply) saveDate("relative-custom");
     };
@@ -725,7 +727,7 @@ export default defineComponent({
       appliedDisplayValue.value = getDisplayValue.value;
     };
 
-    const saveDate = (dateType) => {
+    const saveDate = (dateType?: string) => {
       markApplied();
       const date = getConsumableDateTime();
       // if (isNaN(date.endTime) || isNaN(date.startTime)) {

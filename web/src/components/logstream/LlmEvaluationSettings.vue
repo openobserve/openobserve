@@ -309,7 +309,8 @@ export default defineComponent({
     const samplingRate = ref(0.01);
     const outputStream = ref("");
     const filteredFields = ref<{ label: string; value: string }[]>([]);
-    const selectedTemplate = ref<{ id: string; name: string } | null>(null);
+    // Holds the template ID (OSelect valueKey="id"), not the template object.
+    const selectedTemplate = ref<string | null>(null);
     const availableTemplates = ref<any[]>([]);
     const loadingTemplates = ref(false);
 

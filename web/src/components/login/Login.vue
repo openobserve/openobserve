@@ -443,7 +443,7 @@ export default defineComponent({
   },
   methods: {
     selected(item: any) {
-      toast(`Selected suggestion "${item.label}"`);
+      toast({ message: `Selected suggestion "${item.label}"` });
     },
   },
 });

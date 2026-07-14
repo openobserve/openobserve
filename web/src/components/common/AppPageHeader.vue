@@ -177,7 +177,8 @@ import AppBreadcrumb, {
 } from "@/components/common/AppBreadcrumb.vue";
 
 interface BackTarget {
-  label: string;
+  /** Optional; button falls back to plain "Back" aria-label when omitted. */
+  label?: string;
   to?: import("vue-router").RouteLocationRaw;
   onClick?: () => void;
   dataTest?: string;

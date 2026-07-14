@@ -665,6 +665,7 @@ import {
   defineAsyncComponent,
   watch,
   nextTick,
+  type PropType,
 } from "vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
@@ -770,11 +771,11 @@ export default defineComponent({
       default: () => [],
     },
     streamDocTimeRange: {
-      type: Object,
+      type: Object as PropType<{ min: number; max: number }>,
       default: undefined,
     },
     queryWindowUs: {
-      type: Object,
+      type: Object as PropType<{ start: number; end: number }>,
       default: undefined,
     },
   },
@@ -1918,7 +1919,7 @@ export default defineComponent({
     const selectedStreamFullTextSearchKeys = computed(() => {
       const defaultFTSKeys = store?.state?.zoConfig?.default_fts_keys || [];
       const selectedStreamFTSKeys = searchObj.data.stream.selectedStreamFields
-        .filter((field: string) => field.ftsKey)
+        .filter((field: any) => field.ftsKey)
         .map((field: any) => field.name);
       //merge default FTS keys with selected stream FTS keys
       return [...new Set([...defaultFTSKeys, ...selectedStreamFTSKeys])];

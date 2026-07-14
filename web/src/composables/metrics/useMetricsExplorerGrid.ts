@@ -414,7 +414,8 @@ export function useMetricsExplorerGrid() {
       const response = await getStreams("metrics", false, false, force);
       if (generation !== orgGeneration || requestedOrg !== org.value) return;
 
-      streams.value = (response?.list ?? []) as MetricStream[];
+      streams.value = ((response as { list?: MetricStream[] })?.list ??
+        []) as MetricStream[];
       cards.value = buildMetricCards(streams.value);
       loadLocalState();
       pruneLocalState();

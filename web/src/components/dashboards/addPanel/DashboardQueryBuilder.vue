@@ -82,8 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="axis-field overflow-hidden [--tw-divide-color:rgba(255,255,255,0.25)]"
                 radius="sm"
                 :draggable="true"
-                @dragstart="onFieldDragStart($event, itemX, 'x', index)"
-                @drop="onDrop($event, 'x', index)"
+                @dragstart="onFieldDragStart($event, itemX, 'x', Number(index))"
+                @drop="onDrop($event, 'x', Number(index))"
                 @dragenter="onDragEnter($event, 'x', index)"
               >
                 <OButton
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="icon-chip"
                   :data-test="`dashboard-x-item-${itemX?.alias}-remove`"
-                  @click="removeXAxisItemByIndex(index)"
+                  @click="removeXAxisItemByIndex(Number(index))"
                   icon-left="close"
                 >
                 </OButton>
@@ -257,8 +257,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="axis-field overflow-hidden [--tw-divide-color:rgba(255,255,255,0.25)]"
                 radius="sm"
                 :draggable="true"
-                @dragstart="onFieldDragStart($event, itemB, 'breakdown', index)"
-                @drop="onDrop($event, 'breakdown', index)"
+                @dragstart="
+                  onFieldDragStart($event, itemB, 'breakdown', Number(index))
+                "
+                @drop="onDrop($event, 'breakdown', Number(index))"
                 @dragenter="onDragEnter($event, 'breakdown', index)"
               >
                 <OButton
@@ -319,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="icon-chip"
                   :data-test="`dashboard-b-item-${itemB?.alias}-remove`"
-                  @click="removeBreakdownItemByIndex(index)"
+                  @click="removeBreakdownItemByIndex(Number(index))"
                   icon-left="close"
                 >
                 </OButton>
@@ -397,8 +399,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="axis-field overflow-hidden [--tw-divide-color:rgba(255,255,255,0.25)]"
             radius="sm"
             :draggable="true"
-            @dragstart="onFieldDragStart($event, itemY, 'y', index)"
-            @drop="onDrop($event, 'y', index)"
+            @dragstart="onFieldDragStart($event, itemY, 'y', Number(index))"
+            @drop="onDrop($event, 'y', Number(index))"
             @dragenter="onDragEnter($event, 'y', index)"
           >
             <OButton
@@ -463,7 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-chip"
               :data-test="`dashboard-y-item-${itemY?.alias}-remove`"
-              @click="removeYAxisItemByIndex(index)"
+              @click="removeYAxisItemByIndex(Number(index))"
               icon-left="close"
             >
             </OButton>
@@ -543,8 +545,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="axis-field overflow-hidden [--tw-divide-color:rgba(255,255,255,0.25)]"
               radius="sm"
               :draggable="true"
-              @dragstart="onFieldDragStart($event, itemZ, 'z', index)"
-              @drop="onDrop($event, 'z', index)"
+              @dragstart="onFieldDragStart($event, itemZ, 'z', Number(index))"
+              @drop="onDrop($event, 'z', Number(index))"
               @dragenter="onDragEnter($event, 'z', index)"
             >
               <OButton
@@ -605,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="outline"
                 size="icon-chip"
                 :data-test="`dashboard-z-item-${itemZ?.alias}-remove`"
-                @click="removeZAxisItemByIndex(index)"
+                @click="removeZAxisItemByIndex(Number(index))"
                 icon-left="close"
               >
               </OButton>
@@ -700,7 +702,7 @@ import {
   promqlSeedFor,
 } from "@/utils/dashboard/promqlSeed";
 import { isAutoSeededQuery } from "@/utils/metrics/metricPanelSeed";
-import type { PromqlBuilderQuery } from "@/components/promql/types";
+import type { PromqlBuilderQuery, PromqlStep } from "@/components/promql/types";
 import { normalizeSteps } from "@/components/promql/types";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
@@ -709,6 +711,14 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+
+// Minimal shape of a dashboard panel query slot as read by the PromQL builder.
+interface DashboardQuerySlot {
+  fields?: {
+    promql_operations?: PromqlStep[];
+    promql_labels?: string[];
+  };
+}
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
@@ -746,7 +756,7 @@ export default defineComponent({
       config: true,
       filter: false,
     });
-    const dashboardPanelDataPageKey = inject(
+    const dashboardPanelDataPageKey = inject<string>(
       "dashboardPanelDataPageKey",
       "dashboard",
     );
@@ -1311,8 +1321,10 @@ export default defineComponent({
      * was saved under old ids. A modern panel is not touched, and does not look
      * dirty for having been opened.
      */
-    const loadSavedSteps = (currentQuery: any) => {
-      const stored = currentQuery?.fields?.promql_operations || [];
+    const loadSavedSteps = (
+      currentQuery: DashboardQuerySlot | undefined,
+    ): PromqlStep[] => {
+      const stored: PromqlStep[] = currentQuery?.fields?.promql_operations || [];
       const upgraded = normalizeSteps(stored);
 
       if (upgraded !== stored && currentQuery?.fields) {

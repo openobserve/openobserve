@@ -4,7 +4,7 @@ import type {
   ToggleGroupEmits,
   ToggleGroupSlots,
 } from "./OToggleGroup.types";
-import { ToggleGroupRoot } from "reka-ui";
+import { ToggleGroupRoot, type AcceptableValue } from "reka-ui";
 import { computed } from "vue";
 
 const props = withDefaults(defineProps<ToggleGroupProps>(), {
@@ -18,6 +18,12 @@ const props = withDefaults(defineProps<ToggleGroupProps>(), {
 const emit = defineEmits<ToggleGroupEmits>();
 
 const slots = defineSlots<ToggleGroupSlots>();
+
+// reka-ui's ToggleGroupRoot omits `boolean` from its model type; our public API
+// allows it (boolean-valued groups round-trip fine), so narrow at the boundary.
+const rekaModelValue = computed(
+  () => props.modelValue as AcceptableValue | AcceptableValue[],
+);
 
 const hasLabel = computed(
   () => Boolean(slots.label) || props.label !== undefined,
@@ -54,7 +60,7 @@ const wrapperClasses = computed(() => {
 
     <ToggleGroupRoot
       :type="type"
-      :model-value="modelValue"
+      :model-value="rekaModelValue"
       :disabled="disabled"
       :orientation="orientation"
       :data-variant="variant"
@@ -77,7 +83,7 @@ const wrapperClasses = computed(() => {
   <ToggleGroupRoot
     v-else
     :type="type"
-    :model-value="modelValue"
+    :model-value="rekaModelValue"
     :disabled="disabled"
     :orientation="orientation"
     :data-variant="variant"

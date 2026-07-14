@@ -447,9 +447,7 @@ export default defineComponent({
     const isShowToken = ref(false);
     const confirmRefresh  = ref(false);
     const filterQuery = ref("");
-    const toBeRefreshed = ref({
-
-    });
+    const toBeRefreshed = ref<{ email?: string }>({});
 
     const serviceToken  = ref("");
     const tokenAccountEmail = ref("");

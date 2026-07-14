@@ -305,10 +305,11 @@ export const getEndPoint = (ingestionURL: string) => {
 
 export function getCronIntervalDifferenceInSeconds(cronExpression: string) {
   try {
+    // `utc` is a cron-parser v4 option; v5 types only accept `tz` — cast keeps runtime unchanged
     const interval = CronExpressionParser.parse(cronExpression, {
       currentDate: new Date(),
       utc: true,
-    });
+    } as Parameters<typeof CronExpressionParser.parse>[1]);
 
     const firstExecution = interval.next();
     const secondExecution = interval.next();
@@ -321,10 +322,11 @@ export function getCronIntervalDifferenceInSeconds(cronExpression: string) {
 
 export const getCronIntervalInMinutes = (cronExpression: string): number => {
   try {
+    // `utc` is a cron-parser v4 option; v5 types only accept `tz` — cast keeps runtime unchanged
     const interval = CronExpressionParser.parse(cronExpression, {
       currentDate: new Date(),
       utc: true,
-    });
+    } as Parameters<typeof CronExpressionParser.parse>[1]);
 
     const first = interval.next();
     const second = interval.next();

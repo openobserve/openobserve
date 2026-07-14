@@ -299,7 +299,6 @@
 import {
   onBeforeMount,
   ref,
-  defineExpose,
   computed,
   nextTick,
   onMounted,
@@ -577,7 +576,8 @@ watch(
 watch(inputQuery, (value) => {
   _sqlOnQueryChange();
   autoCompleteData.value.query = value;
-  autoCompleteData.value.cursorIndex = queryEditorRef.value?.getCursorIndex() ?? -1;
+  autoCompleteData.value.cursorIndex =
+    queryEditorRef.value?.getCursorIndex() ?? -1;
   autoCompleteData.value.popup.open = queryEditorRef.value?.triggerAutoComplete;
   autoCompleteData.value.org = store.state.selectedOrganization.identifier;
   autoCompleteData.value.streamType = selectedStream.value.type;

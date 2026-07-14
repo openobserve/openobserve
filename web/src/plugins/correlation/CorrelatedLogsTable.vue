@@ -204,7 +204,7 @@ class="mr-1" />
             :default-columns="showingDefaultColumns"
             :jsonpreview-stream-name="jsonPreviewStreamName"
             :highlight-query="highlightQuery"
-            :selected-stream-fts-keys="ftsFields"
+            :selected-stream-fts-keys="(ftsFields as any)"
             :selected-stream-fields="selectedFields"
             :hide-search-term-actions="hideSearchTermActions"
             :hide-view-related-button="hideViewRelatedButton"
@@ -1265,8 +1265,7 @@ const chipDimensionSource = computed<Record<string, string>>(() => {
   return out;
 });
 
-type ChipKind = "context" | "subject";
-type DimensionChip = { key: string; label: string; value: string; kind: ChipKind; };
+type DimensionChip = import("./CorrelationEventHeader.vue").DimensionChip;
 
 const subjectSemanticIds = computed<Set<string>>(() => {
   if (!props.matchedSetId) return new Set();
@@ -1278,12 +1277,12 @@ const subjectSemanticIds = computed<Set<string>>(() => {
 const unifiedChips = computed<DimensionChip[]>(() =>
   Object.keys(chipDimensionSource.value)
     .filter((key) => !subjectSemanticIds.value.has(key))
-    .map((key): DimensionChip => ({
+    .map((key) => ({
       key,
       label: dimensionDisplayLabel(key),
       value: chipDimensionSource.value[key],
-      kind: "context",
-    })),
+      kind: "context" as DimensionChip["kind"],
+    } as DimensionChip)),
 );
 
 </script>

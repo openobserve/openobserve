@@ -211,18 +211,9 @@ export default defineComponent({
     const folderOptions = ref<{ label: string; value: string }[]>([]);
     const importing = ref(false);
     const showAddFolderDialog = ref(false);
+    // The Add Folder dialog submits natively via form-id="add-folder-dashboards-form";
+    // this ref only anchors the child instance.
     const addFolderRef = ref<InstanceType<typeof AddFolder> | null>(null);
-    const isAddingFolder = ref(false);
-
-    const handleAddFolder = async () => {
-      if (!addFolderRef.value || isAddingFolder.value) return;
-      isAddingFolder.value = true;
-      try {
-        await addFolderRef.value.submit();
-      } finally {
-        isAddingFolder.value = false;
-      }
-    };
 
     const filteredDashboards = computed(() => {
       if (!searchQuery.value) return dashboards.value;
@@ -562,8 +553,6 @@ export default defineComponent({
       importing,
       showAddFolderDialog,
       addFolderRef,
-      isAddingFolder,
-      handleAddFolder,
       isSelected,
       toggleDashboard,
       loadDashboards,

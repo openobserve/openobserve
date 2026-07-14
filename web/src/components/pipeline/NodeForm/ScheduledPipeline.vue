@@ -313,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :key="index"
                         >
                           <div
-                            :data-test="`scheduled-pipeline-group-by-${index + 1}`"
+                            :data-test="`scheduled-pipeline-group-by-${Number(index) + 1}`"
                             class="flex justify-start items-center flex-nowrap o2-input"
                           >
                             <div
@@ -334,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               size="icon-xs-sq"
                               class="mb-2 ml-1 mr-2"
                               :title="t('alert_templates.delete')"
-                              @click="deleteGroupByColumn(index)"
+                              @click="deleteGroupByColumn(Number(index))"
                               icon-left="delete"
                             />
                           </div>
@@ -1155,7 +1155,13 @@ const emits = defineEmits([
   "update:delay",
 ]);
 const { pipelineObj } = useDragAndDrop();
-const { searchObj } = useLogs();
+// `searchObj` is provided by the logs search state, not the job-focused
+// useLogs return; type it as optional so the guarded write stays type-safe.
+const {
+  searchObj,
+}: ReturnType<typeof useLogs> & {
+  searchObj?: { data?: { stream?: { pipelineQueryStream?: string[] } } };
+} = useLogs();
 const { getStream, getStreams } = useStreams();
 const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } =
   useServiceCorrelation();
@@ -1842,7 +1848,8 @@ const updateQueryValue = (value: string) => {
 
   // Feed auto-suggest with the current query and context
   autoCompleteData.value.query = value;
-  autoCompleteData.value.cursorIndex = pipelineEditorRef.value?.getCursorIndex() ?? -1;
+  autoCompleteData.value.cursorIndex =
+    pipelineEditorRef.value?.getCursorIndex() ?? -1;
   autoCompleteData.value.popup.open = pipelineEditorRef.value?.triggerAutoComplete;
   autoCompleteData.value.org = store.state.selectedOrganization.identifier;
   autoCompleteData.value.streamType = selectedStreamType.value;
@@ -1887,9 +1894,9 @@ const updateFrequency = async () => {
 function convertCronToMinutes(cronExpression: string) {
   // Parse the cron expression using cron-parser v5
   try {
+    // cron-parser v5 dropped the `utc` option (it was already ignored at runtime).
     const interval = CronExpressionParser.parse(cronExpression, {
       currentDate: new Date(),
-      utc: true,
     });
     // Get the first and second execution times
     const firstExecution = interval.next();

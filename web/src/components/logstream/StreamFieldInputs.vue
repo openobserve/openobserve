@@ -17,7 +17,7 @@
     </template>
     <template v-else>
       <div
-        v-for="(field, index) in fields as any"
+        v-for="(field, index) in fields as any[]"
         :key="field.uuid"
         class="flex flex-wrap items-start gap-2 mt-2"
         :data-test="`add-stream-field-row-${index}`"

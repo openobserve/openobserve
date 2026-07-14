@@ -328,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ul class="flex flex-col divide-y divide-border">
             <li v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" :data-test="`enrichment-url-jobs-item-${index}`" class="flex items-center gap-2 p-4">
               <div class="flex flex-col flex-1 min-w-0">
-                <span class="text-sm font-bold">Job {{ index + 1 }}</span>
+                <span class="text-sm font-bold">Job {{ (index as number) + 1 }}</span>
                 <span class="block text-xs text-muted-foreground">{{ job.url }}</span>
                 <span class="block text-xs text-muted-foreground mt-2">
                   <OTag

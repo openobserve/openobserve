@@ -393,7 +393,8 @@ const bulkDeleteTemplates = async () => {
       ),
     );
     toast({ variant: "success", message: t("evalTemplate.deleteSuccess") });
-    selectedItems.value = [];
+    // No-op at runtime (computed without setter); selection empties via loadTemplates() below
+    (selectedItems as unknown as { value: Template[] }).value = [];
     await loadTemplates();
   } catch (err: any) {
     if (err?.response?.status !== 403) {

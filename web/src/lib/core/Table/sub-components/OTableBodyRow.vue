@@ -343,6 +343,7 @@ function onRowBlur() {
           :row="row.original"
           :value="cell.getValue()"
           :column="cell.column.columnDef"
+          :index="row.index"
         />
       </template>
     </OTableBodyCell>

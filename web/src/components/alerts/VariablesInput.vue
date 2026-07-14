@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else>
       <div
-        v-for="(variable, index) in variables as any"
+        v-for="(variable, index) in variables as any[]"
         :key="variable.uuid"
         class="gap-2 pb-2 flex items-center"
         :data-test="`alert-variables-${index + 1}`"

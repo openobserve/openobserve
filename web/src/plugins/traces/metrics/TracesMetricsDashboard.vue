@@ -148,10 +148,18 @@ const currentTimeObj = ref({
 const dashboardData = ref(null);
 
 // Unified Analysis Dashboard state
+interface AnalysisFilter {
+  start: number;
+  end: number;
+  timeStart?: number;
+  timeEnd?: number;
+}
 const showAnalysisDashboard = ref(false);
-const analysisDurationFilter = ref({ start: 0, end: 0 });
-const analysisRateFilter = ref({ start: 0, end: 0 });
-const analysisErrorFilter = ref({ start: 0, end: 0 });
+const showVolumeAnalysisDashboard = ref(false);
+const showErrorAnalysisDashboard = ref(false);
+const analysisDurationFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 });
+const analysisRateFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 });
+const analysisErrorFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 });
 const defaultAnalysisTab = ref<"duration" | "volume" | "error">("volume");
 // Store the original time range before selection for baseline comparison
 const originalTimeRangeBeforeSelection = ref<TimeRange | null>(null);
@@ -166,15 +174,27 @@ const streamFields = computed(() => {
     return props.streamFields;
   }
 
-  // Prefer user-defined schema if available
-  if (searchObj.data.stream.userDefinedSchema?.length > 0) {
-    return searchObj.data.stream.userDefinedSchema;
+  // Prefer user-defined schema if available.
+  // Set dynamically on shared stream state; not part of useTraces defaults.
+  const userDefinedSchema = searchObj.data.stream.userDefinedSchema;
+  if (userDefinedSchema?.length > 0) {
+    return userDefinedSchema;
   }
 
   return searchObj.data.stream.selectedStreamFields || [];
 });
 
-const rangeFilters = computed(() => searchObj.meta.metricsRangeFilters);
+// Runtime entries carry timeStart/timeEnd (set below); the useTraces Map generic omits them.
+type MetricsRangeFilter = {
+  panelTitle: string;
+  start: number | null;
+  end: number | null;
+  timeStart?: number | null;
+  timeEnd?: number | null;
+};
+const rangeFilters = computed(
+  () => searchObj.meta.metricsRangeFilters as Map<string, MetricsRangeFilter>,
+);
 
 // Check if ANY RED panel has a time-based brush selection
 // This controls the visibility of the "Analyze Dimensions" button
@@ -368,13 +388,16 @@ const createRangeFilter = (
       panelTitle === "Rate" ||
       panelTitle === "Errors")
   ) {
-    searchObj.meta.metricsRangeFilters.set(panelId, {
-      panelTitle,
-      start: start ? Math.floor(start) : null,
-      end: end ? Math.floor(end) : null,
-      timeStart: timeStart ? Math.floor(timeStart) : null,
-      timeEnd: timeEnd ? Math.floor(timeEnd) : null,
-    });
+    (searchObj.meta.metricsRangeFilters as Map<string, MetricsRangeFilter>).set(
+      panelId,
+      {
+        panelTitle,
+        start: start ? Math.floor(start) : null,
+        end: end ? Math.floor(end) : null,
+        timeStart: timeStart ? Math.floor(timeStart) : null,
+        timeEnd: timeEnd ? Math.floor(timeEnd) : null,
+      },
+    );
     // Increment version to trigger reactivity
     rangeFiltersVersion.value++;
 
