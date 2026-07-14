@@ -19,85 +19,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="schema-drawer"
     :open="open"
     :width="60"
-    :title="t('logStream.schemaHeader')"
+    :title="indexData.name"
+    :title-data-test="'schema-title-text'"
+    :sub-title="t('logStream.schemaHeader')"
     @update:open="$emit('update:open', $event)"
   >
-    <!-- #header override: complex stream header with name badge, timeline info,
-         and close button — cannot be expressed with title + sub-slots -->
-    <template #header-left>
-      <div class="tw:flex tw:items-center tw:flex-nowrap">
-        <div class="tw:flex tw:flex-col">
-          <div
-            class="tw:text-[18px] tw:flex tw:items-center"
-            data-test="schema-title-text"
+    <!-- Timeline / time-range chip sits at the right of the header, next to the
+         close button; the stream name is the title and "Stream Detail" the
+         subtitle (structured ODrawer header). -->
+    <template #header-right>
+      <div
+        v-if="indexData.name"
+        :class="[
+          'flex items-center gap-1.5 px-2 py-1 rounded-md border',
+          store.state.theme === 'dark'
+            ? 'bg-gray-800/50 border-gray-600'
+            : 'bg-gray-50 border-gray-200',
+        ]"
+      >
+        <img
+          :src="getTimelineIcon"
+          alt="Timeline Icon"
+          class="w-[14px] h-[14px] opacity-70"
+        />
+        <div class="flex items-center gap-1.5">
+          <span
+            :class="[
+              'text-[10px] font-medium px-1.5 py-0.5 rounded',
+              store.state.theme === 'dark'
+                ? 'text-gray-300 bg-gray-700/50'
+                : 'text-gray-600 bg-gray-100',
+            ]"
           >
-            <!-- introduced name at the top  -->
-            <span
-              v-if="indexData.name"
-              :class="[
-                'tw:font-semibold tw:mr-4 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:inline-block',
-                store.state.theme === 'dark'
-                  ? 'tw:text-blue-400 tw:bg-blue-900/50'
-                  : 'tw:text-blue-600 tw:bg-blue-50',
-              ]"
-            >
-              {{ indexData.name }}
-              <OTooltip
-                v-if="indexData.name && indexData.name.length > 35"
-                :content="indexData.name"
-                side="top"
-              />
-            </span>
-            <div
-              :class="[
-                'tw:flex tw:items-center tw:gap-1.5 tw:px-2 tw:py-1 tw:rounded-md tw:border',
-                store.state.theme === 'dark'
-                  ? 'tw:bg-gray-800/50 tw:border-gray-600'
-                  : 'tw:bg-gray-50 tw:border-gray-200',
-              ]"
-            >
-              <img
-                :src="getTimelineIcon"
-                alt="Timeline Icon"
-                class="tw:w-[14px] tw:h-[14px] tw:opacity-70"
-              />
-              <div class="tw:flex tw:items-center tw:gap-1.5">
-                <span
-                  :class="[
-                    'tw:text-[10px] tw:font-medium tw:px-1.5 tw:py-0.5 tw:rounded',
-                    store.state.theme === 'dark'
-                      ? 'tw:text-gray-300 tw:bg-gray-700/50'
-                      : 'tw:text-gray-600 tw:bg-gray-100',
-                  ]"
-                >
-                  UTC
-                </span>
-                <div
-                  :class="[
-                    'tw:text-xs tw:font-semibold',
-                    store.state.theme === 'dark'
-                      ? 'tw:text-gray-200'
-                      : 'tw:text-gray-800',
-                  ]"
-                >
-                  {{ indexData.stats.doc_time_min }}
-                  <span class="tw:text-base tw:leading-none">→</span>
-                  {{ indexData.stats.doc_time_max }}
-                </div>
-              </div>
-            </div>
+            UTC
+          </span>
+          <div
+            :class="[
+              'text-xs font-semibold',
+              store.state.theme === 'dark' ? 'text-gray-200' : 'text-gray-800',
+            ]"
+          >
+            {{ indexData.stats.doc_time_min }}
+            <span class="text-base leading-none">→</span>
+            {{ indexData.stats.doc_time_max }}
           </div>
         </div>
       </div>
     </template>
 
     <div v-if="indexData.schema">
-      <div class="tw:m-0 tw:p-0">
+      <div class="m-0 p-0">
         <div @submit.prevent="onSubmit">
           <!-- we will show loading state here -->
           <div
             v-if="loadingState"
-            class="tw:flex tw:items-center tw:justify-center tw:w-full tw:h-full"
+            class="flex items-center justify-center w-full h-full"
             style="min-height: calc(100vh - 3.75rem)"
           >
             <OSpinner size="md" />
@@ -105,11 +81,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- if we have data and no loading then we will show the data otherwise we will show the loading state -->
           <div
             v-else
-            class="indexDetailsContainer tw:w-full tw:flex tw:flex-col tw:min-h-0"
+            class="indexDetailsContainer w-full flex flex-col min-h-0"
             style="height: calc(100vh - 3.75rem)"
           >
             <!-- this the grid section the tiles section -->
-            <div class="stats-grid tw:grid tw:grid-cols-4 tw:gap-2 tw:mb-2">
+            <div class="stats-grid grid grid-cols-4 gap-2 mb-2">
               <!-- Docs Count Tile -->
               <div
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
@@ -117,40 +93,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="docs-count-tile"
               >
                 <div
-                  class="tile-content tw:rounded-lg tw:p-3 tw:text-center tw:border tw:shadow-sm tw:h-20 tw:flex tw:flex-col tw:justify-between"
+                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tile-content-dark tw:border-gray-700'
-                      : 'tile-content-light tw:border-gray-200'
+                      ? 'tile-content-dark border-gray-700'
+                      : 'tile-content-light border-gray-200'
                   "
                 >
                   <div
-                    class="tile-header tw:flex tw:justify-between tw:items-start"
+                    class="tile-header flex justify-between items-start"
                   >
                     <div
-                      class="tile-title tw:text-xs tw:font-bold tw:text-left"
+                      class="tile-title text-xs font-bold text-left"
                       :class="
                         store.state.theme === 'dark'
-                          ? 'tw:text-gray-400'
-                          : 'tw:text-gray-500'
+                          ? 'text-gray-400'
+                          : 'text-gray-500'
                       "
                     >
                       Events
                     </div>
-                    <div class="tile-icon tw:opacity-80">
+                    <div class="tile-icon opacity-80">
                       <img
                         src="@/assets/images/home/records.svg"
                         alt="Records Icon"
-                        class="tw:h-6 tw:w-6"
+                        class="h-6 w-6"
                       />
                     </div>
                   </div>
                   <div
-                    class="tile-value tw:text-lg tw:flex tw:items-end tw:justify-start"
+                    class="tile-value text-lg flex items-end justify-start"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-white'
-                        : 'tw:text-gray-900'
+                        ? 'text-white'
+                        : 'text-gray-900'
                     "
                   >
                     {{
@@ -162,40 +138,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Storage Size Tile -->
               <div class="tile" data-test="storage-size-tile">
                 <div
-                  class="tile-content tw:rounded-lg tw:p-3 tw:text-center tw:border tw:shadow-sm tw:h-20 tw:flex tw:flex-col tw:justify-between"
+                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tile-content-dark tw:border-gray-700'
-                      : 'tile-content-light tw:border-gray-200'
+                      ? 'tile-content-dark border-gray-700'
+                      : 'tile-content-light border-gray-200'
                   "
                 >
                   <div
-                    class="tile-header tw:flex tw:justify-between tw:items-start"
+                    class="tile-header flex justify-between items-start"
                   >
                     <div
-                      class="tile-title tw:text-xs tw:font-bold tw:text-left"
+                      class="tile-title text-xs font-bold text-left"
                       :class="
                         store.state.theme === 'dark'
-                          ? 'tw:text-gray-400'
-                          : 'tw:text-gray-500'
+                          ? 'text-gray-400'
+                          : 'text-gray-500'
                       "
                     >
                       {{ t("logStream.storageSize") }}
                     </div>
-                    <div class="tile-icon tw:opacity-80">
+                    <div class="tile-icon opacity-80">
                       <img
                         src="@/assets/images/home/ingested_size.svg"
                         alt="Ingested Size Icon"
-                        class="tw:h-6 tw:w-6"
+                        class="h-6 w-6"
                       />
                     </div>
                   </div>
                   <div
-                    class="tile-value tw:text-lg tw:flex tw:items-end tw:justify-start"
+                    class="tile-value text-lg flex items-end justify-start"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-white'
-                        : 'tw:text-gray-900'
+                        ? 'text-white'
+                        : 'text-gray-900'
                     "
                   >
                     {{ formatSizeFromMB(indexData.stats.storage_size) }}
@@ -209,40 +185,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="compressed-size-tile"
               >
                 <div
-                  class="tile-content tw:rounded-lg tw:p-3 tw:text-center tw:border tw:shadow-sm tw:h-20 tw:flex tw:flex-col tw:justify-between"
+                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tile-content-dark tw:border-gray-700'
-                      : 'tile-content-light tw:border-gray-200'
+                      ? 'tile-content-dark border-gray-700'
+                      : 'tile-content-light border-gray-200'
                   "
                 >
                   <div
-                    class="tile-header tw:flex tw:justify-between tw:items-start"
+                    class="tile-header flex justify-between items-start"
                   >
                     <div
-                      class="tile-title tw:text-xs tw:font-bold tw:text-left"
+                      class="tile-title text-xs font-bold text-left"
                       :class="
                         store.state.theme === 'dark'
-                          ? 'tw:text-gray-400'
-                          : 'tw:text-gray-500'
+                          ? 'text-gray-400'
+                          : 'text-gray-500'
                       "
                     >
                       {{ t("logStream.compressedSize") }}
                     </div>
-                    <div class="tile-icon tw:opacity-80">
+                    <div class="tile-icon opacity-80">
                       <img
                         src="@/assets/images/home/compressed_size.svg"
                         alt="Compressed Size Icon"
-                        class="tw:h-6 tw:w-6"
+                        class="h-6 w-6"
                       />
                     </div>
                   </div>
                   <div
-                    class="tile-value tw:text-lg tw:flex tw:items-end tw:justify-start"
+                    class="tile-value text-lg flex items-end justify-start"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-white'
-                        : 'tw:text-gray-900'
+                        ? 'text-white'
+                        : 'text-gray-900'
                     "
                   >
                     {{ formatSizeFromMB(indexData.stats.compressed_size) }}
@@ -256,40 +232,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="index-size-tile"
               >
                 <div
-                  class="tile-content tw:rounded-lg tw:p-3 tw:text-center tw:border tw:shadow-sm tw:h-20 tw:flex tw:flex-col tw:justify-between"
+                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tile-content-dark tw:border-gray-700'
-                      : 'tile-content-light tw:border-gray-200'
+                      ? 'tile-content-dark border-gray-700'
+                      : 'tile-content-light border-gray-200'
                   "
                 >
                   <div
-                    class="tile-header tw:flex tw:justify-between tw:items-start"
+                    class="tile-header flex justify-between items-start"
                   >
                     <div
-                      class="tile-title tw:text-xs tw:font-bold tw:text-left"
+                      class="tile-title text-xs font-bold text-left"
                       :class="
                         store.state.theme === 'dark'
-                          ? 'tw:text-gray-400'
-                          : 'tw:text-gray-500'
+                          ? 'text-gray-400'
+                          : 'text-gray-500'
                       "
                     >
                       {{ t("logStream.indexSize") }}
                     </div>
-                    <div class="tile-icon tw:opacity-80">
+                    <div class="tile-icon opacity-80">
                       <img
                         src="@/assets/images/home/index_size.svg"
                         alt="Index Size Icon"
-                        class="tw:h-6 tw:w-6"
+                        class="h-6 w-6"
                       />
                     </div>
                   </div>
                   <div
-                    class="tile-value tw:text-lg tw:flex tw:items-end tw:justify-start"
+                    class="tile-value text-lg flex items-end justify-start"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-white'
-                        : 'tw:text-gray-900'
+                        ? 'text-white'
+                        : 'text-gray-900'
                     "
                   >
                     {{ formatSizeFromMB(indexData.stats.index_size) }}
@@ -297,18 +273,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            <div class="tw:w-full tw:flex tw:flex-1 tw:min-h-0 tw:gap-2">
+            <div class="w-full flex flex-1 min-h-0 gap-2">
               <!--  left section(includes tabs and schema settings) -->
               <div
                 :class="[
-                  'tw:w-[100%] tw:h-full tw:min-h-0 tw:rounded-lg tw:border tw:shadow-sm tw:p-2 tw:flex tw:flex-col tw:overflow-hidden',
+                  'w-[100%] h-full min-h-0 rounded-lg border shadow-sm p-2 flex flex-col overflow-hidden',
                   store.state.theme === 'dark'
-                    ? 'tw:bg-[#181A1B] tw:border-gray-700'
-                    : 'tw:bg-white tw:border-gray-200',
+                    ? 'bg-[#181A1B] border-gray-700'
+                    : 'bg-white border-gray-200',
                 ]"
               >
                 <div>
-                  <div class="tw:flex tw:justify-start">
+                  <div class="flex justify-start">
                     <OTabs v-model="activeMainTab" dense>
                       <!-- Schema Settings Tab with conditional class -->
                       <OTab
@@ -350,29 +326,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <!-- Tab content wrapper — fills remaining height, pushes the footer to the bottom -->
-                <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:overflow-hidden">
+                <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
                 <!-- schema settings tab -->
-                <div v-if="activeMainTab == 'schemaSettings'" class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:overflow-hidden">
+                <div v-if="activeMainTab == 'schemaSettings'" class="flex flex-col h-full min-h-0 overflow-hidden">
                   <div
-                    class="tw:flex tw:justify-between tw:items-center"
+                    class="flex justify-between items-center"
                     data-test="schema-log-stream-mapping-title-text"
                   >
                     <div
                       v-if="indexData.defaultFts"
                       style="font-weight: 400"
-                      class="tw:mt-[12px]"
+                      class="mt-[12px]"
                     >
                       <label
                         style="font-weight: 600"
-                        class="tw:bg-[#f9f290] tw:py-1 tw:px-4 tw:rounded tw:border tw:border-[#f5a623] tw:text-[#865300]"
+                        class="bg-[#f9f290] py-1 px-4 rounded border border-[#f5a623] text-[#865300]"
                       >
                         {{ t("logStream.mapping") }} Default FTS keys used (no
                         custom keys set).</label
                       >
                     </div>
                   </div>
-                  <div class="tw:flex tw:justify-between tw:items-center tw:w-full">
-                    <div class="tw:flex tw:items-center">
+                  <div class="flex justify-between items-center w-full">
+                    <div class="flex items-center">
                       <div class="app-tabs-container">
                         <OToggleGroup
                           v-if="isSchemaUDSEnabled"
@@ -403,7 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OToggleGroup>
                       </div>
 
-                      <div v-if="hasUserDefinedSchema" class="tw:ml-2 tw:flex tw:items-center">
+                      <div v-if="hasUserDefinedSchema" class="ml-2 flex items-center">
                         <OIcon
                           name="info"
                           size="sm"
@@ -416,12 +392,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
 
-                    <div class="tw:flex tw:items-center tw:gap-2">
+                    <div class="flex items-center gap-2">
                       <OSearchInput
                         data-test="schema-field-search-input"
                         v-model="filterField"
                         data-cy="schema-index-field-search-input"
-                        class="tw:ml-auto no-border o2-search-input"
+                        class="ml-auto no-border o2-search-input"
                         :placeholder="t('search.searchField')"
                       />
                       <OButton
@@ -430,7 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :disabled="isDialogOpen"
                         variant="outline"
                         size="icon-sm"
-                        class="tw:my-2"
+                        class="my-2"
                         @click.stop="openDialog"
                         title="Add Field(s)"
                         icon-left="add"
@@ -438,15 +414,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
 
-                  <div class="tw:mb-3" v-if="isDialogOpen">
+                  <div class="mb-3" v-if="isDialogOpen">
                     <OCard class="add-fields-card">
                       <!-- Header Section -->
                       <OCardSection
-                        class="tw:p-0"
+                        class="p-0"
                         style="padding: 4px 16px 4px 16px"
                       >
-                        <div class="tw:flex tw:justify-between tw:items-center">
-                          <div class="tw:text-xl tw:font-semibold">Add Field(s)</div>
+                        <div class="flex justify-between items-center">
+                          <div class="text-xl font-semibold">Add Field(s)</div>
                           <div>
                             <OButton
                               data-test="add-stream-cancel-btn"
@@ -460,7 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OCardSection>
                       <!-- Main Content (Scrollable if necessary) -->
                       <OCardSection
-                        class="tw:p-0"
+                        class="p-0"
                         style="
                           flex: 1;
                           overflow-y: auto;
@@ -486,7 +462,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- OTable fills the remaining height inside the schemaSettings flex column -->
                   <div
                     :class="[
-                      'tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:overflow-hidden',
+                      'flex-1 min-h-0 flex flex-col overflow-hidden',
                       store.state.theme === 'dark'
                         ? 'dark-theme-table'
                         : 'light-theme-table',
@@ -512,20 +488,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :style="{ height: '100%', width: '100%' }"
                     >
                       <template #cell-name="{ row }">
-                        <div class="tw:flex tw:items-center">
+                        <div class="flex items-center">
                           <span class="field-name-text" :data-test="`schema-field-name-cell-${row.name}`">
                             {{ row.name }}
                           </span>
                           <span
                             v-if="isEnvQuickModeField(row.name)"
-                            class="tw:flex tw:items-center tw:ml-1"
+                            class="flex items-center ml-1"
                           >
                             <img
                               :src="quickModeIcon"
                               :alt="t('logStream.envQuickModeMsg')"
-                              class="tw:w-[20px] tw:h-[20px]"
+                              class="w-[20px] h-[20px]"
                             />
-                            <OTooltip class="tw:text-[12px] tw:w-[200px]">
+                            <OTooltip class="text-[12px] w-[200px]">
                               {{ t("logStream.envQuickModeMsg") }}
                             </OTooltip>
                           </span>
@@ -549,14 +525,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               row.name == allFieldsName
                             )
                           "
-                          class="tw:flex tw:items-center tw:gap-1"
+                          class="flex items-center gap-1"
                         >
                           <OSelect
                             :model-value="computedIndexType({ row }).value"
                             :options="indexTypeOptionsForRow(row)"
                             label-key="label"
                             value-key="value"
-                            class="tw:min-h-[24px]! tw:max-h-[24px]! tw:h-[24px]! tw:text-[0.813rem]"
+                            class="min-h-[24px]! max-h-[24px]! h-[24px]! text-[0.813rem]"
                             multiple
                             clearable
                             size="sm"
@@ -581,7 +557,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                         >
                           <span
-                            class="tw:text-[#5960B2] tw:cursor-pointer"
+                            class="text-[#5960B2] cursor-pointer"
                             :data-test="`schema-field-${row.name}-pattern-action`"
                             @click="openPatternAssociationDialog(row.name)"
                           >
@@ -600,13 +576,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Configuration tab -->
                 <div v-if="activeMainTab == 'configuration'">
-                  <div class="tw:w-full tw:h-full tw:overflow-y-auto tw:p-4 tw:flex tw:flex-col tw:gap-4">
+                  <div class="w-full h-full overflow-y-auto p-4 flex flex-col gap-4">
                     <!-- Configuration Settings Card -->
-                    <div class="tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:divide-y tw:divide-[var(--o2-border-color)]">
+                    <div class="rounded-lg border border-[var(--o2-border-color)] divide-y divide-[var(--o2-border-color)]">
 
                       <!-- Data Retention -->
-                      <div v-if="showDataRetention" class="tw:flex tw:flex-col tw:gap-1 tw:p-3">
-                        <label class="tw:text-[0.8125rem] tw:font-[500]" style="color: var(--o2-text-heading)">
+                      <div v-if="showDataRetention" class="flex flex-col gap-1 p-3">
+                        <label class="text-[0.8125rem] font-[500]" style="color: var(--o2-text-heading)">
                           Data Retention (days)
                         </label>
                         <OInput
@@ -614,20 +590,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="dataRetentionDays"
                           type="number"
                           min="1"
-                          class="tw:max-w-[220px]"
+                          class="max-w-[220px]"
                           @update:model-value="markFormDirty"
                         />
                         <small v-if="dataRetentionDays > 0 && dataRetentionDays != ''">
                           Global retention is {{ store.state.zoConfig.data_retention_days }} days
                         </small>
-                        <small v-if="dataRetentionDays <= 0 || dataRetentionDays == ''" class="tw:text-[var(--o2-status-error-text)]">
+                        <small v-if="dataRetentionDays <= 0 || dataRetentionDays == ''" class="text-[var(--o2-status-error-text)]">
                           Retention period must be at least 1 day
                         </small>
                       </div>
 
                       <!-- Max Query Range -->
-                      <div class="tw:flex tw:flex-col tw:gap-1 tw:p-3">
-                        <label class="tw:text-[0.8125rem] tw:font-[500]" style="color: var(--o2-text-heading)">
+                      <div class="flex flex-col gap-1 p-3">
+                        <label class="text-[0.8125rem] font-[500]" style="color: var(--o2-text-heading)">
                           Max Query Range (hours)
                         </label>
                         <OInput
@@ -635,15 +611,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="maxQueryRange"
                           type="number"
                           min="0"
-                          class="tw:max-w-[220px]"
+                          class="max-w-[220px]"
                           @update:model-value="markFormDirty"
                         />
                         <small>Maximum time range allowed for queries. Set 0 for unlimited range.</small>
                       </div>
 
                       <!-- Flatten Level -->
-                      <div class="tw:flex tw:flex-col tw:gap-1 tw:p-3">
-                        <label class="tw:text-[0.8125rem] tw:font-[500]" style="color: var(--o2-text-heading)">
+                      <div class="flex flex-col gap-1 p-3">
+                        <label class="text-[0.8125rem] font-[500]" style="color: var(--o2-text-heading)">
                           {{ t("logStream.flattenLevel") }}
                         </label>
                         <OInput
@@ -651,14 +627,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="flattenLevel"
                           type="number"
                           min="0"
-                          class="tw:max-w-[220px]"
+                          class="max-w-[220px]"
                           @update:model-value="markFormDirty"
                         />
                         <small>Global is {{ store.state.zoConfig.ingest_flatten_level || 3 }}</small>
                       </div>
 
                       <!-- Toggles -->
-                      <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2.5 tw:text-[13px]">
+                      <div class="flex items-center justify-between px-3 py-2.5 text-[13px]">
                         <span>Use Stream Stats for Partitioning</span>
                         <OSwitch
                           data-test="log-stream-use_approx-toggle-btn"
@@ -667,7 +643,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </div>
 
-                      <div v-if="showStoreOriginalDataToggle" class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2.5 tw:text-[13px]">
+                      <div v-if="showStoreOriginalDataToggle" class="flex items-center justify-between px-3 py-2.5 text-[13px]">
                         <span>Store Original Data</span>
                         <OSwitch
                           data-test="log-stream-store-original-data-toggle-btn"
@@ -676,7 +652,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </div>
 
-                      <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2.5 tw:text-[13px]">
+                      <div class="flex items-center justify-between px-3 py-2.5 text-[13px]">
                         <span>Enable Distinct Values</span>
                         <OSwitch
                           data-test="log-stream-enabled-distinct-values-toggle-btn"
@@ -691,14 +667,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- red button tab -->
                 <div
                   v-else-if="activeMainTab == 'redButton'"
-                  class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:overflow-hidden"
+                  class="flex flex-col h-full min-h-0 overflow-hidden"
                 >
                   <div
-                    class="tw:bg-[#f9f290] tw:py-1 tw:px-4 tw:rounded tw:border tw:border-[#f5a623] tw:text-[#865300] tw:mt-2"
+                    class="bg-[#f9f290] py-1 px-4 rounded border border-[#f5a623] text-[#865300] mt-2"
                     style="width: fit-content"
                   >
                     <span style="font-weight: 600">
-                      <OIcon name="info" class="tw:mr-1" size="sm" />
+                      <OIcon name="info" class="mr-1" size="sm" />
 
                       Additional
                       {{
@@ -708,12 +684,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ranges</span
                     >
                   </div>
-                  <div class="tw:mt-2 tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
-                    <div class="tw:text-center tw:mt-2 tw:flex tw:items-center">
-                      <div class="tw:flex tw:items-center">
-                        <span class="tw:font-bold"> Select Date</span>
+                  <div class="mt-2 flex flex-col flex-1 min-h-0">
+                    <div class="text-center mt-2 flex items-center">
+                      <div class="flex items-center">
+                        <span class="font-bold"> Select Date</span>
                         <date-time
-                          class="tw:mx-2"
+                          class="mx-2"
                           @on:date-change="dateChangeValue"
                           disable-relative
                           hide-relative-time
@@ -721,10 +697,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :minDate="minDate"
                         />
                       </div>
-                      <span class="tw:font-bold"> (UTC Timezone) </span>
+                      <span class="font-bold"> (UTC Timezone) </span>
                     </div>
 
-                    <div class="tw:mt-2 tw:flex-1 tw:min-h-0 tw:flex tw:flex-col">
+                    <div class="mt-2 flex-1 min-h-0 flex flex-col">
                       <OTable
                         data-test="schema-log-stream-field-mapping-table"
                         :data="redBtnRows"
@@ -752,7 +728,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- cross-linking tab -->
                 <div v-if="activeMainTab == 'crossLinking'">
-                  <div class="tw:p-4">
+                  <div class="p-4">
                     <!-- Stream-level cross-links (editable) -->
                     <CrossLinkManager
                       v-model="streamCrossLinks"
@@ -762,9 +738,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @change="formDirtyFlag = true"
                     />
 
-                    <!-- Organization-level cross-links (read-only, tw:hidden when empty) -->
+                    <!-- Organization-level cross-links (read-only, hidden when empty) -->
                     <template v-if="orgCrossLinks.length > 0">
-                      <OSeparator class="tw:my-4" />
+                      <OSeparator class="my-4" />
                       <CrossLinkManager
                         :modelValue="orgCrossLinks"
                         :title="t('crossLinks.orgCrossLinks')"
@@ -777,15 +753,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 </div>
                 <!-- floating footer for the table -->
-                <div class="floating-buttons tw:flex-shrink-0 tw:px-2 tw:py-1">
+                <div class="floating-buttons flex-shrink-0 px-2 py-1">
                   <div
                     v-if="indexData.schema.length > 0"
-                    class="tw:flex tw:items-center tw:justify-between"
+                    class="flex items-center justify-between"
                   >
-                    <div class="tw:flex tw:items-center tw:gap-2">
+                    <div class="flex items-center gap-2">
                       <span
                         v-if="activeMainTab == 'schemaSettings'"
-                        class="tw:px-2 tw:py-2"
+                        class="px-2 py-2"
                         ><strong> {{ selectedFields.length }}</strong> fields
                         selected</span
                       >
@@ -803,7 +779,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="updateDefinedSchemaFields"
                       >
                         <span
-                          class="tw:flex tw:items-center tw:justify-start tw:gap-1 tw:mr-1"
+                          class="flex items-center justify-start gap-1 mr-1"
                         >
                           <OIcon name="verified-user" size="sm" />
                           <OIcon name="format-list-bulleted" size="sm" />
@@ -840,7 +816,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("logStream.delete") }}
                       </OButton>
                     </div>
-                    <div class="tw:flex tw:justify-end tw:gap-2">
+                    <div class="flex justify-end gap-2">
                       <OButton
                         data-test="schema-cancel-button"
                         variant="outline"
@@ -867,7 +843,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div v-else class="tw:p-3">
+    <div v-else class="p-3">
       <h5>Wait while loading...</h5>
     </div>
   </ODrawer>
@@ -888,7 +864,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @updateAppliedPattern="handleUpdateAppliedPattern"
     />
     <template #footer>
-      <div class="tw:flex tw:items-center tw:justify-end tw:gap-2">
+      <div class="flex items-center justify-end gap-2">
         <OButton
           variant="outline"
           size="sm-action"
@@ -948,7 +924,10 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { formatDate as formatDateUtil, formatTimestamp } from "@/utils/date";
+import {
+  convertUnixToQuasarFormat as convertUnixToFormat,
+  formatTimestamp,
+} from "@/utils/date";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
 import {
@@ -1337,7 +1316,6 @@ export default defineComponent({
         })
         .catch((err: any) => {
           loadingState.value = false;
-          console.log(err);
           toast({
             message: err.message,
             variant: "error",
@@ -1553,7 +1531,6 @@ export default defineComponent({
         })
         .catch((err) => {
           loadingState.value = false;
-          console.log(err);
         });
     };
 
@@ -2301,13 +2278,9 @@ export default defineComponent({
         resultTotal.value = streamResponse.schema?.length;
       }
     };
-    function convertUnixToQuasarFormat(unixMicroseconds: any) {
-      if (!unixMicroseconds) return "";
-      const unixSeconds = unixMicroseconds / 1e6;
-      const dateToFormat = new Date(unixSeconds * 1000);
-      const formattedDate = dateToFormat.toISOString();
-      return formatDateUtil(formattedDate, "DD-MM-YYYY");
-    }
+    // Date only: this column shows a retention window, not an instant.
+    const convertUnixToQuasarFormat = (unixMicroseconds: any) =>
+      convertUnixToFormat(unixMicroseconds, "DD-MM-YYYY");
     function formatDate(dateString) {
       const date = new Date(dateString); // Convert to Date object
       const day = String(date.getDate()).padStart(2, "0"); // Get day with leading zero
@@ -2727,7 +2700,7 @@ export default defineComponent({
 }
 
 .indexDetailsContainer .o2-schema-table thead tr th {
-  font-size: 0.875rem;
+  font-size: var(--text-xs);
   height: 35px;
 }
 

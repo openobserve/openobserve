@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="traces-search-result-list tw:h-auto! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)]"
+    class="traces-search-result-list h-auto! flex flex-col bg-[var(--o2-card-bg-solid)]"
   >
     <!-- ════════════════════ Empty State ════════════════════ -->
     <TracesNoEventsState
@@ -35,15 +35,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       v-show="hasResults || loading"
       data-test="traces-table-wrapper"
-      class="tw:flex tw:flex-col tw:h-auto! traces-table-container"
+      class="flex flex-col h-auto! traces-table-container"
     >
       <!-- Table scroll area: no overflow here — parent handles unified scroll -->
       <div
         data-test="traces-search-result-list"
-        class="tw:w-full tw:h-auto! tw:overflow-x-auto tw:relative"
+        class="w-full h-auto! overflow-x-auto relative"
       >
         <TenstackTable
-          class="tw:h-auto!"
+          class="h-auto!"
           :columns="searchObj.data.resultGrid.columns"
           :rows="hits"
           :loading="loading"
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-operation_name="{ item }">
             <span
-              class="tw:text-xs tw:truncate tw:text-[var(--o2-text-1)]!"
+              class="text-xs truncate text-(--color-grey-500)! [font-family:var(--font-mono)]"
               data-test="trace-row-operation-name"
             >
               {{ item.operation_name }}
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-duration="{ item }">
-            <span class="tw:text-xs" data-test="trace-row-duration">
+            <span class="text-xs text-(--color-grey-500) [font-family:var(--font-mono)]" data-test="trace-row-duration">
               {{ formatTimeWithSuffix(item.duration) || "0us" }}
             </span>
           </template>
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <TraceStatusCell :item="item" />
           </template>
           <template #cell-input_tokens="{ item }">
-            <span class="tw:text-xs" data-test="trace-row-input-tokens">
+            <span class="text-xs text-(--color-grey-500) [font-family:var(--font-mono)]" data-test="trace-row-input-tokens">
               {{
                 isLLMTrace(item)
                   ? formatTokens(extractLLMData(item)?.usage?.input ?? 0)
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-output_tokens="{ item }">
-            <span class="tw:text-xs" data-test="trace-row-output-tokens">
+            <span class="text-xs text-(--color-grey-500) [font-family:var(--font-mono)]" data-test="trace-row-output-tokens">
               {{
                 isLLMTrace(item)
                   ? formatTokens(extractLLMData(item)?.usage?.output ?? 0)
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-cost="{ item }">
-            <span class="tw:text-xs" data-test="trace-row-cost">
+            <span class="text-xs text-(--color-grey-500) [font-family:var(--font-mono)]" data-test="trace-row-cost">
               {{
                 isLLMTrace(item)
                   ? `$${formatCost(extractLLMData(item)?.cost?.total ?? 0)}`

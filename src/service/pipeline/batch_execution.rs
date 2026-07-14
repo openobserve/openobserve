@@ -1334,26 +1334,6 @@ async fn process_llm_evaluation_node(
         metadata.pipeline_name,
         metadata.node_idx
     );
-    if let Err(e) =
-        crate::service::self_reporting::ensure_llm_scores_stream_initialized(&metadata.org_id).await
-    {
-        log::warn!(
-            "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {} failed to ensure _llm_scores stream initialized for {}: {e}",
-            metadata.pipeline_name,
-            metadata.node_idx,
-            metadata.org_id
-        );
-    }
-    if let Err(e) =
-        crate::service::self_reporting::ensure_evaluator_stream_initialized(&metadata.org_id).await
-    {
-        log::warn!(
-            "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {} failed to ensure _evaluator stream initialized for {}: {e}",
-            metadata.pipeline_name,
-            metadata.node_idx,
-            metadata.org_id
-        );
-    }
 
     let scorer_refs = params.scorers.clone();
 
@@ -1412,58 +1392,34 @@ async fn process_llm_evaluation_node(
                             response: None,
                         },
                     );
-                crate::service::llm_evaluations::evaluator_trace_exporter::EvaluatorTraceExporter::export(
-                    &metadata.org_id,
-                    vec![skipped_trace],
-                    metadata.node_idx,
-                )
-                .await;
+                let observation = o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::UnsampledObservation {
+                    org_id: metadata.org_id.clone(),
+                    evaluator_traces: vec![skipped_trace],
+                    node_idx: metadata.node_idx,
+                };
+                if let Err(e) = o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::enqueue_unsampled_observation(observation) {
+                    o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::log_enqueue_error(
+                        &metadata.pipeline_name,
+                        metadata.node_idx,
+                        e,
+                    );
+                }
                 count += 1;
                 continue;
             }
 
-            match crate::service::llm_evaluations::eval_jobs::executor_runtime::execute_scorers(
-                &ctx,
-                &scorer_refs,
-            )
-            .await
-            {
-                Ok(output) => {
-                    for score_record in output.scores {
-                        send_to_children(
-                            &mut channels.child_senders,
-                            PipelineItem {
-                                idx: item.idx,
-                                record: score_record,
-                                flattened: true,
-                            },
-                            "LlmEvaluationNode",
-                        )
-                        .await;
-                    }
-                    crate::service::llm_evaluations::evaluator_trace_exporter::EvaluatorTraceExporter::export(
-                        &metadata.org_id,
-                        output.evaluator_traces,
-                        metadata.node_idx,
-                    )
-                    .await;
-                    for err in &output.errors {
-                        log::warn!(
-                            "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {} scorer '{}' error: {}",
-                            metadata.pipeline_name,
-                            metadata.node_idx,
-                            err.scorer_id,
-                            err.error_message
-                        );
-                    }
-                }
-                Err(e) => {
-                    log::error!(
-                        "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {} execution error: {e}",
-                        metadata.pipeline_name,
-                        metadata.node_idx
-                    );
-                }
+            let observation = o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::SpanObservation {
+                pipeline_name: metadata.pipeline_name.clone(),
+                node_idx: metadata.node_idx,
+                ctx,
+                scorer_refs: scorer_refs.clone(),
+            };
+            if let Err(e) = o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::enqueue_span_observation(observation) {
+                o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::log_enqueue_error(
+                    &metadata.pipeline_name,
+                    metadata.node_idx,
+                    e,
+                );
             }
         }
         count += 1;
@@ -2691,6 +2647,60 @@ mod tests {
         };
 
         assert!(pipeline.contains_llm_evaluation_node());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_llm_evaluation_node_does_not_forward_downstream() {
+        let params = config::meta::pipeline::components::LlmEvaluationParams {
+            name: "eval-job".to_string(),
+            sampling_rate: 1.0,
+            scorers: Vec::new(),
+            job_id: Some("job-1".to_string()),
+        };
+        let metadata = ProcessMetadata {
+            pipeline_id: "pipeline-1".to_string(),
+            node_idx: 1,
+            org_id: "org-1".to_string(),
+            pipeline_name: "eval-pipeline".to_string(),
+            stream_name: Some("traces".to_string()),
+            source_stream_name: "traces".to_string(),
+            source_stream_type: StreamType::Traces,
+            inv_id: "test".to_string(),
+            print_event: false,
+            leaf_dest_stream: None,
+        };
+        let (input_tx, input_rx) = tokio::sync::mpsc::channel(1);
+        let (child_tx, mut child_rx) = tokio::sync::mpsc::channel(1);
+        let (error_tx, _error_rx) = tokio::sync::mpsc::channel(1);
+
+        input_tx
+            .send(PipelineItem {
+                idx: 0,
+                record: json::json!({
+                    "span_id": "span-1",
+                    "trace_id": "trace-1",
+                }),
+                flattened: true,
+            })
+            .await
+            .unwrap();
+        drop(input_tx);
+
+        let count = process_llm_evaluation_node(
+            &params,
+            metadata,
+            ProcessChannels {
+                receiver: input_rx,
+                child_senders: vec![child_tx],
+                result_sender: None,
+                error_sender: error_tx,
+            },
+        )
+        .await;
+
+        assert_eq!(count, 1);
+        assert!(child_rx.try_recv().is_err());
     }
 
     #[test]

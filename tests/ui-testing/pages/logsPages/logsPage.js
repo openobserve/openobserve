@@ -4,6 +4,7 @@ import { LoginPage } from '../generalPages/loginPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
 import { openNavFlyoutChild } from '../commonActions.js';
+import { openOSelectDropdown } from '../alertsPages/oselectHelpers.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -227,6 +228,8 @@ export class LogsPage {
         this.visualizeToggle = '[data-test="logs-visualize-toggle"]';
         this.patternsToggle = '[data-test="logs-patterns-toggle"]';
         this.buildQueryPage = '[data-test="logs-build-query-page"]';
+        this.viewModeDropdownBtn = '[data-test="logs-view-mode-dropdown-btn"]';
+        this.dashboardMenuItem = '[data-test="menu-link-\\/dashboards-item"]';
 
         // Query type selector (Auto/Custom mode)
         this.builderQueryType = '[data-test="dashboard-builder-query-type"]';
@@ -303,7 +306,10 @@ export class LogsPage {
         // ===== QUERY EDITOR EXPAND/COLLAPSE SELECTORS =====
         this.queryEditorFullScreenBtn = '[data-test="logs-query-editor-full_screen-btn"]';
         this.queryEditorContainer = '.query-editor-container';
-        this.expandOnFocusClass = '.editor-fullscreen';
+        // Fullscreen state is exposed via a stable data attribute on the container
+        // (the old `.editor-fullscreen` scoped class was removed in PR #12764 in
+        // favour of inline utility classes bound to `isFocused`).
+        this.expandOnFocusClass = '[data-fullscreen="true"]';
 
         // ===== LOG DETAIL SIDEBAR SELECTORS (Bug #9724) =====
         this.logDetailDialogBox = '[data-test="log-detail-dialog"]';
@@ -404,8 +410,10 @@ export class LogsPage {
         this.patternCardIncludeBtn = (index) => `[data-test="pattern-card-${index}-include-btn"]`;
         this.patternCardExcludeBtn = (index) => `[data-test="pattern-card-${index}-exclude-btn"]`;
         this.patternCardDetailsIcon = (index) => `[data-test="pattern-card-${index}"]`;
-        this.patternCardWildcardChips = (index) => `[data-test="pattern-card-${index}-template"] .wildcard-chip`;
-        this.wildcardChip = '.wildcard-chip';
+        // The pattern-template wildcard chip carries a data-test hook (the `.wildcard-chip`
+        // scoped class was dropped when the chip moved from a class to the OTag component).
+        this.patternCardWildcardChips = (index) => `[data-test="pattern-card-${index}-template"] [data-test="pattern-card-wildcard-chip"]`;
+        this.wildcardChip = '[data-test="pattern-card-wildcard-chip"]';
         // Pattern details dialog (ODrawer — PatternDetailsDialog.vue)
         this.closePatternDialog = '[data-test="pattern-details-dialog"] [data-test="o-drawer-close-btn"]';
         this.patternDetailPreviousBtn = '[data-test="pattern-detail-previous-btn"]';
@@ -1010,6 +1018,10 @@ export class LogsPage {
         testLogger.info(`Adding stream to selection: ${streamName}`);
         // Open the OSelect popover via the trigger button (same pattern as
         // selectStream), then fill the ListboxFilter search input.
+        // IMPORTANT: The stream selector uses rowClickSingleSelect=true — clicking
+        // the option row REPLACES the selection. To ADD a stream to the existing
+        // selection we must click the CHECKBOX (data-select-checkbox) within the
+        // option, not the option row itself.
         const trigger = this.page.locator(this.indexDropDownTrigger).first();
         const popover = this.page.locator(this.indexDropDownPopover);
         const search = this.page.locator(this.indexDropDownSearch);
@@ -1025,14 +1037,23 @@ export class LogsPage {
             await search.press('Backspace').catch(() => {});
             await search.fill(streamName);
         }
-        await this.page.waitForTimeout(1000);
         const option = this.page.locator(
             `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`,
         );
-        if (await option.first().isVisible({ timeout: 5000 }).catch(() => false)) {
+        await option.first().waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+        // Click the checkbox to ADD to the multi-selection (not replace it).
+        const streamCheckbox = option.first().locator('[data-select-checkbox]');
+        await streamCheckbox.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
+        if (await streamCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await streamCheckbox.click();
+            testLogger.info(`Added ${streamName} to stream selection via checkbox`);
+        } else if (await option.first().isVisible({ timeout: 3000 }).catch(() => false)) {
             await option.first().click();
-            testLogger.info(`Selected additional stream: ${streamName}`);
+            testLogger.info(`Added ${streamName} to stream selection (row click fallback)`);
         }
+        // Close the popover after selection
+        await popover.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.keyboard.press('Escape').catch(() => {});
     }
 
     async expectTimestampColumnVisible() {
@@ -1203,6 +1224,39 @@ export class LogsPage {
             ? expectedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
             : `.*${expectedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`;
         await expect(this.page).toHaveURL(new RegExp(urlPattern));
+    }
+
+    /**
+     * Apply query (click refresh) and wait for the _search API response.
+     * 
+     * First waits for the refresh button to become enabled (not disabled),
+     * then clicks it and concurrently waits for the /_search response.
+     * This replaces the inline `applyQueryButton` helper that previously
+     * lived in specs — no raw selectors leak into the spec layer.
+     */
+    async applyQueryAndWaitForSearchResponse() {
+        // Wait for the refresh button to be enabled before clicking.
+        await this.page.waitForFunction(
+            (sel) => {
+                const el = document.querySelector(sel);
+                return el && !el.disabled;
+            },
+            this.queryButton,
+            { timeout: 15000 }
+        ).catch(() => {
+            testLogger.warn('Refresh button did not become enabled within 15 s — proceeding with click anyway');
+        });
+        // Click refresh and wait for the search API response concurrently.
+        await Promise.all([
+            this.page.waitForResponse(
+                resp => resp.url().includes('/_search') && resp.status() === 200,
+                { timeout: 60000 }
+            ).catch(() => {
+                testLogger.warn('No /_search response received within 60 s');
+            }),
+            this.page.locator(this.queryButton).click(),
+        ]);
+        testLogger.info('Query applied and search response received');
     }
 
     async clearAndRunQuery() {
@@ -4392,9 +4446,9 @@ export class LogsPage {
     }
 
     async isQueryEditorExpanded() {
-        // editor-fullscreen is added to the container itself, not a child element.
-        // Use a combined selector (.query-editor-container.editor-fullscreen) instead of
-        // container.locator('.editor-fullscreen') which would search descendants only.
+        // Fullscreen state is reflected by data-fullscreen="true" on the container itself.
+        // Use a combined selector (.query-editor-container[data-fullscreen="true"]) so we
+        // match the container node, not a descendant.
         return await this.page.locator(`${this.queryEditorContainer}${this.expandOnFocusClass}`).count() > 0;
     }
 
@@ -4932,12 +4986,22 @@ export class LogsPage {
     }
 
     async clickCustomDownloadRangeSelect() {
-        return await this.page.locator(this.customDownloadRangeSelect).click();
+        // OSelect (reka-ui popover): clicking the root wrapper can open-then-close the
+        // listbox on a single click, which continuously re-mounts the options and makes
+        // the subsequent option click flake with "element was detached from the DOM".
+        // openOSelectDropdown clicks the inner -trigger until aria-expanded="true" so the
+        // listbox is stably open before we pick an option.
+        await openOSelectDropdown(this.page, this.page.locator(this.customDownloadRangeSelect));
     }
 
     async selectCustomDownloadRange(range) {
         // OSelect option data-test contract: `${parent}-option` shared + `data-test-value="<value>"`.
-        return await this.page.locator(this.customDownloadRangeOption(range)).click();
+        // The reka listbox virtualises/re-renders its items, so the option node can detach
+        // between resolve and click. Poll the click until it lands (option gone / selected).
+        const option = this.page.locator(this.customDownloadRangeOption(range));
+        await expect(async () => {
+            await option.click({ timeout: 3000 });
+        }).toPass({ timeout: 15000, intervals: [500] });
     }
 
     async clickCustomDownloadFileTypeJson() {
@@ -8243,19 +8307,26 @@ export class LogsPage {
         // Poll up to 2000ms for the Vue watcher chain to update the Monaco editor.
         // The watcher is async (reads buildDashboardPanelData, awaits onBuildQueryGenerated,
         // then Vue re-renders the editor prop) — a fixed 600ms was too short under CI load.
-        await this.page.waitForFunction((selector) => {
-            const host = document.querySelector(selector);
-            if (!host) return false;
-            const editors = window.monaco?.editor?.getEditors?.() ?? [];
-            for (const ed of editors) {
-                const node = ed.getDomNode?.();
-                if (node && host.contains(node)) {
-                    const val = (ed.getValue() || '').toLowerCase().trim();
-                    return val.includes('select') && val.includes('from');
+        // Only the Build tab has this watcher; on the main logs tab it returns early and the
+        // editor never auto-populates, so waiting there just burns the full 2s before the
+        // fallback below runs anyway. Skip straight to the fallback in that case.
+        const onBuildTab = await this.page.locator(this.buildQueryPage)
+            .isVisible({ timeout: 500 }).catch(() => false);
+        if (onBuildTab) {
+            await this.page.waitForFunction((selector) => {
+                const host = document.querySelector(selector);
+                if (!host) return false;
+                const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                for (const ed of editors) {
+                    const node = ed.getDomNode?.();
+                    if (node && host.contains(node)) {
+                        const val = (ed.getValue() || '').toLowerCase().trim();
+                        return val.includes('select') && val.includes('from');
+                    }
                 }
-            }
-            return false;
-        }, this.queryEditor, { timeout: 2000, polling: 100 }).catch(() => {});
+                return false;
+            }, this.queryEditor, { timeout: 2000, polling: 100 }).catch(() => {});
+        }
 
         // Check if the editor was updated (build tab watcher fired).
         // In the main logs tab the watcher returns early, so the editor stays in FTS mode.
@@ -8275,8 +8346,21 @@ export class LogsPage {
                 // now falls back to model.setValue() which bypasses the readOnly restriction.
                 await this.setQueryEditorContent(sql);
             }
-            // Allow Vue reactivity and CodeQueryEditor props.query watcher to propagate
-            await this.page.waitForTimeout(500);
+            // Wait for the CodeQueryEditor props.query watcher to actually apply the value
+            // to Monaco instead of sleeping a fixed 500ms — deterministic and usually <300ms.
+            await this.page.waitForFunction((selector) => {
+                const host = document.querySelector(selector);
+                if (!host) return false;
+                const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                for (const ed of editors) {
+                    const node = ed.getDomNode?.();
+                    if (node && host.contains(node)) {
+                        const val = (ed.getValue() || '').toLowerCase().trim();
+                        return val.includes('select') && val.includes('from');
+                    }
+                }
+                return false;
+            }, this.queryEditor, { timeout: 3000, polling: 100 }).catch(() => {});
         }
         testLogger.info('enableSqlModeIfNeeded: SQL mode enabled');
     }
@@ -8297,7 +8381,22 @@ export class LogsPage {
         // watcher which calls onBuildQueryGenerated() → extractWhereClause() (async) →
         // searchObj.data.query = whereClause → QueryEditor prop watcher → Monaco setValue.
         await this._setSqlModeViaVue(false);
-        await this.page.waitForTimeout(600);
+        // Wait for the watcher chain to strip the SELECT from the editor instead of a fixed
+        // 600ms sleep — resolves as soon as the editor updates, falls through on timeout to
+        // the isStillSQL fallback below (same recovery path as before).
+        await this.page.waitForFunction((selector) => {
+            const host = document.querySelector(selector);
+            if (!host) return true;
+            const editors = window.monaco?.editor?.getEditors?.() ?? [];
+            for (const ed of editors) {
+                const node = ed.getDomNode?.();
+                if (node && host.contains(node)) {
+                    const val = (ed.getValue() || '').toLowerCase().trim();
+                    return !(val.includes('select') && val.includes('from'));
+                }
+            }
+            return true;
+        }, this.queryEditor, { timeout: 2000, polling: 100 }).catch(() => {});
 
         // Verify the editor was updated. The Vue watcher chain is async and involves an
         // SQL-parser dynamic import, so it can exceed 600ms on first load or under CI load.
@@ -8319,7 +8418,21 @@ export class LogsPage {
                 // silently on read-only editors in the build tab's auto mode).
                 await this.setQueryEditorContent('').catch(() => {});
             }
-            await this.page.waitForTimeout(500);
+            // Wait for the editor to actually reflect the cleared query instead of a
+            // fixed 500ms sleep — deterministic, resolves as soon as propagation lands.
+            await this.page.waitForFunction((selector) => {
+                const host = document.querySelector(selector);
+                if (!host) return true;
+                const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                for (const ed of editors) {
+                    const node = ed.getDomNode?.();
+                    if (node && host.contains(node)) {
+                        const val = (ed.getValue() || '').toLowerCase().trim();
+                        return !(val.includes('select') && val.includes('from'));
+                    }
+                }
+                return true;
+            }, this.queryEditor, { timeout: 2000, polling: 100 }).catch(() => {});
         }
         testLogger.info('disableSqlModeIfNeeded: SQL mode disabled');
     }
@@ -8724,7 +8837,7 @@ export class LogsPage {
      */
     async inspectPatternCardDOM(index = 0) {
         const patternElements = await this.page.locator('tbody tr').nth(index).evaluate(el => {
-            const styledElements = el.querySelectorAll('[style*="background"], [class*="chip"], [class*="token"], [class*="highlight"], span[class*="tw:"], code');
+            const styledElements = el.querySelectorAll('[style*="background"], [class*="chip"], [class*="token"], [class*="highlight"], code');
             return {
                 totalElements: styledElements.length,
                 classes: Array.from(styledElements).slice(0, 5).map(e => e.className).filter(c => c),
@@ -8845,6 +8958,119 @@ export class LogsPage {
         await this.page.locator(this.visualizeToggle).click();
         await this.page.waitForTimeout(500);
         testLogger.info('Clicked Visualize tab toggle');
+    }
+
+    // ===== LOGS VISUALIZE PERSISTENCE — SIDEBAR NAVIGATION =====
+
+    /**
+     * Click the Dashboard sidebar menu item to navigate away from Logs.
+     */
+    async clickMenuLinkDashboardItem() {
+        await this.page.locator(this.dashboardMenuItem).click();
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        testLogger.info('Clicked Dashboard sidebar menu item');
+    }
+
+    // ===== LOGS VISUALIZE PERSISTENCE — EXPECT METHODS =====
+
+    /**
+     * Expect the Logs search result area (table) to be visible.
+     */
+    async expectLogsSearchResultVisible() {
+        await expect(this.page.locator(this.resultText)).toBeVisible({ timeout: 15000 });
+        testLogger.info('Logs search result is visible');
+    }
+
+    /**
+     * Expect the Logs search result area to NOT be visible.
+     */
+    async expectLogsSearchResultNotVisible() {
+        await expect(this.page.locator(this.resultText)).toBeHidden({ timeout: 10000 });
+        testLogger.info('Logs search result is NOT visible');
+    }
+
+    /**
+     * Expect the Build query page to be visible.
+     */
+    async expectBuildQueryPageVisible() {
+        await expect(this.page.locator(this.buildQueryPage)).toBeVisible({ timeout: 15000 });
+        testLogger.info('Build query page is visible');
+    }
+
+    /**
+     * Expect the Build query page to NOT be visible.
+     */
+    async expectBuildQueryPageNotVisible() {
+        await expect(this.page.locator(this.buildQueryPage)).toBeHidden({ timeout: 10000 });
+        testLogger.info('Build query page is NOT visible');
+    }
+
+    /**
+     * Expect Visualize tab content to be visible.
+     * The Visualize tab can show a chart renderer, a dashboard panel table, or a no-data
+     * message — any of these means the Visualize tab has loaded.
+     */
+    async expectVisualizeTabContentVisible() {
+        const chart = this.page.locator(this.chartRenderer);
+        const panel = this.page.locator(this.dashboardPanelTable);
+        const noData = this.page.locator(this.noDataMessage);
+        const anyVisible = Promise.any([
+            chart.waitFor({ state: 'visible', timeout: 30000 }).then(() => 'chart'),
+            panel.waitFor({ state: 'visible', timeout: 30000 }).then(() => 'panel'),
+            noData.waitFor({ state: 'visible', timeout: 30000 }).then(() => 'noData'),
+        ]);
+        const result = await anyVisible;
+        testLogger.info(`Visualize tab content visible: ${result}`);
+    }
+
+    /**
+     * Expect the Visualize toggle to be in a disabled state.
+     */
+    async expectVisualizeToggleDisabled() {
+        const toggle = this.page.locator(this.visualizeToggle);
+        await expect(toggle).toBeVisible({ timeout: 10000 });
+        const isDisabled = await toggle.isDisabled().catch(() => false);
+        const hasAriaDisabled = await toggle.getAttribute('aria-disabled').catch(() => null);
+        const hasDataDisabled = await toggle.getAttribute('data-disabled').catch(() => null);
+        expect(isDisabled || hasAriaDisabled === 'true' || hasDataDisabled === '').toBeTruthy();
+        testLogger.info('Visualize toggle is disabled');
+    }
+
+    /**
+     * Expect the view-mode dropdown button to NOT be visible (wide viewport).
+     */
+    async expectViewModeDropdownNotVisible() {
+        await expect(this.page.locator(this.viewModeDropdownBtn)).toBeHidden({ timeout: 5000 });
+        testLogger.info('View mode dropdown is NOT visible (wide viewport)');
+    }
+
+    /**
+     * Expect all three toggle-group buttons to be visible (wide viewport).
+     */
+    async expectAllToggleButtonsVisible() {
+        await expect(this.page.locator(this.logsToggle)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(this.visualizeToggle)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(this.buildToggle)).toBeVisible({ timeout: 10000 });
+        testLogger.info('All toggle-group buttons are visible');
+    }
+
+    /**
+     * Expect the stream selector trigger to contain the given text.
+     */
+    async expectStreamSelectorContainsText(text) {
+        const trigger = this.page.locator(this.indexDropDownTrigger).first();
+        await expect(trigger).toBeVisible({ timeout: 10000 });
+        await expect(trigger).toContainText(text, { timeout: 10000 });
+        testLogger.info(`Stream selector contains text: "${text}"`);
+    }
+
+    /**
+     * Expect the live-mode refresh-interval button to be visible,
+     * indicating that live mode / auto-run is currently enabled.
+     */
+    async expectLiveModeStatusVisible() {
+        await expect(this.page.locator(this.liveModeToggleBtn)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Live mode refresh-interval button is visible');
     }
 
     /**
@@ -9284,6 +9510,16 @@ export class LogsPage {
         // for the Monaco editor inside [data-test="logs-search-bar-query-editor"] to have
         // non-empty content — this confirms that onBuildQueryGenerated() has been called and
         // queries[0].query is ready for any Auto→Custom mode switch.
+        //
+        // With SQL mode OFF the editor holds only the WHERE clause and is often legitimately
+        // empty, so the wait below would always burn its full 10s timeout before the catch
+        // fires. Read sqlMode from Vue state and skip Phase 3 on an explicit `false`; if the
+        // state is unreachable (null) fall through to the wait as before.
+        const sqlModeOn = await this._mutateSearchObj((searchObj) => searchObj.meta.sqlMode === true);
+        if (sqlModeOn === false) {
+            testLogger.info('Build tab loaded (SQL mode off — query editor population not expected)');
+            return true;
+        }
         try {
             await this.page.waitForFunction(
                 (editorSelector) => {
@@ -9352,7 +9588,7 @@ export class LogsPage {
             if (isVisible) {
                 const parent = chartItem.locator('..');
                 // Prefer data-selected attribute (ChartSelection.vue exposes it on the <li>).
-                // Fall back to legacy bg-grey-3/5 (Quasar) and tw:bg-gray-200/400 (Tailwind).
+                // Fall back to legacy bg-grey-3/5 (Quasar) and bg-gray-200/400 (Tailwind).
                 const dataSelected = await parent.getAttribute('data-selected');
                 if (dataSelected === 'true') {
                     testLogger.info(`Current chart type detected: ${chartType}`);
@@ -9363,8 +9599,8 @@ export class LogsPage {
                     if (
                         parentClassList.includes('bg-grey-3') ||
                         parentClassList.includes('bg-grey-5') ||
-                        parentClassList.includes('tw:bg-gray-200') ||
-                        parentClassList.includes('tw:bg-gray-400')
+                        parentClassList.includes('bg-gray-200') ||
+                        parentClassList.includes('bg-gray-400')
                     ) {
                         testLogger.info(`Current chart type detected: ${chartType}`);
                         return chartType;
@@ -9397,8 +9633,8 @@ export class LogsPage {
                         (dataSelected === null && (
                             classes.includes('bg-grey-3') ||
                             classes.includes('bg-grey-5') ||
-                            classes.includes('tw:bg-gray-200') ||
-                            classes.includes('tw:bg-gray-400')
+                            classes.includes('bg-gray-200') ||
+                            classes.includes('bg-gray-400')
                         ));
                     if (matchesSelected) {
                         // Found selected item - extract chart type from child data-test attribute

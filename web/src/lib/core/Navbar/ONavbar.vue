@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     aria-label="Main navigation"
     data-test="navbar-main-nav"
     data-o2-navbar
-    class="left-drawer navbar-links o2-navbar-scroll tw:flex tw:flex-col tw:bg-[var(--color-surface-chrome-deeper)] tw:shrink-0 tw:min-h-0 tw:overflow-y-auto tw:w-[5.5rem] tw:pb-1"
+    class="left-drawer navbar-links o2-navbar-scroll flex flex-col bg-[var(--color-surface-chrome-deeper)] shrink-0 min-h-0 overflow-y-auto w-[5.5rem] pb-1"
     @keydown="handleKeydown"
   >
     <!-- Three rail-entry shapes (see navGroups.ts):
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          - group:     a pure flyout group with no page of its own (click toggles);
                       supported here but not currently emitted by groupNavLinks.
          `pinBottom` groups float to the foot of the rail via the flex spacer. -->
-    <div class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
+    <div class="flex flex-col flex-1 min-h-0 gap-y-1">
       <template
         v-for="entry in topEntries"
         :key="
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Spacer floats any pinned-bottom groups to the foot of the rail -->
-      <div v-if="bottomEntries.length" class="nav-rail-spacer tw:flex-1 tw:min-h-2" aria-hidden="true" />
+      <div v-if="bottomEntries.length" class="nav-rail-spacer flex-1 min-h-2" aria-hidden="true" />
 
       <ONavGroup
         v-for="entry in bottomEntries"
@@ -127,8 +127,11 @@ function handleKeydown(event: KeyboardEvent) {
   if (!(NAV_KEYS as readonly string[]).includes(event.key)) return;
 
   const nav = event.currentTarget as HTMLElement;
+  // Match link tiles (<a>) and group triggers (<button>) so a focused group tile is found.
   const menuLinks = Array.from(
-    nav.querySelectorAll<HTMLElement>("a[data-test^='menu-link-']"),
+    nav.querySelectorAll<HTMLElement>(
+      "a[data-test^='menu-link-'], button[data-test^='menu-link-']",
+    ),
   );
 
   if (menuLinks.length === 0) return;

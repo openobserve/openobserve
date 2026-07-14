@@ -27,9 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="emits('update:open', $event)"
     @click:secondary="emits('update:open', false)"
   >
-    <div class="tw:w-full">
+    <div class="w-full">
       <OForm id="add-stream-form" :default-values="streamInputsDefault" @submit="submitForm">
-        <div class="tw:mt-2">
+        <div class="mt-2">
           <OInput
             data-test="add-stream-name-input"
             v-model="streamInputs.name"
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="tw:mt-2">
+        <div class="mt-2">
           <OSelect
             data-test="add-stream-type-input"
             v-model="streamInputs.stream_type"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="tw:mt-2">
+        <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="mt-2">
           <OInput
             data-test="add-stream-data-retention"
             v-model="streamInputs.dataRetentionDays"
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <StreamFieldInputs
           ref="fieldInputsRef"
-          class="tw:mt-4"
+          class="mt-4"
           :fields="fields"
           @add="addField"
           @remove="removeField"
@@ -83,9 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODialog>
 
   <!-- Inline form for pipeline usage (no drawer wrapper) -->
-    <div v-else class="tw:p-4 tw:w-full">
+    <div v-else class="p-4 w-full">
       <OForm :default-values="streamInputsDefault" @submit="submitForm">
-        <div class="tw:mt-2">
+        <div class="mt-2">
           <OInput
             data-test="add-stream-name-input"
             v-model="streamInputs.name"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="tw:mt-2">
+        <div class="mt-2">
           <OSelect
             data-test="add-stream-type-input"
             v-model="streamInputs.stream_type"
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="tw:mt-2">
+        <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="mt-2">
           <OInput
             data-test="add-stream-data-retention"
             v-model="streamInputs.dataRetentionDays"
@@ -129,13 +129,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <StreamFieldInputs
           ref="fieldInputsRef"
-          class="tw:mt-4"
+          class="mt-4"
           :fields="fields"
           @add="addField"
           @remove="removeField"
         />
 
-        <div class="tw:flex tw:justify-start tw:mt-6 tw:gap-2">
+        <div class="flex justify-start mt-6 gap-2">
           <OButton
             data-test="add-stream-cancel-btn"
             variant="outline"
@@ -259,18 +259,20 @@ const showDataRetention = computed(
 const validateStream = () => {
   let valid = true;
   if (!streamInputs.value.name.trim()) {
-    nameError.value = 'Field is required!';
+    nameError.value = t('logStream.streamNameRequired');
     valid = false;
   } else if (!streamNameRegex.test(streamInputs.value.name)) {
     nameError.value = streamNameHelpText;
     valid = false;
   }
   if (!streamInputs.value.stream_type) {
-    streamTypeError.value = 'Field is required!';
+    streamTypeError.value = t('logStream.streamTypeRequired');
     valid = false;
   }
   if (showDataRetention.value && !(streamInputs.value.dataRetentionDays > 0)) {
-    dataRetentionError.value = 'Field is required!';
+    // A value of 0 IS entered but rejected here, so "required" is misleading —
+    // state the actual rule (must be ≥ 1 day) instead.
+    dataRetentionError.value = t('logStream.dataRetentionMin');
     valid = false;
   }
   // Fields are optional, but any field that has been added must pass the

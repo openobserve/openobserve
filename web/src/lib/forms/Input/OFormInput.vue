@@ -28,6 +28,7 @@ if (import.meta.env.DEV && !form) {
       <OInput
         v-bind="$attrs"
         :label="props.label"
+        :label-position="props.labelPosition"
         :placeholder="props.placeholder"
         :type="props.type"
         :disabled="props.disabled"
@@ -47,16 +48,44 @@ if (import.meta.env.DEV && !form) {
         :width="props.width"
         :model-value="field.state.value"
         :error="
-          field.state.meta.errors.length > 0
+          !$slots.error && field.state.meta.errors.length > 0
         "
         :error-message="
-          field.state.meta.errors.length > 0
+          !$slots.error && field.state.meta.errors.length > 0
             ? firstFieldError(field.state.meta.errors)
             : undefined
         "
         @update:model-value="(val: unknown) => field.handleChange(val)"
         @blur="field.handleBlur"
-      />
+      >
+        <!-- Forward OInput's presentational slots (e.g. a password visibility
+             toggle in #icon-right) so form fields keep full OInput affordances. -->
+        <template v-if="$slots['icon-left']" #icon-left>
+          <slot name="icon-left" />
+        </template>
+        <template v-if="$slots['icon-right']" #icon-right>
+          <slot name="icon-right" />
+        </template>
+        <template v-if="$slots.prefix" #prefix>
+          <slot name="prefix" />
+        </template>
+        <template v-if="$slots.suffix" #suffix>
+          <slot name="suffix" />
+        </template>
+        <template v-if="$slots.tooltip" #tooltip>
+          <slot name="tooltip" />
+        </template>
+        <template v-if="$slots.append" #append>
+          <slot name="append" />
+        </template>
+      </OInput>
+      <!-- #error slot: when provided the consumer OWNS the message and OInput's
+           built-in error (border + inline text) is suppressed above. Rendered
+           after OInput so it can escape a composite border; may be left empty
+           purely to suppress. -->
+      <template v-if="$slots.error">
+        <slot name="error" />
+      </template>
     </template>
   </component>
 </template>

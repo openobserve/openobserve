@@ -35,7 +35,7 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
@@ -324,8 +324,13 @@ const chipIcon = (kind: StepChipKind) =>
   ({ terminal: "", editor: "code", run: "play-arrow", traces: "timeline" })[
     kind
   ];
+// A code block with a filename is a file, not a shell command — render it with
+// editor chrome even under a terminal-chip step. Needed when one step mixes
+// command and file variants (e.g. RUM's npm install vs CDN HTML snippet).
 const codeChrome = (step: RichCardStep): "terminal" | "editor" =>
-  step.chip?.kind === "terminal" ? "terminal" : "editor";
+  !displayCode(step)?.filename && step.chip?.kind === "terminal"
+    ? "terminal"
+    : "editor";
 
 const extras = computed(() => props.content.extras ?? {});
 const hasInstallerAccordion = computed(
@@ -429,29 +434,28 @@ function fireConfetti() {
         </div>
         <p class="c-sub">{{ content.provider.tagline }}</p>
         <div class="pv-meta">
-          <OBadge
+          <OTag
             v-if="content.provider.runtime"
-            variant="default-outline"
-            icon="code"
-            >{{ content.provider.runtime }}</OBadge
+            type="setupCardMeta"
+            value="runtime"
+            >{{ content.provider.runtime }}</OTag
           >
-          <OBadge
+          <OTag
             v-if="content.provider.setupTime"
-            variant="primary-soft"
-            icon="schedule"
-            >{{ content.provider.setupTime }} setup</OBadge
+            type="setupCardMeta"
+            value="setuptime"
+            >{{ content.provider.setupTime }} setup</OTag
           >
           <template v-if="content.provider.metaBadges">
-            <OBadge
+            <OTag
               v-for="b in content.provider.metaBadges"
               :key="b"
-              variant="default-outline"
-              >{{ b }}</OBadge
+              type="setupCardMeta"
+              value="meta"
+              >{{ b }}</OTag
             >
           </template>
-          <OBadge v-else variant="default-outline" icon="attach-money"
-            >Cost &amp; Tokens Captured</OBadge
-          >
+          <OTag v-else type="setupCardMeta" value="cost" />
         </div>
       </div>
 
@@ -488,16 +492,16 @@ function fireConfetti() {
           :data-test="`ai-step-${step.id}`"
         >
           <template v-if="step.chip" #title-suffix>
-            <OBadge
-              size="sm"
-              :variant="step.required ? 'primary-soft' : 'default-outline'"
+            <OTag
+              type="stepChip"
+              :value="step.required ? 'required' : 'optional'"
               :icon="step.chip.kind === 'terminal' ? undefined : chipIcon(step.chip.kind)"
             >
               <template v-if="step.chip.kind === 'terminal'" #icon>
                 <span class="step-tag-glyph">$_</span>
               </template>
               {{ step.chip.label }}
-            </OBadge>
+            </OTag>
           </template>
 
           <div class="step-content-pad" :ref="(el) => setStepRef(el, i)">
@@ -587,20 +591,20 @@ function fireConfetti() {
               <OIcon name="info-outline" size="sm" /> {{ step.note }}
             </p>
 
-            <div v-if="step.pills?.length" class="pill-list tw:mt-2">
-              <OBadge
+            <div v-if="step.pills?.length" class="pill-list mt-2">
+              <OTag
                 v-for="p in step.pills"
                 :key="p"
-                variant="default-soft"
-                size="sm"
-                >{{ p }}</OBadge
+                type="fieldTag"
+                value="softsm"
+                >{{ p }}</OTag
               >
             </div>
 
             <!-- Live status bar + fix box on the detection-anchor step -->
             <template v-if="step.detectionAnchor">
               <div
-                class="statusbar tw:mt-3"
+                class="statusbar mt-3"
                 :class="detect.state.value"
                 data-test="ai-c-statusbar"
               >
@@ -672,7 +676,7 @@ function fireConfetti() {
                 </OButton>
               </div>
 
-              <div v-if="showFixHint" class="fixbox tw:mt-3">
+              <div v-if="showFixHint" class="fixbox mt-3">
                 <div class="fixbox-h">
                   <OIcon name="warning" size="sm" /> Most Likely Fix —
                   {{ extras.fixTitle || "Instrument Before Importing The Client" }}
@@ -728,27 +732,27 @@ function fireConfetti() {
           <div class="acc-body">
             <template v-if="extras.installs?.length">
               Installs via pip and verifies imports:
-              <div class="pill-list tw:mt-2">
-                <OBadge
+              <div class="pill-list mt-2">
+                <OTag
                   v-for="p in extras.installs"
                   :key="p"
-                  variant="default-soft"
-                  size="sm"
-                  >{{ p }}</OBadge
+                  type="fieldTag"
+                  value="softsm"
+                  >{{ p }}</OTag
                 >
               </div>
             </template>
             <template v-if="extras.envVars?.length">
-              <div class="tw:mt-3">
+              <div class="mt-3">
                 Writes these keys to <code>./.env</code> (idempotent):
               </div>
-              <div class="pill-list tw:mt-2">
-                <OBadge
+              <div class="pill-list mt-2">
+                <OTag
                   v-for="p in extras.envVars"
                   :key="p"
-                  variant="default-soft"
-                  size="sm"
-                  >{{ p }}</OBadge
+                  type="fieldTag"
+                  value="softsm"
+                  >{{ p }}</OTag
                 >
               </div>
             </template>
@@ -785,7 +789,7 @@ function fireConfetti() {
           rel="noopener noreferrer"
           >{{ content.provider.name }} →</a
         >
-        <span v-if="content.slackUrl" class="tw:ml-auto"
+        <span v-if="content.slackUrl" class="ml-auto"
           >Stuck?
           <a
             :href="safeHttpUrl(content.slackUrl)"
@@ -917,7 +921,7 @@ function fireConfetti() {
   font-size: 14px;
   margin: 10px 0 0;
 }
-/* Hero meta chips are now <OBadge> (lib) — just lay them out. */
+/* Hero meta chips are now <OTag> (lib) — just lay them out. */
 .pv-meta {
   display: flex;
   align-items: center;
@@ -936,7 +940,7 @@ function fireConfetti() {
 }
 /* Keep the hint on one line — it overflows the 280px field into the empty space
    to its right rather than wrapping (the input box itself stays md width). */
-.c-config :deep(.tw\:text-input-hint) {
+.c-config :deep(.text-input-hint) {
   white-space: nowrap;
 }
 
@@ -957,7 +961,7 @@ function fireConfetti() {
 .steps {
   margin-top: 0;
 }
-/* Step context chip is now <OBadge> (lib). Only the terminal "$_" glyph (used
+/* Step context chip is now <OTag> (lib). Only the terminal "$_" glyph (used
    in the badge's #icon slot) keeps a monospace style. */
 .step-tag-glyph {
   font-weight: 800;
@@ -1133,7 +1137,7 @@ function fireConfetti() {
   border-radius: 4px;
 }
 
-/* ---- pills (now <OBadge>) — just lay them out ---- */
+/* ---- pills (now <OTag>) — just lay them out ---- */
 .pill-list {
   display: flex;
   flex-wrap: wrap;

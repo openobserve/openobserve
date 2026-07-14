@@ -191,8 +191,8 @@ pub async fn process_session_detail(
         Ok(()) => {
             let redirect_url = format!(
                 "{}/web/billings/plans?org_identifier={}",
-                &get_config().common.web_url,
-                &org_id
+                get_config().common.web_url,
+                org_id
             );
             // Send event to ActiveCampaign
             let segment_event_data = HashMap::from([

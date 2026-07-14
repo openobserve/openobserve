@@ -16,40 +16,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-alert-conditions tw:w-full tw:rounded-lg tw:mx-auto tw:bg-[var(--color-surface-overlay)] tw:border tw:border-[var(--color-border-default)]"
+    class="step-alert-conditions w-full rounded-lg mx-auto bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)]"
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <!-- Section header -->
     <div
-      class="tw:flex tw:items-center tw:py-2.5 tw:px-3"
-      :class="store.state.theme === 'dark' ? 'tw:border-b tw:border-[#343434]' : 'tw:border-b tw:border-[#eeeeee]'"
+      class="flex items-center py-2.5 px-3"
+      :class="store.state.theme === 'dark' ? 'border-b border-[#343434]' : 'border-b border-[#eeeeee]'"
     >
-      <div class="tw:w-0.75 tw:h-4 tw:rounded-xs tw:mr-2 tw:shrink-0 tw:bg-[var(--q-primary)]" />
+      <div class="w-0.75 h-4 rounded-xs mr-2 shrink-0 bg-[var(--q-primary)]" />
       <span
-        class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em] tw:text-[var(--color-text-primary)]"
+        class="text-[13px] font-semibold tracking-[0.01em] text-[var(--color-text-primary)]"
       >{{
         t("alerts.alertSettings.sectionTitle")
       }}</span>
     </div>
-    <div class="tw:px-3 tw:py-2">
+    <div class="px-3 py-2">
       <div>
         <!-- For Real-Time Alerts -->
         <template v-if="isRealTime === 'true'">
           <!-- Silence Notification (Cooldown) -->
-          <div class="tw:flex tw:justify-start tw:items-start tw:pb-3 tw:mb-4">
+          <div class="flex justify-start items-start pb-3 mb-4">
             <div
-              class="tw:font-semibold tw:flex tw:items-center"
+              class="font-semibold flex items-center"
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.silenceNotification") + " *" }}
-              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.cooldownTooltip')"
                   side="right"
                 />
             </div>
             <div>
-              <div class="tw:flex tw:items-center tw:mr-2" style="width: fit-content">
+              <div class="flex items-center mr-2" style="width: fit-content">
                 <div
                   style="width: 87px; margin-left: 0 !important"
                   class="silence-notification-input"
@@ -72,9 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     font-size: 13px;
                   "
                   :class="
-                    store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
+                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
                   "
-                  class="tw:flex tw:justify-center tw:items-center tw:bg-input-addon-bg tw:text-input-addon-text"
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   formData.trigger_condition.silence === null ||
                   formData.trigger_condition.silence === ''
                 "
-                class="text-red-8 tw:pt-1"
+                class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
@@ -95,33 +95,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Destinations -->
-          <div class="tw:flex tw:items-start tw:pb-4 tw:mb-4">
+          <div class="flex items-start pb-4 mb-4">
             <div
               style="width: 190px; height: 28px"
-              class="tw:flex tw:items-center tw:font-semibold"
+              class="flex items-center font-semibold"
             >
               <span>{{ t("alerts.destination") }} *</span>
             </div>
-            <div class="tw:flex tw:flex-col">
-              <AlertTargetsSelect
-                :destinations="localDestinations"
-                :workflows="localWorkflows"
-                :destination-options="formattedDestinations"
-                :workflow-options="workflowOptions"
-                :is-enterprise="isEnterprise"
-                @update:destinations="onTargetsDestinations"
-                @update:workflows="onTargetsWorkflows"
-                @refresh="refreshTargets"
-                @create-destination="routeToCreateDestination"
-                @create-workflow="routeToCreateWorkflow"
-              />
+            <div class="flex flex-col">
+              <div class="flex items-center">
+                <OSelect
+                  v-model="localDestinations"
+                  :options="formattedDestinations"
+                  data-test="alert-destinations-select"
+                  multiple
+                  class="min-w-[180px] max-w-[300px]"
+                  @update:model-value="emitDestinationsUpdate"
+                >
+                  <template #empty>{{
+                    t("alerts.alertSettings.noDestinationsAvailable")
+                  }}</template>
+                </OSelect>
+                <OButton
+                  data-test="alert-settings-refresh-destinations-btn"
+                  class="ml-1"
+                  variant="ghost"
+                  size="icon-circle-sm"
+                  :title="t('alerts.alertSettings.refreshDestinations')"
+                  @click="$emit('refresh:destinations')"
+                >
+                  <OIcon name="refresh" size="sm" />
+                </OButton>
+                <OButton
+                  data-test="create-destination-btn"
+                  variant="outline"
+                  size="sm"
+                  class="ml-2"
+                  @click="routeToCreateDestination"
+                  >{{ t("alerts.alertSettings.addNewDestination") }}</OButton
+                >
+              </div>
               <div
                 v-if="
                   destinationsTouched &&
-                  (!localDestinations || localDestinations.length === 0) &&
-                  (!localWorkflows || localWorkflows.length === 0)
+                  (!localDestinations || localDestinations.length === 0)
                 "
-                class="text-red-8 tw:pt-1"
+                class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
@@ -133,13 +152,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- For Scheduled Alerts -->
         <template v-else>
           <!-- Period -->
-          <div class="tw:flex tw:items-start tw:mr-2 tw:mb-4!">
+          <div class="flex items-start mr-2 mb-4!">
             <div
-              class="tw:font-semibold tw:flex tw:items-center"
+              class="font-semibold flex items-center"
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.period") + " *" }}
-              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.periodTooltip')"
                   side="right"
@@ -148,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <div
                 ref="periodFieldRef"
-                class="tw:flex tw:items-center tw:mr-2"
+                class="flex items-center mr-2"
                 style="width: fit-content"
               >
                 <div
@@ -173,16 +192,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     font-size: 13px;
                   "
                   :class="
-                    store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
+                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
                   "
-                  class="tw:flex tw:justify-center tw:items-center tw:bg-input-addon-bg tw:text-input-addon-text"
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
               </div>
               <div
                 v-if="!Number(formData.trigger_condition.period)"
-                class="text-red-8 tw:pt-1"
+                class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
@@ -191,13 +210,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-          <div class="tw:flex tw:items-start tw:mr-2 tw:mb-4!">
+          <div class="flex items-start mr-2 mb-4!">
             <div
-              class="tw:font-semibold tw:flex tw:items-center"
+              class="font-semibold flex items-center"
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.silenceNotification") + " *" }}
-              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.cooldownTooltip')"
                   side="right"
@@ -206,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <div
                 ref="silenceFieldRef"
-                class="tw:flex tw:items-center tw:mr-2"
+                class="flex items-center mr-2"
                 style="width: fit-content"
               >
                 <div style="width: 87px; margin-left: 0 !important">
@@ -227,9 +246,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     font-size: 13px;
                   "
                   :class="
-                    store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'
+                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
                   "
-                  class="tw:flex tw:justify-center tw:items-center tw:bg-input-addon-bg tw:text-input-addon-text"
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
@@ -241,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   formData.trigger_condition.silence === null ||
                   formData.trigger_condition.silence === ''
                 "
-                class="text-red-8 tw:pt-1"
+                class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
@@ -250,40 +269,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Destinations -->
-          <div class="tw:flex tw:items-start tw:mr-2 tw:mb-4!">
+          <div class="flex items-start mr-2 mb-4!">
             <div
-              class="tw:font-semibold tw:flex tw:items-center"
+              class="font-semibold flex items-center"
               style="width: 190px; height: 28px"
             >
               {{ t("alerts.destination") + " *" }}
-              <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
                 <OTooltip
                   :content="t('alerts.alertSettings.destinationsTooltip')"
                   side="right"
                 />
             </div>
             <div>
-              <AlertTargetsSelect
-                ref="destinationsFieldRef"
-                :destinations="localDestinations"
-                :workflows="localWorkflows"
-                :destination-options="formattedDestinations"
-                :workflow-options="workflowOptions"
-                :is-enterprise="isEnterprise"
-                :error="destinationError"
-                @update:destinations="onTargetsDestinations"
-                @update:workflows="onTargetsWorkflows"
-                @refresh="refreshTargets"
-                @create-destination="routeToCreateDestination"
-                @create-workflow="routeToCreateWorkflow"
-              />
+              <div class="flex items-center">
+                <OSelect
+                  ref="destinationsFieldRef"
+                  v-model="localDestinations"
+                  :options="formattedDestinations"
+                  data-test="alert-destinations-select"
+                  multiple
+                  :error="destinationError"
+                  class="min-w-[180px] max-w-[300px]"
+                  @update:model-value="
+                    destinationError = false;
+                    emitDestinationsUpdate();
+                  "
+                >
+                  <template #empty>{{
+                    t("alerts.alertSettings.noDestinationsAvailable")
+                  }}</template>
+                </OSelect>
+                <OButton
+                  data-test="alert-settings-refresh-destinations-btn"
+                  class="ml-1"
+                  variant="ghost"
+                  size="icon-circle-sm"
+                  :title="t('alerts.alertSettings.refreshDestinations')"
+                  @click="$emit('refresh:destinations')"
+                >
+                  <OIcon name="refresh" size="sm" />
+                </OButton>
+                <OButton
+                  data-test="create-destination-btn"
+                  variant="outline"
+                  size="sm"
+                  class="ml-2"
+                  @click="routeToCreateDestination"
+                  >{{ t("alerts.alertSettings.addNewDestination") }}</OButton
+                >
+              </div>
               <div
                 v-if="
                   destinationsTouched &&
-                  (!localDestinations || localDestinations.length === 0) &&
-                  (!localWorkflows || localWorkflows.length === 0)
+                  (!localDestinations || localDestinations.length === 0)
                 "
-                class="text-red-8 tw:pt-1"
+                class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
@@ -293,13 +334,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <!-- Creates Incident toggle — shown for all alert types -->
-        <div class="tw:flex tw:items-start tw:mb-4!">
+        <div class="flex items-start mb-4!">
           <div
-            class="tw:font-semibold tw:flex tw:items-center"
+            class="font-semibold flex items-center"
             style="width: 190px; height: 28px"
           >
             {{ t("alerts.alertSettings.createsIncident") }}
-            <OIcon name="info" size="sm" class="tw:ml-1 tw:cursor-pointer" />
+            <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
               <OTooltip
                 :content="t('alerts.alertSettings.createsIncidentTooltip')"
                 side="right"
@@ -322,14 +363,11 @@ import {
   computed,
   watch,
   nextTick,
-  onMounted,
   type PropType,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import workflowService from "@/services/workflows";
-import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -341,11 +379,10 @@ import {
   convertMinutesToCron,
 } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import AlertTargetsSelect from "@/components/alerts/AlertTargetsSelect.vue";
 
 export default defineComponent({
   name: "Step3AlertConditions",
-  components: { OButton, OInput, OSelect, OSwitch, OTooltip, OIcon, AlertTargetsSelect },
+  components: { OButton, OInput, OSelect, OSwitch, OTooltip, OIcon },
   props: {
     formData: {
       type: Object as PropType<any>,
@@ -371,10 +408,6 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       default: () => [],
     },
-    workflows: {
-      type: Array as PropType<any[]>,
-      default: () => [],
-    },
   },
   emits: [
     "update:trigger",
@@ -382,7 +415,6 @@ export default defineComponent({
     "update:isAggregationEnabled",
     "update:destinations",
     "refresh:destinations",
-    "update:workflows",
     "update:promqlCondition",
   ],
   setup(props, { emit }) {
@@ -407,35 +439,6 @@ export default defineComponent({
     const localDestinations = ref(props.destinations);
     const destinationsTouched = ref(false);
     const destinationError = ref(false);
-    // Workflows linked to the alert (optional; "at least one of destination or
-    // workflow" — see validate()). Options are self-fetched here (unlike
-    // destinations, which are threaded down as props) to avoid plumbing a second
-    // list through the whole alert-form chain. `value` = workflow id.
-    // Workflows are an enterprise/cloud-only feature. In OSS the section is
-    // hidden, no list is fetched, and — because localWorkflows stays [] — the
-    // "at least one" validation naturally reduces to the original "destination
-    // required" behavior.
-    const isEnterprise = computed(() => config.isEnterprise === "true");
-    const localWorkflows = ref(props.workflows);
-    const workflowOptions = ref<{ label: string; value: string }[]>([]);
-    const fetchWorkflows = async () => {
-      if (!isEnterprise.value) return;
-      try {
-        const res = await workflowService.listWorkflows(
-          store.state.selectedOrganization.identifier,
-        );
-        const list = Array.isArray(res.data)
-          ? res.data
-          : (res.data?.list ?? []);
-        workflowOptions.value = list.map((wf: any) => ({
-          label: wf.name,
-          value: wf.id,
-        }));
-      } catch (e) {
-        workflowOptions.value = [];
-      }
-    };
-    onMounted(fetchWorkflows);
 
     // Timezone management
     const browserTimezone = ref("");
@@ -514,13 +517,6 @@ export default defineComponent({
       () => props.destinations,
       (newVal) => {
         localDestinations.value = newVal;
-      },
-    );
-
-    watch(
-      () => props.workflows,
-      (newVal) => {
-        localWorkflows.value = newVal;
       },
     );
 
@@ -738,43 +734,6 @@ export default defineComponent({
       emit("update:destinations", localDestinations.value);
     };
 
-    const emitWorkflowsUpdate = () => {
-      // Touch destinations too so the "at least one" error clears once a workflow
-      // is chosen (the inline error lives under the Destinations select).
-      destinationsTouched.value = true;
-      destinationError.value = false;
-      emit("update:workflows", localWorkflows.value);
-    };
-
-    // Combined AlertTargetsSelect handlers. The child splits the tagged selection
-    // into the two arrays and emits them separately; we mirror each into its local
-    // model and reuse the existing emit helpers so payload/validation are unchanged.
-    const onTargetsDestinations = (value: string[]) => {
-      localDestinations.value = value;
-      destinationError.value = false;
-      emitDestinationsUpdate();
-    };
-    const onTargetsWorkflows = (value: string[]) => {
-      localWorkflows.value = value;
-      emitWorkflowsUpdate();
-    };
-    // The combined field's single refresh reloads both lists.
-    const refreshTargets = () => {
-      emit("refresh:destinations");
-      fetchWorkflows();
-    };
-
-    const routeToCreateWorkflow = () => {
-      const url = router.resolve({
-        name: "createWorkflow",
-        query: {
-          trigger: "alert_fired",
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      }).href;
-      window.open(url, "_blank");
-    };
-
     const emitPromqlConditionUpdate = () => {
       emit(
         "update:promqlCondition",
@@ -818,18 +777,13 @@ export default defineComponent({
           };
         }
 
-        // Require at least one delivery: a destination OR a linked workflow.
-        if (
-          (!localDestinations.value || localDestinations.value.length === 0) &&
-          (!localWorkflows.value || localWorkflows.value.length === 0)
-        ) {
+        // Check destinations (required for both real-time and scheduled)
+        if (!localDestinations.value || localDestinations.value.length === 0) {
           destinationsTouched.value = true;
           destinationError.value = true;
           return {
             valid: false,
-            message: isEnterprise.value
-              ? "Add at least one destination or workflow."
-              : "At least one destination is required.",
+            message: "At least one destination is required.",
             focusDestination: true,
           };
         }
@@ -999,10 +953,6 @@ export default defineComponent({
       localDestinations,
       destinationsTouched,
       destinationError,
-      localWorkflows,
-      workflowOptions,
-      fetchWorkflows,
-      isEnterprise,
       aggFunctions,
       triggerOperators,
       filteredNumericColumns,
@@ -1011,11 +961,6 @@ export default defineComponent({
       emitAggregationUpdate,
       emitDestinationsUpdate,
       routeToCreateDestination,
-      emitWorkflowsUpdate,
-      routeToCreateWorkflow,
-      onTargetsDestinations,
-      onTargetsWorkflows,
-      refreshTargets,
       handlePeriodChange,
       // Timezone
       browserTimezone,

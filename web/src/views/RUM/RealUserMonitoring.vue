@@ -15,38 +15,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:h-full tw:overflow-hidden tw:flex tw:flex-col">
+  <div class="h-full overflow-hidden flex flex-col">
     <template v-if="isLoading.length">
       <div
-        class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:pt-1 tw:h-[calc(100vh-11.875rem)]"
+        class="pb-4 flex items-center justify-center text-center pt-1 h-[calc(100vh-11.875rem)]"
       >
         <div>
           <OSpinner
             size="md"
-            class="tw:mx-auto tw:block"
+            class="mx-auto block"
             data-test="rum-loading-indicator"
           />
-          <div class="tw:text-center tw:w-full">
+          <div class="text-center w-full">
             {{ t("rum.loadingMsg") }}
           </div>
         </div>
       </div>
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
-      <div v-if="showTabs" class="tw:w-full tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default">
-        <OTabs v-model="activeTab" align="left" @change="changeTab">
-          <OTab
-            v-for="tab in tabs"
-            :key="tab.value"
-            :name="tab.value"
-            :label="tab.label"
-          />
-        </OTabs>
-      </div>
+      <AppPageHeader
+        v-if="showTabs"
+        :title="t('rum.title')"
+        icon="devices"
+        tabs-below
+        class="shrink-0 px-4"
+      >
+        <template #tabs>
+          <OTabs v-model="activeTab" align="left" @change="changeTab">
+            <OTab
+              v-for="tab in tabs"
+              :key="tab.value"
+              :name="tab.value"
+              :label="tab.label"
+            />
+          </OTabs>
+        </template>
+      </AppPageHeader>
       <router-view v-slot="{ Component }">
         <template v-if="$route.meta.keepAlive">
           <keep-alive
-            class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col"
+            class="flex-1 min-h-0 flex flex-col"
           >
             <component
               :is="Component"
@@ -56,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </keep-alive>
         </template>
         <template v-else>
-          <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col">
+          <div class="flex-1 min-h-0 flex flex-col">
             <component
               :is="Component"
               :isRumEnabled="isRumEnabled"
@@ -94,8 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #extra>
-          <div class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:flex-wrap">
-            <span class="tw:text-sm tw:font-semibold tw:text-text-secondary tw:mr-1">
+          <div class="flex items-center justify-center gap-2 flex-wrap">
+            <span class="text-sm font-semibold text-text-secondary mr-1">
               {{ t("rum.emptyState.learnMore") }}
             </span>
             <EmptyStateIngestionChip
@@ -136,6 +144,7 @@ import { useI18n } from "vue-i18n";
 import useRum from "@/composables/rum/useRum";
 import useStreams from "@/composables/useStreams";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";

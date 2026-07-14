@@ -49,18 +49,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="inputHandleTest"
     />
 
-    <div class="flow-node__icon tw:flex tw:items-center">
+    <div class="flow-node__icon flex items-center">
       <!-- `icon` may be a glyph name or an "img:<url>" string; OIcon renders both
            (same as the pipeline node), so canvas icons match exactly. -->
-      <OIcon :name="icon || 'help'" size="md" class="tw:my-2 tw:mr-2" />
+      <OIcon :name="icon || 'help'" size="md" class="my-2 mr-2" />
     </div>
 
-    <OSeparator vertical class="tw:mr-2" />
+    <OSeparator vertical class="mr-2" />
 
     <!-- Shared node typography (15px / bold / left) lives here so every #body
          slot inherits it — wrappers supply content, not styling. -->
     <div
-      class="flow-node__container tw:text-[15px]! tw:font-bold! tw:leading-[1.4]!"
+      class="flow-node__container text-[15px]! font-bold! leading-[1.4]!"
     >
       <slot name="body" />
     </div>

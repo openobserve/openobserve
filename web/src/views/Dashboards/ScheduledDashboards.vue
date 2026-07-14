@@ -22,8 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="emit('update:open', $event)"
   >
     <template #header-right>
-      <div class="tw:flex tw:items-center tw:justify-end tw:gap-2">
-        <div class="app-tabs-container tw:h-[36px]">
+      <div class="flex items-center justify-end gap-2">
+        <div class="app-tabs-container h-[36px]">
           <AppTabs
             class="tabs-selection-container"
             :tabs="scheduledReportTypeTabs"
@@ -49,8 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       data-test="scheduled-dashboards-container"
-      class="scheduled-dashboards tw:h-fit"
-      :class="store.state.theme === 'dark' ? 'dark-mode tw:bg-[var(--color-surface-panel)]' : 'tw:bg-white'"
+      class="scheduled-dashboards h-fit"
+      :class="store.state.theme === 'dark' ? 'dark-mode bg-[var(--color-surface-panel)]' : 'bg-white'"
     >
     <OTable
       data-test="scheduled-dashboard-table"
@@ -66,23 +66,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="width: 100%"
     >
       <template #cell-name="{ row }">
-        <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.name }}</span>
+        <span class="cursor-pointer" @click="openReport(row)">{{ row.name }}</span>
       </template>
 
       <template #cell-tab="{ row }">
-        <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.tab }}</span>
+        <span class="cursor-pointer" @click="openReport(row)">{{ row.tab }}</span>
       </template>
 
       <template #cell-time_range="{ row }">
-        <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.time_range }}</span>
+        <span class="cursor-pointer" @click="openReport(row)">{{ row.time_range }}</span>
       </template>
 
       <template #cell-frequency="{ row }">
-        <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.frequency }}</span>
+        <span class="cursor-pointer" @click="openReport(row)">{{ row.frequency }}</span>
       </template>
 
       <template #cell-last_triggered_at="{ row }">
-        <span class="tw:cursor-pointer" @click="openReport(row)">
+        <span class="cursor-pointer" @click="openReport(row)">
           <OTimeCell
             :value="row.last_triggered_at_raw"
             unit="us"
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-created_at="{ row }">
-        <span class="tw:cursor-pointer" @click="openReport(row)">
+        <span class="cursor-pointer" @click="openReport(row)">
           <OTimeCell
             :value="row.created_at_raw"
             unit="us"
@@ -415,7 +415,7 @@ const getTimeRangeValue = (dateTime: any) => {
 }
 
 .scheduled-dashboards thead tr {
-  background-color: var(--o2-table-header-bg) !important;
+  background-color: var(--color-table-header-bg);
 }
 
 .scheduled-dashboards .rum-tabs {

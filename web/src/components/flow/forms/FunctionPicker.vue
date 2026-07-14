@@ -44,16 +44,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="function-picker"
-    class="tw:w-full tw:flex tw:flex-col tw:gap-4"
-    :class="createNewFunction ? 'tw:h-full tw:min-h-0 tw:gap-0' : ''"
+    class="w-full flex flex-col gap-4"
+    :class="createNewFunction ? 'h-full min-h-0 gap-0' : ''"
   >
-    <OSpinner v-if="loading" size="md" class="tw:mx-auto tw:my-8" />
+    <OSpinner v-if="loading" size="md" class="mx-auto my-8" />
 
     <template v-else>
       <!-- create / pick toggle -->
       <div
-        class="tw:flex tw:items-center tw:gap-3"
-        :class="createNewFunction ? 'tw:px-4 tw:pt-4 tw:shrink-0' : ''"
+        class="flex items-center gap-3"
+        :class="createNewFunction ? 'px-4 pt-4 shrink-0' : ''"
       >
         <OSwitch
           v-model="createNewFunction"
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- inline function editor (full-width; its own toolbar owns save/cancel) -->
       <div
         v-if="createNewFunction"
-        class="flow-add-function tw:flex-1 tw:min-h-0 tw:w-full"
+        class="flow-add-function flex-1 min-h-0 w-full"
       >
         <AddFunction
           ref="addFunctionRef"
@@ -100,41 +100,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="selectedFunction && selectedDefinition"
           data-test="function-picker-definition"
-          class="tw:mt-4 tw:mb-4"
+          class="mt-4 mb-4"
         >
           <!-- Dark styling is bound to the app theme (store.state.theme), NOT
-               tw:dark: — the tw:dark: variant follows the OS prefers-color-scheme
+               dark: — the dark: variant follows the OS prefers-color-scheme
                here (no @custom-variant dark), which flips this card dark in the
                app's light mode. -->
           <OCard
-            class="function-definition-card tw:border tw:rounded-lg tw:overflow-hidden"
+            class="function-definition-card border rounded-lg overflow-hidden"
             :class="isDark
-              ? 'tw:border-[#2d3748] tw:bg-[#1a202c] tw:shadow-[0_4px_12px_rgba(0,0,0,0.4)]'
-              : 'tw:border-[#e1e5e9] tw:shadow-[0_2px_4px_rgba(0,0,0,0.05)]'"
+              ? 'border-[#2d3748] bg-[#1a202c] shadow-[0_4px_12px_rgba(0,0,0,0.4)]'
+              : 'border-[#e1e5e9] shadow-[0_2px_4px_rgba(0,0,0,0.05)]'"
           >
             <OCardSection
               role="header"
-              class="tw:border-b"
+              class="border-b"
               :class="isDark
-                ? 'tw:bg-[linear-gradient(135deg,#2d3748_0%,#1a202c_100%)] tw:border-b-[#4a5568]'
-                : 'tw:bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)] tw:border-b-[#e2e8f0]'"
+                ? 'bg-[linear-gradient(135deg,#2d3748_0%,#1a202c_100%)] border-b-[#4a5568]'
+                : 'bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)] border-b-[#e2e8f0]'"
             >
               <div
-                class="tw:text-base tw:font-semibold"
-                :class="isDark ? 'tw:text-white' : 'tw:text-[#2d3748]'"
+                class="text-base font-semibold"
+                :class="isDark ? 'text-white' : 'text-[#2d3748]'"
               >
                 {{ t("function.function_definition") }}
               </div>
             </OCardSection>
             <OSeparator />
-            <OCardSection class="tw:p-0">
+            <OCardSection class="p-0">
               <div
-                class="function-code-container tw:max-h-[250px] tw:overflow-y-auto tw:relative"
-                :class="isDark ? 'tw:bg-[#0d1117] tw:border tw:border-[#21262d]' : 'tw:bg-[#fafbfc]'"
+                class="function-code-container max-h-[250px] overflow-y-auto relative"
+                :class="isDark ? 'bg-[#0d1117] border border-[#21262d]' : 'bg-[#fafbfc]'"
               >
                 <pre
-                  class="function-code tw:bg-transparent tw:m-0 tw:p-4 tw:text-[13px] tw:leading-normal tw:whitespace-pre-wrap tw:break-words tw:border-0 tw:font-normal tw:cursor-default tw:select-text"
-                  :class="isDark ? 'tw:text-[#f7fafc]' : 'tw:text-[#2d3748]'"
+                  class="function-code bg-transparent m-0 p-4 text-[13px] leading-normal whitespace-pre-wrap break-words border-0 font-normal cursor-default select-text"
+                  :class="isDark ? 'text-[#f7fafc]' : 'text-[#2d3748]'"
                 >{{ selectedDefinition }}</pre>
               </div>
             </OCardSection>
@@ -142,28 +142,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- After-Flattening (RAF/RBF) toggle + guidelines -->
-        <div v-if="showFlatten" class="tw:w-full tw:flex tw:flex-col tw:gap-3">
+        <div v-if="showFlatten" class="w-full flex flex-col gap-3">
           <OSwitch
             v-model="afterFlatten"
             :label="t('flow.function.flatten')"
             data-test="function-picker-after-flatten-toggle"
           />
-          <div class="tw:bg-[#f9f290] tw:text-[#2d3748] tw:w-full tw:rounded-md tw:p-3 tw:flex tw:flex-col tw:gap-2">
-            <div class="tw:text-sm tw:text-[#2d3748]">
+          <div class="bg-[#f9f290] text-[#2d3748] w-full rounded-md p-3 flex flex-col gap-2">
+            <div class="text-sm text-[#2d3748]">
               {{ t("flow.function.guidelinesTitle") }}
             </div>
-            <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-[#2d3748]">
-              <div class="tw:flex tw:items-start tw:gap-2">
-                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+            <div class="flex flex-col gap-1 text-sm text-[#2d3748]">
+              <div class="flex items-start gap-2">
+                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
                 <span>
-                  <span class="tw:font-bold tw:text-[#007bff]">{{ t("flow.function.rbf") }}</span>
+                  <span class="font-bold text-[#007bff]">{{ t("flow.function.rbf") }}</span>
                   {{ t("flow.function.rbfDesc") }}
                 </span>
               </div>
-              <div class="tw:flex tw:items-start tw:gap-2">
-                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+              <div class="flex items-start gap-2">
+                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
                 <span>
-                  <span class="tw:font-bold tw:text-[#007bff]">{{ t("flow.function.raf") }}</span>
+                  <span class="font-bold text-[#007bff]">{{ t("flow.function.raf") }}</span>
                   {{ t("flow.function.rafDesc") }}
                 </span>
               </div>
@@ -229,7 +229,7 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const store = useStore();
 
-// App theme (not tw:dark:, which follows the OS here — see the preview markup).
+// App theme (not dark:, which follows the OS here — see the preview markup).
 const isDark = computed(() => store.state.theme === "dark");
 
 const loading = ref(false);

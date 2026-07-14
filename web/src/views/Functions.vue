@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        and uses the same breadcrumb section-switcher for fast lateral nav:
          Stream Pipelines ▾            (› Edit Pipeline on a detail page)
        Page actions (and the detail-view teleport target) live in the bar. -->
-  <div class="tw:h-full tw:min-h-0 tw:flex tw:flex-col">
+  <div class="h-full min-h-0 flex flex-col">
     <!-- This row hosts page actions: the pipelines-list buttons or the detail
          teleport target. Section pages (functions/enrichment/eval) render
          nothing here — their content components have their own headers. -->
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :icon="showPipelineActions ? 'lan' : undefined"
       :back="detailBack"
       :tabs-below="showPipelineActions"
-      class="tw:px-4 tw:border-b tw:border-border-default"
+      class="px-4 border-b border-border-default"
     >
       <!-- Section switcher tabs (Stream Pipelines / Functions / …) next to the
            title on the list page; hidden on detail sub-pages (editor/history).
@@ -40,19 +40,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #tabs>
         <PipelineSectionTabs v-if="showPipelineActions" />
       </template>
-      <!-- Pipeline name input rendered inline with the title on the create page -->
+      <!-- Teleport target for the create-page pipeline name input. The input
+           itself is owned and teleported here by PipelineEditor.vue, so it sits
+           with the save logic that validates it (OForm migration). -->
       <template v-if="routeName === 'createPipeline'" #title-trail>
-        <div class="tw:w-64 tw:shrink-0">
-          <OInput
-            ref="pipelineNameInputRef"
-            v-model="pipelineObj.currentSelectedPipeline.name"
-            :placeholder="t('pipeline.pipelineName')"
-            hide-bottom-space
-            :error="pipelineObj.pipelineNameError"
-            :error-message="pipelineObj.pipelineNameErrorMessage"
-            data-test="pipeline-editor-name-input"
-          />
-        </div>
+        <div id="o2-page-title-trail"></div>
       </template>
       <template #actions>
         <template v-if="showPipelineActions">
@@ -129,15 +121,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-else-if="isDetailView"
           id="o2-page-actions"
-          class="tw:flex tw:items-center tw:gap-2"
+          class="flex items-center gap-2"
           data-test="pipeline-detail-actions"
         />
       </template>
     </AppPageHeader>
 
-    <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:overflow-hidden">
+    <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
       <RouterView v-slot="{ Component }">
-        <component :is="Component" class="tw:h-full" @sendToAiChat="sendToAiChat" />
+        <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
       </RouterView>
     </div>
   </div>
@@ -149,8 +141,6 @@ import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import { pipelineObj } from "@/plugins/pipelines/useDnD";
 import {
   defineComponent,
   ref,
@@ -175,7 +165,6 @@ export default defineComponent({
     OButton,
     ODropdown,
     ODropdownItem,
-    OInput,
   },
   emits: ["sendToAiChat"],
   setup(props, { emit }) {
@@ -289,18 +278,6 @@ export default defineComponent({
       emit("sendToAiChat", value, append);
     };
 
-    const pipelineNameInputRef = ref<any>(null);
-
-    // Auto-focus the pipeline name input when a validation error is triggered
-    watch(
-      () => pipelineObj.pipelineNameError,
-      (hasError) => {
-        if (hasError && pipelineNameInputRef.value) {
-          pipelineNameInputRef.value.focus();
-        }
-      },
-    );
-
     return {
       t,
       store,
@@ -318,8 +295,6 @@ export default defineComponent({
       goToBackfillJobs,
       sendToAiChat,
       routeName,
-      pipelineObj,
-      pipelineNameInputRef,
     };
   },
 });

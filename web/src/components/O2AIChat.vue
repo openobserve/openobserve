@@ -1,6 +1,6 @@
 ﻿<template>
   <div
-    class="chat-container tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:rounded-md tw:text-[var(--q-primary-text)] tw:bg-[var(--o2-card-bg-solid)] tw:[box-shadow:0_0_5px_1px_var(--o2-hover-shadow)]"
+    class="chat-container w-full h-full flex flex-col overflow-hidden rounded-md text-[var(--q-primary-text)] bg-[var(--o2-card-bg-solid)] [box-shadow:0_0_5px_1px_var(--o2-hover-shadow)]"
     :class="[
       { 'chat-open': isOpen },
       store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
@@ -8,7 +8,7 @@
   >
     <div
       v-if="isOpen"
-      class="chat-content-wrapper tw:flex tw:flex-col tw:h-full tw:bg-transparent"
+      class="chat-content-wrapper flex flex-col h-full bg-transparent"
       :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
     >
       <div
@@ -16,11 +16,11 @@
         :style="{ height: headerHeight ? headerHeight + 'px' : '' }"
       >
         <div
-          class="chat-title tw:flex tw:justify-between tw:items-center tw:w-full"
+          class="chat-title flex justify-between items-center w-full"
         >
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <div class="tw:inline-flex tw:w-6 tw:h-6 tw:rounded-full tw:overflow-hidden">
-              <img :src="o2AiTitleLogo" class="tw:w-full tw:h-full tw:object-cover" />
+          <div class="flex items-center gap-2">
+            <div class="inline-flex w-6 h-6 rounded-full overflow-hidden">
+              <img :src="o2AiTitleLogo" class="w-full h-full object-cover" />
             </div>
 
             <ODropdown @update:open="(v) => v && loadHistory()">
@@ -30,9 +30,9 @@
                   size="sm"
                   class="chat-title-dropdown"
                 >
-                  <div class="tw:flex tw:items-center tw:gap-2 tw:max-w-[220px]">
+                  <div class="flex items-center gap-2 max-w-[220px]">
                     <span
-                      class="chat-title-text tw:text-[14px] tw:font-medium tw:truncate tw:block"
+                      class="chat-title-text text-[14px] font-medium truncate block"
                     >
                       {{ displayedTitle || "New Chat" }}
                       <OTooltip
@@ -46,22 +46,22 @@
                     <OIcon
                       name="arrow-drop-down"
                       size="md"
-                      class="tw:flex-shrink-0"
+                      class="flex-shrink-0"
                     />
                   </div>
                 </OButton>
               </template>
               <!-- History menu with search -->
-              <div class="history-menu-container tw:relative tw:max-h-[450px] tw:flex tw:flex-col tw:w-[300px]">
-                <div class="search-history-bar-sticky tw:sticky tw:top-0 tw:z-[2] tw:bg-[var(--q-page-background)] tw:p-2 tw:border-b tw:border-[var(--color-separator)] tw:shrink-0">
+              <div class="history-menu-container relative max-h-[450px] flex flex-col w-[300px]">
+                <div class="search-history-bar-sticky sticky top-0 z-[2] bg-[var(--q-page-background)] p-2 border-b border-[var(--color-separator)] shrink-0">
                   <OSearchInput
                     v-model="historySearchTerm"
                     placeholder="Search chat history"
-                    class="tw:mt-1"
+                    class="mt-1"
                   />
                 </div>
                 <div
-                  class="history-list-container tw:flex-1 tw:overflow-y-auto tw:overflow-x-hidden tw:max-h-[350px]"
+                  class="history-list-container flex-1 overflow-y-auto overflow-x-hidden max-h-[350px]"
                   style="
                     min-width: 200px;
                     width: 300px;
@@ -72,24 +72,24 @@
                   <ODropdownItem
                     v-for="chat in filteredChatHistory"
                     :key="chat.id"
-                    class="history-item tw:relative tw:group"
+                    class="history-item relative group"
                     @select="loadChat(chat.id)"
                   >
                     <div
-                      class="tw:flex tw:items-center tw:justify-between tw:w-full"
+                      class="flex items-center justify-between w-full"
                     >
-                      <div class="tw:flex-1 tw:overflow-hidden">
-                        <div class="tw:text-[13px] tw:truncate">
+                      <div class="flex-1 overflow-hidden">
+                        <div class="text-[13px] truncate">
                           {{ chat.title }}
                         </div>
-                        <div class="tw:text-[11px] tw:text-gray-500">
+                        <div class="text-[11px] text-gray-500">
                           {{ formatTime(chat.timestamp) }}
                         </div>
                       </div>
                       <OButton
                         variant="ghost"
                         size="icon-xs-circle"
-                        class="delete-history-btn tw:opacity-0 tw:transition-opacity tw:duration-200 tw:group-hover:opacity-100"
+                        class="delete-history-btn opacity-0 transition-opacity duration-200 group-hover:opacity-100"
                         @click.stop="deleteChat(chat.id)"
                       >
                         <OIcon name="delete" size="sm" />
@@ -99,7 +99,7 @@
                   </ODropdownItem>
                   <div
                     v-if="filteredChatHistory.length === 0"
-                    class="tw:text-center tw:text-gray-500 tw:p-2"
+                    class="text-center text-gray-500 p-2"
                   >
                     No matching chats found
                   </div>
@@ -108,12 +108,12 @@
                 <!-- Clear all conversations button -->
                 <div
                   v-if="filteredChatHistory.length > 0"
-                  class="clear-all-container tw:bg-[var(--q-page-background)] tw:p-2 tw:border-t tw:border-[var(--color-separator)] tw:shrink-0"
+                  class="clear-all-container bg-[var(--q-page-background)] p-2 border-t border-[var(--color-separator)] shrink-0"
                 >
                   <ODropdownSeparator />
                   <OButton
                     variant="ghost"
-                    class="clear-all-btn tw:w-full tw:text-[var(--q-negative)] tw:text-[13px] tw:hover:bg-[rgba(var(--q-negative-rgb),0.1)]"
+                    class="clear-all-btn w-full text-[var(--q-negative)] text-[13px] hover:bg-[rgba(var(--q-negative-rgb),0.1)]"
                     @click.stop="clearAllConversations"
                   >
                     <template #icon-left>
@@ -126,7 +126,7 @@
             </ODropdown>
           </div>
 
-          <div class="tw:flex tw:items-center tw:gap-1 chat-header-actions">
+          <div class="flex items-center gap-1 chat-header-actions">
             <!-- Edit title button -->
             <OButton
               v-if="currentChatId"
@@ -164,23 +164,23 @@
           </div>
         </div>
       </div>
-      <OSeparator class="tw:bg-[#DBDBDB]" />
+      <OSeparator class="bg-[#DBDBDB]" />
 
       <!-- History Panel -->
       <ODrawer data-test="o2-ai-chat-history-drawer" v-model:open="showHistory" size="sm" title="Chat History">
-        <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border">
+        <ul class="flex flex-col divide-y divide-border">
           <li
             v-for="chat in chatHistory"
             :key="chat.id"
             :data-test="`o2-ai-chat-history-item-${chat.id}`"
-            class="tw:flex tw:flex-col tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-muted/50"
+            class="flex flex-col px-3 py-2 cursor-pointer hover:bg-muted/50"
             @click="loadChat(chat.id)"
           >
-            <span class="tw:text-sm">{{ chat.title }}</span>
-            <span class="tw:block tw:text-xs tw:text-muted-foreground">
+            <span class="text-sm">{{ chat.title }}</span>
+            <span class="block text-xs text-muted-foreground">
               {{ new Date(chat.timestamp).toLocaleString() }}
             </span>
-            <span class="tw:block tw:text-xs tw:text-muted-foreground">
+            <span class="block text-xs text-muted-foreground">
               Model: {{ chat.model }}
             </span>
           </li>
@@ -232,7 +232,7 @@
         size="lg"
         :title="previewImage?.filename"
       >
-        <div class="tw:flex tw:justify-center">
+        <div class="flex justify-center">
           <img
             v-if="previewImage"
             :src="
@@ -266,19 +266,19 @@
             <!-- Sidepanel: minimal logo + title (unchanged) -->
             <div
               v-else
-              class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:w-full"
+              class="flex flex-col items-center justify-center h-full w-full"
             >
-              <div class="tw:flex tw:flex-col tw:items-center">
+              <div class="flex flex-col items-center">
                 <img :src="o2AiTitleLogo" />
-                <div class="tw:relative tw:inline-block">
+                <div class="relative inline-block">
                   <span
-                    class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center"
+                    class="text-[14px] font-[600] ml-[30px] text-center"
                     >O2 Assistant</span
                   >
                   <OBadge
                     variant="primary-outline"
                     size="sm"
-                    class="tw:ml-[8px] tw:uppercase tw:tracking-[0.5px] tw:font-semibold"
+                    class="ml-[8px] uppercase tracking-[0.5px] font-semibold"
                     >BETA</OBadge
                   >
                 </div>
@@ -297,17 +297,17 @@
             <div class="message-content">
               <div
                 v-if="message.role === 'user'"
-                class="tw:inline-flex tw:items-center tw:justify-center tw:w-6 tw:h-6 tw:rounded-full tw:text-white"
+                class="inline-flex items-center justify-center w-6 h-6 rounded-full text-white"
                 :class="
                   store.state.theme == 'dark'
-                    ? 'tw:[background:linear-gradient(135deg,#4c63d2_0%,#5a67d8_100%)]'
-                    : 'tw:[background:linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)]'
+                    ? '[background:linear-gradient(135deg,#4c63d2_0%,#5a67d8_100%)]'
+                    : '[background:linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)]'
                 "
               >
                 <OIcon
                   size="sm"
                   name="person"
-                  class='tw:text-white'
+                  class='text-white'
                 />
               </div>
               <div
@@ -318,7 +318,7 @@
                 "
               >
                 <!-- Loading indicator inside message box for empty assistant messages -->
-                <div v-if="message.role === 'assistant' && (!message.contentBlocks || message.contentBlocks.length === 0) && (!message.content || message.content.trim() === '') && isLoading" class="inline-loading tw:flex tw:items-center tw:gap-[10px] tw:py-2 tw:text-[#6b7280] tw:text-sm">
+                <div v-if="message.role === 'assistant' && (!message.contentBlocks || message.contentBlocks.length === 0) && (!message.content || message.content.trim() === '') && isLoading" class="inline-loading flex items-center gap-[10px] py-2 text-[#6b7280] text-sm">
                   <OSpinner variant="dots" size="sm" />
                   <span>{{ currentAnalyzingMessage }}</span>
                 </div>
@@ -370,11 +370,11 @@
                         :class="
                           block.pendingConfirmation
                             ? block.tool === 'navigation_action'
-                              ? 'tw:text-[var(--o2-primary)]'
-                              : 'tw:text-[var(--o2-warning)]'
+                              ? 'text-[var(--o2-primary)]'
+                              : 'text-[var(--o2-warning)]'
                             : block.success === false
-                              ? 'tw:text-[var(--o2-negative)]'
-                              : 'tw:text-[var(--o2-positive)]'
+                              ? 'text-[var(--o2-negative)]'
+                              : 'text-[var(--o2-positive)]'
                         "
                       />
                       <span class="tool-call-name">
@@ -953,7 +953,7 @@
                             @click="copyToClipboard(textBlock.content)"
                           >
                             <OIcon size="sm" name="content-copy" />
-                            <span class="tw:ml-1">Copy</span>
+                            <span class="ml-1">Copy</span>
                           </OButton>
                         </div>
                         <span class="generated-code-block">
@@ -963,7 +963,7 @@
                           ></code>
                         </span>
                         <div
-                          class="code-block-footer code-block-theme tw:flex tw:items-center tw:justify-between tw:w-full"
+                          class="code-block-footer code-block-theme flex items-center justify-between w-full"
                         >
                           <OButton
                             variant="ghost"
@@ -972,7 +972,7 @@
                             @click="retryGeneration(message)"
                           >
                             <OIcon size="sm" name="refresh" />
-                            <span class="tw:ml-1">Retry</span>
+                            <span class="ml-1">Retry</span>
                           </OButton>
                         </div>
                       </div>
@@ -997,7 +997,7 @@
                       message.images &&
                       message.images.length > 0
                     "
-                    class="message-images tw:flex tw:flex-wrap tw:gap-2 tw:mb-2"
+                    class="message-images flex flex-wrap gap-2 mb-2"
                   >
                     <div
                       v-for="(img, imgIndex) in message.images"
@@ -1007,7 +1007,7 @@
                       <img
                         :src="'data:' + img.mimeType + ';base64,' + img.data"
                         :alt="img.filename"
-                        class="tw:max-w-[200px] tw:max-h-[150px] tw:object-contain tw:rounded-lg tw:border tw:border-gray-300 tw:cursor-pointer tw:[transition:transform_0.2s_ease,box-shadow_0.2s_ease]"
+                        class="max-w-[200px] max-h-[150px] object-contain rounded-lg border border-gray-300 cursor-pointer [transition:transform_0.2s_ease,box-shadow_0.2s_ease]"
                         @click="openImagePreview(img)"
                       />
                       <OTooltip :content="img.filename" />
@@ -1029,7 +1029,7 @@
                           @click="copyToClipboard(block.content)"
                         >
                           <OIcon size="sm" name="content-copy" />
-                          <span class="tw:ml-1">Copy</span>
+                          <span class="ml-1">Copy</span>
                         </OButton>
                       </div>
                       <span class="generated-code-block">
@@ -1185,11 +1185,11 @@
         </div>
 
         <!-- Scroll to bottom button -->
-        <div v-show="showScrollToBottom" class="scroll-to-bottom-container tw:absolute tw:bottom-[10px] tw:left-1/2 tw:-translate-x-1/2 tw:z-[1000] tw:pointer-events-none tw:[transition:all_0.3s_ease]">
+        <div v-show="showScrollToBottom" class="scroll-to-bottom-container absolute bottom-[10px] left-1/2 -translate-x-1/2 z-[1000] pointer-events-none [transition:all_0.3s_ease]">
           <OButton
             variant="ghost"
             size="icon-sm"
-            class="scroll-to-bottom-btn tw:transition-all tw:duration-300 tw:[animation:fadeInUp_0.3s_ease] tw:pointer-events-auto tw:[backdrop-filter:blur(8px)] tw:shadow-[0_2px_8px_rgba(0,0,0,0.2)] tw:border-2! tw:border-[#2563eb]! tw:text-[#2563eb]! tw:bg-[rgba(255,255,255,0.95)]! tw:dark:border-[#8b5cf6]! tw:dark:text-[#8b5cf6]! tw:dark:bg-[rgba(30,30,30,0.9)]! tw:hover:scale-110 tw:hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)] tw:hover:border-[#1d4ed8]! tw:hover:text-[#1d4ed8]! tw:hover:bg-white! tw:dark:hover:border-[#5a6fd8]! tw:dark:hover:text-[#5a6fd8]! tw:dark:hover:bg-[rgba(40,40,40,0.95)]! tw:active:scale-100"
+            class="scroll-to-bottom-btn transition-all duration-300 [animation:fadeInUp_0.3s_ease] pointer-events-auto [backdrop-filter:blur(8px)] shadow-[0_2px_8px_rgba(0,0,0,0.2)] border-2! border-[#2563eb]! text-[#2563eb]! bg-[rgba(255,255,255,0.95)]! dark:border-[#8b5cf6]! dark:text-[#8b5cf6]! dark:bg-[rgba(30,30,30,0.9)]! hover:scale-110 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:border-[#1d4ed8]! hover:text-[#1d4ed8]! hover:bg-white! dark:hover:border-[#5a6fd8]! dark:hover:text-[#5a6fd8]! dark:hover:bg-[rgba(40,40,40,0.95)]! active:scale-100"
             @click="scrollToBottomSmooth"
           >
             <OIcon name="arrow-downward" size="sm" />
@@ -1216,7 +1216,7 @@
         </div>
       </div>
 
-      <div class="chat-input-container tw:m-3">
+      <div class="chat-input-container m-3">
         <!-- Confirmation dialog -->
         <O2AIConfirmDialog
           :visible="pendingConfirmation !== null"
@@ -1245,21 +1245,21 @@
           @paste="handlePaste"
         >
           <!-- Image preview strip -->
-          <div v-if="pendingImages.length > 0" class="image-preview-strip tw:flex tw:flex-wrap tw:gap-2 tw:py-2 tw:mb-2">
+          <div v-if="pendingImages.length > 0" class="image-preview-strip flex flex-wrap gap-2 py-2 mb-2">
             <div
               v-for="(img, index) in pendingImages"
               :key="index"
-              class="image-preview-item tw:relative tw:inline-block"
+              class="image-preview-item relative inline-block"
             >
               <img
                 :src="'data:' + img.mimeType + ';base64,' + img.data"
                 :alt="img.filename"
-                class="preview-image tw:w-16 tw:h-16 tw:object-cover tw:rounded-lg tw:border tw:border-[#d1d5db] tw:[transition:transform_0.2s_ease]"
+                class="preview-image w-16 h-16 object-cover rounded-lg border border-[#d1d5db] [transition:transform_0.2s_ease]"
               />
               <OButton
                 variant="ghost"
                 size="icon-xs-circle"
-                class="image-remove-btn tw:absolute! tw:top-[-6px]! tw:right-[-6px]! tw:w-5! tw:h-5! tw:min-w-5! tw:min-h-5! tw:p-0! tw:bg-[#ef4444]! tw:z-10"
+                class="image-remove-btn absolute! top-[-6px]! right-[-6px]! w-5! h-5! min-w-5! min-h-5! p-0! bg-[#ef4444]! z-10"
                 @click.stop="removeImage(index)"
               >
                 <OIcon name="close" size="xs" />
@@ -1285,23 +1285,23 @@
 
           <!-- Bottom bar with buttons -->
           <div class="input-bottom-bar">
-            <div class="tw:flex tw:items-center tw:gap-2">
+            <div class="flex items-center gap-2">
               <!-- Image upload button -->
               <OButton
                 v-if="!isLoading"
                 @click.stop="triggerImageUpload"
                 variant="ghost"
                 size="icon-sm"
-                class="image-upload-btn tw:opacity-70 tw:transition-opacity tw:duration-200 tw:hover:opacity-100"
+                class="image-upload-btn opacity-70 transition-opacity duration-200 hover:opacity-100"
               >
                 <OIcon
                   name="image"
                   size="sm"
-                  :class="store.state.theme == 'dark' ? 'tw:text-white' : 'tw:text-gray-600'"
+                  :class="store.state.theme == 'dark' ? 'text-white' : 'text-gray-600'"
                 />
                 <OTooltip :content="t('aiAssistant.attachImageTooltip')" />
               </OButton>
-              <div v-else class="tw:w-8"></div>
+              <div v-else class="w-8"></div>
 
               <!-- Auto navigation toggle button -->
               <OButton
@@ -1309,7 +1309,7 @@
                 @click.stop="isAutoNavigationEnabled = !isAutoNavigationEnabled"
                 variant="ghost"
                 size="sm"
-                class="auto-nav-toggle-btn tw:flex tw:items-center tw:gap-1.5 tw:px-2 tw:py-1 tw:rounded-md tw:transition-all tw:duration-200 tw:hover:bg-[#f3f4f6] tw:dark:hover:bg-[#374151]"
+                class="auto-nav-toggle-btn flex items-center gap-1.5 px-2 py-1 rounded-md transition-all duration-200 hover:bg-[#f3f4f6] dark:hover:bg-[#374151]"
                 :class="{ 'auto-nav-enabled': isAutoNavigationEnabled }"
               >
                 <OIcon
@@ -1322,11 +1322,11 @@
                   :class="[
                     'auto-nav-icon',
                     !isAutoNavigationEnabled
-                      ? store.state.theme == 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'
+                      ? store.state.theme == 'dark' ? 'text-gray-400' : 'text-gray-600'
                       : ''
                   ]"
                 />
-                <span class="auto-nav-label tw:ml-1 tw:text-xs tw:font-medium tw:text-[#6b7280] tw:dark:text-[#9ca3af]">{{ t('aiAssistant.autoNavigation.label') }}</span>
+                <span class="auto-nav-label ml-1 text-xs font-medium text-[#6b7280] dark:text-[#9ca3af]">{{ t('aiAssistant.autoNavigation.label') }}</span>
                 <OTooltip
                   :content="
                     isAutoNavigationEnabled
@@ -1337,7 +1337,7 @@
               </OButton>
             </div>
 
-            <div class="tw:flex tw:items-center tw:gap-2">
+            <div class="flex items-center gap-2">
               <!-- Send button - shown when not loading -->
               <OButton
                 v-if="!isLoading"
@@ -1345,7 +1345,7 @@
                 @click="sendMessage"
                 variant="ai-gradient"
                 size="icon-xs-circle"
-                class="send-button tw:bg-[linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)]! tw:[transition:all_0.3s_ease]! tw:shadow-[0_4px_15px_0_rgba(139,92,246,0.3)]!"
+                class="send-button bg-[linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)]! [transition:all_0.3s_ease]! shadow-[0_4px_15px_0_rgba(139,92,246,0.3)]!"
               >
                 <OIcon name="send" size="sm" />
               </OButton>
@@ -1356,7 +1356,7 @@
                 @click="cancelCurrentRequest"
                 variant="ghost"
                 size="icon-xs-circle"
-                class="stop-button tw:bg-[linear-gradient(135deg,#f56565_0%,#e53e3e_100%)]! tw:[transition:all_0.3s_ease]! tw:shadow-[0_4px_15px_0_rgba(245,101,101,0.3)]!"
+                class="stop-button bg-[linear-gradient(135deg,#f56565_0%,#e53e3e_100%)]! [transition:all_0.3s_ease]! shadow-[0_4px_15px_0_rgba(245,101,101,0.3)]!"
               >
                 <OIcon name="stop" size="sm" />
               </OButton>
@@ -3565,6 +3565,8 @@ export default defineComponent({
         id: 'aiChatClose',
         key: 'escape',
         description: 'Close AI chat',
+        // Escape must close the chat even while typing a message in its input.
+        allowInInput: true,
         handler: () => {
           if (store.state.isAiChatEnabled) {
             store.dispatch('setIsAiChatEnabled', false);

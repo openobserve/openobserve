@@ -139,7 +139,6 @@ impl TableProvider for ListingTableAdapter {
             state,
             parquet_exec,
             reverse,
-            order_by_time_desc,
             target_partitions,
         );
 
@@ -181,7 +180,6 @@ fn handler_tantivy_index(
     state: &dyn Session,
     plan: Arc<dyn ExecutionPlan>,
     reverse: bool,
-    order_by_time_desc: bool,
     target_partitions: usize,
 ) -> Arc<dyn ExecutionPlan> {
     if let Some(data_source_exec) = plan.downcast_ref::<DataSourceExec>()
@@ -266,7 +264,8 @@ fn handler_tantivy_index(
         let mut config = config.clone();
         config.file_groups = new_file_groups;
         let mut plan = Arc::new(DataSourceExec::new(Arc::new(config))) as Arc<dyn ExecutionPlan>;
-        if !order_by_time_desc
+        // skip repartitioning when `reverse` is true, becuase it is already have many groups
+        if !reverse
             && let Ok(Some(repartition_plan)) =
                 plan.repartitioned(target_partitions, state.config_options())
         {

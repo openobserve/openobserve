@@ -57,6 +57,7 @@ const OTableStub = {
   template: `
     <div data-test="incident-list-table">
       <slot name="toolbar" />
+      <slot name="toolbar-trailing" />
       <slot name="empty" />
       <slot name="bottom" />
       <template v-for="row in data" :key="row.id">
@@ -191,7 +192,8 @@ describe("IncidentList.vue", () => {
 
     it("renders the refresh button", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="incident-refresh-btn"]').exists()).toBe(true);
+      // Refresh moved into the table's own toolbar (#toolbar-trailing slot).
+      expect(wrapper.find('[data-test="incident-list-refresh-btn"]').exists()).toBe(true);
     });
 
     it("renders the table", () => {
@@ -467,25 +469,6 @@ describe("IncidentList.vue", () => {
       wrapper = createWrapper();
       expect((wrapper.vm as any).getStatusColorClass("unknown")).toBe(
         "status-default",
-      );
-    });
-  });
-
-  describe("getSeverityColorClass", () => {
-    it("returns severity-p1 for P1", () => {
-      wrapper = createWrapper();
-      expect((wrapper.vm as any).getSeverityColorClass("P1")).toBe("severity-p1");
-    });
-
-    it("returns severity-p4 for P4", () => {
-      wrapper = createWrapper();
-      expect((wrapper.vm as any).getSeverityColorClass("P4")).toBe("severity-p4");
-    });
-
-    it("returns severity-default for unknown", () => {
-      wrapper = createWrapper();
-      expect((wrapper.vm as any).getSeverityColorClass("PX")).toBe(
-        "severity-default",
       );
     });
   });

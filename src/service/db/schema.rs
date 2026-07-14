@@ -732,10 +732,17 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             continue;
         }
         schema_versions.sort_by_key(|k| k.0);
-        let latest_schema: Vec<Schema> = json::from_slice(&schema_versions.last().unwrap().1)
-            .map_err(|e| {
-                anyhow::anyhow!("Error parsing schema, key: {}, error: {}", item_key, e)
-            })?;
+        let latest_schema: Vec<Schema> = match json::from_slice(&schema_versions.last().unwrap().1)
+        {
+            Ok(s) => s,
+            Err(e) => {
+                // A corrupt or empty schema entry (e.g. an empty or unreadable
+                // value in the metadata store) must not bring down the whole process.
+                // Log and skip this stream; it can be repaired manually.
+                log::error!("Error parsing schema, key: {item_key}, error: {e}; skipping");
+                continue;
+            }
+        };
         if latest_schema.is_empty() {
             continue;
         }
@@ -761,15 +768,18 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         drop(w);
         let schema_versions = schema_versions
             .into_iter()
-            .map(|(start_dt, data)| {
-                (
-                    start_dt,
-                    json::from_slice::<Vec<Schema>>(&data)
-                        .unwrap()
-                        .pop()
-                        .unwrap(),
-                )
-            })
+            .filter_map(
+                |(start_dt, data)| match json::from_slice::<Vec<Schema>>(&data) {
+                    Ok(mut v) => v.pop().map(|s| (start_dt, s)),
+                    Err(e) => {
+                        log::error!(
+                            "Error parsing schema version, key: {item_key}, \
+                             start_dt: {start_dt}, error: {e}; skipping version"
+                        );
+                        None
+                    }
+                },
+            )
             .collect::<Vec<_>>();
         let mut w = STREAM_SCHEMAS.write().await;
         w.insert(item_key.to_string(), schema_versions);

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:min-h-0">
+  <div class="w-full h-full flex flex-col min-h-0">
     <FunctionsToolbar
       v-model:name="formData.name"
       v-model:trans-type="formData.transType"
@@ -28,28 +28,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @cancel="cancelAddFunction"
       @open:chat="openChat"
       :is-add-function-component="isAddFunctionComponent"
-      class="tw:shrink-0 tw:px-2 tw:border-b tw:border-border-default"
+      class="shrink-0 px-2 border-b border-border-default"
     />
 
-    <div class="tw:flex tw:flex-1 tw:min-h-0">
+    <div class="flex flex-1 min-h-0">
       <div
-        class="tw:flex tw:overflow-hidden tw:min-h-0"
+        class="flex overflow-hidden min-h-0"
         :class="[
           store.state.isAiChatEnabled && !isAddFunctionComponent
-            ? 'tw:w-3/4'
-            : 'tw:w-full',
+            ? 'w-3/4'
+            : 'w-full',
         ]"
       >
         <OSplitter
           v-model="splitterModel"
           :limits="[30, 100]"
-          class="tw:overflow-hidden tw:w-full"
+          class="overflow-hidden w-full"
           :horizontal="false"
-          separator-class="tw:w-[0.0625rem] tw:bg-[var(--o2-border-color)]"
+          separator-class="w-[0.0625rem] bg-[var(--o2-border-color)]"
         >
           <template v-slot:before>
-            <div class="tw:px-2 tw:pt-2 tw:pb-3 card-container tw:h-full tw:flex tw:flex-col tw:min-h-0">
-              <div class="tw:pb-2 o2-input tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
+            <div class="px-2 pt-2 pb-3 card-container h-full flex flex-col min-h-0">
+              <div class="pb-2 o2-input flex flex-col flex-1 min-h-0">
                   <FullViewContainer
                     name="function"
                     v-model:is-expanded="expandState.functions"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-show="expandState.functions"
-                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:relative tw:flex-1 tw:min-h-0"
+                    class="border solid border-[var(--o2-border-color)] mb-[0.375rem] relative flex-1 min-h-0"
                   >
                     <!-- Unified Query Editor (with built-in AI bar) -->
                     <unified-query-editor
@@ -85,31 +85,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <div
                       v-if="!formData.function && functionEditorPlaceholderFlag"
-                      class="tw:absolute tw:inset-0 tw:flex tw:items-start tw:pt-0.75 tw:pr-2 tw:pb-0 tw:pl-[2.15rem] tw:pointer-events-none tw:z-1 tw:select-none"
+                      class="absolute inset-0 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
                     >
-                      <span class="tw:[font-family:monospace] tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:dark:text-[#718096] tw:whitespace-nowrap tw:overflow-hidden tw:[text-overflow:ellipsis]">{{
+                      <span class="[font-family:monospace] text-[var(--text-base)] [line-height:1.3125rem] text-[#a0aec0] dark:text-[#718096] whitespace-nowrap overflow-hidden [text-overflow:ellipsis]">{{
                         formData.transType === '1' ? jsPlaceholder : vrlPlaceholder
                       }}</span>
                     </div>
                   </div>
-                  <div class="tw:text-sm tw:font-medium">
+                  <div class="text-sm font-medium">
                     <div v-if="vrlFunctionError">
                       <FullViewContainer
                         name="function"
                         v-model:is-expanded="expandState.functionError"
                         :label="formData.transType === '1' ? t('function.jsErrorDetails') : t('function.errorDetails')"
-                        labelClass="tw:text-red-600 tw:font-semibold"
+                        labelClass="text-red-600 font-semibold"
                       />
                       <div
                         v-if="expandState.functionError"
-                        class="tw:px-2 tw:pb-2 tw:border-l-4 tw:border-red-500"
+                        class="px-2 pb-2 border-l-4 border-red-500"
                         :class="
                           store.state.theme === 'dark'
-                            ? 'tw:bg-gray-800'
-                            : 'tw:bg-gray-100'
+                            ? 'bg-gray-800'
+                            : 'bg-gray-100'
                         "
                       >
-                        <pre class="tw:my-0 tw:text-red-700" :class="store.state.theme === 'dark' ? 'tw:text-red-400' : 'tw:text-red-700'" style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px;">{{
+                        <pre class="my-0 text-red-700" :class="store.state.theme === 'dark' ? 'text-red-400' : 'text-red-700'" style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px;">{{
                           vrlFunctionError
                         }}</pre>
                       </div>
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-slot:after>
-            <div class="tw:px-2 tw:pt-2 tw:pb-3 tw:h-full tw:overflow-y-auto card-container">
+            <div class="px-2 pt-2 pb-3 h-full overflow-y-auto card-container">
               <TestFunction
                 ref="testFunctionRef"
                 :vrlFunction="formData"
@@ -135,13 +135,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="store.state.isAiChatEnabled && !isAddFunctionComponent"
         :class="[
-          'tw:w-1/4 tw:max-w-full tw:min-w-[75px]',
+          'w-1/4 max-w-full min-w-[75px]',
           heightOffset ? 'ai-chat-with-offset' : '',
           store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container',
         ]"
       >
         <O2AIChat
-          class="tw:h-[calc(100vh-(112px+var(--ai-chat-offset,0px)))]"
+          class="h-[calc(100vh-(112px+var(--ai-chat-offset,0px)))]"
           :is-open="store.state.isAiChatEnabled"
           @close="store.state.isAiChatEnabled = false"
           :aiChatInputContext="aiChatInputContext"
@@ -543,7 +543,6 @@ export default defineComponent({
 
     // Unified Query Editor: Handle language change
     const handleLanguageChange = (newLanguage: 'vrl' | 'javascript') => {
-      console.log('[AddFunction] Language changed to:', newLanguage);
       // Update transType: '1' for JavaScript, '0' for VRL
       formData.value.transType = newLanguage === 'javascript' ? '1' : '0';
     };
@@ -552,7 +551,6 @@ export default defineComponent({
      * Handle NLP mode toggle from AI icon in editor
      */
     const handleToggleNlpMode = () => {
-      console.log('[AddFunction] Toggling NLP mode from AI icon');
       // UnifiedQueryEditor manages its own NLP mode state internally
     };
 
@@ -560,7 +558,6 @@ export default defineComponent({
      * Handle generation start event from UnifiedQueryEditor
      */
     const handleGenerationStart = () => {
-      console.log('[AddFunction] AI generation started');
       // Can add loading indicators here if needed
     };
 
@@ -568,7 +565,6 @@ export default defineComponent({
      * Handle generation end event from UnifiedQueryEditor
      */
     const handleGenerationEnd = () => {
-      console.log('[AddFunction] AI generation ended');
       // Can remove loading indicators here if needed
     };
 
@@ -576,13 +572,11 @@ export default defineComponent({
      * Handle successful generation from UnifiedQueryEditor
      */
     const handleGenerationSuccess = (payload: {type: string, message: string}) => {
-      console.log('[AddFunction] AI generation success:', payload.type);
       // Function code is already updated via @update:query handler
     };
 
     // Unified Query Editor: Handle Ask AI
     const handleAskAI = async (naturalLanguage: string, language: 'vrl' | 'javascript') => {
-      console.log('[AddFunction] Ask AI for language:', language, 'input:', naturalLanguage);
 
       // Enable AI chat if not already enabled
       if (!store.state.isAiChatEnabled) {

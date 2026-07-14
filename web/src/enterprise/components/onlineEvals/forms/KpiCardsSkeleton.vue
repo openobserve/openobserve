@@ -8,7 +8,7 @@
   <div
     v-for="n in count"
     :key="n"
-    class="kpi-card-skeleton tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.5rem]"
+    class="kpi-card-skeleton rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.5rem]"
     data-test="kpi-cards-skeleton"
   >
     <SkeletonBox width="55%" height="12px" rounded />
@@ -26,7 +26,7 @@ withDefaults(defineProps<{ count?: number }>(), { count: 4 });
 // Same chrome as the real `.kpi-card` (SessionDetails.vue) — scoped styles
 // don't pierce into child components, so the skeleton carries its own copy.
 .kpi-card-skeleton {
-  background: var(--o2-card-bg);
-  border: 1px solid var(--o2-border-color);
+  background: var(--color-surface-base);
+  border: 1px solid var(--color-border-default);
 }
 </style>

@@ -37,18 +37,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          Function shows a bold [RAF]/[RBF] tag, everything else shows its
          config-detail line. -->
     <template #body>
-      <div v-if="isConfiguredFunction" class="tw:flex tw:gap-1">
+      <div v-if="isConfiguredFunction" class="flex gap-1">
         {{ data.name }} -
         <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
       </div>
-      <div v-else class="tw:whitespace-nowrap">{{ nodeLabel }}</div>
+      <div v-else class="whitespace-nowrap">{{ nodeLabel }}</div>
     </template>
 
     <!-- hover actions (delete) — trigger is fixed -->
     <template #actions>
       <div
         v-show="showButtons && meta?.category !== 'trigger'"
-        class="tw:absolute tw:top-[-30px] tw:right-0 tw:flex tw:gap-[6px] tw:z-10 tw:pt-[5px] tw:px-[5px] tw:pb-[10px]"
+        class="absolute top-[-30px] right-0 flex gap-[6px] z-10 pt-[5px] px-[5px] pb-[10px]"
         :data-test="`workflow-node-${data?.node_type}-actions`"
         @mouseenter="handleActionsEnter"
         @mouseleave="handleActionsLeave"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="ghost"
           size="icon"
-          class="tw:min-w-[20px]! tw:w-[20px]! tw:h-[20px]! tw:p-0! tw:rounded! tw:bg-[rgba(255,255,255,0.95)]! tw:border! tw:border-[#dc2626]! tw:text-[#dc2626]!"
+          class="min-w-[20px]! w-[20px]! h-[20px]! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-[#dc2626]! text-[#dc2626]!"
           :data-test="`workflow-node-${data?.node_type}-delete-btn`"
           @click.stop="requestDeleteNode(id)"
         >
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="remove" size="xs" />
         <OTooltip side="top" align="center" :side-offset="8" max-width="320px">
           <template #content>
-            <div class="tw:p-2 tw:text-left tw:text-[12px]">
+            <div class="p-2 text-left text-[12px]">
               {{ t("workflow.test.notVerified") }}
             </div>
           </template>
@@ -102,11 +102,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="errorCount > 1" class="wf-test-count">{{ errorCount }}</span>
         <OTooltip side="top" align="center" :side-offset="8" max-width="360px">
           <template #content>
-            <div class="tw:p-2 tw:text-left tw:flex tw:flex-col tw:gap-1">
+            <div class="p-2 text-left flex flex-col gap-1">
               <div
                 v-for="(m, i) in errorMessages"
                 :key="i"
-                class="tw:text-[12px] tw:leading-[1.35]"
+                class="text-[12px] leading-[1.35]"
               >
                 {{ m }}
               </div>

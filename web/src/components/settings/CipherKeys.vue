@@ -16,15 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
-    <div v-if="!showAddDialog" class="tw:flex tw:flex-col tw:h-full">
+  <div class="flex flex-col h-full p-0">
+    <div v-if="!showAddDialog" class="flex flex-col h-full">
       <!-- Standard section header: title + actions only. Search moved into the
            table's own toolbar below. -->
       <AppPageHeader
         :title="t('cipherKey.header')"
         icon="key"
         :subtitle="'Encryption keys for sensitive fields'"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="shrink-0 px-4 border-b border-border-default"
       >
         <template #actions>
           <OButton
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
       </AppPageHeader>
-      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div class="card-container flex-1 min-h-0 overflow-hidden">
       <OTable
         :frame="false"
         :data="visibleRows"
@@ -62,17 +62,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar>
           <OSearchInput
             v-model="filterQuery"
-            class="tw:flex-1"
+            class="flex-1"
             :placeholder="t('cipherKey.search')"
           />
+        </template>
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="cipher-keys-list-refresh-btn"
+            @click="getData"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="cipherKeysRefresh" />
+          </OButton>
         </template>
         <template #empty>
           <OEmptyState
             size="hero"
             preset="no-cipher-keys"
             :filtered="!!filterQuery"
-            :hide-action="!filterQuery"
-            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+            @action="(id) => id === 'clear-filters' ? (filterQuery = '') : addCipherKey()"
           />
         </template>
         <template #cell-actions="{ row }">
@@ -81,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-row-action="edit"
             variant="ghost"
             size="icon-sm"
-            class="tw:ml-1"
+            class="ml-1"
             :title="t('common.edit')"
             @click="editCipherKey(row)"
             icon-left="edit"
@@ -91,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-row-action="delete"
             variant="ghost-destructive"
             size="icon-sm"
-            class="tw:ml-1"
+            class="ml-1"
             :title="t('common.delete')"
             @click="confirmDeleteCipherKey(row)"
             icon-left="delete"
@@ -101,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedKeys.length > 0"
           #bottom
         >
-          <span class="tw:text-xs tw:text-text-primary tw:font-medium">
+          <span class="text-xs text-text-primary font-medium">
             {{ selectedKeys.length }} selected
           </span>
           <OButton
@@ -153,12 +164,15 @@ import AddCipherKey from "@/components/cipherkeys/AddCipherKey.vue";
 import CipherKeysService from "@/services/cipher_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -168,6 +182,7 @@ export default defineComponent({
     AddCipherKey,
     ConfirmDialog,
     OButton,
+    OTooltip,
     OSearchInput,
     OTable,
 },
@@ -455,6 +470,10 @@ export default defineComponent({
           }
         });
     };
+
+    useShortcuts([
+      { id: "cipherKeysRefresh", handler: () => { if (!isInputFocused()) getData(); } },
+    ]);
 
     return {
       t,

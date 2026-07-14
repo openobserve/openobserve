@@ -48,23 +48,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="linkSelected"
     @click:secondary="close"
   >
-    <div class="tw:flex tw:flex-col tw:gap-4 tw:text-left">
+    <div class="flex flex-col gap-4 text-left">
       <OText variant="meta" as="p">
         {{ t("workflow.linkAlerts.intro", { name: workflowName }) }}
       </OText>
 
       <div
         v-if="loadError"
-        class="tw:py-6 tw:text-center"
+        class="py-6 text-center"
       >
-        <OText variant="meta" as="p" class="tw:text-input-error-text">
+        <OText variant="meta" as="p" class="text-input-error-text">
           {{ t("workflow.linkAlerts.loadError") }}
         </OText>
       </div>
 
       <div
         v-else-if="!loading && !alerts.length"
-        class="tw:py-6 tw:text-center"
+        class="py-6 text-center"
       >
         <OText variant="meta" as="p">
           {{ t("workflow.linkAlerts.empty") }}
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template v-else>
         <!-- Two dropdowns: folder → alerts -->
-        <div class="tw:grid tw:grid-cols-2 tw:gap-3">
+        <div class="grid grid-cols-2 gap-3">
           <OSelect
             v-model="selectedFolder"
             :label="t('workflow.linkAlerts.folderLabel')"
@@ -101,9 +101,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              adding / removing chips never resizes the dialog; it scrolls when the
              chips overflow. Native chip tokens keep it consistent with the
              OSelect trigger. -->
-        <div class="tw:flex tw:flex-col tw:gap-1.5">
-          <div class="tw:flex tw:items-center tw:justify-between">
-            <OText variant="meta" as="span" class="tw:font-medium">
+        <div class="flex flex-col gap-1.5">
+          <div class="flex items-center justify-between">
+            <OText variant="meta" as="span" class="font-medium">
               {{ t("workflow.linkAlerts.selectedCount", { count: selected.length }) }}
             </OText>
             <OButton
@@ -117,20 +117,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
           <div
-            class="tw:h-20 tw:overflow-y-auto tw:content-start tw:flex tw:flex-wrap tw:gap-1 tw:rounded tw:border tw:border-border-default tw:p-2"
+            class="h-20 overflow-y-auto content-start flex flex-wrap gap-1 rounded border border-border-default p-2"
           >
             <span
               v-for="row in selectedAlertRows"
               :key="row.alert_id"
               :title="row.folder_name"
-              class="tw:inline-flex tw:items-center tw:gap-1 tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:leading-none tw:max-w-40 tw:h-fit tw:bg-select-item-selected-bg tw:text-select-item-selected-text"
+              class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs leading-none max-w-40 h-fit bg-select-item-selected-bg text-select-item-selected-text"
               :data-test="`workflow-link-alerts-chip-${row.alert_id}`"
             >
-              <span class="tw:truncate">{{ row.name }}</span>
+              <span class="truncate">{{ row.name }}</span>
               <OIcon
                 name="close"
                 size="xs"
-                class="tw:shrink-0 tw:cursor-pointer hover:tw:opacity-70"
+                class="shrink-0 cursor-pointer hover:opacity-70"
                 @click="removeAlert(row.alert_id)"
               />
             </span>
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!selected.length"
               variant="meta"
               as="span"
-              class="tw:text-text-secondary"
+              class="text-text-secondary"
             >
               {{ t("workflow.linkAlerts.noneSelected") }}
             </OText>

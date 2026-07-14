@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="workflow-editor-page"
-    class="tw:flex tw:flex-col tw:h-[calc(100vh-var(--navbar-height,2.25rem))] tw:min-h-0"
+    class="flex flex-col h-[calc(100vh-var(--navbar-height,2.25rem))] min-h-0"
   >
     <!-- Toolbar — the shared AppPageHeader (same as the pipeline editor): a
          back chevron in the module-icon slot, the workflow name input inline
@@ -39,15 +39,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : t('workflow.header')
       "
       :back="{ label: t('workflow.header'), onClick: goBack, dataTest: 'workflow-editor-back' }"
-      class="tw:px-4 tw:border-b tw:border-border-default"
+      class="px-4 border-b border-border-default"
     >
       <!-- Name is editable on CREATE only; on edit it's shown read-only as the
            header title (mirrors the pipeline editor, where the name input is
            gated to the create route). Enable/disable status isn't shown here —
            it's managed from the list, same as pipelines. -->
       <template v-if="!workflowObj.isEditWorkflow" #title-trail>
-        <div class="tw:flex tw:items-center tw:gap-2">
-          <div class="tw:w-56 tw:shrink-0">
+        <div class="flex items-center gap-2">
+          <div class="w-56 shrink-0">
             <OInput
               v-model="workflowObj.currentSelectedWorkflow.name"
               data-test="workflow-editor-name"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="workflowObj.nameError = false"
             />
           </div>
-          <div class="tw:w-72 tw:shrink-0">
+          <div class="w-72 shrink-0">
             <OInput
               v-model="workflowObj.currentSelectedWorkflow.description"
               data-test="workflow-editor-description"
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          side-by-side with the canvas. -->
     <div
       id="workflow-workspace"
-      class="tw:flex-1 tw:flex tw:min-h-0 tw:relative tw:pt-3 tw:px-2"
+      class="flex-1 flex min-h-0 relative pt-3 px-2"
     >
       <!-- Docked node palette — same shared component as Pipelines, so the two
            palettes can never drift apart. Workflows add click-to-append. -->
@@ -131,10 +131,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            history drawer is open it shrinks (mr) so the canvas reflows into the
            visible area beside it instead of hiding under it. -->
       <div
-        class="tw:flex-1 tw:relative tw:min-w-0 tw:rounded-xl tw:overflow-hidden tw:mb-3 tw:transition-[margin] tw:duration-200"
+        class="flex-1 relative min-w-0 rounded-xl overflow-hidden mb-3 transition-[margin] duration-200"
         :class="[
-          store.state.theme === 'dark' ? '' : 'tw:bg-gray-100',
-          showHistory ? 'tw:mr-[42%]' : '',
+          store.state.theme === 'dark' ? '' : 'bg-gray-100',
+          showHistory ? 'mr-[42%]' : '',
         ]"
       >
         <WorkflowCanvas />
@@ -313,8 +313,8 @@ const stepItems = computed(() =>
       icon: img ? `img:${img}` : m?.icon || "help",
       iconTint:
         m?.category === "action"
-          ? "tw:bg-[#e6f6ee] tw:text-[#1f9d63]"
-          : "tw:bg-[#fdf3e2] tw:text-[#e0891d]",
+          ? "bg-[#e6f6ee] text-[#1f9d63]"
+          : "bg-[#fdf3e2] text-[#e0891d]",
     };
   }),
 );

@@ -28,13 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   in the parent (AlertSettings) so the two alert-type layouts keep their chrome.
 -->
 <template>
-  <div class="tw:flex tw:items-center">
+  <div class="flex items-center">
     <OSelect
       :model-value="combined"
       :options="options"
       multiple
       :error="error"
-      class="tw:min-w-[180px] tw:max-w-[300px]"
+      class="min-w-[180px] max-w-[300px]"
       data-test="alert-destinations-select"
       @update:model-value="onUpdate"
     >
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OButton
       data-test="alert-settings-refresh-destinations-btn"
-      class="tw:ml-1"
+      class="ml-1"
       variant="ghost"
       size="icon-circle-sm"
       :title="t('alerts.alertSettings.refreshDestinations')"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="create-destination-btn"
       variant="outline"
       size="sm"
-      class="tw:ml-2"
+      class="ml-2"
       @click="emit('create-destination')"
     >
       {{ t("alerts.alertSettings.addNewDestination") }}
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="create-workflow-btn"
       variant="outline"
       size="sm"
-      class="tw:ml-2"
+      class="ml-2"
       @click="emit('create-workflow')"
     >
       {{ t("workflow.create") }}

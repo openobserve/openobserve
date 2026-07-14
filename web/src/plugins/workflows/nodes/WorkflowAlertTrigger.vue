@@ -35,13 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   WorkflowEditor); there are no editable fields.
 -->
 <template>
-  <div data-test="workflow-trigger-body" class="tw:w-full tw:flex tw:flex-col">
-    <p class="tw:text-[13px] tw:text-text-secondary tw:leading-normal tw:mb-3">
+  <div data-test="workflow-trigger-body" class="w-full flex flex-col">
+    <p class="text-[13px] text-text-secondary leading-normal mb-3">
       {{ t("workflow.node.triggerPayloadIntro") }}
     </p>
 
     <div
-      class="schema-tree tw:border tw:border-border-default tw:bg-surface-subtle tw:rounded-lg tw:p-3 tw:overflow-x-auto"
+      class="schema-tree border border-border-default bg-surface-subtle rounded-lg p-3 overflow-x-auto"
       data-test="workflow-trigger-structure"
     >
       <div class="schema-line"><span class="schema-punct">{</span></div>
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- meta: expandable object -->
       <button
         type="button"
-        class="schema-line schema-row tw:pl-3"
+        class="schema-line schema-row pl-3"
         data-test="workflow-trigger-meta-toggle"
         @click="metaOpen = !metaOpen"
       >
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="metaOpen"><span class="schema-punct">{</span></template>
         <template v-else>
           <span class="schema-punct">{…}</span>
-          <span class="schema-muted tw:ml-1">{{ metaVars.length }} keys</span>
+          <span class="schema-muted ml-1">{{ metaVars.length }} keys</span>
         </template>
       </button>
 
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="v in metaVars"
           :key="v.ref"
-          class="schema-line schema-row schema-leaf tw:pl-8"
+          class="schema-line schema-row schema-leaf pl-8"
           :title="t(v.descKey)"
           :data-test="`workflow-trigger-field-${metaKey(v)}`"
         >
@@ -80,13 +80,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ displayType(v) }}</span
           >
         </div>
-        <div class="schema-line tw:pl-3"><span class="schema-punct">}</span></div>
+        <div class="schema-line pl-3"><span class="schema-punct">}</span></div>
       </template>
 
       <!-- data: expandable array of dynamic objects -->
       <button
         type="button"
-        class="schema-line schema-row tw:pl-3"
+        class="schema-line schema-row pl-3"
         data-test="workflow-trigger-data-toggle"
         @click="dataOpen = !dataOpen"
       >
@@ -100,22 +100,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ><span class="schema-type">Array&lt;object&gt;</span>
       </button>
       <template v-if="dataOpen">
-        <div class="schema-line tw:pl-8"><span class="schema-punct">[</span></div>
-        <div class="schema-line tw:pl-12"><span class="schema-punct">{</span></div>
+        <div class="schema-line pl-8"><span class="schema-punct">[</span></div>
+        <div class="schema-line pl-12"><span class="schema-punct">{</span></div>
         <div
           v-for="ex in dataExample"
           :key="ex.key"
-          class="schema-line tw:pl-16"
+          class="schema-line pl-16"
         >
           <span class="schema-key">{{ ex.key }}</span><span class="schema-punct">: </span><span
             :class="ex.kind === 'string' ? 'schema-enum' : 'schema-type'"
             >{{ ex.value }}</span
           ><span class="schema-punct">,</span>
         </div>
-        <div class="schema-line tw:pl-16"><span class="schema-muted">…</span></div>
-        <div class="schema-line tw:pl-12"><span class="schema-punct">}</span></div>
-        <div class="schema-line tw:pl-8"><span class="schema-punct">]</span></div>
-        <div class="schema-note schema-leaf tw:pl-8 schema-muted tw:italic">
+        <div class="schema-line pl-16"><span class="schema-muted">…</span></div>
+        <div class="schema-line pl-12"><span class="schema-punct">}</span></div>
+        <div class="schema-line pl-8"><span class="schema-punct">]</span></div>
+        <div class="schema-note schema-leaf pl-8 schema-muted italic">
           {{ t("workflow.node.triggerDataExampleNote") }}
         </div>
       </template>
@@ -173,7 +173,7 @@ defineExpose({ submit });
 .schema-tree {
   font-size: 12px;
   line-height: 1.9;
-  /* background comes from the themed `tw:bg-surface-subtle` class */
+  /* background comes from the themed `bg-surface-subtle` class */
 }
 
 .schema-line {

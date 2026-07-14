@@ -1,12 +1,16 @@
 name: API Integration Test
 
 on:
-  push:
-    branches:
-      - "main"
+  # No `push: main` trigger: the merge_group (merge-queue) run already builds and
+  # tests the exact commit that lands on main, so a post-merge push run would be a
+  # full-suite duplicate. The merge_group run is now the trusted main-ward build and
+  # also warms the shared Rust cache (see save-if on the rust-cache step below).
   pull_request:
     branches:
       - "**"
+    # labeled/unlabeled so adding or removing the 'e2e' label re-fires the run and
+    # re-evaluates the gate in api_tests_summary.
+    types: [opened, reopened, synchronize, labeled, unlabeled]
   merge_group:
 
 concurrency:
@@ -43,10 +47,17 @@ jobs:
 
       - id: check
         run: |
+          # Skip when a PR touches only docs, images, frontend/UI-test files, or unrelated
+          # workflow files (e.g. a dependabot bump to another workflow) — none affect the API.
+          # Source and this workflow (api-testing.yml) still run the suite.
+          IGNORE_RE='(\.md$|^docs/|^web/|^tests/ui-testing/|^tests/playwright-tests/|\.(png|jpe?g|gif|svg|webp)$|^\.github/workflows/)'
           CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
-          if [ -z "$CHANGED" ]; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          elif echo "$CHANGED" | grep -qvE '(\.md$|^docs/|^web/|^tests/ui-testing/|^tests/playwright-tests/)'; then
+          # Files not matching IGNORE_RE. Captured (not `grep -qv`) so the check doesn't depend
+          # on grep -qv exit semantics, which differ across grep builds; the `|| true` keeps
+          # `set -e` from aborting when grep matches nothing (exit 1). The `grep -qE` below is a
+          # loop-safe `if`-condition term (`set -e` doesn't fire there), so it needs no `|| true`.
+          RELEVANT=$(printf '%s' "$CHANGED" | grep -vE "$IGNORE_RE" || true)
+          if [ -z "$CHANGED" ] || [ -n "$RELEVANT" ] || printf '%s' "$CHANGED" | grep -qE '^\.github/workflows/api-testing\.yml$'; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
           else
             echo "has_changes=false" >> $GITHUB_OUTPUT
@@ -55,7 +66,14 @@ jobs:
   api_integration_tests:
     name: api_integration_tests
     needs: [check_changes]
-    if: needs.check_changes.outputs.has_changes == 'true'
+    # API-relevant changes are required in every case. On a pull_request the 'e2e'
+    # label is an ADDITIONAL opt-in, not a bypass: the label is shared with the
+    # Playwright suite, so a frontend-only PR carries it to run UI tests and must
+    # not drag the whole API suite (8 jobs, each a full cargo build) along with it.
+    if: >-
+      needs.check_changes.outputs.has_changes == 'true' &&
+      (github.event_name != 'pull_request' ||
+       contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubicloud-standard-4
     permissions:
       contents: read  # only need to checkout the repo
@@ -82,7 +100,9 @@ jobs:
         with:
           cache-on-failure: true
           shared-key: backend-debug-mimalloc
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          # Save the shared cache on merge_group runs (the main-ward build now that
+          # push:main is gone); keep the main-ref check for any non-PR fallback.
+          save-if: ${{ github.event_name == 'merge_group' || github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
         run: |
@@ -162,7 +182,14 @@ jobs:
   api_query_agent_tests:
     name: "api_query_agent / ${{ matrix.config.label }}"
     needs: [check_changes]
-    if: needs.check_changes.outputs.has_changes == 'true'
+    # API-relevant changes are required in every case. On a pull_request the 'e2e'
+    # label is an ADDITIONAL opt-in, not a bypass: the label is shared with the
+    # Playwright suite, so a frontend-only PR carries it to run UI tests and must
+    # not drag the whole API suite (8 jobs, each a full cargo build) along with it.
+    if: >-
+      needs.check_changes.outputs.has_changes == 'true' &&
+      (github.event_name != 'pull_request' ||
+       contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubicloud-standard-4
     # Run the full SQL regression suite with the single-node physical
     # optimizer both enabled (default) and disabled. The non-optimized
@@ -279,7 +306,14 @@ jobs:
   api_regression_tests:
     name: "api_regression / ${{ matrix.config.label }}"
     needs: [check_changes]
-    if: needs.check_changes.outputs.has_changes == 'true'
+    # API-relevant changes are required in every case. On a pull_request the 'e2e'
+    # label is an ADDITIONAL opt-in, not a bypass: the label is shared with the
+    # Playwright suite, so a frontend-only PR carries it to run UI tests and must
+    # not drag the whole API suite (8 jobs, each a full cargo build) along with it.
+    if: >-
+      needs.check_changes.outputs.has_changes == 'true' &&
+      (github.event_name != 'pull_request' ||
+       contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubicloud-standard-4
     permissions:
       contents: read  # only need to checkout the repo
@@ -393,7 +427,14 @@ jobs:
   api_fuzz_tests:
     name: api_fuzz_tests
     needs: [check_changes]
-    if: needs.check_changes.outputs.has_changes == 'true'
+    # API-relevant changes are required in every case. On a pull_request the 'e2e'
+    # label is an ADDITIONAL opt-in, not a bypass: the label is shared with the
+    # Playwright suite, so a frontend-only PR carries it to run UI tests and must
+    # not drag the whole API suite (8 jobs, each a full cargo build) along with it.
+    if: >-
+      needs.check_changes.outputs.has_changes == 'true' &&
+      (github.event_name != 'pull_request' ||
+       contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubicloud-standard-4
     continue-on-error: true
     permissions:
@@ -512,14 +553,34 @@ jobs:
     steps:
       - name: Check test results
         run: |
+          # 1. check_changes must have succeeded.
           if [ "${{ needs.check_changes.result }}" != "success" ]; then
             echo "check_changes job did not succeed: ${{ needs.check_changes.result }}"
             exit 1
           fi
-          # All three test jobs must pass (or be skipped).
-          ok() { [ "$1" == "success" ] || [ "$1" == "skipped" ]; }
-          if ok "${{ needs.api_integration_tests.result }}" && ok "${{ needs.api_query_agent_tests.result }}" && ok "${{ needs.api_regression_tests.result }}"; then
-            echo "All API test jobs passed or skipped"
+
+          # 2. Nothing API-relevant changed → nothing ran → allow, whatever the labels say.
+          #    This covers the frontend-only PR that carries the 'e2e' label to run the
+          #    Playwright suite: the API suite doesn't apply to it and isn't required.
+          if [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
+            echo "✅ No API-relevant changes — suite not required."
+            exit 0
+          fi
+
+          # 3. API-relevant pull_request WITHOUT the 'e2e' label: the suite did not run,
+          #    so block until the author opts in by adding the label.
+          if [ "${{ github.event_name }}" == "pull_request" ] && \
+             [ "${{ contains(github.event.pull_request.labels.*.name, 'e2e') }}" != "true" ]; then
+            echo "::error::This PR changes API-relevant files but has no 'e2e' label, so the suite did not run."
+            echo "::error::Add the 'e2e' label to the PR to run the full test suite before merging."
+            exit 1
+          fi
+
+          # 4. Suite was expected to run — the gating jobs must have succeeded.
+          if [ "${{ needs.api_integration_tests.result }}" == "success" ] && \
+             [ "${{ needs.api_query_agent_tests.result }}" == "success" ] && \
+             [ "${{ needs.api_regression_tests.result }}" == "success" ]; then
+            echo "All API test jobs passed"
             exit 0
           else
             echo "API tests failed: integration=${{ needs.api_integration_tests.result }}, query_agent=${{ needs.api_query_agent_tests.result }}, regression=${{ needs.api_regression_tests.result }}"

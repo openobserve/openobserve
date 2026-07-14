@@ -42,37 +42,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="search"
       :placeholder="searchPlaceholder"
       clearable
-      class="tw:mb-3"
+      class="mb-3"
       :data-test="testPrefix + '-search'"
     />
 
-    <div v-if="filtered.length" class="tw:flex tw:flex-col tw:gap-2">
+    <div v-if="filtered.length" class="flex flex-col gap-2">
       <button
         v-for="item in filtered"
         :key="item.key"
         type="button"
-        class="flow-step-card tw:flex tw:items-start tw:gap-3 tw:p-3 tw:border tw:border-border-default tw:rounded-lg tw:bg-card-bg tw:text-left tw:cursor-pointer tw:transition-[border-color,background,box-shadow] tw:duration-[120ms]"
+        class="flow-step-card flex items-start gap-3 p-3 border border-border-default rounded-lg bg-card-bg text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms]"
         :data-test="`${testPrefix}-${item.key}`"
         @click="emit('pick', item)"
       >
         <div
-          class="tw:inline-flex tw:items-center tw:justify-center tw:w-8 tw:h-8 tw:shrink-0 tw:rounded-lg"
+          class="inline-flex items-center justify-center w-8 h-8 shrink-0 rounded-lg"
           :class="item.iconTint"
         >
           <OIcon :name="item.icon || 'help'" size="md" />
         </div>
-        <div class="tw:min-w-0">
-          <div class="tw:text-sm tw:font-semibold tw:text-text-primary">
+        <div class="min-w-0">
+          <div class="text-sm font-semibold text-text-primary">
             {{ item.title }}
           </div>
-          <div v-if="item.description" class="tw:text-xs tw:text-text-secondary tw:leading-snug">
+          <div v-if="item.description" class="text-xs text-text-secondary leading-snug">
             {{ item.description }}
           </div>
         </div>
       </button>
     </div>
 
-    <div v-else class="tw:py-8 tw:text-center tw:text-sm tw:text-text-secondary">
+    <div v-else class="py-8 text-center text-sm text-text-secondary">
       {{ noMatchText }}
     </div>
   </ODialog>

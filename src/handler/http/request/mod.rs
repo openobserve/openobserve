@@ -74,8 +74,7 @@ pub mod traces;
 pub mod users;
 pub mod workflows;
 
-pub const CONTENT_TYPE_JSON: &str = "application/json";
-pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";
+pub use crate::common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO};
 
 // these are the common bulk delete req/res structs
 

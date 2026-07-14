@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="containerRef"
-    class="workflow-view-tooltip o2vf_node tw:w-150 tw:h-96 tw:overflow-hidden"
+    class="workflow-view-tooltip o2vf_node w-150 h-96 overflow-hidden"
   >
     <VueFlow
       ref="vueFlowRef"

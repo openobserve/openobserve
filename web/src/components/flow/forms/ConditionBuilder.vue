@@ -30,22 +30,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   are dropped.
 -->
 <template>
-  <div data-test="condition-builder" class="tw:w-full">
-    <div class="flow-filter-group-wrapper tw:max-w-full tw:overflow-x-visible!" @submit.stop.prevent>
+  <div data-test="condition-builder" class="w-full">
+    <div class="flow-filter-group-wrapper max-w-full overflow-x-visible!" @submit.stop.prevent>
       <FilterGroup
         v-if="conditionGroup && conditionGroup.conditions"
         :key="filterGroupKey"
         :stream-fields="fields"
         :group="conditionGroup"
         :depth="0"
-        condition-input-width="tw:w-[130px]"
+        condition-input-width="w-[130px]"
         :allow-custom-columns="allowCustomColumns"
         :module="module"
         @add-condition="(g) => updateGroup(g)"
         @add-group="(g) => updateGroup(g)"
         @remove-group="(id) => removeGroup(id)"
       />
-      <div v-else class="tw:p-3 tw:text-gray-400">{{ t("flow.condition.loading") }}</div>
+      <div v-else class="p-3 text-gray-400">{{ t("flow.condition.loading") }}</div>
     </div>
 
     <slot name="guidelines" />

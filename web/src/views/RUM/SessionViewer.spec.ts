@@ -181,7 +181,7 @@ describe("SessionViewer.vue", () => {
     });
 
     it('should render the "Go Back" navigation button', () => {
-      const backBtn = wrapper.find('[title="Go Back"]');
+      const backBtn = wrapper.find('[data-test="session-viewer-back-btn"]');
       expect(backBtn.exists()).toBe(true);
     });
 
@@ -222,7 +222,7 @@ describe("SessionViewer.vue", () => {
   describe("navigation", () => {
     it("should call router.back() when Go Back button is clicked", async () => {
       const backSpy = vi.spyOn(router, "back");
-      const backBtn = wrapper.find('[title="Go Back"]');
+      const backBtn = wrapper.find('[data-test="session-viewer-back-btn"]');
       expect(backBtn.exists()).toBe(true);
       await backBtn.trigger("click");
       expect(backSpy).toHaveBeenCalledTimes(1);
@@ -232,13 +232,13 @@ describe("SessionViewer.vue", () => {
   // -------------------------------------------------------------------------
   describe("session details header", () => {
     it("should render the IP address info section", () => {
-      const sections = wrapper.findAll(".tw\\:truncate");
+      const sections = wrapper.findAll(".truncate");
       expect(sections.length).toBeGreaterThanOrEqual(1);
     });
 
     it("should render at least 5 info sections in the header", () => {
       // ip, date, user, location, browser/os
-      const sections = wrapper.findAll(".tw\\:truncate");
+      const sections = wrapper.findAll(".truncate");
       expect(sections.length).toBeGreaterThanOrEqual(5);
     });
   });

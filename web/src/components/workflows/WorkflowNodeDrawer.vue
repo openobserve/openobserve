@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="workflow-node-drawer"
   >
     <div
-      :class="workflowObj.dialog.expand ? 'tw:h-full tw:min-h-0' : 'tw:p-4'"
+      :class="workflowObj.dialog.expand ? 'h-full min-h-0' : 'p-4'"
     >
       <!-- Per-node-type body. Each exposes submit() returning the data payload
            (or null to block Save). Types without a form yet fall back to the
@@ -63,10 +63,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div
         v-else
-        class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:text-center tw:gap-2 tw:py-10 tw:text-text-secondary"
+        class="flex flex-col items-center justify-center text-center gap-2 py-10 text-text-secondary"
       >
         <OIcon :name="meta?.icon || 'help'" size="lg" />
-        <div class="tw:text-sm">
+        <div class="text-sm">
           {{ t("workflow.node.configComingSoon", { node: title }) }}
         </div>
       </div>

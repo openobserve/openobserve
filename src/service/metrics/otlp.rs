@@ -188,6 +188,63 @@ pub async fn handle_otlp_request(
         for scope_metric in &resource_metric.scope_metrics {
             for metric in &scope_metric.metrics {
                 let metric_name = format_stream_name(metric.name.to_string());
+
+                let mut rec = json::json!({});
+                if let Some(res) = &resource_metric.resource {
+                    for item in &res.attributes {
+                        rec[format_label_name(item.key.as_str())] = get_val(&item.value.as_ref());
+                    }
+                }
+                if let Some(lib) = &scope_metric.scope {
+                    rec["instrumentation_library_name"] =
+                        serde_json::Value::String(lib.name.to_owned());
+                    rec["instrumentation_library_version"] =
+                        serde_json::Value::String(lib.version.to_owned());
+                }
+                rec[NAME_LABEL] = metric_name.to_owned().into();
+
+                // process metadata
+                let metadata = build_metadata(&metric_name, metric);
+                let mut prom_meta: HashMap<String, String> = HashMap::new();
+
+                let records = match &metric.data {
+                    Some(data) => match data {
+                        Data::Gauge(gauge) => process_gauge(&rec, gauge, metadata, &mut prom_meta),
+                        Data::Sum(sum) => process_sum(&mut rec, sum, metadata, &mut prom_meta),
+                        Data::Histogram(hist) => {
+                            process_histogram(&mut rec, hist, metadata, &mut prom_meta)
+                        }
+                        Data::ExponentialHistogram(exp_hist) => process_exponential_histogram(
+                            &mut rec,
+                            exp_hist,
+                            metadata,
+                            &mut prom_meta,
+                        ),
+                        Data::Summary(summary) => {
+                            process_summary(&rec, summary, metadata, &mut prom_meta)
+                        }
+                    },
+                    None => {
+                        // a flattened oneof that fails to deserialize turns into
+                        // None instead of an error, so surface it here
+                        log::warn!(
+                            "[METRICS:OTLP] metric {metric_name} has no data points (unsupported or undecodable metric type), skipping"
+                        );
+                        partial_success.rejected_data_points += 1;
+                        partial_success.error_message =
+                            format!("metric {metric_name} has no data points");
+                        vec![]
+                    }
+                };
+
+                // A metric that yields no records -- every data point NaN, no data points at all,
+                // or an undecodable type -- gets nothing at all: no schema, no metadata entry,
+                // no stream. The per-stream lookups below therefore run only once we know there
+                // is something to write.
+                if records.is_empty() {
+                    continue;
+                }
+
                 // check for schema
                 let schema_exists = stream_schema_exists(
                     org_id,
@@ -218,14 +275,6 @@ pub async fn handle_otlp_request(
                 .await;
                 // End get stream alert
 
-                // get stream pipeline
-                if !stream_executable_pipelines.contains_key(&metric_name) {
-                    let pipeline_params =
-                        crate::service::ingestion::get_stream_executable_pipelines(&stream_param)
-                            .await;
-                    stream_executable_pipelines.insert(metric_name.clone(), pipeline_params);
-                }
-
                 // get user defined schema
                 crate::service::ingestion::get_uds_and_original_data_streams(
                     std::slice::from_ref(&stream_param),
@@ -234,61 +283,6 @@ pub async fn handle_otlp_request(
                     &mut streams_need_all_values_map,
                 )
                 .await;
-
-                let mut rec = json::json!({});
-                if let Some(res) = &resource_metric.resource {
-                    for item in &res.attributes {
-                        rec[format_label_name(item.key.as_str())] = get_val(&item.value.as_ref());
-                    }
-                }
-                if let Some(lib) = &scope_metric.scope {
-                    rec["instrumentation_library_name"] =
-                        serde_json::Value::String(lib.name.to_owned());
-                    rec["instrumentation_library_version"] =
-                        serde_json::Value::String(lib.version.to_owned());
-                }
-                rec[NAME_LABEL] = metric_name.to_owned().into();
-
-                // process metadata
-                let metadata = Metadata {
-                    metric_family_name: rec[NAME_LABEL].to_string(),
-                    metric_type: MetricType::Unknown,
-                    help: metric.description.to_owned(),
-                    unit: metric.unit.to_owned(),
-                };
-                let mut prom_meta: HashMap<String, String> = HashMap::new();
-
-                let records = match &metric.data {
-                    Some(data) => match data {
-                        Data::Gauge(gauge) => {
-                            process_gauge(&mut rec, gauge, metadata, &mut prom_meta)
-                        }
-                        Data::Sum(sum) => process_sum(&mut rec, sum, metadata, &mut prom_meta),
-                        Data::Histogram(hist) => {
-                            process_histogram(&mut rec, hist, metadata, &mut prom_meta)
-                        }
-                        Data::ExponentialHistogram(exp_hist) => process_exponential_histogram(
-                            &mut rec,
-                            exp_hist,
-                            metadata,
-                            &mut prom_meta,
-                        ),
-                        Data::Summary(summary) => {
-                            process_summary(&rec, summary, metadata, &mut prom_meta)
-                        }
-                    },
-                    None => {
-                        // a flattened oneof that fails to deserialize turns into
-                        // None instead of an error, so surface it here
-                        log::warn!(
-                            "[METRICS:OTLP] metric {metric_name} has no data points (unsupported or undecodable metric type), skipping"
-                        );
-                        partial_success.rejected_data_points += 1;
-                        partial_success.error_message =
-                            format!("metric {metric_name} has no data points");
-                        vec![]
-                    }
-                };
 
                 // update schema metadata
                 if !schema_exists.has_metrics_metadata {
@@ -357,17 +351,6 @@ pub async fn handle_otlp_request(
                         .await;
                         // End get stream alert
 
-                        // get stream pipeline
-                        if !stream_executable_pipelines.contains_key(&local_metric_name) {
-                            let pipeline_params =
-                                crate::service::ingestion::get_stream_executable_pipelines(
-                                    &stream_param,
-                                )
-                                .await;
-                            stream_executable_pipelines
-                                .insert(local_metric_name.clone(), pipeline_params);
-                        }
-
                         crate::service::ingestion::get_uds_and_original_data_streams(
                             std::slice::from_ref(&stream_param),
                             &mut user_defined_schema_map,
@@ -375,6 +358,24 @@ pub async fn handle_otlp_request(
                             &mut streams_need_all_values_map,
                         )
                         .await;
+                    }
+
+                    // get stream pipeline -- for the stream this record actually lands in, which
+                    // is not always the metric's own name: a histogram's rows all carry a
+                    // `_count` / `_sum` / `_bucket` name and none carry the base. Registering the
+                    // base here anyway would leave a stream in stream_executable_pipelines with
+                    // no buffered inputs, and the loop at the end of this function reports that
+                    // as a bug on every export request.
+                    if !stream_executable_pipelines.contains_key(&local_metric_name) {
+                        let stream_param =
+                            StreamParams::new(org_id, &local_metric_name, StreamType::Metrics);
+                        let pipeline_params =
+                            crate::service::ingestion::get_stream_executable_pipelines(
+                                &stream_param,
+                            )
+                            .await;
+                        stream_executable_pipelines
+                            .insert(local_metric_name.clone(), pipeline_params);
                     }
 
                     // ready to be buffered for downstream processing
@@ -413,18 +414,22 @@ pub async fn handle_otlp_request(
         if pipelines.is_empty() {
             continue;
         }
+        let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
+            let err_msg = format!(
+                "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG",
+            );
+            log::error!("{err_msg}");
+            partial_success.error_message = err_msg;
+            continue;
+        };
+        let count = pipeline_inputs.len();
+        let has_user_pipeline = pipelines
+            .iter()
+            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
+
         for exec_pl in pipelines {
-            let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
-                let err_msg = format!(
-                    "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG",
-                );
-                log::error!("{err_msg}");
-                partial_success.error_message = err_msg;
-                continue;
-            };
-            let count = pipeline_inputs.len();
             match exec_pl
-                .process_batch(org_id, pipeline_inputs, Some(stream_name.clone()))
+                .process_batch(org_id, pipeline_inputs.clone(), Some(stream_name.clone()))
                 .await
             {
                 Err(e) => {
@@ -479,6 +484,24 @@ pub async fn handle_otlp_request(
                         }
                     }
                 }
+            }
+        }
+
+        if !has_user_pipeline && !json_data_by_stream.contains_key(stream_name) {
+            for mut rec in pipeline_inputs {
+                let mut local_val = match rec.take() {
+                    json::Value::Object(val) => val,
+                    _ => unreachable!(),
+                };
+
+                if let Some(Some(fields)) = user_defined_schema_map.get(stream_name) {
+                    local_val = crate::service::ingestion::refactor_map(local_val, fields);
+                }
+
+                json_data_by_stream
+                    .entry(stream_name.clone())
+                    .or_default()
+                    .push(local_val);
             }
         }
     }
@@ -662,8 +685,25 @@ fn batch_min_timestamp(
     }
 }
 
+/// Builds the family metadata stored on the stream schema.
+///
+/// `metric_family_name` is the plain metric name. It is deliberately not read back out of
+/// `rec[NAME_LABEL]`: that is a `json::Value::String`, and `Value::to_string()` returns the
+/// serialised JSON -- `"name"`, quotes included -- rather than the string content.
+fn build_metadata(
+    metric_name: &str,
+    metric: &opentelemetry_proto::tonic::metrics::v1::Metric,
+) -> Metadata {
+    Metadata {
+        metric_family_name: metric_name.to_string(),
+        metric_type: MetricType::Unknown,
+        help: metric.description.to_owned(),
+        unit: metric.unit.to_owned(),
+    }
+}
+
 fn process_gauge(
-    rec: &mut json::Value,
+    rec: &json::Value,
     gauge: &Gauge,
     mut metadata: Metadata,
     prom_meta: &mut HashMap<String, String>,
@@ -678,11 +718,17 @@ fn process_gauge(
     );
 
     for data_point in &gauge.data_points {
-        process_data_point(rec, data_point);
-        let val_map = rec.as_object_mut().unwrap();
+        // a fresh record per data point: `process_data_point` only ever sets attribute keys,
+        // so reusing one record lets a data point inherit an attribute the previous one
+        // carried and it never dropped -- which then feeds the series hash.
+        let mut dp_rec = rec.clone();
+        if !process_data_point(&mut dp_rec, data_point) {
+            continue;
+        }
+        let val_map = dp_rec.as_object_mut().unwrap();
         let hash = super::signature_without_labels(val_map, &get_exclude_labels());
         val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
-        records.push(rec.clone());
+        records.push(dp_rec);
     }
     records
 }
@@ -705,11 +751,13 @@ fn process_sum(
     rec["is_monotonic"] = sum.is_monotonic.to_string().into();
     for data_point in &sum.data_points {
         let mut dp_rec = rec.clone();
-        process_data_point(&mut dp_rec, data_point);
+        if !process_data_point(&mut dp_rec, data_point) {
+            continue;
+        }
         let val_map = dp_rec.as_object_mut().unwrap();
         let hash = super::signature_without_labels(val_map, &get_exclude_labels());
         val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
-        records.push(dp_rec.clone());
+        records.push(dp_rec);
     }
     records
 }
@@ -793,11 +841,21 @@ fn process_summary(
     records
 }
 
-fn process_data_point(rec: &mut json::Value, data_point: &NumberDataPoint) {
+/// Returns false if this data point has no usable value and must not be recorded.
+///
+/// The caller owns the drop, not this function: it mutates a record in place and cannot
+/// remove it from the caller's buffer. Skipping only the `VALUE_LABEL` assignment would be
+/// worse than the bug -- the record would keep whatever value it already held and re-report
+/// a stale reading as if it were fresh.
+#[must_use]
+fn process_data_point(rec: &mut json::Value, data_point: &NumberDataPoint) -> bool {
     for attr in &data_point.attributes {
         rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
     }
-    rec[VALUE_LABEL] = get_metric_val(&data_point.value);
+    let Some(value) = get_metric_val(&data_point.value).and_then(super::metric_value) else {
+        return false;
+    };
+    rec[VALUE_LABEL] = value;
     rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
@@ -807,6 +865,7 @@ fn process_data_point(rec: &mut json::Value, data_point: &NumberDataPoint) {
     }
     .into();
     process_exemplars(rec, &data_point.exemplars);
+    true
 }
 
 fn process_hist_data_point(
@@ -833,23 +892,26 @@ fn process_hist_data_point(
     count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(count_rec);
 
-    // add sum record
-    let mut sum_rec = rec.clone();
-    sum_rec[VALUE_LABEL] = data_point.sum.into();
-    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
-    bucket_recs.push(sum_rec);
+    if let Some(sum) = data_point.sum.and_then(super::metric_value) {
+        let mut sum_rec = rec.clone();
+        sum_rec[VALUE_LABEL] = sum;
+        sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
+        bucket_recs.push(sum_rec);
+    }
 
-    // add min record
-    let mut min_rec = rec.clone();
-    min_rec[VALUE_LABEL] = data_point.min.into();
-    min_rec[NAME_LABEL] = format!("{}_min", min_rec[NAME_LABEL].as_str().unwrap()).into();
-    bucket_recs.push(min_rec);
+    if let Some(min) = data_point.min.and_then(super::metric_value) {
+        let mut min_rec = rec.clone();
+        min_rec[VALUE_LABEL] = min;
+        min_rec[NAME_LABEL] = format!("{}_min", min_rec[NAME_LABEL].as_str().unwrap()).into();
+        bucket_recs.push(min_rec);
+    }
 
-    // add max record
-    let mut max_rec = rec.clone();
-    max_rec[VALUE_LABEL] = data_point.max.into();
-    max_rec[NAME_LABEL] = format!("{}_max", max_rec[NAME_LABEL].as_str().unwrap()).into();
-    bucket_recs.push(max_rec);
+    if let Some(max) = data_point.max.and_then(super::metric_value) {
+        let mut max_rec = rec.clone();
+        max_rec[VALUE_LABEL] = max;
+        max_rec[NAME_LABEL] = format!("{}_max", max_rec[NAME_LABEL].as_str().unwrap()).into();
+        bucket_recs.push(max_rec);
+    }
 
     // add bucket records
     let len = data_point.bucket_counts.len();
@@ -895,11 +957,13 @@ fn process_exp_hist_data_point(
     count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(count_rec);
 
-    // add sum record
-    let mut sum_rec = rec.clone();
-    sum_rec[VALUE_LABEL] = data_point.sum.into();
-    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
-    bucket_recs.push(sum_rec);
+    // add sum record -- OTLP marks `sum` optional, so an absent (or NaN) sum emits no record
+    if let Some(sum) = data_point.sum.and_then(super::metric_value) {
+        let mut sum_rec = rec.clone();
+        sum_rec[VALUE_LABEL] = sum;
+        sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
+        bucket_recs.push(sum_rec);
+    }
 
     let base = 2 ^ (2 ^ -data_point.scale);
     // add negative bucket records
@@ -951,16 +1015,22 @@ fn process_summary_data_point(
     count_rec[NAME_LABEL] = format!("{}_count", count_rec[NAME_LABEL].as_str().unwrap()).into();
     bucket_recs.push(count_rec);
 
-    // add sum record
-    let mut sum_rec = rec.clone();
-    sum_rec[VALUE_LABEL] = data_point.sum.into();
-    sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
-    bucket_recs.push(sum_rec);
+    // add sum record -- `sum` is a plain f64 here, so it can only be dropped for NaN
+    if let Some(sum) = super::metric_value(data_point.sum) {
+        let mut sum_rec = rec.clone();
+        sum_rec[VALUE_LABEL] = sum;
+        sum_rec[NAME_LABEL] = format!("{}_sum", sum_rec[NAME_LABEL].as_str().unwrap()).into();
+        bucket_recs.push(sum_rec);
+    }
 
-    // add bucket records
+    // add bucket records -- a summary reports NaN for a quantile with no observations, and
+    // an absent series is how Prometheus itself represents "no data"
     for value in &data_point.quantile_values {
+        let Some(quantile_value) = super::metric_value(value.value) else {
+            continue;
+        };
         let mut bucket_rec = rec.clone();
-        bucket_rec[VALUE_LABEL] = value.value.into();
+        bucket_rec[VALUE_LABEL] = quantile_value;
         bucket_rec["quantile"] = value.quantile.to_string().into();
         bucket_recs.push(bucket_rec);
     }
@@ -1204,7 +1274,7 @@ mod tests {
     #[test]
     fn test_process_gauge() {
         let metric = create_test_gauge_metric("test_gauge", 42.5);
-        let mut rec = json!({
+        let rec = json!({
             "__name__": "test_gauge",
             "__type__": "gauge"
         });
@@ -1217,7 +1287,7 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Gauge(gauge)) = &metric.data {
-            let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
+            let result = process_gauge(&rec, gauge, metadata, &mut prom_meta);
 
             // Verify the processed data
             assert!(!result.is_empty());
@@ -1384,7 +1454,7 @@ mod tests {
             ),
         };
 
-        process_data_point(&mut rec, &data_point);
+        assert!(process_data_point(&mut rec, &data_point));
 
         // Verify the processed data
         assert_eq!(rec["value"], 42.0);
@@ -1429,6 +1499,42 @@ mod tests {
         let sum_rec = &result[1];
         assert!(sum_rec["__name__"].as_str().unwrap().ends_with("_sum"));
         assert_eq!(sum_rec["value"], json!(100.0));
+    }
+
+    #[test]
+    fn test_process_hist_data_point_skips_missing_optional_stats() {
+        let mut rec = json!({
+            "__name__": "test_histogram",
+            "__type__": "histogram"
+        });
+        let data_point = HistogramDataPoint {
+            attributes: vec![],
+            start_time_unix_nano: 0,
+            time_unix_nano: 1640995200000000000,
+            exemplars: vec![],
+            flags: 0,
+            count: 100,
+            sum: None,
+            bucket_counts: vec![10, 20],
+            explicit_bounds: vec![10.0],
+            min: None,
+            max: None,
+        };
+
+        let result = process_hist_data_point(&mut rec, &data_point);
+        let metric_names: Vec<&str> = result
+            .iter()
+            .map(|r| r[NAME_LABEL].as_str().unwrap_or(""))
+            .collect();
+
+        assert!(metric_names.contains(&"test_histogram_count"));
+        assert!(metric_names.contains(&"test_histogram_bucket"));
+        assert!(!metric_names.contains(&"test_histogram_sum"));
+        assert!(!metric_names.contains(&"test_histogram_min"));
+        assert!(!metric_names.contains(&"test_histogram_max"));
+        // `!is_null()`, not `.get(..).is_some()`: a null value is still `Some(&Value::Null)`.
+        // The writers are held to this across NaN inputs in `test_no_writer_emits_a_null_value`.
+        assert!(result.iter().all(|r| !r[VALUE_LABEL].is_null()));
     }
 
     #[test]
@@ -1614,7 +1720,7 @@ mod tests {
     #[test]
     fn test_metric_with_attributes() {
         let metric = create_test_gauge_metric("test_metric_with_attrs", 42.0);
-        let mut rec = json!({
+        let rec = json!({
             "__name__": "test_metric_with_attrs",
             "__type__": "gauge"
         });
@@ -1627,7 +1733,7 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Gauge(gauge)) = &metric.data {
-            let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
+            let result = process_gauge(&rec, gauge, metadata, &mut prom_meta);
 
             // Verify the processed data has required fields
             assert!(!result.is_empty());
@@ -1746,7 +1852,7 @@ mod tests {
         #[test]
         fn test_gauge_with_zero_value() {
             let metric = create_test_gauge_metric("zero_gauge", 0.0);
-            let mut rec = json!({"__name__": "zero_gauge", "__type__": "gauge"});
+            let rec = json!({"__name__": "zero_gauge", "__type__": "gauge"});
             let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
@@ -1756,7 +1862,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Gauge(gauge)) = &metric.data {
-                let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
+                let result = process_gauge(&rec, gauge, metadata, &mut prom_meta);
                 assert!(!result.is_empty());
                 assert_eq!(result[0]["value"], 0.0);
             }
@@ -1765,7 +1871,7 @@ mod tests {
         #[test]
         fn test_gauge_with_negative_value() {
             let metric = create_test_gauge_metric("negative_gauge", -42.5);
-            let mut rec = json!({"__name__": "negative_gauge", "__type__": "gauge"});
+            let rec = json!({"__name__": "negative_gauge", "__type__": "gauge"});
             let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
@@ -1775,7 +1881,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Gauge(gauge)) = &metric.data {
-                let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
+                let result = process_gauge(&rec, gauge, metadata, &mut prom_meta);
                 assert!(!result.is_empty());
                 assert_eq!(result[0]["value"], -42.5);
             }
@@ -1784,7 +1890,7 @@ mod tests {
         #[test]
         fn test_gauge_with_infinity() {
             let metric = create_test_gauge_metric("infinity_gauge", f64::INFINITY);
-            let mut rec = json!({"__name__": "infinity_gauge", "__type__": "gauge"});
+            let rec = json!({"__name__": "infinity_gauge", "__type__": "gauge"});
             let metadata = Metadata {
                 metric_family_name: String::new(),
                 metric_type: MetricType::Unknown,
@@ -1794,18 +1900,13 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Gauge(gauge)) = &metric.data {
-                let result = process_gauge(&mut rec, gauge, metadata, &mut prom_meta);
-                assert!(!result.is_empty());
-                // Check that the value is infinite (JSON might not preserve exact infinity)
+                let result = process_gauge(&rec, gauge, metadata, &mut prom_meta);
+                assert_eq!(result.len(), 1);
+                // an infinity is clamped to the f64 bound, matching the remote-write path.
+                // it is never written as JSON null: a null value suppresses the `value`
+                // column and takes the whole stream down with it.
                 let value = &result[0]["value"];
-                if let Some(f_val) = value.as_f64() {
-                    assert!(f_val.is_infinite());
-                } else if let Some(s_val) = value.as_str() {
-                    assert!(s_val.contains("inf") || s_val.contains("Inf") || s_val == "null");
-                } else {
-                    // JSON might convert infinity to null, which is acceptable
-                    assert!(value.is_null(), "Value: {value:?}");
-                }
+                assert_eq!(value.as_f64().unwrap(), f64::MAX);
             }
         }
 
@@ -2210,7 +2311,7 @@ mod tests {
                 ),
             };
 
-            process_data_point(&mut rec, &data_point_flag1);
+            assert!(process_data_point(&mut rec, &data_point_flag1));
             assert_eq!(rec["flag"], "DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK");
 
             // Test with flag 0 (DoNotUse)
@@ -2227,7 +2328,7 @@ mod tests {
                 ),
             };
 
-            process_data_point(&mut rec, &data_point_flag0);
+            assert!(process_data_point(&mut rec, &data_point_flag0));
             assert_eq!(rec["flag"], "DATA_POINT_FLAGS_DO_NOT_USE");
         }
 
@@ -2250,7 +2351,7 @@ mod tests {
                 ),
             };
 
-            process_data_point(&mut rec, &data_point);
+            assert!(process_data_point(&mut rec, &data_point));
             assert_eq!(rec["_timestamp"], expected_micro_timestamp);
         }
 
@@ -2320,7 +2421,7 @@ mod tests {
                 ),
             };
 
-            process_data_point(&mut rec, &data_point);
+            assert!(process_data_point(&mut rec, &data_point));
 
             // Should still process correctly with empty attributes
             assert_eq!(rec["value"], 42.0);
@@ -2562,5 +2663,392 @@ mod tests {
     fn test_batch_min_timestamp_no_timestamp_field_uses_default() {
         let row = serde_json::Map::new(); // no _timestamp field
         assert_eq!(batch_min_timestamp(&[row], 99), 99);
+    }
+
+    /// A record written with a null value never gets a `value` column inferred into the
+    /// schema, and the whole stream then fails every PromQL query while still costing full
+    /// ingest and storage. NaN is the way a null gets in: `serde_json` maps a non-finite f64
+    /// to `Value::Null`. So: NaN means no record, infinities clamp.
+    mod value_policy {
+        use opentelemetry_proto::tonic::{
+            common::v1::{AnyValue, KeyValue, any_value},
+            metrics::v1::{
+                ExponentialHistogramDataPoint, Summary, SummaryDataPoint,
+                exponential_histogram_data_point::Buckets, summary_data_point::ValueAtQuantile,
+            },
+        };
+
+        use super::*;
+
+        fn attr(key: &str, value: &str) -> KeyValue {
+            KeyValue {
+                key: key.to_string(),
+                value: Some(AnyValue {
+                    value: Some(any_value::Value::StringValue(value.to_string())),
+                }),
+                ..Default::default()
+            }
+        }
+
+        fn number_dp(value: f64, attributes: Vec<KeyValue>) -> NumberDataPoint {
+            NumberDataPoint {
+                attributes,
+                start_time_unix_nano: 0,
+                time_unix_nano: 1640995200000000000,
+                exemplars: vec![],
+                flags: 0,
+                value: Some(number_data_point::Value::AsDouble(value)),
+            }
+        }
+
+        fn test_metadata() -> Metadata {
+            Metadata {
+                metric_type: MetricType::Unknown,
+                metric_family_name: "test_metric".to_string(),
+                help: String::new(),
+                unit: String::new(),
+            }
+        }
+
+        fn gauge_records(data_points: Vec<NumberDataPoint>) -> Vec<serde_json::Value> {
+            let rec = json!({"__name__": "test_metric"});
+            let mut prom_meta = HashMap::new();
+            process_gauge(
+                &rec,
+                &Gauge { data_points },
+                test_metadata(),
+                &mut prom_meta,
+            )
+        }
+
+        fn sum_records(data_points: Vec<NumberDataPoint>) -> Vec<serde_json::Value> {
+            let mut rec = json!({"__name__": "test_metric"});
+            let mut prom_meta = HashMap::new();
+            process_sum(
+                &mut rec,
+                &Sum {
+                    data_points,
+                    aggregation_temporality: AggregationTemporality::Cumulative as i32,
+                    is_monotonic: true,
+                },
+                test_metadata(),
+                &mut prom_meta,
+            )
+        }
+
+        fn hist_dp(sum: Option<f64>, min: Option<f64>, max: Option<f64>) -> HistogramDataPoint {
+            HistogramDataPoint {
+                attributes: vec![],
+                start_time_unix_nano: 0,
+                time_unix_nano: 1640995200000000000,
+                exemplars: vec![],
+                flags: 0,
+                count: 100,
+                sum,
+                bucket_counts: vec![10, 20],
+                explicit_bounds: vec![10.0],
+                min,
+                max,
+            }
+        }
+
+        fn hist_records(dp: HistogramDataPoint) -> Vec<serde_json::Value> {
+            let mut rec = json!({"__name__": "test_metric"});
+            process_hist_data_point(&mut rec, &dp)
+        }
+
+        fn exp_hist_records(sum: Option<f64>) -> Vec<serde_json::Value> {
+            let mut rec = json!({"__name__": "test_metric"});
+            process_exp_hist_data_point(
+                &mut rec,
+                &ExponentialHistogramDataPoint {
+                    attributes: vec![],
+                    start_time_unix_nano: 0,
+                    time_unix_nano: 1640995200000000000,
+                    exemplars: vec![],
+                    flags: 0,
+                    count: 100,
+                    sum,
+                    min: None,
+                    max: None,
+                    scale: 0,
+                    zero_count: 0,
+                    zero_threshold: 0.0,
+                    positive: Some(Buckets {
+                        offset: 0,
+                        bucket_counts: vec![50, 50],
+                    }),
+                    negative: None,
+                },
+            )
+        }
+
+        fn summary_records(sum: f64, quantiles: Vec<(f64, f64)>) -> Vec<serde_json::Value> {
+            let mut rec = json!({"__name__": "test_metric"});
+            process_summary_data_point(
+                &mut rec,
+                &SummaryDataPoint {
+                    attributes: vec![],
+                    start_time_unix_nano: 0,
+                    time_unix_nano: 1640995200000000000,
+                    flags: 0,
+                    count: 100,
+                    sum,
+                    quantile_values: quantiles
+                        .into_iter()
+                        .map(|(quantile, value)| ValueAtQuantile { quantile, value })
+                        .collect(),
+                },
+            )
+        }
+
+        fn names(records: &[serde_json::Value]) -> Vec<&str> {
+            records
+                .iter()
+                .map(|r| r[NAME_LABEL].as_str().unwrap_or(""))
+                .collect()
+        }
+
+        // ---- gauges: the HAProxy case. An unset HAProxy limit reads NaN on every scrape,
+        // which is how a deliberately-scraped gauge became permanently unqueryable.
+
+        #[test]
+        fn test_process_gauge_nan_emits_no_record() {
+            assert!(gauge_records(vec![number_dp(f64::NAN, vec![])]).is_empty());
+        }
+
+        #[test]
+        fn test_process_gauge_finite_value_unchanged() {
+            let records = gauge_records(vec![number_dp(42.0, vec![])]);
+            assert_eq!(records.len(), 1);
+            assert_eq!(records[0][VALUE_LABEL], json!(42.0));
+        }
+
+        /// The dangerous near-miss fix: declining to *assign* the value without dropping the
+        /// record leaves the previous data point's reading in place, and the record is then
+        /// pushed carrying a stale value that looks entirely real.
+        #[test]
+        fn test_process_gauge_nan_does_not_re_report_previous_value() {
+            let after = gauge_records(vec![number_dp(5.0, vec![]), number_dp(f64::NAN, vec![])]);
+            assert_eq!(
+                after.len(),
+                1,
+                "the NaN data point must not produce a record"
+            );
+            assert_eq!(after[0][VALUE_LABEL], json!(5.0));
+
+            let before = gauge_records(vec![number_dp(f64::NAN, vec![]), number_dp(5.0, vec![])]);
+            assert_eq!(before.len(), 1);
+            assert_eq!(before[0][VALUE_LABEL], json!(5.0));
+        }
+
+        #[test]
+        fn test_process_gauge_clamps_infinities() {
+            let records = gauge_records(vec![
+                number_dp(f64::INFINITY, vec![]),
+                number_dp(f64::NEG_INFINITY, vec![]),
+            ]);
+            assert_eq!(records.len(), 2);
+            assert_eq!(records[0][VALUE_LABEL].as_f64().unwrap(), f64::MAX);
+            assert_eq!(records[1][VALUE_LABEL].as_f64().unwrap(), f64::MIN);
+        }
+
+        #[test]
+        fn test_process_sum_nan_emits_no_record() {
+            assert!(sum_records(vec![number_dp(f64::NAN, vec![])]).is_empty());
+            assert_eq!(sum_records(vec![number_dp(7.0, vec![])]).len(), 1);
+        }
+
+        // ---- label bleed: `process_data_point` only ever *sets* attribute keys, so a shared
+        // record lets a data point inherit a label it never carried -- into its series hash.
+
+        #[test]
+        fn test_process_gauge_does_not_leak_labels_between_data_points() {
+            let records = gauge_records(vec![
+                number_dp(1.0, vec![attr("pod", "a"), attr("zone", "eu")]),
+                number_dp(2.0, vec![attr("pod", "b")]),
+            ]);
+
+            assert_eq!(records.len(), 2);
+            assert_eq!(records[0]["zone"], json!("eu"));
+            assert!(
+                records[1].get("zone").is_none(),
+                "second data point carried no zone, so the record must not have one"
+            );
+
+            // and the series identity follows: the hash of the leak-free record is the hash of
+            // the same data point sent on its own. An `assert_ne!` against the first record
+            // would not show this -- `pod` alone already makes those two differ.
+            let alone = gauge_records(vec![number_dp(2.0, vec![attr("pod", "b")])]);
+            assert_eq!(
+                records[1][HASH_LABEL], alone[0][HASH_LABEL],
+                "the series hash must be computed over the labels the data point actually carried"
+            );
+        }
+
+        /// `process_sum` has always cloned per data point. Asserted here so the two paths stay
+        /// locked together.
+        #[test]
+        fn test_process_sum_does_not_leak_labels_between_data_points() {
+            let records = sum_records(vec![
+                number_dp(1.0, vec![attr("pod", "a"), attr("zone", "eu")]),
+                number_dp(2.0, vec![attr("pod", "b")]),
+            ]);
+
+            assert_eq!(records.len(), 2);
+            assert!(records[1].get("zone").is_none());
+        }
+
+        /// A dropped NaN data point must not leave its labels behind for the next one either.
+        #[test]
+        fn test_process_gauge_dropped_record_does_not_leak_labels() {
+            let records = gauge_records(vec![
+                number_dp(f64::NAN, vec![attr("pod", "a"), attr("zone", "eu")]),
+                number_dp(2.0, vec![attr("pod", "b")]),
+            ]);
+
+            assert_eq!(records.len(), 1);
+            assert!(records[0].get("zone").is_none());
+        }
+
+        // ---- classic histogram
+
+        #[test]
+        fn test_process_hist_data_point_nan_stats_emit_no_records() {
+            let records = hist_records(hist_dp(Some(f64::NAN), Some(f64::NAN), Some(f64::NAN)));
+            let names = names(&records);
+
+            assert!(names.contains(&"test_metric_count"));
+            assert!(names.contains(&"test_metric_bucket"));
+            assert!(!names.contains(&"test_metric_sum"));
+            assert!(!names.contains(&"test_metric_min"));
+            assert!(!names.contains(&"test_metric_max"));
+        }
+
+        /// Guards against over-correction: the streams whose min/max are genuinely populated
+        /// must keep working.
+        #[test]
+        fn test_process_hist_data_point_finite_stats_still_emitted() {
+            let records = hist_records(hist_dp(Some(f64::NAN), Some(0.5), Some(9.5)));
+
+            let min_rec = records
+                .iter()
+                .find(|r| r[NAME_LABEL] == json!("test_metric_min"))
+                .expect("a real min must still be emitted alongside a NaN sum");
+            assert_eq!(min_rec[VALUE_LABEL], json!(0.5));
+
+            let max_rec = records
+                .iter()
+                .find(|r| r[NAME_LABEL] == json!("test_metric_max"))
+                .expect("a real max must still be emitted");
+            assert_eq!(max_rec[VALUE_LABEL], json!(9.5));
+
+            assert!(!names(&records).contains(&"test_metric_sum"));
+        }
+
+        #[test]
+        fn test_process_hist_data_point_clamps_infinite_sum() {
+            let records = hist_records(hist_dp(Some(f64::INFINITY), None, None));
+            let sum_rec = records
+                .iter()
+                .find(|r| r[NAME_LABEL] == json!("test_metric_sum"))
+                .expect("an infinite sum clamps, it does not drop");
+            assert_eq!(sum_rec[VALUE_LABEL].as_f64().unwrap(), f64::MAX);
+        }
+
+        // ---- exponential histogram: `sum` is optional in OTLP, and today an absent one is
+        // written as a null-valued `_sum` record.
+
+        #[test]
+        fn test_process_exp_hist_data_point_absent_sum_emits_no_sum_record() {
+            assert!(!names(&exp_hist_records(None)).contains(&"test_metric_sum"));
+        }
+
+        #[test]
+        fn test_process_exp_hist_data_point_nan_sum_emits_no_sum_record() {
+            assert!(!names(&exp_hist_records(Some(f64::NAN))).contains(&"test_metric_sum"));
+        }
+
+        #[test]
+        fn test_process_exp_hist_data_point_finite_sum_emitted() {
+            let records = exp_hist_records(Some(100.0));
+            let sum_rec = records
+                .iter()
+                .find(|r| r[NAME_LABEL] == json!("test_metric_sum"))
+                .expect("a finite sum is still emitted");
+            assert_eq!(sum_rec[VALUE_LABEL], json!(100.0));
+        }
+
+        // ---- summary: a quantile with no observations is reported as NaN. An absent series is
+        // how Prometheus itself represents "no data", so the record is dropped.
+
+        #[test]
+        fn test_process_summary_data_point_drops_nan_quantiles_only() {
+            let records = summary_records(50.0, vec![(0.5, 45.0), (0.95, f64::NAN), (0.99, 99.0)]);
+            let quantiles: Vec<&str> = records
+                .iter()
+                .filter_map(|r| r.get("quantile").and_then(|q| q.as_str()))
+                .collect();
+
+            assert_eq!(quantiles, vec!["0.5", "0.99"]);
+            assert!(names(&records).contains(&"test_metric_sum"));
+        }
+
+        #[test]
+        fn test_process_summary_data_point_nan_sum_emits_no_sum_record() {
+            let records = summary_records(f64::NAN, vec![(0.5, 45.0)]);
+            assert!(!names(&records).contains(&"test_metric_sum"));
+            assert!(names(&records).contains(&"test_metric_count"));
+        }
+
+        // ---- the invariant itself, across all four record writers.
+
+        #[test]
+        fn test_no_writer_emits_a_null_value() {
+            let mut records = vec![];
+            records.extend(gauge_records(vec![
+                number_dp(f64::NAN, vec![]),
+                number_dp(1.0, vec![]),
+            ]));
+            records.extend(sum_records(vec![
+                number_dp(f64::NAN, vec![]),
+                number_dp(1.0, vec![]),
+            ]));
+            records.extend(hist_records(hist_dp(
+                Some(f64::NAN),
+                Some(f64::NAN),
+                Some(f64::NAN),
+            )));
+            records.extend(exp_hist_records(None));
+            records.extend(exp_hist_records(Some(f64::NAN)));
+            records.extend(summary_records(f64::NAN, vec![(0.5, f64::NAN), (0.9, 1.0)]));
+
+            assert!(!records.is_empty(), "the writers must still emit something");
+            assert!(
+                records.iter().all(|r| !r[VALUE_LABEL].is_null()),
+                "a record with a null value suppresses the `value` column and makes the stream unreadable"
+            );
+        }
+
+        // ---- the family name the metadata is written with.
+
+        #[test]
+        fn test_build_metadata_family_name_is_not_json_quoted() {
+            let metric = Metric {
+                name: "test_histogram".to_string(),
+                description: "help text".to_string(),
+                unit: "seconds".to_string(),
+                metadata: vec![],
+                data: Some(Data::Summary(Summary {
+                    data_points: vec![],
+                })),
+            };
+
+            let metadata = build_metadata("test_histogram", &metric);
+
+            assert_eq!(metadata.metric_family_name, "test_histogram");
+            assert_eq!(metadata.help, "help text");
+            assert_eq!(metadata.unit, "seconds");
+        }
     }
 }

@@ -21,10 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     test-prefix="semantic-groups"
     :is-importing="isImporting"
     :show-splitter="false"
-    :editor-heights="{
-      urlEditor: 'calc(100vh - 286px)',
-      fileEditor: 'calc(100vh - 308px)',
-    }"
+    container-class=""
+    container-style="height: calc(100vh - var(--navbar-height));"
     @back="handleBack"
     @cancel="handleBack"
     @import="handleImport"
@@ -32,11 +30,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Full-width content for diff view -->
     <template #full-width-content>
-      <div class="tw:w-full tw:p-2 tw:h-[calc(100vh-140px)] tw:flex tw:flex-col tw:overflow-hidden">
+      <div class="w-full p-2 h-full flex-1 min-h-0 flex flex-col overflow-hidden">
         <!-- Compact Header with File Upload -->
-        <div class="card-container tw:p-2 tw:mb-2">
-          <div class="tw:flex tw:items-center">
-            <div class="tw:w-full col-md-8">
+        <div class="card-container p-2 mb-2">
+          <div class="flex items-center">
+            <div class="w-full col-md-8">
               <OFile
                 v-model="jsonFile"
                 label="Select JSON file"
@@ -54,12 +52,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     name="close"
                     size="sm"
                     @click.stop="clearFile"
-                    class="tw:cursor-pointer"
+                    class="cursor-pointer"
                   />
                 </template>
               </OFile>
             </div>
-            <div class="tw:w-full col-md-4 tw:text-right tw:pl-2">
+            <div class="w-full col-md-4 text-right pl-2">
               <OButton
                 v-if="diffData"
                 variant="primary"
@@ -74,28 +72,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Diff Preview Section with Scrollable Content -->
-        <div v-if="diffData" class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+        <div v-if="diffData" class="flex flex-col h-full overflow-hidden">
           <!-- Compact Summary Bar -->
-          <div class="card-container tw:p-2 tw:mb-2">
-            <div class="tw:flex tw:items-center tw:gap-2">
+          <div class="card-container p-2 mb-2">
+            <div class="flex items-center gap-2">
               <div class="col-auto">
-                <OBadge variant="success" class="tw:text-sm!">
-                  <strong class="tw:text-[15px]">{{ diffData.additions.length }}</strong
+                <OTag type="diffCategory" value="new" class="text-sm!">
+                  <strong class="text-[15px]">{{ diffData.additions.length }}</strong
                   >&nbsp;New
-                </OBadge>
+                </OTag>
               </div>
               <div class="col-auto">
-                <OBadge variant="warning" class="tw:text-sm!">
-                  <strong class="tw:text-[15px]">{{ diffData.modifications.length }}</strong
+                <OTag type="diffCategory" value="modified" class="text-sm!">
+                  <strong class="text-[15px]">{{ diffData.modifications.length }}</strong
                   >&nbsp;Modified
-                </OBadge>
+                </OTag>
               </div>
               <div class="col-auto">
-                <OBadge variant="default" class="tw:text-sm!">
+                <OTag type="diffCategory" value="unchanged" class="text-sm!">
                   {{ diffData.unchanged.length }} Unchanged
-                </OBadge>
+                </OTag>
               </div>
-              <div class="tw:flex tw:flex-col">
+              <div class="flex flex-col">
                 <OButtonGroup class="float-right">
                   <OButton
                     variant="ghost-primary"
@@ -118,37 +116,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Scrollable Groups Container -->
-          <div class="card-container groups-scroll-container tw:flex-1 tw:overflow-y-auto tw:overflow-x-hidden tw:p-2">
+          <div class="card-container groups-scroll-container flex-1 overflow-y-auto overflow-x-hidden p-2">
             <!-- Additions -->
-            <div v-if="diffData.additions.length > 0" class="tw:mb-2">
-              <div class="tw:text-sm tw:font-semibold tw:border-b tw:border-[var(--color-separator)] tw:mb-1 tw:text-green-500 tw:p-1">
+            <div v-if="diffData.additions.length > 0" class="mb-2">
+              <div class="text-sm font-semibold border-b border-[var(--color-separator)] mb-1 text-green-500 p-1">
                 <OIcon name="add-circle" size="sm" />
                 New ({{ selectedAdditions.length }}/{{
                   diffData.additions.length
                 }})
               </div>
-              <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md tw:mb-0">
+              <ul class="flex flex-col divide-y divide-border border rounded-md mb-0">
                 <li
                   v-for="group in diffData.additions"
                   :key="group.id"
                   data-test="semantic-groups-addition-item"
-                  class="compact-item tw:flex tw:items-start tw:gap-2 tw:px-2 tw:py-1 tw:min-h-[44px] tw:cursor-pointer tw:hover:bg-muted/50"
+                  class="compact-item flex items-start gap-2 px-2 py-1 min-h-[44px] cursor-pointer hover:bg-muted/50"
                   @click="toggleAddition(group.id)"
                 >
-                  <div class="tw:flex tw:items-start tw:shrink-0 tw:pt-1">
+                  <div class="flex items-start shrink-0 pt-1">
                     <OCheckbox
                       :model-value="selectedAdditions.includes(group.id)"
                       @update:model-value="toggleAddition(group.id)"
                     />
                   </div>
-                  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:px-2">
-                    <span class="tw:text-[13px] tw:font-medium">{{ group.display }}</span>
-                    <span class="tw:block tw:text-[11px] tw:text-muted-foreground tw:truncate">
+                  <div class="flex flex-col flex-1 min-w-0 px-2">
+                    <span class="text-[13px] font-medium">{{ group.display }}</span>
+                    <span class="block text-[11px] text-muted-foreground truncate">
                       {{ group.id }} • {{ group.fields.length }} fields
-                      <OBadge v-if="group.normalize" variant="primary" class="tw:ml-1">norm</OBadge>
+                      <OTag v-if="group.normalize" type="normalizeState" value="true" class="ml-1" />
                     </span>
                   </div>
-                  <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
+                  <div class="flex items-center shrink-0 ms-auto">
                     <OButton
                       variant="ghost"
                       size="icon-circle-sm"
@@ -162,22 +160,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Modifications -->
-            <div v-if="diffData.modifications.length > 0" class="tw:mb-2">
-              <div class="tw:text-sm tw:font-semibold tw:border-b tw:border-[var(--color-separator)] tw:mb-1 tw:text-amber-500 tw:p-1">
+            <div v-if="diffData.modifications.length > 0" class="mb-2">
+              <div class="text-sm font-semibold border-b border-[var(--color-separator)] mb-1 text-amber-500 p-1">
                 <OIcon name="edit" size="sm" />
                 Modified ({{ selectedModifications.length }}/{{
                   diffData.modifications.length
                 }})
               </div>
-              <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md tw:mb-0">
+              <ul class="flex flex-col divide-y divide-border border rounded-md mb-0">
                 <li
                   v-for="mod in diffData.modifications"
                   :key="mod.proposed.id"
                   data-test="semantic-groups-modification-item"
-                  class="compact-item tw:flex tw:items-start tw:gap-2 tw:px-2 tw:py-1 tw:min-h-[44px] tw:cursor-pointer tw:hover:bg-muted/50"
+                  class="compact-item flex items-start gap-2 px-2 py-1 min-h-[44px] cursor-pointer hover:bg-muted/50"
                   @click="toggleModification(mod.proposed.id)"
                 >
-                  <div class="tw:flex tw:items-start tw:shrink-0 tw:pt-1">
+                  <div class="flex items-start shrink-0 pt-1">
                     <OCheckbox
                       :model-value="
                         selectedModifications.includes(mod.proposed.id)
@@ -185,13 +183,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:model-value="toggleModification(mod.proposed.id)"
                     />
                   </div>
-                  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:px-2">
-                    <span class="tw:text-[13px] tw:font-medium">{{ mod.proposed.display }}</span>
-                    <span class="tw:block tw:text-[11px] tw:text-muted-foreground tw:truncate">
+                  <div class="flex flex-col flex-1 min-w-0 px-2">
+                    <span class="text-[13px] font-medium">{{ mod.proposed.display }}</span>
+                    <span class="block text-[11px] text-muted-foreground truncate">
                       {{ mod.proposed.id }} • {{ mod.current.fields.length }} → {{ mod.proposed.fields.length }} fields
                     </span>
                   </div>
-                  <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
+                  <div class="flex items-center shrink-0 ms-auto">
                     <OButton
                       variant="ghost"
                       size="icon-circle-sm"
@@ -211,15 +209,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="`Unchanged (${diffData.unchanged.length})`"
                 icon="check-circle"
               >
-                <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md tw:mb-0">
+                <ul class="flex flex-col divide-y divide-border border rounded-md mb-0">
                   <li
                     v-for="group in diffData.unchanged"
                     :key="group.id"
-                    class="compact-item tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:min-h-[44px]"
+                    class="compact-item flex items-center gap-2 px-2 py-1 min-h-[44px]"
                   >
-                    <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:px-2">
-                      <span class="tw:text-[13px]">{{ group.display }}</span>
-                      <span class="tw:block tw:text-[11px] tw:text-muted-foreground">{{ group.id }} • {{ group.fields.length }} fields</span>
+                    <div class="flex flex-col flex-1 min-w-0 px-2">
+                      <span class="text-[13px]">{{ group.display }}</span>
+                      <span class="block text-[11px] text-muted-foreground">{{ group.id }} • {{ group.fields.length }} fields</span>
                     </div>
                   </li>
                 </ul>
@@ -231,13 +229,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- No Diff State -->
         <div
           v-else-if="!isImporting && !diffData"
-          class="card-container tw:p-4 tw:text-center"
+          class="card-container p-4 text-center"
         >
-          <OIcon name="cloud-upload" class="tw:mb-3" style="width: 64px; height: 64px;" />
-          <div class="tw:text-xl tw:font-semibold tw:text-gray-400 tw:mb-2">
+          <OIcon name="cloud-upload" class="mb-3" style="width: 64px; height: 64px;" />
+          <div class="text-xl font-semibold text-gray-400 mb-2">
             Upload a JSON file to get started
           </div>
-          <div class="tw:text-sm tw:text-gray-400">
+          <div class="text-sm text-gray-400">
             The system will analyze the file and show you what will change
           </div>
         </div>
@@ -256,23 +254,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="showGroupDialog = false"
   >
     <div>
-      <div class="tw:text-sm tw:font-medium tw:mb-2">
+      <div class="text-sm font-medium mb-2">
         Fields ({{ selectedGroup?.fields.length }})
       </div>
-      <OBadge
+      <OTag
         v-for="field in selectedGroup?.fields"
         :key="field"
-        color="primary"
-        text-color="white"
-        class="tw:m-1"
+        type="fieldNameChip"
+        value="highlight"
+        class="m-1"
       >
         {{ field }}
-      </OBadge>
-      <div class="tw:mt-3">
-        <OBadge v-if="selectedGroup?.normalize" variant="primary"
-          >Normalized</OBadge
-        >
-        <OBadge v-else variant="default">Not Normalized</OBadge>
+      </OTag>
+      <div class="mt-3">
+        <OTag type="normalizeState" :value="!!selectedGroup?.normalize" />
       </div>
     </div>
   </ODialog>
@@ -287,45 +282,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     primary-button-label="Close"
     @click:primary="showModificationDialog = false"
   >
-    <div class="tw:flex tw:gap-3">
-      <div class="tw:w-1/2">
-        <div class="tw:text-sm tw:font-medium tw:text-red-500 tw:mb-2">Current</div>
-        <div class="tw:text-xs tw:mb-1">
+    <div class="flex gap-3">
+      <div class="w-1/2">
+        <div class="text-sm font-medium text-red-500 mb-2">Current</div>
+        <div class="text-xs mb-1">
           {{ selectedModification?.current.fields.length }} fields
         </div>
-        <div class="field-chips-container tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--o2-primary-background)] tw:rounded">
-          <OBadge
+        <div class="field-chips-container max-h-[250px] overflow-y-auto p-2 bg-[var(--o2-primary-background)] rounded">
+          <OTag
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
-            color="grey-4"
-            size="sm"
-            class="tw:m-1"
+            type="fieldNameChip"
+            value="muted"
+            class="m-1"
           >
             {{ field }}
-          </OBadge>
+          </OTag>
         </div>
       </div>
-      <div class="tw:w-1/2">
-        <div class="tw:text-sm tw:font-medium tw:text-green-500 tw:mb-2">Proposed</div>
-        <div class="tw:text-xs tw:mb-1">
+      <div class="w-1/2">
+        <div class="text-sm font-medium text-green-500 mb-2">Proposed</div>
+        <div class="text-xs mb-1">
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
-        <div class="field-chips-container tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--o2-primary-background)] tw:rounded">
-          <OBadge
+        <div class="field-chips-container max-h-[250px] overflow-y-auto p-2 bg-[var(--o2-primary-background)] rounded">
+          <OTag
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
-            :variant="isNewField(field) ? 'success' : 'default'"
-            size="sm"
-            class="tw:m-1"
+            type="fieldDiffStatus"
+            :value="isNewField(field) ? 'new' : 'existing'"
+            class="m-1"
           >
             {{ field }}
-            <OIcon
-              v-if="isNewField(field)"
-              name="add"
-              size="xs"
-              class="tw:ml-1"
-            />
-          </OBadge>
+            <template #trailing>
+              <OIcon
+                v-if="isNewField(field)"
+                name="add"
+                size="xs"
+                class="ml-1"
+              />
+            </template>
+          </OTag>
         </div>
       </div>
     </div>
@@ -336,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";

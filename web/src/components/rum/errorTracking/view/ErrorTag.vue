@@ -15,17 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:items-center tw:flex-nowrap tw:mr-2 tw:mt-2 tw:border tw:border-solid tw:border-(--o2-border) tw:rounded">
-    <div class="tw:px-3">{{ tag.key }}</div>
-    <OSeparator data-test="separator" vertical />
-    <div class="tw:px-3 tw:bg-[var(--o2-table-header-bg)] tw:break-all">
-      {{ tag.value }}
-    </div>
-  </div>
+  <ODimensionChip
+    :dim-key="tag.key"
+    :value="tag.value"
+    class="mr-2 mt-2"
+  />
 </template>
 
 <script setup lang="ts">
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 defineProps({
   tag: {
     type: Object,

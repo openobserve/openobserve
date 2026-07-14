@@ -62,7 +62,7 @@ pub mod middlewares;
 pub mod openapi;
 pub mod ui;
 
-pub const ERROR_HEADER: &str = "X-Error-Message";
+pub use crate::common::meta::http::ERROR_HEADER;
 
 /// Custom header name for O2 Assistant session tracking (UUID v7)
 pub const X_O2_ASSISTANT_SESSION_ID: header::HeaderName =
@@ -595,6 +595,11 @@ pub fn service_routes() -> Router {
         // Organizations
         .route("/organizations", get(organization::org::organizations).post(organization::org::create_org))
         .route("/{org_id}/organizations/assume_service_account", post(organization::assume_service_account::assume_service_account))
+        .route("/{org_id}/org_cleanup_tasks/{target_org_id}", get(organization::org::list_org_cleanup_tasks))
+        .route(
+            "/{org_id}/organizations/{target_org_id}/resurrect",
+            post(organization::org::resurrect_org_deletion),
+        )
         .route("/{org_id}/settings", get(organization::settings::get).post(organization::settings::create))
         .route("/{org_id}/settings/logo", post(organization::settings::upload_logo).delete(organization::settings::delete_logo))
         .route("/{org_id}/settings/logo/text", post(organization::settings::set_logo_text).delete(organization::settings::delete_logo_text))
@@ -1031,7 +1036,8 @@ pub fn service_routes() -> Router {
             )
             .route(
                 "/{org_id}/organizations",
-                get(organization::org::all_organizations),
+                get(organization::org::all_organizations)
+                    .delete(organization::org::initiate_org_deletion),
             )
             .route(
                 "/{org_id}/extend_trial_period",

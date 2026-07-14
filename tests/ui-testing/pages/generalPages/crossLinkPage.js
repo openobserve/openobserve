@@ -26,6 +26,10 @@ export class CrossLinkPage {
         // Filling the wrapper div fails (not an <input>), so target the -field hook.
         this.crossLinkNameInput = '[data-test="cross-link-name-input-field"]';
         this.crossLinkUrlInput = '[data-test="cross-link-url-input-field"]';
+        // OForm+zod validation errors render as a `${parent}-error` span inside
+        // the field wrapper (see OInput.vue), only present when the field is invalid.
+        this.crossLinkNameError = '[data-test="cross-link-name-input-error"]';
+        this.crossLinkUrlError = '[data-test="cross-link-url-input-error"]';
         // Field input is an OSelect (or fallback OInput) — its wrapper holds the data-test.
         this.crossLinkFieldInput = '[data-test="cross-link-field-input"]';
         this.crossLinkAddFieldBtn = '[data-test="cross-link-add-field-btn"]';
@@ -275,14 +279,34 @@ export class CrossLinkPage {
         await this.page.locator(this.crossLinkHelpBtn).click();
     }
 
-    async expectSaveDisabled() {
-        testLogger.debug('Expecting save button disabled');
-        await expect(this.page.locator(this.crossLinkSaveBtn)).toBeDisabled();
-    }
-
     async expectSaveEnabled() {
         testLogger.debug('Expecting save button enabled');
         await expect(this.page.locator(this.crossLinkSaveBtn)).toBeEnabled();
+    }
+
+    // After the OForm+zod migration the Save button is no longer disabled while
+    // the form is invalid — it stays enabled and validation runs on submit,
+    // surfacing per-field required errors (submit-then-change timing). The
+    // helpers below assert that validation UX.
+
+    async expectNameRequiredError() {
+        testLogger.debug('Expecting name required error');
+        await expect(this.page.locator(this.crossLinkNameError)).toBeVisible({ timeout: 5000 });
+    }
+
+    async expectUrlRequiredError() {
+        testLogger.debug('Expecting URL required error');
+        await expect(this.page.locator(this.crossLinkUrlError)).toBeVisible({ timeout: 5000 });
+    }
+
+    async expectNoNameError() {
+        testLogger.debug('Expecting no name error');
+        await expect(this.page.locator(this.crossLinkNameError)).toBeHidden({ timeout: 5000 });
+    }
+
+    async expectNoUrlError() {
+        testLogger.debug('Expecting no URL error');
+        await expect(this.page.locator(this.crossLinkUrlError)).toBeHidden({ timeout: 5000 });
     }
 
     async expectDialogVisible() {

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   it reads `createNewDestination` (exposed below, synced from the picker's expand).
 -->
 <template>
-  <div data-test="workflow-destination-body" class="tw:w-full">
+  <div data-test="workflow-destination-body" class="w-full">
     <DestinationPicker
       ref="picker"
       :initial-name="savedData.destination_id || ''"

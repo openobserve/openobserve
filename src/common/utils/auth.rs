@@ -38,6 +38,8 @@ use {
     std::str::FromStr,
 };
 
+#[cfg(feature = "enterprise")]
+use crate::common::meta::user::AuthTokensExt;
 use crate::common::{
     infra::config::{ORG_USERS, PASSWORD_HASH},
     meta::{
@@ -48,6 +50,35 @@ use crate::common::{
 };
 
 pub const V2_API_PREFIX: &str = "v2";
+
+#[cfg(feature = "enterprise")]
+pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
+    if auth_str.starts_with("Basic") {
+        let decoded = config::utils::base64::decode(auth_str.strip_prefix("Basic")?.trim()).ok()?;
+        get_user_details(decoded).map(|value| value.0)
+    } else if auth_str.starts_with("Bearer") {
+        crate::common::utils::jwt::get_user_name_from_token(auth_str).await
+    } else if auth_str.starts_with("{\"auth_ext\":") {
+        let auth_tokens: AuthTokensExt =
+            config::utils::json::from_str(auth_str).unwrap_or_default();
+        if chrono::Utc::now().timestamp() - auth_tokens.request_time > auth_tokens.expires_in {
+            return None;
+        }
+        let decoded =
+            config::utils::base64::decode(auth_tokens.auth_ext.strip_prefix("auth_ext")?.trim())
+                .ok()?;
+        get_user_details(decoded).map(|value| value.0)
+    } else {
+        None
+    }
+}
+
+pub(crate) fn get_user_details(decoded: impl AsRef<[u8]>) -> Option<(String, String)> {
+    let credentials = std::str::from_utf8(decoded.as_ref()).ok()?;
+    credentials
+        .split_once(':')
+        .map(|(user, password)| (user.to_string(), password.to_string()))
+}
 
 /// Resolves the effective permission method for write requests (PUT/DELETE/PATCH).
 ///
@@ -80,16 +111,10 @@ static RE_SPACE_AROUND: Lazy<Regex> = Lazy::new(|| {
     Regex::new(&pattern).unwrap()
 });
 
-pub static EMAIL_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(
-        r"^([a-zA-Z0-9_+]([a-zA-Z0-9_+\-]*(\.[a-zA-Z0-9_+\-]+)*)?[a-zA-Z0-9_+])@([a-zA-Z0-9]+([\-\.]{1}[a-zA-Z0-9]+)*\.[a-zA-Z]{2,6})",
-    )
-    .unwrap()
-});
-
-pub fn is_valid_email(email: &str) -> bool {
-    EMAIL_REGEX.is_match(email)
-}
+// Email validation lives in the shared `config` crate so the OSS auth layer and the enterprise
+// domain-management blocklist validate identically. Re-exported here to preserve the existing
+// `crate::common::utils::auth::{EMAIL_REGEX, is_valid_email}` API.
+pub use config::utils::str::{EMAIL_REGEX, is_valid_email};
 
 pub fn into_ofga_supported_format(name: &str) -> String {
     // remove spaces around special characters
@@ -158,8 +183,10 @@ pub async fn save_org_tuples(_org_id: &str) {}
 pub async fn delete_org_tuples(org_id: &str) {
     use o2_openfga::config::get_config as get_openfga_config;
 
-    if get_openfga_config().enabled {
-        o2_openfga::authorizer::authz::delete_org_tuples(org_id).await
+    if get_openfga_config().enabled
+        && let Err(e) = o2_openfga::authorizer::authz::delete_org_tuples(org_id).await
+    {
+        log::error!("[auth] failed to delete org tuples for {org_id}: {e}");
     }
 }
 
@@ -689,7 +716,7 @@ pub async fn check_permissions(
         // which the auth middleware sets to the DB-resolved email. However, we use user.email
         // directly to avoid any inconsistency between the input identifier and the canonical
         // DB email (e.g. casing differences or aliased identifiers).
-        return crate::handler::http::auth::validator::check_permissions(
+        return crate::service::authz::check_permissions(
             &user.email,
             AuthExtractor {
                 auth: "".to_string(),
@@ -720,8 +747,6 @@ pub async fn check_permissions(
 pub async fn extract_auth_expiry_and_user_id(
     parts: &Parts,
 ) -> (Option<chrono::DateTime<chrono::Utc>>, Option<String>) {
-    use crate::handler::http::auth::validator::get_user_email_from_auth_str;
-
     let decode = async |token: &str| match decode_expiry(token).await {
         Ok(token_data) => token_data
             .claims
@@ -824,6 +849,15 @@ mod tests {
         assert!(is_valid_email("user@example.com"));
         assert!(is_valid_email("john.doe+123@mail.co.in"));
         assert!(is_valid_email("a_b-c.d+e@domain.org"));
+        // Regression for #12961: local part ending in a single-char dotted segment.
+        assert!(is_valid_email("first.x@example.com"));
+        assert!(is_valid_email("s.a@example.com"));
+        assert!(is_valid_email("first.x.y@example.com"));
+        assert!(is_valid_email("first.xy@example.com"));
+        // TLDs longer than 6 letters, incl. the RFC 2606 reserved `.invalid`
+        // used across the API test suite.
+        assert!(is_valid_email("sa_88dddbd4@test.invalid"));
+        assert!(is_valid_email("user@example.software"));
         assert!(!is_valid_email("no-at-symbol.com"));
         assert!(!is_valid_email("@missing-user.com"));
         assert!(!is_valid_email("user@.com"));
@@ -971,6 +1005,8 @@ mod tests {
         assert!(!is_valid_email("user@domain with space.com"));
         assert!(!is_valid_email(".user@example.com"));
         assert!(!is_valid_email("user@.example.com"));
+        assert!(!is_valid_email("user.@example.com")); // trailing dot in local part
+        assert!(!is_valid_email("user@example.com trailing")); // trailing garbage
     }
 
     #[test]

@@ -1,5 +1,6 @@
 // metricsPage.js
 import { expect } from '@playwright/test';
+import { gotoMetricsEditor } from '../commonActions.js';
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
@@ -195,19 +196,19 @@ export class MetricsPage {
             // Caller branches on the current visibility (warn vs assert).
         }
     }
+    /**
+     * Opens the metrics PANEL EDITOR — the page every caller of this method
+     * actually drives (PromQL input, Apply, visualizations, Add to Dashboard).
+     *
+     * It used to click the sidebar, which was the same thing until `/metrics`
+     * became the Metrics Explorer browse grid; the editor moved to
+     * `/metrics/editor`. Navigating there directly also drops the cloud
+     * sidebar-click fallback this method used to need.
+     */
     async gotoMetricsPage() {
-        await this.metricsPageMenu.click();
+        await gotoMetricsEditor(this.page);
 
-        // Cloud: sidebar click may silently fail — verify URL and fallback to direct navigation
-        if (isCloudEnvironment()) {
-            await this.page.waitForURL('**/metrics**', { timeout: 5000 }).catch(async () => {
-                await this.page.goto(
-                    `${process.env.ZO_BASE_URL}/web/metrics?org_identifier=${getOrgIdentifier()}`
-                );
-            });
-        }
-
-        // Wait for a key metrics page element to be visible before proceeding
+        // Wait for a key editor control before proceeding.
         await this.page.locator(this.applyButton).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
     }
 

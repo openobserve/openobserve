@@ -50,30 +50,30 @@ export default {
 </script>
 
 <template>
-  <div class="np-sidebar tw:shrink-0 tw:w-[200px] tw:pr-3" :data-test="testPrefix">
+  <div class="np-sidebar shrink-0 w-[200px] pr-3" :data-test="testPrefix">
     <div
-      class="np-header tw:mb-2 tw:mx-2 tw:text-base tw:font-semibold tw:px-1 tw:pb-2 tw:text-center tw:tracking-wide"
+      class="np-header mb-2 mx-2 text-base font-semibold px-1 pb-2 text-center tracking-wide"
       :data-test="`${testPrefix}-title`"
     >
       {{ title || t("pipeline.nodes") }}
     </div>
 
-    <div class="tw:flex tw:mt-2">
+    <div class="flex mt-2">
       <div class="np-body np-panel">
         <template v-for="(node, idx) in items" :key="`${node.subtype}-${node.io_type}-${idx}`">
         <!-- section label (Source / Transform / Destination). Same mb-3 outer
              gap as the node cards (matching the original NodeSidebar). -->
-        <div v-if="node.isSectionHeader" class="tw:rounded-lg tw:mb-3">
-          <div class="np-section tw:text-base tw:font-medium">{{ node.label }}</div>
+        <div v-if="node.isSectionHeader" class="rounded-lg mb-3">
+          <div class="np-section text-base font-medium">{{ node.label }}</div>
         </div>
 
         <!-- draggable / clickable node card -->
-        <div v-else class="o2vf_node tw:transition-all tw:rounded-lg tw:mb-3 tw:last:mb-0">
+        <div v-else class="o2vf_node transition-all rounded-lg mb-3 last:mb-0">
           <OButton
             variant="ghost"
             size="md"
-            :class="[`o2vf_node_${node.io_type}`, onItemClick ? 'tw:cursor-pointer' : '']"
-            class="tw:p-0 btn-fixed-width tw:relative tw:flex tw:items-center tw:w-full tw:hover:translate-x-[3px] tw:hover:bg-[rgba(255,255,255,0.1)] tw:hover:backdrop-blur-[8px] tw:dark:hover:bg-[rgba(255,255,255,0.08)]! tw:dark:hover:backdrop-blur-[12px]!"
+            :class="[`o2vf_node_${node.io_type}`, onItemClick ? 'cursor-pointer' : '']"
+            class="p-0 btn-fixed-width relative flex items-center w-full hover:translate-x-[3px] hover:bg-[rgba(255,255,255,0.1)] hover:backdrop-blur-[8px] dark:hover:bg-[rgba(255,255,255,0.08)]! dark:hover:backdrop-blur-[12px]!"
             style="width: 170px; justify-content: flex-start"
             :data-test="`${testPrefix}-${node.subtype}-${node.io_type}-btn`"
             :draggable="!!onDragStart"
@@ -82,29 +82,29 @@ export default {
           >
             <OTooltip side="right" :side-offset="10">
               <template #content>
-                <div class="tw:px-2.5 tw:py-1.5">
-                  <div class="tw:font-medium tw:text-[11px] tw:mb-0.5 tw:capitalize">{{ node.label }}</div>
-                  <div v-if="node.tooltip" class="tw:text-[10px] tw:leading-[1.3] tw:capitalize">{{ node.tooltip }}</div>
+                <div class="px-2.5 py-1.5">
+                  <div class="font-medium text-[11px] mb-0.5 capitalize">{{ node.label }}</div>
+                  <div v-if="node.tooltip" class="text-[10px] leading-[1.3] capitalize">{{ node.tooltip }}</div>
                 </div>
               </template>
             </OTooltip>
-            <div class="node-content tw:grid tw:items-center tw:w-full tw:py-1 tw:pr-1.5 tw:gap-2" style="grid-template-columns: auto 1fr auto">
-              <div class="node-icon-section tw:flex tw:items-center tw:gap-2">
+            <div class="node-content grid items-center w-full py-1 pr-1.5 gap-2" style="grid-template-columns: auto 1fr auto">
+              <div class="node-icon-section flex items-center gap-2">
                 <img
                   v-if="typeof node.icon === 'string' && node.icon.startsWith('img:')"
                   :src="node.icon.slice(4)"
                   alt=""
-                  class="node-icon-img tw:w-[1.3em] tw:h-[1.3em] tw:object-contain tw:shrink-0"
+                  class="node-icon-img w-[1.3em] h-[1.3em] object-contain shrink-0"
                 />
                 <OIcon v-else size="md" :name="node.icon" />
-                <OSeparator vertical class="node-separator tw:h-4" />
+                <OSeparator vertical class="node-separator h-4" />
               </div>
-              <div class="node-label tw:w-[70px] tw:text-left tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:font-medium tw:text-[12px]">{{ node.label }}</div>
-              <div class="drag-dots tw:grid tw:gap-0.5 tw:w-2 tw:h-2" style="grid-template-columns: 1fr 1fr">
-                <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all"></span>
-                <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all"></span>
-                <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all"></span>
-                <span class="dot tw:w-0.5 tw:h-0.5 tw:rounded-full tw:transition-all"></span>
+              <div class="node-label w-[70px] text-left overflow-hidden text-ellipsis whitespace-nowrap font-medium text-[12px]">{{ node.label }}</div>
+              <div class="drag-dots grid gap-0.5 w-2 h-2" style="grid-template-columns: 1fr 1fr">
+                <span class="dot w-0.5 h-0.5 rounded-full transition-all"></span>
+                <span class="dot w-0.5 h-0.5 rounded-full transition-all"></span>
+                <span class="dot w-0.5 h-0.5 rounded-full transition-all"></span>
+                <span class="dot w-0.5 h-0.5 rounded-full transition-all"></span>
               </div>
             </div>
           </OButton>

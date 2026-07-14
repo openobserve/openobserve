@@ -618,52 +618,6 @@ describe("PipelineHistory", () => {
       });
     });
 
-    describe("getStatusVariant", () => {
-      it("returns 'success-outline' for 'success'", async () => {
-        const wrapper = createWrapper();
-        await flushPromises();
-        const vm = wrapper.vm as any;
-        expect(vm.getStatusVariant("success")).toBe("success-outline");
-      });
-
-      it("returns 'success-outline' for 'ok' and 'completed'", async () => {
-        const wrapper = createWrapper();
-        await flushPromises();
-        const vm = wrapper.vm as any;
-        expect(vm.getStatusVariant("ok")).toBe("success-outline");
-        expect(vm.getStatusVariant("completed")).toBe("success-outline");
-      });
-
-      it("returns 'error-outline' for 'error' and 'failed'", async () => {
-        const wrapper = createWrapper();
-        await flushPromises();
-        const vm = wrapper.vm as any;
-        expect(vm.getStatusVariant("error")).toBe("error-outline");
-        expect(vm.getStatusVariant("failed")).toBe("error-outline");
-      });
-
-      it("returns 'warning-outline' for 'warning'", async () => {
-        const wrapper = createWrapper();
-        await flushPromises();
-        const vm = wrapper.vm as any;
-        expect(vm.getStatusVariant("warning")).toBe("warning-outline");
-      });
-
-      it("returns 'primary-outline' for 'pending' and 'running'", async () => {
-        const wrapper = createWrapper();
-        await flushPromises();
-        const vm = wrapper.vm as any;
-        expect(vm.getStatusVariant("pending")).toBe("primary-outline");
-        expect(vm.getStatusVariant("running")).toBe("primary-outline");
-      });
-
-      it("returns 'default-outline' for unknown status", async () => {
-        const wrapper = createWrapper();
-        await flushPromises();
-        const vm = wrapper.vm as any;
-        expect(vm.getStatusVariant("some-unknown-status")).toBe("default-outline");
-      });
-    });
   });
 
   describe("filteredPipelineOptions initialization", () => {
@@ -905,7 +859,8 @@ describe("PipelineHistory", () => {
 
       const dialog = wrapper.findAll('[data-test="o-dialog-stub"]')[0];
       expect(dialog.text()).toContain("My Test Pipeline");
-      expect(dialog.text()).toContain("success");
+      // Registry humanises the status label ("success" → "Success").
+      expect(dialog.text().toLowerCase()).toContain("success");
     });
 
     it("renders error details section when selectedRow has error", async () => {

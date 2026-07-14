@@ -19,17 +19,17 @@
     <template #group-header="{ row, groupName }">
       <slot name="group-header" :row="row" :group-name="groupName">
         <div
-          class="tw:h-full tw:w-full tw:flex tw:justify-between tw:items-center tw:rounded-[0.25rem] tw:font-semibold tw:text-xs tw:px-[0.325rem] tw:cursor-pointer tw:bg-surface-subtle tw:text-field-list-group-text"
+          class="h-full w-full flex justify-between items-center rounded-[0.25rem] font-semibold text-xs px-[0.325rem] cursor-pointer bg-surface-subtle text-field-list-group-text"
           @click="toggleGroup(row.group)"
         >
-          <div class="tw:flex-1 tw:min-w-0">
+          <div class="flex-1 min-w-0">
             {{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})
           </div>
           <OButton
             v-if="(groupFieldCount[row.group] ?? 0) > 0"
             variant="ghost"
             size="icon"
-            class="tw:flex-shrink-0"
+            class="flex-shrink-0"
           >
             <OIcon
               :name="expandGroupRows[row.group] !== false ? 'expand-more' : 'chevron-right'"
@@ -48,9 +48,9 @@
     <!-- Empty state -->
     <template #empty>
       <slot name="empty">
-        <div class="tw:text-center tw:py-[0.725rem] tw:flex tw:items-center tw:justify-center">
+        <div class="text-center py-[0.725rem] flex items-center justify-center">
           <OIcon name="info" size="xs" />
-          <span class="tw:pl-[0.375rem]">{{ t("search.noFieldFound") }}</span>
+          <span class="pl-[0.375rem]">{{ t("search.noFieldFound") }}</span>
         </div>
       </slot>
     </template>
@@ -157,16 +157,54 @@ const groupFieldCount = computed(() => {
 });
 
 // ---------------------------------------------------------------------------
+// Groups that still have at least one field matching the active search term.
+// Computed from the full (pre-collapse) field set so a collapsed group whose
+// matching field rows have been filtered out is still recognised as a match.
+// Returns null when there is no active search (every group is a match).
+// ---------------------------------------------------------------------------
+
+const searchMatchedGroups = computed<Set<string> | null>(() => {
+  const term = props.search?.trim().toLowerCase();
+  if (!term) return null;
+  const matched = new Set<string>();
+  for (const row of annotatedFields.value) {
+    if (
+      !row.isGroup &&
+      row.group &&
+      String(row.name ?? "").toLowerCase().includes(term)
+    ) {
+      matched.add(row.group);
+    }
+  }
+  return matched;
+});
+
+// ---------------------------------------------------------------------------
 // Visible fields — collapse filter
+//
+// A collapsed group keeps its header but drops its field rows. Because the
+// downstream OFieldList decides whether to keep a group header during a search
+// by looking for matching child rows, we must stamp the header with
+// `matchesSearch` here — otherwise a collapsed group whose only match is hidden
+// would lose its header too, making the field unreachable until page refresh.
 // ---------------------------------------------------------------------------
 
 const visibleFields = computed(() =>
-  annotatedFields.value.filter((row: any) => {
-    if (row.isGroup) return true;
-    const group = row.group;
-    if (group && expandGroupRows.value[group] === false) return false;
-    return true;
-  }),
+  annotatedFields.value
+    .filter((row: any) => {
+      if (row.isGroup) return true;
+      const group = row.group;
+      if (group && expandGroupRows.value[group] === false) return false;
+      return true;
+    })
+    .map((row: any) => {
+      if (!row.isGroup) return row;
+      const matched = searchMatchedGroups.value;
+      return {
+        ...row,
+        matchesSearch: matched ? matched.has(row.group) : true,
+      };
+    }),
 );
 
 // ---------------------------------------------------------------------------

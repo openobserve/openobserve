@@ -15,16 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="report-list-page" class="tw:h-full">
+  <div data-test="report-list-page" class="h-full">
     <PageLayout
       :main-panel="false"
-      :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+      :header-class="'shrink-0 px-4 border-b border-border-default'"
     >
       <!-- Row 1: standard header — title + actions only. Tabs / search / folder
            scope moved into the table's own toolbar below. -->
       <template #header>
-        <AppPageHeader icon="description" :subtitle="t('reports.subtitle')">
-          <template #title><span data-test="report-list-title">{{ t('reports.header') }}</span></template>
+        <AppPageHeader
+          :title="t('reports.header')"
+          title-data-test="report-list-title"
+          icon="description"
+          :subtitle="t('reports.subtitle')"
+        >
           <template #actions>
             <OButton
               data-test="report-list-add-report-btn"
@@ -41,11 +45,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Folder rail (fixed width) + table — matches the Alerts layout. -->
     <div
       data-test="report-list-splitter"
-      class="report-list-table tw:flex-1 tw:flex tw:min-h-0"
+      class="report-list-table flex-1 flex min-h-0"
     >
       <!-- Left: folder list -->
-      <div class="tw:shrink-0 tw:h-full" :style="{ width: 230 + 'px' }">
-        <div class="tw:h-full">
+      <div class="shrink-0 h-full" :style="{ width: 230 + 'px' }">
+        <div class="h-full">
           <FolderList
             type="reports"
             @update:activeFolderId="updateActiveFolderId"
@@ -54,8 +58,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Right: report table -->
-      <div class="tw:flex-1 tw:min-w-0 tw:h-full">
-        <div class="tw:h-full card-container">
+      <div class="flex-1 min-w-0 h-full">
+        <div class="h-full card-container">
               <OTable
                 data-test="report-list-table"
                 :data="visibleRows"
@@ -75,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- Toolbar: Scheduled/Cached tabs + search (inline folder scope) + refresh -->
                 <template #toolbar>
-                  <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+                  <div class="flex items-center gap-2 w-full">
                     <div class="app-tabs-container">
                       <app-tabs
                         class="tabs-selection-container"
@@ -84,14 +88,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:active-tab="() => { invalidateFolderCache(activeFolderId); loadReports(activeFolderId); }"
                       />
                     </div>
-                    <div class="tw:flex-1 tw:min-w-0">
+                    <div class="flex-1 min-w-0">
                       <OInput
                         v-model="dynamicQueryModel"
                         :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('reports.search')"
                         :clearable="searchAcrossFolders"
                         @clear="clearSearch"
                         data-test="report-list-search-input"
-                        class="tw:w-full"
+                        class="w-full"
                       >
                         <template #icon-left>
                           <OIcon name="search" size="sm" />
@@ -100,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OToggleGroup
                             :model-value="searchAcrossFolders ? 'all' : 'this'"
                             type="single"
-                            class="tw:self-center tw:mr-1"
+                            class="self-center mr-1"
                             @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                           >
                             <OToggleGroupItem
@@ -152,20 +156,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Name column: badges for type/preview -->
                 <template #cell-name="{ row }">
                   <span :data-test="`report-list-name-cell-${row.name}`">{{ row.name }}</span>
-                  <OBadge
+                  <OTag
                     v-if="row.dashboards?.[0]?.report_type === 'png'"
-                    variant="primary-outline"
-                    class="tw:ml-1"
-                  >
-                    PNG
-                  </OBadge>
-                  <OBadge
+                    type="reportTag"
+                    value="png"
+                    class="ml-1"
+                  />
+                  <OTag
                     v-if="row.imagePreview"
-                    variant="default-outline"
-                    class="tw:ml-1"
-                  >
-                    Preview
-                  </OBadge>
+                    type="reportTag"
+                    value="preview"
+                    class="ml-1"
+                  />
                 </template>
 
                 <!-- Owner column -->
@@ -196,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="reportsStateLoadingMap[row.report_id]"
                     data-test="report-list-toggle-report-state-loader"
                     style="display: inline-block; width: 33.14px; height: auto"
-                    class="tw:flex tw:justify-center tw:items-center"
+                    class="flex justify-center items-center"
                   >
                     <OSpinner size="xs" />
                   </div>
@@ -246,10 +248,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Table footer: pagination + bulk actions -->
                 <template #bottom="scope">
-                  <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+                  <div class="flex items-center justify-between w-full h-[48px]">
                     <!-- Left: count + action buttons grouped together -->
-                    <div class="tw:flex tw:items-center tw:gap-2">
-                      <div class="o2-table-footer-title tw:flex tw:items-center tw:whitespace-nowrap">
+                    <div class="flex items-center gap-2">
+                      <div class="o2-table-footer-title flex items-center whitespace-nowrap">
                         {{ resultTotal }} {{ t("reports.header") }}
                       </div>
                       <OButton
@@ -322,7 +324,7 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
-import { formatDate } from "@/utils/date";
+import { convertUnixToQuasarFormat } from "@/utils/date";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -338,7 +340,7 @@ import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import OIcon from '@/lib/core/Icon/OIcon.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -614,12 +616,6 @@ const clearSearch = () => {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function convertUnixToQuasarFormat(unixMicroseconds: any) {
-  if (!unixMicroseconds) return "";
-  const unixSeconds = unixMicroseconds / 1e6;
-  const dateToFormat = new Date(unixSeconds * 1000);
-  return formatDate(dateToFormat.toISOString(), "YYYY-MM-DDTHH:mm:ssZ");
-}
 
 const filterData = (rows: any[], terms: any) => {
   const lc = terms.toLowerCase();

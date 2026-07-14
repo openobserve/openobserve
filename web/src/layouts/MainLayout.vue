@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'tw:min-h-screen', 'tw:h-screen', 'tw:flex', 'tw:flex-col']"
+    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'min-h-screen', 'h-screen', 'flex', 'flex-col']"
   >
-    <header class="o2-app-header tw:shrink-0" :class="store.state.printMode === true ? 'tw:hidden' : ''">
+    <header class="o2-app-header shrink-0" :class="store.state.printMode === true ? 'hidden' : ''">
       <!-- Webinar announcement bar: shown above toolbar for cloud users -->
       <div
         v-if="config.isCloud === 'true'"
-        class="tw:bg-[var(--o2-primary-btn-bg)] tw:text-[var(--o2-primary-btn-text)] tw:text-center"
+        class="bg-[var(--o2-primary-btn-bg)] text-[var(--o2-primary-btn-text)] text-center"
       >
         <WebinarBanner variant="header" />
       </div>
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </header>
 
-    <div class="tw:flex-1 tw:flex tw:min-h-0">
+    <div class="flex-1 flex min-h-0">
       <ONavbar
         v-if="store.state.printMode !== true"
         :links-list="linksList"
@@ -67,11 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @menu-hover="handleMenuHover"
       />
 
-      <div class="tw:flex-1 tw:min-w-0 tw:flex tw:min-h-0 tw:h-full">
+      <div class="flex-1 min-w-0 flex min-h-0 h-full">
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="tw:flex tw:flex-col tw:min-h-0 tw:bg-[var(--color-surface-chrome-deeper)] tw:pr-2 tw:pb-2"
+          class="flex flex-col min-h-0 bg-[var(--color-surface-chrome-deeper)] pr-2 pb-2"
           :style="{
             width:
               store.state.isAiChatEnabled && !store.state.isAiChatExpanded
@@ -81,16 +81,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- White content card — rounded, soft shadow (light) / border (dark). All pages render inside this. -->
           <div
-            class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:bg-surface-base tw:rounded-xl tw:overflow-hidden tw:shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
-            :class="store.state.theme === 'dark' ? 'tw:border tw:border-border-default' : ''"
+            class="flex-1 flex flex-col min-h-0 bg-surface-base rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
+            :class="store.state.theme === 'dark' ? 'border border-border-default' : ''"
           >
             <div
               v-if="isLoading"
               :key="store.state.selectedOrganization?.identifier"
-              class="o2-content-scroll tw:flex-1 tw:overflow-y-auto tw:h-full"
+              class="o2-content-scroll flex-1 overflow-y-auto h-full"
             >
               <router-view v-slot="{ Component }">
-                <component :is="Component" class="tw:h-full" @sendToAiChat="sendToAiChat" />
+                <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
               </router-view>
             </div>
           </div>
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
           v-show="store.state.isAiChatEnabled && isLoading"
-          class="o2-sidebar o2-sidebar-right tw:overflow-y-auto tw:sticky tw:top-[var(--navbar-height,2.25rem)] tw:self-start tw:shrink-0"
+          class="o2-sidebar o2-sidebar-right overflow-y-auto sticky top-[var(--navbar-height,2.25rem)] self-start shrink-0"
           :class="[
             store.state.theme == 'dark'
               ? 'dark-mode-chat-container'
@@ -205,6 +205,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useShortcut } from "@/lib/vue-shortcut-manager";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -777,6 +778,33 @@ export default defineComponent({
         let tempDefaultOrg = {};
         let localOrgFlag = false;
         const url = new URL(window.location.href);
+
+        // If the org the user is currently on (URL or stored) is no longer in the
+        // available list, it is being deleted (the backend hides deleting orgs from
+        // this list). Warn the user, then fall through to default-org selection and
+        // redirect home so the stale org_identifier query param is dropped.
+        const intendedOrgId =
+          customOrganization ||
+          (useLocalOrganization()?.value?.identifier ?? "");
+        const orgs = store.state.organizations || [];
+        if (
+          intendedOrgId &&
+          orgs.length > 0 &&
+          !orgs.some((o: any) => o.identifier === intendedOrgId)
+        ) {
+          toast({
+            variant: "warning",
+            message: t("organization.orgBeingDeletedSwitching"),
+          });
+          // Clear stale selection so the logic below picks the default org.
+          customOrganization = "";
+          useLocalOrganization("");
+          selectedOrg.value = {};
+          store.dispatch("setSelectedOrganization", {});
+          if (router.currentRoute.value.query.org_identifier) {
+            router.replace({ path: "/", query: {} });
+          }
+        }
         if (store.state.organizations?.length > 0) {
           const localOrg: any = useLocalOrganization();
           if (
@@ -986,6 +1014,12 @@ export default defineComponent({
             defaultSettings.org_storage_enabled,
         });
 
+        // Load the org's home dashboard (settings/v2 KV) alongside the legacy org
+        // settings so it's available on boot and every org switch.
+        await useHomeDashboard().load(
+          store.state?.selectedOrganization?.identifier,
+        );
+
         if (
           orgSettings?.data?.data?.free_trial_expiry != null &&
           orgSettings?.data?.data?.free_trial_expiry != ""
@@ -1101,7 +1135,7 @@ export default defineComponent({
         return;
       }
       if (!store.state.isAiChatEnabled) {
-        // Closed → Open tw:inline sidebar
+        // Closed → Open inline sidebar
         store.dispatch("setIsAiChatEnabled", true);
         store.dispatch("setIsAiChatExpanded", false);
       } else if (!store.state.isAiChatExpanded) {
@@ -1109,7 +1143,7 @@ export default defineComponent({
         store.dispatch("setIsAiChatEnabled", false);
         store.dispatch("setIsAiChatExpanded", false);
       } else {
-        // Expanded overlay → Back to tw:inline sidebar
+        // Expanded overlay → Back to inline sidebar
         store.dispatch("setIsAiChatExpanded", false);
       }
       window.dispatchEvent(new Event("resize"));

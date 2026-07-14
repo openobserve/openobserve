@@ -44,8 +44,10 @@ use prost::Message;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
-    common::meta::ingestion::{IngestionStatus, StreamStatus},
-    handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    common::meta::{
+        http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+        ingestion::{IngestionStatus, StreamStatus},
+    },
     service::{
         format_stream_name,
         ingestion::{
@@ -445,6 +447,77 @@ pub async fn handle_request(
                 }
             }
         } // for each pipeline
+
+        // Evaluation-only pipelines emit no downstream records. Preserve the
+        // original log stream while evaluator work runs asynchronously.
+        let has_user_pipeline = executable_pipelines
+            .iter()
+            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
+        if !has_user_pipeline && !json_data_by_stream.contains_key(&stream_name) {
+            for (idx, mut rec) in pipeline_inputs.iter().cloned().enumerate() {
+                let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
+                *size += estimate_json_bytes(&rec);
+
+                let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+                rec = flatten::flatten_with_level(rec, flatten_level)?;
+
+                let mut local_val = match rec.take() {
+                    json::Value::Object(v) => v,
+                    _ => unreachable!(),
+                };
+
+                if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
+                    local_val = crate::service::ingestion::refactor_map(local_val, fields);
+                }
+
+                if streams_need_original_map
+                    .get(&stream_name)
+                    .is_some_and(|v| *v)
+                    && let Some(original_data) = original_options[idx].clone()
+                {
+                    local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
+
+                    let record_id = crate::service::ingestion::generate_record_id(
+                        org_id,
+                        &stream_name,
+                        &StreamType::Logs,
+                    );
+
+                    local_val.insert(ID_COL_NAME.to_string(), record_id.to_string().into());
+                }
+
+                if streams_need_all_values_map
+                    .get(&stream_name)
+                    .copied()
+                    .unwrap_or_default()
+                {
+                    let values = local_val
+                        .iter()
+                        .filter(|(k, v)| {
+                            ![
+                                TIMESTAMP_COL_NAME,
+                                ID_COL_NAME,
+                                ORIGINAL_DATA_COL_NAME,
+                                ALL_VALUES_COL_NAME,
+                            ]
+                            .contains(&k.as_str())
+                                && (index_all_max_value_length == 0
+                                    || v.as_str()
+                                        .is_none_or(|s| s.len() <= index_all_max_value_length))
+                        })
+                        .map(|(_, v)| v)
+                        .join(" ");
+
+                    local_val.insert(ALL_VALUES_COL_NAME.to_string(), values.into());
+                }
+
+                let (ts_data, fn_num) = json_data_by_stream
+                    .entry(stream_name.clone())
+                    .or_insert((Vec::new(), None));
+                ts_data.push((timestamps[idx], local_val));
+                *fn_num = Some(0);
+            }
+        }
     }
 
     // drop variables

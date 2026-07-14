@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   TracesNoStreamState — shown when no trace stream has been selected yet.
-  Mirrors the LogsNoStreamState pattern: explorer illustration, two action cards,
-  and a recent-stream chip loaded from localStorage.
+  Mirrors the LogsNoStreamState pattern: stream-select illustration, two action
+  cards, and a recent-stream chip loaded from localStorage.
 -->
 <template>
-  <OEmptyState illustration="explorer" size="hero" :hide-action="true">
+  <OEmptyState illustration="stream-select" size="hero" :hide-action="true">
     <template #title>{{ t("traces.noStream.title") }}</template>
 
     <template #description>
@@ -49,15 +49,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template v-if="recentStream" #extra>
-      <div class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:flex-wrap">
-        <span class="tw:text-sm tw:font-semibold tw:text-text-secondary tw:mr-1">
+      <div class="flex items-center justify-center gap-2 flex-wrap">
+        <span class="text-sm font-semibold text-text-secondary mr-1">
           {{ t("traces.noStream.recent") }}
         </span>
         <EmptyStateIngestionChip
           icon="account-tree"
           :data-test="`traces-no-stream-recent-${recentStream}`"
           @click="emit('pick-stream', recentStream)"
-        ><span class="tw:truncate tw:max-w-[10rem]">{{ recentStream }}</span></EmptyStateIngestionChip>
+        ><span class="truncate max-w-[10rem]">{{ recentStream }}</span></EmptyStateIngestionChip>
       </div>
     </template>
   </OEmptyState>

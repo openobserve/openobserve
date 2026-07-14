@@ -63,6 +63,33 @@ use crate::{
 
 const VALID_METRICS_TYPES: &[&str] = &["counter", "gauge", "histogram", "summary"];
 
+/// The value a JSON metric record carries, put through the same policy as every other
+/// ingestion path (`super::metric_value`).
+///
+/// JSON has no NaN or infinity *literal*, but it can still carry a non-finite *value*: `1e400`
+/// is a syntactically valid JSON number, and with serde_json's `arbitrary_precision` the literal
+/// is kept verbatim, `is_number()` is true, and `as_f64()` returns `None`. Unwrapping that --
+/// which is what this code used to do -- panics the ingestion handler on a request body anyone
+/// can send. An out-of-range magnitude clamps to the f64 bound, like an OTLP or remote-write
+/// infinity does; anything that is not a number at all is rejected.
+fn parse_metric_value(value: &json::Value) -> Result<json::Value, anyhow::Error> {
+    let json::Value::Number(n) = value else {
+        return Err(anyhow!("invalid value, need to be number"));
+    };
+
+    // `as_f64` is `None` only when the literal is out of f64 range, where parsing it yields an
+    // infinity -- which the policy clamps.
+    let raw = match n.as_f64() {
+        Some(v) => v,
+        None => n
+            .to_string()
+            .parse::<f64>()
+            .map_err(|_| anyhow!("invalid value, need to be number"))?,
+    };
+
+    super::metric_value(raw).ok_or_else(|| anyhow!("invalid value, not a number"))
+}
+
 pub async fn ingest(
     org_id: &str,
     stream_name: Option<&str>,
@@ -192,9 +219,13 @@ pub async fn ingest(
         // check timestamp
         let timestamp: i64 = match record.get(TIMESTAMP_COL_NAME) {
             None => now_micros(),
-            Some(json::Value::Number(s)) => {
-                time::parse_i64_to_timestamp_micros(s.as_f64().unwrap() as i64)
-            }
+            // `as_f64` is `None` for a literal out of f64 range (`1e400`), which unwrapping
+            // turned into a panic on a request body anyone can send
+            Some(json::Value::Number(s)) => time::parse_i64_to_timestamp_micros(
+                s.as_f64()
+                    .ok_or_else(|| anyhow::anyhow!("invalid _timestamp, out of range"))?
+                    as i64,
+            ),
             Some(_) => {
                 return Err(anyhow::anyhow!("invalid _timestamp, need to be number"));
             }
@@ -241,18 +272,22 @@ pub async fn ingest(
         if pipelines.is_empty() {
             continue;
         }
+        let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
+            log::error!(
+                "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG"
+            );
+            continue;
+        };
+        let (records, metric_types): (Vec<json::Value>, Vec<String>) =
+            pipeline_inputs.into_iter().unzip();
+        let count = records.len();
+        let has_user_pipeline = pipelines
+            .iter()
+            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
+
         for exec_pl in pipelines {
-            let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
-                log::error!(
-                    "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG"
-                );
-                continue;
-            };
-            let (records, metric_types): (Vec<json::Value>, Vec<String>) =
-                pipeline_inputs.into_iter().unzip();
-            let count = records.len();
             match exec_pl
-                .process_batch(org_id, records, Some(stream_name.clone()))
+                .process_batch(org_id, records.clone(), Some(stream_name.clone()))
                 .await
             {
                 Err(e) => {
@@ -312,6 +347,24 @@ pub async fn ingest(
                 }
             }
         }
+
+        if !has_user_pipeline && !json_data_by_stream.contains_key(stream_name) {
+            for (mut value, metrics_type) in records.into_iter().zip(metric_types) {
+                let mut local_val = match value.take() {
+                    json::Value::Object(val) => val,
+                    _ => unreachable!(),
+                };
+
+                if let Some(Some(fields)) = user_defined_schema_map.get(stream_name) {
+                    local_val = crate::service::ingestion::refactor_map(local_val, fields);
+                }
+
+                json_data_by_stream
+                    .entry(stream_name.clone())
+                    .or_default()
+                    .push((local_val, metrics_type));
+            }
+        }
     }
 
     for (stream_name, json_data) in json_data_by_stream {
@@ -347,17 +400,10 @@ pub async fn ingest(
             // End get stream alert
 
             // check value
-            let value: f64 = match record.get(VALUE_LABEL).ok_or(anyhow!("missing value"))? {
-                json::Value::Number(s) => s.as_f64().unwrap(),
-                _ => {
-                    return Err(anyhow::anyhow!("invalid value, need to be number"));
-                }
-            };
+            let value =
+                parse_metric_value(record.get(VALUE_LABEL).ok_or(anyhow!("missing value"))?)?;
             // reset value
-            record.insert(
-                VALUE_LABEL.to_string(),
-                json::Number::from_f64(value).unwrap().into(),
-            );
+            record.insert(VALUE_LABEL.to_string(), value);
 
             let timestamp = record
                 .get(TIMESTAMP_COL_NAME)
@@ -581,6 +627,41 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    /// `1e400` is a valid JSON number whose value is an infinity. `as_f64()` returns `None` for
+    /// it, and unwrapping that panicked the ingestion handler -- on a body anyone can POST.
+    #[test]
+    fn test_parse_metric_value_clamps_an_out_of_range_number() {
+        let value: json::Value = json::from_str("1e400").unwrap();
+        assert!(value.is_number());
+        assert!(
+            value.as_f64().is_none(),
+            "precondition: as_f64 is None here"
+        );
+
+        let parsed = parse_metric_value(&value).unwrap();
+        assert_eq!(parsed.as_f64().unwrap(), f64::MAX);
+
+        let negative: json::Value = json::from_str("-1e400").unwrap();
+        assert_eq!(
+            parse_metric_value(&negative).unwrap().as_f64().unwrap(),
+            f64::MIN
+        );
+    }
+
+    #[test]
+    fn test_parse_metric_value_passes_a_finite_number_through() {
+        assert_eq!(
+            parse_metric_value(&json!(42.5)).unwrap().as_f64().unwrap(),
+            42.5
+        );
+    }
+
+    #[test]
+    fn test_parse_metric_value_rejects_a_non_number() {
+        assert!(parse_metric_value(&json!("42.5")).is_err());
+        assert!(parse_metric_value(&json!(null)).is_err());
+    }
 
     fn create_test_metric_record(
         name: &str,

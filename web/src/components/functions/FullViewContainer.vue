@@ -1,34 +1,34 @@
 <template>
   <div
-    class="tw:py-[2px]"
-    :class="store.state.theme === 'dark' ? 'tw:bg-gray-500' : 'tw:bg-gray-200 '"
+    class="py-[2px]"
+    :class="store.state.theme === 'dark' ? 'bg-gray-500' : 'bg-gray-200 '"
   >
     <div
-      class="tw:flex tw:justify-between"
-      :class="{ 'tw:items-center': minHeaderHeight }"
+      class="flex justify-between"
+      :class="{ 'items-center': minHeaderHeight }"
       :style="minHeaderHeight ? { minHeight: minHeaderHeight } : undefined"
     >
-      <div class="tw:flex tw:items-center">
+      <div class="flex items-center">
         <OIcon
           v-if="showExpandIcon"
           name="keyboard-arrow-up"
           @click.stop="expanded = !expanded"
-          class="tw:mr-1 tw:cursor-pointer tw:transition-all"
+          class="mr-1 cursor-pointer transition-all"
           :class="[
             store.state.theme === 'dark'
-              ? 'tw:text-gray-100'
-              : 'tw:text-gray-500',
-            expanded ? 'tw:transform tw:rotate-180' : '',
+              ? 'text-gray-100'
+              : 'text-gray-500',
+            expanded ? 'transform rotate-180' : '',
           ]"
           size="md"
         />
         <div
           @click="showExpandIcon ? expanded = !expanded : null"
-          class="tw:text-[14px] tw:font-bold"
+          class="text-[14px] font-bold"
           :class="[
             store.state.theme === 'dark'
-              ? 'tw:text-gray-100'
-              : 'tw:text-gray-500',
+              ? 'text-gray-100'
+              : 'text-gray-500',
             labelClass,
           ]"
         >

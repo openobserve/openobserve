@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   or null when nothing is configured.
 -->
 <template>
-  <div data-test="workflow-condition-body" class="tw:w-full">
+  <div data-test="workflow-condition-body" class="w-full">
     <ConditionBuilder
       ref="builder"
       :fields="fields"
@@ -33,29 +33,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #guidelines>
         <div
-          class="tw:bg-[#f9f290] tw:text-[#2d3748] tw:w-full tw:rounded-md tw:p-3 tw:mt-4 tw:flex tw:flex-col tw:gap-2"
+          class="bg-[#f9f290] text-[#2d3748] w-full rounded-md p-3 mt-4 flex flex-col gap-2"
           data-test="workflow-condition-note"
         >
-          <div class="tw:text-sm tw:font-bold">
+          <div class="text-sm font-bold">
             {{ t("workflow.node.conditionNoteTitle") }}
           </div>
-          <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm">
-            <div class="tw:flex tw:items-start tw:gap-2">
-              <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+          <div class="flex flex-col gap-1 text-sm">
+            <div class="flex items-start gap-2">
+              <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
               <span>
                 {{ t("workflow.node.conditionNoteEmpty") }}
-                <span class="tw:font-mono tw:py-[1px] tw:px-[4px] tw:rounded-[3px] tw:bg-[rgba(0,0,0,0.06)] tw:text-[#b30059]">severity != ""</span>
+                <span class="font-mono py-[1px] px-[4px] rounded-[3px] bg-[rgba(0,0,0,0.06)] text-[#b30059]">severity != ""</span>
               </span>
             </div>
-            <div class="tw:flex tw:items-start tw:gap-2">
-              <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+            <div class="flex items-start gap-2">
+              <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
               <span>
                 {{ t("workflow.node.conditionNoteNull") }}
-                <span class="tw:font-mono tw:py-[1px] tw:px-[4px] tw:rounded-[3px] tw:bg-[rgba(0,0,0,0.06)] tw:text-[#b30059]">severity != null</span>
+                <span class="font-mono py-[1px] px-[4px] rounded-[3px] bg-[rgba(0,0,0,0.06)] text-[#b30059]">severity != null</span>
               </span>
             </div>
-            <div class="tw:flex tw:items-start tw:gap-2">
-              <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+            <div class="flex items-start gap-2">
+              <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
               <span>{{ t("workflow.node.conditionNoteCustom") }}</span>
             </div>
           </div>

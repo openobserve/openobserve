@@ -19,6 +19,13 @@ const props = withDefaults(defineProps<TooltipProps>(), {
   delay: 700,
   maxWidth: "320px",
   disabled: false,
+  // MUST stay explicitly undefined. Vue casts an absent Boolean prop to `false`,
+  // so without this `open` is false rather than undefined — the `open !== undefined`
+  // guard below then passes, TooltipRoot receives `open: false`, and reka switches
+  // into CONTROLLED mode locked shut. Wrapper mode never emits update:open, so the
+  // tooltip could never open: hovering left the trigger at data-state="closed"
+  // forever. Child mode was unaffected because it drives `open` itself.
+  open: undefined,
 });
 
 defineSlots<TooltipSlots>();
@@ -28,7 +35,7 @@ const hasDefaultSlot = computed(() => !!slots.default);
 
 // ΓöÇΓöÇΓöÇ Child mode (placed inside a parent like q-tooltip) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 // When no default slot is provided, OTooltip acts like q-tooltip: it finds its
-// parent element via a tw:hidden DOM anchor span and attaches hover listeners to it.
+// parent element via a hidden DOM anchor span and attaches hover listeners to it.
 const childAnchorRef = ref<HTMLSpanElement | null>(null);
 const parentEl = ref<Element | null>(null);
 const childOpen = ref(false);
@@ -110,16 +117,16 @@ const contentStyle = computed(() => ({
 }));
 
 const contentClasses = computed(() => [
-  "tw:z-[10100] tw:px-2.5 tw:py-1.5",
-  "tw:bg-[var(--color-surface-overlay)] tw:rounded-md",
-  "tw:text-xs tw:text-[var(--color-text-primary)] tw:font-medium tw:leading-relaxed",
-  "tw:data-[state=delayed-open]:animate-in tw:data-[state=delayed-open]:fade-in-0 tw:data-[state=delayed-open]:zoom-in-95",
-  "tw:data-[state=instant-open]:animate-in tw:data-[state=instant-open]:fade-in-0",
-  "tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:zoom-out-95",
-  "tw:data-[side=top]:slide-in-from-bottom-1",
-  "tw:data-[side=bottom]:slide-in-from-top-1",
-  "tw:data-[side=left]:slide-in-from-right-1",
-  "tw:data-[side=right]:slide-in-from-left-1",
+  "z-[10100] px-2.5 py-1.5",
+  "bg-[var(--color-surface-overlay)] rounded-md",
+  "text-xs text-[var(--color-text-primary)] font-medium leading-relaxed",
+  "data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95",
+  "data-[state=instant-open]:animate-in data-[state=instant-open]:fade-in-0",
+  "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+  "data-[side=top]:slide-in-from-bottom-1",
+  "data-[side=bottom]:slide-in-from-top-1",
+  "data-[side=left]:slide-in-from-right-1",
+  "data-[side=right]:slide-in-from-left-1",
   props.contentClass,
 ]);
 </script>
@@ -145,7 +152,7 @@ const contentClasses = computed(() => [
           :style="contentStyle"
           :class="contentClasses"
         >
-          <span class="tw:inline-flex tw:items-center tw:gap-1.5">
+          <span class="inline-flex items-center gap-1.5">
             <slot name="content">{{ content }}</slot>
             <OShortcut
               v-if="shortcut || shortcutId"
@@ -156,7 +163,7 @@ const contentClasses = computed(() => [
           <TooltipArrow
             :width="10"
             :height="5"
-            :class="'tw:fill-[var(--color-surface-overlay)]'"
+            :class="'fill-[var(--color-surface-overlay)]'"
           />
         </TooltipContent>
       </TooltipPortal>
@@ -188,7 +195,7 @@ const contentClasses = computed(() => [
             :style="contentStyle"
             :class="contentClasses"
           >
-            <span class="tw:inline-flex tw:items-center tw:gap-1.5">
+            <span class="inline-flex items-center gap-1.5">
               <slot name="content">{{ content }}</slot>
               <OShortcut
               v-if="shortcut || shortcutId"
@@ -199,7 +206,7 @@ const contentClasses = computed(() => [
             <TooltipArrow
               :width="10"
               :height="5"
-              :class="'tw:fill-[var(--color-surface-overlay)]'"
+              :class="'fill-[var(--color-surface-overlay)]'"
             />
           </TooltipContent>
         </TooltipPortal>

@@ -15,21 +15,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:items-center tw:flex-nowrap!" :data-test="dataTest || 'trace-row-service'">
+  <div class="flex items-center flex-nowrap!" :data-test="dataTest || 'trace-row-service'">
     <!-- Service type icon -->
     <img
       data-test="trace-row-service-icon"
       :src="serviceIconUrl"
-      class="tw:mr-2 tw:shrink-0 tw:w-[1.25rem] tw:h-[1.25rem]"
+      class="mr-2 shrink-0 w-[1.25rem] h-[1.25rem]"
       aria-hidden="true"
       alt=""
     />
 
     <!-- Service name + badge -->
-    <div class="tw:flex tw:items-center tw:gap-[0.325rem] tw:min-w-0 tw:flex-nowrap!">
+    <div class="flex items-center gap-[0.325rem] min-w-0 flex-nowrap!">
       <span
         data-test="trace-row-service-name"
-        class="text-weight-bold tw:truncate tw:min-w-0 tw:text-[var(--o2-text-1)]! tw:text-[0.8rem]! tw:tracking-[0.03rem]!"
+        class="text-weight-bold truncate min-w-0 text-(--color-grey-500)! text-[0.8rem]! tracking-[0.03rem]! [font-family:var(--font-mono)]"
       >
         {{ item.service_name }}
         <OTooltip side="bottom" align="center">

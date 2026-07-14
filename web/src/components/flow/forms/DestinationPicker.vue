@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="destination-picker"
-    class="tw:w-full tw:flex tw:flex-col tw:gap-4"
+    class="w-full flex flex-col gap-4"
   >
     <OSwitch
       v-model="createNewDestination"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- inline create destination form (own save/cancel) -->
-    <div v-if="createNewDestination" class="tw:w-full">
+    <div v-if="createNewDestination" class="w-full">
       <CreateDestinationForm
         @created="onDestinationCreated"
         @cancel="createNewDestination = false"

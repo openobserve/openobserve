@@ -34,9 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="drawerTitle"
     @update:open="onOpenChange"
   >
-    <div class="tw:flex tw:flex-col tw:gap-3 tw:p-4 tw:h-full tw:min-h-0">
+    <div class="flex flex-col gap-3 p-4 h-full min-h-0">
       <!-- status — the drawer only opens for error nodes, so it's always Errored -->
-      <div class="tw:flex tw:items-center tw:justify-end">
+      <div class="flex items-center justify-end">
         <OBadge variant="error-soft" size="sm">
           {{ t("workflow.test.stepResult.status.error") }}
         </OBadge>
@@ -46,16 +46,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            flex-1 + min-h-0 so it fills the drawer body down to the footer. -->
       <div
         ref="ioContainerRef"
-        class="io-container tw:flex tw:gap-2 tw:flex-1 tw:min-h-0"
+        class="io-container flex gap-2 flex-1 min-h-0"
         :class="{ 'io-container-dark': isDark }"
       >
         <!-- Input -->
-        <div class="io-section tw:w-1/2">
+        <div class="io-section w-1/2">
           <div
-            class="section-label tw:font-bold tw:flex tw:items-center tw:justify-between"
+            class="section-label font-bold flex items-center justify-between"
           >
             <div>{{ t("workflow.test.stepResult.input") }}</div>
-            <div class="tw:flex tw:items-center tw:gap-1">
+            <div class="flex items-center gap-1">
               <OButton
                 variant="outline"
                 size="icon"
@@ -92,19 +92,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="!isHistory && editableInput && inputInvalid"
-            class="wf-input-error tw:mt-1"
+            class="wf-input-error mt-1"
           >
             {{ t("workflow.test.invalidJson") }}
           </div>
         </div>
 
         <!-- Output -->
-        <div class="io-section tw:w-1/2">
+        <div class="io-section w-1/2">
           <div
-            class="section-label tw:font-bold tw:flex tw:items-center tw:justify-between"
+            class="section-label font-bold flex items-center justify-between"
           >
             <div>{{ t("workflow.test.stepResult.output") }}</div>
-            <div class="tw:flex tw:items-center tw:gap-1">
+            <div class="flex items-center gap-1">
               <OButton
                 variant="outline"
                 size="icon"
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Custom footer so the Replay button can carry a hover tooltip. -->
     <template #footer>
-      <div class="tw:flex tw:items-center tw:justify-end tw:gap-2 tw:w-full">
+      <div class="flex items-center justify-end gap-2 w-full">
         <OButton variant="outline" size="sm-action" @click="close">
           {{ t("common.close") }}
         </OButton>

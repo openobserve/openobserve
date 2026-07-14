@@ -74,7 +74,6 @@ function measureTime<T>(label: string, fn: () => T): { result: T; ms: number } {
   const start = performance.now();
   const result = fn();
   const ms = performance.now() - start;
-  console.log(`  [PERF] ${label}: ${ms.toFixed(0)}ms`);
   return { result, ms };
 }
 
@@ -123,7 +122,6 @@ describe("OTable Performance Benchmarks", () => {
       // getRows() returns only the current page (default 20). Test verifies pagination works.
       expect(wrapper.vm.getRows().length).toBeGreaterThan(0);
       expect(wrapper.vm.getRows().length).toBeLessThanOrEqual(20);
-      console.log(`  [PERF] 1K rows mounted with virtual scroll in ${ms.toFixed(0)}ms`);
     });
 
     it("should mount 1K rows without virtual scroll", () => {
@@ -145,7 +143,6 @@ describe("OTable Performance Benchmarks", () => {
       const renderedRows = wrapper.findAll('[data-test^="o2-table-row-"]');
       // Only paginated rows are rendered (default page size = 20)
       expect(renderedRows.length).toBeLessThanOrEqual(20);
-      console.log(`  [PERF] 1K non-virtual: ${renderedRows.length} DOM rows in ${ms.toFixed(0)}ms`);
     });
   });
 
@@ -179,7 +176,6 @@ describe("OTable Performance Benchmarks", () => {
       expect(sortedRows.length).toBeGreaterThan(0);
       // After sorting by ID descending, first visible row should be id=100
       expect(sortedRows[0].id).toBe(100);
-      console.log(`  [PERF] Sort completed in ${sortMs.ms.toFixed(0)}ms`);
     }, 30000);
   });
 
@@ -206,7 +202,6 @@ describe("OTable Performance Benchmarks", () => {
       // Client-side global filter should reduce visible rows
       const filteredRows = wrapper.vm.getRows();
       expect(filteredRows.length).toBeLessThan(rows.length);
-      console.log(`  [PERF] Global filter filtered 1K → ${filteredRows.length} rows in ${ms.toFixed(0)}ms`);
     }, 30000);
 
     it("should filter 1K rows with no-match returning zero rows", () => {
@@ -223,7 +218,6 @@ describe("OTable Performance Benchmarks", () => {
       expect(wrapper.find('[data-test="o2-table-root"]').exists()).toBe(true);
       const filteredRows = wrapper.vm.getRows();
       expect(filteredRows).toHaveLength(0);
-      console.log(`  [PERF] Global filter (no-match): ${filteredRows.length} rows returned`);
     }, 30000);
   });
 
@@ -251,7 +245,6 @@ describe("OTable Performance Benchmarks", () => {
       // Data update should preserve pagination, getRows() returns current page
       expect(wrapper.vm.getRows().length).toBeGreaterThan(0);
       expect(wrapper.vm.getRows().length).toBeLessThanOrEqual(20);
-      console.log(`  [PERF] Data update completed in ${ms.toFixed(0)}ms`);
     }, 30000);
   });
 

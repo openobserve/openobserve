@@ -28,11 +28,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="currentRouteName === 'workflows'"
     data-test="workflows-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
+    class="flex flex-col h-full min-h-0"
   >
     <PageLayout
       :main-panel="false"
-      :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+      :header-class="'shrink-0 px-4 border-b border-border-default'"
     >
       <template #header>
         <AppPageHeader
@@ -41,12 +41,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="schema"
         >
           <template #title>
-            <span class="tw:inline-flex tw:items-center tw:gap-2">
+            <span class="inline-flex items-center gap-2">
               {{ t("workflow.header") }}
               <OBadge
                 variant="primary-outline"
                 size="sm"
-                class="tw:uppercase tw:tracking-[0.5px] tw:font-semibold"
+                class="uppercase tracking-[0.5px] font-semibold"
                 >{{ t("workflow.beta") }}</OBadge
               >
             </span>
@@ -67,8 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </AppPageHeader>
       </template>
 
-      <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-        <div class="card-container tw:h-full">
+      <div class="flex-1 min-h-0 overflow-hidden">
+        <div class="card-container h-full">
           <OTable
             :frame="false"
             data-test="workflow-list-table"
@@ -84,16 +84,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :footer-title="t('workflow.header')"
             table-id="workflows-workflow-list"
             width="100%"
-            class="tw:w-full tw:h-full"
+            class="w-full h-full"
             @row-click="openHistory"
           >
             <template #toolbar>
-              <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
-                <div class="tw:flex-1 tw:min-w-0">
+              <div class="flex items-center gap-2 w-full">
+                <div class="flex-1 min-w-0">
                   <OInput
                     data-test="workflow-list-search-input"
                     v-model="filterQuery"
-                    class="tw:w-full"
+                    class="w-full"
                     :placeholder="t('workflow.search')"
                   >
                     <template #icon-left>
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-actions="{ row }">
-              <div class="tw:flex tw:items-center actions-container">
+              <div class="flex items-center actions-container">
                 <OButton
                   :data-test="`workflow-list-${row.name}-pause-start-action`"
                   :data-row-action="row.enabled ? 'pause' : 'resume'"
@@ -192,10 +192,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #bottom>
               <div
-                class="tw:flex tw:w-full tw:justify-between tw:items-center tw:h-[48px]"
+                class="flex w-full justify-between items-center h-[48px]"
               >
                 <div
-                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md"
+                  class="o2-table-footer-title flex items-center w-[200px] mr-md"
                 >
                   {{ resultTotal }} {{ t("workflow.header") }}
                 </div>

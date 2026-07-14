@@ -87,13 +87,15 @@ pub fn get_severity_value(severity_number: i32) -> String {
     .into()
 }
 
-pub fn get_metric_val(attr_val: &Option<number_data_point::Value>) -> json::Value {
-    match attr_val {
-        Some(local_val) => match local_val {
-            number_data_point::Value::AsDouble(val) => json::json!(val),
-            number_data_point::Value::AsInt(val) => json::json!(*val as f64),
-        },
-        None => json::Value::Null,
+/// Extracts the data point's value. Returns `None` when it carries none -- an absent value
+/// is not an observation, so the caller has no record to write.
+///
+/// The value is returned raw: whether a NaN or an infinity may be *recorded* is the metrics
+/// value policy, and lives with it (`crate::service::metrics::metric_value`).
+pub fn get_metric_val(attr_val: &Option<number_data_point::Value>) -> Option<f64> {
+    match attr_val.as_ref()? {
+        number_data_point::Value::AsDouble(val) => Some(*val),
+        number_data_point::Value::AsInt(val) => Some(*val as f64),
     }
 }
 
@@ -327,17 +329,22 @@ mod tests {
     fn test_get_metric_val() {
         // Test AsDouble variant
         let double_val = number_data_point::Value::AsDouble(42.5);
-        let resp = get_metric_val(&Some(double_val));
-        assert_eq!(resp.as_f64().unwrap(), 42.5);
+        assert_eq!(get_metric_val(&Some(double_val)).unwrap(), 42.5);
 
         // Test AsInt variant
         let int_val = number_data_point::Value::AsInt(42);
-        let resp = get_metric_val(&Some(int_val));
-        assert_eq!(resp.as_f64().unwrap(), 42.0);
+        assert_eq!(get_metric_val(&Some(int_val)).unwrap(), 42.0);
 
         // Test None case
-        let resp = get_metric_val(&None);
-        assert!(resp.is_null());
+        assert!(get_metric_val(&None).is_none());
+    }
+
+    /// The value is returned raw -- deciding what a NaN *means* is the metrics value policy,
+    /// not this extractor's job.
+    #[test]
+    fn test_get_metric_val_returns_nan_unjudged() {
+        let nan = number_data_point::Value::AsDouble(f64::NAN);
+        assert!(get_metric_val(&Some(nan)).unwrap().is_nan());
     }
 
     #[test]

@@ -14,8 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div>
-    <div v-if="isAddVariable" class="tw:flex tw:flex-col full-height">
+  <div class="full-height">
+    <div v-if="isAddVariable" class="flex flex-col full-height">
       <AddSettingVariable
         v-if="isAddVariable"
         @save="handleSaveVariable"
@@ -24,10 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dashboardVariablesList="dashboardVariablesList"
       />
     </div>
-    <div v-else class="tw:flex tw:flex-col full-height">
+    <div v-else class="flex flex-col full-height">
       <DashboardHeader title="Variables">
         <template #right>
-          <div class="tw:flex tw:gap-2">
+          <div class="flex gap-2">
             <!-- show variables dependencies if variables exist -->
             <OButton
               v-if="dashboardVariablesList.length > 0"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-drag>
             <div
-              class="variable-drag-handle tw:flex tw:items-center tw:justify-center tw:cursor-move"
+              class="variable-drag-handle flex items-center justify-center cursor-move"
               data-test="dashboard-variable-settings-drag-handle"
             >
               <OIcon name="drag-indicator" size="sm" />
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-name="{ row }">
             <div class="item-name">
-              <span class="tw:block tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">
+              <span class="block overflow-hidden text-ellipsis whitespace-nowrap">
                 {{ row.name }}
               </span>
               <OTooltip v-if="row.name.length > 30" :content="row.name" />
@@ -99,32 +99,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-scope="{ row }">
-            <div class="tw:flex tw:items-center">
-              <OBadge
-                variant="primary-soft"
-                class="tw:ring-1 tw:ring-inset tw:ring-current"
-                size="sm"
+            <div class="flex items-center">
+              <OTag
+                type="variableScope"
+                value="global"
                 data-test="dashboard-variable-scope-badge"
                 v-if="getScopeType(row) === 'global'"
-              >
-                Global
-              </OBadge>
-              <OBadge
-                variant="primary-outline"
-                size="sm"
+              />
+              <OTag
+                type="variableScope"
+                value="tabs"
                 data-test="dashboard-variable-scope-badge"
                 v-else-if="getScopeType(row) === 'tabs'"
               >
                 {{ row.tabs?.length || 0 }} Tabs
-              </OBadge>
-              <OBadge
-                variant="primary-outline"
-                size="sm"
+              </OTag>
+              <OTag
+                type="variableScope"
+                value="panels"
                 data-test="dashboard-variable-scope-badge"
                 v-else-if="getScopeType(row) === 'panels'"
               >
                 {{ row.panels?.length || 0 }} Panels
-              </OBadge>
+              </OTag>
 
               <OTooltip
                 v-if="getScopeType(row) === 'tabs' && row.tabs?.length"
@@ -147,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-actions="{ row }">
-            <div class="tw:flex tw:justify-center tw:gap-2">
+            <div class="flex justify-center gap-2">
               <OButton
                 variant="ghost"
                 size="icon"
@@ -181,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div style="height: 60vh">
             <VariablesDependenciesGraph
               :variablesList="dashboardVariablesList"
-              :class="store.state.theme == 'dark' ? 'dark-mode' : 'tw:bg-white'"
+              :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
               @closePopUp="
                 () => (showVariablesDependenciesGraphPopUp = false)
               "
@@ -223,7 +220,7 @@ import useNotifications from "@/composables/useNotifications";
 import Sortable from "sortablejs";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
@@ -242,7 +239,7 @@ export default defineComponent({
     OButton,
     OIcon,
     ODialog,
-    OBadge,
+    OTag,
     OTooltip,
     OTable,
   },

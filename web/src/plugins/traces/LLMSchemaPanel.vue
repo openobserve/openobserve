@@ -26,25 +26,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container llm-trend-panel tw:rounded-lg tw:p-[1rem] tw:flex tw:flex-col"
+    class="card-container llm-trend-panel rounded-lg p-[1rem] flex flex-col"
   >
-    <div class="tw:flex tw:items-baseline tw:justify-between tw:mb-[0.25rem]">
+    <div class="flex items-baseline justify-between mb-[0.25rem]">
       <div>
         <div
-          class="tw:text-[0.85rem] tw:font-semibold tw:text-[var(--o2-text-primary)]"
+          class="text-[0.85rem] font-semibold text-[var(--color-text-heading)]"
         >
           {{ displayTitle }}
         </div>
         <div
           v-if="displaySubtitle"
-          class="tw:text-[0.7rem] tw:leading-normal tw:mt-[0.1rem]"
+          class="text-[0.7rem] leading-normal mt-[0.1rem]"
         >
           {{ displaySubtitle }}
         </div>
       </div>
     </div>
 
-    <div class="llm-schema-panel__body tw:w-full">
+    <div class="llm-schema-panel__body w-full">
       <PanelSchemaRenderer
         v-if="chartData"
         class="llm-schema-panel__renderer"
@@ -153,7 +153,7 @@ const selectedTimeObj = computed(() => ({
 
 <style lang="scss" scoped>
 .llm-trend-panel {
-  border: 1px solid var(--o2-border-color);
+  border: 1px solid var(--color-border-default);
 }
 
 /* Match LLMTrendPanel's chart height (.llm-trend-chart = 220px) so the

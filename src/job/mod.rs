@@ -372,6 +372,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::org_users::watch());
     tokio::task::spawn(db::org_ingestion_tokens::watch());
     tokio::task::spawn(db::organization::watch());
+    tokio::task::spawn(db::org_status::watch());
+    if let Err(e) = db::org_status::load_from_db().await {
+        log::error!("Failed to load org status cache: {e}");
+    }
 
     #[cfg(feature = "cloud")]
     tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
@@ -426,6 +430,20 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // All nodes need org settings watch for consistent cache
     tokio::task::spawn(db::organization::org_settings_watch());
 
+    // Domain management (allow-list + blocklist) is enforced in the auth path —
+    // `validate_credentials`, `validate_credentials_ext`, `token_validator` and `process_token`
+    // — which runs on ALL node roles, including single-role routers. Initialize and watch its
+    // cache BEFORE the router early-return below so a router keeps the blocklist fresh;
+    // otherwise its cache would go stale and a newly-blocked user could keep
+    // authenticating/ingesting through that router.
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::domain_management::db::cache()
+            .await
+            .expect("domain management cache failed");
+        tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
+    }
+
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
@@ -464,8 +482,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::alerts::realtime_triggers::watch());
     tokio::task::spawn(db::alerts::alert::watch());
     // org_settings_watch already started above for all nodes including routers
-    #[cfg(feature = "enterprise")]
-    tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
     // Watch needed on queriers (UI APIs) and on whichever node role is the configured
     // processing node (ingester or compactor) so their local cache stays in sync with
     // coordinator events emitted by the flusher.
@@ -562,10 +578,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::alerts::alert::cache()
         .await
         .expect("alerts cache failed");
-    #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::domain_management::db::cache()
-        .await
-        .expect("domain management cache failed");
     // Warm the cache on queriers (UI APIs) and on whichever node role is the configured
     // processing node so that get_coverage_deficit returns accurate data from startup
     // rather than always returning (0, 0) until files happen to be processed.
@@ -613,11 +625,62 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(service_graph::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(incidents::run());
-    // Register anomaly detection callbacks on every node.  The HTTP handlers
-    // for /retrain and /trigger can land on any node (querier, ingester, etc.),
-    // not just the alert_manager, so all nodes need the callbacks available.
+    // Register enterprise callbacks on every node. HTTP/background work can land on
+    // querier, ingester, or alert_manager nodes, so callbacks must be available everywhere.
     #[cfg(feature = "enterprise")]
     {
+        o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_score_writer(
+            |org_id, records| {
+                Box::pin(async move {
+                    if records.is_empty() {
+                        return Ok(());
+                    }
+
+                    crate::service::self_reporting::ensure_llm_scores_stream_initialized(&org_id)
+                        .await
+                        .map_err(|e| anyhow::anyhow!(e))?;
+
+                    let req = proto::cluster_rpc::IngestionRequest {
+                        org_id: org_id.clone(),
+                        stream_name: config::meta::self_reporting::llm_scores::LLM_SCORES_STREAM
+                            .to_string(),
+                        stream_type: config::meta::stream::StreamType::Logs.to_string(),
+                        data: Some(proto::cluster_rpc::IngestionData::from(records)),
+                        ingestion_type: Some(proto::cluster_rpc::IngestionType::Json.into()),
+                        metadata: None,
+                    };
+
+                    match crate::service::ingestion::ingestion_service::ingest(req).await {
+                        Ok(resp) if resp.status_code == 200 => Ok(()),
+                        Ok(resp) => Err(anyhow::anyhow!(
+                            "_llm_scores ingestion failed with status {}: {}",
+                            resp.status_code,
+                            resp.message
+                        )),
+                        Err(e) => Err(anyhow::anyhow!(e)),
+                    }
+                })
+            },
+        );
+
+        o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_evaluator_trace_exporter(
+            |org_id, traces, node_idx| {
+                Box::pin(async move {
+                    if let Err(e) = crate::service::self_reporting::ensure_evaluator_stream_initialized(&org_id).await {
+                        log::warn!(
+                            "[Pipeline]: LLM evaluation node {node_idx} failed to ensure _evaluator stream initialized for {org_id}: {e}"
+                        );
+                    }
+                    crate::service::llm_evaluations::evaluator_trace_exporter::EvaluatorTraceExporter::export(
+                        &org_id,
+                        traces,
+                        node_idx,
+                    )
+                    .await;
+                })
+            },
+        );
+
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_query_executor(
             |org_id, sql, start, end, cfg_id, stream_type| {
                 Box::pin(async move {
@@ -751,7 +814,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(alert_grouping::process_expired_batches());
     tokio::task::spawn(file_downloader::run());
     // Note: Service discovery extraction runs automatically during parquet file processing
-    // See src/job/files/parquet.rs:queue_services_from_parquet for implementation
+    // See src/job/files/parquet.rs:queue_services_from_data_file for implementation
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(
         "service_streams_batch_processor",
@@ -845,6 +908,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());
+        // Org deletion is data-lifecycle work (object-store + file_list + DB teardown,
+        // via the same compact::retention path the compactor already uses), so both
+        // the cleanup worker and the grace-period promotion scheduler run on the
+        // compactor. Cluster coordination is unchanged: the worker holds a dist-lock
+        // to fetch tasks and a per-task CAS guards execution; the promotion sweep uses
+        // an atomic status CAS — so multiple compactors remain safe, just less
+        // contended. (The org_status cache watch loop stays on every node — see below.)
+        tokio::task::spawn(crate::service::org_cleanup::run());
+        tokio::task::spawn(crate::service::org_cleanup::run_promotion_scheduler());
     }
 
     // load metrics disk cache

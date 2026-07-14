@@ -273,6 +273,7 @@ describe("EditGroup Component", () => {
       vi.mocked(getGroup).mockRejectedValueOnce(new Error("Network error"));
 
       await newWrapper.vm.getGroupDetails();
+      await flushPromises();
 
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();

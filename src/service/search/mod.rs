@@ -55,7 +55,6 @@ use {
 use super::self_reporting::report_request_usage_stats;
 use crate::{
     common::utils::functions::{get_all_transform_keys, init_vrl_runtime},
-    handler::grpc::request::search::Searcher,
     service::search::{
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         partition::{
@@ -76,6 +75,7 @@ pub(crate) mod grpc_search;
 pub(crate) mod index;
 pub(crate) mod inspector;
 pub(crate) mod partition;
+mod searcher;
 pub(crate) mod sql;
 pub(crate) mod streaming;
 #[cfg(feature = "enterprise")]
@@ -83,6 +83,8 @@ pub(crate) mod super_cluster;
 pub(crate) mod tantivy;
 pub(crate) mod utils;
 pub(crate) mod work_group;
+
+pub use searcher::Searcher;
 
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err

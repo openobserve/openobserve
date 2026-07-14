@@ -17,11 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="pipeline-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
+    class="flex flex-col h-full min-h-0"
     v-if="currentRouteName === 'pipelines'"
   >
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+    <div class="w-full flex-1 min-h-0 overflow-hidden">
+      <div class="card-container h-full">
       <OTable
         :frame="false"
         :key="activeTab"
@@ -42,13 +42,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model:selected-ids="selectedPipelineIds"
         :expansion="activeTab === 'scheduled' ? 'single' : 'none'"
         :expand-on-row-click="(row: any) => row.source?.source_type === 'scheduled'"
-        :row-class="(row: any) => row.source?.source_type === 'scheduled' ? 'tw:cursor-pointer' : ''"
+        :row-class="(row: any) => row.source?.source_type === 'scheduled' ? 'cursor-pointer' : ''"
         v-model:expanded-ids="expandedId"
         width="100%"
-        class="tw:w-full tw:h-full"
+        class="w-full h-full"
       >
         <template #toolbar>
-          <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+          <div class="flex items-center gap-2 w-full">
             <OToggleGroup
               :model-value="activeTab"
               @update:model-value="(v) => { activeTab = v as string; updateActiveTab(); }"
@@ -67,11 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("pipeline_list.tab_realtime") }}
               </OToggleGroupItem>
             </OToggleGroup>
-            <div class="tw:flex-1 tw:min-w-0">
+            <div class="flex-1 min-w-0">
               <OInput
                 data-test="pipeline-list-search-input"
                 v-model="filterQuery"
-                class="tw:w-full"
+                class="w-full"
                 :placeholder="t('pipeline.search')"
               >
                 <template #icon-left>
@@ -81,13 +81,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </template>
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="pipeline-list-refresh-btn"
+            @click="getPipelines"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="pipelinesRefresh" />
+          </OButton>
+        </template>
 
         <template #cell-type="{ row }">
           <OTag type="pipelineType" :value="row.type" />
         </template>
 
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:items-center actions-container">
+          <div class="flex items-center actions-container">
             <OButton
               :data-test="`pipeline-list-${row.name}-pause-start-action`"
               :data-row-action="row.enabled ? 'pause' : 'resume'"
@@ -130,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               type="button"
               data-row-action="export"
-              class="tw:hidden"
+              class="hidden"
               tabindex="-1"
               aria-hidden="true"
               @click.stop="exportPipeline(row)"
@@ -138,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               type="button"
               data-row-action="delete"
-              class="tw:hidden"
+              class="hidden"
               tabindex="-1"
               aria-hidden="true"
               @click.stop="openDeleteDialog(row)"
@@ -203,9 +215,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #icon-left>
                   <OIcon size="sm" name="error" />
                 </template>
-                <div class="tw:flex tw:flex-col">
+                <div class="flex flex-col">
                   <div>View Error</div>
-                  <div class="tw:text-xs tw:text-gray-500">
+                  <div class="text-xs text-gray-500">
                     {{
                       new Date(
                         row.last_error.last_error_timestamp / 1000,
@@ -222,17 +234,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-if="row?.sql_query"
             data-test="scheduled-pipeline-expanded-content"
-            class="tw:text-left tw:px-12 tw:py-0 tw:mb-2 tw:max-h-screen tw:overflow-hidden"
+            class="text-left px-12 py-0 mb-2 max-h-screen overflow-hidden"
           >
-            <div class="tw:flex tw:items-center tw:py-2">
+            <div class="flex items-center py-2">
               <strong
                 >{{ t("pipeline_list.sql_query") }} : <span></span
               ></strong>
             </div>
-            <div class="tw:flex tw:items-start tw:justify-center">
+            <div class="flex items-start justify-center">
               <div
                 data-test="scheduled-pipeline-expanded-sql"
-                class="tw:w-full tw:overflow-y-auto tw:p-2.5 tw:border tw:border-[#ddd] tw:border-l-[3px] tw:border-l-[#7a54a2] tw:h-full tw:max-h-[200px] tw:whitespace-normal tw:bg-[#e8e8e8] tw:text-black"
+                class="w-full overflow-y-auto p-2.5 border border-[#ddd] border-l-[3px] border-l-[#7a54a2] h-full max-h-[200px] whitespace-normal bg-[#e8e8e8] text-black"
               >
                 <pre style="text-wrap: wrap">{{ row?.sql_query }} </pre>
               </div>
@@ -258,16 +270,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #bottom="bottomProps">
           <div
-            class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-1"
+            class="flex items-center justify-between w-full py-1"
           >
             <div
-              class="tw:flex tw:items-center tw:text-sm tw:mr-4"
+              class="flex items-center o2-table-footer-title mr-4"
             >
               {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
             </div>
             <div
               v-if="selectedPipelineIds.length > 0"
-              class="tw:flex tw:items-center tw:gap-2"
+              class="flex items-center gap-2"
             >
               <OButton
                 data-test="pipeline-list-export-pipelines-btn"
@@ -364,16 +376,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="closeErrorDialog"
   >
     <template #header-left>
-      <OIcon name="error" size="md" class="tw:text-[#ef4444]" />
+      <OIcon name="error" size="md" class="text-[#ef4444]" />
     </template>
 
-    <div v-if="errorDialog.data" class="pipeline-error-content tw:px-6 tw:py-5 tw:max-h-[60vh] tw:overflow-y-auto">
+    <div v-if="errorDialog.data" class="pipeline-error-content px-6 py-5 max-h-[60vh] overflow-y-auto">
       <!-- Error Summary -->
-      <div v-if="errorDialog.data.last_error.error_summary" class="tw:mb-4">
-        <div class="section-label tw:mb-2 tw:text-[13px] tw:font-semibold tw:tracking-[0.02em] tw:opacity-80">
+      <div v-if="errorDialog.data.last_error.error_summary" class="mb-4">
+        <div class="section-label mb-2 text-[13px] font-semibold tracking-[0.02em] opacity-80">
           {{ t("pipeline_list.error_summary") }}
         </div>
-        <div class="error-summary-box tw:p-4 tw:rounded-lg tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:whitespace-pre-wrap tw:wrap-break-word tw:bg-[rgba(239,68,68,0.08)] tw:border tw:border-[rgba(239,68,68,0.2)] tw:text-[#dc2626]">
+        <div class="error-summary-box p-4 rounded-lg font-mono text-[13px] leading-[1.6] whitespace-pre-wrap wrap-break-word bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)] text-[#dc2626]">
           {{ errorDialog.data.last_error.error_summary }}
         </div>
       </div>
@@ -385,30 +397,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Object.keys(errorDialog.data.last_error.node_errors).length > 0
         "
       >
-        <div class="section-label tw:mb-3 tw:text-[13px] tw:font-semibold tw:tracking-[0.02em] tw:opacity-80">
+        <div class="section-label mb-3 text-[13px] font-semibold tracking-[0.02em] opacity-80">
           {{ t("pipeline_list.node_errors") }}
         </div>
-        <div class="node-errors-container tw:flex tw:flex-col tw:gap-3">
+        <div class="node-errors-container flex flex-col gap-3">
           <div
             v-for="(nodeError, nodeId) in errorDialog.data.last_error
               .node_errors"
             :key="nodeId"
-            class="node-error-item tw:p-4 tw:rounded-lg tw:bg-[rgba(0,0,0,0.02)] tw:border tw:border-[rgba(0,0,0,0.08)] tw:transition-all tw:hover:bg-[rgba(0,0,0,0.04)]"
+            class="node-error-item p-4 rounded-lg bg-[rgba(0,0,0,0.02)] border border-[rgba(0,0,0,0.08)] transition-all hover:bg-[rgba(0,0,0,0.04)]"
           >
-            <div class="node-error-header tw:flex tw:items-center tw:justify-between tw:mb-2.5">
-              <span class="node-name tw:font-semibold tw:text-sm">{{ nodeError.node_name || nodeId }}</span>
-              <span class="node-type tw:text-xs tw:px-2.5 tw:py-1 tw:rounded-xl tw:bg-[rgba(99,102,241,0.1)] tw:text-[#6366f1] tw:font-medium">{{ nodeError.node_type }}</span>
+            <div class="node-error-header flex items-center justify-between mb-2.5">
+              <span class="node-name font-semibold text-sm">{{ nodeError.node_name || nodeId }}</span>
+              <span class="node-type text-xs px-2.5 py-1 rounded-xl bg-[rgba(99,102,241,0.1)] text-[#6366f1] font-medium">{{ nodeError.node_type }}</span>
             </div>
             <div
               v-if="
                 nodeError.error_messages && nodeError.error_messages.length > 0
               "
-              class="node-error-messages tw:flex tw:flex-col tw:gap-2"
+              class="node-error-messages flex flex-col gap-2"
             >
               <div
                 v-for="(msg, idx) in nodeError.error_messages"
                 :key="idx"
-                class="error-message tw:p-3 tw:rounded-md tw:bg-[rgba(239,68,68,0.06)] tw:border-l-[3px] tw:border-l-[#ef4444] tw:font-mono tw:text-xs tw:leading-[1.5] tw:whitespace-pre-wrap tw:wrap-break-word tw:text-[#991b1b]"
+                class="error-message p-3 rounded-md bg-[rgba(239,68,68,0.06)] border-l-[3px] border-l-[#ef4444] font-mono text-xs leading-[1.5] whitespace-pre-wrap wrap-break-word text-[#991b1b]"
               >
                 {{ msg }}
               </div>

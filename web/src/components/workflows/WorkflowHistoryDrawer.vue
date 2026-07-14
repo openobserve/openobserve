@@ -59,17 +59,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
 
-    <div class="tw:h-full tw:flex tw:flex-col tw:min-h-0 tw:gap-2">
+    <div class="h-full flex flex-col min-h-0 gap-2">
       <!-- Run-frequency timeline (reused from AlertHistory for consistency). -->
       <WorkflowExecutionTimeline
         v-if="rows.length > 0"
         :history="timelineHistory"
         :firing-label="t('workflow.history.failed')"
         :ok-label="t('workflow.history.success')"
-        class="tw:shrink-0"
+        class="shrink-0"
       />
 
-      <div class="alert-history-table tw:flex-1 tw:min-h-0">
+      <div class="alert-history-table flex-1 min-h-0">
         <OTable
           data-test="workflow-history-table"
           :data="rows"
@@ -86,11 +86,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sort-by="start_time"
           sort-order="desc"
           width="100%"
-          class="tw:w-full tw:h-full"
+          class="w-full h-full"
           @row-click="openRun"
         >
           <template #empty>
-            <div class="tw:py-10"><NoData /></div>
+            <div class="py-10"><NoData /></div>
           </template>
 
           <template #cell-start_time="{ value }">

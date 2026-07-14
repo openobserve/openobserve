@@ -19,6 +19,13 @@ export interface Shortcut {
   whenFocused?: Ref<HTMLElement | null> | HTMLElement | null;
   /** When true the shortcut fires but is omitted from the cheatsheet list */
   hidden?: boolean;
+  /**
+   * Fire even while a text input / contenteditable has focus. Only for
+   * shortcuts that must work mid-typing (e.g. Escape closing a panel) —
+   * plain-key shortcuts are otherwise suppressed so they don't steal
+   * keystrokes from the user's typing.
+   */
+  allowInInput?: boolean;
 }
 
 /**

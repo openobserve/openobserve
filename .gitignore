@@ -76,4 +76,4 @@ tests/ui-testing/.env.old
 !/.opencode/agents/
 /.opencode/agents/*
 !/.opencode/agents/e2e_ci_council_of_agents/
-/tests/ux-audit/*
+/tests/ux-audit/*.worktrees/

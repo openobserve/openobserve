@@ -429,6 +429,7 @@ pub async fn write_file(
                     partition_key: Arc::from(hour_key.as_str()),
                     data: entry.records,
                     data_size: entry.records_size,
+                    batch: None,
                 })
             }
         })

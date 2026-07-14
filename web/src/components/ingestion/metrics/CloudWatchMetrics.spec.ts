@@ -104,7 +104,7 @@ describe("CloudWatchMetrics", () => {
 
     it("should have correct component structure", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
+      expect(wrapper.find('.p-3').exists()).toBe(true);
       expect(wrapper.find('.copy-content-container-cls').exists()).toBe(true);
     });
 
@@ -398,7 +398,7 @@ describe("CloudWatchMetrics", () => {
   describe("Template Rendering", () => {
     it("should render main container with correct classes", () => {
       wrapper = createWrapper();
-      const container = wrapper.find('.tw\\:p-3');
+      const container = wrapper.find('.p-3');
       expect(container.exists()).toBe(true);
     });
 
@@ -412,8 +412,8 @@ describe("CloudWatchMetrics", () => {
       wrapper = createWrapper();
       const link = wrapper.find('a[href*="aws.amazon.com"]');
       expect(link.attributes('target')).toBe('_blank');
-      expect(link.attributes('class')).toContain('tw:text-text-link');
-      expect(link.attributes('class')).toContain('tw:underline');
+      expect(link.attributes('class')).toContain('text-text-link');
+      expect(link.attributes('class')).toContain('underline');
     });
 
     it("should render documentation link text", () => {
@@ -432,7 +432,7 @@ describe("CloudWatchMetrics", () => {
 
     it("should render note about output availability", () => {
       wrapper = createWrapper();
-      const note = wrapper.find('.tw\\:italic');
+      const note = wrapper.find('.italic');
       expect(note.exists()).toBe(true);
       expect(note.text()).toContain("Note: Output is available under Logs");
       expect(note.text()).toContain("cloudwatch_metrics");

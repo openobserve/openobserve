@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="isCanvasEmpty"
     data-test="workflow-flow-empty-text"
-    class="tw:absolute tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2 tw:text-[var(--color-text-secondary)] tw:text-[1.3em] tw:text-center tw:pointer-events-none tw:z-10"
+    class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[var(--color-text-secondary)] text-[1.3em] text-center pointer-events-none z-10"
   >
     {{ t("workflow.canvasEmpty") }}
   </div>

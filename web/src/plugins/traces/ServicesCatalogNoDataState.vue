@@ -16,14 +16,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   ServicesCatalogNoDataState — empty state for the services catalog panel.
-  Shows the services-catalog illustration. No widen-range action: the panel
-  aggregates across the selected window, so widening would not reliably
-  surface data and the suggestion was not useful.
+
+  Uses the hero size so the illustration and copy match the other traces empty
+  states. No widen-range action (the panel aggregates across the window, so
+  widening wouldn't reliably surface data), but when the stream has data outside
+  the current window we offer a precise "jump to latest data" action, consistent
+  with the traces search "no events" state.
 -->
 <template>
-  <OEmptyState preset="no-services-catalog" size="block" :hide-action="true" />
+  <OEmptyState
+    v-if="jumpTarget"
+    preset="no-services-catalog"
+    size="hero"
+  >
+    <template #actions>
+      <EmptyStateActionCard
+        icon="schedule"
+        :label="t('traces.noEvents.jumpToData')"
+        :sublabel="jumpTargetSublabel"
+        data-test="services-catalog-no-data-jump-to-data-card"
+        @click="emit('jump-to-stream-data', jumpTarget.from, jumpTarget.to)"
+      />
+    </template>
+  </OEmptyState>
+  <OEmptyState
+    v-else
+    preset="no-services-catalog"
+    size="hero"
+    :hide-action="true"
+  />
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import useJumpToLatestData from "@/composables/useJumpToLatestData";
+
+const { t } = useI18n();
+const { jumpTarget, jumpTargetSublabel } = useJumpToLatestData();
+
+const emit = defineEmits<{
+  "jump-to-stream-data": [fromUs: number, toUs: number];
+}>();
 </script>

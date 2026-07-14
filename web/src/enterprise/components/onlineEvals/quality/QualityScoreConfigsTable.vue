@@ -1,13 +1,13 @@
 <template>
-  <section class="tw:flex tw:flex-col tw:gap-[10px] tw:min-h-0 tw:flex-1" data-test="quality-score-configs-overview">
-    <div v-if="isLoading && rows.length === 0" class="tw:flex tw:flex-col tw:items-center tw:gap-2 tw:py-8 tw:px-3 tw:border tw:border-dashed tw:border-[var(--color-dialog-header-border,var(--o2-border))] tw:rounded-md tw:text-center tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">
+  <section class="flex flex-col gap-[10px] min-h-0 flex-1" data-test="quality-score-configs-overview">
+    <div v-if="isLoading && rows.length === 0" class="flex flex-col items-center gap-2 py-8 px-3 border border-dashed border-[var(--color-dialog-header-border,var(--o2-border))] rounded-md text-center text-[var(--color-text-secondary)]">
       <OSpinner size="sm" />
-      <span>{{ t("onlineEvals.quality.overview.loading") }}</span>
+      <span>{{ t("onlineEvals.quality.loading") }}</span>
     </div>
 
     <div
       v-if="rows.length === 0 && !isLoading"
-      class="tw:flex-1 tw:min-h-0 tw:flex tw:items-center tw:justify-center"
+      class="flex-1 min-h-0 flex items-center justify-center"
       data-test="quality-overview-empty"
     >
       <OEmptyState
@@ -24,7 +24,7 @@
          so a fresh setup reads as "configs are here, scores will fill in"
          rather than a blank screen. -->
 
-    <div v-else class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col">
+    <div v-else class="flex-1 min-h-0 flex flex-col">
       <OTable
         data-test="quality-overview-table"
         :data="filteredRows"
@@ -40,7 +40,7 @@
         :persist-columns="true"
         table-id="quality-score-configs"
         width="100%"
-        class="tw:w-full tw:h-full"
+        class="w-full h-full"
         @row-click="(row: any) => $emit('select', row)"
       >
         <!-- Filter moved into the table toolbar so OTable's column chooser
@@ -50,7 +50,7 @@
             v-model="filter"
             :placeholder="t('onlineEvals.quality.overview.searchPlaceholder')"
             size="sm"
-            class="tw:flex-1 tw:min-w-0"
+            class="flex-1 min-w-0"
             data-test="quality-overview-filter-input"
           >
             <template #icon-left>
@@ -60,37 +60,35 @@
         </template>
 
         <template #cell-status="{ row }">
-          <span class="tw:inline-flex tw:text-base tw:leading-none" :class="statusClass(row.status)" :aria-label="row.status">●</span>
+          <OTag type="qualityStatus" :value="row.status" label="" :aria-label="row.status" />
         </template>
 
         <template #cell-name="{ row }">
-          <div class="tw:font-semibold tw:text-[var(--color-text-primary,currentColor)]">{{ row.name }}</div>
+          <div class="text-[var(--color-text-primary)]">{{ row.name }}</div>
         </template>
 
         <template #cell-type="{ row }">
-          <OBadge
+          <OTag
             v-if="shortType(row.dataType) !== '—'"
-            :variant="dataTypeBadgeVariant(row.dataType)"
-            size="sm"
-          >
-            {{ row.dataType }}
-          </OBadge>
-          <span v-else class="tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">—</span>
+            type="evalDataType"
+            :value="row.dataType"
+          />
+          <span v-else class="text-[var(--color-text-secondary)]">—</span>
         </template>
 
         <template #cell-totalScores="{ row }">
-          <span class="tw:[font-variant-numeric:tabular-nums]">{{ formatCount(row.totalScores) }}</span>
+          <span class="[font-variant-numeric:tabular-nums]">{{ formatCount(row.totalScores) }}</span>
         </template>
 
         <template #cell-coverage="{ row }">
-          <span v-if="row.coveragePct != null" class="tw:[font-variant-numeric:tabular-nums]">{{ formatPct(row.coveragePct) }}</span>
-          <span v-else class="tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">—</span>
+          <span v-if="row.coveragePct != null" class="[font-variant-numeric:tabular-nums]">{{ formatPct(row.coveragePct) }}</span>
+          <span v-else class="text-[var(--color-text-secondary)]">—</span>
         </template>
 
         <template #cell-trend="{ row }">
           <svg
             v-if="row.trendSparkline.length > 0"
-            class="tw:w-full tw:h-5"
+            class="w-full h-5"
             :class="sparkClass(row.status)"
             viewBox="0 0 100 20"
             preserveAspectRatio="none"
@@ -103,14 +101,14 @@
               :points="sparkPoints(row.trendSparkline)"
             />
           </svg>
-          <span v-else class="tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">—</span>
+          <span v-else class="text-[var(--color-text-secondary)]">—</span>
         </template>
 
         <template #cell-updated="{ row }">
-          <span v-if="row.lastUpdatedMs" class="tw:text-[11px] tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:[font-variant-numeric:tabular-nums]">
+          <span v-if="row.lastUpdatedMs" class="text-[11px] text-[var(--color-text-secondary)] [font-variant-numeric:tabular-nums]">
             {{ relativeTime(row.lastUpdatedMs) }}
           </span>
-          <span v-else class="tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]">—</span>
+          <span v-else class="text-[var(--color-text-secondary)]">—</span>
         </template>
       </OTable>
     </div>
@@ -125,7 +123,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useRoute, useRouter } from "vue-router";
 import type { ScoreConfigRow } from "../composables/useQualityScoreConfigs";
@@ -168,26 +166,15 @@ const filteredRows = computed(() => {
   );
 });
 
-// De-emphasize configs that have no scores in the selected window. They
-// stay visible (so users can spot a scorer they defined but never wired
-// up) but visually recede beneath active rows.
-function statusClass(status: string): string {
-  if (status === 'unhealthy') return 'tw:text-[var(--o2-status-warning-text,#b25400)]';
-  if (status === 'warn') return 'tw:text-[var(--o2-status-warning-text,#b25400)] tw:opacity-[0.7]';
-  if (status === 'healthy') return 'tw:text-[var(--o2-status-success-text,#2e7d32)]';
-  if (status === 'noData') return 'tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:opacity-[0.55]';
-  return 'tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]';
-}
-
 function sparkClass(status: string): string {
-  if (status === 'unhealthy' || status === 'warn') return 'tw:text-[var(--o2-status-warning-text,#b25400)]';
-  if (status === 'healthy') return 'tw:text-[var(--o2-status-success-text,#2e7d32)]';
-  if (status === 'noData') return 'tw:text-[var(--color-text-secondary,var(--o2-text-secondary))] tw:opacity-[0.55]';
-  return 'tw:text-[var(--color-text-secondary,var(--o2-text-secondary))]';
+  if (status === 'unhealthy' || status === 'warn') return 'text-[var(--color-status-warning-text)]';
+  if (status === 'healthy') return 'text-[var(--color-status-success-text)]';
+  if (status === 'noData') return 'text-[var(--color-text-secondary)] opacity-[0.55]';
+  return 'text-[var(--color-text-secondary)]';
 }
 
 function rowClassOf(row: ScoreConfigRow): string {
-  return row.status === "noData" ? "tw:opacity-[0.6] tw:hover:opacity-[0.85]" : "";
+  return row.status === "noData" ? "opacity-[0.6] hover:opacity-[0.85]" : "";
 }
 
 const columns = computed(() => [
@@ -261,15 +248,6 @@ function shortType(type: ScoreConfigRow["dataType"]): string {
   if (type === "categorical") return "Cat";
   if (type === "boolean") return "Bool";
   return "—";
-}
-
-// Map a score-config data type to a neutral design-system OBadge soft variant
-// (numeric → blue, categorical → purple, boolean → teal). Data types are just
-// labels, so use neutral palette colors rather than semantic variants.
-function dataTypeBadgeVariant(type: ScoreConfigRow["dataType"]) {
-  if (type === "categorical") return "purple-soft" as const;
-  if (type === "boolean") return "teal-soft" as const;
-  return "blue-soft" as const; // numeric
 }
 
 function formatCount(n: number | null): string {

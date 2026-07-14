@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:relative tw:w-full tw:h-full tw:flex tw:flex-col" v-bind="$attrs">
+  <div class="relative w-full h-full flex flex-col" v-bind="$attrs">
     <div
       data-test="query-editor"
-      class="logs-query-editor tw:flex-1 tw:min-h-0 tw:bg-(--o2-card-bg)"
+      class="logs-query-editor flex-1 min-h-0 bg-(--o2-card-bg)"
       ref="editorRef"
       :id="editorId"
     />
@@ -27,13 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showAiIcon && !disableAi"
       variant="sidebar-toggle"
       size="icon-toolbar"
-      class="tw:absolute! tw:top-2 tw:right-2 tw:z-10 tw:bg-(--o2-bg-primary) tw:border tw:border-(--o2-border-color) tw:transition-all tw:duration-200 tw:hover:bg-(--color-button-outline-hover-bg) tw:hover:border-[var(--o2-color-primary)]"
-      :class="nlpMode ? 'tw:bg-[var(--o2-color-primary-light)] tw:border-[var(--o2-color-primary)]' : ''"
+      class="absolute! top-2 right-2 z-10 bg-(--o2-bg-primary) border border-(--o2-border-color) transition-all duration-200 hover:bg-(--color-button-outline-hover-bg) hover:border-[var(--o2-color-primary)]"
+      :class="nlpMode ? 'bg-[var(--o2-color-primary-light)] border-[var(--o2-color-primary)]' : ''"
       @click="toggleNlpMode"
       data-test="query-editor-ai-icon-btn"
     >
       <OIcon size="md">
-        <img :src="aiIcon" alt="AI" class="tw:w-4.5 tw:h-4.5" />
+        <img :src="aiIcon" alt="AI" class="w-4.5 h-4.5" />
       </OIcon>
       <OTooltip side="top" align="center">
         <template #content>{{ disableAiReason || t(nlpMode ? 'search.nlpModeEnabled' : 'search.nlpModeLabel') }}</template>
@@ -182,6 +182,9 @@ export default defineComponent({
     const editorRef: any = ref();
     // editor object is used to interact with the monaco editor instance
     let editorObj: any = null;
+    // Emits the editor's content immediately instead of waiting out the change
+    // debounce. Assigned when the editor is created; see `commitModelChange`.
+    let commitPendingChange: (() => void) | null = null;
     const { searchObj } = searchState();
     const {
       detectNaturalLanguage,
@@ -395,31 +398,16 @@ export default defineComponent({
       currentEditorText.value = text;
       const isNL = detectNaturalLanguage(text, props.language);
 
-      console.log("[NL2Q-Detection]", {
-        text: text.substring(0, 50),
-        language: props.language,
-        isNaturalLanguage: isNL,
-        currentNlpMode: props.nlpMode,
-      });
 
       // ONLY emit events if NOT already in NLP mode (auto-detection feature)
       // If already in NLP mode (user toggled it), don't change anything
       if (!props.nlpMode) {
         if (isNL) {
-          console.log(
-            "[NL2Q-Detection] Natural language detected, emitting nlpModeDetected: true",
-          );
           emit("nlpModeDetected", true);
         } else {
-          console.log(
-            "[NL2Q-Detection] Query syntax detected, emitting nlpModeDetected: false",
-          );
           emit("nlpModeDetected", false);
         }
       } else {
-        console.log(
-          "[NL2Q-Detection] Already in NLP mode, not emitting auto-detection events",
-        );
       }
     }, 500);
 
@@ -437,17 +425,10 @@ export default defineComponent({
       if (!currentText.trim()) return;
 
       const currentLanguage = props.language?.toLowerCase() || "sql";
-      console.log(
-        "[NL2Q-UI] Starting query generation for language:",
-        currentLanguage,
-        "text:",
-        currentText,
-      );
 
       try {
         // Get organization ID from store
         const orgId = store.state.selectedOrganization?.identifier || "default";
-        console.log("[NL2Q-UI] Organization ID:", orgId);
 
         // Create language-appropriate prompt
         let promptPrefix = "";
@@ -468,29 +449,17 @@ export default defineComponent({
         }
 
         const prompt = `${promptPrefix} : ${currentText}`;
-        console.log("[NL2Q-UI] Generated prompt:", prompt);
 
         // Generate query from natural language
-        console.log("[NL2Q-UI] Calling generateSQL...");
         const generatedSQL = await generateSQL(
           prompt,
           orgId,
           abortSignal,
           sessionId,
         );
-        console.log("[NL2Q-UI] generateSQL returned:", {
-          value: generatedSQL,
-          type: typeof generatedSQL,
-          isNull: generatedSQL === null,
-          isEmpty: generatedSQL === "",
-          isFalsy: !generatedSQL,
-        });
 
         if (!generatedSQL || generatedSQL.trim() === "") {
           // Show error notification - use streaming error message if available (e.g. Unauthorized Access)
-          console.log(
-            "[NL2Q-UI] Showing error notification - query generation failed or empty",
-          );
           const errorMsg = isAuthError(streamingResponse.value)
             ? streamingResponse.value
             : t("search.nlQueryGenerationFailed");
@@ -503,7 +472,6 @@ export default defineComponent({
 
         // Check if this is a special action completion (dashboard/alert)
         if (generatedSQL.startsWith("✓ DASHBOARD_CREATED:")) {
-          console.log("[NL2Q-UI] Dashboard created successfully");
           const responseText = generatedSQL
             .replace("✓ DASHBOARD_CREATED:", "")
             .trim();
@@ -516,7 +484,6 @@ export default defineComponent({
         }
 
         if (generatedSQL.startsWith("✓ ALERT_CREATED:")) {
-          console.log("[NL2Q-UI] Alert created successfully");
           const responseText = generatedSQL
             .replace("✓ ALERT_CREATED:", "")
             .trim();
@@ -526,7 +493,6 @@ export default defineComponent({
         }
 
         if (generatedSQL.startsWith("✓ ACTION_COMPLETED:")) {
-          console.log("[NL2Q-UI] Action completed successfully");
           const responseText = generatedSQL
             .replace("✓ ACTION_COMPLETED:", "")
             .trim();
@@ -541,7 +507,6 @@ export default defineComponent({
           generatedSQL,
           props.language,
         );
-        console.log("[NL2Q-UI] Transformed text:", transformedText);
 
         // Update editor value
         setValue(transformedText);
@@ -552,14 +517,10 @@ export default defineComponent({
 
         // Turn off NLP mode after generating SQL (we're now in SQL mode)
         emit("nlpModeDetected", false);
-        console.log(
-          "[NL2Q-UI] Emitted nlpModeDetected: false to turn off NLP mode",
-        );
 
         // Emit SQL generation success
         emit("generation-success", { type: "sql", message: generatedSQL });
 
-        console.log("[NL2Q-UI] SQL generation completed successfully");
       } catch (error) {
         console.error("[NL2Q-UI] Exception during SQL generation:", error);
         showErrorNotification(t("search.nlQueryGenerationFailed"));
@@ -734,26 +695,36 @@ export default defineComponent({
         },
       });
 
-      editorObj.onDidChangeModelContent(
-        debounce((e: any) => {
-          const newValue = editorObj?.getValue()?.trim();
-          emit("update-query", newValue, e);
-          emit("update:query", newValue, e);
+      // The editor's content only reaches the parent after `debounceTime`. Held
+      // as a named handle so it can be flushed on the paths that consume the
+      // query (blur, run) — otherwise they act on the previous query and the
+      // parent re-renders the editor from that stale state, dropping the edit.
+      const commitModelChange = debounce((e: any) => {
+        const newValue = editorObj?.getValue()?.trim();
+        emit("update-query", newValue, e);
+        emit("update:query", newValue, e);
 
-          // Check for natural language after user stops typing (debounced)
-          if (newValue) checkForNaturalLanguage(newValue);
+        // Check for natural language after user stops typing (debounced)
+        if (newValue) checkForNaturalLanguage(newValue);
 
-          validateDoubleQuotes();
-        }, props.debounceTime),
-      );
+        validateDoubleQuotes();
+      }, props.debounceTime);
+
+      // No-op when nothing is pending, so it is safe on any path that consumes
+      // the query.
+      commitPendingChange = () => commitModelChange.flush();
+
+      editorObj.onDidChangeModelContent(commitModelChange);
+
+      const runQuery = () => {
+        commitModelChange.flush();
+        emit("run-query");
+      };
 
       editorObj.createContextKey("ctrlenter", true);
       editorObj.addCommand(
         monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-        function () {
-          // Emit run-query event when Ctrl/Cmd+Enter is pressed
-          emit("run-query");
-        },
+        runQuery,
         "ctrlenter",
       );
       editorObj.onDidFocusEditorWidget(() => {
@@ -764,10 +735,7 @@ export default defineComponent({
         // This is because the editor loses focus and the context key "ctrlenter" is not active anymore, so we need to re-add the command on focus
         editorObj.addCommand(
           monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-          function () {
-            // Emit run-query event when Ctrl/Cmd+Enter is pressed
-            emit("run-query");
-          },
+          runQuery,
           "ctrlenter",
         );
       });
@@ -796,6 +764,11 @@ export default defineComponent({
             () => null,
           );
         }
+
+        // Whatever was clicked (Apply, a query tab) is about to read the query.
+        // Flush after the trim above so the committed value is the trimmed one.
+        commitPendingChange?.();
+
         emit("blur");
       });
 
@@ -1189,12 +1162,9 @@ export default defineComponent({
 
     // Watch isGenerating and emit events to parent
     watch(isGenerating, (newValue) => {
-      console.log("[CodeQueryEditor] isGenerating changed to:", newValue);
       if (newValue) {
-        console.log("[CodeQueryEditor] Emitting generation-start");
         emit("generation-start");
       } else {
-        console.log("[CodeQueryEditor] Emitting generation-end");
         emit("generation-end");
       }
     });

@@ -21,23 +21,15 @@ pub(super) fn partition_tantivy_files(
     index_parquet_files: Vec<FileKey>,
     idx_optimize_mode: &Option<IndexOptimizeMode>,
     target_partitions: usize,
-) -> (Vec<Vec<FileKey>>, usize) {
-    let (file_groups, limit, ascend) = if let Some(IndexOptimizeMode::SimpleSelect(limit, ascend)) =
-        idx_optimize_mode
+) -> Vec<Vec<FileKey>> {
+    if let Some(IndexOptimizeMode::SimpleSelect(limit, ascend)) = idx_optimize_mode
         && *limit > 0
     {
         let file_groups = group_files_by_time_range(index_parquet_files, target_partitions);
-        (file_groups, *limit, *ascend)
+        regroup_tantivy_files(file_groups, *ascend)
     } else {
         // splite the filter groups by target partitions
-        let file_groups = into_chunks(index_parquet_files, target_partitions);
-        (file_groups, 0, false)
-    };
-
-    if limit == 0 {
-        (file_groups, limit)
-    } else {
-        (regroup_tantivy_files(file_groups, ascend), limit)
+        into_chunks(index_parquet_files, target_partitions)
     }
 }
 
@@ -492,9 +484,7 @@ mod tests {
             Some(config::meta::inverted_index::IndexOptimizeMode::SimpleSelect(100, false));
         let target_partitions = 2;
 
-        let (file_groups, limit) =
-            partition_tantivy_files(files, &idx_optimize_mode, target_partitions);
-        assert_eq!(limit, 100);
+        let file_groups = partition_tantivy_files(files, &idx_optimize_mode, target_partitions);
         assert!(!file_groups.is_empty());
     }
 
@@ -505,9 +495,7 @@ mod tests {
             Some(config::meta::inverted_index::IndexOptimizeMode::SimpleSelect(0, false));
         let target_partitions = 2;
 
-        let (file_groups, limit) =
-            partition_tantivy_files(files, &idx_optimize_mode, target_partitions);
-        assert_eq!(limit, 0);
+        let file_groups = partition_tantivy_files(files, &idx_optimize_mode, target_partitions);
         assert_eq!(file_groups.len(), 1);
     }
 
@@ -522,9 +510,7 @@ mod tests {
         let idx_optimize_mode = Some(config::meta::inverted_index::IndexOptimizeMode::SimpleCount);
         let target_partitions = 2;
 
-        let (file_groups, limit) =
-            partition_tantivy_files(files, &idx_optimize_mode, target_partitions);
-        assert_eq!(limit, 0);
+        let file_groups = partition_tantivy_files(files, &idx_optimize_mode, target_partitions);
         assert!(file_groups.len() <= 2);
     }
 }

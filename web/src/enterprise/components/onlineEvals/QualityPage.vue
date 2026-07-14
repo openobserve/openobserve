@@ -1,12 +1,12 @@
 <template>
   <div
-    class="quality-page tw:flex tw:flex-col tw:gap-[14px] tw:p-[14px_16px_18px] tw:min-h-0 tw:flex-1"
+    class="quality-page flex flex-col gap-[14px] p-[14px_16px_18px] min-h-0 flex-1"
     data-test="quality-page"
   >
     <!-- Agent filter — right-aligned at the top of the content container so it
          sits with the KPIs + table it scopes (matches LLM Insights). -->
-    <div class="tw:flex tw:items-center tw:justify-end tw:px-4">
-      <div class="tw:w-[14rem] tw:flex-shrink-0">
+    <div class="flex items-center justify-end px-4">
+      <div class="w-[17rem] flex-shrink-0">
         <!-- While the agent list is loading we swap the select for a skeleton
              of the same height so the control reads as "loading" (and can't be
              opened on an empty list) instead of showing an empty dropdown. -->
@@ -22,10 +22,11 @@
           v-model="agentModel"
           label="Agent"
           label-position="inside"
+          :placeholder="t('onlineEvals.quality.agentPlaceholder')"
           :options="agentOptions || []"
           labelKey="label"
           valueKey="value"
-          class="tw:rounded"
+          class="rounded"
           data-test="quality-agent-filter"
         />
       </div>
@@ -34,9 +35,9 @@
     <QualityKpiSkeleton
       v-if="showKpiSkeleton"
       :count="visibleKpis.length"
-      class="tw:px-4"
+      class="px-4"
     />
-    <section v-else class="quality-page__kpis tw:grid tw:gap-[10px] tw:px-4" aria-label="Tier 1 KPIs"
+    <section v-else class="quality-page__kpis grid gap-[10px] px-4" aria-label="Tier 1 KPIs"
       style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr))"
     >
       <QualityKpiCard
@@ -51,7 +52,7 @@
          row opens the detail in a right-side ODrawer (70% width) instead
          of replacing the whole page. The user keeps full context of the
          list behind the drawer. -->
-    <div class="quality-page__tier2 tw:grid tw:gap-3 tw:min-h-0 tw:flex-1"
+    <div class="quality-page__tier2 grid gap-3 min-h-0 flex-1"
       style="grid-template-columns: minmax(0, 1fr)"
     >
       <QualityScoreConfigsTable
@@ -74,11 +75,11 @@
            the inner panel no longer renders its own title row. -->
       <template #header-right>
         <span
-          class="qpd-type tw:inline-flex tw:py-0 tw:px-1 tw:rounded-[2px] tw:font-bold tw:text-[13px] tw:leading-[1.4] tw:tracking-[0.02em]"
+          class="qpd-type inline-flex py-0 px-1 rounded-[2px] font-bold text-[13px] leading-[1.4] tracking-[0.02em]"
           :class="{
-            'tw:bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] tw:text-[#4f5bcf]': detailDataType === 'numeric',
-            'tw:bg-[color-mix(in_srgb,#9333ea_14%,transparent)] tw:text-[#7c3aed]': detailDataType === 'categorical',
-            'tw:bg-[color-mix(in_srgb,#16a34a_14%,transparent)] tw:text-[#15803d]': detailDataType === 'boolean',
+            'bg-[color-mix(in_srgb,var(--color-indigo-500)_14%,transparent)] text-[var(--color-indigo-700)]': detailDataType === 'numeric',
+            'bg-[color-mix(in_srgb,var(--color-purple-600)_14%,transparent)] text-[var(--color-purple-700)]': detailDataType === 'categorical',
+            'bg-[color-mix(in_srgb,var(--color-success-600)_14%,transparent)] text-[var(--color-success-700)]': detailDataType === 'boolean',
           }"
           data-test="quality-detail-type-badge"
         >
@@ -86,7 +87,7 @@
         </span>
         <span
           v-if="selectedConfig?.version"
-          class="qpd-version tw:ml-[6px] tw:text-[11px] tw:text-(--color-text-secondary) tw:[font-variant-numeric:tabular-nums]"
+          class="qpd-version ml-[6px] text-[11px] text-(--color-text-secondary) [font-variant-numeric:tabular-nums]"
           data-test="quality-detail-version-badge"
           >v{{ selectedConfig.version }}</span
         >

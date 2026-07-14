@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <IngestionContent>
-    <div class="tw:flex tw:flex-col tw:gap-2" data-test="vector-title-text">
+    <div class="flex flex-col gap-2" data-test="vector-title-text">
       <b>OTLP HTTP</b>
       <CopyContent
         :content="copyHTTPTracesContentURL"
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div class="tw:flex tw:flex-col tw:gap-2" data-test="vector-title-text" v-if="config.isCloud == 'false'">
+    <div class="flex flex-col gap-2" data-test="vector-title-text" v-if="config.isCloud == 'false'">
       <b>OTLP gRPC</b>
       <CopyContent :content="copyGRPCTracesContent" />
     </div>

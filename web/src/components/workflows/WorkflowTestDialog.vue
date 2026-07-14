@@ -34,12 +34,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="run"
     @click:secondary="close"
   >
-    <div class="tw:flex tw:flex-col tw:gap-4 tw:text-left">
+    <div class="flex flex-col gap-4 text-left">
       <OText variant="meta" as="p">{{ t("workflow.test.intro") }}</OText>
 
       <!-- Run-from selector -->
-      <div class="tw:flex tw:flex-col tw:gap-1">
-        <OText as="label" class="tw:text-[12px] tw:font-medium">
+      <div class="flex flex-col gap-1">
+        <OText as="label" class="text-[12px] font-medium">
           {{ t("workflow.test.runFrom") }}
         </OText>
         <OSelect
@@ -53,9 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Sample input editor -->
-      <div class="tw:flex tw:flex-col tw:gap-1">
-        <div class="tw:flex tw:items-center tw:justify-between">
-          <OText as="label" class="tw:text-[12px] tw:font-medium">
+      <div class="flex flex-col gap-1">
+        <div class="flex items-center justify-between">
+          <OText as="label" class="text-[12px] font-medium">
             {{ t("workflow.test.inputLabel") }}
           </OText>
           <OButton
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
         <div
-          class="tw:h-[240px] tw:rounded-md tw:border tw:border-border-default tw:overflow-hidden"
+          class="h-[240px] rounded-md border border-border-default overflow-hidden"
         >
           <CodeQueryEditor
             editor-id="workflow-test-input"
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:query="workflowObj.testRun.input = $event"
           />
         </div>
-        <OText v-if="parseError" variant="meta" as="p" class="tw:text-error">
+        <OText v-if="parseError" variant="meta" as="p" class="text-error">
           {{ t("workflow.test.invalidJson") }}
         </OText>
         <OText v-else variant="meta" as="p">
