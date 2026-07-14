@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       v-if="!drawerMode"
       class="px-2!"
-      :subtitle="displayMonitorName"
+      :subtitle="currentRun.timestamp"
       :back="{
         label: t('synthetics.results.monitors'),
         to: { name: 'synthetic-monitor-results', params: { id: monitorId } },
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
     >
       <template #title>
-        <span data-test="synthetics-run-detail-title">Run Details</span>
+        <span data-test="synthetics-run-detail-title">{{ displayMonitorName }}</span>
       </template>
       <template #title-trail>
         <OBadge
@@ -64,12 +64,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ currentRun.url }}
         </OBadge>
-        <span
-          class="font-mono text-xs text-text-secondary shrink-0"
-          data-test="synthetics-run-detail-timestamp-label"
-        >
-          {{ currentRun.timestamp }}
-        </span>
         <div class="flex ml-1">
           <OButton
             variant="ghost"
@@ -722,8 +716,8 @@ function capitalizeEngine(engine: string): string {
 function fmtTimestamp(tsMs: number): string {
   return timestampToTimezoneDate(
     tsMs,
-    store.state.timezone,
-    "MMM dd, HH:mm ZZZ",
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+    "MMM dd, yyyy 'at' HH:mm ZZZ",
   );
 }
 

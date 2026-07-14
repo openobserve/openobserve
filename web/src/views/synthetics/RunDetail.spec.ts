@@ -162,7 +162,7 @@ describe("RunDetail", () => {
       '[data-test="synthetics-run-detail-title"]',
     );
     expect(title.exists()).toBe(true);
-    expect(title.text()).toBe("Run Details");
+    expect(title.text()).toBe("Test Monitor");
   });
 
   it("should render the status badge", () => {

@@ -91,7 +91,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="drawerOpen"
     side="right"
     :width="90"
-    :title="drawerTitle"
+    :title="monitorName"
+    :subTitle="drawerTimestamp"
     data-test="synthetics-run-detail-drawer"
     @update:open="onDrawerClose"
   >
@@ -101,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :variant="drawerRunStatus.variant"
         size="sm"
         :icon="drawerRunStatus.icon"
+        class="ml-3"
       >
         {{ drawerRunStatus.label }}
       </OBadge>
@@ -113,9 +115,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ drawerUrl }}
       </OBadge>
-      <span class="font-mono text-xs text-text-secondary shrink-0">
-        {{ drawerTimestamp }}
-      </span>
     </template>
     <RunDetail
       :drawer-mode="true"
@@ -197,7 +196,6 @@ const isRefreshing = ref(false);
 const drawerOpen = ref(false);
 const selectedRunId = ref("");
 const selectedExecutionId = ref("");
-const drawerTitle = "Run Details";
 const drawerRunStatus = ref<{
   variant: string;
   icon: string;
