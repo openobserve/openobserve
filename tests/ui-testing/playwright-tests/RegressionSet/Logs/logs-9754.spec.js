@@ -428,7 +428,15 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
       // Delete the test stream via API
       const result = await cleanupPm.apiCleanup.deleteStream(STREAM_NAME);
       testLogger.info('Stream cleanup result:', result);
-      testLogger.info(`Test stream ${STREAM_NAME} cleanup completed`);
+
+      // Block until the deletion has fully settled server-side. This describe runs in
+      // serial mode, so a failing test retries the WHOLE block (afterAll -> beforeEach ->
+      // setup). Without this wait, the retry's setup re-ingests while this deletion is
+      // still in-flight and gets 400 "stream [...] is being deleted", which cascades into
+      // every downstream test and makes the built-in retry useless. Waiting here lets the
+      // next attempt start from a clean slate so re-ingestion recreates the stream cleanly.
+      const deleted = await cleanupPm.apiCleanup.waitForStreamDeletion(STREAM_NAME, 120000, 3000);
+      testLogger.info(`Test stream ${STREAM_NAME} cleanup completed (deletion settled: ${deleted})`);
     } catch (error) {
       testLogger.warn(`Failed to cleanup test stream: ${error.message}`);
     } finally {
