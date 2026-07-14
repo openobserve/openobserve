@@ -1,5 +1,5 @@
 ---
-name: fe-ui-authoring
+name: ui-architect
 description: >-
   Authoring guardrails for building ANY new frontend UI in the OpenObserve web
   app (web/) — new views, pages, panels, dialogs, feature components, or edits
@@ -37,7 +37,7 @@ description: >-
   <style scoped>, this skill applies.
 ---
 
-# Frontend UI Authoring Guardrails (OpenObserve `web/`)
+# UI Architect — Frontend UI Guardrails (OpenObserve `web/`)
 
 Use this skill whenever you build or modify user-facing UI in `web/`. It is a
 **pre-flight contract**: apply it before and while you write template markup, not
