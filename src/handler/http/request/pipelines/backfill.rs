@@ -25,6 +25,7 @@ use utoipa::ToSchema;
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 #[cfg(feature = "enterprise")]
 use crate::service::alerts::backfill;
+pub use crate::service::alerts::backfill::BackfillRequest;
 
 #[cfg(feature = "enterprise")]
 async fn ensure_user_pipeline(org_id: &str, pipeline_id: &str) -> Result<(), Response> {
@@ -32,20 +33,6 @@ async fn ensure_user_pipeline(org_id: &str, pipeline_id: &str) -> Result<(), Res
         .await
         .map(|_| ())
         .map_err(Into::into)
-}
-
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct BackfillRequest {
-    /// Start time in microseconds
-    pub start_time: i64,
-    /// End time in microseconds
-    pub end_time: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub chunk_period_minutes: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub delay_between_chunks_secs: Option<i64>,
-    #[serde(default)]
-    pub delete_before_backfill: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
