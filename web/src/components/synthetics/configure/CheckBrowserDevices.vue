@@ -129,6 +129,5 @@ function toggle(browserId: string, deviceId: string) {
         </div>
       </div>
     </div>
-    </div>
   </div>
 </template>

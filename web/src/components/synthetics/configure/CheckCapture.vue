@@ -48,6 +48,5 @@ const screenshot = computed({
       </div>
 
     </div>
-    </div>
   </div>
 </template>
