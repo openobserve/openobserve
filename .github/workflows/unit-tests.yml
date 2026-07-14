@@ -196,11 +196,18 @@ jobs:
       - name: Type-check gate (no errors above baseline)
         working-directory: web
         run: |
-          COUNT=$(npm run --silent type-check:app 2>&1 | grep -c "error TS" || true)
+          OUTPUT=$(npm run --silent type-check:app 2>&1 || true)
+          COUNT=$(printf '%s\n' "$OUTPUT" | grep -c "error TS" || true)
           BASELINE=$(cat typecheck-error-baseline.txt 2>/dev/null || echo 0)
           echo "TypeScript errors: $COUNT (baseline: $BASELINE)"
           if [ "$COUNT" -gt "$BASELINE" ]; then
-            echo "::error::This change introduces TypeScript errors ($COUNT > $BASELINE). Run 'npm run type-check:app' in web/ to see them."
+            echo "----------------- TypeScript errors -----------------"
+            printf '%s\n' "$OUTPUT" | grep "error TS" || true
+            echo "-----------------------------------------------------"
+            # Surface each error as an inline GitHub annotation (file:line).
+            printf '%s\n' "$OUTPUT" | grep "error TS" | \
+              sed -E 's|^(.*)\(([0-9]+),([0-9]+)\): (error TS.*)$|::error file=web/\1,line=\2,col=\3::\4|' || true
+            echo "::error::This change introduces TypeScript errors ($COUNT > $BASELINE). See the list above or run 'npm run type-check:app' in web/."
             exit 1
           fi
           if [ "$COUNT" -lt "$BASELINE" ]; then
