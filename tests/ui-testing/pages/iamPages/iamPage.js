@@ -203,7 +203,7 @@ export class IamPage {
 
     async clickCopyToken() {
 
-        // ODialog renders via reka-ui's DialogPortal, not a Quasar
+        // ODialog renders via reka-ui's DialogPortal, not a
         // #q-portal--dialog--N container, so scope by the token dialog's
         // own data-test attribute instead.
         await this.tokenCopyButton.click();

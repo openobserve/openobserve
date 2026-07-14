@@ -8,8 +8,8 @@
 // active kind, but switching kind never reshapes the form data. Factory keeps
 // the messages i18n-driven (pass useI18n's `t`).
 //
-// Restores the BEFORE (Quasar) validation baseline for this form
-// (complete-quasar-validation-inventory-BEFORE.md, "4 blocks → 6 sub-rules"):
+// Restores the BEFORE validation baseline for this form
+// ("4 blocks → 6 sub-rules"):
 //   • name : required + /^[a-zA-Z0-9_-]+$/ + max 256
 //   • kind : required
 //   • mcp.url      : required when kind === "mcp"   (superRefine)

@@ -22,7 +22,7 @@ export class AlertCreationWizard {
 
     /**
      * Select a stream from the stream name dropdown using keyboard filtering.
-     * The dropdown uses Quasar virtual scroll which only renders visible items.
+     * The dropdown uses virtual scroll which only renders visible items.
      * Typing the stream name triggers QSelect's built-in filter to narrow results.
      */
     async selectStreamByName(streamName) {
@@ -400,7 +400,7 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(2000);
 
         // Aggressively clean up any portal overlays that may intercept pointer events.
-        // Both Quasar (q-portal--dialog) and reka-ui (data-reka-dialog-overlay) portals
+        // Both the q-portal--dialog and reka-ui (data-reka-dialog-overlay) portals
         // can linger after the dialog state is toggled off.
         await this.page.evaluate(() => {
             document.querySelectorAll('div[id^="q-portal--dialog"]').forEach(el => { el.style.display = 'none'; });
@@ -1472,7 +1472,7 @@ export class AlertCreationWizard {
         // In measure mode, the "Alert if" row shows a trigger condition:
         // "is [operator: conditionOperator] [value: conditionValue]"
         // conditionOperator defaults to '>=' but conditionValue is '' (empty) for new alerts.
-        // Quasar validation rule requires non-empty value, so fill it explicitly.
+        // The validation rule requires non-empty value, so fill it explicitly.
         const alertIfTriggerValue = alertIfSection.locator('input[type="number"]').first();
         if (await alertIfTriggerValue.isVisible({ timeout: 3000 }).catch(() => false)) {
             await alertIfTriggerValue.fill('1');

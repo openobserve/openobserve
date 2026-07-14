@@ -18,7 +18,7 @@ import { ref, nextTick } from 'vue';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import regexPatternsService from '@/services/regex_pattern';
-import { convertUnixToQuasarFormat } from '@/utils/zincutils';
+import { convertUnixToDateFormat } from '@/utils/zincutils';
 import config from '@/aws-exports';
 
 // Mock dependencies
@@ -32,11 +32,11 @@ vi.mock('@/services/regex_pattern', () => ({
 vi.mock('@/utils/zincutils', async (importOriginal) => {
   // Preserve all real exports (the mounted component pulls in modules that
   // reference other zincutils helpers like useLocalOrganization) while still
-  // letting the existing setup-style tests stub convertUnixToQuasarFormat.
+  // letting the existing setup-style tests stub convertUnixToDateFormat.
   const actual = (await importOriginal()) as any;
   return {
     ...actual,
-    convertUnixToQuasarFormat: vi.fn(),
+    convertUnixToDateFormat: vi.fn(),
   };
 });
 
@@ -132,8 +132,8 @@ const mockRouter = {
   push: vi.fn()
 };
 
-// Mock Quasar
-const mockQuasar = {
+// Mock notify
+const mockNotify = {
   notify: vi.fn()
 };
 
@@ -170,7 +170,7 @@ describe('RegexPatternList.vue Component Logic', () => {
 
     regexPatternsService.delete.mockResolvedValue({});
 
-    convertUnixToQuasarFormat.mockImplementation((timestamp) =>
+    convertUnixToDateFormat.mockImplementation((timestamp) =>
       `2022-01-01 ${timestamp}`
     );
 
@@ -259,13 +259,13 @@ describe('RegexPatternList.vue Component Logic', () => {
         regexPatterns.value = response.data.patterns.map((pattern) => ({
           ...pattern,
           '#': counter <= 9 ? `0${counter++}` : `${counter++}`,
-          created_at: convertUnixToQuasarFormat(pattern.created_at),
-          updated_at: convertUnixToQuasarFormat(pattern.updated_at),
+          created_at: convertUnixToDateFormat(pattern.created_at),
+          updated_at: convertUnixToDateFormat(pattern.updated_at),
         }));
         mockStore.dispatch('setRegexPatterns', regexPatterns.value);
         resultTotal.value = regexPatterns.value.length;
       } catch (error) {
-        mockQuasar.notify({
+        mockNotify.notify({
           message: error.data?.message || 'Error fetching regex patterns',
           color: 'negative',
           icon: 'error',
@@ -290,13 +290,13 @@ describe('RegexPatternList.vue Component Logic', () => {
       try {
         await regexPatternsService.delete(mockStore.state.selectedOrganization.identifier, deleteDialog.value.data);
         getRegexPatterns();
-        mockQuasar.notify({
+        mockNotify.notify({
           message: 'Regex pattern deleted successfully.',
           color: 'positive',
           timeout: 1500,
         });
       } catch (error) {
-        mockQuasar.notify({
+        mockNotify.notify({
           message: error?.data?.message || error?.response?.data?.message || 'Error deleting regex pattern',
           color: 'negative',
           timeout: 1500,
@@ -331,13 +331,13 @@ describe('RegexPatternList.vue Component Logic', () => {
         link.href = url;
         link.download = `${row.name || 'regex_pattern'}.json`;
         link.click();
-        mockQuasar.notify({
+        mockNotify.notify({
           message: 'Regex pattern exported successfully',
           color: 'positive',
           icon: 'check',
         });
       } catch (error) {
-        mockQuasar.notify({
+        mockNotify.notify({
           message: error.data?.message || 'Error exporting regex pattern',
           color: 'negative',
           icon: 'error',
@@ -657,7 +657,7 @@ describe('RegexPatternList.vue Component Logic', () => {
     await setup.getRegexPatterns();
     
     expect(setup.listLoading.value).toBe(false);
-    expect(mockQuasar.notify).toHaveBeenCalledWith({
+    expect(mockNotify.notify).toHaveBeenCalledWith({
       message: 'API Error',
       color: 'negative',
       icon: 'error',
@@ -673,7 +673,7 @@ describe('RegexPatternList.vue Component Logic', () => {
     await setup.getRegexPatterns();
     
     expect(setup.listLoading.value).toBe(false);
-    expect(mockQuasar.notify).toHaveBeenCalledWith({
+    expect(mockNotify.notify).toHaveBeenCalledWith({
       message: 'Error fetching regex patterns',
       color: 'negative',
       icon: 'error',
@@ -690,7 +690,7 @@ describe('RegexPatternList.vue Component Logic', () => {
     
     await setup.deleteRegexPattern();
     
-    expect(mockQuasar.notify).toHaveBeenCalledWith({
+    expect(mockNotify.notify).toHaveBeenCalledWith({
       message: 'Delete error',
       color: 'negative',
       timeout: 1500,
@@ -707,7 +707,7 @@ describe('RegexPatternList.vue Component Logic', () => {
 
     setup.exportRegexPattern(mockRegexPatterns[0]);
 
-    expect(mockQuasar.notify).toHaveBeenCalledWith({
+    expect(mockNotify.notify).toHaveBeenCalledWith({
       message: 'Error exporting regex pattern',
       color: 'negative',
       icon: 'error',
@@ -882,7 +882,7 @@ describe('RegexPatternList.vue Component Logic', () => {
     
     expect(regexPatternsService.delete).toHaveBeenCalledWith('default', '1');
     expect(regexPatternsService.list).toHaveBeenCalled(); // Called by getRegexPatterns
-    expect(mockQuasar.notify).toHaveBeenCalledWith({
+    expect(mockNotify.notify).toHaveBeenCalledWith({
       message: 'Regex pattern deleted successfully.',
       color: 'positive',
       timeout: 1500,
@@ -896,7 +896,7 @@ describe('RegexPatternList.vue Component Logic', () => {
     
     setup.exportRegexPattern(testRow);
     
-    expect(mockQuasar.notify).toHaveBeenCalledWith({
+    expect(mockNotify.notify).toHaveBeenCalledWith({
       message: 'Regex pattern exported successfully',
       color: 'positive',
       icon: 'check',
@@ -913,7 +913,7 @@ describe('RegexPatternList.vue Component Logic', () => {
     
     await setup.deleteRegexPattern();
     
-    expect(mockQuasar.notify).toHaveBeenCalledWith({
+    expect(mockNotify.notify).toHaveBeenCalledWith({
       message: 'Response delete error',
       color: 'negative',
       timeout: 1500,
@@ -928,7 +928,7 @@ describe('RegexPatternList.vue Component Logic', () => {
     
     await setup.deleteRegexPattern();
     
-    expect(mockQuasar.notify).toHaveBeenCalledWith({
+    expect(mockNotify.notify).toHaveBeenCalledWith({
       message: 'Error deleting regex pattern',
       color: 'negative',
       timeout: 1500,
@@ -986,7 +986,7 @@ describe('RegexPatternList.vue Component Logic', () => {
     await setup.getRegexPatterns();
     
     expect(regexPatternsService.list).toHaveBeenCalledWith('default');
-    expect(convertUnixToQuasarFormat).toHaveBeenCalled();
+    expect(convertUnixToDateFormat).toHaveBeenCalled();
   });
 
   // Test 47: Component pagination state updates correctly
@@ -1177,7 +1177,7 @@ describe('RegexPatternList.vue - ODrawer Migration', () => {
           Pencil: true,
           Trash2: true,
           Download: true,
-          // Quasar layout primitives are stubbed so the page renders without
+          // Layout primitives are stubbed so the page renders without
           // needing a Layout context (q-page normally requires a QLayout
           // ancestor; without one it silently fails to render its slot,
           // which would hide the ODrawer that lives inside).

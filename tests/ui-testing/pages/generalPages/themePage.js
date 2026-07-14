@@ -48,7 +48,7 @@ export class ThemePage {
         // Theme Switcher
         this.themeToggleBtn = page.locator('[data-test="navbar-theme-toggle-btn"]');
 
-        // Body class for theme detection (Quasar dark plugin adds 'body--dark')
+        // Body class for theme detection (the dark plugin adds 'body--dark')
         this.bodyDarkClass = 'body--dark';
 
         // Notification — OToast surfaces success/error toasts under stable data-test slugs

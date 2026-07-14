@@ -18,7 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import ErrorStackTrace from "@/components/rum/errorTracking/view/ErrorStackTrace.vue";
 import i18n from "@/locales";
 
-// Stub tab components so the raw panel renders without full Quasar setup
+// Stub tab components so the raw panel renders without full setup
 const tabPanelStub = {
   template: '<div><slot /></div>',
   props: ["name", "animated"],

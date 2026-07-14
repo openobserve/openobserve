@@ -1915,6 +1915,11 @@
     "tooltipPromptTemplate": "LLM に送信されたプロンプト。評価時の動的値のプレースホルダーとして {input}、{output}、{context} を使用してください。"
   },
   "function": {
+    "csvFileRequired": "CSV ファイルは必須です！",
+    "urlRequired": "URL は必須です！",
+    "urlMustStartWithHttp": "URL は http:// または https:// で始まる必要があります",
+    "nameRequired": "この項目は必須です！",
+    "invalidMethodName": "無効なメソッド名です。文字またはアンダースコアで始める必要があります。使用できるのは文字、数字、アンダースコアのみです。",
     "header": "関数",
     "subtitle": "パイプラインに適用される再利用可能な VRL 機能",
     "clickTestFunctionHint": "イベントを確認するには、「テスト機能」をクリックしてください",

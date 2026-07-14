@@ -109,7 +109,6 @@ describe("ShortUrl", () => {
   it("should render spinner with correct props", () => {
     const spinner = wrapper.find('[data-test="spinner"]');
     expect(spinner.exists()).toBe(true);
-    // Note: Quasar component props may not be reflected as HTML attributes
   });
 
   it("should render message with correct data-test attribute", () => {

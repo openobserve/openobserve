@@ -3,7 +3,7 @@
 // Validation schema for AddGroup.vue. Built via a factory so the required
 // message stays i18n-driven (pass useI18n's `t`).
 //
-// Restores the full pre-migration Quasar rule for `name`
+// Restores the full pre-migration validation rule for `name`
 // (`!!v ? isValidGroupName : nameRequired`) per the truthy→Zod inversion: it is
 // BOTH required (min(1)) AND the alphanumeric/underscore regex — not regex-only.
 
