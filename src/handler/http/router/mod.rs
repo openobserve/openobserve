@@ -982,7 +982,8 @@ pub fn service_routes() -> Router {
             router = router
                 // Synthetics — CRUD + locations
                 .route("/{org_id}/synthetics", get(synthetics::list_synthetics).post(synthetics::create_synthetic).delete(synthetics::delete_synthetics_bulk))
-                .route("/{org_id}/synthetics/locations", get(synthetics::list_locations))
+                .route("/{org_id}/synthetics/locations", get(synthetics::list_locations).post(synthetics::create_location))
+                .route("/{org_id}/synthetics/locations/{id}", put(synthetics::update_location).delete(synthetics::delete_location))
                 .route("/{org_id}/synthetics/{id}", get(synthetics::get_synthetic).put(synthetics::update_synthetic).delete(synthetics::delete_synthetic))
                 .route("/{org_id}/synthetics/{id}/run", post(synthetics::run_synthetic_now))
                 .route("/{org_id}/synthetics/{id}/enable", put(synthetics::set_synthetic_enabled))
@@ -1000,7 +1001,16 @@ pub fn service_routes() -> Router {
                     "/synthetics/jobs/artifact-urls",
                     post(synthetics::job_artifact_urls),
                 )
-                .route("/synthetics/jobs/upload", post(synthetics::job_upload));
+                .route("/synthetics/jobs/upload", post(synthetics::job_upload))
+                // Synthetics — agent liveness API (no org prefix; o2syn_ token)
+                .route(
+                    "/synthetics/agent/register",
+                    post(synthetics::agent_register),
+                )
+                .route(
+                    "/synthetics/agent/heartbeat",
+                    post(synthetics::agent_heartbeat),
+                );
         }
     }
 

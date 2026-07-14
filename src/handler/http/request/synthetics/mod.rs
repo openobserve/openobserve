@@ -927,61 +927,47 @@ pub async fn job_lease(Json(body): Json<serde_json::Value>) -> Response {
 pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let req = match serde_json::from_value::<
-            o2_enterprise::enterprise::synthetics::job_api::AckRequest,
-        >(body)
-        {
+        use o2_enterprise::enterprise::synthetics::job_api::{AckBatchRequest, AckRequest};
+
+        // Batch of rich acks: {"acks": [{...}, ...]}. Cadence is the sender's
+        // choice — browser probe acks per execution (array of one), protocol
+        // agents accumulate per lease cycle. The bare single-job shape stays
+        // accepted for compatibility.
+        if body.get("acks").is_some() {
+            let req = match serde_json::from_value::<AckBatchRequest>(body) {
+                Ok(r) => r,
+                Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+            };
+            let mut results = Vec::with_capacity(req.acks.len());
+            for ack in req.acks {
+                let job_id = ack.job_id.clone();
+                match process_ack(ack).await {
+                    Ok(resp) => results.push(serde_json::json!({
+                        "job_id": job_id,
+                        "ok": true,
+                        "run_complete": resp.run_complete,
+                    })),
+                    Err(e) => {
+                        tracing::error!(job_id = %job_id, "[synthetics] job_ack: {e}");
+                        results.push(serde_json::json!({
+                            "job_id": job_id,
+                            "ok": false,
+                            "error": e.to_string(),
+                        }));
+                    }
+                }
+            }
+            return MetaHttpResponse::json(serde_json::json!({ "results": results }));
+        }
+
+        let req = match serde_json::from_value::<AckRequest>(body) {
             Ok(r) => r,
             Err(e) => {
                 return MetaHttpResponse::bad_request(e.to_string());
             }
         };
-
-        let status = req.status.clone();
-        let response_time_ms = req.response_time_ms;
-        let error = req.error.clone();
-        let checked_at = config::utils::time::now_micros();
-
-        match o2_enterprise::enterprise::synthetics::job_api::ack(req).await {
-            Ok(resp) => {
-                // Emit trigger usage record for synthetics telemetry.
-                crate::service::self_reporting::publish_triggers_usage(
-                    config::meta::self_reporting::usage::TriggerData {
-                        _timestamp: checked_at,
-                        org: resp.org_id.clone(),
-                        module: config::meta::self_reporting::usage::TriggerDataType::Synthetics,
-                        key: format!("{}/{}", resp.synthetics_name, resp.synthetics_id),
-                        start_time: checked_at,
-                        end_time: checked_at,
-                        status: config::meta::self_reporting::usage::TriggerDataStatus::Completed,
-                        success_response: Some(status.clone()),
-                        error: error.clone(),
-                        evaluation_took_in_secs: Some(response_time_ms as f64 / 1000.0),
-                        ..Default::default()
-                    },
-                );
-
-                // Notify once per run, not once per job ack.
-                if resp.run_complete && !resp.destinations.is_empty() {
-                    let notification = crate::service::synthetics::CheckNotification {
-                        org_id: resp.org_id.clone(),
-                        monitor_name: resp.synthetics_name.clone(),
-                        monitor_id: resp.synthetics_id.clone(),
-                        monitor_type: resp.monitor_type.clone(),
-                        target: resp.target.clone(),
-                        destinations: resp.destinations.clone(),
-                        run_id: resp.run_id.clone(),
-                        status: resp.run_status.clone().unwrap_or_else(|| status.clone()),
-                        job_count: resp.job_count as i64,
-                        error: error.clone(),
-                        checked_at,
-                    };
-                    tokio::spawn(async move {
-                        crate::service::synthetics::notify_check_result(notification).await;
-                    });
-                }
-                MetaHttpResponse::json(resp)
-            }
+        match process_ack(req).await {
+            Ok(resp) => MetaHttpResponse::json(resp),
             Err(e) => {
                 tracing::error!("[synthetics] job_ack: {e}");
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
@@ -996,7 +982,359 @@ pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
     }
 }
 
-// ── Locations ─────────────────────────────────────────────────────────────────
+/// Runs one job ack through the enterprise service plus the per-ack side
+/// effects (telemetry, run-complete notification). Shared by the single and
+/// batch forms of `job_ack`.
+#[cfg(feature = "enterprise")]
+async fn process_ack(
+    req: o2_enterprise::enterprise::synthetics::job_api::AckRequest,
+) -> anyhow::Result<o2_enterprise::enterprise::synthetics::job_api::AckResponse> {
+    let status = req.status.clone();
+    let response_time_ms = req.response_time_ms;
+    let error = req.error.clone();
+    let checked_at = config::utils::time::now_micros();
+
+    let resp = o2_enterprise::enterprise::synthetics::job_api::ack(req).await?;
+
+    // Emit trigger usage record for synthetics telemetry.
+    crate::service::self_reporting::publish_triggers_usage(
+        config::meta::self_reporting::usage::TriggerData {
+            _timestamp: checked_at,
+            org: resp.org_id.clone(),
+            module: config::meta::self_reporting::usage::TriggerDataType::Synthetics,
+            key: format!("{}/{}", resp.synthetics_name, resp.synthetics_id),
+            start_time: checked_at,
+            end_time: checked_at,
+            status: config::meta::self_reporting::usage::TriggerDataStatus::Completed,
+            success_response: Some(status.clone()),
+            error: error.clone(),
+            evaluation_took_in_secs: Some(response_time_ms / 1000.0),
+            ..Default::default()
+        },
+    );
+
+    // Notify once per run, not once per job ack.
+    if resp.run_complete && !resp.destinations.is_empty() {
+        let notification = crate::service::synthetics::CheckNotification {
+            org_id: resp.org_id.clone(),
+            monitor_name: resp.synthetics_name.clone(),
+            monitor_id: resp.synthetics_id.clone(),
+            monitor_type: resp.synthetic_type.clone(),
+            target: resp.target.clone(),
+            destinations: resp.destinations.clone(),
+            run_id: resp.run_id.clone(),
+            status: resp.run_status.clone().unwrap_or_else(|| status.clone()),
+            job_count: resp.job_count as i64,
+            error: error.clone(),
+            checked_at,
+        };
+        tokio::spawn(async move {
+            crate::service::synthetics::notify_check_result(notification).await;
+        });
+    }
+    Ok(resp)
+}
+
+// ── Agent liveness API (probe-facing, authenticated via o2syn_ token) ────────
+
+/// Resolves the org owning the `o2syn_` token in a Basic Authorization header.
+/// The auth middleware has already validated the token; this recovers the org
+/// for scoping, which the middleware does not propagate on probe paths.
+#[cfg(feature = "enterprise")]
+async fn probe_token_org(headers: &axum::http::HeaderMap) -> Option<String> {
+    let auth = headers
+        .get(axum::http::header::AUTHORIZATION)?
+        .to_str()
+        .ok()?;
+    let decoded = config::utils::base64::decode(auth.strip_prefix("Basic ")?).ok()?;
+    let token = decoded.split_once(':')?.1;
+    infra::table::synthetics_probe_tokens::find_global(token)
+        .await
+        .ok()
+        .flatten()
+        .map(|t| t.org_id)
+}
+
+#[utoipa::path(
+    post,
+    path = "/synthetics/agent/register",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "SyntheticsAgentRegister",
+    summary = "Register a probe agent for a location (authenticated via o2syn_ token)",
+    security(("Authorization" = [])),
+    request_body(content = Object, description = r#"{"name": "dc1-agent-01", "location_id": "...", "version": "1.2.0", "capabilities": {"types": ["http"], "icmp": false}}"#, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "Location not found"),
+        (status = 500, description = "Error", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn agent_register(
+    headers: axum::http::HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let Some(org_id) = probe_token_org(&headers).await else {
+            return MetaHttpResponse::unauthorized("invalid probe token");
+        };
+        let req = match serde_json::from_value::<
+            o2_enterprise::enterprise::synthetics::agent::RegisterRequest,
+        >(body)
+        {
+            Ok(r) => r,
+            Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+        };
+        match o2_enterprise::enterprise::synthetics::agent::register(req, &org_id).await {
+            Ok(resp) => MetaHttpResponse::json(resp),
+            Err(e) => {
+                let msg = e.to_string();
+                if msg.contains("not found") || msg.contains("disabled") {
+                    return MetaHttpResponse::not_found(msg);
+                }
+                tracing::error!("[synthetics] agent_register: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (headers, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/synthetics/agent/heartbeat",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "SyntheticsAgentHeartbeat",
+    summary = "Refresh an agent's liveness (authenticated via o2syn_ token)",
+    security(("Authorization" = [])),
+    request_body(content = Object, description = r#"{"agent_id": "..."}"#, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "Agent not found"),
+        (status = 500, description = "Error", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn agent_heartbeat(
+    headers: axum::http::HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let Some(org_id) = probe_token_org(&headers).await else {
+            return MetaHttpResponse::unauthorized("invalid probe token");
+        };
+        let req = match serde_json::from_value::<
+            o2_enterprise::enterprise::synthetics::agent::HeartbeatRequest,
+        >(body)
+        {
+            Ok(r) => r,
+            Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+        };
+        match o2_enterprise::enterprise::synthetics::agent::heartbeat(req, &org_id).await {
+            Ok(resp) => MetaHttpResponse::json(resp),
+            Err(e) => {
+                let msg = e.to_string();
+                if msg.contains("not found") {
+                    return MetaHttpResponse::not_found(msg);
+                }
+                tracing::error!("[synthetics] agent_heartbeat: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (headers, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+// ── Locations CRUD ────────────────────────────────────────────────────────────
+
+/// Maps a location service error onto the right HTTP status.
+#[cfg(feature = "enterprise")]
+fn location_error_response(e: anyhow::Error) -> Response {
+    let msg = e.to_string();
+    if msg.starts_with("validation:") {
+        MetaHttpResponse::bad_request(msg)
+    } else if msg.starts_with("forbidden:") {
+        MetaHttpResponse::forbidden(msg)
+    } else if msg.contains("not found") {
+        MetaHttpResponse::not_found(msg)
+    } else {
+        tracing::error!("[synthetics] locations: {msg}");
+        MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg).into_response()
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/synthetics/locations",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "CreateSyntheticsLocation",
+    summary = "Create a probe location (kind=public is root-only)",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = Object, description = r#"{"kind": "public", "id": "aws-us-east-1", "provider": "aws", "region": "us-east-1", "label": "AWS US East (N. Virginia)"}"#, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Validation error"),
+        (status = 403, description = "Public locations are root-only"),
+    ),
+)]
+pub async fn create_location(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::synthetics::service::{
+            CreateLocationRequest, create_location,
+        };
+
+        let is_root = crate::common::utils::auth::is_root_user(&user_email.user_id);
+
+        // Batch shape: {"locations": [{...}, ...]} → per-item results, same
+        // pattern as batch acks. Single-object shape stays unchanged.
+        if body.get("locations").is_some() {
+            #[derive(serde::Deserialize)]
+            struct Batch {
+                locations: Vec<CreateLocationRequest>,
+            }
+            let batch = match serde_json::from_value::<Batch>(body) {
+                Ok(b) => b,
+                Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+            };
+            let mut results = Vec::with_capacity(batch.locations.len());
+            for req in batch.locations {
+                let label = req.label.clone();
+                match create_location(&org_id, is_root, req).await {
+                    Ok(loc) => results.push(serde_json::json!({
+                        "id": loc.id, "pool": loc.pool, "ok": true,
+                    })),
+                    Err(e) => results.push(serde_json::json!({
+                        "label": label, "ok": false, "error": e.to_string(),
+                    })),
+                }
+            }
+            return MetaHttpResponse::json(serde_json::json!({ "results": results }));
+        }
+
+        let req = match serde_json::from_value::<CreateLocationRequest>(body) {
+            Ok(r) => r,
+            Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+        };
+        match create_location(&org_id, is_root, req).await {
+            Ok(loc) => MetaHttpResponse::json(loc),
+            Err(e) => location_error_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    put,
+    path = "/{org_id}/synthetics/locations/{id}",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "UpdateSyntheticsLocation",
+    summary = "Update a probe location's label/enabled (public rows root-only)",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Location id"),
+    ),
+    request_body(content = Object, description = r#"{"label": "New label", "enabled": true}"#, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Public locations are root-only"),
+        (status = 404, description = "Not found"),
+    ),
+)]
+pub async fn update_location(
+    Path((org_id, id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let is_root = crate::common::utils::auth::is_root_user(&user_email.user_id);
+        let req = match serde_json::from_value::<
+            o2_enterprise::enterprise::synthetics::service::UpdateLocationRequest,
+        >(body)
+        {
+            Ok(r) => r,
+            Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+        };
+        match o2_enterprise::enterprise::synthetics::service::update_location(
+            &org_id, is_root, &id, req,
+        )
+        .await
+        {
+            Ok(loc) => MetaHttpResponse::json(loc),
+            Err(e) => location_error_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/synthetics/locations/{id}",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "DeleteSyntheticsLocation",
+    summary = "Delete a probe location (rejected while synthetics reference it)",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Location id"),
+    ),
+    responses(
+        (status = 200, description = "Deleted"),
+        (status = 400, description = "Still referenced by synthetics"),
+        (status = 403, description = "Public locations are root-only"),
+        (status = 404, description = "Not found"),
+    ),
+)]
+pub async fn delete_location(
+    Path((org_id, id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let is_root = crate::common::utils::auth::is_root_user(&user_email.user_id);
+        match o2_enterprise::enterprise::synthetics::service::delete_location(&org_id, is_root, &id)
+            .await
+        {
+            Ok(()) => MetaHttpResponse::json(serde_json::json!({"deleted": true})),
+            Err(e) => location_error_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
 
 #[utoipa::path(
     get,
@@ -1016,8 +1354,15 @@ pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
 pub async fn list_locations(Path(_org_id): Path<String>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let capabilities = o2_enterprise::enterprise::synthetics::service::list_capabilities();
-        MetaHttpResponse::json(capabilities)
+        match o2_enterprise::enterprise::synthetics::service::list_locations_for_org(&_org_id).await
+        {
+            Ok(capabilities) => MetaHttpResponse::json(capabilities),
+            Err(e) => {
+                tracing::error!("[synthetics] list_locations: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
     }
     #[cfg(not(feature = "enterprise"))]
     {

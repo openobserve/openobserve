@@ -385,10 +385,11 @@ where
             path_columns[0].to_string()
         };
 
-        // Synthetics probe job API — no org_id in path, authenticated via org ingestion token.
+        // Synthetics probe job + agent APIs — no org_id in path, authenticated
+        // via the o2syn_ probe token.
         if method.eq("POST")
             && path_columns.first() == Some(&"synthetics")
-            && path_columns.get(1) == Some(&"jobs")
+            && matches!(path_columns.get(1), Some(&"jobs") | Some(&"agent"))
         {
             if let Some(auth_header) = parts.headers.get("Authorization")
                 && let Ok(auth_str) = auth_header.to_str()

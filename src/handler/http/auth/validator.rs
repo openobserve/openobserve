@@ -252,10 +252,11 @@ pub async fn validate_credentials(
         path_columns.pop();
     }
 
-    // Synthetics probe job API — no org_id in path. Look up exclusively in
-    // synthetics_probe_tokens (o2syn_ prefix). Separate table from o2oi_ ingest tokens.
-    let is_synthetics_job_path =
-        path_columns.first() == Some(&"synthetics") && path_columns.get(1) == Some(&"jobs");
+    // Synthetics probe job + agent APIs — no org_id in path. Look up exclusively
+    // in synthetics_probe_tokens (o2syn_ prefix). Separate table from o2oi_
+    // ingest tokens.
+    let is_synthetics_job_path = path_columns.first() == Some(&"synthetics")
+        && matches!(path_columns.get(1), Some(&"jobs") | Some(&"agent"));
     if is_synthetics_job_path
         && user_password
             .starts_with(infra::table::synthetics_probe_tokens::SYNTHETICS_PROBE_TOKEN_PREFIX)
