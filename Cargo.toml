@@ -222,7 +222,7 @@ tokio-rustls.workspace = true
 flight.workspace = true
 async-stream.workspace = true
 sourcemap = "9.3.2"
-openobserve-core = { path = "crates/openobserve-core" }
+openobserve-core = { path = "src/core" }
 
 [dev-dependencies]
 expect-test.workspace = true
@@ -233,7 +233,7 @@ rcgen = "0.14.4"
 
 [workspace]
 members = [
-    "crates/openobserve-core",
+    "src/core",
     "src/config",
     "src/infra",
     "src/ingester",
@@ -259,11 +259,11 @@ proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
 flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
-o2_dex = { path = "crates/enterprise-stubs/o2_dex" }
-o2_enterprise = { path = "crates/enterprise-stubs/o2_enterprise", default-features = false }
-o2_openfga = { path = "crates/enterprise-stubs/o2_openfga" }
-vortex = { path = "crates/enterprise-stubs/vortex" }
-vortex-datafusion = { path = "crates/enterprise-stubs/vortex-datafusion" }
+o2_dex = { path = "src/enterprise-stubs/o2_dex" }
+o2_enterprise = { path = "src/enterprise-stubs/o2_enterprise", default-features = false }
+o2_openfga = { path = "src/enterprise-stubs/o2_openfga" }
+vortex = { path = "src/enterprise-stubs/vortex" }
+vortex-datafusion = { path = "src/enterprise-stubs/vortex-datafusion" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
 axum = { version = "0.8", features = ["macros", "multipart", "tracing"] }

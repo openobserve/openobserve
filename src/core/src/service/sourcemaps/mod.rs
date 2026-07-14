@@ -536,7 +536,26 @@ mod tests {
 
     use super::{super::db::sourcemaps::*, *};
 
+    // Unit tests run without `init-db` (which creates the sqlite db dir and runs
+    // migrations from the workspace root); create the db dir and the one table
+    // these tests touch so they are self-contained under any meta store / cwd.
+    async fn ensure_source_maps_table() {
+        use sea_orm::{ConnectionTrait, Schema};
+
+        infra::db::create_table().await.unwrap();
+        let client = infra::db::ORM_CLIENT
+            .get_or_init(infra::db::connect_to_orm)
+            .await;
+        let backend = client.get_database_backend();
+        let mut stmt = Schema::new(backend)
+            .create_table_from_entity(infra::table::entity::source_maps::Entity);
+        // Ignore errors from concurrent `if_not_exists` races; the queries below
+        // fail loudly if the table is genuinely missing.
+        let _ = client.execute(backend.build(stmt.if_not_exists())).await;
+    }
+
     async fn upload_zip(svc: &str, env: &str, version: &str) {
+        ensure_source_maps_table().await;
         delete_group(
             "default",
             Some(svc.into()),
@@ -545,7 +564,13 @@ mod tests {
         )
         .await
         .unwrap();
-        let f = std::fs::read("tests/sourcemaps.zip").unwrap();
+        // The fixture lives at the workspace root and is shared with the api/ui test
+        // suites; unit tests run with the crate dir as cwd, so anchor on the manifest.
+        let f = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/sourcemaps.zip"
+        ))
+        .unwrap();
         process_zip(
             "default",
             Some(svc.into()),

@@ -814,7 +814,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(alert_grouping::process_expired_batches());
     tokio::task::spawn(file_downloader::run());
     // Note: Service discovery extraction runs automatically during parquet file processing
-    // See crates/openobserve-core/src/job/files/parquet.rs:queue_services_from_data_file for
+    // See src/core/src/job/files/parquet.rs:queue_services_from_data_file for
     // implementation
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(

@@ -18,6 +18,7 @@ flamegraph.html
 /tmp/
 /data*/
 /src/infra/data/
+/src/core/data/
 /.idea/
 /.vscode
 /.env
