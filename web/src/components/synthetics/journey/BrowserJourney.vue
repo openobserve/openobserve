@@ -412,7 +412,7 @@ function openChromeExtensions() {
             @click="emit('replay')"
             icon-left="replay"
           >
-            Run replay
+            Replay
           </OButton>
           <OButton
             v-else-if="replayPhase === 'running'"
@@ -432,7 +432,7 @@ function openChromeExtensions() {
             @click="emit('replay')"
             icon-left="replay"
           >
-            Re-run
+            Replay
           </OButton>
         </template>
 

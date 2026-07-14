@@ -572,7 +572,7 @@ function onClearResults() {
 
     <!-- ── Editor phase ── -->
     <template v-else>
-      <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0">
+      <div class="flex-1 flex flex-col min-h-0">
           <OStepper
             v-model="currentStep"
         :navigable="true"
@@ -700,6 +700,7 @@ function onClearResults() {
           Delete {{ journeySelectionState.count }} step{{ journeySelectionState.count !== 1 ? 's' : '' }}? This cannot be undone.
         </p>
       </ODialog>
-    </template>
+    </div>
+  </template>
   </div>
 </template>

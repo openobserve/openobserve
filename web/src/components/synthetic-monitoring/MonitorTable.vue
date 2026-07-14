@@ -30,22 +30,22 @@
 
     <!-- Status dot -->
     <template #cell-status="{ row }">
-      <span class="dot" :class="'dot--' + (row as any).status.toLowerCase()" />
+      <span :class="dotCls((row as any).status)" />
     </template>
 
     <!-- Monitor name -->
     <template #cell-name="{ row }">
-      <div class="mon-name">{{ (row as any).name }}</div>
+      <div class="text-sm font-semibold truncate">{{ (row as any).name }}</div>
     </template>
 
     <!-- URL / Endpoint -->
     <template #cell-url="{ row }">
-      <div class="mon-url">{{ (row as any).url }}</div>
+      <div class="text-xs font-mono text-text-code truncate">{{ (row as any).url }}</div>
     </template>
 
     <!-- HTTP Method badge (API mode) -->
     <template #cell-method="{ row }">
-      <span class="http-method" :class="'method--' + (row as any).method.toLowerCase()">{{ (row as any).method }}</span>
+      <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-xs font-bold font-mono" :class="methodCls((row as any).method)">{{ (row as any).method }}</span>
     </template>
 
     <!-- Steps count (Browser mode) -->
@@ -61,7 +61,7 @@
     <!-- Folder name (cross-folder search mode) — click navigates sidebar to that folder -->
     <template #cell-folder_name="{ row }">
       <button
-        class="text-sm text-[var(--o2-text-link)] cursor-pointer bg-transparent border-0 p-0 hover:underline"
+        class="text-xs text-text-link cursor-pointer bg-transparent border-0 p-0 hover:underline"
         @click.stop="emit('navigate-to-folder', (row as any).folderId)"
       >
         {{ (row as any).folder_name ?? '—' }}
@@ -80,7 +80,7 @@
           v-for="(tick, i) in (row as any).history"
           :key="i"
           class="spark-bar"
-          :class="'spark--' + tick.status"
+          :class="tick.status === 'up' ? 'bg-success-500' : tick.status === 'down' ? 'bg-error-500' : 'bg-warning-500'"
           @mouseenter="showSparkTip($event, tick)"
           @mouseleave="hideSparkTip"
         />
@@ -89,13 +89,13 @@
 
     <!-- Response time -->
     <template #cell-responseTime="{ row }">
-      <span class="mono" :class="rtCls((row as any).responseTime)">{{ (row as any).responseTime ?? '—' }}</span>
+      <span :class="'font-mono text-sm font-semibold ' + rtCls((row as any).responseTime)">{{ (row as any).responseTime ?? '—' }}</span>
     </template>
 
     <!-- Uptime with progress bar -->
     <template #cell-uptime="{ row }">
       <template v-if="(row as any).uptime !== null">
-        <div class="uptime-row">
+        <div class="flex items-center justify-end gap-2">
           <OProgressBar
             :value="(row as any).uptime / 100"
             :variant="(row as any).uptime >= 99 ? 'default' : (row as any).uptime >= 95 ? 'warning' : 'danger'"
@@ -103,20 +103,19 @@
             class="flex-1"
           />
           <span
-            class="mono"
-            :class="(row as any).uptime >= 99 ? 'c-g' : (row as any).uptime >= 95 ? 'c-a' : 'c-r'"
-            style="min-width:44px;text-align:right;font-size:12px"
+            :class="'font-mono text-sm font-semibold min-w-[44px] text-right text-xs '
+              + ((row as any).uptime >= 99 ? 'text-success-600' : (row as any).uptime >= 95 ? 'text-amber-600' : 'text-error-600')"
           >{{ (row as any).uptime }}%</span>
         </div>
       </template>
-      <span v-else class="text-secondary" style="font-size:13px">—</span>
+      <span v-else class="text-xs text-text-secondary">—</span>
     </template>
 
     <!-- Locations with tooltip (monitors mode) -->
     <template #cell-locations="{ row }">
-      <div class="locs-cell" @mouseenter="showLoc($event, (row as any).locations)" @mouseleave="hideLoc">
-        <span class="loc-first">{{ (row as any).locations[0] }}</span>
-        <span v-if="(row as any).locations.length > 1" class="loc-badge">+{{ (row as any).locations.length - 1 }}</span>
+      <div class="flex items-center gap-1 cursor-default" @mouseenter="showLoc($event, (row as any).locations)" @mouseleave="hideLoc">
+        <span class="text-xs truncate max-w-[70px]">{{ (row as any).locations[0] }}</span>
+        <span v-if="(row as any).locations.length > 1" class="text-xs font-bold px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 whitespace-nowrap shrink-0">+{{ (row as any).locations.length - 1 }}</span>
       </div>
     </template>
 
@@ -132,7 +131,7 @@
 
     <!-- Row actions -->
     <template #cell-actions="{ row }">
-      <div class="flex items-center row-actions" @click.stop>
+      <div class="flex items-center gap-0.5" @click.stop>
         <!-- Enable/Pause toggle with per-row spinner -->
         <div
           v-if="props.toggleLoadingMap[(row as any).id]"
@@ -415,12 +414,13 @@ const FOLDER_COL: OTableColumnDef = {
 
 const columns = computed<OTableColumnDef[]>(() => {
   let cols: OTableColumnDef[]
+  console.log(props.mode);
   if (props.mode === 'browser') {
     cols = [STATUS_COL, TEST_NAME_COL, URL_COL, STEPS_COL, HISTORY_COL, PAGE_LOAD_COL, UPTIME_COL, LAST_RUN_COL, ACTIONS_COL]
   } else if (props.mode === 'api') {
     cols = [STATUS_COL, TEST_NAME_COL, METHOD_COL, ENDPOINT_COL, ASSERTIONS_COL, HISTORY_COL, P50_COL, UPTIME_COL, LAST_RUN_COL, ACTIONS_COL]
   } else {
-    cols = [STATUS_COL, NAME_COL, URL_COL, TYPE_COL, HISTORY_COL, RESPONSE_TIME_COL, UPTIME_COL, LOCATIONS_COL, INTERVAL_COL, LAST_CHECK_COL, ACTIONS_COL]
+    cols = [STATUS_COL, NAME_COL, URL_COL, TYPE_COL, RESPONSE_TIME_COL, LOCATIONS_COL, INTERVAL_COL, LAST_CHECK_COL, ACTIONS_COL]
   }
   if (props.showFolderColumn) {
     const nameIdx = cols.findIndex(c => c.id === 'name')
@@ -432,9 +432,29 @@ const columns = computed<OTableColumnDef[]>(() => {
 // ── Utilities ────────────────────────────────────────────────────────
 
 const rtCls = (rt: string | null) => {
-  if (!rt) return 'c-r'
+  if (!rt) return 'text-error-600'
   const v = parseFloat(rt)
-  return v < 300 ? 'c-g' : v < 1000 ? 'c-a' : 'c-r'
+  return v < 300 ? 'text-success-600' : v < 1000 ? 'text-amber-600' : 'text-error-600'
+}
+
+const dotCls = (status: string): string => {
+  const map: Record<string, string> = {
+    up: 'size-[9px] rounded-full shrink-0 bg-success-500 shadow-[0_0_0_3px_var(--color-success-500)/0.15]',
+    degraded: 'size-[9px] rounded-full shrink-0 bg-warning-500 shadow-[0_0_0_3px_var(--color-warning-500)/0.15]',
+    down: 'size-[9px] rounded-full shrink-0 bg-error-500 shadow-[0_0_0_3px_var(--color-error-500)/0.15]',
+    unknown: 'size-[9px] rounded-full shrink-0 bg-neutral-400 shadow-[0_0_0_3px_var(--color-neutral-400)/0.15]',
+  }
+  return map[status.toLowerCase()] ?? map.unknown
+}
+
+const methodCls = (method: string): string => {
+  const map: Record<string, string> = {
+    get: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
+    post: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300',
+    put: 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300',
+    delete: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
+  }
+  return map[method.toLowerCase()] ?? 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
 }
 
 const typeBadgeVariant = (type: string): string => {
@@ -497,25 +517,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.dot         { display:inline-block; border-radius:50%; flex-shrink:0; }
-.dot--up       { width:9px; height:9px; background:#22c55e; box-shadow:0 0 0 3px rgba(34,197,94,.15); }
-.dot--degraded { width:9px; height:9px; background:#f59e0b; box-shadow:0 0 0 3px rgba(245,158,11,.15); }
-.dot--down     { width:9px; height:9px; background:#ef4444; box-shadow:0 0 0 3px rgba(239,68,68,.15); }
-.dot--unknown  { width:9px; height:9px; background:#94a3b8; box-shadow:0 0 0 3px rgba(148,163,184,.15); }
-
-.mon-name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.mon-url  { font-size:11px; font-family:monospace; color:var(--o2-tab-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-
-.http-method    { display:inline-block; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:700; font-family:monospace; }
-.method--get    { background:#dbeafe; color:#1d4ed8; }
-.method--post   { background:#d1fae5; color:#065f46; }
-.method--put    { background:#ffedd5; color:#c2410c; }
-.method--delete { background:#fee2e2; color:#991b1b; }
-.body--dark .method--get    { background:#172554; color:#93c5fd; }
-.body--dark .method--post   { background:#052e16; color:#6ee7b7; }
-.body--dark .method--put    { background:#431407; color:#fdba74; }
-.body--dark .method--delete { background:#450a0a; color:#fca5a5; }
-
+/* Sparkbar — container, bar shape, hover/dim interaction (kept: :has() can't be expressed in Tailwind) */
 .spark { display:flex; align-items:flex-end; gap:2px; height:20px; }
 .spark-bar {
   width:7px; height:18px; border-radius:2px; flex-shrink:0; cursor:pointer;
@@ -523,22 +525,6 @@ onUnmounted(() => {
 }
 .spark-bar:hover { height:20px; filter:brightness(1.25); }
 .spark:has(.spark-bar:hover) .spark-bar:not(:hover) { opacity:.45; }
-.spark--up   { background:#22c55e; }
-.spark--down { background:#ef4444; }
-.spark--deg  { background:#f59e0b; }
-
-.uptime-row { display:flex; align-items:center; justify-content:flex-end; gap:8px; }
-
-.locs-cell  { display:flex; align-items:center; gap:5px; cursor:default; }
-.loc-first  { font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:70px; }
-.loc-badge  { font-size:11px; font-weight:700; padding:1px 5px; background:rgba(128,128,128,.18); border-radius:4px; white-space:nowrap; flex-shrink:0; }
-
-.row-actions { display:flex; align-items:center; gap:2px; }
-
-.mono { font-family:monospace; font-size:13px; font-weight:600; }
-.c-g  { color:#16a34a; }
-.c-a  { color:#d97706; }
-.c-r  { color:#dc2626; }
 
 /* Locations tooltip */
 .loc-float-tip  { position:fixed; z-index:9999; background:#1e293b; color:#f1f5f9; border-radius:8px; padding:9px 13px; box-shadow:0 8px 24px rgba(0,0,0,.28); min-width:150px; pointer-events:none; }
