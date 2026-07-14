@@ -1,6 +1,8 @@
 // Page object for Dashboard Panel Drilldown configuration
 // Covers: Logs, URL, byDashboard drilldown types + chart-click trigger
 
+import { expect } from "@playwright/test";
+
 export default class DashboardDrilldownPage {
   constructor(page) {
     this.page = page;
@@ -17,6 +19,15 @@ export default class DashboardDrilldownPage {
     this.folderSelect = page.locator('[data-test="dashboard-drilldown-folder-select"]');
     this.dashboardSelect = page.locator('[data-test="dashboard-drilldown-dashboard-select"]');
     this.tabSelect = page.locator('[data-test="dashboard-drilldown-tab-select"]');
+
+    // The clickable part of an OSelect is the trigger <button> INSIDE the
+    // `data-test` wrapper — and the `disabled` attribute lives on that button,
+    // not on the wrapper. Clicking the wrapper therefore skips Playwright's
+    // "enabled" actionability check entirely (a <div> is never disabled) and the
+    // click lands on a disabled <button>, where the browser swallows it. Always
+    // drive the trigger so the click waits for the select's list to finish loading.
+    this.selectTrigger = (baseTestId) =>
+      page.locator(`[data-test="${baseTestId}-trigger"]`);
     this.confirmButton = page.locator(
       '[data-test="dashboard-drilldown-popup"] [data-test="o-dialog-primary-btn"]'
     );
@@ -38,6 +49,36 @@ export default class DashboardDrilldownPage {
 
   generateUniqueDrilldownName(prefix = "u") {
     return `${prefix}_${Date.now()}`;
+  }
+
+  /**
+   * Open a drilldown OSelect dropdown and wait until its listbox is really open.
+   *
+   * The three byDashboard selects cascade through async fetches (folders →
+   * dashboards → tabs) and each one renders `:disabled` while its own list is in
+   * flight. Two things then have to be true before an option can be clicked:
+   *
+   *  1. the trigger must be enabled — so we click the trigger <button> (which
+   *     carries `disabled`) rather than the wrapper <div>, letting Playwright's
+   *     actionability check wait out the load instead of firing a click that the
+   *     disabled button silently drops;
+   *  2. the popover must actually be open — the trigger can flip back to disabled
+   *     between the actionability check and the dispatched mouse event (the tab
+   *     list is refetched when the dashboard changes), so we assert `data-state`
+   *     and re-issue the click if the popover did not open.
+   *
+   * @param {string} baseTestId - e.g. "dashboard-drilldown-tab-select"
+   */
+  async openSelectDropdown(baseTestId) {
+    const trigger = this.selectTrigger(baseTestId);
+    await expect(trigger).toBeEnabled({ timeout: 15000 });
+
+    await expect(async () => {
+      if ((await trigger.getAttribute("data-state")) !== "open") {
+        await trigger.click();
+      }
+      await expect(trigger).toHaveAttribute("data-state", "open", { timeout: 2000 });
+    }).toPass({ timeout: 20000, intervals: [200, 500, 1000] });
   }
 
   // Backward-compatible alias for dashboard.spec.js (old signature: folderName, drilldownName, dashboardName, tabName)
@@ -119,15 +160,15 @@ export default class DashboardDrilldownPage {
     await this.openPopup(name);
     // byDashboard is the default drilldown type
     await this.folderSelect.waitFor({ state: 'visible', timeout: 10000 });
-    await this.folderSelect.click();
+    await this.openSelectDropdown("dashboard-drilldown-folder-select");
     await this.folderOptionByValue(folderName).first().click();
 
     await this.dashboardSelect.waitFor({ state: 'visible', timeout: 10000 });
-    await this.dashboardSelect.click();
+    await this.openSelectDropdown("dashboard-drilldown-dashboard-select");
     await this.dashboardOptionByValue(dashboardTitle).first().click();
 
     await this.tabSelect.waitFor({ state: 'visible', timeout: 10000 });
-    await this.tabSelect.click();
+    await this.openSelectDropdown("dashboard-drilldown-tab-select");
     if (tabName) {
       await this.tabOptionByValue(tabName).first().click();
     } else {

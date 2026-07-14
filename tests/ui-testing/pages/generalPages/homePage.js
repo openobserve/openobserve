@@ -1,6 +1,6 @@
 // homePage.js - Landing Page Object for OpenObserve
 import { expect } from '@playwright/test';
-import { openNavFlyoutChild } from '../commonActions.js';
+import { openNavFlyoutChild, gotoMetricsEditor } from '../commonActions.js';
 
 export class HomePage {
     constructor(page) {
@@ -87,10 +87,20 @@ export class HomePage {
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
+    /**
+     * Clicks the sidebar's Metrics item — which is what this page object's
+     * callers are testing — and then continues into the panel EDITOR, whose
+     * controls `validateMetricsPageElements` asserts on.
+     *
+     * The sidebar now lands on the Metrics Explorer browse grid (`/metrics`);
+     * the editor moved to `/metrics/editor`. Both hops are kept so the sidebar
+     * link itself stays covered rather than being bypassed by a direct goto.
+     */
     async navigateToMetrics() {
         await this.metricsMenu.waitFor({ state: 'visible', timeout: 10000 });
         await this.metricsMenu.click();
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        await gotoMetricsEditor(this.page);
     }
 
     async navigateToTraces() {

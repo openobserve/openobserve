@@ -679,7 +679,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
-import { formatDate } from "@/utils/date";
+import { convertUnixToQuasarFormat as convertUnixToFormat } from "@/utils/date";
 import { useI18n } from "vue-i18n";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
@@ -1683,13 +1683,9 @@ export default defineComponent({
       return filteredResults.value?.length;
     });
 
-    function convertUnixToQuasarFormat(unixMicroseconds: any) {
-      if (!unixMicroseconds) return "";
-      const unixSeconds = unixMicroseconds / 1e6;
-      const dateToFormat = new Date(unixSeconds * 1000);
-      const formattedDate = dateToFormat.toISOString();
-      return formatDate(formattedDate, "YYYY-MM-DD HH:mm:ss");
-    }
+    // No timezone suffix in this table, unlike the other lists.
+    const convertUnixToQuasarFormat = (unixMicroseconds: any) =>
+      convertUnixToFormat(unixMicroseconds, "YYYY-MM-DD HH:mm:ss");
 
     const addAlert = () => {
       showAddAlertDialog.value = true;

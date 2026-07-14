@@ -924,7 +924,10 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { formatDate as formatDateUtil, formatTimestamp } from "@/utils/date";
+import {
+  convertUnixToQuasarFormat as convertUnixToFormat,
+  formatTimestamp,
+} from "@/utils/date";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
 import {
@@ -2275,13 +2278,9 @@ export default defineComponent({
         resultTotal.value = streamResponse.schema?.length;
       }
     };
-    function convertUnixToQuasarFormat(unixMicroseconds: any) {
-      if (!unixMicroseconds) return "";
-      const unixSeconds = unixMicroseconds / 1e6;
-      const dateToFormat = new Date(unixSeconds * 1000);
-      const formattedDate = dateToFormat.toISOString();
-      return formatDateUtil(formattedDate, "DD-MM-YYYY");
-    }
+    // Date only: this column shows a retention window, not an instant.
+    const convertUnixToQuasarFormat = (unixMicroseconds: any) =>
+      convertUnixToFormat(unixMicroseconds, "DD-MM-YYYY");
     function formatDate(dateString) {
       const date = new Date(dateString); // Convert to Date object
       const day = String(date.getDate()).padStart(2, "0"); // Get day with leading zero

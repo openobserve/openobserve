@@ -66,11 +66,14 @@ jobs:
   api_integration_tests:
     name: api_integration_tests
     needs: [check_changes]
+    # API-relevant changes are required in every case. On a pull_request the 'e2e'
+    # label is an ADDITIONAL opt-in, not a bypass: the label is shared with the
+    # Playwright suite, so a frontend-only PR carries it to run UI tests and must
+    # not drag the whole API suite (8 jobs, each a full cargo build) along with it.
     if: >-
-      (github.event_name == 'pull_request' &&
-       contains(github.event.pull_request.labels.*.name, 'e2e')) ||
-      (github.event_name != 'pull_request' &&
-       needs.check_changes.outputs.has_changes == 'true')
+      needs.check_changes.outputs.has_changes == 'true' &&
+      (github.event_name != 'pull_request' ||
+       contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubicloud-standard-4
     permissions:
       contents: read  # only need to checkout the repo
@@ -179,11 +182,14 @@ jobs:
   api_query_agent_tests:
     name: "api_query_agent / ${{ matrix.config.label }}"
     needs: [check_changes]
+    # API-relevant changes are required in every case. On a pull_request the 'e2e'
+    # label is an ADDITIONAL opt-in, not a bypass: the label is shared with the
+    # Playwright suite, so a frontend-only PR carries it to run UI tests and must
+    # not drag the whole API suite (8 jobs, each a full cargo build) along with it.
     if: >-
-      (github.event_name == 'pull_request' &&
-       contains(github.event.pull_request.labels.*.name, 'e2e')) ||
-      (github.event_name != 'pull_request' &&
-       needs.check_changes.outputs.has_changes == 'true')
+      needs.check_changes.outputs.has_changes == 'true' &&
+      (github.event_name != 'pull_request' ||
+       contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubicloud-standard-4
     # Run the full SQL regression suite with the single-node physical
     # optimizer both enabled (default) and disabled. The non-optimized
@@ -300,11 +306,14 @@ jobs:
   api_regression_tests:
     name: "api_regression / ${{ matrix.config.label }}"
     needs: [check_changes]
+    # API-relevant changes are required in every case. On a pull_request the 'e2e'
+    # label is an ADDITIONAL opt-in, not a bypass: the label is shared with the
+    # Playwright suite, so a frontend-only PR carries it to run UI tests and must
+    # not drag the whole API suite (8 jobs, each a full cargo build) along with it.
     if: >-
-      (github.event_name == 'pull_request' &&
-       contains(github.event.pull_request.labels.*.name, 'e2e')) ||
-      (github.event_name != 'pull_request' &&
-       needs.check_changes.outputs.has_changes == 'true')
+      needs.check_changes.outputs.has_changes == 'true' &&
+      (github.event_name != 'pull_request' ||
+       contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubicloud-standard-4
     permissions:
       contents: read  # only need to checkout the repo
@@ -418,11 +427,14 @@ jobs:
   api_fuzz_tests:
     name: api_fuzz_tests
     needs: [check_changes]
+    # API-relevant changes are required in every case. On a pull_request the 'e2e'
+    # label is an ADDITIONAL opt-in, not a bypass: the label is shared with the
+    # Playwright suite, so a frontend-only PR carries it to run UI tests and must
+    # not drag the whole API suite (8 jobs, each a full cargo build) along with it.
     if: >-
-      (github.event_name == 'pull_request' &&
-       contains(github.event.pull_request.labels.*.name, 'e2e')) ||
-      (github.event_name != 'pull_request' &&
-       needs.check_changes.outputs.has_changes == 'true')
+      needs.check_changes.outputs.has_changes == 'true' &&
+      (github.event_name != 'pull_request' ||
+       contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubicloud-standard-4
     continue-on-error: true
     permissions:
@@ -547,25 +559,21 @@ jobs:
             exit 1
           fi
 
-          # 2. On a pull_request WITHOUT the 'e2e' label the suite did not run: block (fail)
-          #    when the change is API-relevant so the author opts in, else bypass (pass).
-          #    Adding the 'e2e' label always runs the suite (see the test jobs' if).
-          if [ "${{ github.event_name }}" == "pull_request" ] && \
-             [ "${{ contains(github.event.pull_request.labels.*.name, 'e2e') }}" != "true" ]; then
-            if [ "${{ needs.check_changes.outputs.has_changes }}" == "true" ]; then
-              echo "::error::This PR changes API-relevant files but has no 'e2e' label, so the suite did not run."
-              echo "::error::Add the 'e2e' label to the PR to run the full test suite before merging."
-              exit 1
-            fi
-            echo "✅ No API-relevant changes and no 'e2e' label — suite not required for this PR."
+          # 2. Nothing API-relevant changed → nothing ran → allow, whatever the labels say.
+          #    This covers the frontend-only PR that carries the 'e2e' label to run the
+          #    Playwright suite: the API suite doesn't apply to it and isn't required.
+          if [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
+            echo "✅ No API-relevant changes — suite not required."
             exit 0
           fi
 
-          # 3. Non-PR event (push / merge queue) with nothing relevant → nothing ran → allow.
-          if [ "${{ github.event_name }}" != "pull_request" ] && \
-             [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
-            echo "✅ No API-relevant changes — suite not required."
-            exit 0
+          # 3. API-relevant pull_request WITHOUT the 'e2e' label: the suite did not run,
+          #    so block until the author opts in by adding the label.
+          if [ "${{ github.event_name }}" == "pull_request" ] && \
+             [ "${{ contains(github.event.pull_request.labels.*.name, 'e2e') }}" != "true" ]; then
+            echo "::error::This PR changes API-relevant files but has no 'e2e' label, so the suite did not run."
+            echo "::error::Add the 'e2e' label to the PR to run the full test suite before merging."
+            exit 1
           fi
 
           # 4. Suite was expected to run — the gating jobs must have succeeded.
