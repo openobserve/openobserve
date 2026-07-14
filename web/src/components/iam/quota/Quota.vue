@@ -24,14 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Standard page header: title + icon + subtitle, matching the other IAM pages. -->
     <AppPageHeader
       :title="t('quota.header')"
+      title-data-test="user-title-text"
       :subtitle="'Usage limits applied per role'"
       icon="speed"
       class="shrink-0 px-4 border-b border-border-default"
-    >
-      <template #title>
-        <span data-test="user-title-text">{{ t("quota.header") }}</span>
-      </template>
-    </AppPageHeader>
+    />
     <div :style="{ marginTop: 0 }" class="app-table-container flex flex-col flex-1 min-h-0">
       <div class="card-container mb-[0.625rem] mt-2.5">
         <div class="px-3 py-2">

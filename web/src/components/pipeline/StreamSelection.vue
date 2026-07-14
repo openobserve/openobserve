@@ -35,103 +35,114 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="w-full bg-gray-300" style="height: 1px" />
 
-      <div class="px-3">
-        <div
-          data-test="add-pipeline-name-input"
-          class="alert-name-input o2-input"
-          style="padding-top: 12px"
-        >
-          <OInput
-            v-model="formData.name"
-            :label="t('alerts.name') + ' *'"
-            :readonly="isUpdating"
-            :disabled="isUpdating"
-            :error="!!nameError"
-            :error-message="nameError"
-            @update:model-value="nameError = ''"
+      <!-- Inline form — the Save button lives inside the <OForm>, so Enter submits
+           natively via type="submit" (no form-id needed; R4 case 1). -->
+      <OForm
+        id="add-pipeline-form"
+        :form="form"
+        v-slot="{ isSubmitting }"
+      >
+        <div class="px-3">
+          <div
             data-test="add-pipeline-name-input"
-            style="min-width: 480px"
-          />
-        </div>
-        <div
-          data-test="add-pipeline-description-input"
-          class="alert-name-input o2-input mb-2"
-        >
-          <OInput
-            v-model="formData.description"
-            :label="t('alerts.description')"
+            class="alert-name-input o2-input"
+            style="padding-top: 12px"
+          >
+            <OFormInput
+              name="name"
+              :label="t('alerts.name')"
+              required
+              :readonly="isUpdating"
+              :disabled="isUpdating"
+              data-test="add-pipeline-name-input"
+              style="min-width: 480px"
+            />
+          </div>
+          <div
             data-test="add-pipeline-description-input"
-            style="min-width: 480px"
-          />
-        </div>
-        <div
-          data-test="add-pipeline-stream-type-select"
-          class="alert-stream-type o2-input mr-2 mb-2"
-          style="padding-top: 0"
-        >
-          <OSelect
-            v-model="formData.stream_type"
-            :options="streamTypes"
-            labelKey="label"
-            valueKey="value"
-            :label="t('alerts.streamType') + ' *'"
-            :readonly="isUpdating"
-            :disabled="isUpdating"
-            :error="!!streamTypeError"
-            :error-message="streamTypeError"
-            @update:model-value="updateStreams(); streamTypeError = ''"
+            class="alert-name-input o2-input mb-2"
+          >
+            <OFormInput
+              name="description"
+              :label="t('alerts.description')"
+              data-test="add-pipeline-description-input"
+              style="min-width: 480px"
+            />
+          </div>
+          <div
             data-test="add-pipeline-stream-type-select"
-            style="min-width: 220px"
-          />
-        </div>
-        <div
-          data-test="add-pipeline-stream-select"
-          class="o2-input"
-          style="padding-top: 0"
-        >
-          <OSelect
-            v-model="formData.stream_name"
-            :options="indexOptions"
-            :label="t('alerts.stream_name') + ' *'"
-            :loading="isFetchingStreams"
-            searchable
-            :readonly="isUpdating"
-            :disabled="isUpdating"
-            :error="!!streamNameError"
-            :error-message="streamNameError"
-            @update:model-value="streamNameError = ''"
+            class="alert-stream-type o2-input mr-2 mb-2"
+            style="padding-top: 0"
+          >
+            <OFormSelect
+              name="stream_type"
+              :options="streamTypes"
+              labelKey="label"
+              valueKey="value"
+              :label="t('alerts.streamType')"
+              required
+              :readonly="isUpdating"
+              :disabled="isUpdating"
+              data-test="add-pipeline-stream-type-select"
+              style="min-width: 220px"
+            />
+          </div>
+          <div
             data-test="add-pipeline-stream-select"
-            style="min-width: 250px"
-          />
+            class="o2-input"
+            style="padding-top: 0"
+          >
+            <OFormSelect
+              name="stream_name"
+              :options="indexOptions"
+              :label="t('alerts.stream_name')"
+              required
+              :loading="isFetchingStreams"
+              searchable
+              :readonly="isUpdating"
+              :disabled="isUpdating"
+              data-test="add-pipeline-stream-select"
+              style="min-width: 250px"
+            />
+          </div>
         </div>
-      </div>
 
-      <div class="flex gap-2 mt-4 px-3">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          data-test="add-pipeline-cancel-btn"
-        >{{ t('alerts.cancel') }}</OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          @click="handleSave"
-          data-test="add-pipeline-submit-btn"
-        >{{ t('alerts.save') }}</OButton>
-      </div>
+        <div class="flex gap-2 mt-4 px-3">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            :disabled="isSubmitting"
+            data-test="add-pipeline-cancel-btn"
+          >{{ t('alerts.cancel') }}</OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            type="submit"
+            :loading="isSubmitting"
+            data-test="add-pipeline-submit-btn"
+          >{{ t('alerts.save') }}</OButton>
+        </div>
+      </OForm>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
 import useStreams from "@/composables/useStreams";
-import { ref, computed, type Ref } from "vue";
+import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import {
+  makeAddPipelineSchema,
+  addPipelineDefaults,
+  type AddPipelineForm,
+} from "./StreamSelection.schema";
 
 const props = defineProps({
   isUpdating: {
@@ -145,18 +156,25 @@ const emit = defineEmits(["save"]);
 
 const store = useStore();
 
-const formData = ref({
-  name: "",
-  description: "",
-  stream_type: "",
-  stream_name: "",
-});
-
 const { getStreams } = useStreams();
 
 const isFetchingStreams = ref(false);
 
 const { t } = useI18n();
+
+// Co-located schema (factory keeps the required message i18n-driven).
+const addPipelineSchema = makeAddPipelineSchema(t);
+
+// Rule ③ OWNER pattern: this component OWNS <OForm> and needs to read the
+// form-owned `stream_type` to drive the updateStreams() side effect, so it
+// creates the form here with useOForm and reads it reactively via form.useStore
+// — a SINGLE source of truth (no mirror ref, no store.subscribe). The form is
+// handed to <OForm :form="form">.
+const form = useOForm<AddPipelineForm>({
+  defaultValues: addPipelineDefaults(),
+  schema: addPipelineSchema,
+  onSubmit: (value) => onSubmit(value),
+});
 
 const streamTypes = ref([
   { label: "Logs", value: "logs" },
@@ -164,26 +182,23 @@ const streamTypes = ref([
   { label: "Traces", value: "traces" },
 ]);
 
-const nameError = ref('');
-const streamTypeError = ref('');
-const streamNameError = ref('');
-
 const indexOptions = ref([]);
 const filteredStreams = ref([]);
 
-const isValidName = computed(() => {
-  const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
-  // Check if the role name is valid
-  return roleNameRegex.test(formData.value.name);
-});
-
+// Refetch the stream list (+ reset the dependent stream_name) for a stream_type.
+// Reads/writes the FORM-owned values (the select is form-owned now).
 const updateStreams = (resetStream = true) => {
-  if (resetStream) formData.value.stream_name = "";
-  if (!formData.value.stream_type) return Promise.resolve();
+  const streamType = form.state.values.stream_type ?? "";
+  if (resetStream) {
+    form.setFieldValue("stream_name", "", {
+      dontUpdateMeta: true,
+    });
+  }
+  if (!streamType) return Promise.resolve();
 
   isFetchingStreams.value = true;
 
-  return getStreams(formData.value.stream_type, false)
+  return getStreams(streamType, false)
     .then((res: any) => {
       indexOptions.value = res.list.map((data: any) => {
         return data.name;
@@ -194,6 +209,21 @@ const updateStreams = (resetStream = true) => {
     .catch(() => Promise.reject())
     .finally(() => (isFetchingStreams.value = false));
 };
+
+// ── Run updateStreams() when the form-owned stream_type changes ──────────────
+// (preserves the old `@update:model-value="updateStreams()"` side effect). The
+// form is the single source of truth: read `stream_type` reactively via
+// form.useStore and refetch options (+ reset stream_name) on a real change.
+// `flush: "sync"` matches the old form.store.subscribe timing: the reset runs the
+// instant stream_type changes — before any later setFieldValue("stream_name", …)
+// in the same tick can be clobbered by a late-flushed watcher.
+watch(
+  form.useStore((s: any) => s.values.stream_type),
+  (newType, prev) => {
+    if (newType !== prev) updateStreams();
+  },
+  { flush: "sync" },
+);
 
 const filterStreams = (val: string, update: any) => {
   filteredStreams.value = filterColumns(indexOptions.value, val, update);
@@ -216,19 +246,23 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   return filteredOptions;
 };
 
-const handleSave = () => {
-  nameError.value = '';
-  streamTypeError.value = '';
-  streamNameError.value = '';
-  if (!formData.value.name) { nameError.value = t('common.nameRequired'); }
-  if (!isValidName.value && formData.value.name) { nameError.value = "Use alphanumeric and '+=,.@-_' characters only, without spaces."; }
-  if (!formData.value.stream_type) { streamTypeError.value = 'Field is required!'; }
-  if (!formData.value.stream_name) { streamNameError.value = 'Field is required!'; }
-  if (nameError.value || streamTypeError.value || streamNameError.value) return;
-  savePipeline();
+// @submit handler — OForm only calls it once the schema passes (name required +
+// regex, stream_type + stream_name required), so the schema gates the emit (the
+// old hand-rolled handleSave/nameError/streamTypeError/streamNameError checks are
+// gone). The parent owns the actual async save.
+const onSubmit = (value: AddPipelineForm) => {
+  emit("save", value);
 };
 
-const savePipeline = () => {
-  emit("save", formData.value);
-};
+defineExpose({
+  form,
+  streamTypes,
+  indexOptions,
+  filteredStreams,
+  isFetchingStreams,
+  updateStreams,
+  filterStreams,
+  filterColumns,
+  onSubmit,
+});
 </script>

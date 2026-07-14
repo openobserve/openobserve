@@ -19,73 +19,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="schema-drawer"
     :open="open"
     :width="60"
-    :title="t('logStream.schemaHeader')"
+    :title="indexData.name"
+    :title-data-test="'schema-title-text'"
+    :sub-title="t('logStream.schemaHeader')"
     @update:open="$emit('update:open', $event)"
   >
-    <!-- #header override: complex stream header with name badge, timeline info,
-         and close button — cannot be expressed with title + sub-slots -->
-    <template #header-left>
-      <div class="flex items-center flex-nowrap">
-        <div class="flex flex-col">
-          <div
-            class="text-[18px] flex items-center"
-            data-test="schema-title-text"
+    <!-- Timeline / time-range chip sits at the right of the header, next to the
+         close button; the stream name is the title and "Stream Detail" the
+         subtitle (structured ODrawer header). -->
+    <template #header-right>
+      <div
+        v-if="indexData.name"
+        :class="[
+          'flex items-center gap-1.5 px-2 py-1 rounded-md border',
+          store.state.theme === 'dark'
+            ? 'bg-gray-800/50 border-gray-600'
+            : 'bg-gray-50 border-gray-200',
+        ]"
+      >
+        <img
+          :src="getTimelineIcon"
+          alt="Timeline Icon"
+          class="w-[14px] h-[14px] opacity-70"
+        />
+        <div class="flex items-center gap-1.5">
+          <span
+            :class="[
+              'text-[10px] font-medium px-1.5 py-0.5 rounded',
+              store.state.theme === 'dark'
+                ? 'text-gray-300 bg-gray-700/50'
+                : 'text-gray-600 bg-gray-100',
+            ]"
           >
-            <!-- introduced name at the top  -->
-            <span
-              v-if="indexData.name"
-              :class="[
-                'font-semibold mr-4 px-2 py-1 rounded-md ml-2 inline-block',
-                store.state.theme === 'dark'
-                  ? 'text-blue-400 bg-blue-900/50'
-                  : 'text-blue-600 bg-blue-50',
-              ]"
-            >
-              {{ indexData.name }}
-              <OTooltip
-                v-if="indexData.name && indexData.name.length > 35"
-                :content="indexData.name"
-                side="top"
-              />
-            </span>
-            <div
-              :class="[
-                'flex items-center gap-1.5 px-2 py-1 rounded-md border',
-                store.state.theme === 'dark'
-                  ? 'bg-gray-800/50 border-gray-600'
-                  : 'bg-gray-50 border-gray-200',
-              ]"
-            >
-              <img
-                :src="getTimelineIcon"
-                alt="Timeline Icon"
-                class="w-[14px] h-[14px] opacity-70"
-              />
-              <div class="flex items-center gap-1.5">
-                <span
-                  :class="[
-                    'text-[10px] font-medium px-1.5 py-0.5 rounded',
-                    store.state.theme === 'dark'
-                      ? 'text-gray-300 bg-gray-700/50'
-                      : 'text-gray-600 bg-gray-100',
-                  ]"
-                >
-                  UTC
-                </span>
-                <div
-                  :class="[
-                    'text-xs font-semibold',
-                    store.state.theme === 'dark'
-                      ? 'text-gray-200'
-                      : 'text-gray-800',
-                  ]"
-                >
-                  {{ indexData.stats.doc_time_min }}
-                  <span class="text-base leading-none">→</span>
-                  {{ indexData.stats.doc_time_max }}
-                </div>
-              </div>
-            </div>
+            UTC
+          </span>
+          <div
+            :class="[
+              'text-xs font-semibold',
+              store.state.theme === 'dark' ? 'text-gray-200' : 'text-gray-800',
+            ]"
+          >
+            {{ indexData.stats.doc_time_min }}
+            <span class="text-base leading-none">→</span>
+            {{ indexData.stats.doc_time_max }}
           </div>
         </div>
       </div>

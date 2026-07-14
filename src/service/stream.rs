@@ -59,10 +59,9 @@ use crate::service::db::re_pattern::process_association_changes;
 use crate::{
     common::meta::{
         authz::Authz,
-        http::HttpResponse as MetaHttpResponse,
+        http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
         stream::{FieldUpdate, Stream, StreamCreate},
     },
-    handler::http::router::ERROR_HEADER,
     service::{
         db::{self, distinct_values},
         metrics::get_prom_metadata_from_schema,

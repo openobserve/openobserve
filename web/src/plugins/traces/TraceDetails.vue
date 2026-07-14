@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <AppPageHeader
           v-if="mode === 'standalone'"
           :title="traceTree[0]?.operationName || t('traces.loadingTrace')"
+          title-data-test="trace-details-operation-name"
           :back="
             showBackButton
               ? {
@@ -41,17 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }
               : undefined
           "
+          class="px-4"
         >
-          <template #title>
-            <span
-              data-test="trace-details-operation-name"
-              :title="traceTree[0]?.operationName"
-            >
-              {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
-              <OTooltip :content="traceTree[0]?.operationName" />
-            </span>
-          </template>
-
           <template #subtitle>
             <div
               class="flex items-center space-x-2 text-[0.6875rem] text-(--o2-text-secondary) whitespace-nowrap"

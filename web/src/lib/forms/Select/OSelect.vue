@@ -580,7 +580,27 @@ function close() {
   searchTerm.value = "";
 }
 
-defineExpose({ close });
+/** Focus the trigger programmatically (both listbox and native-select modes). */
+function focus() {
+  if (typeof document === "undefined") return;
+  document.getElementById(inputId.value)?.focus();
+}
+
+defineExpose({ close, focus });
+
+// Type-to-search on the closed trigger: a printable keystroke opens the
+// dropdown and seeds the filter, mirroring native <select> typeahead. The
+// event is consumed here so page-level single-letter shortcuts (logs "s",
+// "r", "h", …) never fire while the select has keyboard focus.
+function handleTriggerKeydown(e: KeyboardEvent) {
+  if (props.disabled) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key.length !== 1 || e.key === " ") return;
+  e.preventDefault();
+  e.stopPropagation();
+  popoverOpen.value = true;
+  if (inputEnabled.value) searchTerm.value = searchTerm.value + e.key;
+}
 
 // ── Virtual scroll (listbox mode) ─────────────────────────────────────────
 // Items are virtualised whenever the listbox has more than 50 entries, keeping
@@ -1028,6 +1048,9 @@ const fieldWidthClass = computed(() => {
             :name="name"
             :disabled="disabled"
             :tabindex="inputTabindex"
+            role="combobox"
+            :aria-expanded="popoverOpen"
+            @keydown="handleTriggerKeydown"
             :data-test="
               parentDataTest ? `${parentDataTest}-trigger` : undefined
             "

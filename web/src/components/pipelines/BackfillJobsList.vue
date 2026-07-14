@@ -82,6 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             :column-visibility="columnVisibility"
             :default-columns="false"
+            :enable-column-resize="true"
+            :persist-columns="true"
+            table-id="pipelines-backfill-jobs-list"
             row-key="job_id"
             :loading="loading"
             pagination="client"
@@ -144,13 +147,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OProgressBar>
                 </div>
                 <div
-                  v-if="row.chunks_total"
-                  class="text-xs text-text-primary whitespace-nowrap pr-8"
+                  class="text-xs text-text-primary whitespace-nowrap pr-2 w-24 shrink-0"
                 >
-                  {{ row.chunks_completed || 0 }}/{{
-                    row.chunks_total
-                  }}
-                  chunks
+                  <template v-if="row.chunks_total">
+                    {{ row.chunks_completed || 0 }}/{{
+                      row.chunks_total
+                    }}
+                    chunks
+                  </template>
                 </div>
               </div>
             </template>
@@ -369,7 +373,7 @@ const { columnVisibility, setColumnVisibility } = useExternalColumnToggle(
 );
 
 const columns: OTableColumnDef[] = [
-  { id: "pipeline_name", header: "Pipeline", accessorKey: "pipeline_name", sortable: true, hideable: true, size: COL.streamName, meta: { align: "left", autoWidth: true } },
+  { id: "pipeline_name", header: "Pipeline", accessorKey: "pipeline_name", sortable: true, hideable: true, size: COL.streamName, meta: { align: "left", flex: true } },
   { id: "time_range", header: "Time Range", accessorKey: "start_time", sortable: true, hideable: true, size: COL.date, meta: { align: "left" } },
   { id: "progress_percent", header: "Progress", accessorKey: "progress_percent", sortable: true, hideable: true, size: 400, meta: { align: "left" } },
   { id: "created_at", header: "Created", accessorKey: "created_at", sortable: true, hideable: true, size: COL.createdAt, meta: { align: "left" } },

@@ -26,18 +26,67 @@ use config::{
 };
 use infra::{db::ORM_CLIENT, table::anomaly_detection::config as anomaly_config_table};
 use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
+use serde::{Deserialize, Serialize};
 use svix_ksuid::KsuidLike;
+use utoipa::ToSchema;
 
 use crate::{
     common::{
         meta::authz::Authz,
         utils::auth::{remove_ownership, set_ownership},
     },
-    handler::http::request::anomaly_detection::{
-        CreateAnomalyConfigRequest, UpdateAnomalyConfigRequest,
-    },
     service::{alerts::destinations, search},
 };
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct CreateAnomalyConfigRequest {
+    pub name: String,
+    pub description: Option<String>,
+    pub stream_name: String,
+    pub stream_type: String,
+    pub query_mode: String,
+    pub filters: Option<serde_json::Value>,
+    pub custom_sql: Option<String>,
+    pub detection_function: String,
+    pub detection_function_field: Option<String>,
+    pub histogram_interval: String,
+    pub schedule_interval: String,
+    pub detection_window_seconds: i64,
+    pub training_window_days: Option<i32>,
+    pub retrain_interval_days: Option<i32>,
+    pub percentile: Option<f64>,
+    pub rcf_num_trees: Option<i32>,
+    pub rcf_tree_size: Option<i32>,
+    pub rcf_shingle_size: Option<i32>,
+    pub alert_enabled: Option<bool>,
+    #[serde(default)]
+    pub alert_destinations: Vec<String>,
+    pub enabled: Option<bool>,
+    pub folder_id: Option<String>,
+    pub owner: Option<String>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct UpdateAnomalyConfigRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub query_mode: Option<String>,
+    pub filters: Option<serde_json::Value>,
+    pub custom_sql: Option<String>,
+    pub detection_function: Option<String>,
+    pub detection_function_field: Option<String>,
+    pub histogram_interval: Option<String>,
+    pub schedule_interval: Option<String>,
+    pub detection_window_seconds: Option<i64>,
+    pub training_window_days: Option<i32>,
+    pub percentile: Option<f64>,
+    pub retrain_interval_days: Option<i32>,
+    pub alert_enabled: Option<bool>,
+    pub alert_destinations: Option<Vec<String>>,
+    pub enabled: Option<bool>,
+    pub folder_id: Option<String>,
+    pub owner: Option<String>,
+}
 
 /// Resolve a folder name (e.g. "default") to the PK stored in `folders.id`.
 ///
@@ -1706,8 +1755,6 @@ pub async fn send_anomaly_alert(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::handler::http::request::anomaly_detection::CreateAnomalyConfigRequest;
-
     // ── combine_detection_fn ────────────────────────────────────────────────
 
     #[test]
