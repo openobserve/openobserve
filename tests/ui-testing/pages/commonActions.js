@@ -245,7 +245,27 @@ export class CommonActions {
         });
         const responseData = await response.json().catch(() => ({ error: 'Failed to parse JSON' }));
         testLogger.debug('Ingestion response', { response: responseData });
-        testLogger.info('Successfully ingested test data');
+
+        // Poll the streams API until this stream is registered before returning. Callers
+        // open the alert wizard right after and pick this stream from the dropdown; under
+        // concurrent CI load the wizard's stream-list fetch can run before registration
+        // completes, so the freshly-ingested stream never renders as an option (the exact
+        // failure seen for auto_playwright_stream). Mirrors initializeAlertTestStream.
+        const listUrl = `${baseUrl}/api/${orgName}/streams?type=logs`;
+        let registered = false;
+        for (let i = 0; i < 20 && !registered; i++) {
+            const listResp = await this.page.request.get(listUrl, { headers }).catch(() => null);
+            if (listResp && listResp.ok()) {
+                const body = await listResp.json().catch(() => null);
+                registered = (body?.list || []).some(s => s.name === streamName);
+            }
+            if (!registered) await this.page.waitForTimeout(1000);
+        }
+        if (!registered) {
+            testLogger.warn('Stream not confirmed in streams list after ingest', { streamName });
+        }
+
+        testLogger.info('Successfully ingested test data', { streamName, registered });
         return responseData;
     }
 
