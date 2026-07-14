@@ -1456,7 +1456,7 @@ const fieldWidthClass = computed(() => {
                               <span
                                 v-if="filteredOptions[vRow.index].badge"
                                 class="shrink-0 text-[10px] font-medium px-1 py-px rounded border border-solid leading-tight"
-                                style="color: var(--o2-positive); border-color: var(--o2-positive);"
+                                style="color: var(--color-status-positive); border-color: var(--color-status-positive);"
                               >{{ filteredOptions[vRow.index].badge }}</span>
                             </span>
                             <span

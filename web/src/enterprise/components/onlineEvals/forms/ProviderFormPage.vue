@@ -28,7 +28,7 @@
           <div class="mb-3">
             <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
               {{ t("onlineEvals.provider.nameLabel") }}
-              <span class="text-(--o2-status-error-text) ml-0.5">*</span>
+              <span class="text-(--color-status-error-text) ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
             </div>
             <OInput
@@ -46,7 +46,7 @@
           <div class="mb-3">
             <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
               {{ t("onlineEvals.provider.typeLabel") }}
-              <span class="text-(--o2-status-error-text) ml-0.5">*</span>
+              <span class="text-(--color-status-error-text) ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
             </div>
             <OSelect
@@ -73,7 +73,7 @@
           <div class="mb-3">
             <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
               {{ t("onlineEvals.provider.defaultModelLabel") }}
-              <span class="text-(--o2-status-error-text) ml-0.5">*</span>
+              <span class="text-(--color-status-error-text) ml-0.5">*</span>
             </div>
             <OInput
               v-model.trim="form.defaultModel"
@@ -111,7 +111,7 @@
         <div class="mb-3">
           <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
             {{ t("onlineEvals.provider.apiKeyLabel") }}
-            <span v-if="mode === 'create'" class="text-(--o2-status-error-text) ml-0.5">*</span>
+            <span v-if="mode === 'create'" class="text-(--color-status-error-text) ml-0.5">*</span>
           </div>
           <OInput
             v-model.trim="form.apiKey"

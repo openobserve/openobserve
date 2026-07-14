@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex-1 flex items-center justify-center"
       data-test="rum-errors-over-time-chart-empty"
     >
-      <p class="text-[var(--o2-text-muted)]">
+      <p class="text-[var(--color-text-muted)]">
         {{ t("rum.noErrorsInWindow") }}
       </p>
     </div>

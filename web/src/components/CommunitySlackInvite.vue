@@ -201,7 +201,7 @@ const joinSlack = () => {
 
       <p
         data-test="community-slack-invite-description"
-        class="text-[var(--o2-text-secondary)]"
+        class="text-[var(--color-text-secondary)]"
       >
         {{ t("communitySlackInvite.description") }}
       </p>
@@ -226,7 +226,7 @@ const joinSlack = () => {
           >
             <path d="M20 6 9 17l-5-5" />
           </svg>
-          <span class="text-[var(--o2-text-secondary)]">{{
+          <span class="text-[var(--color-text-secondary)]">{{
             benefit
           }}</span>
         </li>

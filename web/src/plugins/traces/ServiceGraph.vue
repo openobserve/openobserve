@@ -42,7 +42,7 @@
         >
           <!-- Border Color -->
           <div
-            class="mb-0! whitespace-nowrap text-(--o2-text-4)! font-bold text-xs"
+            class="mb-0! whitespace-nowrap text-(--color-text-primary)! font-bold text-xs"
           >
             {{ t("traces.serviceGraph.borderColor") }}
             <span class="font-normal opacity-55">| {{ t("traces.serviceGraph.borderColorMetric") }}</span>
@@ -59,7 +59,7 @@
                 :class="`sg-health-ring--${level.key}`"
               />
               <div class="flex flex-row items-baseline gap-1">
-                <div class="text-left text-(--o2-text-2)! text-xs font-semibold">
+                <div class="text-left text-(--color-text-secondary)! text-xs font-semibold">
                   {{ level.label }}
                 </div>
                 <div class="text-left text-[0.625rem] opacity-55">{{ level.range }}</div>
@@ -80,8 +80,8 @@
               size="xs"
               icon-right="expand-more"
             >
-              <span class="font-bold text-(--o2-text-2)">{{ totalEntities }}</span>
-              <span class="ml-1 text-(--o2-text-4)">{{ t("traces.serviceGraph.entities") }}</span>
+              <span class="font-bold text-(--color-text-secondary)">{{ totalEntities }}</span>
+              <span class="ml-1 text-(--color-text-primary)">{{ t("traces.serviceGraph.entities") }}</span>
             </OButton>
           </template>
           <div class="min-w-48" data-test="service-graph-entity-distribution">
@@ -198,7 +198,7 @@
         >
           <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
           <div
-            class="mb-0! whitespace-nowrap text-(--o2-text-4)! font-bold text-xs"
+            class="mb-0! whitespace-nowrap text-(--color-text-primary)! font-bold text-xs"
           >
             {{ t("traces.serviceGraph.nodeSize") }}
             <span class="font-normal opacity-55">| {{ t("traces.serviceGraph.nodeSizeMetric") }}</span>
@@ -206,12 +206,12 @@
           <div class="flex items-center gap-1 py-0!">
             <div class="flex flex-row items-center gap-1.5">
               <span class="sg-size-ring sg-size-ring--sm" />
-              <span class="text-xs text-(--o2-text-2)!">{{ t("traces.serviceGraph.sizeLow") }}</span>
+              <span class="text-xs text-(--color-text-secondary)!">{{ t("traces.serviceGraph.sizeLow") }}</span>
             </div>
             <div class="opacity-35 text-base tracking-[0.125rem] mb-0">···</div>
             <div class="flex flex-row items-center gap-1.5">
               <span class="sg-size-ring sg-size-ring--lg" />
-              <span class="text-xs text-(--o2-text-2)!">{{ t("traces.serviceGraph.sizeHigh") }}</span>
+              <span class="text-xs text-(--color-text-secondary)!">{{ t("traces.serviceGraph.sizeHigh") }}</span>
             </div>
           </div>
         </div>
@@ -242,7 +242,7 @@
             >
               <div>
                 <OIcon name="error-outline" style="width: 4em; height: 4em;" />
-                <div class="text-xl font-semibold mt-3 text-[var(--o2-text-primary)]">
+                <div class="text-xl font-semibold mt-3 text-[var(--color-text-primary)]">
                   {{ error }}
                 </div>
                 <OButton
@@ -1889,6 +1889,6 @@ export default defineComponent({
 
 .body--dark [data-test="service-graph-stream-selector"] .q-field,
 .body--dark [data-test="service-graph-search-input"] .q-field {
-  background: var(--o2-primary-background);
+  background: var(--color-surface-base);
 }
 </style>

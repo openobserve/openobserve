@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="handlePlaybackBarClick"
       >
         <div
-          class="bg-(--o2-primary-btn-bg)! absolute"
+          class="bg-(--color-button-primary)! absolute"
           :style="{
             width: playerState.progressWidth + 'px',
             left: 0,
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
         />
         <div
-          class="bg-(--o2-primary-btn-bg)! absolute"
+          class="bg-(--color-button-primary)! absolute"
           :style="{
             width: '2px',
             left: playerState.progressWidth - 2 + 'px',
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="replay-10"
               size="md"
-              class="mr-2 cursor-pointer text-[var(--o2-icon-color-dark)] hover:text-[var(--o2-primary-btn-bg)]"
+              class="mr-2 cursor-pointer text-[var(--o2-icon-color-dark)] hover:text-[var(--color-button-primary)]"
               @click="skipTo('backward')"
             />
             <OIcon
@@ -109,13 +109,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'play-circle-filled'
               "
               size="lg"
-              class="cursor-pointer text-[var(--o2-icon-color-dark)] hover:text-[var(--o2-primary-btn-bg)]"
+              class="cursor-pointer text-[var(--o2-icon-color-dark)] hover:text-[var(--color-button-primary)]"
               @click="togglePlay"
             />
             <OIcon
               name="forward-10"
               size="md"
-              class="ml-2 cursor-pointer text-[var(--o2-icon-color-dark)] hover:text-[var(--o2-primary-btn-bg)]"
+              class="ml-2 cursor-pointer text-[var(--o2-icon-color-dark)] hover:text-[var(--color-button-primary)]"
               @click="skipTo('forward')"
             />
           </div>

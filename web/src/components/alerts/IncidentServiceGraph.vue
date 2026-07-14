@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="info-outline" size="sm" />
       </OButton>
       <div
-        class="graph-legend absolute top-[calc(100%+8px)] right-0 min-w-[240px] py-[14px] px-4 text-[13px] leading-normal text-[#1f2937] bg-white border border-(--o2-border) rounded-lg shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] opacity-0 invisible -translate-y-1 transition-all duration-150 pointer-events-none whitespace-nowrap"
+        class="graph-legend absolute top-[calc(100%+8px)] right-0 min-w-[240px] py-[14px] px-4 text-[13px] leading-normal text-[#1f2937] bg-white border border-(--color-border-default) rounded-lg shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] opacity-0 invisible -translate-y-1 transition-all duration-150 pointer-events-none whitespace-nowrap"
         role="tooltip"
       >
         <div class="font-semibold text-sm mb-2.5">Graph Legend</div>
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="graph-legend__dot text-[14px] leading-none w-[14px] text-center shrink-0" style="color: #3b82f6;">●</span>
           Blue = Normal
         </div>
-        <div class="graph-legend__divider h-px bg-(--o2-border) my-2" />
+        <div class="graph-legend__divider h-px bg-(--color-border-default) my-2" />
         <div class="graph-legend__row flex items-center gap-2 py-1">
           <span class="graph-legend__dot text-[14px] leading-none w-[14px] text-center shrink-0" style="color: #a78bfa;">→</span>
           Purple arrows show temporal flow

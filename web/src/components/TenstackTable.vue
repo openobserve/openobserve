@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       header.column.getToggleSortingHandler(),
                     )
                   "
-                  class="overflow-hidden whitespace-nowrap text-ellipsis! tracking-[0.06rem] text-[var(--o2-text-2)] text-[0.85rem]"
+                  class="overflow-hidden whitespace-nowrap text-ellipsis! tracking-[0.06rem] text-[var(--color-text-secondary)] text-[0.85rem]"
                 >
                   <FlexRender
                     :render="header.column.columnDef.header"

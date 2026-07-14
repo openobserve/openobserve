@@ -30,12 +30,12 @@
             </div>
             <div>
               <div
-                class="text-[15px] font-semibold leading-tight text-[var(--o2-text-primary)]"
+                class="text-[15px] font-semibold leading-tight text-[var(--color-text-primary)]"
               >
                 {{ t("shortcuts.title") }}
               </div>
               <div
-                class="text-[11px] text-[var(--o2-text-secondary)] mt-0.5"
+                class="text-[11px] text-[var(--color-text-secondary)] mt-0.5"
               >
                 {{ t("shortcuts.subtitle") }}
               </div>
@@ -87,7 +87,7 @@
     <div class="contents">
       <div
         v-if="!hasResults"
-        class="text-center py-10 text-[13px] text-[var(--o2-text-secondary)]"
+        class="text-center py-10 text-[13px] text-[var(--color-text-secondary)]"
         data-test="shortcut-cheatsheet-no-results"
       >
         {{ t("shortcuts.noResults") }}
@@ -109,7 +109,7 @@
               :class="
                 idx === 0
                   ? 'pt-1'
-                  : 'mt-2 pt-3 border-t border-[var(--o2-border)]'
+                  : 'mt-2 pt-3 border-t border-[var(--color-border-default)]'
               "
               data-test="shortcut-cheatsheet-module"
             >
@@ -133,11 +133,11 @@
                 <li
                   v-for="entry in sec.entries"
                   :key="entry.id"
-                  class="flex justify-between items-center py-1.5 px-2 rounded-md transition-colors duration-100 hover:bg-[var(--o2-primary-background)]"
+                  class="flex justify-between items-center py-1.5 px-2 rounded-md transition-colors duration-100 hover:bg-[var(--color-surface-base)]"
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                 >
                   <span
-                    class="text-[13px] text-[var(--o2-text-primary)] truncate leading-snug"
+                    class="text-[13px] text-[var(--color-text-primary)] truncate leading-snug"
                     >{{ entry.label }}</span
                   >
                   <div
@@ -149,12 +149,12 @@
                     >
                       <span
                         v-if="part === 'then'"
-                        class="text-[10px] text-[var(--o2-text-secondary)] mx-0.5"
+                        class="text-[10px] text-[var(--color-text-secondary)] mx-0.5"
                         >then</span
                       >
                       <kbd
                         v-else
-                        class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 bg-[var(--o2-card-background)] border border-[var(--o2-border)] rounded font-mono text-[11px] font-medium text-[var(--o2-text-secondary)] whitespace-nowrap shadow-[0_1px_0_0_var(--o2-border)]"
+                        class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 bg-[var(--color-surface-base)] border border-[var(--color-border-default)] rounded font-mono text-[11px] font-medium text-[var(--color-text-secondary)] whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
                         >{{ part }}</kbd
                       >
                     </template>
@@ -167,7 +167,7 @@
 
         <!-- Right column -->
         <div
-          class="flex flex-col border-l border-[var(--o2-border)] pl-8"
+          class="flex flex-col border-l border-[var(--color-border-default)] pl-8"
         >
           <div
             v-for="(m, idx) in filteredColumns[1]"
@@ -182,7 +182,7 @@
               :class="
                 idx === 0
                   ? 'pt-1'
-                  : 'mt-2 pt-3 border-t border-[var(--o2-border)]'
+                  : 'mt-2 pt-3 border-t border-[var(--color-border-default)]'
               "
               data-test="shortcut-cheatsheet-module"
             >
@@ -206,11 +206,11 @@
                 <li
                   v-for="entry in sec.entries"
                   :key="entry.id"
-                  class="flex justify-between items-center py-1.5 px-2 rounded-md transition-colors duration-100 hover:bg-[var(--o2-primary-background)]"
+                  class="flex justify-between items-center py-1.5 px-2 rounded-md transition-colors duration-100 hover:bg-[var(--color-surface-base)]"
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                 >
                   <span
-                    class="text-[13px] text-[var(--o2-text-primary)] truncate leading-snug"
+                    class="text-[13px] text-[var(--color-text-primary)] truncate leading-snug"
                     >{{ entry.label }}</span
                   >
                   <div
@@ -222,12 +222,12 @@
                     >
                       <span
                         v-if="part === 'then'"
-                        class="text-[10px] text-[var(--o2-text-secondary)] mx-0.5"
+                        class="text-[10px] text-[var(--color-text-secondary)] mx-0.5"
                         >then</span
                       >
                       <kbd
                         v-else
-                        class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 bg-[var(--o2-card-background)] border border-[var(--o2-border)] rounded font-mono text-[11px] font-medium text-[var(--o2-text-secondary)] whitespace-nowrap shadow-[0_1px_0_0_var(--o2-border)]"
+                        class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 bg-[var(--color-surface-base)] border border-[var(--color-border-default)] rounded font-mono text-[11px] font-medium text-[var(--color-text-secondary)] whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
                         >{{ part }}</kbd
                       >
                     </template>
@@ -243,17 +243,17 @@
     <!-- ── Sticky footer ── -->
     <template #footer>
       <div
-        class="flex justify-between items-center text-[11px] text-[var(--o2-text-secondary)]"
+        class="flex justify-between items-center text-[11px] text-[var(--color-text-secondary)]"
       >
         <div class="flex items-center gap-1.5 flex-wrap">
           <kbd
-            class="inline-flex items-center justify-center h-5 px-1.5 bg-[var(--o2-card-background)] border border-[var(--o2-border)] rounded font-mono text-[11px] shadow-[0_1px_0_0_var(--o2-border)]"
+            class="inline-flex items-center justify-center h-5 px-1.5 bg-[var(--color-surface-base)] border border-[var(--color-border-default)] rounded font-mono text-[11px] shadow-[0_1px_0_0_var(--color-border-default)]"
             >Esc</kbd
           >
           <span>{{ t("shortcuts.footerClose") }}</span>
           <span class="opacity-40">·</span>
           <kbd
-            class="inline-flex items-center justify-center h-5 px-1.5 bg-[var(--o2-card-background)] border border-[var(--o2-border)] rounded font-mono text-[11px] shadow-[0_1px_0_0_var(--o2-border)]"
+            class="inline-flex items-center justify-center h-5 px-1.5 bg-[var(--color-surface-base)] border border-[var(--color-border-default)] rounded font-mono text-[11px] shadow-[0_1px_0_0_var(--color-border-default)]"
             >?</kbd
           >
           <span>{{ t("shortcuts.footerReopen") }}</span>

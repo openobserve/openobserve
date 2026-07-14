@@ -156,7 +156,7 @@
         <!-- Boolean info banner -->
         <div
           v-if="form.dataType === 'boolean'"
-          class="sc-callout sc-callout--neutral flex gap-[10px] items-start px-3 py-[10px] bg-[color-mix(in_srgb,var(--color-text-secondary,var(--o2-text-secondary))_12%,transparent)] border border-(--color-dialog-header-border) rounded-md text-xs leading-normal text-(--color-text-primary) mb-4"
+          class="sc-callout sc-callout--neutral flex gap-[10px] items-start px-3 py-[10px] bg-[color-mix(in_srgb,var(--color-text-secondary,var(--color-text-secondary))_12%,transparent)] border border-(--color-dialog-header-border) rounded-md text-xs leading-normal text-(--color-text-primary) mb-4"
         >
           <OIcon name="info" size="xs" />
           <span>
@@ -542,7 +542,7 @@ async function save() {
 .sc-callout__lead strong { font-weight: 700; }
 
 /* child selector for neutral callout icon: cannot be inlined */
-.sc-callout--neutral > :first-child { color: var(--color-text-secondary, var(--o2-text-secondary)); }
+.sc-callout--neutral > :first-child { color: var(--color-text-secondary, var(--color-text-secondary)); }
 
 .sc-field {
   margin-bottom: 10px;
@@ -559,7 +559,7 @@ async function save() {
 /* Info icon sitting after a field label (e.g. Data type's "can't change"). */
 .sc-field__info {
   margin-left: 4px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
 /* ── Data-type radio cards (reuse ORadio inside ORadioGroup) ────────────────
@@ -572,7 +572,7 @@ async function save() {
 .sc-dtype-radio {
   flex: 1;
   min-width: 0;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  border: 1px solid var(--color-dialog-header-border, var(--color-border-default));
   border-radius: 6px;
   background: var(--color-card-bg);
   transition: border-color 0.12s, background 0.12s;
@@ -596,7 +596,7 @@ async function save() {
 }
 
 .sc-dtype-radio:hover {
-  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 40%, var(--color-dialog-header-border, var(--o2-border)));
+  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 40%, var(--color-dialog-header-border, var(--color-border-default)));
 }
 
 /* dynamic selected state: cannot be inlined */
@@ -608,7 +608,7 @@ async function save() {
 /* Edit mode: cards are locked — no hover affordance, but the selected card keeps
    its highlight so the current type stays obvious. */
 .sc-dtype-radio--locked:hover {
-  border-color: var(--color-dialog-header-border, var(--o2-border));
+  border-color: var(--color-dialog-header-border, var(--color-border-default));
   background: var(--color-card-bg);
 }
 .sc-dtype-radio--locked.sc-dtype-radio--selected,
@@ -625,7 +625,7 @@ async function save() {
 .sc-dtype-radio__sub {
   font-size: 11px;
   font-weight: 400;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
   margin-top: 3px;
   line-height: 1.4;
 }
@@ -637,14 +637,14 @@ async function save() {
 }
 
 .sc-range-row__label {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
   font-size: 11px;
 }
 
 .sc-ht-section {
   margin-top: 4px;
   padding: 12px 14px 10px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  border: 1px solid var(--color-dialog-header-border, var(--color-border-default));
   border-radius: 6px;
   background: color-mix(in srgb, var(--color-primary-600, #3F7994) 2.5%, var(--color-card-bg));
 }
@@ -665,7 +665,7 @@ async function save() {
 }
 
 .sc-ht-section__info {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
 
@@ -676,9 +676,9 @@ async function save() {
   gap: 6px;
   margin-top: 10px;
   padding-top: 8px;
-  border-top: 1px dashed var(--color-dialog-header-border, var(--o2-border));
+  border-top: 1px dashed var(--color-dialog-header-border, var(--color-border-default));
   font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
   line-height: 1.5;
 }
 
@@ -686,13 +686,13 @@ async function save() {
 .sc-ht-section__foot > :first-child {
   flex-shrink: 0;
   margin-top: 2px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
 .sc-ht-field-label {
   font-size: 12px;
   font-weight: 500;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
   margin-bottom: 8px;
 }
 
@@ -716,7 +716,7 @@ async function save() {
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  border: 1px solid var(--color-dialog-header-border, var(--color-border-default));
   border-radius: 5px;
   background: var(--color-card-bg);
   cursor: pointer;
@@ -724,7 +724,7 @@ async function save() {
 }
 
 .sc-ht-num-radio:hover {
-  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 40%, var(--color-dialog-header-border, var(--o2-border)));
+  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 40%, var(--color-dialog-header-border, var(--color-border-default)));
 }
 
 .sc-ht-num-radio--selected {
@@ -749,7 +749,7 @@ async function save() {
   gap: 6px;
   margin-top: 8px;
   font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
 /* child selector: cannot be inlined */
@@ -769,7 +769,7 @@ async function save() {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  border: 1px solid var(--color-dialog-header-border, var(--color-border-default));
   border-radius: 5px;
   background: var(--color-card-bg);
   padding: 4px;
@@ -788,15 +788,15 @@ async function save() {
 .sc-ht-check:hover { background: color-mix(in srgb, var(--color-text-primary) 6%, transparent); }
 
 .sc-ht-check--on {
-  background: color-mix(in srgb, color-mix(in srgb, var(--o2-status-success-text) 14%, transparent) 35%, transparent);
+  background: color-mix(in srgb, color-mix(in srgb, var(--color-status-success-text) 14%, transparent) 35%, transparent);
 }
 
 .sc-ht-empty {
   font-size: 11.5px;
   font-style: italic;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
   padding: 10px 12px;
-  border: 1px dashed var(--color-dialog-header-border, var(--o2-border));
+  border: 1px dashed var(--color-dialog-header-border, var(--color-border-default));
   border-radius: 5px;
   background: var(--color-card-bg);
 }
@@ -821,7 +821,7 @@ async function save() {
   align-items: start;
   gap: 10px;
   padding: 7px 12px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
+  border: 1px solid var(--color-dialog-header-border, var(--color-border-default));
   border-radius: 5px;
   background: var(--color-card-bg);
   cursor: pointer;
@@ -829,7 +829,7 @@ async function save() {
 }
 
 .sc-ht-bool-radio:hover {
-  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 40%, var(--color-dialog-header-border, var(--o2-border)));
+  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 40%, var(--color-dialog-header-border, var(--color-border-default)));
 }
 
 /* dynamic selected state: cannot be inlined */

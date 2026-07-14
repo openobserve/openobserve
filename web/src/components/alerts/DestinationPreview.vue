@@ -23,7 +23,7 @@ limitations under the License.
 
     <div data-test="destination-preview-card" class="w-full">
         <!-- Slack Preview -->
-        <div v-if="type === 'slack'" data-test="slack-preview" class="slack-message max-w-[600px] mx-auto bg-white border border-(--o2-border) rounded-lg p-4 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+        <div v-if="type === 'slack'" data-test="slack-preview" class="slack-message max-w-[600px] mx-auto bg-white border border-(--color-border-default) rounded-lg p-4 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div class="slack-message-container flex gap-3">
             <div class="slack-avatar">
               <div class="avatar-circle w-[36px] h-[36px] bg-[#4a154b] text-white rounded flex items-center justify-center font-bold text-[0.875rem]">OO</div>
@@ -324,7 +324,7 @@ const copyTemplate = () => {
 </script>
 
 <style>
-/* The global `a { color: var(--o2-text-link) }` rule (unlayered) outranks the
+/* The global `a { color: var(--color-text-link) }` rule (unlayered) outranks the
    inline `text-[#06ac38]` utility, turning this link the theme link color.
    This selector's specificity wins it back to PagerDuty green, like main. */
 .pagerduty-link a {
@@ -332,7 +332,7 @@ const copyTemplate = () => {
   text-decoration: none;
 }
 
-/* Same issue as the link above: the global `p { color: var(--o2-text-body) }`
+/* Same issue as the link above: the global `p { color: var(--color-text-body) }`
    rule (light text in dark mode) overrides the inline utility, making this
    message unreadable on the email card's fixed light background. */
 .email-alert-info p {

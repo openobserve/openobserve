@@ -492,7 +492,7 @@ defineExpose({
   <style>
 
     .group-container.dark-mode-group {
-      scrollbar-color: #818181 var(--o2-primary-background); /* thumb color, track color */
+      scrollbar-color: #818181 var(--color-surface-base); /* thumb color, track color */
     }
 
     .group-container.light-mode-group {

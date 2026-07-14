@@ -1284,7 +1284,7 @@ export default defineComponent({
     Arial, sans-serif;
   font-size: 0.875rem;
   line-height: 1.6; /* Better readability for text content */
-  color: var(--o2-text-primary);
+  color: var(--color-text-primary);
   margin: 0;
   padding: 1rem;
   overflow-y: auto;
@@ -1296,7 +1296,7 @@ export default defineComponent({
 .generating-text {
   font-size: 0.9375rem; /* 15px */
   font-weight: 500;
-  color: var(--o2-text-primary);
+  color: var(--color-text-primary);
 }
 
 /* Animated dots - ellipsis animation using pseudo-element */

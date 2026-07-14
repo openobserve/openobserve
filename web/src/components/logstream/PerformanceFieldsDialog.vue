@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         class="p-2 max-h-50 overflow-y-auto border rounded"
-        :class="store.state.theme === 'dark' ? 'border-[#3a3a3a] bg-[#1e1e1e]' : 'border-(--o2-border) bg-[#f5f5f5]'"
+        :class="store.state.theme === 'dark' ? 'border-[#3a3a3a] bg-[#1e1e1e]' : 'border-(--color-border-default) bg-[#f5f5f5]'"
       >
         <OTag
           v-for="field in fieldsByType.fts"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         class="p-2 max-h-50 overflow-y-auto border rounded"
-        :class="store.state.theme === 'dark' ? 'border-[#3a3a3a] bg-[#1e1e1e]' : 'border-(--o2-border) bg-[#f5f5f5]'"
+        :class="store.state.theme === 'dark' ? 'border-[#3a3a3a] bg-[#1e1e1e]' : 'border-(--color-border-default) bg-[#f5f5f5]'"
       >
         <OTag
           v-for="field in fieldsByType.secondaryIndex"

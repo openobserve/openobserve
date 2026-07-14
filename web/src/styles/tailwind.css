@@ -76,7 +76,7 @@
   font-family: monospace;
   font-size: var(--text-base);
   line-height: 1.3125rem;
-  color: var(--o2-text-placeholder);
+  color: var(--color-text-placeholder);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

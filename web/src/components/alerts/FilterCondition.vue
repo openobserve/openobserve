@@ -27,7 +27,7 @@
             data-test="alert-conditions-toggle-operator-btn"
             variant="ghost"
             size="icon-circle-sm"
-            class="h-[26px] flex-shrink-0 text-(--o2-primary-btn-bg)! hover:bg-[rgba(var(--o2-primary-btn-bg-rgb),0.1)]!"
+            class="h-[26px] flex-shrink-0 text-(--color-button-primary)! hover:bg-[rgba(var(--o2-primary-btn-bg-rgb),0.1)]!"
             @click="toggleOperator"
           >
             <OIcon name="restart-alt" size="sm" />

@@ -130,11 +130,11 @@ describe("useEventFormatters", () => {
     });
 
     it("returns positive color class for status 200", () => {
-      expect(formatters.getStatusColorClass(200)).toBe("text-[var(--o2-positive)]");
+      expect(formatters.getStatusColorClass(200)).toBe("text-[var(--color-status-positive)]");
     });
 
     it("returns positive color class for status 201", () => {
-      expect(formatters.getStatusColorClass(201)).toBe("text-[var(--o2-positive)]");
+      expect(formatters.getStatusColorClass(201)).toBe("text-[var(--color-status-positive)]");
     });
 
     it("returns info color class for status 301", () => {
@@ -146,11 +146,11 @@ describe("useEventFormatters", () => {
     });
 
     it("returns negative color class for status 500", () => {
-      expect(formatters.getStatusColorClass(500)).toBe("text-[var(--o2-negative)]");
+      expect(formatters.getStatusColorClass(500)).toBe("text-[var(--color-status-negative)]");
     });
 
     it("returns negative color class for status 502", () => {
-      expect(formatters.getStatusColorClass(502)).toBe("text-[var(--o2-negative)]");
+      expect(formatters.getStatusColorClass(502)).toBe("text-[var(--color-status-negative)]");
     });
   });
 

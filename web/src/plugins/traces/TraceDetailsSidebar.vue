@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="error"
             size="sm"
-            class="mr-1 text-[var(--o2-status-error-text)]!"
+            class="mr-1 text-[var(--color-status-error-text)]!"
           />
         </span>
         <!-- Observation Type Badge (for LLM spans) -->
@@ -399,7 +399,7 @@ class="h-full overflow-y-auto">
                       icon="settings"
                       label="System Instructions"
                     >
-                      <div class="p-2 bg-[var(--o2-code-bg)]">
+                      <div class="p-2 bg-[var(--color-code-bg)]">
                         <LLMContentRenderer
                           :content="JSON.stringify([{ role: 'system', content: parsedSystemInstructions }])"
                           :observation-type="span.gen_ai_operation_name"
@@ -2163,7 +2163,7 @@ export default defineComponent({
 
 .traces-correlated-metrics-container .q-card {
   box-shadow: none !important;
-  border: 1px solid var(--o2-border) !important;
+  border: 1px solid var(--color-border-default) !important;
 }
 
 .traces-correlated-metrics-container .card-container {
@@ -2638,7 +2638,7 @@ body.body--dark .trace-details-toolbar-container .provider-badge {
 }
 
 .llm-preview-container .section-label {
-  color: var(--o2-text-primary);
+  color: var(--color-text-primary);
   font-size: 14px;
   margin-bottom: 0.5rem;
 }
@@ -2659,7 +2659,7 @@ body.body--dark .trace-details-toolbar-container .provider-badge {
   padding: 0.75rem;
   overflow-y: auto;
   overflow-x: hidden;
-  background-color: var(--o2-code-bg);
+  background-color: var(--color-code-bg);
 }
 
 .llm-preview-container .llm-content-box .plain-text-content:hover {
@@ -2671,7 +2671,7 @@ body.body--dark .trace-details-toolbar-container .provider-badge {
 }
 
 .llm-preview-container .no-data-message {
-  color: var(--o2-text-secondary);
+  color: var(--color-text-secondary);
   font-style: italic;
   text-align: center;
   padding: 2rem;
@@ -2711,7 +2711,7 @@ body.body--dark .trace-details-toolbar-container .provider-badge {
 
 .llm-preview-container .io-container-dark:fullscreen .io-section .section-label {
   background: #1e1e1e;
-  color: var(--o2-border);
+  color: var(--color-border-default);
 }
 
 .llm-preview-container .io-container-dark .llm-content-box .plain-text-content:hover {
@@ -2723,7 +2723,7 @@ body.body--dark .trace-details-toolbar-container .provider-badge {
 }
 
 .llm-preview-container .model-params-json {
-  background-color: var(--o2-code-bg);
+  background-color: var(--color-code-bg);
   padding: 1rem;
   border-radius: 4px;
   overflow-x: auto;

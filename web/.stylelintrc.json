@@ -1,0 +1,17 @@
+{
+  "overrides": [
+    {
+      "files": ["**/*.vue"],
+      "customSyntax": "postcss-html"
+    }
+  ],
+  "rules": {
+    "declaration-property-value-disallowed-list": [
+      { "/.*/": ["/var\\(\\s*--o2-/"] },
+      {
+        "message": "Legacy --o2-* tokens are banned. Use the modern --color-* token or a Tailwind utility.",
+        "severity": "warning"
+      }
+    ]
+  }
+}

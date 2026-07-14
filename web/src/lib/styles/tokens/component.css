@@ -25,20 +25,22 @@
   --color-button-primary-focus-ring: var(--color-primary-400);
 
   /* Button — secondary */
-  --o2-secondary-btn-bg: var(--color-surface-panel);
-  --o2-secondary-btn-text: var(--color-text-primary);
-  --o2-secondary-btn-border: var(--color-border-subtle, #e5e7eb);
-  --color-button-secondary: var(--o2-secondary-btn-bg);
+  --color-button-secondary: var(--color-surface-panel);
+  --color-button-secondary-foreground: var(--color-text-primary);
+  --color-button-secondary-border: var(--color-border-subtle, #e5e7eb);
   --color-button-secondary-hover: var(--color-primary-50);
   --color-button-secondary-active: var(--color-primary-100);
   --color-button-secondary-disabled: var(--color-surface-panel);
-  --color-button-secondary-foreground: var(--o2-secondary-btn-text);
   --color-button-secondary-focus-ring: var(--color-primary-400);
+  /* Legacy compat aliases — kept until Stage 5 deletion; no known consumer */
+  --o2-secondary-btn-bg: var(--color-button-secondary);
+  --o2-secondary-btn-text: var(--color-button-secondary-foreground);
+  --o2-secondary-btn-border: var(--color-button-secondary-border);
 
   /* Button — outline */
   --color-button-outline-text: var(--color-text-primary);
   --color-button-outline-border: var(--color-border-default);
-  --color-button-outline-hover-bg: var(--o2-hover-accent);
+  --color-button-outline-hover-bg: var(--color-interactive-hover-bg);
   --color-button-outline-hover-border: var(--color-primary-300);
   --color-button-outline-active-bg: var(--color-primary-100);
   --color-button-outline-focus-ring: var(--color-primary-200);
@@ -188,7 +190,7 @@
   /* OFieldList / OFieldRow / OFieldLabel */
   --color-field-list-row-hover-bg:     var(--color-primary-100);
   --color-field-list-group-text:       var(--color-text-secondary);
-  --color-field-list-label-text:       var(--color-grey-text-primary);
+  --color-field-list-label-text:       var(--color-text-primary);
   --color-field-list-label-icon:       var(--color-text-secondary);
   --color-field-list-drag-icon:        var(--color-text-secondary);
   --color-field-list-expand-icon:      var(--color-text-secondary);
@@ -733,10 +735,9 @@
   --color-skeleton-shimmer:        rgba(255, 255, 255, 0.8);
   --color-datepicker-inner-border: var(--color-grey-100);
 
-  /* Shared hover + surface accent — wraps --o2-hover-accent so templates use
-     component tokens, not semantic tokens directly */
-  --color-interactive-hover-bg: var(--o2-hover-accent);
-  --color-surface-accent: var(--o2-hover-accent);
+  /* Shared hover + surface accent — real formula owned by semantic.css
+     (theme-accent tinted); --color-surface-accent is an alias of it. */
+  --color-surface-accent: var(--color-interactive-hover-bg);
 }
 
 
@@ -1400,38 +1401,38 @@
 
 /* ── sdr-fields ── */
 @theme inline {
-  --color-label-chip-ip-bg:        var(--o2-label-chip-ip-bg);
-  --color-label-chip-ip-text:      var(--o2-label-chip-ip-text);
-  --color-label-chip-ipv4-bg:      var(--o2-label-chip-ipv4-bg);
-  --color-label-chip-ipv4-text:    var(--o2-label-chip-ipv4-text);
-  --color-label-chip-ipv6-bg:      var(--o2-label-chip-ipv6-bg);
-  --color-label-chip-ipv6-text:    var(--o2-label-chip-ipv6-text);
-  --color-label-chip-method-bg:    var(--o2-label-chip-method-bg);
-  --color-label-chip-method-text:  var(--o2-label-chip-method-text);
-  --color-label-chip-url-bg:       var(--o2-label-chip-url-bg);
-  --color-label-chip-url-text:     var(--o2-label-chip-url-text);
-  --color-label-chip-num-bg:       var(--o2-label-chip-num-bg);
-  --color-label-chip-num-text:     var(--o2-label-chip-num-text);
-  --color-label-chip-float-bg:     var(--o2-label-chip-float-bg);
-  --color-label-chip-float-text:   var(--o2-label-chip-float-text);
-  --color-label-chip-hex-bg:       var(--o2-label-chip-hex-bg);
-  --color-label-chip-hex-text:     var(--o2-label-chip-hex-text);
-  --color-label-chip-ts-bg:        var(--o2-label-chip-ts-bg);
-  --color-label-chip-ts-text:      var(--o2-label-chip-ts-text);
-  --color-label-chip-date-bg:      var(--o2-label-chip-date-bg);
-  --color-label-chip-date-text:    var(--o2-label-chip-date-text);
-  --color-label-chip-time-bg:      var(--o2-label-chip-time-bg);
-  --color-label-chip-time-text:    var(--o2-label-chip-time-text);
-  --color-label-chip-id-bg:        var(--o2-label-chip-id-bg);
-  --color-label-chip-id-text:      var(--o2-label-chip-id-text);
-  --color-label-chip-email-bg:     var(--o2-label-chip-email-bg);
-  --color-label-chip-email-text:   var(--o2-label-chip-email-text);
-  --color-label-chip-str-bg:       var(--o2-label-chip-str-bg);
-  --color-label-chip-str-text:     var(--o2-label-chip-str-text);
-  --color-label-chip-default-bg:   var(--o2-label-chip-default-bg);
-  --color-label-chip-default-text: var(--o2-label-chip-default-text);
-  --color-label-chip-pattern-bg:   var(--o2-label-chip-pattern-bg);
-  --color-label-chip-pattern-text: var(--o2-label-chip-pattern-text);
+  --color-label-chip-ip-bg:        var(--color-label-chip-ip-bg);
+  --color-label-chip-ip-text:      var(--color-label-chip-ip-text);
+  --color-label-chip-ipv4-bg:      var(--color-label-chip-ipv4-bg);
+  --color-label-chip-ipv4-text:    var(--color-label-chip-ipv4-text);
+  --color-label-chip-ipv6-bg:      var(--color-label-chip-ipv6-bg);
+  --color-label-chip-ipv6-text:    var(--color-label-chip-ipv6-text);
+  --color-label-chip-method-bg:    var(--color-label-chip-method-bg);
+  --color-label-chip-method-text:  var(--color-label-chip-method-text);
+  --color-label-chip-url-bg:       var(--color-label-chip-url-bg);
+  --color-label-chip-url-text:     var(--color-label-chip-url-text);
+  --color-label-chip-num-bg:       var(--color-label-chip-num-bg);
+  --color-label-chip-num-text:     var(--color-label-chip-num-text);
+  --color-label-chip-float-bg:     var(--color-label-chip-float-bg);
+  --color-label-chip-float-text:   var(--color-label-chip-float-text);
+  --color-label-chip-hex-bg:       var(--color-label-chip-hex-bg);
+  --color-label-chip-hex-text:     var(--color-label-chip-hex-text);
+  --color-label-chip-ts-bg:        var(--color-label-chip-ts-bg);
+  --color-label-chip-ts-text:      var(--color-label-chip-ts-text);
+  --color-label-chip-date-bg:      var(--color-label-chip-date-bg);
+  --color-label-chip-date-text:    var(--color-label-chip-date-text);
+  --color-label-chip-time-bg:      var(--color-label-chip-time-bg);
+  --color-label-chip-time-text:    var(--color-label-chip-time-text);
+  --color-label-chip-id-bg:        var(--color-label-chip-id-bg);
+  --color-label-chip-id-text:      var(--color-label-chip-id-text);
+  --color-label-chip-email-bg:     var(--color-label-chip-email-bg);
+  --color-label-chip-email-text:   var(--color-label-chip-email-text);
+  --color-label-chip-str-bg:       var(--color-label-chip-str-bg);
+  --color-label-chip-str-text:     var(--color-label-chip-str-text);
+  --color-label-chip-default-bg:   var(--color-label-chip-default-bg);
+  --color-label-chip-default-text: var(--color-label-chip-default-text);
+  --color-label-chip-pattern-bg:   var(--color-label-chip-pattern-bg);
+  --color-label-chip-pattern-text: var(--color-label-chip-pattern-text);
 }
 
 /* ── Table ── */
@@ -1479,9 +1480,9 @@ html {
 }
 
 body {
-  background: var(--o2-body-primary-bg);
+  background: var(--color-theme-body-bg-primary);
   overflow: hidden;
-  color: var(--o2-text-body);
+  color: var(--color-text-body);
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   font-weight: var(--font-normal);
@@ -1497,7 +1498,7 @@ body {
  */
 @layer base {
 h1, h2, h3, h4, h5, h6 {
-  color: var(--o2-text-heading);
+  color: var(--color-text-heading);
   margin: 0;
 }
 
@@ -1544,30 +1545,30 @@ h6 {
 }
 
 p {
-  color: var(--o2-text-body);
+  color: var(--color-text-body);
   font-size: var(--text-base);
   line-height: var(--leading-base);
   margin: 0;
 }
 
 a {
-  color: var(--o2-text-link);
+  color: var(--color-text-link);
   text-decoration: none;
 }
 
 a:hover {
-  color: var(--o2-text-link-hover);
+  color: var(--color-text-link-hover);
   text-decoration: underline;
 }
 
 small {
   font-size: var(--text-xs);
-  color: var(--o2-text-caption);
+  color: var(--color-text-caption);
 }
 
 label:not(.o-input-label) {
   font-size: var(--text-sm);
-  color: var(--o2-text-label);
+  color: var(--color-text-label);
   font-weight: var(--font-normal);
 }
 }
@@ -1576,7 +1577,7 @@ label:not(.o-input-label) {
   code {
     font-family: var(--font-mono);
     font-size: var(--text-sm);
-    color: var(--o2-text-code);
+    color: var(--color-text-code);
     font-feature-settings: "tnum";
     letter-spacing: -0.2px;
   }
@@ -1592,7 +1593,7 @@ label:not(.o-input-label) {
 }
 
 ::placeholder {
-  color: var(--o2-text-placeholder);
+  color: var(--color-text-placeholder);
 }
 
 .o2-app-root {
@@ -1601,18 +1602,18 @@ label:not(.o-input-label) {
 }
 
 /*
- * NOTE: the legacy `.bg-white { background-color: var(--o2-body-primary-bg) }`
+ * NOTE: the legacy `.bg-white { background-color: var(--color-theme-body-bg-primary) }`
  * shim was removed. It collided with Tailwind's `bg-white` utility once the
  * `tw:` prefix was dropped, silently overriding every `bg-white` with the 1%
  * body tint (e.g. the OSwitch thumb rendered invisible). Components that need
- * the tint reference `var(--o2-body-primary-bg)` directly (QueryInspector,
+ * the tint reference `var(--color-theme-body-bg-primary)` directly (QueryInspector,
  * `.o2-custom-bg`); `bg-white` now means Tailwind white everywhere.
  */
 
 .o2-custom-bg {
-  background: var(--o2-body-secondary-bg);
-  background: -webkit-linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg));
-  background: linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg));
+  background: var(--color-theme-body-bg-secondary);
+  background: -webkit-linear-gradient(to bottom right, var(--color-theme-body-bg-primary), var(--color-theme-body-bg-secondary));
+  background: linear-gradient(to bottom right, var(--color-theme-body-bg-primary), var(--color-theme-body-bg-secondary));
   overflow: hidden;
 }
 
@@ -2517,8 +2518,8 @@ body.body--dark .rca-report-content {
 }
 
 .logs-saved-view-icon:hover {
-  color: var(--o2-text-primary) !important;
-  background-color: var(--o2-hover-accent) !important;
+  color: var(--color-text-primary) !important;
+  background-color: var(--color-interactive-hover-bg) !important;
 }
 
 .logs-search-bar-component {
@@ -2540,11 +2541,11 @@ body.body--dark .rca-report-content {
     width: 2rem;
     height: 2rem;
     border-radius: 0.375rem;
-    border: 0.11rem solid var(--o2-border) !important;
+    border: 0.11rem solid var(--color-border-default) !important;
   }
 
   .toggle-container {
-    border: 0.0625rem solid var(--o2-border);
+    border: 0.0625rem solid var(--color-border-default);
     border-radius: 0.375rem;
   }
 
@@ -2566,7 +2567,7 @@ body.body--dark .rca-report-content {
   #fnEditor {
     width: 100%;
     border-radius: 0.375rem;
-    border: 0 solid var(--o2-border);
+    border: 0 solid var(--color-border-default);
     overflow: hidden;
   }
 
@@ -2577,7 +2578,7 @@ body.body--dark .rca-report-content {
   .function-dropdown {
     width: 12.8125rem;
     padding-bottom: 0;
-    border: 0.0625rem solid var(--o2-border);
+    border: 0.0625rem solid var(--color-border-default);
     border-radius: 0.375rem;
     cursor: pointer;
   }
@@ -2585,7 +2586,7 @@ body.body--dark .rca-report-content {
   .casesensitive-btn {
     padding: 0.5rem;
     margin-left: -0.375rem;
-    background-color: var(--o2-muted-background);
+    background-color: var(--color-surface-subtle);
     border-radius: 0 0.25rem 0.25rem 0;
   }
 
@@ -2593,7 +2594,7 @@ body.body--dark .rca-report-content {
     padding: 0;
 
     .block {
-      color: var(--o2-text-primary);
+      color: var(--color-text-primary);
       font-weight: 600;
       font-size: 0.75rem;
     }
@@ -2612,7 +2613,7 @@ body.body--dark .rca-report-content {
   .resultsOverChart {
     margin-bottom: 0.75rem;
     font-size: 0.875rem;
-    color: var(--o2-text-primary);
+    color: var(--color-text-primary);
     font-weight: 700;
   }
 
@@ -2624,7 +2625,7 @@ body.body--dark .rca-report-content {
       box-shadow: 0 0.1875rem 0.9375rem rgba(0, 0, 0, 0.1);
       transition: height 0.25s ease;
       height: calc(100vh - 9.125rem);
-      background-color: var(--o2-card-background);
+      background-color: var(--color-surface-base);
       position: absolute;
       top: 2.75rem;
       width: 100%;
@@ -2651,7 +2652,7 @@ body.body--dark .rca-report-content {
     font-weight: bold;
     text-transform: initial;
     font-size: 0.6875rem;
-    color: var(--o2-primary-foreground);
+    color: var(--color-button-primary-foreground);
     border-radius: 0.375rem;
   }
 
@@ -2661,7 +2662,7 @@ body.body--dark .rca-report-content {
     transition: all 0.2s ease;
 
     &:hover {
-      background-color: var(--o2-hover-accent);
+      background-color: var(--color-interactive-hover-bg);
     }
   }
 
@@ -2683,14 +2684,14 @@ body.body--dark .rca-report-content {
     }
 
     &:hover {
-      background-color: var(--o2-hover-accent);
+      background-color: var(--color-interactive-hover-bg);
     }
   }
 
   .savedview-dropdown {
     width: 13.4375rem;
     display: inline-block;
-    border: 0.0625rem solid var(--o2-border);
+    border: 0.0625rem solid var(--color-border-default);
     border-radius: 0.375rem;
   }
 
@@ -2804,7 +2805,7 @@ body.body--dark .rca-report-content {
         font-size: 0.75rem !important;
         font-weight: 500;
         line-height: 1;
-        color: var(--o2-text-primary) !important;
+        color: var(--color-text-primary) !important;
         border-radius: 0.25rem !important;
         overflow: visible !important;
       }
@@ -2816,7 +2817,7 @@ body.body--dark .rca-report-content {
 
       .reset-icon {
         font-size: 1.25rem !important;
-        color: var(--o2-text-primary);
+        color: var(--color-text-primary);
         transition: color 0.2s ease;
       }
     }
@@ -2837,7 +2838,7 @@ body.body--dark .rca-report-content {
       z-index: 2;
       left: 0;
       height: 20px;
-      color: var(--o2-text-primary);
+      color: var(--color-text-primary);
     }
 
     .field-container {
@@ -2858,7 +2859,7 @@ body.body--dark .rca-report-content {
 
     &.selected {
       .field_overlay {
-        background-color: var(--o2-hover-accent);
+        background-color: var(--color-interactive-hover-bg);
 
         .field_icons {
           opacity: 0;
@@ -2871,14 +2872,14 @@ body.body--dark .rca-report-content {
     .field_list {
       &:hover {
         .field_overlay {
-          background-color: var(--o2-hover-accent);
+          background-color: var(--color-interactive-hover-bg);
         }
       }
     }
 
     .field-list-reset {
       .reset-icon {
-        color: var(--o2-text-primary);
+        color: var(--color-text-primary);
         border: 1px solid rgba(196, 196, 196);
         border-radius: 0.375rem !important;
         padding: 0.125rem;
@@ -2894,7 +2895,7 @@ body.body--dark .rca-report-content {
     .field_list {
       &:hover {
         .field_overlay {
-          background-color: var(--o2-hover-accent);
+          background-color: var(--color-interactive-hover-bg);
           opacity: 1;
         }
       }
@@ -3099,7 +3100,7 @@ body.body--dark .rca-report-content {
   .pagination__content {
     input {
       border: 1px solid rgba(255, 255, 255, 0.28) !important;
-      color: var(--o2-text-primary);
+      color: var(--color-text-primary);
       background-color: transparent;
     }
   }
@@ -3139,7 +3140,7 @@ body.body--dark .rca-report-content {
   }
 
   .active {
-    border-bottom: 3px solid var(--o2-primary-btn-bg) !important;
+    border-bottom: 3px solid var(--color-button-primary) !important;
   }
 }
 
@@ -3341,7 +3342,7 @@ body.body--dark .rca-report-content {
   border-width: 1.5px !important;
 
   &:hover {
-    background-color: rgba(var(--o2-theme-color), 0.1) !important;
+    background-color: rgba(var(--color-theme-accent), 0.1) !important;
     border-width: 2px !important;
   }
 }
@@ -3407,7 +3408,7 @@ button.date-time-button {
 }
 .rp-selector-selected {
   color: #ffffff;
-  background: var(--o2-primary-btn-bg);
+  background: var(--color-button-primary);
 }
 
 .wrap-content-btn {
@@ -3799,7 +3800,7 @@ button.date-time-button {
   transition: all 0.2s ease;
 
   &:hover {
-    background-color: var(--o2-hover-accent);
+    background-color: var(--color-interactive-hover-bg);
   }
 }
 
@@ -3989,7 +3990,7 @@ button.date-time-button {
   cursor: pointer;
 
   &:hover {
-    background-color: var(--o2-hover-accent);
+    background-color: var(--color-interactive-hover-bg);
   }
 }
 
@@ -4012,7 +4013,7 @@ button.date-time-button {
     min-width: auto;
 
     &:hover {
-      background-color: var(--o2-hover-accent);
+      background-color: var(--color-interactive-hover-bg);
     }
   }
 }
@@ -4046,7 +4047,7 @@ button.date-time-button {
     min-width: auto;
 
     &:hover {
-      background-color: var(--o2-hover-accent);
+      background-color: var(--color-interactive-hover-bg);
     }
 
     .btn__content {
@@ -4059,7 +4060,7 @@ button.date-time-button {
   transition: all 0.2s ease;
 
   &:hover {
-    background-color: var(--o2-hover-accent);
+    background-color: var(--color-interactive-hover-bg);
   }
 }
 
@@ -4223,7 +4224,7 @@ button.date-time-button {
 }
 
 .no-data-image {
-  color: var(--o2-primary-btn-bg);
+  color: var(--color-button-primary);
 }
 
 @media print {

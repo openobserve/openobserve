@@ -101,12 +101,12 @@ const metadataRows = computed(() =>
             :data-test="`traces-db-span-details-tag-${row.key}`"
             class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[0.85rem]"
             style="
-              background: var(--o2-card-background);
-              border: 1px solid var(--o2-border);
-              color: var(--o2-text-primary);
+              background: var(--color-surface-base);
+              border: 1px solid var(--color-border-default);
+              color: var(--color-text-primary);
             "
           >
-            <span style="color: var(--o2-text-secondary)"
+            <span style="color: var(--color-text-secondary)"
               >{{ row.label }}:</span
             >
             <span class="break-all">{{ row.value }}</span>
@@ -136,7 +136,7 @@ const metadataRows = computed(() =>
           v-else
           data-test="traces-db-span-details-no-query"
           class="p-4 text-sm"
-          style="color: var(--o2-text-secondary)"
+          style="color: var(--color-text-secondary)"
         >
           No query text recorded for this span.
         </div>
@@ -152,30 +152,30 @@ const metadataRows = computed(() =>
       <div class="py-2 px-3">
           <div class="grid grid-cols-2 gap-x-4 gap-y-1">
             <template v-if="span.db_response_returned_rows">
-              <div class="text-xs" style="color: var(--o2-text-secondary)">
+              <div class="text-xs" style="color: var(--color-text-secondary)">
                 Rows Returned
               </div>
               <div class="text-xs">{{ span.db_response_returned_rows }}</div>
             </template>
             <template v-if="span.db_operation_batch_size">
-              <div class="text-xs" style="color: var(--o2-text-secondary)">
+              <div class="text-xs" style="color: var(--color-text-secondary)">
                 Batch Size
               </div>
               <div class="text-xs">{{ span.db_operation_batch_size }}</div>
             </template>
             <template v-if="span.db_query_summary">
-              <div class="text-xs" style="color: var(--o2-text-secondary)">
+              <div class="text-xs" style="color: var(--color-text-secondary)">
                 Query Summary
               </div>
               <div class="text-xs">{{ span.db_query_summary }}</div>
             </template>
             <template v-if="span.db_response_status_code">
-              <div class="text-xs" style="color: var(--o2-text-secondary)">
+              <div class="text-xs" style="color: var(--color-text-secondary)">
                 Response Status
               </div>
               <div
                 class="text-xs"
-                style="color: var(--o2-status-error-text)"
+                style="color: var(--color-status-error-text)"
               >
                 {{ span.db_response_status_code }}
               </div>

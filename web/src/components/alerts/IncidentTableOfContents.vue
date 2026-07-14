@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         data-test="toc-header"
         :class="[
-          'px-3 py-2 flex items-center gap-2 border-b flex-shrink-0 !bg-[var(--o2-table-header-bg)]',
+          'px-3 py-2 flex items-center gap-2 border-b flex-shrink-0 !bg-[var(--color-theme-table-header-bg)]',
           isDarkMode
             ? 'border-gray-700'
             : 'border-gray-200'

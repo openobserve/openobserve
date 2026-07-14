@@ -572,7 +572,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="min-h-45 relative flex-1">
                   <div
                     v-if="!previewActive"
-                    class="w-full h-45 flex flex-col items-center justify-center rounded border border-dashed border-(--o2-border)"
+                    class="w-full h-45 flex flex-col items-center justify-center rounded border border-dashed border-(--color-border-default)"
                     :class="
                       store.state.theme === 'dark'
                         ? 'text-gray-400'
@@ -625,7 +625,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       { value: 75, label: '75' },
                       { value: 100, label: '100' },
                     ]"
-                    class="sensitivity-range-slider mt-[14px] h-[145px]! [--color-slider-track-fill:var(--o2-primary-color)] [--color-slider-thumb:var(--o2-primary-color)] [--color-slider-thumb-border:white] [--color-slider-value:var(--o2-text-secondary)]"
+                    class="sensitivity-range-slider mt-[14px] h-[145px]! [--color-slider-track-fill:var(--o2-primary-color)] [--color-slider-thumb:var(--o2-primary-color)] [--color-slider-thumb-border:white] [--color-slider-value:var(--color-text-secondary)]"
                     data-test="anomaly-threshold-range"
                     @update:model-value="onThresholdRangeChange"
                   />

@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex py-1 px-1.5 border-b border-solid border-[var(--o2-border-color)] text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--o2-text-secondary)] shrink-0"
+                  class="w-[100px] font-medium text-[var(--color-text-secondary)] shrink-0"
                 >
                   Error Type:
                 </div>
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex py-1 px-1.5 border-b border-solid border-[var(--o2-border-color)] text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--o2-text-secondary)] shrink-0"
+                  class="w-[100px] font-medium text-[var(--color-text-secondary)] shrink-0"
                 >
                   Message:
                 </div>
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex py-1 px-1.5 border-b border-solid border-[var(--o2-border-color)] text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--o2-text-secondary)] shrink-0"
+                  class="w-[100px] font-medium text-[var(--color-text-secondary)] shrink-0"
                 >
                   Handling:
                 </div>
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex py-1 px-1.5 text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--o2-text-secondary)] shrink-0"
+                  class="w-[100px] font-medium text-[var(--color-text-secondary)] shrink-0"
                 >
                   Error ID:
                 </div>
@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex py-1 px-1.5 border-b border-solid border-[var(--o2-border-color)] text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--o2-text-secondary)] shrink-0"
+                  class="w-[100px] font-medium text-[var(--color-text-secondary)] shrink-0"
                 >
                   Loading Type:
                 </div>
@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex py-1 px-1.5 border-b border-solid border-[var(--o2-border-color)] text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--o2-text-secondary)] shrink-0"
+                  class="w-[100px] font-medium text-[var(--color-text-secondary)] shrink-0"
                 >
                   URL:
                 </div>
@@ -245,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex py-1 px-1.5 text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--o2-text-secondary)] shrink-0"
+                  class="w-[100px] font-medium text-[var(--color-text-secondary)] shrink-0"
                 >
                   View ID:
                 </div>
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Resource -->
                     <template v-if="item.type === 'resource'">
                       <span
-                        class="mr-1 font-bold text-[10px] text-[var(--o2-primary-btn-bg)]"
+                        class="mr-1 font-bold text-[10px] text-[var(--color-button-primary)]"
                       >
                         {{ item.resource_method || "GET" }}
                       </span>

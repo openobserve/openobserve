@@ -51,19 +51,19 @@
             <div v-if="row.hasThreshold" class="qcs-item__bar flex-1 h-1 bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] rounded-full overflow-hidden">
               <div
                 class="qcs-item__bar-fill h-full"
-                :class="{ 'bg-[var(--o2-status-warning-text,#b25400)]': row.status === 'unhealthy' || row.status === 'warn', 'bg-[var(--o2-status-success-text,#2e7d32)]': row.status === 'healthy', 'bg-[color-mix(in_srgb,var(--color-text-secondary)_30%,transparent)]': row.status === 'noThreshold' }"
+                :class="{ 'bg-[var(--o2-status-warning-text,#b25400)]': row.status === 'unhealthy' || row.status === 'warn', 'bg-[var(--color-status-success-text,#2e7d32)]': row.status === 'healthy', 'bg-[color-mix(in_srgb,var(--color-text-secondary)_30%,transparent)]': row.status === 'noThreshold' }"
                 :style="{ width: `${Math.min(100, row.unhealthyPct ?? 0)}%` }"
               />
             </div>
             <span v-if="row.hasThreshold" class="qcs-item__pct shrink-0 text-[11px] font-semibold text-(--o2-status-warning-text,#b25400)">{{ formatPct(row.unhealthyPct) }}</span>
-            <span v-else class="qcs-item__pct--muted shrink-0 text-[11px] font-semibold text-(--color-text-secondary,var(--o2-text-secondary))">—</span>
-            <span class="shrink-0 text-[11px] text-(--color-text-secondary,var(--o2-text-secondary))">{{ formatCount(row.totalScores) }}</span>
+            <span v-else class="qcs-item__pct--muted shrink-0 text-[11px] font-semibold text-(--color-text-secondary,var(--color-text-secondary))">—</span>
+            <span class="shrink-0 text-[11px] text-(--color-text-secondary,var(--color-text-secondary))">{{ formatCount(row.totalScores) }}</span>
           </div>
 
           <svg
             v-if="row.trendSparkline.length > 0"
             class="qcs-item__spark w-full h-5"
-            :class="{ 'text-[var(--o2-status-warning-text,#b25400)]': row.status === 'unhealthy' || row.status === 'warn', 'text-[var(--o2-status-success-text,#2e7d32)]': row.status === 'healthy', 'text-[color-mix(in_srgb,var(--color-text-secondary)_50%,transparent)]': row.status === 'noThreshold' }"
+            :class="{ 'text-[var(--o2-status-warning-text,#b25400)]': row.status === 'unhealthy' || row.status === 'warn', 'text-[var(--color-status-success-text,#2e7d32)]': row.status === 'healthy', 'text-[color-mix(in_srgb,var(--color-text-secondary)_50%,transparent)]': row.status === 'noThreshold' }"
             viewBox="0 0 100 20"
             preserveAspectRatio="none"
             aria-hidden="true"

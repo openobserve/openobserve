@@ -66,7 +66,7 @@
                     min-width: 200px;
                     width: 300px;
                     max-width: 300px;
-                    border: 1px solid var(--o2-border);
+                    border: 1px solid var(--color-border-default);
                   "
                 >
                   <ODropdownItem
@@ -368,8 +368,8 @@
                               ? 'text-[var(--o2-primary)]'
                               : 'text-[var(--o2-warning)]'
                             : block.success === false
-                              ? 'text-[var(--o2-negative)]'
-                              : 'text-[var(--o2-positive)]'
+                              ? 'text-[var(--color-status-negative)]'
+                              : 'text-[var(--color-status-positive)]'
                         "
                       />
                       <span class="tool-call-name">
@@ -6307,7 +6307,7 @@ export default defineComponent({
 }
 
 .dark .generated-code-block code {
-  background-color: var(--o2-primary-background);
+  background-color: var(--color-surface-base);
   border: 0.5px solid #e1e1e124;
   border-top: none;
 }
@@ -6425,7 +6425,7 @@ export default defineComponent({
 
 .dark .code-block-header {
   background-color: #3b3b3b;
-  border: 1px 1px 0px 1px solid var(--o2-border-input);
+  border: 1px 1px 0px 1px solid var(--color-input-border);
 }
 
 @keyframes bounce {

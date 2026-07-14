@@ -194,27 +194,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="storage-detail-grid grid gap-x-8 gap-y-5" style="grid-template-columns: repeat(2, 1fr);">
             <div v-if="storageData.bucket_name" class="storage-field">
               <div class="storage-field__label text-xs text-[#6b7280] capitalize mb-[3px] font-medium">{{ t("storage_settings.bucketName") }}</div>
-              <div class="storage-field__value text-[#6b7280] break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.bucket_name }}</div>
+              <div class="storage-field__value text-[#6b7280] break-all" style="font-size: 0.9rem; color: var(--color-text-primary);">{{ storageData.bucket_name }}</div>
             </div>
             <div v-if="storageData.region" class="storage-field">
               <div class="storage-field__label text-xs text-[#6b7280] capitalize mb-[3px] font-medium">{{ t("storage_settings.region") }}</div>
-              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.region }}</div>
+              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--color-text-primary);">{{ storageData.region }}</div>
             </div>
             <div v-if="storageData.server_url && !isCloud" class="storage-field">
               <div class="storage-field__label text-xs text-[#6b7280] capitalize mb-[3px] font-medium">{{ t("storage_settings.serverUrl") }}</div>
-              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.server_url }}</div>
+              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--color-text-primary);">{{ storageData.server_url }}</div>
             </div>
             <div v-if="storageData.access_key" class="storage-field">
               <div class="storage-field__label text-xs text-[#6b7280] capitalize mb-[3px] font-medium">{{ t("storage_settings.accessKey") }}</div>
-              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.access_key }}</div>
+              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--color-text-primary);">{{ storageData.access_key }}</div>
             </div>
             <div v-if="storageData.secret_key" class="storage-field">
               <div class="storage-field__label text-xs text-[#6b7280] capitalize mb-[3px] font-medium">{{ t("storage_settings.secretKey") }}</div>
-              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.secret_key }}</div>
+              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--color-text-primary);">{{ storageData.secret_key }}</div>
             </div>
             <div v-if="storageData.role_arn" class="storage-field">
               <div class="storage-field__label text-xs text-[#6b7280] capitalize mb-[3px] font-medium">{{ t("storage_settings.roleArn") }}</div>
-              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--o2-text-primary); word-break: break-all;">{{ storageData.role_arn }}</div>
+              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--color-text-primary); word-break: break-all;">{{ storageData.role_arn }}</div>
             </div>
           </div>
         </OCardSection>

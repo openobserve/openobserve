@@ -9,19 +9,19 @@
       </div>
       <div class="flex items-baseline gap-[0.2rem]">
         <template v-if="kpi.value != null">
-          <span class="text-[1.4rem] font-bold leading-none text-[var(--o2-text-primary)]">
+          <span class="text-[1.4rem] font-bold leading-none text-[var(--color-text-primary)]">
             {{ bigNumber }}
           </span>
           <span
             v-if="unitLabel"
-            class="text-[0.8rem] font-semibold text-[var(--o2-text-secondary)] "
+            class="text-[0.8rem] font-semibold text-[var(--color-text-secondary)] "
           >
             {{ unitLabel }}
           </span>
         </template>
         <span
           v-else
-          class="text-[0.95rem] font-medium leading-none text-[var(--o2-text-muted)]"
+          class="text-[0.95rem] font-medium leading-none text-[var(--color-text-muted)]"
         >
           {{ t("onlineEvals.quality.kpis.noData") }}
         </span>
@@ -36,8 +36,8 @@
         class="text-[0.65rem] font-medium flex items-center gap-[0.25rem]"
         :class="{
           'text-[#16a34a]': (delta != null ? trendSentiment : 'neutral') === 'good',
-          'text-[var(--o2-status-error-text,#c62828)]': (delta != null ? trendSentiment : 'neutral') === 'bad',
-          'text-[var(--o2-text-muted)]': (delta != null ? trendSentiment : 'neutral') === 'neutral',
+          'text-[var(--color-status-error-text,#c62828)]': (delta != null ? trendSentiment : 'neutral') === 'bad',
+          'text-[var(--color-text-muted)]': (delta != null ? trendSentiment : 'neutral') === 'neutral',
         }"
       >
         <template v-if="delta != null">
@@ -124,7 +124,7 @@ const unitLabel = computed(() => {
 
 const sparkColor = computed(() => {
   if (trendSentiment.value === "good") return "#16a34a";
-  if (trendSentiment.value === "bad") return "var(--o2-status-error-text, #c62828)";
+  if (trendSentiment.value === "bad") return "var(--color-status-error-text, #c62828)";
   return "#3b82f6";
 });
 </script>

@@ -1047,8 +1047,8 @@ export default defineComponent({
   height: 100%;
   background: linear-gradient(
     180deg,
-    var(--o2-menu-color) 0%,
-    var(--o2-menu-color) 100%
+    var(--color-theme-menu-color) 0%,
+    var(--color-theme-menu-color) 100%
   );
   opacity: 0.6;
 }
@@ -1057,8 +1057,8 @@ export default defineComponent({
   font-weight: 700;
   background: linear-gradient(
     135deg,
-    var(--o2-menu-color) 0%,
-    var(--o2-menu-color) 100%
+    var(--color-theme-menu-color) 0%,
+    var(--color-theme-menu-color) 100%
   );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;

@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         data-test="dashboard-errors-expand-bar"
         class="flex items-center gap-2 px-2 py-2 cursor-pointer overflow-hidden hover:bg-[#eaeaeaa5]"
-        :style="{ backgroundColor: store.state.theme === 'dark' ? 'var(--o2-header-menu-bg)' : 'var(--color-primary-100)' }"
+        :style="{ backgroundColor: store.state.theme === 'dark' ? 'var(--color-theme-header-menu-bg)' : 'var(--color-primary-100)' }"
         @click="onDropDownClick"
       >
         <OIcon

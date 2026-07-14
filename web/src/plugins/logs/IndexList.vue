@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="log-search-index-list-stream-type-badge"
         variant="ghost"
         size="icon-sm"
-        class="shrink-0 h-8 w-8 border border-(--o2-border) rounded p-0"
+        class="shrink-0 h-8 w-8 border border-(--color-border-default) rounded p-0"
         @click="onStreamTypeChange('logs')"
       >
         <OIcon :name="streamTypeIcon" size="sm" />

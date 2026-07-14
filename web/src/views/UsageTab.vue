@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-success-text)]"
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--color-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--color-status-success-text)]"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 2.89% from last
                   week
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-success-text)]"
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--color-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--color-status-success-text)]"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 2.89% from last
                   week
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-error-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-error-text)]"
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--color-status-error-bg)] border border-[var(--o2-border-color)] text-[var(--color-status-error-text)]"
                 >
                   <OIcon name="arrow-downward" size="xs" /> 2.89% from last
                   week
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-success-text)]"
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--color-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--color-status-success-text)]"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 2.89% from last
                   week
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-success-text)]"
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--color-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--color-status-success-text)]"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 0.00% from last
                   week

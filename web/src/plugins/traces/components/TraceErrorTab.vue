@@ -25,12 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Error Summary: HTTP / gRPC status code -->
   <div
     v-if="hasSpanError && (spanStatusCode || spanGrpcStatusCode)"
-    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-[var(--o2-status-error-bg)] border-[var(--o2-status-error-text)]"
+    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-[var(--color-status-error-bg)] border-[var(--color-status-error-text)]"
     data-test="trace-details-sidebar-error-summary"
   >
     <div class="flex-col items-center gap-1">
       <div
-        class="text-[var(--o2-text-4)]! text-[0.85rem] tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
+        class="text-[var(--color-text-primary)]! text-[0.85rem] tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
       >
         {{ spanStatusCode ? "HTTP Status Code" : "gRPC Status Code" }}
       </div>
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <span
           class="text-[0.9rem] font-semibold"
-          :style="{ color: 'var(--o2-status-error-text)' }"
+          :style="{ color: 'var(--color-status-error-text)' }"
           data-test="trace-details-sidebar-error-summary-title"
         >
           {{ statusCodeTitle }}
@@ -55,19 +55,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- DB Response Status Code -->
   <div
     v-if="hasSpanError && spanDbResponseStatusCode"
-    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-[var(--o2-status-error-bg)] border-[var(--o2-status-error-text)]"
+    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-[var(--color-status-error-bg)] border-[var(--color-status-error-text)]"
     data-test="trace-details-sidebar-db-response-status-code"
   >
     <div class="flex-col items-center gap-1">
       <div
-        class="text-[var(--o2-text-4)]! text-[0.65rem] tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
+        class="text-[var(--color-text-primary)]! text-[0.65rem] tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
       >
         DB Response Status Code
       </div>
       <div class="flex items-center pl-[0.5rem]">
         <span
           class="text-[0.9rem] font-semibold"
-          :style="{ color: 'var(--o2-status-error-text)' }"
+          :style="{ color: 'var(--color-status-error-text)' }"
           data-test="trace-details-sidebar-db-response-status-code-value"
         >
           {{ spanDbResponseStatusCode }}
@@ -79,19 +79,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Process Exit Code -->
   <div
     v-if="hasSpanError && spanProcessExitCode"
-    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-[var(--o2-status-error-bg)] border-[var(--o2-status-error-text)]"
+    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-[var(--color-status-error-bg)] border-[var(--color-status-error-text)]"
     data-test="trace-details-sidebar-process-exit-code"
   >
     <div class="flex-col items-center gap-1">
       <div
-        class="text-[var(--o2-text-4)]! text-[0.65rem] tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
+        class="text-[var(--color-text-primary)]! text-[0.65rem] tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
       >
         Process Exit Code
       </div>
       <div class="flex items-center pl-[0.5rem]">
         <span
           class="text-[0.9rem] font-semibold"
-          :style="{ color: 'var(--o2-status-error-text)' }"
+          :style="{ color: 'var(--color-status-error-text)' }"
           data-test="trace-details-sidebar-process-exit-code-value"
         >
           {{ spanProcessExitCode }}
@@ -105,18 +105,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="
       hasSpanError && (errorBannerTitle || errorBannerMessage || spanErrorType)
     "
-    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-[var(--o2-status-error-bg)] border-[var(--o2-status-error-text)]"
+    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-[var(--color-status-error-bg)] border-[var(--color-status-error-text)]"
     data-test="trace-details-sidebar-error-summary"
   >
     <div class="flex items-center gap-2 mb-[0.25rem]">
       <OIcon
         name="error"
         size="sm"
-        class="text-[var(--o2-status-error-text)]"
+        class="text-[var(--color-status-error-text)]"
       />
       <span
         class="text-[1rem] font-semibold"
-        :style="{ color: 'var(--o2-status-error-text)' }"
+        :style="{ color: 'var(--color-status-error-text)' }"
         data-test="trace-details-sidebar-error-summary-title"
       >
         {{ errorBannerTitle }}
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="errorBannerMessage"
       class="ml-[1.5rem] text-[0.875rem] mb-[0.25rem]"
-      :style="{ color: 'var(--o2-text-secondary)' }"
+      :style="{ color: 'var(--color-text-secondary)' }"
       data-test="trace-details-sidebar-error-summary-message"
     >
       {{ errorBannerMessage }}
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Exceptions Table -->
   <template v-if="hasExceptionEvents.length">
     <div
-      class="text-[0.9rem] pt-[0.325rem]! font-semibold pb-[0.325rem] text-[var(--o2-text-secondary)]!"
+      class="text-[0.9rem] pt-[0.325rem]! font-semibold pb-[0.325rem] text-[var(--color-text-secondary)]!"
     >
       {{ t("traces.exceptionsWithCount", { count: hasExceptionEvents.length }) }}
     </div>
@@ -163,32 +163,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #expansion="{ row }">
-        <div class="px-4 py-3 bg-[var(--o2-card-background)] rounded">
+        <div class="px-4 py-3 bg-[var(--color-surface-base)] rounded">
           <div class="space-y-3">
             <!-- Exception Type -->
             <div class="space-y-1">
-              <span class="block font-semibold text-[var(--o2-text-secondary)] text-sm mb-1">{{ t("traces.typeLabel") }}</span>
+              <span class="block font-semibold text-[var(--color-text-secondary)] text-sm mb-1">{{ t("traces.typeLabel") }}</span>
               <span class="text-[#d32f2f] font-semibold bg-[rgba(211,47,47,0.1)] py-1 px-2 rounded inline-block text-sm dark:text-[#ef5350] dark:bg-[rgba(239,83,80,0.15)]">{{ row["exception.type"] }}</span>
             </div>
 
             <!-- Exception Message -->
             <div class="space-y-1">
-              <span class="block font-semibold text-[var(--o2-text-secondary)] text-sm mb-1">{{ t("traces.messageLabel") }}</span>
-              <div class="text-(--o2-text-secondary) bg-(--o2-code-bg) p-2 rounded border-l-[3px] border-l-[#ff9800] whitespace-pre-wrap break-words leading-normal text-sm dark:bg-[rgba(255,255,255,0.05)] dark:border-l-[#ffb74d] dark:text-[var(--o2-border)]">
+              <span class="block font-semibold text-[var(--color-text-secondary)] text-sm mb-1">{{ t("traces.messageLabel") }}</span>
+              <div class="text-(--color-text-secondary) bg-(--color-code-bg) p-2 rounded border-l-[3px] border-l-[#ff9800] whitespace-pre-wrap break-words leading-normal text-sm dark:bg-[rgba(255,255,255,0.05)] dark:border-l-[#ffb74d] dark:text-[var(--color-border-default)]">
                 {{ formatExceptionMessage(row["exception.message"]) }}
               </div>
             </div>
 
             <!-- Exception Escaped -->
             <div class="space-y-1">
-              <span class="block font-semibold text-[var(--o2-text-secondary)] text-sm mb-1">{{ t("traces.escapedLabel") }}</span>
+              <span class="block font-semibold text-[var(--color-text-secondary)] text-sm mb-1">{{ t("traces.escapedLabel") }}</span>
               <span class="text-sm">{{ row["exception.escaped"] }}</span>
             </div>
 
             <!-- Stacktrace -->
             <div class="space-y-2">
               <div class="flex items-center justify-between">
-                <span class="block font-semibold text-[var(--o2-text-secondary)] text-sm">{{ t("traces.stacktraceLabel") }}</span>
+                <span class="block font-semibold text-[var(--color-text-secondary)] text-sm">{{ t("traces.stacktraceLabel") }}</span>
                 <OButton
                   v-if="row['exception.stacktrace'] && row['exception.stacktrace'].trim()"
                   variant="secondary"
@@ -203,12 +203,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="row['exception.stacktrace'] && row['exception.stacktrace'].trim()"
-                class="bg-(--o2-code-bg) rounded border border-(--o2-border) p-3 overflow-x-auto max-h-[600px] overflow-y-auto dark:bg-[#0d0d0d] dark:border-[#2a2a2a]"
+                class="bg-(--color-code-bg) rounded border border-(--color-border-default) p-3 overflow-x-auto max-h-[600px] overflow-y-auto dark:bg-[#0d0d0d] dark:border-[#2a2a2a]"
                 data-test="exception-stacktrace-container"
               >
                 <div class="stacktrace-content m-0 p-0 text-[11px] leading-[1.6] text-[#2c3e50] font-[Monaco,Menlo,'Ubuntu_Mono',Consolas,'source-code-pro',monospace] whitespace-pre-wrap break-words dark:text-[#d4d4d4]" v-html="formatStackTrace(row['exception.stacktrace'])" />
               </div>
-              <div v-else class="flex items-center justify-center bg-(--o2-code-bg) text-[#6c757d] text-xs italic py-4 px-3 border border-dashed border-(--o2-border) rounded dark:bg-[rgba(255,255,255,0.05)] dark:border-[#4a5568] dark:text-[#a0aec0]" data-test="exception-stacktrace-empty">
+              <div v-else class="flex items-center justify-center bg-(--color-code-bg) text-[#6c757d] text-xs italic py-4 px-3 border border-dashed border-(--color-border-default) rounded dark:bg-[rgba(255,255,255,0.05)] dark:border-[#4a5568] dark:text-[#a0aec0]" data-test="exception-stacktrace-empty">
                 <OIcon name="info" size="sm" class="mr-1" />
                 <span>{{ t("traces.noStacktraceAvailable") }}</span>
               </div>

@@ -74,11 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div>
             <div class="flex py-2 px-3 border-b border-solid border-[var(--o2-border-color)]" v-if="resource.resource_type">
-              <div class="w-[150px] text-[var(--o2-text-secondary)] font-medium shrink-0">Type:</div>
+              <div class="w-[150px] text-[var(--color-text-secondary)] font-medium shrink-0">Type:</div>
               <div class="flex-1 text-[var(--o2-text-color)] break-words">{{ resource.resource_type }}</div>
             </div>
             <div class="flex py-2 px-3 border-b border-solid border-[var(--o2-border-color)]" v-if="resource.resource_size">
-              <div class="w-[150px] text-[var(--o2-text-secondary)] font-medium shrink-0">Size:</div>
+              <div class="w-[150px] text-[var(--color-text-secondary)] font-medium shrink-0">Size:</div>
               <div class="flex-1 text-[var(--o2-text-color)] break-words">
                 {{ formatBytes(resource.resource_size) }}
               </div>
@@ -87,13 +87,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex py-2 px-3 border-b border-solid border-[var(--o2-border-color)]"
               v-if="resource.resource_render_blocking_status"
             >
-              <div class="w-[150px] text-[var(--o2-text-secondary)] font-medium shrink-0">Render Blocking:</div>
+              <div class="w-[150px] text-[var(--color-text-secondary)] font-medium shrink-0">Render Blocking:</div>
               <div class="flex-1 text-[var(--o2-text-color)] break-words">
                 {{ resource.resource_render_blocking_status }}
               </div>
             </div>
             <div class="flex py-2 px-3 border-b border-solid border-[var(--o2-border-color)]" v-if="resource.session?.id">
-              <div class="w-[150px] text-[var(--o2-text-secondary)] font-medium shrink-0">Session ID:</div>
+              <div class="w-[150px] text-[var(--color-text-secondary)] font-medium shrink-0">Session ID:</div>
               <div class="flex-1 text-[var(--o2-text-color)] break-words">
                 <code
                   data-test="resource-detail-drawer-session-id-text"
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div class="flex py-2 px-3" v-if="resource.view?.url">
-              <div class="w-[150px] text-[var(--o2-text-secondary)] font-medium shrink-0">Page URL:</div>
+              <div class="w-[150px] text-[var(--color-text-secondary)] font-medium shrink-0">Page URL:</div>
               <div class="flex-1 text-[var(--o2-text-color)] truncate" :title="resource.view.url">
                 {{ resource.view.url }}
               </div>
@@ -257,10 +257,10 @@ const getStatusIcon = (statusCode: number) => {
 
 const getStatusColorClass = (statusCode: number) => {
   if (!statusCode) return "text-gray-500";
-  if (statusCode >= 200 && statusCode < 300) return "text-[var(--o2-positive)]";
+  if (statusCode >= 200 && statusCode < 300) return "text-[var(--color-status-positive)]";
   if (statusCode >= 300 && statusCode < 400) return "text-[var(--o2-info)]";
   if (statusCode >= 400 && statusCode < 500) return "text-[var(--o2-warning)]";
-  return "text-[var(--o2-negative)]";
+  return "text-[var(--color-status-negative)]";
 };
 
 const viewSessionReplay = () => {

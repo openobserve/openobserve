@@ -202,10 +202,10 @@ const onCopy = () => {
   padding: 0.18rem 0.6rem;
   margin: -0.05rem 0;
   border-radius: 6px;
-  background: var(--o2-tab-bg, rgba(0, 0, 0, 0.05));
+  background: var(--color-theme-tab-bg, rgba(0, 0, 0, 0.05));
 }
 .o2-dark.o2-chrome-editor .o2-code-head {
-  --o2-tab-bg: rgba(255, 255, 255, 0.06);
+  --color-theme-tab-bg: rgba(255, 255, 255, 0.06);
 }
 
 .o2-code-pre {

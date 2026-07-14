@@ -370,6 +370,6 @@ loadConfig();
 }
 
 :deep(.text-caption) {
-  color: var(--o2-text-primary);
+  color: var(--color-text-primary);
 }
 </style>

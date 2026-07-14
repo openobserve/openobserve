@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="shrink-0 text-right">
           <span
-            class="tabular-nums text-[var(--o2-text-secondary)]"
+            class="tabular-nums text-[var(--color-text-secondary)]"
             :data-test="`error-events-timeline-offset-${index}`"
             :title="getFormattedDate(event._timestamp / 1000)"
           >{{ offsetLabel(event) }}</span>

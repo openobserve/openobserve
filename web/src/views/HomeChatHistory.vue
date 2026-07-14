@@ -139,7 +139,7 @@ function formatTime(ts: string): string {
         </svg>
         <input
           v-model="searchTerm"
-          class="hch-search-input flex-1 min-w-0 border-0 bg-transparent outline-none text-[0.8125em] text-(--o2-text-primary) py-[0.375em]"
+          class="hch-search-input flex-1 min-w-0 border-0 bg-transparent outline-none text-[0.8125em] text-(--color-text-primary) py-[0.375em]"
           :placeholder="t('chatHistory.search')"
           type="text"
         />
@@ -177,8 +177,8 @@ function formatTime(ts: string): string {
         @click="selectChat(chat.id)"
       >
         <div class="flex-1 min-w-0">
-          <div class="text-[0.8125em] leading-[1.35] truncate text-(--o2-text-body)" :class="{ 'font-medium': activeChatId === chat.id }">{{ chat.title }}</div>
-          <div class="text-[0.6875em] text-(--o2-text-caption) mt-[0.0625em]">{{ formatTime(chat.timestamp) }}</div>
+          <div class="text-[0.8125em] leading-[1.35] truncate text-(--color-text-body)" :class="{ 'font-medium': activeChatId === chat.id }">{{ chat.title }}</div>
+          <div class="text-[0.6875em] text-(--color-text-caption) mt-[0.0625em]">{{ formatTime(chat.timestamp) }}</div>
         </div>
         <span class="inline-flex items-center shrink-0 opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100">
           <OButton
@@ -239,7 +239,7 @@ function formatTime(ts: string): string {
 <style>
 /* placeholder pseudo-element — cannot be inlined */
 .hch-search-input::placeholder {
-  color: var(--o2-text-muted);
+  color: var(--color-text-muted);
   opacity: 0.7;
 }
 </style>

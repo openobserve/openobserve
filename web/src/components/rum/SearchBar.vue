@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="search-bar-component border-b border-(--o2-border) pb-px" id="searchBarComponent">
+  <div class="search-bar-component border-b border-(--color-border-default) pb-px" id="searchBarComponent">
     <div class="flex my-1">
       <div class="float-right flex flex-col">
         <syntax-guide

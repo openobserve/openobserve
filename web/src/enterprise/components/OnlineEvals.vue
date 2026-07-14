@@ -169,11 +169,11 @@ the Free Software Foundation, either version 3 of the License, or
       </AppPageHeader>
 
       <section class="online-evals__content card-container flex flex-1 flex-col min-h-0 overflow-hidden bg-(--o2-card-bg)">
-        <div v-if="!hideTabBar" class="online-evals__tabs flex items-center gap-2 shrink-0 py-0 px-3.5 bg-transparent border-b border-(--o2-border)">
+        <div v-if="!hideTabBar" class="online-evals__tabs flex items-center gap-2 shrink-0 py-0 px-3.5 bg-transparent border-b border-(--color-border-default)">
           <button
             v-for="tab in tabs"
             :key="tab.value"
-            class="online-evals__tab inline-flex items-center gap-1.75 h-9.5 py-0 px-3.5 bg-transparent border-0 border-b-2 border-b-transparent text-(--o2-text-muted) cursor-pointer font-semibold text-[13px]"
+            class="online-evals__tab inline-flex items-center gap-1.75 h-9.5 py-0 px-3.5 bg-transparent border-0 border-b-2 border-b-transparent text-(--color-text-muted) cursor-pointer font-semibold text-[13px]"
             :class="activeTab === tab.value ? 'is-active text-[var(--o2-text)] border-b-[var(--o2-brand)] -mb-px' : ''"
             type="button"
             @click="activeTab = tab.value"
@@ -1243,7 +1243,7 @@ async function performDelete() {
 @media (max-width: 960px) {
   .eval-form-page__side {
     border-left: 0;
-    border-top: 1px solid var(--o2-border);
+    border-top: 1px solid var(--color-border-default);
   }
 }
 </style>

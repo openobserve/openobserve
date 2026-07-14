@@ -44,7 +44,7 @@ const emit = defineEmits<{ click: [] }>();
 
 <style>
 /* Color can't be inlined: as an <a> the chip inherits the global unlayered
-   `a { color: var(--o2-text-link) }`, which beats any layered  utility.
+   `a { color: var(--color-text-link) }`, which beats any layered  utility.
    A class selector outranks the bare `a` selector without needing `!`. */
 .es-ing-chip { color: var(--color-text-secondary); }
 .es-ing-chip:hover { color: var(--color-primary-600); text-decoration: none; }

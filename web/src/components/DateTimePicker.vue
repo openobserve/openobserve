@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel name="relative">
           <div class="date-time-table relative flex flex-col">
             <div
-              class="relative-row px-3 py-2 flex items-center border-b border-[var(--o2-border)]"
+              class="relative-row px-3 py-2 flex items-center border-b border-[var(--color-border-default)]"
               v-for="(period, index) in relativePeriods"
               :key="'date_' + index"
             >
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div class="relative-row px-3 py-2 flex items-center border-b border-[var(--o2-border)]">
+            <div class="relative-row px-3 py-2 flex items-center border-b border-[var(--color-border-default)]">
               <div class="text-sm font-semibold min-w-18.75">Custom</div>
 
               <div class="flex gap-2 flex-1 min-w-0">
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:start-date="data.selectedDate.absolute.date.from = $event"
               @update:end-date="data.selectedDate.absolute.date.to = $event"
             />
-            <div class="pr-6 pl-6 text-[0.625rem] text-(--o2-text-secondary)">{{ t("common.datetimeMessage") }}</div>
+            <div class="pr-6 pl-6 text-[0.625rem] text-(--color-text-secondary)">{{ t("common.datetimeMessage") }}</div>
             <OSeparator class="my-2" />
 
             <table class="px-3 startEndTime w-[calc(100%-0.8rem)] mx-[0.4rem] mt-2 mb-[0.3rem]">

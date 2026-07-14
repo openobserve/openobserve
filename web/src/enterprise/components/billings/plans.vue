@@ -72,11 +72,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <trial-period class="mb-3" currentPage="billing"></trial-period>
     <!-- AI Credits card -->
     <div v-if="aiUsage" class="grid grid-cols-1 gap-4 w-full mb-4">
-      <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 shadow-none transition-shadow duration-200 hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)] dark:bg-[var(--o2-card-background)] dark:border-[var(--o2-border)]">
+      <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 shadow-none transition-shadow duration-200 hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)] dark:bg-[var(--color-surface-base)] dark:border-[var(--color-border-default)]">
         <div class="min-h-full rounded-lg transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] text-center flex flex-col justify-between">
           <div class="flex flex-col justify-between">
             <div class="flex justify-between items-center">
-              <div class="text-base font-medium leading-5 text-(--o2-text-heading) text-left">{{ t("billing.aiCredits") }}</div>
+              <div class="text-base font-medium leading-5 text-(--color-text-heading) text-left">{{ t("billing.aiCredits") }}</div>
               <div style="opacity: 0.8;">
                 <img :src="aiIcon" />
               </div>
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :variant="aiUsageRatio >= 1 ? 'danger' : aiUsageRatio >= 0.9 ? 'warning' : 'default'"
             />
           </div>
-          <div class="text-2xl font-semibold leading-7 text-(--o2-text-heading) text-left flex items-end">
+          <div class="text-2xl font-semibold leading-7 text-(--color-text-heading) text-left flex items-end">
             {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }} credits used
           </div>
           <div v-if="aiUsage.mode === 'exhausted'" class="text-red-500 mt-2" style="font-size: 13px;">

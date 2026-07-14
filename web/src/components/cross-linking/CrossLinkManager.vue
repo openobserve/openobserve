@@ -4,7 +4,7 @@
     <div class="flex justify-between items-center mb-3">
       <div>
         <div class="text-base font-bold">{{ title }}</div>
-        <div v-if="subtitle" class="text-xs" style="color: var(--o2-text-muted)">
+        <div v-if="subtitle" class="text-xs" style="color: var(--color-text-muted)">
           {{ subtitle }}
         </div>
       </div>
@@ -34,7 +34,7 @@
             <div
               class="text-sm font-medium font-bold truncate"
               :title="link.name"
-              style="color: var(--o2-text-primary)"
+              style="color: var(--color-text-primary)"
               :data-test="`cross-link-item-name-${idx}`"
             >
               {{ link.name }}
@@ -49,7 +49,7 @@
             <div
               class="text-xs truncate mt-1"
               :title="link.url"
-              style="color: var(--o2-text-muted)"
+              style="color: var(--color-text-muted)"
               :data-test="`cross-link-item-url-${idx}`"
             >
               {{ link.url }}
@@ -92,7 +92,7 @@
     <div
       v-else
       class="text-center py-4 text-sm"
-      style="color: var(--o2-text-muted)"
+      style="color: var(--color-text-muted)"
       data-test="cross-link-empty"
     >
       {{ t("crossLinks.emptyState", { addLabel: t("crossLinks.addCrossLink") }) }}

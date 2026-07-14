@@ -169,10 +169,10 @@ const getStateColorClass = (state: string) => {
   switch (state.toLowerCase()) {
     case "firing":
     case "error":
-      return "text-[var(--o2-negative)]";
+      return "text-[var(--color-status-negative)]";
     case "ok":
     case "completed":
-      return "text-[var(--o2-positive)]";
+      return "text-[var(--color-status-positive)]";
     default:
       return "text-gray-500";
   }

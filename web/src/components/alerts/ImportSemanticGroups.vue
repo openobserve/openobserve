@@ -288,7 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-xs mb-1">
           {{ selectedModification?.current.fields.length }} fields
         </div>
-        <div class="field-chips-container max-h-[250px] overflow-y-auto p-2 bg-[var(--o2-primary-background)] rounded">
+        <div class="field-chips-container max-h-[250px] overflow-y-auto p-2 bg-[var(--color-surface-base)] rounded">
           <OTag
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
@@ -305,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-xs mb-1">
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
-        <div class="field-chips-container max-h-[250px] overflow-y-auto p-2 bg-[var(--o2-primary-background)] rounded">
+        <div class="field-chips-container max-h-[250px] overflow-y-auto p-2 bg-[var(--color-surface-base)] rounded">
           <OTag
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
@@ -582,7 +582,7 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
 }
 
 .groups-scroll-container::-webkit-scrollbar-track {
-  background: var(--o2-primary-background);
+  background: var(--color-surface-base);
 }
 
 .groups-scroll-container::-webkit-scrollbar-thumb {
@@ -599,7 +599,7 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
 }
 
 .field-chips-container::-webkit-scrollbar-track {
-  background: var(--o2-primary-background);
+  background: var(--color-surface-base);
 }
 
 .field-chips-container::-webkit-scrollbar-thumb {

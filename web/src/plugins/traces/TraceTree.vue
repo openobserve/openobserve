@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'ERROR'
                         "
                         name="error" size="sm"
-                        class="text-[var(--o2-status-error-text)]! mr-1"
+                        class="text-[var(--color-status-error-text)]! mr-1"
                         title="Error Span"
                         :data-test="`trace-tree-span-error-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- LLM Metrics -->
                     <div
                       v-if="isLLMTrace((spans as any[])[virtualRow.index])"
-                      class="flex items-center text-xs text-[var(--o2-status-error-text)]! mt-[-0.125rem] mb-[0.125rem] leading-none"
+                      class="flex items-center text-xs text-[var(--color-status-error-text)]! mt-[-0.125rem] mb-[0.125rem] leading-none"
                     >
                       <span
                         v-if="
@@ -336,7 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         fontSize: '0.625rem',
                         lineHeight: 1,
                         gap: '0.125rem',
-                        color: 'var(--o2-text-secondary)',
+                        color: 'var(--color-text-secondary)',
                         whiteSpace: 'nowrap',
                       }"
                       :title="`${getEventCount((spans as any[])[virtualRow.index])} span event${getEventCount((spans as any[])[virtualRow.index]) > 1 ? 's' : ''}`"
@@ -814,8 +814,8 @@ export default defineComponent({
       if (code === null || code < 200) return null;
       if (code < 300)
         return {
-          text: "var(--o2-status-success-text)",
-          bg: "var(--o2-status-success-bg)",
+          text: "var(--color-status-success-text)",
+          bg: "var(--color-status-success-bg)",
         };
       if (code < 400)
         return {
@@ -828,8 +828,8 @@ export default defineComponent({
           bg: "var(--o2-status-warning-bg)",
         };
       return {
-        text: "var(--o2-status-error-text)",
-        bg: "var(--o2-status-error-bg)",
+        text: "var(--color-status-error-text)",
+        bg: "var(--color-status-error-bg)",
       };
     };
 

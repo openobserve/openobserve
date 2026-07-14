@@ -582,7 +582,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Data Retention -->
                       <div v-if="showDataRetention" class="flex flex-col gap-1 p-3">
-                        <label class="text-[0.8125rem] font-[500]" style="color: var(--o2-text-heading)">
+                        <label class="text-[0.8125rem] font-[500]" style="color: var(--color-text-heading)">
                           Data Retention (days)
                         </label>
                         <OInput
@@ -596,14 +596,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <small v-if="dataRetentionDays > 0 && dataRetentionDays != ''">
                           Global retention is {{ store.state.zoConfig.data_retention_days }} days
                         </small>
-                        <small v-if="dataRetentionDays <= 0 || dataRetentionDays == ''" class="text-[var(--o2-status-error-text)]">
+                        <small v-if="dataRetentionDays <= 0 || dataRetentionDays == ''" class="text-[var(--color-status-error-text)]">
                           Retention period must be at least 1 day
                         </small>
                       </div>
 
                       <!-- Max Query Range -->
                       <div class="flex flex-col gap-1 p-3">
-                        <label class="text-[0.8125rem] font-[500]" style="color: var(--o2-text-heading)">
+                        <label class="text-[0.8125rem] font-[500]" style="color: var(--color-text-heading)">
                           Max Query Range (hours)
                         </label>
                         <OInput
@@ -619,7 +619,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Flatten Level -->
                       <div class="flex flex-col gap-1 p-3">
-                        <label class="text-[0.8125rem] font-[500]" style="color: var(--o2-text-heading)">
+                        <label class="text-[0.8125rem] font-[500]" style="color: var(--color-text-heading)">
                           {{ t("logStream.flattenLevel") }}
                         </label>
                         <OInput

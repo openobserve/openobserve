@@ -425,7 +425,7 @@ export default defineComponent({
     const paramRowClass = computed(() =>
       isDark.value
         ? 'bg-[rgba(255,255,255,0.03)] border border-[#404040]'
-        : 'bg-white border border-(--o2-border)');
+        : 'bg-white border border-(--color-border-default)');
     const paramKeyClass = computed(() =>
       isDark.value ? 'text-[#ccc]' : 'text-[#333]');
     const paramValTextClass = computed(() =>

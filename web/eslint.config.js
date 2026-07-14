@@ -7,6 +7,41 @@ import prettier from "eslint-plugin-prettier";
 import cypress from "eslint-plugin-cypress";
 import fs from "fs";
 
+// Bans the legacy --o2-* CSS custom-property vocabulary anywhere in a .vue
+// file's raw text — catches Tailwind arbitrary-value usages in templates
+// (e.g. class="bg-[var(--o2-card-bg)]") that stylelint's <style>-block
+// parser (postcss-html) can't see. See O2_TOKEN_MIGRATION_PLAN.md §7b.
+// WARN for now (Stage 0 freeze); flips to "error" once the Stage 3/4 codemod
+// removes all existing usages (Stage 5).
+const noLegacyO2Tokens = {
+  rules: {
+    "no-legacy-o2-tokens": {
+      meta: { type: "problem", docs: { description: "Ban legacy --o2-* CSS custom properties" } },
+      create(context) {
+        return {
+          Program() {
+            const sourceCode = context.sourceCode ?? context.getSourceCode();
+            const text = sourceCode.getText();
+            const re = /--o2-[A-Za-z0-9-]+/g;
+            let match;
+            while ((match = re.exec(text))) {
+              const start = match.index;
+              const end = start + match[0].length;
+              context.report({
+                loc: {
+                  start: sourceCode.getLocFromIndex(start),
+                  end: sourceCode.getLocFromIndex(end),
+                },
+                message: `Legacy CSS token "${match[0]}" is banned. Use the modern --color-* token or a Tailwind utility.`,
+              });
+            }
+          },
+        };
+      },
+    },
+  },
+};
+
 // Read .gitignore to use as ignore patterns
 const gitignore = fs.existsSync(".gitignore")
   ? fs
@@ -44,8 +79,10 @@ export default [
       vue,
       "@typescript-eslint": typescript,
       prettier,
+      "local": noLegacyO2Tokens,
     },
     rules: {
+      "local/no-legacy-o2-tokens": ["warn"],
       // Disable noisy rules inherited from recommended configs
       "prettier/prettier": "off",
       "no-unused-vars": "off",

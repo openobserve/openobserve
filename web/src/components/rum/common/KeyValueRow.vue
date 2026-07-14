@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test="dataTest"
   >
     <div
-      class="w-[100px] font-medium text-[var(--o2-text-secondary)] shrink-0"
+      class="w-[100px] font-medium text-[var(--color-text-secondary)] shrink-0"
     >
       {{ label }}:
     </div>

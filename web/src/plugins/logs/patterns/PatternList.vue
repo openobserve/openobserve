@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Table Header -->
       <div
         class="flex items-center border-b border-[var(--o2-border-color)]"
-        style="background: var(--o2-table-header-bg); min-width: 100%"
+        style="background: var(--color-theme-table-header-bg); min-width: 100%"
       >
         <!-- Pattern Column Header -->
         <div
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Header skeleton -->
       <div
         class="min-h-8 flex items-center border-b border-[var(--o2-border-color)]"
-        style="background: var(--o2-table-header-bg); min-width: 100%"
+        style="background: var(--color-theme-table-header-bg); min-width: 100%"
       >
         <div class="flex-1 min-w-0 px-2">
           <span class="pattern-skel-pill inline-block h-3 w-16 rounded-sm" aria-hidden="true" />

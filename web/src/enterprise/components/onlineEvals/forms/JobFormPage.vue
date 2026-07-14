@@ -30,8 +30,8 @@
     <div class="job-form__body flex-1 min-h-0 overflow-hidden flex gap-2">
       <div class="job-form__main flex-[6.5] min-w-0 min-h-0 overflow-auto flex flex-col gap-2 p-2">
         <!-- Target -->
-        <section class="card-container border border-(--color-dialog-header-border,var(--o2-border)) rounded-md overflow-hidden shrink-0">
-          <div class="flex items-center py-[10px] px-3 border-b border-(--color-border-default,var(--o2-border))">
+        <section class="card-container border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md overflow-hidden shrink-0">
+          <div class="flex items-center py-[10px] px-3 border-b border-(--color-border-default,var(--color-border-default))">
             <div class="w-[3px] h-4 rounded-[2px] mr-2 shrink-0 bg-(--q-primary)" />
             <span class="text-[13px] font-semibold tracking-[0.01em] text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.targetSection") }}</span>
           </div>
@@ -39,8 +39,8 @@
           <div class="job-field">
             <label class="flex items-center text-xs font-semibold text-(--color-text-primary,currentColor) mb-1">
               {{ t("onlineEvals.job.nameLabel") }}
-              <span class="text-(--o2-status-error-text) ml-0.5">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary,var(--o2-text-secondary))" />
+              <span class="text-(--color-status-error-text) ml-0.5">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary,var(--color-text-secondary))" />
             </label>
             <OInput
               v-model.trim="form.name"
@@ -54,8 +54,8 @@
           <div class="job-field">
             <label class="flex items-center text-xs font-semibold text-(--color-text-primary,currentColor) mb-1">
               {{ t("onlineEvals.job.streamLabel") }}
-              <span class="text-(--o2-status-error-text) ml-0.5">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary,var(--o2-text-secondary))" />
+              <span class="text-(--color-status-error-text) ml-0.5">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary,var(--color-text-secondary))" />
             </label>
             <OSelect
               v-model="form.stream"
@@ -82,8 +82,8 @@
         </section>
 
         <!-- Scorers + Filter + Mapping -->
-        <section class="card-container border border-(--color-dialog-header-border,var(--o2-border)) rounded-md overflow-hidden shrink-0">
-          <div class="flex items-center py-[10px] px-3 border-b border-(--color-border-default,var(--o2-border))">
+        <section class="card-container border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md overflow-hidden shrink-0">
+          <div class="flex items-center py-[10px] px-3 border-b border-(--color-border-default,var(--color-border-default))">
             <div class="w-[3px] h-4 rounded-[2px] mr-2 shrink-0 bg-(--q-primary)" />
             <span class="text-[13px] font-semibold tracking-[0.01em] text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.scorersSection") }}</span>
           </div>
@@ -107,8 +107,8 @@
         </section>
 
         <!-- Sampling -->
-        <section class="card-container border border-(--color-dialog-header-border,var(--o2-border)) rounded-md overflow-hidden shrink-0">
-          <div class="flex items-center py-[10px] px-3 border-b border-(--color-border-default,var(--o2-border))">
+        <section class="card-container border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md overflow-hidden shrink-0">
+          <div class="flex items-center py-[10px] px-3 border-b border-(--color-border-default,var(--color-border-default))">
             <div class="w-[3px] h-4 rounded-[2px] mr-2 shrink-0 bg-(--q-primary)" />
             <span class="text-[13px] font-semibold tracking-[0.01em] text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.stepper.sampling") }}</span>
           </div>
@@ -122,13 +122,13 @@
                 size="md"
                 data-test="job-form-sampling-mode-select"
               />
-              <div class="job-field__help text-[11.5px] text-(--color-text-secondary,var(--o2-text-secondary)) mt-1">{{ t("onlineEvals.job.samplingHelp") }}</div>
+              <div class="job-field__help text-[11.5px] text-(--color-text-secondary,var(--color-text-secondary)) mt-1">{{ t("onlineEvals.job.samplingHelp") }}</div>
             </div>
 
             <div class="job-field">
               <label class="flex items-center text-xs font-semibold text-(--color-text-primary,currentColor) mb-1">
                 {{ t("onlineEvals.job.samplingValueLabel") }}
-                <span v-if="form.samplingMode !== 'all'" class="text-(--o2-status-error-text) ml-0.5">*</span>
+                <span v-if="form.samplingMode !== 'all'" class="text-(--color-status-error-text) ml-0.5">*</span>
               </label>
               <OInput
                 v-model="form.samplingValue"
@@ -136,7 +136,7 @@
                 :disabled="form.samplingMode === 'all'"
                 data-test="job-form-sampling-value-input"
               />
-              <div class="job-field__help text-[11.5px] text-(--color-text-secondary,var(--o2-text-secondary)) mt-1">
+              <div class="job-field__help text-[11.5px] text-(--color-text-secondary,var(--color-text-secondary)) mt-1">
                 {{ form.samplingMode === 'all'
                   ? t("onlineEvals.job.samplingValueAllHelp")
                   : t("onlineEvals.job.samplingValueHelp") }}

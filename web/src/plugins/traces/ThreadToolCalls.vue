@@ -217,7 +217,7 @@ function formatDuration(ns: number): string {
 
   .tt-count {
     font-size: 0.72rem;
-    color: var(--o2-text-secondary);
+    color: var(--color-text-secondary);
     font-weight: 600;
     white-space: nowrap;
   }
@@ -295,7 +295,7 @@ function formatDuration(ns: number): string {
     border-radius: 0.25rem;
     background: transparent;
     border: none;
-    color: var(--o2-text-3);
+    color: var(--color-text-label);
     cursor: pointer;
     line-height: 1;
     flex-shrink: 0;
@@ -351,7 +351,7 @@ function formatDuration(ns: number): string {
     font-size: 0.62rem;
     font-weight: 700;
     letter-spacing: 0.06rem;
-    color: var(--o2-text-3);
+    color: var(--color-text-label);
   }
 
   &__pre {
@@ -362,7 +362,7 @@ function formatDuration(ns: number): string {
     border-radius: 0.25rem;
     font-family: monospace;
     font-size: 0.72rem;
-    color: var(--o2-text-1);
+    color: var(--color-text-caption);
     line-height: 1.45;
     white-space: pre-wrap;
     word-break: break-word;

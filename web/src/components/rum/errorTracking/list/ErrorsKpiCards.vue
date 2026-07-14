@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`rum-errors-kpi-${card.key}-card`"
     >
       <span
-        class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-[var(--o2-text-label)]"
+        class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-[var(--color-text-label)]"
       >
         {{ card.label }}
         <OTag

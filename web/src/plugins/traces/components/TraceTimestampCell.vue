@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex flex-col justify-center" data-test="trace-row-timestamp">
     <span
-      class="text-xs text-weight-medium text-[var(--o2-text-1)]!"
+      class="text-xs text-weight-medium text-[var(--color-text-caption)]!"
       data-test="trace-row-timestamp-day"
     >
       {{ value }}

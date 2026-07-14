@@ -30,15 +30,15 @@
               :placeholder="t('crossLinks.urlPlaceholder')"
               data-test="cross-link-url-input"
             />
-            <div class="text-xs mt-1" style="color: var(--o2-text-muted)">
+            <div class="text-xs mt-1" style="color: var(--color-text-muted)">
               {{ t("crossLinks.urlHint") }}
             </div>
           </div>
 
           <!-- Fields -->
           <div class="mb-2">
-            <label class="block text-sm font-semibold mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.fields") }}</label>
-            <div class="text-xs mb-2" style="color: var(--o2-text-muted)">
+            <label class="block text-sm font-semibold mb-1" style="color: var(--color-text-primary)">{{ t("crossLinks.fields") }}</label>
+            <div class="text-xs mb-2" style="color: var(--color-text-muted)">
               {{ t("crossLinks.fieldsHint") }}
             </div>
             <div v-if="formFields.length > 0" class="flex flex-wrap gap-1 mb-2">

@@ -17,7 +17,7 @@ the Free Software Foundation, either version 3 of the License, or
 
     <div
       v-else-if="loadError"
-      class="flex flex-col items-center justify-center flex-1 p-8 text-(--o2-text-muted)"
+      class="flex flex-col items-center justify-center flex-1 p-8 text-(--color-text-muted)"
       data-test="scorer-library-error"
     >
       <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
@@ -29,7 +29,7 @@ the Free Software Foundation, either version 3 of the License, or
 
     <div
       v-else-if="providers.length === 0"
-      class="flex flex-col items-center justify-center flex-1 p-8 text-(--o2-text-muted)"
+      class="flex flex-col items-center justify-center flex-1 p-8 text-(--color-text-muted)"
       data-test="scorer-library-no-providers"
     >
       Create a Provider first before importing LLM Judge scorers.
@@ -83,7 +83,7 @@ the Free Software Foundation, either version 3 of the License, or
         >
           <h4 class="flex items-baseline gap-1.5 m-0 mb-1.5 text-xs font-bold uppercase tracking-[0.04em] text-(--o2-text)">
             <span>{{ group.category }}</span>
-            <span class="font-medium text-(--o2-text-muted)">({{ group.entries.length }})</span>
+            <span class="font-medium text-(--color-text-muted)">({{ group.entries.length }})</span>
           </h4>
           <ul
             class="flex flex-col rounded border border-border"

@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="absolute z-9999999 min-w-50 py-1 px-0 hidden whitespace-nowrap top-0 left-0 rounded border border-(--o2-border) shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
+        class="absolute z-9999999 min-w-50 py-1 px-0 hidden whitespace-nowrap top-0 left-0 rounded border border-(--color-border-default) shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
         :class="{
           'group/menu bg-[#2c2c2c] border-[#404040] shadow-[0_2px_8px_rgba(0,0,0,0.4)] crosslink-drilldown-menu--dark': store.state.theme === 'dark',
           'bg-white': store.state.theme !== 'dark',
@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           />
           <div
-            class="flex items-center py-2 px-4 cursor-pointer transition-colors duration-200 text-sm text-[#333] hover:bg-[#f5f5f5] active:bg-(--o2-border) group-[.crosslink-drilldown-menu--dark]/menu:text-[var(--o2-border)] group-[.crosslink-drilldown-menu--dark]/menu:hover:bg-[#383838] group-[.crosslink-drilldown-menu--dark]/menu:active:bg-[#444444]"
+            class="flex items-center py-2 px-4 cursor-pointer transition-colors duration-200 text-sm text-[#333] hover:bg-[#f5f5f5] active:bg-(--color-border-default) group-[.crosslink-drilldown-menu--dark]/menu:text-[var(--color-border-default)] group-[.crosslink-drilldown-menu--dark]/menu:hover:bg-[#383838] group-[.crosslink-drilldown-menu--dark]/menu:active:bg-[#444444]"
             :data-test="`drilldown-menu-item-${drilldown.name}`"
             @click="openDrilldown(index)"
           >

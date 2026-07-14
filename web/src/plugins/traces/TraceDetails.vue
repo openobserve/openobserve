@@ -46,17 +46,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #subtitle>
             <div
-              class="flex items-center space-x-2 text-[0.6875rem] text-(--o2-text-secondary) whitespace-nowrap"
+              class="flex items-center space-x-2 text-[0.6875rem] text-(--color-text-secondary) whitespace-nowrap"
             >
               <span>{{
                 formatTimestamp(traceStartTime, store.state.timezone)
               }}</span>
-              <div class="bg-(--o2-text-3) py-0 w-px h-4" />
+              <div class="bg-(--color-text-label) py-0 w-px h-4" />
               <span class="mr-1">
                 {{ t("traces.traceId") }}:
                 <span
                   data-test="trace-details-trace-id"
-                  class="text-(--o2-text-primary) font-mono"
+                  class="text-(--color-text-primary) font-mono"
                   :title="effectiveTraceId"
                 >
                   {{ effectiveTraceId }}
@@ -68,19 +68,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="trace-details-copy-trace-id-btn"
                 name="content-copy"
                 size="xs"
-                class="cursor-pointer hover:text-(--o2-text-primary)"
+                class="cursor-pointer hover:text-(--color-text-primary)"
                 :title="t('traces.copyTraceId')"
                 @click="copyTraceId"
               />
 
               <!-- Session ID (LLM traces) -->
               <template v-if="sessionId">
-                <div class="bg-(--o2-text-3) py-0 w-px h-4" />
+                <div class="bg-(--color-text-label) py-0 w-px h-4" />
                 <span class="mr-1">
                   Session ID:
                   <span
                     data-test="trace-details-session-id"
-                    class="text-(--o2-text-primary) font-mono"
+                    class="text-(--color-text-primary) font-mono"
                     :title="sessionId"
                   >
                     {{ sessionId }}
@@ -90,13 +90,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="trace-details-copy-session-id-btn"
                   name="content-copy"
                   size="xs"
-                  class="cursor-pointer hover:text-(--o2-text-primary)"
+                  class="cursor-pointer hover:text-(--color-text-primary)"
                   title="Copy Session ID"
                   @click="copySessionId"
                 />
               </template>
 
-              <div class="bg-(--o2-text-3) py-0 w-px h-4" />
+              <div class="bg-(--color-text-label) py-0 w-px h-4" />
               <!-- Span Count Badge -->
               <span class="inline-flex">
                 <OTag
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </span>
 
-              <div class="bg-(--o2-text-3) py-0 w-px h-4" />
+              <div class="bg-(--color-text-label) py-0 w-px h-4" />
 
               <!-- Error Count Badge -->
               <span class="inline-flex">
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Operation Name -->
               <div
                 data-test="trace-details-operation-name"
-                class="text-base font-semibold leading-tight text-[var(--o2-text-primary)] truncate min-w-0 max-w-[24rem]!"
+                class="text-base font-semibold leading-tight text-[var(--color-text-primary)] truncate min-w-0 max-w-[24rem]!"
                 :title="traceTree[0]?.operationName"
               >
                 {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
@@ -210,18 +210,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Service, Timestamp, and Trace ID -->
               <div
-                class="flex items-center space-x-2 text-[11px] text-[var(--o2-text-secondary)] whitespace-nowrap"
+                class="flex items-center space-x-2 text-[11px] text-[var(--color-text-secondary)] whitespace-nowrap"
               >
                 <span>{{ formatTimestamp(traceStartTime, store.state.timezone) }}</span>
                 <div
-                  class="bg-[var(--o2-text-3)] py-[0rem] w-[1px] h-[16px]"
+                  class="bg-[var(--color-text-label)] py-[0rem] w-[1px] h-[16px]"
                 />
                 <span class="mr-[0.25rem]">
                   {{ t("traces.traceId") }}:
                   <span
                     v-if="mode === 'embedded'"
                     data-test="trace-details-trace-id"
-                    class="text-[var(--o2-text-primary)] font-mono cursor-pointer hover:text-[var(--o2-theme-color)] transition-colors"
+                    class="text-[var(--color-text-primary)] font-mono cursor-pointer hover:text-[var(--color-theme-accent)] transition-colors"
                     :title="t('traces.openInTraces')"
                     @click="handleExpandToFullView"
                   >
@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-else
                     data-test="trace-details-trace-id"
-                    class="text-[var(--o2-text-primary)] font-mono"
+                    class="text-[var(--color-text-primary)] font-mono"
                     :title="effectiveTraceId"
                   >
                     {{ effectiveTraceId }}
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="trace-details-copy-trace-id-btn"
                   name="content-copy"
                   size="xs"
-                  class="cursor-pointer hover:text-[var(--o2-text-primary)]"
+                  class="cursor-pointer hover:text-[var(--color-text-primary)]"
                   :title="t('traces.copyTraceId')"
                   @click="copyTraceId"
                 />
@@ -250,13 +250,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Session ID (LLM traces) -->
                 <template v-if="sessionId">
                   <div
-                    class="bg-[var(--o2-text-3)] py-[0rem] w-[1px] h-[16px]"
+                    class="bg-[var(--color-text-label)] py-[0rem] w-[1px] h-[16px]"
                   />
                   <span class="mr-[0.25rem]">
                     Session ID:
                     <span
                       data-test="trace-details-session-id"
-                      class="text-[var(--o2-text-primary)] font-mono"
+                      class="text-[var(--color-text-primary)] font-mono"
                       :title="sessionId"
                     >
                       {{ sessionId }}
@@ -266,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="trace-details-copy-session-id-btn"
                     name="content-copy"
                     size="xs"
-                    class="cursor-pointer hover:text-[var(--o2-text-primary)]"
+                    class="cursor-pointer hover:text-[var(--color-text-primary)]"
                     title="Copy Session ID"
                     @click="copySessionId"
                   />
@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   v-if="mode === 'embedded' && showExpandButton"
                   data-test="trace-details-trace-id-open-btn"
-                  class="cursor-pointer hover:text-[var(--o2-theme-color)]"
+                  class="cursor-pointer hover:text-[var(--color-theme-accent)]"
                   size="xs"
                   name="open-in-new"
                   :title="t('traces.openInTraces')"
@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div
-                class="bg-[var(--o2-text-3)] py-[0rem] w-[1px] h-[16px]"
+                class="bg-[var(--color-text-label)] py-[0rem] w-[1px] h-[16px]"
               />
               <!-- Span Count Badge -->
               <span class="inline-flex">
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
 
               <div
-                class="bg-[var(--o2-text-3)] py-[0rem] w-[1px] h-[16px]"
+                class="bg-[var(--color-text-label)] py-[0rem] w-[1px] h-[16px]"
               />
 
               <!-- Error Count Badge -->
@@ -386,7 +386,7 @@ size="xs"
       >
         <!-- Tabs & Search Bar -->
         <div
-          class="py-0 border-b border-[var(--o2-border)] flex items-center justify-between bg-white bg-[var(--o2-card-bg)]!"
+          class="py-0 border-b border-[var(--color-border-default)] flex items-center justify-between bg-white bg-[var(--o2-card-bg)]!"
         >
           <div
             class="flex items-center space-x-4 trace-details-view-tabs ml-[0.325rem] py-[0.325rem]"
@@ -465,16 +465,16 @@ size="sm">
                 />
               </div>
               <!-- Search Results Navigation -->
-              <div class="inline-flex items-center bg-transparent px-[0.125rem] [transition:all_0.2s_ease] rounded-[var(--radius-md)] border border-[var(--color-input-border)] dark:hover:border-[var(--o2-theme-color)] h-8.2! py-[0.125px]!">
+              <div class="inline-flex items-center bg-transparent px-[0.125rem] [transition:all_0.2s_ease] rounded-[var(--radius-md)] border border-[var(--color-input-border)] dark:hover:border-[var(--color-theme-accent)] h-8.2! py-[0.125px]!">
                 <div
                   class="flex items-center text-xs font-medium px-1 gap-[0.0625rem] select-none"
                   data-test="trace-details-search-results"
                 >
-                  <span class="text-[var(--o2-text-secondary)]">{{
+                  <span class="text-[var(--color-text-secondary)]">{{
                     searchResults ? currentIndex + 1 : 0
                   }}</span>
-                  <span class="text-[var(--o2-text-secondary)] mx-[0.125rem]">/</span>
-                  <span class="text-[var(--o2-text-secondary)]">{{ searchResults }}</span>
+                  <span class="text-[var(--color-text-secondary)] mx-[0.125rem]">/</span>
+                  <span class="text-[var(--color-text-secondary)]">{{ searchResults }}</span>
                 </div>
                 <div class="flex items-center h-full ml-1">
                   <OButton
@@ -714,7 +714,7 @@ size="sm">
                 class="dag-resizer w-2 cursor-col-resize flex items-center justify-center shrink-0 relative z-10"
                 @mousedown="startDagResize"
               >
-                <div class="dag-resizer-line w-0.75 h-full bg-(--o2-border) rounded transition-colors duration-200"></div>
+                <div class="dag-resizer-line w-0.75 h-full bg-(--color-border-default) rounded transition-colors duration-200"></div>
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
@@ -840,7 +840,7 @@ size="sm">
               <div
                 style="
                   text-align: center;
-                  color: var(--o2-text-secondary);
+                  color: var(--color-text-secondary);
                   padding: 40px;
                 "
               >
@@ -924,7 +924,7 @@ size="sm">
       @click:secondary="showFilterPopover = false"
       @click:primary="applyAndViewTraces"
     >
-      <div class="flex-1 border border-[var(--o2-border)] rounded">
+      <div class="flex-1 border border-[var(--color-border-default)] rounded">
         <CodeQueryEditor
           v-model:query="localEditorValue"
           language="sql"
@@ -2923,7 +2923,7 @@ export default defineComponent({
 
 <style>
 .dag-resizer:hover .dag-resizer-line {
-  background-color: var(--o2-theme-color, #1976d2);
+  background-color: var(--color-theme-accent, #1976d2);
 }
 
 body.body--dark .dag-resizer-line {
@@ -2985,7 +2985,7 @@ body.body--dark .unified-search-group {
 
 body.body--dark .unified-search-group:hover,
 body.body--dark .unified-search-group:focus-within {
-  border-color: var(--o2-theme-color);
+  border-color: var(--color-theme-accent);
 }
 
 .resize::after {

@@ -48,7 +48,7 @@
           <div class="mb-3">
             <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
               {{ t("onlineEvals.scorer.nameLabel") }}
-              <span class="text-(--o2-status-error-text) ml-[2px]">*</span>
+              <span class="text-(--color-status-error-text) ml-[2px]">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary)" />
             </label>
             <OInput
@@ -77,7 +77,7 @@
           <div class="mb-3">
             <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
               {{ t("onlineEvals.scorer.producesScoreConfigLabel") }}
-              <span class="text-(--o2-status-error-text) ml-[2px]">*</span>
+              <span class="text-(--color-status-error-text) ml-[2px]">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary)" />
             </label>
             <OSelect
@@ -128,7 +128,7 @@
           <div class="mb-3">
             <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
               {{ t("onlineEvals.scorer.providerLabel") }}
-              <span class="text-(--o2-status-error-text) ml-[2px]">*</span>
+              <span class="text-(--color-status-error-text) ml-[2px]">*</span>
             </label>
             <div class="flex items-center gap-2">
               <OSelect
@@ -196,7 +196,7 @@
           <div class="mb-3 flex flex-col gap-[14px]">
             <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
               {{ t("onlineEvals.scorer.promptLabel") }}
-              <span class="text-(--o2-status-error-text) ml-[2px]">*</span>
+              <span class="text-(--color-status-error-text) ml-[2px]">*</span>
             </label>
             <OInput
               v-model="form.template"
@@ -285,7 +285,7 @@
                 />
                 <button
                   type="button"
-                  class="w-6 h-6 border-0 bg-transparent text-(--color-text-secondary) text-base cursor-pointer rounded hover:bg-[color-mix(in_srgb,var(--o2-status-error-text)_12%,transparent)] hover:text-(--o2-status-error-text)"
+                  class="w-6 h-6 border-0 bg-transparent text-(--color-text-secondary) text-base cursor-pointer rounded hover:bg-[color-mix(in_srgb,var(--color-status-error-text)_12%,transparent)] hover:text-(--color-status-error-text)"
                   :aria-label="t('onlineEvals.buttons.remove')"
                   :data-test="`scorer-form-extra-field-remove-${idx}`"
                   @click="removeExtraField(idx)"
@@ -298,7 +298,7 @@
             <div class="flex justify-between gap-3">
               <button
                 type="button"
-                class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-(--o2-primary-btn-bg) cursor-pointer disabled:text-(--color-text-muted) disabled:cursor-not-allowed"
+                class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-(--color-button-primary) cursor-pointer disabled:text-(--color-text-muted) disabled:cursor-not-allowed"
                 :disabled="form.extraMetadataFields.length >= MAX_EXTRA_FIELDS"
                 data-test="scorer-form-extra-field-add"
                 @click="addExtraField"
@@ -311,7 +311,7 @@
 
               <button
                 type="button"
-                class="scorer-extras__preview border-0 bg-transparent py-1 px-0 text-xs font-semibold text-(--o2-primary-btn-bg) cursor-pointer"
+                class="scorer-extras__preview border-0 bg-transparent py-1 px-0 text-xs font-semibold text-(--color-button-primary) cursor-pointer"
                 data-test="scorer-form-preview-schema"
                 @click="previewOutputSchema"
               >
@@ -332,7 +332,7 @@
           <div class="mb-3">
             <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
               {{ t("onlineEvals.scorer.remoteUrlLabel") }}
-              <span class="text-(--o2-status-error-text) ml-[2px]">*</span>
+              <span class="text-(--color-status-error-text) ml-[2px]">*</span>
             </label>
             <div class="scorer-url-bar grid grid-cols-[104px_minmax(0,1fr)] gap-0">
               <OSelect
@@ -415,7 +415,7 @@
           <div v-if="form.authType === 'bearer'" class="mb-3">
             <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
               {{ t("onlineEvals.scorer.remoteAuth.tokenLabel") }}
-              <span class="text-(--o2-status-error-text) ml-[2px]">*</span>
+              <span class="text-(--color-status-error-text) ml-[2px]">*</span>
             </label>
             <OInput
               v-model.trim="form.authBearerToken"
@@ -433,7 +433,7 @@
             <div class="flex flex-col gap-1.5">
               <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.usernameLabel") }}
-                <span class="text-(--o2-status-error-text) ml-[2px]">*</span>
+                <span class="text-(--color-status-error-text) ml-[2px]">*</span>
               </label>
               <OInput
                 v-model.trim="form.authBasicUsername"
@@ -445,7 +445,7 @@
             <div class="flex flex-col gap-1.5">
               <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.passwordLabel") }}
-                <span class="text-(--o2-status-error-text) ml-[2px]">*</span>
+                <span class="text-(--color-status-error-text) ml-[2px]">*</span>
               </label>
               <OInput
                 v-model.trim="form.authBasicPassword"
@@ -464,7 +464,7 @@
             <div class="flex flex-col gap-1.5">
               <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.headerNameLabel") }}
-                <span class="text-(--o2-status-error-text) ml-[2px]">*</span>
+                <span class="text-(--color-status-error-text) ml-[2px]">*</span>
               </label>
               <OInput
                 v-model.trim="form.authApiKeyHeaderName"
@@ -476,7 +476,7 @@
             <div class="flex flex-col gap-1.5">
               <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.tokenLabel") }}
-                <span class="text-(--o2-status-error-text) ml-[2px]">*</span>
+                <span class="text-(--color-status-error-text) ml-[2px]">*</span>
               </label>
               <OInput
                 v-model.trim="form.authApiKeyToken"
@@ -532,7 +532,7 @@
                 />
                 <button
                   type="button"
-                  class="w-6 h-6 border-0 bg-transparent text-(--color-text-secondary) text-base cursor-pointer rounded hover:bg-[color-mix(in_srgb,var(--o2-status-error-text)_12%,transparent)] hover:text-(--o2-status-error-text)"
+                  class="w-6 h-6 border-0 bg-transparent text-(--color-text-secondary) text-base cursor-pointer rounded hover:bg-[color-mix(in_srgb,var(--color-status-error-text)_12%,transparent)] hover:text-(--color-status-error-text)"
                   :aria-label="t('onlineEvals.buttons.remove')"
                   :data-test="`scorer-form-remote-header-remove-${idx}`"
                   @click="removeCustomHeader(idx)"
@@ -545,7 +545,7 @@
             <div class="flex justify-between gap-3">
               <button
                 type="button"
-                class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-(--o2-primary-btn-bg) cursor-pointer"
+                class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-(--color-button-primary) cursor-pointer"
                 data-test="scorer-form-remote-header-add"
                 @click="addCustomHeader"
               >
@@ -565,7 +565,7 @@
           <div class="mb-3">
             <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
               {{ t("onlineEvals.scorer.requestBodyLabel") }}
-              <span class="text-(--o2-status-error-text) ml-[2px]">*</span>
+              <span class="text-(--color-status-error-text) ml-[2px]">*</span>
             </label>
             <OInput
               v-model="form.template"
@@ -632,7 +632,7 @@
       </p>
       <p
         v-else-if="schemaPreviewError"
-        class="m-0 p-3 text-xs text-(--o2-status-error-text)"
+        class="m-0 p-3 text-xs text-(--color-status-error-text)"
       >
         {{ schemaPreviewError }}
       </p>

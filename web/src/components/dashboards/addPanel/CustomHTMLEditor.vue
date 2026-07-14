@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #separator>
-          <div class="w-1 h-full bg-(--o2-border,#e5e7eb) transition-colors hover:bg-orange-500"></div>
+          <div class="w-1 h-full bg-(--color-border-default,#e5e7eb) transition-colors hover:bg-orange-500"></div>
         </template>
         <template #after>
           <HTMLRenderer

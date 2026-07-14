@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon"
-            :class="{ 'text-white! bg-[var(--o2-theme-color)]!': wrapTableCells }"
+            :class="{ 'text-white! bg-[var(--color-theme-accent)]!': wrapTableCells }"
             data-test="correlated-logs-table-wrap-content-btn"
             @click="wrapTableCells = !wrapTableCells"
           >
@@ -174,7 +174,7 @@ class="mr-1" />
           variant="ghost"
           size="icon"
           class="h-5!"
-          :class="{ 'text-white! bg-[var(--o2-theme-color)]! hover:opacity-80': wrapTableCells }"
+          :class="{ 'text-white! bg-[var(--color-theme-accent)]! hover:opacity-80': wrapTableCells }"
           data-test="correlated-logs-table-wrap-content-btn"
           @click="wrapTableCells = !wrapTableCells"
         >
@@ -1303,7 +1303,7 @@ const unifiedChips = computed<DimensionChip[]>(() =>
 
 .light-theme {
   background-color: var(--o2-bg-light);
-  color: var(--o2-text-primary);
+  color: var(--color-text-primary);
 }
 
 .dark-theme {

@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="flex items-center justify-between gap-2">
               <div
-                class="text-(length:--text-xs) font-medium text-(--o2-text-secondary) truncate"
+                class="text-(length:--text-xs) font-medium text-(--color-text-secondary) truncate"
                 data-test="billings-usage-tile-title"
                 :title="tile.label"
               >
@@ -119,13 +119,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-(length:--text-xl) font-bold text-(--color-text-heading) leading-none">
                 {{ tile.value }}
               </span>
-              <span class="text-(length:--text-xs) font-medium text-(--o2-text-secondary)">
+              <span class="text-(length:--text-xs) font-medium text-(--color-text-secondary)">
                 {{ tile.unit }}
               </span>
             </div>
             <div
               v-if="usageCost[tile.key]"
-              class="text-(length:--text-xs) font-medium text-(--o2-text-secondary)"
+              class="text-(length:--text-xs) font-medium text-(--color-text-secondary)"
             >
               ${{ usageCost[tile.key] }}
             </div>

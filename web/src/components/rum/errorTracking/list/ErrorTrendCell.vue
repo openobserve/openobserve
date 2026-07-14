@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <span
       v-else
-      class="text-[var(--o2-text-muted)]"
+      class="text-[var(--color-text-muted)]"
       :title="t('rum.trendNoData')"
       data-test="rum-error-trend-cell-empty"
       >—</span
@@ -223,12 +223,12 @@ const ariaLabel = computed(() =>
   }
 
   &--drop {
-    color: var(--o2-status-success-text);
+    color: var(--color-status-success-text);
   }
 
   &--new,
   &--flat {
-    color: var(--o2-text-caption);
+    color: var(--color-text-caption);
   }
 }
 </style>

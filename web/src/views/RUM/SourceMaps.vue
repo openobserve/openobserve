@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="w-full"
         >
           <template #expansion="{ row }">
-            <div class="p-3 bg-(--q-background) border-t border-(--q-border-color,var(--o2-border))">
+            <div class="p-3 bg-(--q-background) border-t border-(--q-border-color,var(--color-border-default))">
               <div class="text-sm font-medium mb-2">
                 Source Map Files ({{ row.files.length }})
               </div>

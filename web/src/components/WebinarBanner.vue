@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Home variant: larger banner -->
   <div
     v-else-if="webinarData && !isExpired && variant === 'home'"
-    class="webinar-home-banner mb-3 relative overflow-hidden rounded-[0.625rem] border border-[color-mix(in_srgb,var(--q-secondary)_35%,transparent)] bg-[linear-gradient(120deg,color-mix(in_srgb,var(--q-secondary)_14%,var(--o2-primary-background))_0%,var(--o2-primary-background)_55%,color-mix(in_srgb,var(--q-secondary)_7%,var(--o2-primary-background))_100%)]"
+    class="webinar-home-banner mb-3 relative overflow-hidden rounded-[0.625rem] border border-[color-mix(in_srgb,var(--q-secondary)_35%,transparent)] bg-[linear-gradient(120deg,color-mix(in_srgb,var(--q-secondary)_14%,var(--color-surface-base))_0%,var(--color-surface-base)_55%,color-mix(in_srgb,var(--q-secondary)_7%,var(--color-surface-base))_100%)]"
     data-test="webinar-home-banner"
   >
     <!-- Decorative blobs -->
@@ -73,9 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ webinarData.tag }}
         </div>
 
-        <div class="webinar-home-title text-base font-bold text-[var(--o2-text-primary)] leading-[1.35] max-w-[36rem]">{{ webinarData.title }}</div>
+        <div class="webinar-home-title text-base font-bold text-[var(--color-text-primary)] leading-[1.35] max-w-[36rem]">{{ webinarData.title }}</div>
 
-        <div v-if="webinarData.date" class="webinar-home-meta flex items-center gap-[0.3rem] text-[0.8125rem] leading-none text-[var(--o2-text-secondary)]">
+        <div v-if="webinarData.date" class="webinar-home-meta flex items-center gap-[0.3rem] text-[0.8125rem] leading-none text-[var(--color-text-secondary)]">
           <OIcon name="schedule" size="xs" />
           <span class="[line-height:1]">{{ formattedDate }}</span>
         </div>

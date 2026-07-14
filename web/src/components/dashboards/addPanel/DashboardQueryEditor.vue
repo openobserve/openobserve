@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="{
         backgroundColor:
           store.state.theme === 'dark'
-            ? 'var(--o2-header-menu-bg)'
+            ? 'var(--color-theme-header-menu-bg)'
             : 'var(--color-primary-100)',
       }"
       @click.stop
@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
           >
             <template #separator>
-              <div class="w-1 h-full bg-(--o2-border) transition-colors hover:bg-[orange]"></div>
+              <div class="w-1 h-full bg-(--color-border-default) transition-colors hover:bg-[orange]"></div>
             </template>
             <template #before>
               <UnifiedQueryEditor

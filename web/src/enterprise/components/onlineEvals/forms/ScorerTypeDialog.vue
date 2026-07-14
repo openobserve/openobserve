@@ -10,7 +10,7 @@
         <h2 class="flex-1 m-0 text-base font-semibold text-text-primary">{{ t("onlineEvals.scorerTypeDialog.title") }}</h2>
         <button
           type="button"
-          class="inline-flex items-center justify-center w-7 h-7 p-0 text-(--color-text-secondary,var(--o2-text-secondary)) bg-transparent border-0 rounded-md cursor-pointer transition-[background,color] duration-150 hover:bg-[color-mix(in_srgb,var(--color-text-primary)_6%,transparent)] hover:text-(--color-primary-600,#3F7994)"
+          class="inline-flex items-center justify-center w-7 h-7 p-0 text-(--color-text-secondary,var(--color-text-secondary)) bg-transparent border-0 rounded-md cursor-pointer transition-[background,color] duration-150 hover:bg-[color-mix(in_srgb,var(--color-text-primary)_6%,transparent)] hover:text-(--color-primary-600,#3F7994)"
           :aria-label="t('onlineEvals.buttons.cancel')"
           data-test="scorer-type-close-btn"
           @click="$emit('close')"
@@ -37,7 +37,7 @@
       <div class="grid grid-cols-3 max-[720px]:grid-cols-1 gap-3">
         <button
           type="button"
-          class="scorer-type-card relative flex flex-col items-start gap-[10px] min-h-[180px] py-4 px-4 pb-[14px] border border-(--color-dialog-header-border,var(--o2-border)) rounded-lg bg-(--color-card-bg) text-(--color-text-primary,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms]"
+          class="scorer-type-card relative flex flex-col items-start gap-[10px] min-h-[180px] py-4 px-4 pb-[14px] border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-(--color-card-bg) text-(--color-text-primary,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms]"
           data-test="scorer-type-llm-judge"
           @click="$emit('select', 'llm_judge')"
         >
@@ -47,7 +47,7 @@
           <div class="text-sm font-semibold text-(--color-text-primary,currentColor)">
             {{ t("onlineEvals.scorerTypeDialog.llmJudgeTitle") }}
           </div>
-          <div class="flex-1 text-xs leading-normal text-(--color-text-secondary,var(--o2-text-secondary))">
+          <div class="flex-1 text-xs leading-normal text-(--color-text-secondary,var(--color-text-secondary))">
             {{ t("onlineEvals.scorerTypeDialog.llmJudgeDescription") }}
           </div>
           <div class="inline-flex items-center gap-1 mt-auto text-xs font-semibold text-(--color-primary-600,#3F7994)">
@@ -58,7 +58,7 @@
 
         <button
           type="button"
-          class="scorer-type-card relative flex flex-col items-start gap-[10px] min-h-[180px] py-4 px-4 pb-[14px] border border-(--color-dialog-header-border,var(--o2-border)) rounded-lg bg-(--color-card-bg) text-(--color-text-primary,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms]"
+          class="scorer-type-card relative flex flex-col items-start gap-[10px] min-h-[180px] py-4 px-4 pb-[14px] border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-(--color-card-bg) text-(--color-text-primary,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms]"
           data-test="scorer-type-remote"
           @click="$emit('select', 'remote')"
         >
@@ -68,7 +68,7 @@
           <div class="text-sm font-semibold text-(--color-text-primary,currentColor)">
             {{ t("onlineEvals.scorerTypeDialog.remoteTitle") }}
           </div>
-          <div class="flex-1 text-xs leading-normal text-(--color-text-secondary,var(--o2-text-secondary))">
+          <div class="flex-1 text-xs leading-normal text-(--color-text-secondary,var(--color-text-secondary))">
             {{ t("onlineEvals.scorerTypeDialog.remoteDescription") }}
           </div>
           <div class="inline-flex items-center gap-1 mt-auto text-xs font-semibold text-(--color-primary-600,#3F7994)">
@@ -79,7 +79,7 @@
 
         <button
           type="button"
-          class="scorer-type-card scorer-type-card--disabled relative flex flex-col items-start gap-[10px] min-h-[180px] py-4 px-4 pb-[14px] border border-(--color-dialog-header-border,var(--o2-border)) rounded-lg bg-(--color-card-bg) text-(--color-text-primary,currentColor) text-left cursor-not-allowed opacity-60 transition-[border-color,background,box-shadow] duration-[120ms]"
+          class="scorer-type-card scorer-type-card--disabled relative flex flex-col items-start gap-[10px] min-h-[180px] py-4 px-4 pb-[14px] border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-(--color-card-bg) text-(--color-text-primary,currentColor) text-left cursor-not-allowed opacity-60 transition-[border-color,background,box-shadow] duration-[120ms]"
           data-test="scorer-type-code"
           disabled
         >
@@ -92,10 +92,10 @@
           <div class="text-sm font-semibold text-(--color-text-primary,currentColor)">
             {{ t("onlineEvals.scorerTypeDialog.codeTitle") }}
           </div>
-          <div class="flex-1 text-xs leading-normal text-(--color-text-secondary,var(--o2-text-secondary))">
+          <div class="flex-1 text-xs leading-normal text-(--color-text-secondary,var(--color-text-secondary))">
             {{ t("onlineEvals.scorerTypeDialog.codeDescription") }}
           </div>
-          <div class="inline-flex items-center gap-1 mt-auto text-xs font-semibold text-(--color-text-secondary,var(--o2-text-secondary))">
+          <div class="inline-flex items-center gap-1 mt-auto text-xs font-semibold text-(--color-text-secondary,var(--color-text-secondary))">
             {{ t("onlineEvals.scorerTypeDialog.codeCta") }}
           </div>
         </button>

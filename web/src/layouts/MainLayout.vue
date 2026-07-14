@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Webinar announcement bar: shown above toolbar for cloud users -->
       <div
         v-if="config.isCloud === 'true'"
-        class="bg-[var(--o2-primary-btn-bg)] text-[var(--o2-primary-btn-text)] text-center"
+        class="bg-[var(--color-button-primary)] text-[var(--color-button-primary-foreground)] text-center"
       >
         <WebinarBanner variant="header" />
       </div>

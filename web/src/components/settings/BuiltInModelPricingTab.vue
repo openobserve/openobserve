@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-if="row.description"
             class="text-xs"
-            style="max-width: 260px; white-space: normal; line-height: 1.3; color: var(--o2-text-muted)"
+            style="max-width: 260px; white-space: normal; line-height: 1.3; color: var(--color-text-muted)"
           >
             {{ row.description }}
           </div>
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tier-name text-[11px] font-semibold text-[#555] mb-px" :class="tier.condition ? 'text-[#888]' : ''">
                 <span v-if="tier.condition">
                   {{ tier.name }}
-                  <span style="font-weight: 400; color: var(--o2-text-muted)">
+                  <span style="font-weight: 400; color: var(--color-text-muted)">
                     ({{ tier.condition.usage_key }}
                     {{ tier.condition.operator }}
                     {{ tier.condition.value.toLocaleString() }})
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #empty>
           <div class="w-full flex flex-col flex-center p-6">
             <OIcon name="search-off" style="width: 50px; height: 50px;" />
-            <div class="mt-3" style="color: var(--o2-text-muted)">
+            <div class="mt-3" style="color: var(--color-text-muted)">
               {{ t("modelPricing.noModelsFound") }}
             </div>
           </div>
@@ -385,7 +385,7 @@ export default defineComponent({
 <style>
 /* Tier pricing rows — sibling selector not convertible to  */
 .tier-row + .tier-row {
-  border-top: 1px dashed var(--o2-border);
+  border-top: 1px dashed var(--color-border-default);
   margin-top: 2px;
   padding-top: 2px;
 }

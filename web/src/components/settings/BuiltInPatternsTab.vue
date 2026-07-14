@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   +{{ pattern.tags.length - 3 }}
                 </OTag>
               </div>
-              <div class="font-mono text-[0.8125rem] leading-[1.4] text-(--o2-text-secondary) break-all line-clamp-1">
+              <div class="font-mono text-[0.8125rem] leading-[1.4] text-(--color-text-secondary) break-all line-clamp-1">
                 {{ pattern.pattern.substring(0, 100)
                 }}{{ pattern.pattern.length > 100 ? "..." : "" }}
               </div>

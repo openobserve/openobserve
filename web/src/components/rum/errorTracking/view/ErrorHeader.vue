@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               size="xs"
               name="content-copy"
-              class="hover:text-[var(--o2-primary-btn-bg)]"
+              class="hover:text-[var(--color-button-primary)]"
               @click="copyErrorId(error.error_id)"
           /></span>
         </template>

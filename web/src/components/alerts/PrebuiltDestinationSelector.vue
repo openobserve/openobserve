@@ -43,12 +43,12 @@ limitations under the License. -->
           </div>
 
           <!-- Name -->
-          <div data-test="destination-type-name" class="card-title text-[0.8125rem] font-medium mt-1 mb-0 text-[var(--o2-text-primary)] [line-height:1.3] text-center">
+          <div data-test="destination-type-name" class="card-title text-[0.8125rem] font-medium mt-1 mb-0 text-[var(--color-text-primary)] [line-height:1.3] text-center">
             {{ type.name }}
           </div>
 
           <!-- Description -->
-          <div data-test="destination-type-description" class="card-description text-[0.6875rem] text-[var(--o2-text-secondary)] mt-1 mb-0 [line-height:1.2] grow text-center hidden">
+          <div data-test="destination-type-description" class="card-description text-[0.6875rem] text-[var(--color-text-secondary)] mt-1 mb-0 [line-height:1.2] grow text-center hidden">
             {{ type.description }}
           </div>
         </div>
@@ -56,7 +56,7 @@ limitations under the License. -->
         <!-- Selection Indicator -->
         <div
           v-if="selectedType === type.id"
-          class="check-icon absolute top-[0.375rem] right-[0.375rem] w-5 h-5 rounded-full overflow-hidden bg-[var(--o2-positive)] text-white flex items-center justify-center z-[1]"
+          class="check-icon absolute top-[0.375rem] right-[0.375rem] w-5 h-5 rounded-full overflow-hidden bg-[var(--color-status-positive)] text-white flex items-center justify-center z-[1]"
         >
           <OIcon name="check" size="xs" />
         </div>
@@ -74,10 +74,10 @@ limitations under the License. -->
           <div data-test="destination-type-icon" class="mb-2 text-[var(--o2-icon-color)] group-[.selected]/dest-card:text-[var(--o2-primary-color)]">
             <OIcon name="settings" size="md" />
           </div>
-          <div data-test="destination-type-name" class="card-title text-[0.8125rem] font-medium mt-1 mb-0 text-[var(--o2-text-primary)] [line-height:1.3] text-center">
+          <div data-test="destination-type-name" class="card-title text-[0.8125rem] font-medium mt-1 mb-0 text-[var(--color-text-primary)] [line-height:1.3] text-center">
             {{ t('alerts.customDestination') }}
           </div>
-          <div data-test="destination-type-description" class="card-description text-[0.6875rem] text-[var(--o2-text-secondary)] mt-1 mb-0 [line-height:1.2] grow text-center hidden">
+          <div data-test="destination-type-description" class="card-description text-[0.6875rem] text-[var(--color-text-secondary)] mt-1 mb-0 [line-height:1.2] grow text-center hidden">
             {{ t('alerts.customDestinationDescription') }}
           </div>
         </div>
@@ -85,7 +85,7 @@ limitations under the License. -->
         <!-- Selection Indicator -->
         <div
           v-if="selectedType === 'custom'"
-          class="check-icon absolute top-[0.375rem] right-[0.375rem] w-5 h-5 rounded-full overflow-hidden bg-[var(--o2-positive)] text-white flex items-center justify-center z-[1]"
+          class="check-icon absolute top-[0.375rem] right-[0.375rem] w-5 h-5 rounded-full overflow-hidden bg-[var(--color-status-positive)] text-white flex items-center justify-center z-[1]"
         >
           <OIcon name="check" size="xs" />
         </div>

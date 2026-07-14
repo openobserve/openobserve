@@ -28,7 +28,7 @@
       v-if="showDetailCard"
       class="chip-detail-card fixed max-w-75 max-h-75 border rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.25)] z-[100000] flex flex-col overflow-hidden"
       :class="theme === 'dark'
-        ? ['dark-mode', 'bg-(--o2-primary-background)', 'border-(--o2-primary-background)']
+        ? ['dark-mode', 'bg-(--color-surface-base)', 'border-(--color-surface-base)']
         : ['light-mode', 'bg-white', 'border-[#e4e7ec]']"
       :style="{
         top: cardPosition.top + 'px',

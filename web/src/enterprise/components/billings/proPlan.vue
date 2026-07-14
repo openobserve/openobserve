@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="flex flex-col shadow-none border border-(--o2-border-color) bg-(--o2-card-bg) rounded-lg w-full h-full dark:bg-[var(--o2-card-background)] dark:border-[var(--o2-border)]">
+  <OCard class="flex flex-col shadow-none border border-(--o2-border-color) bg-(--o2-card-bg) rounded-lg w-full h-full dark:bg-[var(--color-surface-base)] dark:border-[var(--color-border-default)]">
     <div class="flex items-center justify-between px-3 py-2">
       <div>
-        <h3 class="pt-2 text-base font-semibold leading-6 text-(--o2-text-heading) m-0">{{ t("billing.proPlanLabel") }}</h3>
-        <p class="mt-2 text-sm font-normal leading-4.5 text-(--o2-text-secondary) m-0">
+        <h3 class="pt-2 text-base font-semibold leading-6 text-(--color-text-heading) m-0">{{ t("billing.proPlanLabel") }}</h3>
+        <p class="mt-2 text-sm font-normal leading-4.5 text-(--color-text-secondary) m-0">
           {{ t("billing.proPlanSubtitle") }}
         </p>
       </div>
@@ -34,8 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSeparator class="my-2" />
 
     <div class="px-3 py-2">
-      <h4 class="text-[0.8125rem] font-semibold leading-[0.983rem] text-(--o2-text-heading) m-0">{{ t("billing.features") }}</h4>
-      <p class="mb-3 mt-1 text-[0.8125rem] font-normal leading-4.5 text-(--o2-text-secondary) m-0">
+      <h4 class="text-[0.8125rem] font-semibold leading-[0.983rem] text-(--color-text-heading) m-0">{{ t("billing.features") }}</h4>
+      <p class="mb-3 mt-1 text-[0.8125rem] font-normal leading-4.5 text-(--color-text-secondary) m-0">
         {{ t("billing.included") }}
       </p>
 
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex items-center mb-2 text-red-500"
       >
         <OIcon name="warning" size="sm" class="mr-2" />
-        <span class="text-[0.938rem] leading-5.5 text-(--o2-text-body)"
+        <span class="text-[0.938rem] leading-5.5 text-(--color-text-body)"
           >Failed to load pricing details. Please refresh the page.</span
         >
       </div>
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="md"
             class="mr-2 text-green-500 check-icon"
           />
-          <div class="text-[0.938rem] leading-5.5 text-(--o2-text-body)" :class="{ 'ml-6': !feature.is_parent }">{{ feature.name }}</div>
+          <div class="text-[0.938rem] leading-5.5 text-(--color-text-body)" :class="{ 'ml-6': !feature.is_parent }">{{ feature.name }}</div>
         </div>
         <div
           v-if="feature.price !== ''"
@@ -72,13 +72,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             opacity: 0.4;
           "
         ></div>
-        <div class="text-[0.938rem] leading-5.5 text-(--o2-text-body) font-bold">{{ feature.price }}</div>
+        <div class="text-[0.938rem] leading-5.5 text-(--color-text-body) font-bold">{{ feature.price }}</div>
       </div>
     </div>
 
     <OSeparator />
 
-    <p class="px-3 pt-2 text-[0.8125rem] font-normal leading-4.5 text-(--o2-text-secondary) m-0">
+    <p class="px-3 pt-2 text-[0.8125rem] font-normal leading-4.5 text-(--color-text-secondary) m-0">
       {{ t("billing.unlimitedNote") }}<br />
       {{ t("billing.paymentNote") }}
     </p>

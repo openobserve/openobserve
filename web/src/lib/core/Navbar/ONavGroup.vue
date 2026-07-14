@@ -72,7 +72,7 @@ const isLinkMode = computed(() => !!props.parentItem);
 // text stays legible on the dark surface.
 //
 // `!` is REQUIRED: the flyout items are <router-link> (<a>) and the app's global
-// `a { color: var(--o2-text-link) }` rule (app.scss, unlayered) otherwise wins
+// `a { color: var(--color-text-link) }` rule (app.scss, unlayered) otherwise wins
 // over the layered Tailwind color utility, tinting the link text/icon primary.
 const isDark = computed(() => store.state.theme === "dark");
 const flyoutTextClass = computed(() =>

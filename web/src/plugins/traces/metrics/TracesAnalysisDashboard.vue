@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="showTabs"
         v-model="activeAnalysisType"
         dense
-        class="border-b border-solid border-[var(--o2-border-color)] text-[var(--o2-text-1)]! insights-dashboard-tabs"
+        class="border-b border-solid border-[var(--o2-border-color)] text-[var(--color-text-caption)]! insights-dashboard-tabs"
         align="left"
       >
         <OTab
@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <div class="flex flex-col flex-1 min-w-0">
                         <span
-                          class="dimension-label truncate cursor-pointer text-[var(--o2-text-2)]! text-sm [line-height:1.25rem]"
+                          class="dimension-label truncate cursor-pointer text-[var(--color-text-secondary)]! text-sm [line-height:1.25rem]"
                         >
                           {{ dimension.label }}
                           <OTooltip

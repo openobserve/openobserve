@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="row.is_realtime ? 'Real-time' : 'Scheduled'">
               <OIcon
                 :name="row.is_realtime ? 'check-circle' : 'schedule'"
-                :class="row.is_realtime ? 'text-[var(--o2-positive)]' : 'text-gray-500'"
+                :class="row.is_realtime ? 'text-[var(--color-status-positive)]' : 'text-gray-500'"
                 size="md"
               />
             </OTooltip>
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="row.is_silenced ? 'Silenced' : 'Not Silenced'">
               <OIcon
                 :name="row.is_silenced ? 'volume-off' : 'volume-up'"
-                :class="row.is_silenced ? 'text-gray-500' : 'text-[var(--o2-positive)]'"
+                :class="row.is_silenced ? 'text-gray-500' : 'text-[var(--color-status-positive)]'"
                 size="md"
               />
             </OTooltip>
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 row.is_partial !== undefined
               "
               :name="row.is_partial ? 'warning' : 'check-circle'"
-              :class="row.is_partial ? 'text-[var(--o2-warning)]' : 'text-[var(--o2-positive)]'"
+              :class="row.is_partial ? 'text-[var(--o2-warning)]' : 'text-[var(--color-status-positive)]'"
               size="xs"
             >
               <OTooltip
@@ -374,7 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :name="
                         selectedRow.is_partial ? 'warning' : 'check-circle'
                       "
-                      :class="['mr-1', selectedRow.is_partial ? 'text-[var(--o2-warning)]' : 'text-[var(--o2-positive)]']"
+                      :class="['mr-1', selectedRow.is_partial ? 'text-[var(--o2-warning)]' : 'text-[var(--color-status-positive)]']"
                       size="xs"
                     />
                     {{ selectedRow.is_partial ? "Partial" : "Complete" }}

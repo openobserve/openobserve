@@ -834,7 +834,7 @@ export default defineComponent({
 .panel-header .edge-name .health-badge.critical { background: rgba(239,68,68,0.15);   color: #ef4444; }
 
 .body--light .panel-header {
-  border-bottom: 1px solid var(--o2-border);
+  border-bottom: 1px solid var(--color-border-default);
   background: #f5f5f5;
 }
 
@@ -863,7 +863,7 @@ export default defineComponent({
   background: #ffffff;
 }
 .body--light .panel-content::-webkit-scrollbar-track { background: #f8f9fa; }
-.body--light .panel-content::-webkit-scrollbar-thumb { background: var(--o2-border); }
+.body--light .panel-content::-webkit-scrollbar-thumb { background: var(--color-border-default); }
 .body--light .panel-content::-webkit-scrollbar-thumb:hover { background: #d0d0d0; }
 
 /* Metric card — descendant selectors */
@@ -1197,6 +1197,6 @@ export default defineComponent({
 .body--light .service-graph-edge-side-panel {
   background: #ffffff;
   color: #333333;
-  border-left: 1px solid var(--o2-border);
+  border-left: 1px solid var(--color-border-default);
 }
 </style>

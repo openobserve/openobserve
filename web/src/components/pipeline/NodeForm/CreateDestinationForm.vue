@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 { selected: destinationType === destType.value },
                 store.state.theme === 'dark'
                   ? 'border-[#424242] bg-[#1e1e1e] hover:border-[#5d9cec] hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]'
-                  : 'border-[var(--o2-border)] bg-white hover:border-[var(--o2-border-color)] hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
+                  : 'border-[var(--color-border-default)] bg-white hover:border-[var(--o2-border-color)] hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
               ]"
               @click="form.setFieldValue('destination_type', destType.value)"
             >
@@ -70,10 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 class="card-icon mb-2 text-[#666] [transition:color_0.3s_ease]"
               />
-              <div class="card-label text-[13px] font-medium text-center leading-[1.3] mt-1 text-[var(--o2-text-primary)]">{{ destType.label }}</div>
+              <div class="card-label text-[13px] font-medium text-center leading-[1.3] mt-1 text-[var(--color-text-primary)]">{{ destType.label }}</div>
               <div
                 v-if="destinationType === destType.value"
-                class="absolute top-[0.375rem] right-[0.375rem] w-5 h-5 rounded-full overflow-hidden bg-[var(--o2-positive)] text-white flex items-center justify-center z-[1]"
+                class="absolute top-[0.375rem] right-[0.375rem] w-5 h-5 rounded-full overflow-hidden bg-[var(--color-status-positive)] text-white flex items-center justify-center z-[1]"
               >
                 <!-- eslint-disable-next-line vue/max-attributes-per-line -->
                 <OIcon name="check" size="xs" />
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Destination-specific Metadata Section -->
           <div v-if="showMetadataFields" class="flex flex-col gap-4 mt-4">
-            <div class="w-full text-[14px] font-bold text-(--o2-input-label-text-color)">
+            <div class="w-full text-[14px] font-bold text-(--color-input-label)">
               Metadata Configuration
             </div>
 

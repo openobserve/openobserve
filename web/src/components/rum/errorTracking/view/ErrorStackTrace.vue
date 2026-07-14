@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="index"
                 data-test="error-stack-trace-line"
-                class="border-b border-l border-r border-solid border-(--o2-border) text-[13px] py-1.5 px-2"
+                class="border-b border-l border-r border-solid border-(--color-border-default) text-[13px] py-1.5 px-2"
                 :style="{
                   'border-top': Number(index) === 1 ? '1px solid #e0e0e0' : '',
                   'border-radius':

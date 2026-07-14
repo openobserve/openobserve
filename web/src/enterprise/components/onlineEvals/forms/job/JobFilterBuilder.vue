@@ -71,7 +71,7 @@ function handleInputUpdate() {
   width: 100%;
   max-width: 100%;
   margin-left: 0 !important;
-  border-color: var(--color-dialog-header-border, var(--o2-border));
+  border-color: var(--color-dialog-header-border, var(--color-border-default));
 }
 
 /* Only the root group sits flush under the label. Nested groups keep their

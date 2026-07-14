@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           :class="statusColorClass"
         />
-        <span class="text-xs font-medium text-[var(--o2-text-secondary)]">
+        <span class="text-xs font-medium text-[var(--color-text-secondary)]">
           {{ label }}
         </span>
       </div>
@@ -44,18 +44,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-2xl font-bold">
         {{ formattedValue }}
       </span>
-      <span v-if="displayUnit" class="text-xs text-[var(--o2-text-secondary)]">
+      <span v-if="displayUnit" class="text-xs text-[var(--color-text-secondary)]">
         {{ displayUnit }}
       </span>
     </div>
 
-    <div v-if="description" class="mt-2 text-[10px] text-[var(--o2-text-secondary)]">
+    <div v-if="description" class="mt-2 text-[10px] text-[var(--color-text-secondary)]">
       {{ description }}
     </div>
 
     <div v-if="threshold" class="mt-2">
       <div class="flex justify-between text-[10px] mb-1">
-        <span class="text-[var(--o2-text-secondary)]">Threshold</span>
+        <span class="text-[var(--color-text-secondary)]">Threshold</span>
         <span class="font-medium">{{ threshold }}</span>
       </div>
       <OProgressBar
@@ -155,9 +155,9 @@ const statusColorClass = computed(() => {
   if (!props.status) return "text-gray-500";
 
   const classes = {
-    good: "text-[var(--o2-positive)]",
+    good: "text-[var(--color-status-positive)]",
     "needs-improvement": "text-[var(--o2-warning)]",
-    poor: "text-[var(--o2-negative)]",
+    poor: "text-[var(--color-status-negative)]",
   };
 
   return classes[props.status] || "text-gray-500";

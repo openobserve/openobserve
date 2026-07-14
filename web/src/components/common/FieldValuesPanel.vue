@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ selectedValues.length }} selected
         </span>
-        <span v-else class="selection-hint  text-3! text-[0.625rem] text-[var(--o2-text-secondary)]">Select to filter</span>
+        <span v-else class="selection-hint  text-3! text-[0.625rem] text-[var(--color-text-secondary)]">Select to filter</span>
         <OButton
           v-if="selectedValues.length > 0"
           variant="ghost"

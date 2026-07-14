@@ -20,7 +20,7 @@ the Free Software Foundation, either version 3 of the License, or
 
     <div
       v-else-if="loadError"
-      class="flex flex-col items-center justify-center flex-1 p-8 text-(--o2-text-muted)"
+      class="flex flex-col items-center justify-center flex-1 p-8 text-(--color-text-muted)"
       data-test="score-config-library-error"
     >
       <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
@@ -67,7 +67,7 @@ the Free Software Foundation, either version 3 of the License, or
             class="flex items-baseline gap-1.5 mt-0 mx-0 mb-1.5 text-xs font-bold uppercase tracking-[0.04em] text-(--o2-text)"
           >
             <span class="text-(--o2-text)">{{ group.label }}</span>
-            <span class="font-medium text-(--o2-text-muted)">({{ group.entries.length }})</span>
+            <span class="font-medium text-(--color-text-muted)">({{ group.entries.length }})</span>
           </div>
           <ul
             class="flex flex-col rounded border border-border"

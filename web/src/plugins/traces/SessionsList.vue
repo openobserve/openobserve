@@ -199,12 +199,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-firstUserMessage="{ row }">
           <div
             v-if="row.firstUserMessage"
-            class="text-[0.75rem] text-[var(--o2-text-secondary)] truncate w-full"
+            class="text-[0.75rem] text-[var(--color-text-secondary)] truncate w-full"
           >
             {{ row.firstUserMessage }}
             <OTooltip :content="row.firstUserMessage" />
           </div>
-          <span v-else class="text-[0.75rem] text-[var(--o2-text-muted)]">—</span>
+          <span v-else class="text-[0.75rem] text-[var(--color-text-muted)]">—</span>
         </template>
 
         <!-- Turns -->

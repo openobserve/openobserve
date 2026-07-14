@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="idx"
               class="message-item mb-2 h-full"
               :style="{
-                border: '1px solid var(--o2-border)',
+                border: '1px solid var(--color-border-default)',
                 borderRadius: '8px',
               }"
             >
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="message-role text-xs font-bold p-2 capitalize"
                 :style="{
                   backgroundColor: roleColor(msg.role),
-                  borderBottom: '1px solid var(--o2-border)',
+                  borderBottom: '1px solid var(--color-border-default)',
                 }"
               >
                 {{ roleLabel(msg.role) }}
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="isMessageJson(msg.content)"
                 class="message-content-json p-2 h-full text-[13px]"
-                style="background-color: var(--o2-code-bg)"
+                style="background-color: var(--color-code-bg)"
               >
                 <CodeQueryEditor
                   :editor-id="`${editorIdPrefix}msg-json-editor-${idx}`"
@@ -109,13 +109,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-else
                 class="message-content markdown-body p-2 overflow-x-auto"
-                style="background-color: var(--o2-code-bg)"
+                style="background-color: var(--color-code-bg)"
                 v-html="renderMarkdown(msg.content)"
               />
             </div>
           </div>
           <div v-else-if="isPlainText" class="text-content">
-            <pre class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-[13px] leading-normal bg-(--o2-code-bg) rounded overflow-x-auto">{{ contentStats.previewText }}</pre>
+            <pre class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-[13px] leading-normal bg-(--color-code-bg) rounded overflow-x-auto">{{ contentStats.previewText }}</pre>
           </div>
           <div v-else class="json-content">
             <CodeQueryEditor
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="idx"
               class="message-item mb-2 h-full"
               :style="{
-                border: '1px solid var(--o2-border)',
+                border: '1px solid var(--color-border-default)',
                 borderRadius: '8px',
               }"
             >
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="message-role text-xs font-bold p-2 capitalize"
                 :style="{
                   backgroundColor: roleColor(msg.role),
-                  borderBottom: '1px solid var(--o2-border)',
+                  borderBottom: '1px solid var(--color-border-default)',
                 }"
               >
                 {{ roleLabel(msg.role) }}
@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="isMessageJson(msg.content)"
                 class="message-content-json p-2 h-full text-[13px]"
-                style="background-color: var(--o2-code-bg)"
+                style="background-color: var(--color-code-bg)"
               >
                 <CodeQueryEditor
                   :editor-id="`${editorIdPrefix}msg-json-editor-full-${idx}`"
@@ -210,13 +210,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-else
                 class="message-content markdown-body p-2 overflow-x-auto"
-                style="background-color: var(--o2-code-bg)"
+                style="background-color: var(--color-code-bg)"
                 v-html="renderMarkdown(msg.content)"
               />
             </div>
           </div>
           <div v-else-if="isPlainText" class="text-content">
-            <pre class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-[13px] leading-normal bg-(--o2-code-bg) rounded overflow-x-auto">{{ fullText }}</pre>
+            <pre class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-[13px] leading-normal bg-(--color-code-bg) rounded overflow-x-auto">{{ fullText }}</pre>
           </div>
           <div v-else class="json-content h-full">
             <CodeQueryEditor
@@ -755,7 +755,7 @@ const renderMarkdown = (content: string): string => {
   border-left: 3px solid var(--o2-border-color);
   margin: 8px 0;
   padding-left: 12px;
-  color: var(--o2-text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .messages-view .message-item .message-content table {

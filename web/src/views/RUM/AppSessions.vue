@@ -310,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       name="play-circle-filled"
                       size="md"
-                      class="cursor-pointer session-play-icon text-[var(--o2-icon-color)] hover:text-[var(--o2-primary-btn-bg)]"
+                      class="cursor-pointer session-play-icon text-[var(--o2-icon-color)] hover:text-[var(--color-button-primary)]"
                     />
                   </template>
                   <template #cell-session="{ row }">
@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="font-medium truncate"
                       />
                       <div
-                        class="flex items-center gap-1.5 text-xs text-[var(--o2-text-caption)]"
+                        class="flex items-center gap-1.5 text-xs text-[var(--color-text-caption)]"
                       >
                         <span
                           class="o2-monospace-font"
@@ -368,7 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >{{ t("rum.bounced").toLowerCase() }}</small>
                       <small
                         v-else-if="row.is_active"
-                        class="text-[var(--o2-status-success-text)]"
+                        class="text-[var(--color-status-success-text)]"
                         data-test="rum-app-sessions-active-text"
                       >{{ t("rum.active") }}</small>
                     </div>

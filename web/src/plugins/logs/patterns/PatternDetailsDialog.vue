@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ patternLevelInfo.level }}
           </span>
-          <h4 class="font-semibold text-[var(--o2-text-heading)] truncate min-w-0 text-base leading-tight m-0">
+          <h4 class="font-semibold text-[var(--color-text-heading)] truncate min-w-0 text-base leading-tight m-0">
             {{ selectedPattern?.pattern?.description || t('search.patternDetailsTitle') }}
           </h4>
           <template v-if="selectedPattern">
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Row 2: full-width module path, truncates at edge -->
         <code
           v-if="selectedPattern && patternPathToken"
-          class="block w-full truncate text-[var(--o2-text-code)] font-mono text-[0.6875rem] text-[var(--o2-text-caption)]"
+          class="block w-full truncate text-[var(--color-text-code)] font-mono text-[0.6875rem] text-[var(--color-text-caption)]"
         >{{ patternPathToken }}</code>
       </div>
     </template>

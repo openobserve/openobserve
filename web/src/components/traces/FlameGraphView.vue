@@ -11,16 +11,16 @@
     <div class="flex flex-col flex-1" style="min-height: 0">
       <!-- Controls Bar -->
       <div
-        class="px-6 py-3 border-b border-[var(--o2-border)] flex items-center justify-between bg-[var(--o2-card-bg)]!"
+        class="px-6 py-3 border-b border-[var(--color-border-default)] flex items-center justify-between bg-[var(--o2-card-bg)]!"
       >
         <div class="flex items-center space-x-4">
           <div
-            class="text-xs font-bold text-[var(--o2-text-secondary)]"
+            class="text-xs font-bold text-[var(--color-text-secondary)]"
           >
-            <span class="text-[var(--o2-text-primary)]">{{ totalSpans }}</span>
+            <span class="text-[var(--color-text-primary)]">{{ totalSpans }}</span>
             spans
             <span class="mx-2">•</span>
-            <span class="text-[var(--o2-text-primary)]">{{ maxDepth }}</span>
+            <span class="text-[var(--color-text-primary)]">{{ maxDepth }}</span>
             depth
           </div>
         </div>
@@ -43,7 +43,7 @@
           <span
             v-for="(tick, index) in timelineTicks"
             :key="'lbl-' + index"
-            class="absolute text-[10px] text-[var(--o2-text-secondary)] leading-none whitespace-nowrap"
+            class="absolute text-[10px] text-[var(--color-text-secondary)] leading-none whitespace-nowrap"
             style="top: 50%; padding-left: 3px"
             :style="{ left: tick.left, transform: tick.transform }"
             >{{ tick.label }}</span
@@ -129,7 +129,7 @@
         class="absolute inset-0 flex items-center justify-center bg-white"
         style="top: 60px"
       >
-        <div class="text-center text-[var(--o2-text-secondary)]">
+        <div class="text-center text-[var(--color-text-secondary)]">
           <div class="text-sm">No spans to display</div>
         </div>
       </div>
@@ -138,7 +138,7 @@
     <!-- Resize handle -->
     <div
       v-if="sidebarVisible"
-      class="h-1 cursor-row-resize bg-[var(--o2-border)] hover:bg-[var(--o2-primary-color)] flex-shrink-0 transition-colors"
+      class="h-1 cursor-row-resize bg-[var(--color-border-default)] hover:bg-[var(--o2-primary-color)] flex-shrink-0 transition-colors"
       style="min-height: 4px"
       data-test="flame-graph-resizer"
       @mousedown="startResize"

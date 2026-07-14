@@ -44,22 +44,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="{ 'border-2 border-(--o2-primary-color) pt-7 max-[1024px]:pt-5': buildType === ed.id }"
       >
         <!-- Your Plan badge (floats above the card top border) -->
-        <div v-if="buildType === ed.id" data-test="feature-comparison-table-your-plan-badge" class="absolute top-[-14px] left-1/2 -translate-x-1/2 inline-flex items-center py-1 px-[0.875rem] rounded-full text-[0.625rem] font-bold uppercase tracking-[0.08em] whitespace-nowrap bg-(--o2-primary-color) text-(--o2-primary-foreground)">
+        <div v-if="buildType === ed.id" data-test="feature-comparison-table-your-plan-badge" class="absolute top-[-14px] left-1/2 -translate-x-1/2 inline-flex items-center py-1 px-[0.875rem] rounded-full text-[0.625rem] font-bold uppercase tracking-[0.08em] whitespace-nowrap bg-(--o2-primary-color) text-(--color-button-primary-foreground)">
           <OIcon name="arrow-upward" size="sm" class="mr-1" />
           Your Plan
         </div>
 
         <!-- Edition name + hosting + price ────────────────────────────── -->
         <div class="mb-5">
-          <div class="text-base font-bold text-(--o2-text-heading) m-0 mb-[0.125rem]">{{ ed.shortName }}</div>
-          <div class="text-[0.8125rem] text-(--o2-text-muted) m-0 mb-[0.875rem]">{{ ed.hosting }}</div>
+          <div class="text-base font-bold text-(--color-text-heading) m-0 mb-[0.125rem]">{{ ed.shortName }}</div>
+          <div class="text-[0.8125rem] text-(--color-text-muted) m-0 mb-[0.875rem]">{{ ed.hosting }}</div>
           <div class="text-[1.75rem] font-bold text-(--o2-primary-color) m-0 mb-1 tracking-[-0.03em] leading-[1.1]">{{ ed.price }}</div>
-          <div class="text-[0.8125rem] text-(--o2-text-muted) m-0 leading-[1.4]">{{ ed.priceSub }}</div>
+          <div class="text-[0.8125rem] text-(--color-text-muted) m-0 leading-[1.4]">{{ ed.priceSub }}</div>
         </div>
 
         <!-- All Five Pillars chips ────────────────────────────────────── -->
         <div class="bg-[color-mix(in_srgb,var(--o2-primary-color)_5%,var(--o2-card-bg))] border border-[color-mix(in_srgb,var(--o2-primary-color)_15%,transparent)] rounded-lg p-3 mb-4">
-          <div class="text-[0.5625rem] font-bold uppercase tracking-[0.12em] text-(--o2-text-label) m-0 mb-2">ALL FIVE PILLARS</div>
+          <div class="text-[0.5625rem] font-bold uppercase tracking-[0.12em] text-(--color-text-label) m-0 mb-2">ALL FIVE PILLARS</div>
           <div class="flex flex-wrap gap-1.5 mb-1.5">
             <span v-for="pillarId in PILLAR_IDS" :key="pillarId" data-test="feature-comparison-table-pillar-chip" class="inline-flex items-center py-[0.1875rem] px-2 rounded text-[0.6875rem] font-medium bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] text-(--o2-primary-color) border border-[color-mix(in_srgb,var(--o2-primary-color)_20%,transparent)] mr-[0.375rem] mb-[0.375rem]">
               {{ t(`about.feature_${pillarId}`) }}
@@ -76,14 +76,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="feature-comparison-table-feature-item"
             class="flex items-start gap-2 py-[0.4375rem] text-[0.8125rem] border-b border-(--o2-border-color) last:border-b-0"
             :class="{
-              'text-[var(--o2-text-body)]': getFeatureStatus(feature, ed.id) !== 'unavailable',
-              'text-[var(--o2-text-muted)]': getFeatureStatus(feature, ed.id) === 'unavailable',
+              'text-[var(--color-text-body)]': getFeatureStatus(feature, ed.id) !== 'unavailable',
+              'text-[var(--color-text-muted)]': getFeatureStatus(feature, ed.id) === 'unavailable',
             }"
           >
             <span class="shrink-0 mt-[0.125rem] leading-none"
               :class="{
-                'text-[var(--o2-positive)]': getFeatureStatus(feature, ed.id) !== 'unavailable',
-                'text-[var(--o2-text-muted)]': getFeatureStatus(feature, ed.id) === 'unavailable',
+                'text-[var(--color-status-positive)]': getFeatureStatus(feature, ed.id) !== 'unavailable',
+                'text-[var(--color-text-muted)]': getFeatureStatus(feature, ed.id) === 'unavailable',
               }"
             >
               <OIcon
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <span class="flex flex-col gap-[0.0625rem]">
               <span class="leading-[1.45]">{{ t(getFeatureNameKey(feature)) }}</span>
-              <span v-if="getFeatureNote(feature, ed.id)" class="text-[0.6875rem] text-(--o2-text-muted) italic">
+              <span v-if="getFeatureNote(feature, ed.id)" class="text-[0.6875rem] text-(--color-text-muted) italic">
                 {{ getFeatureNote(feature, ed.id) }}
               </span>
             </span>
@@ -111,12 +111,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="h-px bg-(--o2-border-color) mb-3"></div>
           <div class="mb-[0.875rem]">
             <div data-test="feature-comparison-table-footer-row" class="flex justify-between items-baseline text-[0.8125rem] py-[0.125rem]">
-              <span class="text-(--o2-text-muted) font-medium">{{ t('about.feature_license') }}</span>
-              <span class="text-(--o2-text-body) font-semibold">{{ ed.license }}</span>
+              <span class="text-(--color-text-muted) font-medium">{{ t('about.feature_license') }}</span>
+              <span class="text-(--color-text-body) font-semibold">{{ ed.license }}</span>
             </div>
             <div data-test="feature-comparison-table-footer-row" class="flex justify-between items-baseline text-[0.8125rem] py-[0.125rem]">
-              <span class="text-(--o2-text-muted) font-medium">{{ t('about.feature_support') }}</span>
-              <span class="text-(--o2-text-body) font-semibold">{{ ed.support }}</span>
+              <span class="text-(--color-text-muted) font-medium">{{ t('about.feature_support') }}</span>
+              <span class="text-(--color-text-body) font-semibold">{{ ed.support }}</span>
             </div>
           </div>
           <a
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ ed.ctaLabel }}
           </a>
-          <button v-else data-test="feature-comparison-table-cta-btn" data-test-cta="current" class="block w-full py-2 px-4 rounded-md text-sm font-semibold text-center no-underline cursor-default transition-all duration-200 border-[1.5px] border-solid bg-transparent text-(--o2-text-muted) border-(--o2-border-color)" disabled>
+          <button v-else data-test="feature-comparison-table-cta-btn" data-test-cta="current" class="block w-full py-2 px-4 rounded-md text-sm font-semibold text-center no-underline cursor-default transition-all duration-200 border-[1.5px] border-solid bg-transparent text-(--color-text-muted) border-(--o2-border-color)" disabled>
             {{ ed.ctaLabel }}
           </button>
         </div>

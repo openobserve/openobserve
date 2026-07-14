@@ -326,7 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Footer -->
         <div
           class="flex items-center gap-2 px-4 py-3 border-t border-border-default sticky bottom-0"
-          :class="store.state.theme === 'dark' ? 'bg-(--o2-primary-background)' : 'bg-white'"
+          :class="store.state.theme === 'dark' ? 'bg-(--color-surface-base)' : 'bg-white'"
         >
           <OButton
             data-test="ai-toolset-save-btn"

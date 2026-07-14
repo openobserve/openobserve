@@ -195,16 +195,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template v-else>
             <div class="flex flex-col gap-[0.25rem]">
-              <div class="text-[0.7rem] leading-normal font-semibold mb-[0.25rem] text-(--o2-text-muted)">
+              <div class="text-[0.7rem] leading-normal font-semibold mb-[0.25rem] text-(--color-text-muted)">
                 {{ card.label }}
               </div>
               <div class="flex items-baseline gap-[0.2rem]">
-                <span class="text-[1.4rem] font-bold leading-none text-(--o2-text-primary)">
+                <span class="text-[1.4rem] font-bold leading-none text-(--color-text-primary)">
                   {{ card.value }}
                 </span>
                 <span
                   v-if="card.unit"
-                  class="text-[0.8rem] font-semibold text-(--o2-text-secondary)"
+                  class="text-[0.8rem] font-semibold text-(--color-text-secondary)"
                 >
                   {{ card.unit }}
                 </span>

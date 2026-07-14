@@ -156,6 +156,6 @@ export default defineComponent({
 
 <style>
 .q-btn:before {
-  border: 0px solid var(--o2-border-input);
+  border: 0px solid var(--color-input-border);
 }
 </style>

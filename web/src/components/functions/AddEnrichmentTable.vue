@@ -116,8 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     :class="[
                       job.status === 'processing' ? '[animation:rotate_2s_linear_infinite]' : '',
-                      job.status === 'completed' ? 'text-[var(--o2-positive)]' :
-                      job.status === 'failed' ? 'text-[var(--o2-negative)]' :
+                      job.status === 'completed' ? 'text-[var(--color-status-positive)]' :
+                      job.status === 'failed' ? 'text-[var(--color-status-negative)]' :
                       job.status === 'processing' ? 'text-[var(--o2-primary)]' :
                       'text-gray-500'
                     ]"

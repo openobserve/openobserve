@@ -31,24 +31,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Left Pane: SQL Query -->
         <template #before>
-          <section class="flex flex-col overflow-hidden bg-(--o2-card-background) h-full">
+          <section class="flex flex-col overflow-hidden bg-(--color-surface-base) h-full">
             <header class="shrink-0 flex items-center gap-2 h-11 px-4 bg-(--o2-card-bg) border-b border-solid border-(--o2-border-color)">
               <div class="flex items-center gap-2">
-                <OIcon name="code" size="sm" class="text-(--o2-text-secondary)" />
-                <h3 class="text-(length:--text-sm) font-(--font-semibold) text-(--o2-text-heading) m-0 tracking-[0.01em]">SQL Query</h3>
+                <OIcon name="code" size="sm" class="text-(--color-text-secondary)" />
+                <h3 class="text-(length:--text-sm) font-(--font-semibold) text-(--color-text-heading) m-0 tracking-[0.01em]">SQL Query</h3>
               </div>
             </header>
             <div class="flex-1 overflow-y-auto p-4">
-              <pre class="sql-query-text [font-family:var(--font-mono)] text-[0.8125rem] leading-[1.6] m-0 py-3.5 px-4 whitespace-pre-wrap wrap-break-word bg-(--o2-code-bg) border border-solid border-(--o2-border-color) rounded-md text-(--o2-text-code) min-h-full box-border"><code class="[font-family:inherit] text-inherit bg-transparent p-0">{{ sqlQuery }}</code></pre>
+              <pre class="sql-query-text [font-family:var(--font-mono)] text-[0.8125rem] leading-[1.6] m-0 py-3.5 px-4 whitespace-pre-wrap wrap-break-word bg-(--color-code-bg) border border-solid border-(--o2-border-color) rounded-md text-(--color-text-code) min-h-full box-border"><code class="[font-family:inherit] text-inherit bg-transparent p-0">{{ sqlQuery }}</code></pre>
             </div>
           </section>
         </template>
 
         <!-- Right Pane: Explain/Analyze Results -->
         <template #after>
-          <section class="flex flex-col overflow-hidden bg-(--o2-card-background) h-full">
+          <section class="flex flex-col overflow-hidden bg-(--color-surface-base) h-full">
             <header class="shrink-0 flex items-center gap-2 h-11 px-4 bg-(--o2-card-bg) border-b border-solid border-(--o2-border-color)">
-              <h3 class="text-(length:--text-sm) font-(--font-semibold) text-(--o2-text-heading) m-0 tracking-[0.01em]">
+              <h3 class="text-(length:--text-sm) font-(--font-semibold) text-(--color-text-heading) m-0 tracking-[0.01em]">
                 {{
                   showAnalyzeResults
                     ? t("search.analyzeResults")
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="loading" class="flex-1 flex items-center justify-center p-6">
               <div class="text-center">
                 <OSpinner variant="dots" size="lg" />
-                <div class="mt-3 text-(--o2-text-secondary) text-(length:--text-sm)">
+                <div class="mt-3 text-(--color-text-secondary) text-(length:--text-sm)">
                   {{
                     isAnalyzing
                       ? t("search.runningAnalyze")
@@ -94,8 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <div class="plan-surface flex-1 flex flex-col bg-(--o2-card-bg) border border-solid border-(--o2-border-color) rounded-lg overflow-hidden">
-                <div class="px-4 py-2.5 border-b border-solid border-(--o2-border-color) bg-(--o2-card-background)">
-                  <span class="text-(length:--text-xs) font-(--font-semibold) tracking-[0.06em] uppercase text-(--o2-text-label)">{{ t("search.executionPlan") }}</span>
+                <div class="px-4 py-2.5 border-b border-solid border-(--o2-border-color) bg-(--color-surface-base)">
+                  <span class="text-(length:--text-xs) font-(--font-semibold) tracking-[0.06em] uppercase text-(--color-text-label)">{{ t("search.executionPlan") }}</span>
                 </div>
                 <div class="flex-1 overflow-y-auto py-3 px-4">
                   <QueryPlanTree
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :tree="planTree"
                     :is-analyze="true"
                   />
-                  <div v-else class="py-6 px-4 text-center text-(length:--text-sm) text-(--o2-text-muted)">
+                  <div v-else class="py-6 px-4 text-center text-(length:--text-sm) text-(--color-text-muted)">
                     {{ t("search.noAnalyzePlanFound") }}
                   </div>
                 </div>
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :tree="logicalPlanTree"
                         :is-analyze="false"
                       />
-                      <div v-else class="py-6 px-4 text-center text-(length:--text-sm) text-(--o2-text-muted)">
+                      <div v-else class="py-6 px-4 text-center text-(length:--text-sm) text-(--color-text-muted)">
                         {{ t("search.noLogicalPlan") }}
                       </div>
                     </div>
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :tree="physicalPlanTree"
                         :is-analyze="false"
                       />
-                      <div v-else class="py-6 px-4 text-center text-(length:--text-sm) text-(--o2-text-muted)">
+                      <div v-else class="py-6 px-4 text-center text-(length:--text-sm) text-(--color-text-muted)">
                         {{ t("search.noPhysicalPlan") }}
                       </div>
                     </div>

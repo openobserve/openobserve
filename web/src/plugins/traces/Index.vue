@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        so the empties don't flash in between. -->
                   <div
                     v-else-if="searchObj.loadingStream"
-                    class="card-container h-full flex flex-col items-center justify-center gap-2 text-[var(--o2-text-secondary)]"
+                    class="card-container h-full flex flex-col items-center justify-center gap-2 text-[var(--color-text-secondary)]"
                     data-test="traces-search-loading"
                   >
                     <OSpinner size="sm" />
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                             <div
                               v-if="searchObj?.data?.errorDetail"
-                              class="error-display__message pt-[1rem]! text-[var(--o2-text-2)]!"
+                              class="error-display__message pt-[1rem]! text-[var(--color-text-secondary)]!"
                             >
                               {{ searchObj.data.errorDetail }}
                             </div>

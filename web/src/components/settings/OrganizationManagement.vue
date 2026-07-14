@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="[
                 'cursor-pointer px-2 py-1 border border-gray-300',
                 extendedTrial === page
-                  ? 'bg-(--o2-primary-btn-bg) text-(--o2-primary-btn-text) border-(--o2-primary-btn-bg)'
+                  ? 'bg-(--color-button-primary) text-(--color-button-primary-foreground) border-(--color-button-primary)'
                   : 'bg-white text-gray-700 border-gray-300',
               ]"
             >

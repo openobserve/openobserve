@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-col items-center justify-center h-full gap-3 p-4"
       data-test="rum-player-traces-tab-empty"
     >
-      <OIcon name="info" size="lg" class="text-[var(--o2-text-muted)]" />
-      <p class="text-center text-[var(--o2-text-secondary)]">
+      <OIcon name="info" size="lg" class="text-[var(--color-text-muted)]" />
+      <p class="text-center text-[var(--color-text-secondary)]">
         {{ t("rum.noCorrelatedTraces") }}
       </p>
     </div>
@@ -72,37 +72,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon name="arrow-back" size="sm" />
         </OButton>
-        <code class="text-sm text-[var(--o2-text-secondary)] truncate min-w-0 flex-1">{{ shortRoute(selectedTrace.route) || selectedTrace.label }}</code>
+        <code class="text-sm text-[var(--color-text-secondary)] truncate min-w-0 flex-1">{{ shortRoute(selectedTrace.route) || selectedTrace.label }}</code>
         <div class="flex items-center gap-1.5 flex-shrink-0">
           <span
             v-if="selectedTrace.metadata?.errorCount > 0"
-            class="font-bold inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-[var(--o2-status-error-bg)]! text-[var(--o2-status-error-text)]!"
+            class="font-bold inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-[var(--color-status-error-bg)]! text-[var(--color-status-error-text)]!"
           >
             <OIcon name="error" size="xs" />
             {{ selectedTrace.metadata.errorCount }} {{ selectedTrace.metadata.errorCount === 1 ? t("rum.error") : t("rum.errors") }}
           </span>
           <button
             v-if="selectedTrace.metadata?.start_time && props.startTime > 0"
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-(--color-surface-accent) text-[var(--o2-text-body)] whitespace-nowrap cursor-pointer hover:bg-[var(--o2-border-color)]"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-(--color-surface-accent) text-[var(--color-text-body)] whitespace-nowrap cursor-pointer hover:bg-[var(--o2-border-color)]"
             :title="t('rum.seekToMoment')"
             data-test="rum-player-traces-tab-seek-btn"
             @click="seekToTrace(selectedTrace)"
           >
-            <OIcon name="play-arrow" size="xs" class="text-[var(--o2-text-secondary)]" />
+            <OIcon name="play-arrow" size="xs" class="text-[var(--color-text-secondary)]" />
             {{ traceTimeOffset(selectedTrace.metadata.start_time) }}
           </button>
           <span
             v-if="selectedTrace.metadata?.e2eDuration"
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-(--color-surface-accent) text-[var(--o2-text-body)] whitespace-nowrap"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-(--color-surface-accent) text-[var(--color-text-body)] whitespace-nowrap"
           >
-            <OIcon name="timer" size="xs" class="text-[var(--o2-text-secondary)]" />
+            <OIcon name="timer" size="xs" class="text-[var(--color-text-secondary)]" />
             {{ formatTimeWithSuffix(selectedTrace.metadata.e2eDuration * 1000) }}
           </span>
           <span
             v-if="selectedTrace.metadata?.spanCount"
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-(--color-surface-accent) text-[var(--o2-text-body)] whitespace-nowrap"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-(--color-surface-accent) text-[var(--color-text-body)] whitespace-nowrap"
           >
-            <OIcon name="lan" size="xs" class="text-[var(--o2-text-secondary)]" />
+            <OIcon name="lan" size="xs" class="text-[var(--color-text-secondary)]" />
             {{ selectedTrace.metadata.spanCount }} {{ selectedTrace.metadata.spanCount === 1 ? t("rum.span") : t("rum.spans") }}
           </span>
           <OButton

@@ -47,7 +47,7 @@
           <OFieldRow>
             <span class="field-type-container w-[0.55rem] shrink-0 flex items-center justify-center">
               <OIcon
-                class="field-expand-icon inline-flex items-center justify-center shrink-0 w-4 text-[var(--o2-text-muted)]"
+                class="field-expand-icon inline-flex items-center justify-center shrink-0 w-4 text-[var(--color-text-muted)]"
                 :name="expandedRows[row.name] ? 'expand-more' : 'chevron-right'"
                 size="sm"
               />
@@ -182,7 +182,7 @@
                   bottomProps.currentPage === page ? 'primary' : 'ghost'
                 "
                 size="icon-panel"
-                class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! text-xs! font-medium leading-none text-(--o2-text-primary)! rounded! overflow-visible!"
+                class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! text-xs! font-medium leading-none text-(--color-text-primary)! rounded! overflow-visible!"
                 @click="setPage(page)"
                 >{{ page }}</OButton
               >
@@ -740,7 +740,7 @@ const copyContentValue = (value: string) => {
   font-size: 0.75rem !important;
   font-weight: 500;
   line-height: 1;
-  color: var(--o2-text-primary) !important;
+  color: var(--color-text-primary) !important;
   border-radius: 0.25rem !important;
   overflow: visible !important;
 }
@@ -775,7 +775,7 @@ const copyContentValue = (value: string) => {
     justify-content: center;
     flex-shrink: 0;
     width: 1rem;
-    color: var(--o2-text-muted);
+    color: var(--color-text-muted);
   }
 }
 </style>

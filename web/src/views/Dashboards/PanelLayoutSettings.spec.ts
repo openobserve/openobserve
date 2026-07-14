@@ -289,7 +289,7 @@ describe("PanelLayoutSettings.vue", () => {
       expect(contentDiv.attributes("class")).toContain("p-0");
       expect(contentDiv.attributes("class")).not.toContain("bg-white");
       expect(contentDiv.attributes("class")).not.toContain(
-        "bg-(--o2-primary-background)",
+        "bg-(--color-surface-base)",
       );
     });
 
@@ -298,7 +298,7 @@ describe("PanelLayoutSettings.vue", () => {
       expect(contentDiv.exists()).toBe(true);
       expect(contentDiv.attributes("class")).toContain("p-0");
       expect(contentDiv.attributes("class")).not.toContain(
-        "bg-(--o2-primary-background)",
+        "bg-(--color-surface-base)",
       );
     });
 

@@ -2022,7 +2022,7 @@ export default defineComponent({
   z-index: 5000 !important;
   margin: 0 !important;
   padding: 0 !important;
-  background-color: var(--o2-primary-background, #ffffff) !important;
+  background-color: var(--color-surface-base, #ffffff) !important;
 }
 
 .print-mode-container {

@@ -820,7 +820,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Header -->
               <div
                 :class="[
-                  '!bg-[var(--o2-table-header-bg)] px-3 py-2 flex items-center gap-2 border-b flex-shrink-0',
+                  '!bg-[var(--color-theme-table-header-bg)] px-3 py-2 flex items-center gap-2 border-b flex-shrink-0',
                   store.state.theme === 'dark'
                     ? 'border-gray-700'
                     : 'border-gray-200'
@@ -922,7 +922,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Alert Conditions Section -->
                   <div :class="['rounded border flex flex-col border-[var(--o2-border-color)] rounded-md',]" class="overflow-hidden" style="height: 392px;">
-                    <div :class="['!bg-[var(--o2-table-header-bg)] px-2.5 py-1.5 border-b flex items-center justify-between flex-shrink-0', store.state.theme === 'dark' ? 'border-gray-700' : 'border-gray-200']">
+                    <div :class="['!bg-[var(--color-theme-table-header-bg)] px-2.5 py-1.5 border-b flex items-center justify-between flex-shrink-0', store.state.theme === 'dark' ? 'border-gray-700' : 'border-gray-200']">
                       <span :class="'text-text-secondary'" class="text-[11px] font-semibold uppercase tracking-wide">
                         {{ alerts[selectedAlertIndex]?.query_condition?.type === 'sql' ? 'SQL Query' : alerts[selectedAlertIndex]?.query_condition?.type === 'promql' ? 'PromQL Query' : 'Conditions' }}
                       </span>
@@ -966,7 +966,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="flex flex-1 flex-col items-center justify-center gap-2 h-full">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
-              :class="['w-16 h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'text-[var(--o2-warning)]' : 'text-[var(--o2-negative)]') : 'text-gray-400']" />
+              :class="['w-16 h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'text-[var(--o2-warning)]' : 'text-[var(--color-status-negative)]') : 'text-gray-400']" />
             <div class="text-xl font-semibold mt-3">
               {{ correlationError || 'No correlated logs found' }}
             </div>
@@ -1015,7 +1015,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="flex flex-1 flex-col items-center justify-center gap-2 h-full">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
-              :class="['w-16 h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'text-[var(--o2-warning)]' : 'text-[var(--o2-negative)]') : 'text-gray-400']" />
+              :class="['w-16 h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'text-[var(--o2-warning)]' : 'text-[var(--color-status-negative)]') : 'text-gray-400']" />
             <div class="text-xl font-semibold mt-3">
               {{ correlationError || 'No correlated metrics found' }}
             </div>
@@ -1073,7 +1073,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="flex flex-1 flex-col items-center justify-center gap-2 h-full">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
-              :class="['w-16 h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'text-[var(--o2-warning)]' : 'text-[var(--o2-negative)]') : 'text-gray-400']" />
+              :class="['w-16 h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'text-[var(--o2-warning)]' : 'text-[var(--color-status-negative)]') : 'text-gray-400']" />
             <div class="text-xl font-semibold mt-3">
               {{ correlationError || 'No correlated traces found' }}
             </div>

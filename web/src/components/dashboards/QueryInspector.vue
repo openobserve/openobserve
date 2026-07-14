@@ -21,7 +21,7 @@
     <!-- Body -->
       <div
         v-if="queryData.length === 0"
-        class="flex flex-col items-center justify-center h-64 text-[var(--o2-text-muted)]"
+        class="flex flex-col items-center justify-center h-64 text-[var(--color-text-muted)]"
       >
         <OIcon name="info" style="width: 48px; height: 48px;" />
         <p class="mt-2">No queries executed for this panel.</p>
@@ -35,14 +35,14 @@
         >
           <!-- Query Header -->
           <div
-            class="p-2 gap-3 bg-[var(--o2-body-primary-bg)] border-b border-[var(--o2-border-color)] flex items-start justify-start"
+            class="p-2 gap-3 bg-[var(--color-theme-body-bg-primary)] border-b border-[var(--o2-border-color)] flex items-start justify-start"
           >
             <span class="text-sm font-bold rounded-md"
                 :data-test="`query-inspector-query-name-${index}`">
               {{ query.tabName || ('Query ' + (index + 1)) }}
             </span>
             <span
-              class="bg-[var(--o2-body-primary-bg)] border border-[var(--o2-border-color)] text-[var(--o2-text-secondary)] text-[10px] font-bold px-2 py-0.5 rounded-md"
+              class="bg-[var(--color-theme-body-bg-primary)] border border-[var(--o2-border-color)] text-[var(--color-text-secondary)] text-[10px] font-bold px-2 py-0.5 rounded-md"
             >
               {{ getQueryTypeDisplay(query.queryType) }}
             </span>
@@ -67,7 +67,7 @@
               </div>
               <div class="relative group mt-1">
                 <div
-                  class="p-2 rounded-lg bg-[var(--o2-body-primary-bg)] border border-[var(--o2-border-color)] font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:rgba(128,128,128,0.2)_transparent] inspector-query-editor"
+                  class="p-2 rounded-lg bg-[var(--color-theme-body-bg-primary)] border border-[var(--o2-border-color)] font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:rgba(128,128,128,0.2)_transparent] inspector-query-editor"
                   :data-test="`query-inspector-original-query-${index}`"
                   v-html="
                     highlightSearch(
@@ -97,7 +97,7 @@
               </div>
               <div class="relative group mt-1">
                 <div
-                  class="p-2 rounded-lg bg-[var(--o2-body-primary-bg)] border border-[var(--o2-border-color)] font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:rgba(128,128,128,0.2)_transparent] inspector-query-editor"
+                  class="p-2 rounded-lg bg-[var(--color-theme-body-bg-primary)] border border-[var(--o2-border-color)] font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:rgba(128,128,128,0.2)_transparent] inspector-query-editor"
                   :data-test="`query-inspector-executed-query-${index}`"
                   v-html="
                     highlightSearch(
@@ -120,12 +120,12 @@
                   >Start Time</label
                 >
                 <div
-                  class="text-xs text-[var(--o2-text-secondary)] font-medium flex items-center gap-2"
+                  class="text-xs text-[var(--color-text-secondary)] font-medium flex items-center gap-2"
                 >
                   <OIcon
                     name="login"
                     size="xs"
-                    class="text-[var(--o2-text-muted)]"
+                    class="text-[var(--color-text-muted)]"
                   />
                   {{ formatTimestamp(query.startTime) }}
                 </div>
@@ -137,12 +137,12 @@
                   >End Time</label
                 >
                 <div
-                  class="text-xs text-[var(--o2-text-secondary)] font-medium flex items-center gap-2"
+                  class="text-xs text-[var(--color-text-secondary)] font-medium flex items-center gap-2"
                 >
                   <OIcon
                     name="logout"
                     size="xs"
-                    class="text-[var(--o2-text-muted)]"
+                    class="text-[var(--color-text-muted)]"
                   />
                   {{ formatTimestamp(query.endTime) }}
                 </div>
@@ -166,17 +166,17 @@
                       class="flex items-center gap-2 p-1 rounded-md border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] text-xs"
                     >
                       <span
-                        class="font-bold text-[var(--o2-text-primary)]"
+                        class="font-bold text-[var(--color-text-primary)]"
                         >{{ v.name }}</span
                       >
-                      <span class="text-[var(--o2-text-muted)]">:</span>
+                      <span class="text-[var(--color-text-muted)]">:</span>
                       <span
-                        class="text-[var(--o2-text-secondary)] italic"
+                        class="text-[var(--color-text-secondary)] italic"
                         >{{ v.value }}</span
                       >
                     </div>
                   </template>
-                  <span v-else class="text-xs text-[var(--o2-text-muted)]"
+                  <span v-else class="text-xs text-[var(--color-text-muted)]"
                     >-</span
                   >
                 </div>
@@ -195,17 +195,17 @@
                       class="flex items-center gap-2 p-1 rounded-md border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] text-xs"
                     >
                       <span
-                        class="font-bold text-[var(--o2-text-primary)]"
+                        class="font-bold text-[var(--color-text-primary)]"
                         >{{ v.name }}</span
                       >
-                      <span class="text-[var(--o2-text-muted)]">:</span>
+                      <span class="text-[var(--color-text-muted)]">:</span>
                       <span
-                        class="text-[var(--o2-text-secondary)] italic"
+                        class="text-[var(--color-text-secondary)] italic"
                         >{{ v.value }}</span
                       >
                     </div>
                   </template>
-                  <span v-else class="text-xs text-[var(--o2-text-muted)]"
+                  <span v-else class="text-xs text-[var(--color-text-muted)]"
                     >-</span
                   >
                 </div>
@@ -226,19 +226,19 @@
                       class="flex items-center gap-2 p-1 rounded-md border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] text-xs"
                     >
                       <span
-                        class="font-bold text-[var(--o2-text-primary)]"
+                        class="font-bold text-[var(--color-text-primary)]"
                         >{{ v.name }}</span
                       >
-                      <span class="text-[var(--o2-text-muted)]">{{
+                      <span class="text-[var(--color-text-muted)]">{{
                         v.operator
                       }}</span>
                       <span
-                        class="text-[var(--o2-text-secondary)] italic"
+                        class="text-[var(--color-text-secondary)] italic"
                         >{{ v.value }}</span
                       >
                     </div>
                   </template>
-                  <span v-else class="text-xs text-[var(--o2-text-muted)]"
+                  <span v-else class="text-xs text-[var(--color-text-muted)]"
                     >-</span
                   >
                 </div>

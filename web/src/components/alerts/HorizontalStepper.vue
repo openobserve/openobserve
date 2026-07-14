@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'bg-[#1976d2] text-white border-[#1976d2] shadow-[0_0_0_4px_rgba(25,118,210,0.1)]'
                     : isDarkMode
                       ? 'bg-[#424242] text-[#9e9e9e] border-[#616161]'
-                      : 'bg-[#f5f5f5] text-[#757575] border-[var(--o2-border)]'
+                      : 'bg-[#f5f5f5] text-[#757575] border-[var(--color-border-default)]'
             "
           >
             <OIcon
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? 'bg-[#2e7d32]'
                 : isDarkMode
                   ? 'bg-[#616161]'
-                  : 'bg-[var(--o2-border)]'
+                  : 'bg-[var(--color-border-default)]'
             "
           ></div>
         </div>
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'text-white'
                   : 'text-[#1976d2] font-bold'
                 : isDarkMode
-                  ? 'text-[var(--o2-border)]'
+                  ? 'text-[var(--color-border-default)]'
                   : 'text-[#424242]'
             "
           >{{ step.label }}</div>

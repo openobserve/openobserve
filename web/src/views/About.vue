@@ -38,8 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- One-line meta bar -->
             <div class="inline-flex items-center flex-wrap gap-2 mt-5">
               <!-- version -->
-              <span class="inline-flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap py-2 px-3.5 rounded border text-(--o2-positive) border-[color-mix(in_srgb,var(--o2-positive)_28%,transparent)] bg-[color-mix(in_srgb,var(--o2-positive)_8%,var(--o2-card-bg))]">
-                <OIcon name="check-circle" size="sm" class="text-(--o2-positive) shrink-0" />
+              <span class="inline-flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap py-2 px-3.5 rounded border text-(--color-status-positive) border-[color-mix(in_srgb,var(--color-status-positive)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-status-positive)_8%,var(--o2-card-bg))]">
+                <OIcon name="check-circle" size="sm" class="text-(--color-status-positive) shrink-0" />
                 {{ store.state.zoConfig.version }}
               </span>
               <!-- build type -->
@@ -48,20 +48,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ store.state.zoConfig.build_type }}
               </span>
               <!-- commit -->
-              <span class="inline-flex items-center gap-1.5 text-sm text-(--o2-text-heading) whitespace-nowrap py-2 px-3.5 rounded border border-[color-mix(in_srgb,var(--o2-info)_28%,transparent)] bg-[color-mix(in_srgb,var(--o2-info)_8%,var(--o2-card-bg))]">
+              <span class="inline-flex items-center gap-1.5 text-sm text-(--color-text-heading) whitespace-nowrap py-2 px-3.5 rounded border border-[color-mix(in_srgb,var(--o2-info)_28%,transparent)] bg-[color-mix(in_srgb,var(--o2-info)_8%,var(--o2-card-bg))]">
                 <OIcon name="code" size="sm" class="text-(--o2-info) shrink-0" />
                 <span class="text-xs font-semibold uppercase tracking-wide text-(--o2-info)">{{ t("about.commit_lbl") }}</span>
                 <OText variant="mono">{{ store.state.zoConfig.commit_hash }}</OText>
                 <button
                   @click="copyToClipboard(store.state.zoConfig.commit_hash)"
-                  class="inline-flex items-center justify-center p-0.5 rounded border-none bg-transparent cursor-pointer text-(--o2-text-muted) hover:text-(--o2-info) transition-colors duration-150"
+                  class="inline-flex items-center justify-center p-0.5 rounded border-none bg-transparent cursor-pointer text-(--color-text-muted) hover:text-(--o2-info) transition-colors duration-150"
                   title="Copy commit hash"
                 >
                   <OIcon name="content-copy" size="sm" />
                 </button>
               </span>
               <!-- built date -->
-              <span class="inline-flex items-center gap-1.5 text-sm text-(--o2-text-heading) whitespace-nowrap py-2 px-3.5 rounded border border-[color-mix(in_srgb,var(--o2-warning)_28%,transparent)] bg-[color-mix(in_srgb,var(--o2-warning)_8%,var(--o2-card-bg))]">
+              <span class="inline-flex items-center gap-1.5 text-sm text-(--color-text-heading) whitespace-nowrap py-2 px-3.5 rounded border border-[color-mix(in_srgb,var(--o2-warning)_28%,transparent)] bg-[color-mix(in_srgb,var(--o2-warning)_8%,var(--o2-card-bg))]">
                 <OIcon name="event" size="sm" class="text-(--o2-warning) shrink-0" />
                 <span class="text-xs font-semibold uppercase tracking-wide text-(--o2-warning)">{{ t("about.build_lbl") }}</span>
                 {{ formatDate(store.state.zoConfig.build_date) }}
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
                 <OText variant="page-title" as="h2" class="text-xl font-medium">{{ t("about.os_libraries") }}</OText>
             </div>
-            <div class="text-sm" style="color: var(--o2-text-secondary)">{{ t("about.os_libraries_msg") }}</div>
+            <div class="text-sm" style="color: var(--color-text-secondary)">{{ t("about.os_libraries_msg") }}</div>
             <div class="grid grid-cols-4 gap-2.5">
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/Cargo.toml"
@@ -90,10 +90,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="settings" size="md" class="text-(--o2-primary-color) shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
-                  <span class="text-sm font-semibold font-mono text-(--o2-text-heading) whitespace-nowrap overflow-hidden text-ellipsis">Cargo.toml</span>
-                  <span class="text-xs text-(--o2-text-muted)">Rust crates</span>
+                  <span class="text-sm font-semibold font-mono text-(--color-text-heading) whitespace-nowrap overflow-hidden text-ellipsis">Cargo.toml</span>
+                  <span class="text-xs text-(--color-text-muted)">Rust crates</span>
                 </div>
-                <OIcon name="open-in-new" size="sm" class="text-(--o2-text-muted) shrink-0" />
+                <OIcon name="open-in-new" size="sm" class="text-(--color-text-muted) shrink-0" />
               </a>
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/web/package.json"
@@ -102,10 +102,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="backpack" size="md" class="text-(--o2-primary-color) shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
-                  <span class="text-sm font-semibold font-mono text-(--o2-text-heading) whitespace-nowrap overflow-hidden text-ellipsis">package.json</span>
-                  <span class="text-xs text-(--o2-text-muted)">Node packages</span>
+                  <span class="text-sm font-semibold font-mono text-(--color-text-heading) whitespace-nowrap overflow-hidden text-ellipsis">package.json</span>
+                  <span class="text-xs text-(--color-text-muted)">Node packages</span>
                 </div>
-                <OIcon name="open-in-new" size="sm" class="text-(--o2-text-muted) shrink-0" />
+                <OIcon name="open-in-new" size="sm" class="text-(--color-text-muted) shrink-0" />
               </a>
               <a
                 href="https://npmjs.com"
@@ -114,10 +114,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="javascript" size="md" class="text-(--o2-primary-color) shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
-                  <span class="text-sm font-semibold font-mono text-(--o2-text-heading) whitespace-nowrap overflow-hidden text-ellipsis">npmjs.com</span>
-                  <span class="text-xs text-(--o2-text-muted)">JS registry</span>
+                  <span class="text-sm font-semibold font-mono text-(--color-text-heading) whitespace-nowrap overflow-hidden text-ellipsis">npmjs.com</span>
+                  <span class="text-xs text-(--color-text-muted)">JS registry</span>
                 </div>
-                <OIcon name="open-in-new" size="sm" class="text-(--o2-text-muted) shrink-0" />
+                <OIcon name="open-in-new" size="sm" class="text-(--color-text-muted) shrink-0" />
               </a>
               <a
                 href="https://crates.io"
@@ -126,10 +126,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="inventory-2" size="md" class="text-(--o2-primary-color) shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
-                  <span class="text-sm font-semibold font-mono text-(--o2-text-heading) whitespace-nowrap overflow-hidden text-ellipsis">crates.io</span>
-                  <span class="text-xs text-(--o2-text-muted)">Rust registry</span>
+                  <span class="text-sm font-semibold font-mono text-(--color-text-heading) whitespace-nowrap overflow-hidden text-ellipsis">crates.io</span>
+                  <span class="text-xs text-(--color-text-muted)">Rust registry</span>
                 </div>
-                <OIcon name="open-in-new" size="sm" class="text-(--o2-text-muted) shrink-0" />
+                <OIcon name="open-in-new" size="sm" class="text-(--color-text-muted) shrink-0" />
               </a>
             </div>
           </div>
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/LICENSE"
                 target="_blank"
-                class="text-(--o2-text-link) no-underline font-medium border-b border-[color-mix(in_srgb,var(--o2-text-link)_35%,transparent)] transition-colors duration-200 hover:border-(--o2-text-link)"
+                class="text-(--color-text-link) no-underline font-medium border-b border-[color-mix(in_srgb,var(--color-text-link)_35%,transparent)] transition-colors duration-200 hover:border-(--color-text-link)"
               >GNU Affero General Public License (AGPL)</a>.
             </OText>
             <OText v-if="store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false'" variant="body" as="div" class="leading-relaxed">
@@ -212,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div v-if="loadingLicense" class="text-center py-8">
             <OSpinner size="md" />
-            <div class="mt-3 text-sm text-(--o2-text-muted)">{{ t("about.loading_license_info") }}</div>
+            <div class="mt-3 text-sm text-(--color-text-muted)">{{ t("about.loading_license_info") }}</div>
           </div>
 
           <div v-else-if="!licenseData || !licenseData.license" class="py-2">
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <p class="text-sm mb-2">{{ t("about.no_license_installed_msg") }}</p>
               <div v-if="licenseData && licenseData.installation_id" class="text-xs flex items-center flex-wrap gap-1">
                 {{ t("about.installation_id_lbl") }}:
-                <code class="px-2 py-0.5 rounded font-mono border border-solid border-(--o2-border-color) bg-(--o2-code-bg) select-all">
+                <code class="px-2 py-0.5 rounded font-mono border border-solid border-(--o2-border-color) bg-(--color-code-bg) select-all">
                   {{ licenseData.installation_id }}
                 </code>
               </div>
@@ -234,13 +234,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <table class="w-full border-collapse">
                 <tbody>
                   <tr class="border-b border-(--o2-border-color) last:border-b-0">
-                    <td class="w-2/5 font-semibold text-sm text-(--o2-text-secondary) py-2.5 px-3.5 border-r border-(--o2-border-color) whitespace-nowrap bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.lincese_id_lbl") }}</td>
-                    <td class="text-sm text-(--o2-text-body) py-2.5 px-3.5 font-mono">
+                    <td class="w-2/5 font-semibold text-sm text-(--color-text-secondary) py-2.5 px-3.5 border-r border-(--o2-border-color) whitespace-nowrap bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.lincese_id_lbl") }}</td>
+                    <td class="text-sm text-(--color-text-body) py-2.5 px-3.5 font-mono">
                       <div class="flex items-center gap-1.5">
                         <span>{{ licenseData.license.license_id }}</span>
                         <button
                           @click="copyToClipboard(licenseData.license.license_id)"
-                          class="inline-flex items-center justify-center p-0.5 rounded border-none bg-transparent cursor-pointer text-(--o2-text-muted) hover:text-(--o2-primary-color) transition-colors duration-150"
+                          class="inline-flex items-center justify-center p-0.5 rounded border-none bg-transparent cursor-pointer text-(--color-text-muted) hover:text-(--o2-primary-color) transition-colors duration-150"
                           title="Copy license ID"
                         >
                           <OIcon name="content-copy" size="sm" />
@@ -249,11 +249,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </td>
                   </tr>
                   <tr class="border-b border-(--o2-border-color) last:border-b-0">
-                    <td class="w-2/5 font-semibold text-sm text-(--o2-text-secondary) py-2.5 px-3.5 border-r border-(--o2-border-color) whitespace-nowrap bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.status_lbl") }}</td>
-                    <td class="text-sm text-(--o2-text-body) py-2.5 px-3.5">
+                    <td class="w-2/5 font-semibold text-sm text-(--color-text-secondary) py-2.5 px-3.5 border-r border-(--o2-border-color) whitespace-nowrap bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.status_lbl") }}</td>
+                    <td class="text-sm text-(--color-text-body) py-2.5 px-3.5">
                       <span
                         class="inline-block w-2 h-2 rounded-full mr-1.5 align-middle"
-                        :class="licenseData?.expired ? 'bg-(--o2-negative)' : 'bg-(--o2-positive)'"
+                        :class="licenseData?.expired ? 'bg-(--color-status-negative)' : 'bg-(--color-status-positive)'"
                       />
                       <span :class="licenseData?.expired ? 'text-red-500' : 'text-green-600'">
                         {{ licenseData?.expired ? t("about.expired_lbl") : t("about.active_lbl") }}
@@ -261,16 +261,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </td>
                   </tr>
                   <tr class="border-b border-(--o2-border-color) last:border-b-0">
-                    <td class="w-2/5 font-semibold text-sm text-(--o2-text-secondary) py-2.5 px-3.5 border-r border-(--o2-border-color) whitespace-nowrap bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">Edition</td>
-                    <td class="text-sm text-(--o2-text-body) py-2.5 px-3.5">{{ t("about.value_license_enterprise") }}</td>
+                    <td class="w-2/5 font-semibold text-sm text-(--color-text-secondary) py-2.5 px-3.5 border-r border-(--o2-border-color) whitespace-nowrap bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">Edition</td>
+                    <td class="text-sm text-(--color-text-body) py-2.5 px-3.5">{{ t("about.value_license_enterprise") }}</td>
                   </tr>
                   <tr class="border-b border-(--o2-border-color) last:border-b-0">
-                    <td class="w-2/5 font-semibold text-sm text-(--o2-text-secondary) py-2.5 px-3.5 border-r border-(--o2-border-color) whitespace-nowrap bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.create_at_lbl") }}</td>
-                    <td class="text-sm text-(--o2-text-body) py-2.5 px-3.5">{{ formatLicenseDate(licenseData.license.created_at) }}</td>
+                    <td class="w-2/5 font-semibold text-sm text-(--color-text-secondary) py-2.5 px-3.5 border-r border-(--o2-border-color) whitespace-nowrap bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.create_at_lbl") }}</td>
+                    <td class="text-sm text-(--color-text-body) py-2.5 px-3.5">{{ formatLicenseDate(licenseData.license.created_at) }}</td>
                   </tr>
                   <tr class="border-b border-(--o2-border-color) last:border-b-0">
-                    <td class="w-2/5 font-semibold text-sm text-(--o2-text-secondary) py-2.5 px-3.5 border-r border-(--o2-border-color) whitespace-nowrap bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.expires_at_lbl") }}</td>
-                    <td class="text-sm text-(--o2-text-body) py-2.5 px-3.5">{{ formatLicenseDate(licenseData.license.expires_at) }}</td>
+                    <td class="w-2/5 font-semibold text-sm text-(--color-text-secondary) py-2.5 px-3.5 border-r border-(--o2-border-color) whitespace-nowrap bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.expires_at_lbl") }}</td>
+                    <td class="text-sm text-(--color-text-body) py-2.5 px-3.5">{{ formatLicenseDate(licenseData.license.expires_at) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -278,32 +278,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Ingestion usage panel -->
             <div class="bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))] border border-(--o2-border-color) rounded-lg p-5">
-              <p class="text-sm font-semibold m-0 mb-1" style="color: var(--o2-text-heading)">{{ t("about.usage_limits") }}</p>
-              <p class="text-xs m-0 mb-4" style="color: var(--o2-text-muted)">
+              <p class="text-sm font-semibold m-0 mb-1" style="color: var(--color-text-heading)">{{ t("about.usage_limits") }}</p>
+              <p class="text-xs m-0 mb-4" style="color: var(--color-text-muted)">
                 {{ licenseData.license.limits?.Ingestion?.typ || 'PerDayCount' }}
                 · limit {{ licenseData.license.limits?.Ingestion?.value || 50 }} GB / day
               </p>
               <div v-if="licenseData.ingestion_used !== undefined">
                 <div class="flex items-baseline gap-2 mb-3">
                   <span
-                    class="text-4xl font-bold text-(--o2-text-heading) leading-none"
+                    class="text-4xl font-bold text-(--color-text-heading) leading-none"
                     :class="licenseData.ingestion_used > 90 ? 'text-red-500' : licenseData.ingestion_used > 70 ? 'text-orange-500' : ''"
                   >{{ licenseData.ingestion_used.toFixed(2) }}%</span>
-                  <span class="text-xs text-(--o2-text-secondary)">of daily limit used today</span>
+                  <span class="text-xs text-(--color-text-secondary)">of daily limit used today</span>
                 </div>
                 <div class="h-1.5 rounded-full bg-(--o2-border-color) overflow-hidden mb-1.5">
                   <div
                     class="h-full rounded-full transition-[width] duration-[400ms] min-w-1"
-                    :class="licenseData.ingestion_used > 90 ? 'bg-(--o2-negative)' : licenseData.ingestion_used > 70 ? 'bg-(--o2-warning)' : 'bg-(--o2-primary-color)'"
+                    :class="licenseData.ingestion_used > 90 ? 'bg-(--color-status-negative)' : licenseData.ingestion_used > 70 ? 'bg-(--o2-warning)' : 'bg-(--o2-primary-color)'"
                     :style="{ width: Math.min(licenseData.ingestion_used, 100) + '%' }"
                   />
                 </div>
-                <div class="flex justify-between text-xs text-(--o2-text-muted) mb-3.5">
+                <div class="flex justify-between text-xs text-(--color-text-muted) mb-3.5">
                   <span>{{ ((licenseData.ingestion_used / 100) * (licenseData.license.limits?.Ingestion?.value || 50)).toFixed(0) }} GB today</span>
                   <span>{{ licenseData.license.limits?.Ingestion?.value || 50 }} GB / day</span>
                 </div>
               </div>
-              <div class="flex items-start gap-1.5 text-xs text-(--o2-positive) bg-[color-mix(in_srgb,var(--o2-positive)_8%,var(--o2-card-bg))] border border-[color-mix(in_srgb,var(--o2-positive)_22%,transparent)] rounded py-2 px-3">
+              <div class="flex items-start gap-1.5 text-xs text-(--color-status-positive) bg-[color-mix(in_srgb,var(--color-status-positive)_8%,var(--o2-card-bg))] border border-[color-mix(in_srgb,var(--color-status-positive)_22%,transparent)] rounded py-2 px-3">
                 <OIcon name="check-circle" size="sm" class="shrink-0 mt-0.5" />
                 {{ t("about.feature_comparision_plan_detail") }}
               </div>

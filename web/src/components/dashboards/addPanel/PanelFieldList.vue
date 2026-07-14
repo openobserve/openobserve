@@ -79,7 +79,7 @@
       <!-- Group header -->
       <template #group-header="{ row }">
         <div
-          class="h-7! w-full flex justify-between items-center rounded font-semibold pl-2 pr-1 text-xs cursor-default select-none bg-(--o2-section-header-bg) text-(--o2-text-secondary)"
+          class="h-7! w-full flex justify-between items-center rounded font-semibold pl-2 pr-1 text-xs cursor-default select-none bg-(--o2-section-header-bg) text-(--color-text-secondary)"
           :title="row.groupName"
         >
           <div class="flex-1 min-w-0">{{ row.groupName }}</div>

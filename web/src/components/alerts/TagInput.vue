@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`tag-chip-${index}`"
           type="selectionChip"
           class="tag-chip m-0! shrink-0 grow-0 basis-auto"
-          style="background-color: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%)"
+          style="background-color: color-mix(in srgb, var(--color-button-primary) 20%, white 10%)"
         >
           {{ tag }}
           <template #trailing>
@@ -148,6 +148,6 @@ const handleBackspace = () => {
 }
 
 .tag-input::placeholder {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary, var(--color-text-secondary));
 }
 </style>

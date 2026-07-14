@@ -154,11 +154,11 @@ export default defineComponent({
 
 .functions-tabs .o-tabs--vertical .o-tab--active {
   color: var(--o2-tab-text-color);
-  background-color: var(--o2-tab-bg);
+  background-color: var(--color-theme-tab-bg);
 }
 
 .o-splitter__before {
-  border-right: 1px solid var(--o2-border);
+  border-right: 1px solid var(--color-border-default);
 }
 
 .dark-mode .o-splitter__before {

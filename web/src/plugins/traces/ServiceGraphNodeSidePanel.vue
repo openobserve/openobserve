@@ -70,12 +70,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="chip in filterChips"
               :key="chip.key"
-              class="inline-flex items-center gap-1 rounded border border-[var(--o2-border)] px-2 py-[0.325rem] text-[0.7rem] leading-none text-[var(--o2-text-primary)]"
+              class="inline-flex items-center gap-1 rounded border border-[var(--color-border-default)] px-2 py-[0.325rem] text-[0.7rem] leading-none text-[var(--color-text-primary)]"
               :data-test="`service-graph-filter-chip-${chip.key}`"
               :class="
                 chip.type === 'duration'
                   ? 'text-[var(--o2-latency-p95)]'
-                  : 'text-[var(--o2-status-error-text)]'
+                  : 'text-[var(--color-status-error-text)]'
               "
             >
               <!-- Duration chip icon -->
@@ -90,13 +90,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else-if="chip.type === 'error'"
                 name="warning"
                 size="xs"
-                class="text-[var(--o2-status-error-text)]"
+                class="text-[var(--color-status-error-text)]"
               />
               <span
                 :class="
                   chip.type === 'duration'
                     ? 'text-[var(--o2-latency-p95)]'
-                    : 'text-[var(--o2-status-error-text)]'
+                    : 'text-[var(--color-status-error-text)]'
                 "
                 >{{ chip.label }}</span
               >
@@ -244,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="recentOperations.length === 0 && !loadingOperations"
                 class="text-xs italic py-2 text-center"
-                style="color: var(--o2-text-secondary)"
+                style="color: var(--color-text-secondary)"
               >
                 No operations found
               </div>
@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #empty>
                       <div
                         class="text-xs italic py-2 text-center"
-                        style="color: var(--o2-text-secondary)"
+                        style="color: var(--color-text-secondary)"
                       >
                         No operations found
                       </div>
@@ -351,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="!resourceTabData[cfg.id]?.length && !resourceTabLoading[cfg.id]"
                 class="text-xs italic py-2 text-center"
-                style="color: var(--o2-text-secondary)"
+                style="color: var(--color-text-secondary)"
               >
                 No {{ cfg.label.toLowerCase() }} data found
               </div>
@@ -439,7 +439,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #empty>
                     <div
                       class="text-xs italic py-2 text-center"
-                      style="color: var(--o2-text-secondary)"
+                      style="color: var(--color-text-secondary)"
                     >
                       No {{ cfg.label.toLowerCase() }} data found
                     </div>
@@ -459,7 +459,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="metricsCorrelationLoading"
                 class="flex items-center gap-2 py-3 text-sm"
-                style="color: var(--o2-text-secondary)"
+                style="color: var(--color-text-secondary)"
                 data-test="service-graph-side-panel-metrics-loading"
               >
                 <OSpinner size="xs" />
@@ -470,7 +470,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-else-if="metricsCorrelationError"
                 class="flex flex-col items-center gap-3 py-6 text-center text-sm"
-                style="color: var(--o2-text-secondary)"
+                style="color: var(--color-text-secondary)"
                 data-test="service-graph-side-panel-metrics-error"
               >
                 <span>{{ metricsCorrelationError }}</span>
@@ -513,7 +513,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-else-if="metricsCorrelationLoaded"
                 class="text-xs italic py-2 text-center"
-                style="color: var(--o2-text-secondary)"
+                style="color: var(--color-text-secondary)"
                 data-test="service-graph-side-panel-metrics-empty"
               >
                 No metrics available for this service.
@@ -2477,7 +2477,7 @@ export default defineComponent({
 }
 
 .body--light .panel-content::-webkit-scrollbar-thumb {
-  background: var(--o2-border);
+  background: var(--color-border-default);
 }
 
 .body--light .panel-content::-webkit-scrollbar-thumb:hover {
