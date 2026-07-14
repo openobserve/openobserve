@@ -436,6 +436,11 @@ impl Writer {
 
     fn preprocess_batch(&self, mut entries: Vec<Entry>) -> Result<crate::ProcessedBatch> {
         let _start_preprocess_batch = Instant::now();
+        // data_size == 0 is treated as an empty entry downstream
+        for entry in entries.iter_mut() {
+            entry.normalize_data_size();
+        }
+
         // Bulk convert to Arrow RecordBatch
         let batch_entries = entries
             .iter()
@@ -452,16 +457,13 @@ impl Writer {
             .map(|(entry, batch)| entry.into_bytes_arrow(&batch.data))
             .collect::<Result<Vec<_>>>()?;
 
-        // Calculate total sizes for rotation check
-        let (entries_json_size, entries_arrow_size) = batch_entries
+        // Calculate total sizes for rotation check: the WAL grows by the
+        // serialized bytes, the memtable by the Arrow in-memory size
+        let entries_wal_size = bytes_entries.iter().map(Vec::len).sum();
+        let entries_arrow_size = batch_entries
             .iter()
-            .map(|entry| (entry.data_json_size, entry.data_arrow_size))
-            .fold(
-                (0, 0),
-                |(acc_json_size, acc_arrow_size), (json_size, arrow_size)| {
-                    (acc_json_size + json_size, acc_arrow_size + arrow_size)
-                },
-            );
+            .map(|entry| entry.data_arrow_size)
+            .sum();
 
         // Move entries into ProcessedBatch
         // Clear the heavy data field after conversion to avoid memory duplication
@@ -478,7 +480,7 @@ impl Writer {
             entries,
             bytes_entries,
             batch_entries,
-            entries_json_size,
+            entries_wal_size,
             entries_arrow_size,
         })
     }
@@ -489,7 +491,7 @@ impl Writer {
         }
         let _start_consume_processed = Instant::now();
         // Check rotation
-        self.rotate(batch.entries_json_size, batch.entries_arrow_size)
+        self.rotate(batch.entries_wal_size, batch.entries_arrow_size)
             .await?;
 
         // Write into WAL - pure IO, no CPU-intensive processing
@@ -522,7 +524,7 @@ impl Writer {
             .observe(mem_lock_time);
         let _start_mem_processed = Instant::now();
         for (entry, batch_entry) in batch.entries.into_iter().zip(batch.batch_entries) {
-            if entry.data_size == 0 {
+            if batch_entry.data.num_rows() == 0 {
                 continue;
             }
             mem.write(entry.schema.clone().unwrap(), entry, batch_entry)?;

@@ -203,6 +203,19 @@ impl Entry {
         })
     }
 
+    /// The legacy into_bytes() reset data_size to the serialized JSON length,
+    /// so callers could leave it 0. Downstream treats data_size == 0 as an
+    /// empty entry, so estimate it from the data when unset.
+    pub fn normalize_data_size(&mut self) {
+        if self.data_size == 0 && !self.data.is_empty() {
+            self.data_size = self
+                .data
+                .iter()
+                .map(|v| config::utils::json::estimate_json_bytes(v))
+                .sum();
+        }
+    }
+
     pub fn into_batch(
         &self,
         stream_type: Arc<str>,
@@ -473,6 +486,32 @@ mod tests {
         assert_eq!(decoded.stream.as_ref(), "日志流");
         assert_eq!(decoded.partition_key.as_ref(), "2024/01/01/00/city=北京");
         assert_eq!(decoded.batch.expect("batch"), batch);
+    }
+
+    #[test]
+    fn test_normalize_data_size_sets_estimate_when_zero() {
+        let mut entry = make_entry("org", "stream", "key", "part");
+        assert_eq!(entry.data_size, 0);
+        entry.normalize_data_size();
+        // non-empty data must never keep data_size == 0, otherwise the entry
+        // is treated as empty and skipped by the memtable write
+        assert!(entry.data_size > 0);
+    }
+
+    #[test]
+    fn test_normalize_data_size_keeps_caller_value() {
+        let mut entry = make_entry("org", "stream", "key", "part");
+        entry.data_size = 42;
+        entry.normalize_data_size();
+        assert_eq!(entry.data_size, 42);
+    }
+
+    #[test]
+    fn test_normalize_data_size_empty_data_stays_zero() {
+        let mut entry = make_entry("org", "stream", "key", "part");
+        entry.data.clear();
+        entry.normalize_data_size();
+        assert_eq!(entry.data_size, 0);
     }
 
     #[test]
