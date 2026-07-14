@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 :name="serviceNameDetected ? 'check-circle' : 'warning'"
                 size="sm"
-                :class="serviceNameDetected ? 'text-[var(--color-status-positive)]' : 'text-amber-500'"
+                :class="serviceNameDetected ? 'text-status-positive' : 'text-amber-500'"
               />
               <div class="flex-1 min-w-0 text-[13px] leading-tight">
                 <template v-if="serviceNameDetected">

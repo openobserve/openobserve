@@ -4243,3 +4243,81 @@ button.date-time-button {
     display: none !important;
   }
 }
+
+/* ── Register component/domain tokens used in class utilities ──
+   These tokens were previously only reachable via arbitrary class values
+   (e.g. a bracketed bg-[var()] expression); registering them here generates
+   real Tailwind utilities (bg-card-glass-bg, text-status-error-text, …) so
+   component classes no longer need arbitrary color values. */
+@theme inline {
+  --color-banner-default-bg: var(--color-banner-default-bg);
+  --color-banner-default-text: var(--color-banner-default-text);
+  --color-banner-error-bg: var(--color-banner-error-bg);
+  --color-banner-error-soft-bg: var(--color-banner-error-soft-bg);
+  --color-banner-error-soft-border: var(--color-banner-error-soft-border);
+  --color-banner-error-soft-text: var(--color-banner-error-soft-text);
+  --color-banner-error-text: var(--color-banner-error-text);
+  --color-banner-info-bg: var(--color-banner-info-bg);
+  --color-banner-info-border: var(--color-banner-info-border);
+  --color-banner-info-text: var(--color-banner-info-text);
+  --color-banner-success-bg: var(--color-banner-success-bg);
+  --color-banner-success-border: var(--color-banner-success-border);
+  --color-banner-success-text: var(--color-banner-success-text);
+  --color-banner-warning-bg: var(--color-banner-warning-bg);
+  --color-banner-warning-border: var(--color-banner-warning-border);
+  --color-banner-warning-text: var(--color-banner-warning-text);
+  --color-bg-gray: var(--color-bg-gray);
+  --color-cancel-query-bg: var(--color-cancel-query-bg);
+  --color-card-glass-bg: var(--color-card-glass-bg);
+  --color-card-glass-border: var(--color-card-glass-border);
+  --color-card-glass-solid: var(--color-card-glass-solid);
+  --color-error-300: var(--color-error-300);
+  --color-error-tag-bg: var(--color-error-tag-bg);
+  --color-error-tag-text: var(--color-error-tag-text);
+  --color-gray: var(--color-gray);
+  --color-grey-300: var(--color-grey-300);
+  --color-grey-500: var(--color-grey-500);
+  --color-grey-600: var(--color-grey-600);
+  --color-hover-gray: var(--color-hover-gray);
+  --color-icon-color: var(--color-icon-color);
+  --color-icon-color-dark: var(--color-icon-color-dark);
+  --color-indigo-700: var(--color-indigo-700);
+  --color-info: var(--color-info);
+  --color-info-50: var(--color-info-50);
+  --color-info-700: var(--color-info-700);
+  --color-json-key: var(--color-json-key);
+  --color-latency-p95: var(--color-latency-p95);
+  --color-log-table-row-bg: var(--color-log-table-row-bg);
+  --color-log-table-row-border: var(--color-log-table-row-border);
+  --color-purple-700: var(--color-purple-700);
+  --color-section-header-bg: var(--color-section-header-bg);
+  --color-service-health-critical: var(--color-service-health-critical);
+  --color-service-health-degraded: var(--color-service-health-degraded);
+  --color-service-health-healthy: var(--color-service-health-healthy);
+  --color-service-health-warning: var(--color-service-health-warning);
+  --color-severity-error-color: var(--color-severity-error-color);
+  --color-severity-warning-color: var(--color-severity-warning-color);
+  --color-status-error-bg: var(--color-status-error-bg);
+  --color-status-error-text: var(--color-status-error-text);
+  --color-status-info-text: var(--color-status-info-text);
+  --color-status-negative: var(--color-status-negative);
+  --color-status-neutral-text: var(--color-status-neutral-text);
+  --color-status-positive: var(--color-status-positive);
+  --color-status-success-bg: var(--color-status-success-bg);
+  --color-status-success-text: var(--color-status-success-text);
+  --color-status-warning-bg: var(--color-status-warning-bg);
+  --color-status-warning-text: var(--color-status-warning-text);
+  --color-sticky-col-header-bg: var(--color-sticky-col-header-bg);
+  --color-success-500: var(--color-success-500);
+  --color-success-600: var(--color-success-600);
+  --color-success-700: var(--color-success-700);
+  --color-tab-text-color: var(--color-tab-text-color);
+  --color-theme-accent: var(--color-theme-accent);
+  --color-theme-body-bg-primary: var(--color-theme-body-bg-primary);
+  --color-theme-tab-bg: var(--color-theme-tab-bg);
+  --color-warning: var(--color-warning);
+  --color-wildcard-bar-blue: var(--color-wildcard-bar-blue);
+  --color-wildcard-bar-green: var(--color-wildcard-bar-green);
+  --color-wildcard-bar-orange: var(--color-wildcard-bar-orange);
+  --color-wildcard-bar-purple: var(--color-wildcard-bar-purple);
+}

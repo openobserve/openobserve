@@ -362,8 +362,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-sm font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : (t('alerts.preview') || 'Preview') }}</span>
             <template v-if="!isAnomalyMode && activeEvaluationStatus">
               <div class="w-px h-4 bg-border-default" />
-              <OIcon :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" :class="activeEvaluationStatus.wouldTrigger ? 'text-[var(--color-status-positive)]' : 'text-[var(--color-gray)]'" size="sm" />
-              <span class="text-xs font-semibold" :class="activeEvaluationStatus.wouldTrigger ? 'text-[var(--color-status-positive)]' : 'text-[var(--color-gray)]'">
+              <OIcon :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" :class="activeEvaluationStatus.wouldTrigger ? 'text-status-positive' : 'text-gray'" size="sm" />
+              <span class="text-xs font-semibold" :class="activeEvaluationStatus.wouldTrigger ? 'text-status-positive' : 'text-gray'">
                 {{ activeEvaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
               </span>
               <span class="text-xs opacity-60">{{ activeEvaluationStatus.reason }}</span>

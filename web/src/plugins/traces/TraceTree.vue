@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="(spans as any[])[virtualRow.index].hasChildSpans"
-                  class="span-count-box min-w-5 h-5 py-0 px-1 rounded-full border flex items-center justify-center text-[0.7rem] font-semibold mr-1 transition-colors duration-200 cursor-pointer border-(--color-card-glass-border)! relative"
+                  class="span-count-box min-w-5 h-5 py-0 px-1 rounded-full border flex items-center justify-center text-[0.7rem] font-semibold mr-1 transition-colors duration-200 cursor-pointer border-card-glass-border! relative"
                   :style="{
                     color: (spans as any[])[virtualRow.index].style.color,
                   }"
@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'ERROR'
                         "
                         name="error" size="sm"
-                        class="text-[var(--color-status-error-text)]! mr-1"
+                        class="text-status-error-text! mr-1"
                         title="Error Span"
                         :data-test="`trace-tree-span-error-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- LLM Metrics -->
                     <div
                       v-if="isLLMTrace((spans as any[])[virtualRow.index])"
-                      class="flex items-center text-xs text-[var(--color-status-error-text)]! mt-[-0.125rem] mb-[0.125rem] leading-none"
+                      class="flex items-center text-xs text-status-error-text! mt-[-0.125rem] mb-[0.125rem] leading-none"
                     >
                       <span
                         v-if="

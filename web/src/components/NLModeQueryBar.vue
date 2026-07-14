@@ -101,7 +101,7 @@
         <!-- AI Input Bar (shown in NL Mode) -->
         <div
           v-if="isAIMode"
-          class="p-3 bg-[linear-gradient(135deg,rgba(139,92,246,0.05)_0%,rgba(236,72,153,0.05)_100%)] border-b border-(--color-card-glass-border)"
+          class="p-3 bg-[linear-gradient(135deg,rgba(139,92,246,0.05)_0%,rgba(236,72,153,0.05)_100%)] border-b border-card-glass-border"
         >
           <!-- Show streaming status with spinner -->
           <div v-if="isGenerating" class="ai-bar-streaming flex items-center gap-2 bg-white rounded-lg py-2 px-3 text-(--q-primary)">

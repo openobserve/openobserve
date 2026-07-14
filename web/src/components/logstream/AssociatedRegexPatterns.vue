@@ -71,7 +71,7 @@
                     :key="row.pattern_id"
                     :data-test="`associated-regex-patterns-applied-patterns-table-row-${row.pattern_id}`"
                     class="cursor-pointer flex justify-between items-center px-2 py-2.5 border-b text-[13px] font-[600]"
-                    :class="checkCurrentUserClickedPattern(row.pattern_name) ? 'text-[var(--color-tab-text-color)] bg-[var(--color-theme-tab-bg)]' : ''"
+                    :class="checkCurrentUserClickedPattern(row.pattern_name) ? 'text-tab-text-color bg-theme-tab-bg' : ''"
                     @click="handlePatternClick(row)"
                   >
                     <span class="regex-pattern-name whitespace-nowrap overflow-hidden max-w-[10vw] truncate normal-case!">{{ row.pattern_name }}</span>
@@ -94,7 +94,7 @@
                     :key="row.pattern_id"
                     :data-test="`associated-regex-patterns-all-patterns-table-row-${row.pattern_id}`"
                     class="cursor-pointer flex justify-between items-center px-2 py-2.5 border-b text-[13px] font-[600]"
-                    :class="checkCurrentUserClickedPattern(row.pattern_name) ? 'text-[var(--color-tab-text-color)] bg-[var(--color-theme-tab-bg)]' : ''"
+                    :class="checkCurrentUserClickedPattern(row.pattern_name) ? 'text-tab-text-color bg-theme-tab-bg' : ''"
                     @click="handlePatternClick(row)"
                   >
                     <span class="regex-pattern-name whitespace-nowrap overflow-hidden max-w-[10vw] truncate normal-case!">{{ row.pattern_name }}</span>

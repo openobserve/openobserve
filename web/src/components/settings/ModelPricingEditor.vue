@@ -52,8 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div style="max-width: 760px" class="flex flex-col gap-6">
         <!-- ── Model Details Card ── -->
-        <div class="border border-(--color-card-glass-border) rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
-          <div class="flex flex-row items-center justify-between gap-3 py-[10px] px-4 bg-[rgba(0,0,0,0.025)] border-b border-(--color-card-glass-border) rounded-t-[10px] dark:bg-[rgba(255,255,255,0.04)]">
+        <div class="border border-card-glass-border rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+          <div class="flex flex-row items-center justify-between gap-3 py-[10px] px-4 bg-[rgba(0,0,0,0.025)] border-b border-card-glass-border rounded-t-[10px] dark:bg-[rgba(255,255,255,0.04)]">
             <div>
               <div class="form-card-title text-[13px] font-semibold">
                 {{ t("modelPricing.modelDetails") }}
@@ -144,15 +144,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('modelPricing.patternExamplesTitle')"
           :sub-title="t('modelPricing.patternExamplesDesc')"
         >
-          <div class="examples-table border border-(--color-card-glass-border) rounded-lg overflow-hidden">
-            <div class="grid grid-cols-[180px_1fr_auto] gap-3 py-[6px] px-3 bg-[rgba(0,0,0,0.03)] border-b border-(--color-card-glass-border) text-[10px] font-bold uppercase tracking-[0.06em] opacity-45 dark:bg-[rgba(255,255,255,0.05)]">
+          <div class="examples-table border border-card-glass-border rounded-lg overflow-hidden">
+            <div class="grid grid-cols-[180px_1fr_auto] gap-3 py-[6px] px-3 bg-[rgba(0,0,0,0.03)] border-b border-card-glass-border text-[10px] font-bold uppercase tracking-[0.06em] opacity-45 dark:bg-[rgba(255,255,255,0.05)]">
               <span>{{ t("modelPricing.patternExamplesModelCol") }}</span>
               <span>{{ t("modelPricing.patternExamplesPatternCol") }}</span>
             </div>
             <div
               v-for="ex in patternExamples"
               :key="ex.name"
-              class="examples-table-row grid grid-cols-[180px_1fr_auto] gap-3 items-center py-2 px-3 border-b border-(--color-card-glass-border) text-xs"
+              class="examples-table-row grid grid-cols-[180px_1fr_auto] gap-3 items-center py-2 px-3 border-b border-card-glass-border text-xs"
             >
               <span class="examples-model-name font-medium">{{ ex.name }}</span>
               <code class="font-mono text-[11px] bg-[rgba(0,0,0,0.04)] py-px px-[6px] rounded break-all dark:bg-[rgba(255,255,255,0.08)]">{{ ex.match_pattern }}</code>
@@ -190,8 +190,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODialog>
 
         <!-- ── Pricing Tiers ── -->
-        <div class="border border-(--color-card-glass-border) rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
-          <div class="flex flex-row items-center justify-between gap-3 py-[10px] px-4 bg-[rgba(0,0,0,0.025)] border-b border-(--color-card-glass-border) rounded-t-[10px] dark:bg-[rgba(255,255,255,0.04)]">
+        <div class="border border-card-glass-border rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+          <div class="flex flex-row items-center justify-between gap-3 py-[10px] px-4 bg-[rgba(0,0,0,0.025)] border-b border-card-glass-border rounded-t-[10px] dark:bg-[rgba(255,255,255,0.04)]">
             <div>
               <div class="form-card-title text-[13px] font-semibold">
                 {{ t("modelPricing.pricingTiers") }}
@@ -206,10 +206,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(tier, idx) in formTiers"
               :key="idx"
-              class="border border-(--color-card-glass-border) rounded-[10px] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_4px_rgba(0,0,0,0.3)]"
+              class="border border-card-glass-border rounded-[10px] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_4px_rgba(0,0,0,0.3)]"
             >
               <!-- Tier Header -->
-              <div class="flex items-center justify-between gap-2 py-2 px-4 bg-[rgba(0,0,0,0.025)] border-b border-(--color-card-glass-border) dark:bg-[rgba(255,255,255,0.04)]">
+              <div class="flex items-center justify-between gap-2 py-2 px-4 bg-[rgba(0,0,0,0.025)] border-b border-card-glass-border dark:bg-[rgba(255,255,255,0.04)]">
                 <div class="flex items-center gap-2">
                   <span class="tier-name-label text-xs font-medium opacity-50 whitespace-nowrap shrink-0">{{
                     t("modelPricing.tierName")
@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Condition row (non-default tiers only) -->
                 <div
                   v-if="idx > 0 && tier.condition"
-                  class="py-3 px-[14px] rounded-lg bg-[rgba(0,0,0,0.02)] border border-(--color-card-glass-border) dark:bg-[rgba(255,255,255,0.03)]"
+                  class="py-3 px-[14px] rounded-lg bg-[rgba(0,0,0,0.02)] border border-card-glass-border dark:bg-[rgba(255,255,255,0.03)]"
                 >
                   <div class="sub-label mb-2 text-[11px] font-semibold tracking-[0.06em] opacity-65">
                     {{ t("modelPricing.applyTierWhen") }}
@@ -501,7 +501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Footer -->
-    <div class="page-footer flex items-center justify-end gap-2 px-6 h-[50px] shrink-0 border-t border-(--color-card-glass-border)">
+    <div class="page-footer flex items-center justify-end gap-2 px-6 h-[50px] shrink-0 border-t border-card-glass-border">
       <OButton
         variant="outline"
         size="sm-action"

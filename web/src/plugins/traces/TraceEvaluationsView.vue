@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                         class="text-[20px]" />
               </div>
             </div>
-            <div class="text-3xl font-bold tracking-tight leading-none text-[var(--color-grey-600)]">
+            <div class="text-3xl font-bold tracking-tight leading-none text-grey-600">
               {{ formatScore(record.llm_evaluation_quality_score) }}
             </div>
           </div>
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 <OIcon name="layers" size="sm" class="text-blue-500 text-[20px]" />
               </div>
             </div>
-            <div class="text-3xl font-bold tracking-tight leading-none text-[var(--color-grey-600)]">
+            <div class="text-3xl font-bold tracking-tight leading-none text-grey-600">
               {{ record.total_steps || "0" }}
             </div>
           </div>
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 <OIcon name="build" size="sm" class="text-purple-500 text-[20px]" />
               </div>
             </div>
-            <div class="text-3xl font-bold leading-none text-[var(--color-grey-600)]">
+            <div class="text-3xl font-bold leading-none text-grey-600">
               {{ record.total_tool_calls || "0" }}
             </div>
           </div>
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 <OIcon name="flag" size="sm" class="text-teal-500 text-[20px]" />
               </div>
             </div>
-            <div class="text-lg font-semibold leading-tight text-[var(--color-grey-600)] truncate" :title="record.completion_signal">
+            <div class="text-lg font-semibold leading-tight text-grey-600 truncate" :title="record.completion_signal">
               {{ record.completion_signal || "N/A" }}
             </div>
           </div>
@@ -669,7 +669,7 @@ export default defineComponent({
     };
     const DIM_COLOR_CLASSES: Record<string, string> = {
       relevance: "text-primary-600",
-      groundedness: "text-[var(--color-success-600)]",
+      groundedness: "text-success-600",
       conciseness: "text-purple-700",
       instruction_following: "text-orange-500",
       accuracy: "text-error-600",

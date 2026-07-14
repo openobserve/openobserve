@@ -708,7 +708,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="flex justify-end px-3 w-full py-3 card-container sticky! bottom-0 border-t border-[var(--color-card-glass-border)]"
+      class="flex justify-end px-3 w-full py-3 card-container sticky! bottom-0 border-t border-card-glass-border"
       style="z-index: 2"
       :class="store.state.theme === 'dark' ? 'bg-surface-base' : 'bg-white'"
     >

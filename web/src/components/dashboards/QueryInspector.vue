@@ -31,18 +31,18 @@
         <div
           v-for="(query, index) in queryData"
           :key="query?.originalQuery + index"
-          class="bg-[var(--color-card-glass-bg)] rounded-xl border border-[var(--color-card-glass-border)] shadow-sm overflow-hidden"
+          class="bg-card-glass-bg rounded-xl border border-card-glass-border shadow-sm overflow-hidden"
         >
           <!-- Query Header -->
           <div
-            class="p-2 gap-3 bg-[var(--color-theme-body-bg-primary)] border-b border-[var(--color-card-glass-border)] flex items-start justify-start"
+            class="p-2 gap-3 bg-theme-body-bg-primary border-b border-card-glass-border flex items-start justify-start"
           >
             <span class="text-sm font-bold rounded-md"
                 :data-test="`query-inspector-query-name-${index}`">
               {{ query.tabName || ('Query ' + (index + 1)) }}
             </span>
             <span
-              class="bg-[var(--color-theme-body-bg-primary)] border border-[var(--color-card-glass-border)] text-text-secondary text-[10px] font-bold px-2 py-0.5 rounded-md"
+              class="bg-theme-body-bg-primary border border-card-glass-border text-text-secondary text-[10px] font-bold px-2 py-0.5 rounded-md"
             >
               {{ getQueryTypeDisplay(query.queryType) }}
             </span>
@@ -67,7 +67,7 @@
               </div>
               <div class="relative group mt-1">
                 <div
-                  class="p-2 rounded-lg bg-[var(--color-theme-body-bg-primary)] border border-[var(--color-card-glass-border)] font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:rgba(128,128,128,0.2)_transparent] inspector-query-editor"
+                  class="p-2 rounded-lg bg-theme-body-bg-primary border border-card-glass-border font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:rgba(128,128,128,0.2)_transparent] inspector-query-editor"
                   :data-test="`query-inspector-original-query-${index}`"
                   v-html="
                     highlightSearch(
@@ -97,7 +97,7 @@
               </div>
               <div class="relative group mt-1">
                 <div
-                  class="p-2 rounded-lg bg-[var(--color-theme-body-bg-primary)] border border-[var(--color-card-glass-border)] font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:rgba(128,128,128,0.2)_transparent] inspector-query-editor"
+                  class="p-2 rounded-lg bg-theme-body-bg-primary border border-card-glass-border font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:rgba(128,128,128,0.2)_transparent] inspector-query-editor"
                   :data-test="`query-inspector-executed-query-${index}`"
                   v-html="
                     highlightSearch(
@@ -111,7 +111,7 @@
 
             <!-- Time Metadata -->
             <div
-              class="grid grid-cols-2 gap-4 border-t border-[var(--color-card-glass-border)] pt-2"
+              class="grid grid-cols-2 gap-4 border-t border-card-glass-border pt-2"
             >
               <div class="space-y-1"
                 :data-test="`dashboard-query-inspector-start-time-${index}`"
@@ -151,7 +151,7 @@
 
             <!-- Variables List (Row by Row) -->
             <div
-              class="space-y-3 border-t border-[var(--color-card-glass-border)]"
+              class="space-y-3 border-t border-card-glass-border"
             >
               <!-- Standard Variables -->
               <div class="pt-2">
@@ -163,7 +163,7 @@
                     <div
                       v-for="v in getVariablesByType(query, 'variable')"
                       :key="v.name"
-                      class="flex items-center gap-2 p-1 rounded-md border border-[var(--color-card-glass-border)] bg-[var(--color-card-glass-bg)] text-xs"
+                      class="flex items-center gap-2 p-1 rounded-md border border-card-glass-border bg-card-glass-bg text-xs"
                     >
                       <span
                         class="font-bold text-text-primary"
@@ -192,7 +192,7 @@
                     <div
                       v-for="v in getVariablesByType(query, 'fixed')"
                       :key="v.name"
-                      class="flex items-center gap-2 p-1 rounded-md border border-[var(--color-card-glass-border)] bg-[var(--color-card-glass-bg)] text-xs"
+                      class="flex items-center gap-2 p-1 rounded-md border border-card-glass-border bg-card-glass-bg text-xs"
                     >
                       <span
                         class="font-bold text-text-primary"
@@ -223,7 +223,7 @@
                     <div
                       v-for="v in getVariablesByType(query, 'dynamicVariable')"
                       :key="v.name"
-                      class="flex items-center gap-2 p-1 rounded-md border border-[var(--color-card-glass-border)] bg-[var(--color-card-glass-bg)] text-xs"
+                      class="flex items-center gap-2 p-1 rounded-md border border-card-glass-border bg-card-glass-bg text-xs"
                     >
                       <span
                         class="font-bold text-text-primary"

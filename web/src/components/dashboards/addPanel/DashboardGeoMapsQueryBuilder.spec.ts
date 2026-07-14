@@ -866,7 +866,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
         '[data-test="dashboard-latitude-layout"]',
       );
       expect(latitudeContainer.classes()).toContain(
-        "bg-[var(--color-field-list-row-hover-bg)]",
+        "bg-field-list-row-hover-bg",
       );
     });
 
@@ -879,7 +879,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
         '[data-test="dashboard-latitude-layout"]',
       );
       expect(latitudeContainer.classes()).not.toContain(
-        "bg-[var(--color-field-list-row-hover-bg)]",
+        "bg-field-list-row-hover-bg",
       );
     });
   });

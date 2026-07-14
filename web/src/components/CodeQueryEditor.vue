@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="relative w-full h-full flex flex-col" v-bind="$attrs">
     <div
       data-test="query-editor"
-      class="logs-query-editor flex-1 min-h-0 bg-(--color-card-glass-bg)"
+      class="logs-query-editor flex-1 min-h-0 bg-card-glass-bg"
       ref="editorRef"
       :id="editorId"
     />
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showAiIcon && !disableAi"
       variant="sidebar-toggle"
       size="icon-toolbar"
-      class="absolute! top-2 right-2 z-10 bg-(--color-card-glass-bg) border border-(--color-card-glass-border) transition-all duration-200 hover:bg-button-outline-hover-bg hover:border-accent"
+      class="absolute! top-2 right-2 z-10 bg-card-glass-bg border border-card-glass-border transition-all duration-200 hover:bg-button-outline-hover-bg hover:border-accent"
       :class="nlpMode ? 'bg-primary-100 border-accent' : ''"
       @click="toggleNlpMode"
       data-test="query-editor-ai-icon-btn"

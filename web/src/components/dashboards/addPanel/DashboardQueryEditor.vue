@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'visibility-off'
                       : 'visibility'
                   "
-                  class="ml-1 opacity-[0.7] transition-all duration-150 hover:opacity-100 hover:bg-[var(--color-hover-gray)] hover:rounded-full"
+                  class="ml-1 opacity-[0.7] transition-all duration-150 hover:opacity-100 hover:bg-hover-gray hover:rounded-full"
                   @click.stop="toggleQueryVisibility(index)"
                   @mousedown.stop.prevent
                   @pointerdown.stop.prevent
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 name="close"
                 size="sm"
-                class="opacity-60 transition-all duration-150 hover:opacity-100 hover:bg-[var(--color-hover-gray)] hover:rounded-full"
+                class="opacity-60 transition-all duration-150 hover:opacity-100 hover:bg-hover-gray hover:rounded-full"
                 @click.stop.prevent="removeTab(index)"
                 @mousedown.stop.prevent
                 @pointerdown.stop.prevent

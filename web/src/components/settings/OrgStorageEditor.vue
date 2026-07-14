@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   { selected: selectedProvider === provider.value },
                   store.state.theme === 'dark'
                     ? 'bg-[#1e1e1e] border-[#424242] hover:border-[#5d9cec] hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]'
-                    : 'bg-white border-border-default hover:border-(--color-card-glass-border) hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
+                    : 'bg-white border-border-default hover:border-card-glass-border hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
                 ]"
                 :style="selectedProvider === provider.value && store.state.theme !== 'dark'
                   ? 'border-color: var(--color-card-glass-border); background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%); box-shadow: 0 4px 16px rgba(25,118,210,0.2);'
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-[13px] font-medium text-center [line-height:1.3] mt-1 text-text-primary group-[.selected]/card:text-[#333333] dark:group-[.selected]/card:text-white">{{ provider.label }}</div>
                 <div
                   v-if="selectedProvider === provider.value"
-                  class="check-icon absolute top-[0.375rem] right-[0.375rem] w-[1.25rem] h-[1.25rem] rounded-full overflow-hidden bg-[var(--color-status-positive)] text-white flex items-center justify-center z-[1]"
+                  class="check-icon absolute top-[0.375rem] right-[0.375rem] w-[1.25rem] h-[1.25rem] rounded-full overflow-hidden bg-status-positive text-white flex items-center justify-center z-[1]"
                 >
                   <OIcon name="check" size="xs" />
                 </div>

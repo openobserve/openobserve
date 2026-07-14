@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             { 'cursor-move': table.getState().columnOrder.length > 1 },
             // Header-row chrome via centralized token utilities (same tokens
             // OTable uses): background band + full-width underline on the row.
-            'bg-table-header-bg border-b border-[var(--color-grey-300)]',
+            'bg-table-header-bg border-b border-grey-300',
           ]"
           :style="{
             width:
@@ -245,7 +245,7 @@ class="mr-1" />
         <tr
           v-for="r in SKEL_ROW_COUNT"
           :key="`skel-${r}`"
-          class="logs-skel-row flex items-center w-full opacity-0 h-[29px] bg-(--color-log-table-row-bg) border-b border-(--color-log-table-row-border)"
+          class="logs-skel-row flex items-center w-full opacity-0 h-[29px] bg-log-table-row-bg border-b border-log-table-row-border"
           :style="{ animationDelay: `${(r - 1) * 40}ms` }"
         >
           <!-- No columns loaded yet (first page load) — full-width shimmer bar -->
@@ -325,10 +325,10 @@ class="mr-1" />
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'bg-table-row-selected-bg'
                 : !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                  ? 'log-row-base bg-(--color-log-table-row-bg)'
+                  ? 'log-row-base bg-log-table-row-bg'
                   : '',
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? 'table-row-hover table-row-focus focus-visible:outline-none transition-[background-color,box-shadow] duration-[120ms] [transition-timing-function:ease-in-out] border-b-(--color-log-table-row-border)!'
+                ? 'table-row-hover table-row-focus focus-visible:outline-none transition-[background-color,box-shadow] duration-[120ms] [transition-timing-function:ease-in-out] border-b-log-table-row-border!'
                 : '',
             ]"
             @click="

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="!loading && patterns?.length > 0" class="flex flex-col">
       <!-- Table Header -->
       <div
-        class="flex items-center border-b border-[var(--color-card-glass-border)]"
+        class="flex items-center border-b border-card-glass-border"
         style="background: var(--color-theme-table-header-bg); min-width: 100%"
       >
         <!-- Pattern Column Header -->
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Header skeleton -->
       <div
-        class="min-h-8 flex items-center border-b border-[var(--color-card-glass-border)]"
+        class="min-h-8 flex items-center border-b border-card-glass-border"
         style="background: var(--color-theme-table-header-bg); min-width: 100%"
       >
         <div class="flex-1 min-w-0 px-2">
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(skeletonWidth, n) in SKELETON_WIDTHS"
         :key="n"
-        class="pattern-skel-row flex items-center border-b border-table-row-divider relative opacity-0 h-8 bg-[var(--color-log-table-row-bg,transparent)]"
+        class="pattern-skel-row flex items-center border-b border-table-row-divider relative opacity-0 h-8 bg-log-table-row-bg"
         :style="{ animationDelay: `${n * 40}ms` }"
       >
         <!-- Left accent bar -->

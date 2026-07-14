@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="!col.conditions.length"
-        class="text-[length:var(--text-sm)] text-[var(--color-text-secondary,#9e9e9e)] mb-1.5"
+        class="text-[length:var(--text-sm)] text-text-secondary mb-1.5"
       >
         {{ t("dashboard.conditionNoRules") }}
       </div>
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="flex items-center gap-2 flex-wrap">
-          <span class="o-input-label shrink-0 w-28 text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.conditionThenText") }}</span>
+          <span class="o-input-label shrink-0 w-28 text-text-secondary">{{ t("dashboard.conditionThenText") }}</span>
           <ColorSwatchPicker
             v-model="rule.textColor"
             :swatches="TEXT_SWATCHES"
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="flex items-center gap-2 flex-wrap">
-          <span class="o-input-label shrink-0 w-28 text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.conditionAndBg") }}</span>
+          <span class="o-input-label shrink-0 w-28 text-text-secondary">{{ t("dashboard.conditionAndBg") }}</span>
           <ColorSwatchPicker
             v-model="rule.bgColor"
             :swatches="BG_SWATCHES"

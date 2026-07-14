@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 { selected: destinationType === destType.value },
                 store.state.theme === 'dark'
                   ? 'border-[#424242] bg-[#1e1e1e] hover:border-[#5d9cec] hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]'
-                  : 'border-border-default bg-white hover:border-[var(--color-card-glass-border)] hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
+                  : 'border-border-default bg-white hover:border-card-glass-border hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
               ]"
               @click="form.setFieldValue('destination_type', destType.value)"
             >
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="card-label text-[13px] font-medium text-center leading-[1.3] mt-1 text-text-primary">{{ destType.label }}</div>
               <div
                 v-if="destinationType === destType.value"
-                class="absolute top-[0.375rem] right-[0.375rem] w-5 h-5 rounded-full overflow-hidden bg-[var(--color-status-positive)] text-white flex items-center justify-center z-[1]"
+                class="absolute top-[0.375rem] right-[0.375rem] w-5 h-5 rounded-full overflow-hidden bg-status-positive text-white flex items-center justify-center z-[1]"
               >
                 <!-- eslint-disable-next-line vue/max-attributes-per-line -->
                 <OIcon name="check" size="xs" />
@@ -342,7 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Connection Notes Card -->
           <OCard
-            class="connection-notes-card rounded-lg border border-[#e3f2fd] mb-6 mt-4 bg-(--color-banner-info-bg)!"
+            class="connection-notes-card rounded-lg border border-[#e3f2fd] mb-6 mt-4 bg-banner-info-bg!"
           >
             <OCardSection role="body">
               <div class="flex items-center mb-2">

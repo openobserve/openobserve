@@ -57,7 +57,7 @@
       <div
         v-if="state !== 'idle'"
         class="flex flex-col gap-2 mt-4 p-3 border border-border-default rounded-md bg-surface-base text-text-secondary text-xs"
-        :class="{ 'border-[color-mix(in_srgb,var(--color-status-success-text)_35%,var(--color-border-default))]': state === 'success', 'border-[color-mix(in_srgb,var(--color-status-error-text)_35%,var(--color-border-default))] text-(--color-status-error-text)': state === 'error' }"
+        :class="{ 'border-[color-mix(in_srgb,var(--color-status-success-text)_35%,var(--color-border-default))]': state === 'success', 'border-[color-mix(in_srgb,var(--color-status-error-text)_35%,var(--color-border-default))] text-status-error-text': state === 'error' }"
         data-test="scorer-test-result"
       >
         <template v-if="state === 'running'">
@@ -69,7 +69,7 @@
           <dl class="eval-test-panel__result-grid grid gap-x-3 gap-y-1 m-0 text-text-secondary text-xs" style="grid-template-columns: max-content 1fr">
             <template v-if="displayValue !== null">
               <dt class="text-text-secondary font-medium">{{ t("onlineEvals.scorer.testPanel.resultScore") }}</dt>
-              <dd class="eval-test-panel__result-score m-0 text-(--color-grey-600) font-bold text-[13px] [font-family:var(--font-mono)]">{{ displayValue }}</dd>
+              <dd class="eval-test-panel__result-score m-0 text-grey-600 font-bold text-[13px] [font-family:var(--font-mono)]">{{ displayValue }}</dd>
             </template>
             <template v-if="latencyLabel">
               <dt class="text-text-secondary font-medium">{{ t("onlineEvals.scorer.testPanel.resultLatency") }}</dt>
@@ -96,7 +96,7 @@
 
         <template v-else>
           <strong class="text-[13px] font-semibold">{{ t("onlineEvals.scorer.testPanel.errorHeader") }}</strong>
-          <p class="eval-test-panel__error-message m-0 text-(--color-status-error-text) text-xs whitespace-pre-wrap break-words">{{ errorText }}</p>
+          <p class="eval-test-panel__error-message m-0 text-status-error-text text-xs whitespace-pre-wrap break-words">{{ errorText }}</p>
           <p v-if="latencyLabel" class="eval-test-panel__error-meta m-0 text-text-secondary text-[11.5px]">
             {{ t("onlineEvals.scorer.testPanel.resultLatency") }}: {{ latencyLabel }}
           </p>

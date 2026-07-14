@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
   <span
     v-if="!displayValue"
     data-test="span-status-code-badge-empty"
-    class="text-[var(--color-status-neutral-text)]"
+    class="text-status-neutral-text"
   >
     —
   </span>

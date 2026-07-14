@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("regex_patterns.unsupported_lookaround_note") }}
                 {{ t("regex_patterns.unsupported_lookaround_example") }}
                 <code
-                  class="font-mono text-[12px] px-[4px] py-[1px] rounded-[4px] bg-[var(--color-banner-info-border)]"
+                  class="font-mono text-[12px] px-[4px] py-[1px] rounded-[4px] bg-banner-info-border"
                   >(?=openobserve)\w+</code
                 >
                 <OIcon
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="inline-block align-middle mx-1"
                 />
                 <code
-                  class="font-mono text-[12px] px-[4px] py-[1px] rounded-[4px] bg-[var(--color-banner-info-border)]"
+                  class="font-mono text-[12px] px-[4px] py-[1px] rounded-[4px] bg-banner-info-border"
                   >openobserve\w*</code
                 >
               </div>

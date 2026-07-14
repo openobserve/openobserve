@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="card-container h-full flex flex-col pb-[0.3rem]">
     <!-- Current org section (if super org, not a member) -->
     <div v-if="currentOrgToShow" class="mb-3">
-      <div class="rounded-[0.625rem] bg-(--color-card-glass-bg) dark:bg-surface-base">
+      <div class="rounded-[0.625rem] bg-card-glass-bg dark:bg-surface-base">
         <div class="font-semibold px-2 py-2">
           {{ t("billing.billingGroup.currentOrgTitle") }}
         </div>
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Member organizations section -->
     <div class="flex-1 flex flex-col min-h-0">
-      <div class="rounded-[0.625rem] bg-(--color-card-glass-bg) dark:bg-surface-base">
+      <div class="rounded-[0.625rem] bg-card-glass-bg dark:bg-surface-base">
         <div class="font-semibold px-2 py-2">
           {{ t("billing.billingGroup.memberOrgsTitle") }}
         </div>

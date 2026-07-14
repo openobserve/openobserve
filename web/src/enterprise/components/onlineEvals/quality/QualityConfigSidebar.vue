@@ -51,7 +51,7 @@
             <div v-if="row.hasThreshold" class="qcs-item__bar flex-1 h-1 bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] rounded-full overflow-hidden">
               <div
                 class="qcs-item__bar-fill h-full"
-                :class="{ 'bg-[var(--color-status-warning-text)]': row.status === 'unhealthy' || row.status === 'warn', 'bg-[var(--color-status-success-text)]': row.status === 'healthy', 'bg-[color-mix(in_srgb,var(--color-text-secondary)_30%,transparent)]': row.status === 'noThreshold' }"
+                :class="{ 'bg-status-warning-text': row.status === 'unhealthy' || row.status === 'warn', 'bg-status-success-text': row.status === 'healthy', 'bg-[color-mix(in_srgb,var(--color-text-secondary)_30%,transparent)]': row.status === 'noThreshold' }"
                 :style="{ width: `${Math.min(100, row.unhealthyPct ?? 0)}%` }"
               />
             </div>
@@ -63,7 +63,7 @@
           <svg
             v-if="row.trendSparkline.length > 0"
             class="qcs-item__spark w-full h-5"
-            :class="{ 'text-[var(--color-status-warning-text)]': row.status === 'unhealthy' || row.status === 'warn', 'text-[var(--color-status-success-text)]': row.status === 'healthy', 'text-[color-mix(in_srgb,var(--color-text-secondary)_50%,transparent)]': row.status === 'noThreshold' }"
+            :class="{ 'text-status-warning-text': row.status === 'unhealthy' || row.status === 'warn', 'text-status-success-text': row.status === 'healthy', 'text-[color-mix(in_srgb,var(--color-text-secondary)_50%,transparent)]': row.status === 'noThreshold' }"
             viewBox="0 0 100 20"
             preserveAspectRatio="none"
             aria-hidden="true"

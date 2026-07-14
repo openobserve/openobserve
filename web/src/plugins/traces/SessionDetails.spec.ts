@@ -516,7 +516,7 @@ describe("SessionDetails — turn rows", () => {
 
     const wrapper = await mountComponent();
     const row = wrapper.find(turnRowSelector("ok-trace"));
-    expect(row.classes()).toContain("bg-[var(--color-surface-base)]");
+    expect(row.classes()).toContain("bg-surface-base");
   });
 
   it("status badge in turn header uses critical class for error traces", async () => {
@@ -529,7 +529,7 @@ describe("SessionDetails — turn rows", () => {
     const header = wrapper.find(turnHeaderSelector());
     // Look for the status badge span within the header
     const badgeSpan = header.findAll("span").find(
-      (s) => s.classes().join("").includes("text-[var(--color-error-500)]"),
+      (s) => s.classes().join("").includes("text-error-500"),
     );
     expect(badgeSpan).toBeTruthy();
   });
@@ -544,7 +544,7 @@ describe("SessionDetails — turn rows", () => {
     const header = wrapper.find(turnHeaderSelector());
     const badgeSpan = header.findAll("span").find(
       (s) =>
-        s.classes().join("").includes("text-[var(--color-text-secondary)]"),
+        s.classes().join("").includes("text-text-secondary"),
     );
     expect(badgeSpan).toBeTruthy();
   });

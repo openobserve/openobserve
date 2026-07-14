@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-match_pattern="{ row }">
           <div class="flex items-center gap-1 min-w-0">
             <code
-              class="text-xs block max-w-full bg-[rgba(0,0,0,0.04)] border border-(--color-card-glass-border) py-[2px] px-[6px] rounded text-inherit dark:bg-[rgba(255,255,255,0.05)]"
+              class="text-xs block max-w-full bg-[rgba(0,0,0,0.04)] border border-card-glass-border py-[2px] px-[6px] rounded text-inherit dark:bg-[rgba(255,255,255,0.05)]"
               :class="{ 'opacity-50 [text-decoration:line-through] [text-decoration-color:currentColor]': isChildRow(row) }"
               >{{ row.match_pattern }}</code
             >
@@ -445,7 +445,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-xs font-semibold mb-[6px] text-[#555] dark:text-[#aaa]">
               {{ t("modelPricing.colPattern") }}
             </div>
-            <code class="text-xs block bg-[rgba(0,0,0,0.04)] border border-(--color-card-glass-border) py-[2px] px-[6px] rounded text-inherit text-[13px] px-[10px] py-[6px] whitespace-pre-wrap break-all max-h-[300px] overflow-y-auto dark:bg-[rgba(255,255,255,0.05)]">{{
+            <code class="text-xs block bg-[rgba(0,0,0,0.04)] border border-card-glass-border py-[2px] px-[6px] rounded text-inherit text-[13px] px-[10px] py-[6px] whitespace-pre-wrap break-all max-h-[300px] overflow-y-auto dark:bg-[rgba(255,255,255,0.05)]">{{
               pricingDialogRow.match_pattern
             }}</code>
           </div>
@@ -461,7 +461,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   getDefaultTier(pricingDialogRow)?.prices || {},
                 ).length
               "
-              class="mt-2 border border-(--color-card-glass-border) rounded-lg overflow-hidden"
+              class="mt-2 border border-card-glass-border rounded-lg overflow-hidden"
             >
               <table class="w-full border-collapse pricing-panel-table">
                 <thead>

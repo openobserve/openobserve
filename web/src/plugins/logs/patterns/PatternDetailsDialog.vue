@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex gap-3">
             <div class="w-1/2">
               <OCard
-                class="bg-[var(--color-card-glass-solid)] border border-solid border-[var(--color-card-glass-border)]"
+                class="bg-card-glass-solid border border-solid border-card-glass-border"
               >
                 <OCardSection class="p-[0.375rem]">
                   <div
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OCard>
             </div>
             <div class="w-1/2">
-              <OCard class="bg-[var(--color-card-glass-solid)] border border-solid border-[var(--color-card-glass-border)]">
+              <OCard class="bg-card-glass-solid border border-solid border-card-glass-border">
                 <OCardSection class="p-[0.375rem]">
                   <div
                     class="text-xs"
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="mt-3"
           >
             <div
-              class="rounded border border-solid border-[var(--color-error-300)] px-3 py-2 flex gap-3 items-start"
+              class="rounded border border-solid border-error-300 px-3 py-2 flex gap-3 items-start"
               :class="store.state.theme === 'dark' ? 'bg-gray-800' : 'bg-white'"
             >
               <OIcon name="warning" size="sm" class="mt-0.5 shrink-0" />
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-global-filter="false"
             :default-columns="false"
             :max-height="undefined"
-            class="w-full border border-solid border-[var(--color-card-glass-border)]"
+            class="w-full border border-solid border-card-glass-border"
           >
             <template #cell-name="{ row }">
               <div class="text-left text-weight-bold text-primary">

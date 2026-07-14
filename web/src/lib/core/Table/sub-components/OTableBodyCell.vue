@@ -333,7 +333,7 @@ function handleClick() {
 .o2-tree-parent-expanded::after {
   content: "";
   position: absolute;
-  left: var(--tree-x);
+  left: var(--tree-x, 0);
   top: calc(50% + 9px);
   bottom: 0;
   width: 1.5px;
@@ -349,7 +349,7 @@ function handleClick() {
 .o2-tree-child::before {
   content: "";
   position: absolute;
-  left: var(--tree-parent-x);
+  left: var(--tree-parent-x, 0);
   top: 0;
   bottom: 0;
   width: 1.5px;
@@ -363,11 +363,11 @@ function handleClick() {
 .o2-tree-child::after {
   content: "";
   position: absolute;
-  left: var(--tree-parent-x);
+  left: var(--tree-parent-x, 0);
   top: 50%;
   /* Parent-row child (has its own chevron): stop the stub 9px before the
      chevron center so the line doesn't run into the icon. */
-  width: calc(var(--tree-x) - var(--tree-parent-x) - 9px);
+  width: calc(var(--tree-x, 0) - var(--tree-parent-x, 0) - 9px);
   height: 1.5px;
   background-color: var(--q-primary, #6366f1);
   opacity: 0.55;
@@ -376,6 +376,6 @@ function handleClick() {
 /* Leaf children (no chevron, endpoint marker dot instead): run the stub all
    the way to the dot's centre so the line visually touches it. */
 .o2-tree-child.o2-tree-leaf::after {
-  width: calc(var(--tree-x) - var(--tree-parent-x));
+  width: calc(var(--tree-x, 0) - var(--tree-parent-x, 0));
 }
 </style>

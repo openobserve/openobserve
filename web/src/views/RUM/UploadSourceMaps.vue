@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Bottom Action Bar -->
-      <div class="action-bar shrink-0 card-container flex items-center justify-end gap-3 py-3 pr-3 border-t border-[var(--color-card-glass-border)]"
+      <div class="action-bar shrink-0 card-container flex items-center justify-end gap-3 py-3 pr-3 border-t border-card-glass-border"
         style="position: sticky; z-index: 2">
         <OButton
           data-test="rum-upload-source-maps-cancel-btn"

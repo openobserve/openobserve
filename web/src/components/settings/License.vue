@@ -13,7 +13,7 @@
     >
       <div class="col-span-1 min-h-0">
         <div v-if="licenseData.license === null || !licenseData.license">
-          <OCard class="mb-4 border border-solid border-[var(--color-card-glass-border)]">
+          <OCard class="mb-4 border border-solid border-card-glass-border">
             <OCardSection role="body">
               <div class="text-xl font-semibold">{{ t("about.no_license_found") }}</div>
               <div class="mt-2 text-sm">
@@ -36,7 +36,7 @@
             </OCardSection>
           </OCard>
 
-          <OCard class="border border-solid border-[var(--color-card-glass-border)]">
+          <OCard class="border border-solid border-card-glass-border">
             <OCardSection role="body">
               <div class="text-base font-medium mb-3">
                 {{ t("about.enter_license_key") }}
@@ -83,7 +83,7 @@
         </div>
 
         <div v-else>
-          <OCard class="border border-solid border-[var(--color-card-glass-border)]">
+          <OCard class="border border-solid border-card-glass-border">
             <OCardSection role="body">
               <div class="text-xl font-semibold mb-3">{{ t("about.license_info") }}</div>
               <table class="w-full border-collapse border border-solid border-table-header-border">
@@ -199,7 +199,7 @@
             </OCardSection>
           </OCard>
 
-          <OCard v-show="showUpdateForm" class="mt-4 border border-solid border-[var(--color-card-glass-border)]">
+          <OCard v-show="showUpdateForm" class="mt-4 border border-solid border-card-glass-border">
             <OCardSection role="body">
               <div class="text-base font-medium mb-2">
                 {{ t("about.update_license_key") }}
@@ -261,7 +261,7 @@
       </div>
 
       <div class="col-span-1 self-start">
-        <OCard class="futuristic-card border border-solid" :class="store.state.theme === 'dark' ? 'bg-[linear-gradient(135deg,rgba(99,102,241,0.08)_0%,rgba(168,85,247,0.08)_100%)] border-[rgba(99,102,241,0.25)]' : 'border-[var(--color-card-glass-border)]'">
+        <OCard class="futuristic-card border border-solid" :class="store.state.theme === 'dark' ? 'bg-[linear-gradient(135deg,rgba(99,102,241,0.08)_0%,rgba(168,85,247,0.08)_100%)] border-[rgba(99,102,241,0.25)]' : 'border-card-glass-border'">
           <OCardSection class="p-3">
             <div>
               <div :class="store.state.theme === 'dark' ? 'bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.15)_0%,transparent_70%)]' : ''"></div>

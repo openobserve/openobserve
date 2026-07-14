@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(value, key) in matchedDimensions"
               :key="`matched-${key}`"
-              class="flex items-center gap-3 p-3 border border-solid border-[var(--color-card-glass-border)] rounded"
+              class="flex items-center gap-3 p-3 border border-solid border-card-glass-border rounded"
               :data-test="`matched-dimension-${key}`"
             >
               <div class="flex-1 flex items-center gap-3">
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(value, key) in additionalDimensions"
               :key="`additional-${key}`"
-              class="flex items-center gap-3 p-3 border border-solid border-[var(--color-card-glass-border)] rounded bg-surface-panel"
+              class="flex items-center gap-3 p-3 border border-solid border-card-glass-border rounded bg-surface-panel"
               :data-test="`additional-dimension-${key}`"
             >
               <div class="flex-1 flex flex-col gap-2">

@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="template-body-editor"
                 ref="queryEditorRef"
                 editor-id="template-body-editor"
-                class="w-full min-h-[310px]! rounded-[5px] border border-(--color-card-glass-border) resize-y overflow-auto mb-3"
+                class="w-full min-h-[310px]! rounded-[5px] border border-card-glass-border resize-y overflow-auto mb-3"
                 language="markdown"
                 v-model:query="formData.body"
               />
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="template-body-editor"
                 ref="queryEditorRef"
                 editor-id="template-body-editor"
-                class="w-full min-h-[310px]! rounded-[5px] border border-(--color-card-glass-border) resize-y overflow-auto mb-3"
+                class="w-full min-h-[310px]! rounded-[5px] border border-card-glass-border resize-y overflow-auto mb-3"
                 language="json"
                 v-model:query="formData.body"
               />

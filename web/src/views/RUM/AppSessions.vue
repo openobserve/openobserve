@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="[
                   'border',
                   'solid',
-                  'border-[var(--color-card-glass-border)]',
+                  'border-card-glass-border',
                   'p-[0.25rem]',
                   'rounded-[0.375rem]',
                   'overflow-y-auto',
@@ -310,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       name="play-circle-filled"
                       size="md"
-                      class="cursor-pointer session-play-icon text-[var(--color-icon-color)] hover:text-button-primary"
+                      class="cursor-pointer session-play-icon text-icon-color hover:text-button-primary"
                     />
                   </template>
                   <template #cell-session="{ row }">
@@ -363,12 +363,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }}</span>
                       <small
                         v-if="row.is_bounce"
-                        class="text-[var(--color-status-warning-text)]"
+                        class="text-status-warning-text"
                         data-test="rum-app-sessions-bounced-text"
                       >{{ t("rum.bounced").toLowerCase() }}</small>
                       <small
                         v-else-if="row.is_active"
-                        class="text-[var(--color-status-success-text)]"
+                        class="text-status-success-text"
                         data-test="rum-app-sessions-active-text"
                       >{{ t("rum.active") }}</small>
                     </div>

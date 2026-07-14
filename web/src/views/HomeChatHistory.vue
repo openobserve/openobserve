@@ -92,7 +92,7 @@ function formatTime(ts: string): string {
 
 <template>
   <div
-    class="flex flex-col h-full text-base w-[15em] shrink-0 border-r border-r-[0.0625em] border-(--color-card-glass-border) bg-(--color-card-glass-bg) overflow-hidden"
+    class="flex flex-col h-full text-base w-[15em] shrink-0 border-r border-r-[0.0625em] border-card-glass-border bg-card-glass-bg overflow-hidden"
     :class="store.state.theme === 'dark' ? 'hch-dark' : 'hch-light'"
   >
     <!-- Header -->
@@ -170,9 +170,9 @@ function formatTime(ts: string): string {
       <div
         v-for="chat in filtered"
         :key="chat.id"
-        class="group flex items-center gap-1 py-[0.4375em] px-2 rounded-md cursor-pointer transition-[background] duration-[120ms] hover:bg-[var(--color-interactive-hover-bg,rgba(128,128,128,0.1))]"
+        class="group flex items-center gap-1 py-[0.4375em] px-2 rounded-md cursor-pointer transition-[background] duration-[120ms] hover:bg-interactive-hover-bg"
         :class="{
-          'bg-[var(--color-primary-100,rgba(57,126,246,0.12))]!': activeChatId === chat.id,
+          'bg-primary-100!': activeChatId === chat.id,
         }"
         @click="selectChat(chat.id)"
       >
@@ -215,7 +215,7 @@ function formatTime(ts: string): string {
     </div>
 
     <!-- Clear all -->
-    <div v-if="history.length > 0" class="shrink-0 py-[0.375em] px-2 border-t border-t-[0.0625em] border-t-(--color-card-glass-border)">
+    <div v-if="history.length > 0" class="shrink-0 py-[0.375em] px-2 border-t border-t-[0.0625em] border-t-card-glass-border">
       <OButton variant="ghost-subtle" :block="true" @click="clearAll">
         <svg
           width="0.875em"

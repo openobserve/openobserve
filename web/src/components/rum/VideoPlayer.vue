@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="replay-10"
               size="md"
-              class="mr-2 cursor-pointer text-[var(--color-icon-color-dark)] hover:text-button-primary"
+              class="mr-2 cursor-pointer text-icon-color-dark hover:text-button-primary"
               @click="skipTo('backward')"
             />
             <OIcon
@@ -109,13 +109,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'play-circle-filled'
               "
               size="lg"
-              class="cursor-pointer text-[var(--color-icon-color-dark)] hover:text-button-primary"
+              class="cursor-pointer text-icon-color-dark hover:text-button-primary"
               @click="togglePlay"
             />
             <OIcon
               name="forward-10"
               size="md"
-              class="ml-2 cursor-pointer text-[var(--color-icon-color-dark)] hover:text-button-primary"
+              class="ml-2 cursor-pointer text-icon-color-dark hover:text-button-primary"
               @click="skipTo('forward')"
             />
           </div>

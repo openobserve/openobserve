@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="p-3 rounded border border-solid border-[var(--color-card-glass-border)]"
+    class="p-3 rounded border border-solid border-card-glass-border"
     :class="statusClass"
     :data-test="dataTest"
   >
@@ -155,9 +155,9 @@ const statusColorClass = computed(() => {
   if (!props.status) return "text-gray-500";
 
   const classes = {
-    good: "text-[var(--color-status-positive)]",
-    "needs-improvement": "text-[var(--color-warning)]",
-    poor: "text-[var(--color-status-negative)]",
+    good: "text-status-positive",
+    "needs-improvement": "text-warning",
+    poor: "text-status-negative",
   };
 
   return classes[props.status] || "text-gray-500";

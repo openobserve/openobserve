@@ -152,7 +152,7 @@ the Free Software Foundation, either version 3 of the License, or
               <div
                 :class="{
                   'font-bold py-1.25 px-0 text-sm': true,
-                  'text-(--color-success-600)': c.status === 'success',
+                  'text-success-600': c.status === 'success',
                   'text-error-600': c.status === 'error',
                   'text-text-secondary': c.status === 'exists',
                 }"

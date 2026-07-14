@@ -1453,7 +1453,7 @@ const fieldWidthClass = computed(() => {
                           <!-- Separator between checkbox zone and label zone (rowClickSingleSelect only) -->
                           <span
                             v-if="rowClickSingleSelect"
-                            class="w-px shrink-0 bg-[var(--color-card-glass-border)] mx-1 my-1"
+                            class="w-px shrink-0 bg-card-glass-border mx-1 my-1"
                             style="align-self: stretch"
                             aria-hidden="true"
                             data-select-separator

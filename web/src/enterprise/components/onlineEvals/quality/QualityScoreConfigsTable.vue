@@ -1,6 +1,6 @@
 <template>
   <section class="flex flex-col gap-[10px] min-h-0 flex-1" data-test="quality-score-configs-overview">
-    <div v-if="isLoading && rows.length === 0" class="flex flex-col items-center gap-2 py-8 px-3 border border-dashed border-[var(--color-dialog-header-border,var(--color-border-default))] rounded-md text-center text-text-secondary">
+    <div v-if="isLoading && rows.length === 0" class="flex flex-col items-center gap-2 py-8 px-3 border border-dashed border-dialog-header-border rounded-md text-center text-text-secondary">
       <OSpinner size="sm" />
       <span>{{ t("onlineEvals.quality.loading") }}</span>
     </div>
@@ -167,8 +167,8 @@ const filteredRows = computed(() => {
 });
 
 function sparkClass(status: string): string {
-  if (status === 'unhealthy' || status === 'warn') return 'text-[var(--color-status-warning-text)]';
-  if (status === 'healthy') return 'text-[var(--color-status-success-text)]';
+  if (status === 'unhealthy' || status === 'warn') return 'text-status-warning-text';
+  if (status === 'healthy') return 'text-status-success-text';
   if (status === 'noData') return 'text-text-secondary opacity-[0.55]';
   return 'text-text-secondary';
 }

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="mt-3 border border-solid border-(--color-card-glass-border) rounded">
+  <div class="mt-3 border border-solid border-card-glass-border rounded">
     <div class="text-base text-text-primary font-bold ml-1 mb-2">Distributed Trace</div>
 
     <template v-if="isLoading">
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-else>
       <!-- Trace ID Section -->
-      <div class="bg-(--color-card-glass-bg) p-3">
+      <div class="bg-card-glass-bg p-3">
         <div class="flex items-center mb-3">
           <div class="w-1/4 text-gray-400">Trace ID:</div>
           <div class="w-3/4 flex items-center flex-nowrap">

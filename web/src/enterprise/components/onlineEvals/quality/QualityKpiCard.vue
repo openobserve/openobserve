@@ -18,7 +18,7 @@
       </div>
       <div class="flex items-baseline gap-[0.2rem]">
         <template v-if="kpi.value != null">
-          <span class="text-[1.4rem] font-bold leading-none text-[var(--color-grey-600)]">
+          <span class="text-[1.4rem] font-bold leading-none text-grey-600">
             {{ bigNumber }}
           </span>
           <span
@@ -44,7 +44,7 @@
         v-if="kpi.value != null"
         class="text-[0.65rem] font-medium flex items-center gap-[0.25rem]"
         :class="{
-          'text-[var(--color-success-600)]': (delta != null ? trendSentiment : 'neutral') === 'good',
+          'text-success-600': (delta != null ? trendSentiment : 'neutral') === 'good',
           'text-error-600': (delta != null ? trendSentiment : 'neutral') === 'bad',
           'text-text-muted': (delta != null ? trendSentiment : 'neutral') === 'neutral',
         }"

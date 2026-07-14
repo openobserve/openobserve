@@ -100,7 +100,7 @@ const alignClassFor = (col: Column<any, any>): string => {
       class="o2-skel-row opacity-0 [animation:o2-skel-row-in_320ms_ease-out_forwards]"
       :style="{
         animationDelay: `${(r - 1) * 40}ms`,
-        height: 'var(--table-row-height)',
+        height: 'var(--table-row-height, 2.25rem)',
       }"
     >
       <!-- Expand chevron placeholder — matches OTableBodyRow exactly -->

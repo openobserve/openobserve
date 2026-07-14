@@ -698,7 +698,7 @@ describe("TenstackTable", () => {
       // column separator): a child element painted with the border token.
       const line = resizer.find("div");
       expect(line.exists()).toBe(true);
-      expect(line.classes()).toContain("bg-[var(--color-border-default)]");
+      expect(line.classes()).toContain("bg-border-default");
     });
 
     it("should not carry a transparent background class on the resizer", () => {
@@ -712,7 +712,7 @@ describe("TenstackTable", () => {
       wrapper = mountTable();
       const resizer = wrapper.find(".resizer");
       expect(resizer.exists()).toBe(true);
-      expect(resizer.classes()).not.toContain("hover:bg-[var(--color-card-glass-border)]");
+      expect(resizer.classes()).not.toContain("hover:bg-card-glass-border");
     });
   });
 

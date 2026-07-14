@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </template>
-    <div data-test="query-editor-dialog-card" class="flex h-[calc(100vh-3.5rem)] overflow-hidden bg-(--color-card-glass-bg)">
+    <div data-test="query-editor-dialog-card" class="flex h-[calc(100vh-3.5rem)] overflow-hidden bg-card-glass-bg">
       <div
         class="h-full flex overflow-hidden flex-1"
       >
@@ -337,14 +337,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Content -->
                 <div class="flex-1 min-h-0 overflow-hidden">
                   <!-- Idle: not yet run -->
-                  <div v-if="!tempRunQuery && outputEvents == ''" class="flex flex-col justify-center items-center h-full w-full bg-(--color-card-glass-bg)">
+                  <div v-if="!tempRunQuery && outputEvents == ''" class="flex flex-col justify-center items-center h-full w-full bg-card-glass-bg">
                     <div class="flex flex-col items-center gap-2">
                       <OIcon name="table-chart" class="opacity-[0.18]" style="width: 48px; height: 48px;" />
                       <span class="text-xs opacity-[0.45]">{{ t('alerts.runQueryForOutput') }}</span>
                     </div>
                   </div>
                   <!-- No results after run -->
-                  <div v-else-if="outputEvents == '' && !runQueryLoading" class="flex flex-col justify-center items-center h-full bg-(--color-card-glass-bg)">
+                  <div v-else-if="outputEvents == '' && !runQueryLoading" class="flex flex-col justify-center items-center h-full bg-card-glass-bg">
                     <div class="flex flex-col items-center gap-2">
                       <OIcon name="warning" size="xl" class="text-orange-400 opacity-60" />
                     </div>
@@ -398,14 +398,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Content -->
                 <div class="flex-1 min-h-0 overflow-hidden">
                   <!-- Idle -->
-                  <div v-if="!tempTestFunction && !runFnQueryLoading" class="flex flex-col justify-center items-center h-full w-full bg-(--color-card-glass-bg)">
+                  <div v-if="!tempTestFunction && !runFnQueryLoading" class="flex flex-col justify-center items-center h-full w-full bg-card-glass-bg">
                     <div class="flex flex-col items-center gap-2">
                       <OIcon name="data-object" class="opacity-[0.18]" style="width: 48px; height: 48px;" />
                       <span class="text-xs opacity-[0.45]">{{ t('alerts.applyVRLForOutput') }}</span>
                     </div>
                   </div>
                   <!-- No results -->
-                  <div v-else-if="outputFnEvents == '' && !runFnQueryLoading && tempTestFunction" class="flex flex-col justify-center items-center h-full bg-(--color-card-glass-bg)">
+                  <div v-else-if="outputFnEvents == '' && !runFnQueryLoading && tempTestFunction" class="flex flex-col justify-center items-center h-full bg-card-glass-bg">
                     <div class="flex flex-col items-center gap-2">
                       <OIcon name="warning" size="xl" class="text-orange-400 opacity-60" />
                     </div>

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-col gap-4">
 
         <!-- ── Hero Banner ─────────────────────────────────────────── -->
-        <div class="relative bg-(--color-card-glass-bg) rounded-xl p-4 overflow-hidden">
+        <div class="relative bg-card-glass-bg rounded-xl p-4 overflow-hidden">
           <div class="relative z-1">
             <img
               :src="
@@ -38,8 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- One-line meta bar -->
             <div class="inline-flex items-center flex-wrap gap-2 mt-5">
               <!-- version -->
-              <span class="inline-flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap py-2 px-3.5 rounded border text-(--color-status-positive) border-[color-mix(in_srgb,var(--color-status-positive)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-status-positive)_8%,var(--color-card-glass-bg))]">
-                <OIcon name="check-circle" size="sm" class="text-(--color-status-positive) shrink-0" />
+              <span class="inline-flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap py-2 px-3.5 rounded border text-status-positive border-[color-mix(in_srgb,var(--color-status-positive)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-status-positive)_8%,var(--color-card-glass-bg))]">
+                <OIcon name="check-circle" size="sm" class="text-status-positive shrink-0" />
                 {{ store.state.zoConfig.version }}
               </span>
               <!-- build type -->
@@ -49,12 +49,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <!-- commit -->
               <span class="inline-flex items-center gap-1.5 text-sm text-text-heading whitespace-nowrap py-2 px-3.5 rounded border border-[color-mix(in_srgb,var(--color-info)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-info)_8%,var(--color-card-glass-bg))]">
-                <OIcon name="code" size="sm" class="text-(--color-info) shrink-0" />
-                <span class="text-xs font-semibold uppercase tracking-wide text-(--color-info)">{{ t("about.commit_lbl") }}</span>
+                <OIcon name="code" size="sm" class="text-info shrink-0" />
+                <span class="text-xs font-semibold uppercase tracking-wide text-info">{{ t("about.commit_lbl") }}</span>
                 <OText variant="mono">{{ store.state.zoConfig.commit_hash }}</OText>
                 <button
                   @click="copyToClipboard(store.state.zoConfig.commit_hash)"
-                  class="inline-flex items-center justify-center p-0.5 rounded border-none bg-transparent cursor-pointer text-text-muted hover:text-(--color-info) transition-colors duration-150"
+                  class="inline-flex items-center justify-center p-0.5 rounded border-none bg-transparent cursor-pointer text-text-muted hover:text-info transition-colors duration-150"
                   title="Copy commit hash"
                 >
                   <OIcon name="content-copy" size="sm" />
@@ -62,8 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <!-- built date -->
               <span class="inline-flex items-center gap-1.5 text-sm text-text-heading whitespace-nowrap py-2 px-3.5 rounded border border-[color-mix(in_srgb,var(--color-warning)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-warning)_8%,var(--color-card-glass-bg))]">
-                <OIcon name="event" size="sm" class="text-(--color-warning) shrink-0" />
-                <span class="text-xs font-semibold uppercase tracking-wide text-(--color-warning)">{{ t("about.build_lbl") }}</span>
+                <OIcon name="event" size="sm" class="text-warning shrink-0" />
+                <span class="text-xs font-semibold uppercase tracking-wide text-warning">{{ t("about.build_lbl") }}</span>
                 {{ formatDate(store.state.zoConfig.build_date) }}
               </span>
             </div>
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="grid grid-cols-1 gap-4">
 
           <!-- Open Source Libraries -->
-          <div class="bg-(--color-card-glass-bg) rounded-[0.625rem] p-4 flex flex-col gap-y-2">
+          <div class="bg-card-glass-bg rounded-[0.625rem] p-4 flex flex-col gap-y-2">
             <div class="flex items-center gap-3">
               <div class="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-card-glass-bg))] text-accent">
                 <OIcon name="code" size="md" />
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/Cargo.toml"
                 target="_blank"
-                class="flex items-center gap-3 py-3 px-3.5 border border-(--color-card-glass-border) rounded-lg bg-(--color-card-glass-bg) no-underline transition-all duration-200 hover:border-[color-mix(in_srgb,var(--color-accent)_35%,transparent)]"
+                class="flex items-center gap-3 py-3 px-3.5 border border-card-glass-border rounded-lg bg-card-glass-bg no-underline transition-all duration-200 hover:border-[color-mix(in_srgb,var(--color-accent)_35%,transparent)]"
               >
                 <OIcon name="settings" size="md" class="text-accent shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/web/package.json"
                 target="_blank"
-                class="flex items-center gap-3 py-3 px-3.5 border border-(--color-card-glass-border) rounded-lg bg-(--color-card-glass-bg) no-underline transition-all duration-200 hover:border-[color-mix(in_srgb,var(--color-accent)_35%,transparent)]"
+                class="flex items-center gap-3 py-3 px-3.5 border border-card-glass-border rounded-lg bg-card-glass-bg no-underline transition-all duration-200 hover:border-[color-mix(in_srgb,var(--color-accent)_35%,transparent)]"
               >
                 <OIcon name="backpack" size="md" class="text-accent shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <a
                 href="https://npmjs.com"
                 target="_blank"
-                class="flex items-center gap-3 py-3 px-3.5 border border-(--color-card-glass-border) rounded-lg bg-(--color-card-glass-bg) no-underline transition-all duration-200 hover:border-[color-mix(in_srgb,var(--color-accent)_35%,transparent)]"
+                class="flex items-center gap-3 py-3 px-3.5 border border-card-glass-border rounded-lg bg-card-glass-bg no-underline transition-all duration-200 hover:border-[color-mix(in_srgb,var(--color-accent)_35%,transparent)]"
               >
                 <OIcon name="javascript" size="md" class="text-accent shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <a
                 href="https://crates.io"
                 target="_blank"
-                class="flex items-center gap-3 py-3 px-3.5 border border-(--color-card-glass-border) rounded-lg bg-(--color-card-glass-bg) no-underline transition-all duration-200 hover:border-[color-mix(in_srgb,var(--color-accent)_35%,transparent)]"
+                class="flex items-center gap-3 py-3 px-3.5 border border-card-glass-border rounded-lg bg-card-glass-bg no-underline transition-all duration-200 hover:border-[color-mix(in_srgb,var(--color-accent)_35%,transparent)]"
               >
                 <OIcon name="inventory-2" size="md" class="text-accent shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
@@ -137,10 +137,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- License Info (opensource or enterprise on-prem) -->
           <div
             v-if="store.state.zoConfig.build_type == 'opensource' || (store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false')"
-            class="bg-(--color-card-glass-bg) rounded-[0.625rem] p-4"
+            class="bg-card-glass-bg rounded-[0.625rem] p-4"
           >
             <div class="flex items-center gap-3 mb-3">
-              <div class="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 bg-[color-mix(in_srgb,var(--color-info)_12%,var(--color-card-glass-bg))] text-(--color-info)">
+              <div class="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 bg-[color-mix(in_srgb,var(--color-info)_12%,var(--color-card-glass-bg))] text-info">
                 <OIcon name="shield" size="md" />
               </div>
               <OText variant="page-title" as="h2" class="m-0 text-xl font-medium">{{ t("about.license_info") }}</OText>
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Community Card (fallback for cloud) -->
-          <div v-else class="bg-(--color-card-glass-bg) rounded-[0.625rem] p-4">
+          <div v-else class="bg-card-glass-bg rounded-[0.625rem] p-4">
             <div class="flex items-center gap-3 mb-3">
               <div class="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-card-glass-bg))] text-accent">
                 <OIcon name="groups" size="md" />
@@ -192,11 +192,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- ── Enterprise License Details ──────────────────────────── -->
-        <div v-if="config.isEnterprise == 'true' && config.isCloud === 'false'" class="bg-(--color-card-glass-bg) rounded-[0.625rem] p-4">
+        <div v-if="config.isEnterprise == 'true' && config.isCloud === 'false'" class="bg-card-glass-bg rounded-[0.625rem] p-4">
           <!-- Header: eyebrow + title + manage button -->
           <div class="flex items-start justify-between mb-2">
             <div class="flex items-start gap-3">
-              <div class="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 bg-[color-mix(in_srgb,var(--color-info)_12%,var(--color-card-glass-bg))] text-(--color-info)">
+              <div class="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 bg-[color-mix(in_srgb,var(--color-info)_12%,var(--color-card-glass-bg))] text-info">
                 <OIcon name="workspace-premium" size="md" />
               </div>
               <div>
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <p class="text-sm mb-2">{{ t("about.no_license_installed_msg") }}</p>
               <div v-if="licenseData && licenseData.installation_id" class="text-xs flex items-center flex-wrap gap-1">
                 {{ t("about.installation_id_lbl") }}:
-                <code class="px-2 py-0.5 rounded font-mono border border-solid border-(--color-card-glass-border) bg-code-bg select-all">
+                <code class="px-2 py-0.5 rounded font-mono border border-solid border-card-glass-border bg-code-bg select-all">
                   {{ licenseData.installation_id }}
                 </code>
               </div>
@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div v-else class="grid grid-cols-2 gap-4">
             <!-- License details table -->
-            <div class="border border-(--color-card-glass-border) rounded-lg overflow-hidden">
+            <div class="border border-card-glass-border rounded-lg overflow-hidden">
               <table class="w-full border-collapse">
                 <tbody>
                   <tr class="border-b border-table-row-divider last:border-b-0">
@@ -253,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <td class="text-sm text-text-body py-2.5 px-3.5">
                       <span
                         class="inline-block w-2 h-2 rounded-full mr-1.5 align-middle"
-                        :class="licenseData?.expired ? 'bg-(--color-status-negative)' : 'bg-(--color-status-positive)'"
+                        :class="licenseData?.expired ? 'bg-status-negative' : 'bg-status-positive'"
                       />
                       <span :class="licenseData?.expired ? 'text-red-500' : 'text-green-600'">
                         {{ licenseData?.expired ? t("about.expired_lbl") : t("about.active_lbl") }}
@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Ingestion usage panel -->
-            <div class="bg-[color-mix(in_srgb,var(--color-accent)_4%,var(--color-card-glass-bg))] border border-(--color-card-glass-border) rounded-lg p-5">
+            <div class="bg-[color-mix(in_srgb,var(--color-accent)_4%,var(--color-card-glass-bg))] border border-card-glass-border rounded-lg p-5">
               <p class="text-sm font-semibold m-0 mb-1" style="color: var(--color-text-heading)">{{ t("about.usage_limits") }}</p>
               <p class="text-xs m-0 mb-4" style="color: var(--color-text-muted)">
                 {{ licenseData.license.limits?.Ingestion?.typ || 'PerDayCount' }}
@@ -291,10 +291,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ licenseData.ingestion_used.toFixed(2) }}%</span>
                   <span class="text-xs text-text-secondary">of daily limit used today</span>
                 </div>
-                <div class="h-1.5 rounded-full bg-(--color-card-glass-border) overflow-hidden mb-1.5">
+                <div class="h-1.5 rounded-full bg-card-glass-border overflow-hidden mb-1.5">
                   <div
                     class="h-full rounded-full transition-[width] duration-[400ms] min-w-1"
-                    :class="licenseData.ingestion_used > 90 ? 'bg-(--color-status-negative)' : licenseData.ingestion_used > 70 ? 'bg-(--color-warning)' : 'bg-accent'"
+                    :class="licenseData.ingestion_used > 90 ? 'bg-status-negative' : licenseData.ingestion_used > 70 ? 'bg-warning' : 'bg-accent'"
                     :style="{ width: Math.min(licenseData.ingestion_used, 100) + '%' }"
                   />
                 </div>
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ licenseData.license.limits?.Ingestion?.value || 50 }} GB / day</span>
                 </div>
               </div>
-              <div class="flex items-start gap-1.5 text-xs text-(--color-status-positive) bg-[color-mix(in_srgb,var(--color-status-positive)_8%,var(--color-card-glass-bg))] border border-[color-mix(in_srgb,var(--color-status-positive)_22%,transparent)] rounded py-2 px-3">
+              <div class="flex items-start gap-1.5 text-xs text-status-positive bg-[color-mix(in_srgb,var(--color-status-positive)_8%,var(--color-card-glass-bg))] border border-[color-mix(in_srgb,var(--color-status-positive)_22%,transparent)] rounded py-2 px-3">
                 <OIcon name="check-circle" size="sm" class="shrink-0 mt-0.5" />
                 {{ t("about.feature_comparision_plan_detail") }}
               </div>
@@ -312,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- ── Feature Comparison ──────────────────────────────────── -->
-        <div v-if="config.isCloud === 'false'" class="bg-(--color-card-glass-bg) rounded-[0.625rem] p-4 mb-5">
+        <div v-if="config.isCloud === 'false'" class="bg-card-glass-bg rounded-[0.625rem] p-4 mb-5">
           <FeatureComparisonTable />
         </div>
 

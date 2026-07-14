@@ -122,7 +122,7 @@
               v-if="healthyLabel"
               class="flex items-baseline gap-2 p-[12px_14px] border border-[color-mix(in_srgb,var(--color-status-success-text)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-status-success-text)_8%,transparent)] rounded-md"
             >
-              <span class="text-lg font-bold text-(--color-status-success-text)">{{ thresholdSign }}</span>
+              <span class="text-lg font-bold text-status-success-text">{{ thresholdSign }}</span>
               <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] font-bold text-sm text-text-primary">{{ healthyLabel }}</span>
               <span class="ml-auto text-[11px] text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.thresholdHint") }}</span>
             </div>

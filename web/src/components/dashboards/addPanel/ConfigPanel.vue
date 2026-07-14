@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-else class="pb-8">
     <!-- Search bar -->
     <div
-      class="sticky p-1 top-0 z-20 bg-(--color-card-glass-solid) border-b border-solid border-(--color-card-glass-border)"
+      class="sticky p-1 top-0 z-20 bg-card-glass-solid border-b border-solid border-card-glass-border"
       data-test="dashboard-config-search-wrapper"
     >
       <div class="flex flex-nowrap items-center" style="gap: 4px">
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionGeneral')"
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <div
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionPromqlTable')"
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <PromQLChartConfig
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionGeographic')"
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <PromQLChartConfig :chart-type="dashboardPanelData.data.type" />
@@ -252,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionLegend')"
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <div class="o2-input flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <OSwitch
@@ -482,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionData')"
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <div class="o2-input flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <OSelect
@@ -728,7 +728,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionAxis')"
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <OInput
@@ -830,7 +830,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionLabels')"
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <OSelect
@@ -942,7 +942,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionLineStyle')"
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <div class="o2-input flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <OSelect
@@ -1003,7 +1003,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionTable')"
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <OSwitch
@@ -1083,7 +1083,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionPivotTable')"
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <OSwitch
@@ -1203,7 +1203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.valueTransformations = v;
         }
       "
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
         <span class="text-sm font-medium">{{
@@ -1231,7 +1231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.fieldOverrides = v;
         }
       "
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
         <span class="text-sm font-medium">{{
@@ -1266,7 +1266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionMap')"
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <div class="o2-input flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <div v-if="dashboardPanelData.data.type == 'maps'">
@@ -1455,7 +1455,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionGauge')"
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <OInput
@@ -1520,7 +1520,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionLayout')"
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <div v-show="isConfigOptionVisible('layout', 'trellis-layout')">
@@ -1649,7 +1649,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionColors')"
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <ColorPaletteDropDown />
@@ -1668,7 +1668,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.drilldown = v;
         }
       "
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
         <span class="text-sm font-medium">{{
@@ -1706,7 +1706,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.comparison = v;
         }
       "
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
         <span class="text-sm font-medium">{{
@@ -1773,7 +1773,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.markLines = v;
         }
       "
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
         <span class="text-sm font-medium">{{
@@ -1806,7 +1806,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionBackground')"
-      class="border-t border-solid border-[var(--color-card-glass-border)]"
+      class="border-t border-solid border-card-glass-border"
     >
       <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <BackGroundColorConfig />

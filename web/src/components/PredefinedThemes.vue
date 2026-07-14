@@ -67,12 +67,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex items-center w-full py-2 px-3 border rounded-lg cursor-pointer transition-[border-color,background-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_40%,transparent)]"
             :class="isThemeApplied(theme, mode)
               ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] shadow-[inset_0_0_0_1px_var(--color-accent)]'
-              : 'border-(--color-card-glass-border) bg-(--color-card-glass-bg) hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'"
+              : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'"
             :aria-pressed="isThemeApplied(theme, mode)"
             :aria-label="`Apply ${themeDisplayName(theme.name)} theme`"
             @click="applyTheme(theme, mode)"
           >
-            <span class="w-8 h-8 rounded border border-(--color-card-glass-border) shrink-0 relative" :style="swatchStyle(theme[mode])" />
+            <span class="w-8 h-8 rounded border border-card-glass-border shrink-0 relative" :style="swatchStyle(theme[mode])" />
             <span class="ml-2 min-w-0 flex-1 text-left">
               <span class="block text-sm font-medium truncate">{{ themeDisplayName(theme.name) }}</span>
               <span class="block text-xs text-gray-400 truncate">{{ theme[mode].themeColor }}</span>
@@ -94,14 +94,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex items-center w-full py-2 px-3 border border-dashed rounded-lg cursor-pointer transition-[border-color,background-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_40%,transparent)]"
             :class="isCustomThemeApplied(mode)
               ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] shadow-[inset_0_0_0_1px_var(--color-accent)]'
-              : 'border-(--color-card-glass-border) bg-(--color-card-glass-bg) hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'"
+              : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'"
             :aria-pressed="isCustomThemeApplied(mode)"
             aria-label="Pick a custom theme color"
             @click="openColorPicker(mode)"
           >
             <span
               :data-test="`predefined-themes-custom-color-preview-${mode}`"
-              class="w-8 h-8 rounded border border-(--color-card-glass-border) shrink-0 relative"
+              class="w-8 h-8 rounded border border-card-glass-border shrink-0 relative"
               :style="{ backgroundColor: mode === 'light' ? customLightColor : customDarkColor }"
             >
               <OIcon name="colorize" size="sm" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />

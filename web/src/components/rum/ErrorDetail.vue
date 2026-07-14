@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       data-test="error-detail-error-type"
       @click="handleErrorTypeClick"
-      class="text-base text-[var(--color-info)] capitalize cursor-pointer"
+      class="text-base text-info capitalize cursor-pointer"
     >
       {{ column.error_type || "Error" }}
     </div>

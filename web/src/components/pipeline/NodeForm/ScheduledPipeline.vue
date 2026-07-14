@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                           size="icon-xs-circle"
                                           :title="`duration >= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
                                           @click.stop="addFieldSearchTerm(`duration>='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
-                                          class="ml-[0.125rem]! border! border-[var(--color-card-glass-border)]!"
+                                          class="ml-[0.125rem]! border! border-card-glass-border!"
                                         >
                                           <OIcon name="arrow-forward-ios" size="sm" class="h-[0.4rem]! w-[0.4rem]!" />
                                         </OButton>
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                           size="icon-xs-circle"
                                           :title="`duration <= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
                                           @click.stop="addFieldSearchTerm(`duration<='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
-                                          class="ml-auto! mr-[0.5rem]! border! border-[var(--color-card-glass-border)]!"
+                                          class="ml-auto! mr-[0.5rem]! border! border-card-glass-border!"
                                         >
                                           <OIcon name="arrow-back-ios" size="sm" class="h-[0.4rem]! w-[0.4rem]!" />
                                         </OButton>
@@ -614,7 +614,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                suppresses its inline message; we surface the schema
                                error in the full-width sibling below (R3-timed). -->
                           <div
-                            class="flex items-stretch border border-[var(--color-card-glass-border)] rounded-md w-fit overflow-hidden"
+                            class="flex items-stretch border border-card-glass-border rounded-md w-fit overflow-hidden"
                           >
                             <OFormInput
                               data-test="scheduled-pipeline-frequency-input-field"
@@ -703,7 +703,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                              below the bordered control instead of inside the
                              7.5rem field, where it would wrap. -->
                         <div
-                          class="flex items-stretch border border-[var(--color-card-glass-border)] rounded-md w-fit overflow-hidden"
+                          class="flex items-stretch border border-card-glass-border rounded-md w-fit overflow-hidden"
                         >
                           <OFormInput
                             data-test="scheduled-pipeline-period-input"
@@ -772,7 +772,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OIcon>
                       </div>
                       <div
-                        class="flex items-stretch border border-[var(--color-card-glass-border)] rounded-md w-fit overflow-hidden"
+                        class="flex items-stretch border border-card-glass-border rounded-md w-fit overflow-hidden"
                       >
                         <OFormInput
                           data-test="scheduled-pipeline-delay-input"
@@ -937,7 +937,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div
-                class="border-t border-(--color-card-glass-border) sticky bottom-0 px-4 py-3 z-10"
+                class="border-t border-card-glass-border sticky bottom-0 px-4 py-3 z-10"
                 :class="store.state.theme === 'dark' ? 'bg-surface-base' : 'bg-white'"
               >
                 <div class="flex justify-end gap-2">

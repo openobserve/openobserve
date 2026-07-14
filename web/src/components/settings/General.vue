@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-slot="{ isSubmitting }"
         >
           <!-- scape interval section -->
-          <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-(--color-card-glass-border)">
+          <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-card-glass-border">
             <span class="individual-setting-title text-sm font-medium leading-5">
               {{ t("settings.scrapintervalLabel") }}
             </span>
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Max Series Per Query section -->
-          <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-(--color-card-glass-border)">
+          <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-card-glass-border">
             <span class="individual-setting-title text-sm font-medium leading-5">
               {{ t("settings.maxSeriesPerQueryLabel") }}
             </span>
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Manage Theme section -->
-          <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-(--color-card-glass-border)">
+          <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-card-glass-border">
             <span class="individual-setting-title text-sm font-medium leading-5">
               {{ t("settings.manageTheme") }}
             </span>
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div>
-        <div class="settings-grid-item no-border-bottom grid grid-cols-3 gap-4 items-center py-4 border-b border-(--color-card-glass-border)">
+        <div class="settings-grid-item no-border-bottom grid grid-cols-3 gap-4 items-center py-4 border-b border-card-glass-border">
           <span class="individual-setting-title text-sm font-medium leading-5">
             {{ t("settings.customLogoText") }}
           </span>
@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
         <!-- Light Mode Logo -->
-        <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-(--color-card-glass-border)">
+        <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-card-glass-border">
           <div class="pt-2 individual-setting-title text-sm font-medium leading-5 w-full mb-5">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.lightMode") }})
           </div>
@@ -301,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
         <!-- Dark Mode Logo -->
-        <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-(--color-card-glass-border)">
+        <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-card-glass-border">
           <div class="pt-2 individual-setting-title text-sm font-medium leading-5 w-full mb-5">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.darkMode") }})
           </div>

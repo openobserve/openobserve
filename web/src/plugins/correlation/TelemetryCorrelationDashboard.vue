@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
       <div
-        class="py-2 px-4 border-b border-solid border-[var(--color-card-glass-border)]"
+        class="py-2 px-4 border-b border-solid border-card-glass-border"
       >
         <div class="flex items-center gap-3 flex-wrap">
           <span class="text-xs font-semibold opacity-70">
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Refresh Button (dialog mode) -->
           <div
             v-if="logsDashboardData"
-            class="p-2 border-b border-solid border-[var(--color-card-glass-border)] flex justify-end"
+            class="p-2 border-b border-solid border-card-glass-border flex justify-end"
           >
             <OButton
               variant="ghost"
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- Search -->
                   <div
-                    class="dimension-sidebar-search-container p-[0.625rem] border-b border-solid border-[var(--color-card-glass-border)]"
+                    class="dimension-sidebar-search-container p-[0.625rem] border-b border-solid border-card-glass-border"
                   >
                     <OSearchInput
                       v-model="metricSearchText"
@@ -203,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template v-if="group.streams.length > 0">
                         <div
-                          class="flex items-center justify-between py-1.5 px-2 bg-(--color-section-header-bg) border-b border-solid border-border-default sticky top-0 z-10 cursor-pointer"
+                          class="flex items-center justify-between py-1.5 px-2 bg-section-header-bg border-b border-solid border-border-default sticky top-0 z-10 cursor-pointer"
                           @click="toggleGroupCollapse(group.id)"
                         >
                           <div class="flex items-center gap-[0.375rem] text-[0.6875rem] font-bold uppercase tracking-[0.05em] opacity-75">
@@ -283,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Footer: selected count -->
                 <div
-                  class="p-3 border-t border-solid border-[var(--color-card-glass-border)] o2-table-footer-title"
+                  class="p-3 border-t border-solid border-card-glass-border o2-table-footer-title"
                 >
                   {{ selectedMetricStreams.length }} of
                   {{ uniqueMetricStreams.length }} selected
@@ -305,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="activeOuterTab"
                   dense
                   align="left"
-                  class="metric-group-tabs border-b border-solid border-[var(--color-card-glass-border)]"
+                  class="metric-group-tabs border-b border-solid border-card-glass-border"
                 >
                   <OTab
                     v-for="outerGroup in groupDefs"
@@ -334,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="activeMetricGroupTab"
                   dense
                   align="left"
-                  class="metric-group-tabs shrink-0 bg-surface-panel border-b border-solid border-(--color-card-glass-border)"
+                  class="metric-group-tabs shrink-0 bg-surface-panel border-b border-solid border-card-glass-border"
                 >
                   <OTab
                     v-for="group in groupedUniqueMetricStreams.groups.filter(
@@ -502,7 +502,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Header -->
             <div
-              class="p-3 border-b border-solid border-(--color-card-glass-border) bg-surface-panel"
+              class="p-3 border-b border-solid border-card-glass-border bg-surface-panel"
             >
               <div class="flex items-center gap-3">
                 <OIcon name="hub" size="md" />
@@ -613,7 +613,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Refresh Button (embedded mode) -->
           <div
             v-if="logsDashboardData"
-            class="p-2 border-b border-solid border-[var(--color-card-glass-border)] flex justify-end"
+            class="p-2 border-b border-solid border-card-glass-border flex justify-end"
           >
             <OButton
               variant="ghost"
@@ -678,7 +678,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="h-full min-h-0 flex flex-col bg-surface-overlay"
             >
             <div
-              class="dimension-sidebar-search-container p-[0.625rem] border-b border-solid border-[var(--color-card-glass-border)]"
+              class="dimension-sidebar-search-container p-[0.625rem] border-b border-solid border-card-glass-border"
             >
               <OSearchInput
                 v-model="metricSearchText"
@@ -705,7 +705,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template v-if="group.streams.length > 0">
                       <div
-                        class="flex items-center justify-between py-1.5 px-2 bg-(--color-section-header-bg) border-b border-solid border-border-default sticky top-0 z-10 cursor-pointer"
+                        class="flex items-center justify-between py-1.5 px-2 bg-section-header-bg border-b border-solid border-border-default sticky top-0 z-10 cursor-pointer"
                         @click="toggleGroupCollapse(group.id)"
                       >
                         <div class="flex items-center gap-[0.375rem] text-[0.6875rem] font-bold uppercase tracking-[0.05em] opacity-75">
@@ -785,7 +785,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Footer: selected count -->
               <div
-                class="p-3 border-t border-solid border-[var(--color-card-glass-border)] o2-table-footer-title"
+                class="p-3 border-t border-solid border-card-glass-border o2-table-footer-title"
               >
                 {{ selectedMetricStreams.length }} of
                 {{ uniqueMetricStreams.length }} selected
@@ -807,7 +807,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="activeOuterTab"
                 dense
                 align="left"
-                class="metric-group-tabs border-b border-solid border-[var(--color-card-glass-border)]"
+                class="metric-group-tabs border-b border-solid border-card-glass-border"
               >
                 <OTab
                   v-for="outerGroup in groupDefs"
@@ -836,7 +836,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="activeMetricGroupTab"
                 dense
                 align="left"
-                class="metric-group-tabs shrink-0 bg-surface-panel border-b border-solid border-(--color-card-glass-border)"
+                class="metric-group-tabs shrink-0 bg-surface-panel border-b border-solid border-card-glass-border"
               >
                 <OTab
                   v-for="group in groupedUniqueMetricStreams.groups.filter(
@@ -1004,7 +1004,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Header -->
           <div
-            class="p-3 border-b border-solid border-(--color-card-glass-border) bg-surface-panel"
+            class="p-3 border-b border-solid border-card-glass-border bg-surface-panel"
           >
             <div class="flex items-center gap-3">
               <OIcon name="hub" size="md" />
@@ -1105,7 +1105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Group section — hidden when no streams match -->
           <template v-if="group.streams.length > 0">
             <!-- Group header -->
-            <div class="flex items-center justify-between py-1.5 px-2 bg-(--color-section-header-bg) border-b border-solid border-border-default sticky top-0 z-10">
+            <div class="flex items-center justify-between py-1.5 px-2 bg-section-header-bg border-b border-solid border-border-default sticky top-0 z-10">
               <div class="flex items-center gap-[0.375rem] text-[0.6875rem] font-bold uppercase tracking-[0.05em] opacity-75">
                 <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="mr-0.5" />
                 <component v-else :is="group.icon" />

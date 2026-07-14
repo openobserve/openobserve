@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("correlation.logs.timeRange.sourceTime") }}
         </div>
         <div
-          class="p-3 border border-solid border-[var(--color-card-glass-border)] rounded bg-surface-panel flex items-center gap-2"
+          class="p-3 border border-solid border-card-glass-border rounded bg-surface-panel flex items-center gap-2"
         >
           <OIcon name="schedule" size="sm" />
           <span class="font-mono text-sm">{{
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Current Range Display -->
     <div
-      class="p-3 border border-solid border-[var(--color-card-glass-border)] rounded bg-blue-50"
+      class="p-3 border border-solid border-card-glass-border rounded bg-blue-50"
     >
       <div class="text-xs font-semibold mb-2 opacity-70">
         {{ t("correlation.logs.timeRange.currentRange") }}

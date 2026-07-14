@@ -130,8 +130,8 @@ const deltaCaption = (
       suffix === "%"
         ? "text-text-caption"
         : delta > 0
-          ? "text-[var(--color-status-error-text)]"
-          : "text-[var(--color-status-success-text)]",
+          ? "text-status-error-text"
+          : "text-status-success-text",
   };
 };
 
@@ -151,7 +151,7 @@ const cards = computed(() => [
     value: props.errorSessions.toLocaleString(),
     valueClass:
       props.errorSessions > 0
-        ? "text-[var(--color-severity-error-color)]"
+        ? "text-severity-error-color"
         : "text-text-heading",
     rate: rate(props.errorSessions),
     ...deltaCaption(props.errorsDelta, t("rum.sessionsWithErrors")),
@@ -163,7 +163,7 @@ const cards = computed(() => [
     value: props.frustratedSessions.toLocaleString(),
     valueClass:
       props.frustratedSessions > 0
-        ? "text-[var(--color-severity-warning-color)]"
+        ? "text-severity-warning-color"
         : "text-text-heading",
     rate: rate(props.frustratedSessions),
     ...deltaCaption(props.frustratedDelta, t("rum.rageDeadClicks")),

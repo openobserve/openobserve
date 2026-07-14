@@ -396,14 +396,14 @@ function onRowBlur() {
    cell — an extra <td> would add a phantom column on only the rows that have
    a status color and shift their cells out of alignment under table-fixed. */
 .o2-table-row-with-status > td:first-child {
-  box-shadow: inset 0.25rem 0 0 0 var(--row-status-color);
+  box-shadow: inset 0.25rem 0 0 0 var(--row-status-color, transparent);
 }
 
 /* Continuation of the tree connector vertical line through the warning row */
 .o2-table-tree-warning-cell::after {
   content: "";
   position: absolute;
-  left: var(--tree-connector-x);
+  left: var(--tree-connector-x, 0);
   top: 0;
   bottom: 0;
   width: 1.5px;

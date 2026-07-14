@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex w-11/12 justify-center mt-6">
     <OIcon
-      name="warning" class="text-[var(--color-warning)]" style="width: 80px; height: 80px;" /><br />
+      name="warning" class="text-warning" style="width: 80px; height: 80px;" /><br />
     <h5>
       <b
         ><u><span class="text-red">Warning:</span></u></b

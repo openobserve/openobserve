@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="traces-search-result-list h-auto! flex flex-col bg-[var(--color-card-glass-solid)]"
+    class="traces-search-result-list h-auto! flex flex-col bg-card-glass-solid"
   >
     <!-- ════════════════════ Empty State ════════════════════ -->
     <TracesNoEventsState
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-operation_name="{ item }">
             <span
-              class="text-xs truncate text-(--color-grey-500)! [font-family:var(--font-mono)]"
+              class="text-xs truncate text-grey-500! [font-family:var(--font-mono)]"
               data-test="trace-row-operation-name"
             >
               {{ item.operation_name }}
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-duration="{ item }">
-            <span class="text-xs text-(--color-grey-500) [font-family:var(--font-mono)]" data-test="trace-row-duration">
+            <span class="text-xs text-grey-500 [font-family:var(--font-mono)]" data-test="trace-row-duration">
               {{ formatTimeWithSuffix(item.duration) || "0us" }}
             </span>
           </template>
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <TraceStatusCell :item="item" />
           </template>
           <template #cell-input_tokens="{ item }">
-            <span class="text-xs text-(--color-grey-500) [font-family:var(--font-mono)]" data-test="trace-row-input-tokens">
+            <span class="text-xs text-grey-500 [font-family:var(--font-mono)]" data-test="trace-row-input-tokens">
               {{
                 isLLMTrace(item)
                   ? formatTokens(extractLLMData(item)?.usage?.input ?? 0)
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-output_tokens="{ item }">
-            <span class="text-xs text-(--color-grey-500) [font-family:var(--font-mono)]" data-test="trace-row-output-tokens">
+            <span class="text-xs text-grey-500 [font-family:var(--font-mono)]" data-test="trace-row-output-tokens">
               {{
                 isLLMTrace(item)
                   ? formatTokens(extractLLMData(item)?.usage?.output ?? 0)
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-cost="{ item }">
-            <span class="text-xs text-(--color-grey-500) [font-family:var(--font-mono)]" data-test="trace-row-cost">
+            <span class="text-xs text-grey-500 [font-family:var(--font-mono)]" data-test="trace-row-cost">
               {{
                 isLLMTrace(item)
                   ? `$${formatCost(extractLLMData(item)?.cost?.total ?? 0)}`

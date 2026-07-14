@@ -74,8 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`service-graph-filter-chip-${chip.key}`"
               :class="
                 chip.type === 'duration'
-                  ? 'text-[var(--color-latency-p95)]'
-                  : 'text-[var(--color-status-error-text)]'
+                  ? 'text-latency-p95'
+                  : 'text-status-error-text'
               "
             >
               <!-- Duration chip icon -->
@@ -83,20 +83,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="chip.type === 'duration'"
                 name="schedule"
                 size="xs"
-                class="text-[var(--color-latency-p95)]"
+                class="text-latency-p95"
               />
               <!-- Error chip icon -->
               <OIcon
                 v-else-if="chip.type === 'error'"
                 name="warning"
                 size="xs"
-                class="text-[var(--color-status-error-text)]"
+                class="text-status-error-text"
               />
               <span
                 :class="
                   chip.type === 'duration'
-                    ? 'text-[var(--color-latency-p95)]'
-                    : 'text-[var(--color-status-error-text)]'
+                    ? 'text-latency-p95'
+                    : 'text-status-error-text'
                 "
                 >{{ chip.label }}</span
               >
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Tabs: Operations / Nodes / Pods -->
         <template v-if="streamFilter !== 'all'">
           <div
-            class="flex items-end border-b border-b-[var(--color-card-glass-border)] mx-[0.5rem] mb-[0.375rem]"
+            class="flex items-end border-b border-b-card-glass-border mx-[0.5rem] mb-[0.375rem]"
             data-test="service-graph-node-panel-tabs-row"
           >
             <OTabs

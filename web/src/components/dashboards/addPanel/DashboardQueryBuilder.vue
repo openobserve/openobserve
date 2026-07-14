@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     index &&
                   dashboardPanelData.meta.dragAndDrop.currentDragArea == 'x'
                 "
-                class="dragItem bg-(--color-theme-accent) w-5 h-full rounded-md opacity-70"
+                class="dragItem bg-theme-accent w-5 h-full rounded-md opacity-70"
                 data-test="dashboard-query-builder-drag-item"
               >
                 &nbsp;
@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dashboardPanelData.meta.dragAndDrop.currentDragArea ==
                     'breakdown'
                 "
-                class="dragItem bg-(--color-theme-accent) w-5 h-full rounded-md opacity-70"
+                class="dragItem bg-theme-accent w-5 h-full rounded-md opacity-70"
                 data-test="dashboard-query-builder-drag-item"
               >
                 &nbsp;
@@ -388,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.meta.dragAndDrop.targetDragIndex == index &&
               dashboardPanelData.meta.dragAndDrop.currentDragArea == 'y'
             "
-            class="dragItem bg-(--color-theme-accent) w-5 h-full rounded-md opacity-70"
+            class="dragItem bg-theme-accent w-5 h-full rounded-md opacity-70"
             data-test="dashboard-query-builder-drag-item"
           >
             &nbsp;
@@ -534,7 +534,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dashboardPanelData.meta.dragAndDrop.targetDragIndex == index &&
                 dashboardPanelData.meta.dragAndDrop.currentDragArea == 'z'
               "
-              class="dragItem bg-(--color-theme-accent) w-5 h-full rounded-md opacity-70"
+              class="dragItem bg-theme-accent w-5 h-full rounded-md opacity-70"
               data-test="dashboard-query-builder-drag-item"
             >
               &nbsp;

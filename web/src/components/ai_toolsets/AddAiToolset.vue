@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <query-editor
                 :editor-id="`cred-file-editor-${idx}`"
-                class="w-full min-h-50! rounded-[5px] border border-(--color-card-glass-border) resize-y overflow-auto"
+                class="w-full min-h-50! rounded-[5px] border border-card-glass-border resize-y overflow-auto"
                 language="yaml"
                 :query="cred.value"
                 @update:query="(v: string) => setCredValue(idx, v)"
@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <query-editor
               data-test="ai-toolset-skill-content"
               editor-id="skill-content-editor"
-              class="w-full min-h-100! rounded-[5px] border border-(--color-card-glass-border) resize-y overflow-auto mb-3"
+              class="w-full min-h-100! rounded-[5px] border border-card-glass-border resize-y overflow-auto mb-3"
               language="markdown"
               :query="skillContent"
               @update:query="(v: string) => setSkillContent(v)"

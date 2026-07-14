@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="col in pivotRowColumns"
               :key="'rh_' + col.name"
               :rowspan="pivotHeaderLevels.length"
-              class="cursor-pointer px-2 text-center font-semibold align-middle whitespace-nowrap py-[5px] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-(--color-sticky-col-header-bg)"
+              class="cursor-pointer px-2 text-center font-semibold align-middle whitespace-nowrap py-[5px] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-sticky-col-header-bg"
               :style="getStickyColumnStyle(col) as any"
               @click="handlePivotSort(col.name)"
             >
@@ -103,8 +103,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="px-2"
               :class="[
                 level.isLeaf
-                  ? 'text-center font-medium text-[0.85em] align-middle py-[5px] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-(--color-sticky-col-header-bg)'
-                  : 'text-center font-semibold align-middle whitespace-nowrap py-[5px] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-(--color-sticky-col-header-bg)',
+                  ? 'text-center font-medium text-[0.85em] align-middle py-[5px] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-sticky-col-header-bg'
+                  : 'text-center font-semibold align-middle whitespace-nowrap py-[5px] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-sticky-col-header-bg',
                 {
                   'pivot-section-border':
                     cell.hasBorder && !(stickyColTotals && cell._isTotalHeader),
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               // Header-row chrome via centralized token utilities (same tokens
               // OTable uses): background band + full-width underline on the row
               // so it spans past the last column.
-              'bg-table-header-bg border-b border-[var(--color-grey-300)]',
+              'bg-table-header-bg border-b border-grey-300',
             ]"
             :style="{
               width:
@@ -511,7 +511,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr
             v-for="r in SKEL_ROW_COUNT"
             :key="`skel-${r}`"
-            class="o2-skel-row flex items-center w-full opacity-0 h-[29px] bg-(--color-log-table-row-bg) border-b border-(--color-log-table-row-border) [animation:o2-skel-row-in_320ms_ease-out_forwards] motion-reduce:opacity-100 motion-reduce:animate-none"
+            class="o2-skel-row flex items-center w-full opacity-0 h-[29px] bg-log-table-row-bg border-b border-log-table-row-border [animation:o2-skel-row-in_320ms_ease-out_forwards] motion-reduce:opacity-100 motion-reduce:animate-none"
             :style="{ animationDelay: `${(r - 1) * 40}ms` }"
           >
             <!-- No columns yet (first paint) — full-width shimmer bar -->

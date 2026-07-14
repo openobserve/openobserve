@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex gap-3 mb-3" style="height: 100px;">
             <!-- 1. Total Alerts Card -->
             <div
-              class="flex-1 flex flex-col justify-between el-border el-border-radius bg-(--color-card-glass-bg) transition-all duration-200 cursor-pointer p-3"
+              class="flex-1 flex flex-col justify-between el-border el-border-radius bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="flex justify-between items-start">
@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- 2. Unique Alerts Card -->
             <div
-              class="flex-1 flex flex-col justify-between el-border el-border-radius bg-(--color-card-glass-bg) transition-all duration-200 cursor-pointer p-3"
+              class="flex-1 flex flex-col justify-between el-border el-border-radius bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="flex justify-between items-start">
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- 3. Affected Services Card -->
             <div
-              class="flex-1 flex flex-col justify-between el-border el-border-radius bg-(--color-card-glass-bg) transition-all duration-200 cursor-pointer p-3"
+              class="flex-1 flex flex-col justify-between el-border el-border-radius bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="flex justify-between items-start">
@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- 4. Active Duration Card -->
             <div
-              class="flex-1 flex flex-col justify-between el-border el-border-radius bg-(--color-card-glass-bg) transition-all duration-200 cursor-pointer p-3"
+              class="flex-1 flex flex-col justify-between el-border el-border-radius bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="flex justify-between items-start">
@@ -292,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- 5. Alert Frequency Card -->
             <div
-              class="flex-1 flex flex-col justify-between el-border el-border-radius bg-(--color-card-glass-bg) transition-all duration-200 cursor-pointer p-3"
+              class="flex-1 flex flex-col justify-between el-border el-border-radius bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="flex justify-between items-start">
@@ -319,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex gap-3" style="height: 50%;">
                                <!-- Incident Timeline (33.33% width) -->
                 <div
-                  class="el-border el-border-radius bg-(--color-card-glass-bg) flex flex-col overflow-hidden"
+                  class="el-border el-border-radius bg-card-glass-bg flex flex-col overflow-hidden"
                   :style="{
                     width: '33.33%'
                   }"
@@ -426,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- Incident Details (66.67% width) -->
                 <div
-                  class="el-border el-border-radius bg-(--color-card-glass-bg) flex flex-col overflow-hidden"
+                  class="el-border el-border-radius bg-card-glass-bg flex flex-col overflow-hidden"
                   :style="{
                     width: '66.67%'
                   }"
@@ -537,7 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- alert activity -->
                <!-- 2.1B: Alert Activity Chart (50% height, full width) -->
               <div
-                class="el-border el-border-radius bg-(--color-card-glass-bg) flex flex-col overflow-hidden"
+                class="el-border el-border-radius bg-card-glass-bg flex flex-col overflow-hidden"
                 :style="{
                   height: '50%'
                 }"
@@ -568,7 +568,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex flex-col gap-2" style="width: 33.33%; height: 100%;">
               <!-- 2.2A: Manage Panel (40% of available height after gaps) -->
               <div
-                class="el-border el-border-radius bg-(--color-card-glass-bg) flex flex-col overflow-hidden"
+                class="el-border el-border-radius bg-card-glass-bg flex flex-col overflow-hidden"
                 :style="{
                   height: 'calc(35% - 6.4px)'
                 }"
@@ -644,7 +644,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- 2.2B: Dimensions Panel (35% when Alert Flow present, 60% when absent, or when no triggers) -->
               <div
-                class="el-border el-border-radius bg-(--color-card-glass-bg) flex flex-col overflow-hidden"
+                class="el-border el-border-radius bg-card-glass-bg flex flex-col overflow-hidden"
                 :style="{
                   height: (sortedAlertsByTriggerCount?.length)
                     ? 'calc(35% - 5.6px)'
@@ -705,7 +705,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- 2.2C: Alert Flow Panel (25% of available height after gaps) - Conditional -->
               <div
                 v-if="sortedAlertsByTriggerCount?.length"
-                class="el-border el-border-radius bg-(--color-card-glass-bg) flex flex-col overflow-hidden"
+                class="el-border el-border-radius bg-card-glass-bg flex flex-col overflow-hidden"
                 :style="{
                   height: 'calc(30% - 4px)'
                 }"
@@ -799,7 +799,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex-1 flex flex-col overflow-hidden pr-2 pt-4">
             <div
               :class="[
-                'border border-[var(--color-card-glass-border)] rounded-md overflow-hidden flex flex-col flex-1'
+                'border border-card-glass-border rounded-md overflow-hidden flex flex-col flex-1'
               ]"
             >
               <IncidentAlertTriggersTable
@@ -814,7 +814,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="w-[400px] flex-shrink-0 flex flex-col pt-4">
             <div
               :class="[
-                'border border-[var(--color-card-glass-border)] rounded-md overflow-hidden flex flex-col flex-1'
+                'border border-card-glass-border rounded-md overflow-hidden flex flex-col flex-1'
               ]"
             >
               <!-- Header -->
@@ -921,7 +921,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Alert Conditions Section -->
-                  <div :class="['rounded border flex flex-col border-[var(--color-card-glass-border)] rounded-md',]" class="overflow-hidden" style="height: 392px;">
+                  <div :class="['rounded border flex flex-col border-card-glass-border rounded-md',]" class="overflow-hidden" style="height: 392px;">
                     <div :class="['!bg-[var(--color-theme-table-header-bg)] px-2.5 py-1.5 border-b flex items-center justify-between flex-shrink-0', store.state.theme === 'dark' ? 'border-gray-700' : 'border-gray-200']">
                       <span :class="'text-text-secondary'" class="text-[11px] font-semibold uppercase tracking-wide">
                         {{ alerts[selectedAlertIndex]?.query_condition?.type === 'sql' ? 'SQL Query' : alerts[selectedAlertIndex]?.query_condition?.type === 'promql' ? 'PromQL Query' : 'Conditions' }}
@@ -966,7 +966,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="flex flex-1 flex-col items-center justify-center gap-2 h-full">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
-              :class="['w-16 h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'text-[var(--color-warning)]' : 'text-[var(--color-status-negative)]') : 'text-gray-400']" />
+              :class="['w-16 h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'text-warning' : 'text-status-negative') : 'text-gray-400']" />
             <div class="text-xl font-semibold mt-3">
               {{ correlationError || 'No correlated logs found' }}
             </div>
@@ -1015,7 +1015,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="flex flex-1 flex-col items-center justify-center gap-2 h-full">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
-              :class="['w-16 h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'text-[var(--color-warning)]' : 'text-[var(--color-status-negative)]') : 'text-gray-400']" />
+              :class="['w-16 h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'text-warning' : 'text-status-negative') : 'text-gray-400']" />
             <div class="text-xl font-semibold mt-3">
               {{ correlationError || 'No correlated metrics found' }}
             </div>
@@ -1053,7 +1053,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Traces Tab Content -->
         <div v-if="activeTab === 'traces'" class="flex flex-col flex-1 overflow-hidden h-full">
           <!-- Refresh Button (shown when traces data is loaded) -->
-          <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.traceStreams?.length > 0" class="px-4 py-2 border-b border-solid border-[var(--color-card-glass-border)] flex items-center gap-2">
+          <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.traceStreams?.length > 0" class="px-4 py-2 border-b border-solid border-card-glass-border flex items-center gap-2">
             <span class="text-xs">{{ t('alerts.incidents.showingCorrelatedTraces') }}</span>
             <OButton
               variant="ghost"
@@ -1073,7 +1073,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="flex flex-1 flex-col items-center justify-center gap-2 h-full">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
-              :class="['w-16 h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'text-[var(--color-warning)]' : 'text-[var(--color-status-negative)]') : 'text-gray-400']" />
+              :class="['w-16 h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'text-warning' : 'text-status-negative') : 'text-gray-400']" />
             <div class="text-xl font-semibold mt-3">
               {{ correlationError || 'No correlated traces found' }}
             </div>

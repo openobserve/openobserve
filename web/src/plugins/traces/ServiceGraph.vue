@@ -34,7 +34,7 @@
       <!-- Legends (horizontal) -->
       <div
         data-test="service-graph-legends"
-        class="flex flex-row items-center gap-3 p-[0.325rem] rounded border border-[var(--color-card-glass-border)]!"
+        class="flex flex-row items-center gap-3 p-[0.325rem] rounded border border-card-glass-border!"
       >
         <div
           data-test="sg-legend"

@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex items-baseline gap-[0.2rem]">
             <span
-              :class="['text-[1.4rem] font-bold leading-none tabular-nums', kpiAccentClass(card.variant) || 'text-[var(--color-grey-600)]']"
+              :class="['text-[1.4rem] font-bold leading-none tabular-nums', kpiAccentClass(card.variant) || 'text-grey-600']"
             >
               {{ card.value }}
             </span>
@@ -401,7 +401,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="inline-flex items-center justify-center w-[1.5rem] h-[1.5rem] rounded-full text-[0.7rem] font-bold tabular-nums flex-shrink-0"
                 :class="trace.status === 'error'
                   ? 'bg-[color-mix(in_srgb,var(--color-error-500)_15%,transparent)] text-error-500'
-                  : 'bg-[color-mix(in_srgb,var(--color-success-500)_15%,transparent)] text-[var(--color-success-500)]'"
+                  : 'bg-[color-mix(in_srgb,var(--color-success-500)_15%,transparent)] text-success-500'"
               >
                 {{ originalTurnIndex(trace.traceId) + 1 }}
               </span>

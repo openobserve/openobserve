@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-col items-center justify-center h-full gap-4 p-4"
       data-test="rum-player-traces-tab-error"
     >
-      <OIcon name="error-outline" size="lg" class="text-[var(--color-status-error-text)]" />
+      <OIcon name="error-outline" size="lg" class="text-status-error-text" />
       <p class="text-center">{{ error }}</p>
       <OButton
         variant="outline"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-col h-full overflow-hidden"
     >
       <!-- Trace detail header -->
-      <div class="flex items-center gap-1 px-2 py-1.5 border-b border-solid border-[var(--color-card-glass-border)]">
+      <div class="flex items-center gap-1 px-2 py-1.5 border-b border-solid border-card-glass-border">
         <OButton
           variant="ghost"
           size="xs"
@@ -76,14 +76,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center gap-1.5 flex-shrink-0">
           <span
             v-if="selectedTrace.metadata?.errorCount > 0"
-            class="font-bold inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-[var(--color-status-error-bg)]! text-[var(--color-status-error-text)]!"
+            class="font-bold inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-status-error-bg! text-status-error-text!"
           >
             <OIcon name="error" size="xs" />
             {{ selectedTrace.metadata.errorCount }} {{ selectedTrace.metadata.errorCount === 1 ? t("rum.error") : t("rum.errors") }}
           </span>
           <button
             v-if="selectedTrace.metadata?.start_time && props.startTime > 0"
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-surface-accent text-text-body whitespace-nowrap cursor-pointer hover:bg-[var(--color-card-glass-border)]"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-surface-accent text-text-body whitespace-nowrap cursor-pointer hover:bg-card-glass-border"
             :title="t('rum.seekToMoment')"
             data-test="rum-player-traces-tab-seek-btn"
             @click="seekToTrace(selectedTrace)"

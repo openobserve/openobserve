@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-show="visible && !!anchorEl"
     ref="popoverRef"
-    class="wcp w-72 bg-(--color-card-glass-solid) border border-border-default rounded-[0.625rem] overflow-hidden shadow-[0_0.5rem_1.5rem_rgba(0,0,0,0.14),0_0.125rem_0.375rem_rgba(0,0,0,0.06)] [animation:wcpIn_0.15s_ease-out]"
+    class="wcp w-72 bg-card-glass-solid border border-border-default rounded-[0.625rem] overflow-hidden shadow-[0_0.5rem_1.5rem_rgba(0,0,0,0.14),0_0.125rem_0.375rem_rgba(0,0,0,0.06)] [animation:wcpIn_0.15s_ease-out]"
     :class="{ '[animation-name:wcpInUp]': flipUpward }"
     :style="popoverStyle"
     data-test="wildcard-value-popover"
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- Full-width progress bar -->
         <div
-          class="wcp__bar-track w-full h-1 bg-(--color-card-glass-border) rounded-full overflow-hidden mb-[0.1875rem]"
+          class="wcp__bar-track w-full h-1 bg-card-glass-border rounded-full overflow-hidden mb-[0.1875rem]"
         >
           <div
             class="wcp__bar-fill h-full rounded-full transition-[width] duration-200"
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ── Footer ── -->
     <div
       v-if="displayValues.length > 0 && totalOccurrences > 0"
-      class="wcp__footer flex items-center justify-end py-[0.4375rem] px-3 border-t border-(--color-card-glass-border)"
+      class="wcp__footer flex items-center justify-end py-[0.4375rem] px-3 border-t border-card-glass-border"
     >
       <span
         class="wcp__occurrences text-[0.6875rem] font-semibold text-text-caption [font-variant-numeric:tabular-nums]"
@@ -155,10 +155,10 @@ const barWidth = (count: number): string => {
 
 const barColorClass = computed(() => {
   const cls = wildcardChipColor(props.token, props.displayValues);
-  if (cls.includes("blue"))   return "bg-(--color-wildcard-bar-blue)";
-  if (cls.includes("green"))  return "bg-(--color-wildcard-bar-green)";
-  if (cls.includes("orange")) return "bg-(--color-wildcard-bar-orange)";
-  if (cls.includes("purple")) return "bg-(--color-wildcard-bar-purple)";
+  if (cls.includes("blue"))   return "bg-wildcard-bar-blue";
+  if (cls.includes("green"))  return "bg-wildcard-bar-green";
+  if (cls.includes("orange")) return "bg-wildcard-bar-orange";
+  if (cls.includes("purple")) return "bg-wildcard-bar-purple";
   return "bg-accent";
 });
 

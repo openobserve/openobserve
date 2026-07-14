@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="h-full flex flex-col">
     <!-- Header -->
     <div
-      class="p-[0.625rem] border-b border-solid border-[var(--color-card-glass-border)]"
+      class="p-[0.625rem] border-b border-solid border-card-glass-border"
     >
       <div class="flex justify-between items-center">
         <div class="font-bold text-xl font-semibold">Resource Details</div>
@@ -73,18 +73,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Resource Information
           </div>
           <div>
-            <div class="flex py-2 px-3 border-b border-solid border-[var(--color-card-glass-border)]" v-if="resource.resource_type">
+            <div class="flex py-2 px-3 border-b border-solid border-card-glass-border" v-if="resource.resource_type">
               <div class="w-[150px] text-text-secondary font-medium shrink-0">Type:</div>
               <div class="flex-1 text-text-primary break-words">{{ resource.resource_type }}</div>
             </div>
-            <div class="flex py-2 px-3 border-b border-solid border-[var(--color-card-glass-border)]" v-if="resource.resource_size">
+            <div class="flex py-2 px-3 border-b border-solid border-card-glass-border" v-if="resource.resource_size">
               <div class="w-[150px] text-text-secondary font-medium shrink-0">Size:</div>
               <div class="flex-1 text-text-primary break-words">
                 {{ formatBytes(resource.resource_size) }}
               </div>
             </div>
             <div
-              class="flex py-2 px-3 border-b border-solid border-[var(--color-card-glass-border)]"
+              class="flex py-2 px-3 border-b border-solid border-card-glass-border"
               v-if="resource.resource_render_blocking_status"
             >
               <div class="w-[150px] text-text-secondary font-medium shrink-0">Render Blocking:</div>
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ resource.resource_render_blocking_status }}
               </div>
             </div>
-            <div class="flex py-2 px-3 border-b border-solid border-[var(--color-card-glass-border)]" v-if="resource.session?.id">
+            <div class="flex py-2 px-3 border-b border-solid border-card-glass-border" v-if="resource.session?.id">
               <div class="w-[150px] text-text-secondary font-medium shrink-0">Session ID:</div>
               <div class="flex-1 text-text-primary break-words">
                 <code
@@ -257,10 +257,10 @@ const getStatusIcon = (statusCode: number) => {
 
 const getStatusColorClass = (statusCode: number) => {
   if (!statusCode) return "text-gray-500";
-  if (statusCode >= 200 && statusCode < 300) return "text-[var(--color-status-positive)]";
-  if (statusCode >= 300 && statusCode < 400) return "text-[var(--color-info)]";
-  if (statusCode >= 400 && statusCode < 500) return "text-[var(--color-warning)]";
-  return "text-[var(--color-status-negative)]";
+  if (statusCode >= 200 && statusCode < 300) return "text-status-positive";
+  if (statusCode >= 300 && statusCode < 400) return "text-info";
+  if (statusCode >= 400 && statusCode < 500) return "text-warning";
+  return "text-status-negative";
 };
 
 const viewSessionReplay = () => {

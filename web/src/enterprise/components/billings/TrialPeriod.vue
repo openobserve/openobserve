@@ -18,10 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="showTrialPeriodMsg"
     data-test="trial-period-container"
-    class="flex items-center gap-3 px-4 py-2 rounded-md w-full bg-(--color-status-warning-bg) border border-(--color-status-warning-text) text-(--color-status-warning-text)"
+    class="flex items-center gap-3 px-4 py-2 rounded-md w-full bg-status-warning-bg border border-status-warning-text text-status-warning-text"
   >
     <!-- Warning icon -->
-    <OIcon name="warning" size="sm" class="shrink-0 text-(--color-status-warning-text)" />
+    <OIcon name="warning" size="sm" class="shrink-0 text-status-warning-text" />
 
     <!-- Message + subtitle on one line -->
     <p class="flex-1 min-w-0 m-0 text-sm truncate">

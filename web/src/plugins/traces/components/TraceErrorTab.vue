@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Error Summary: HTTP / gRPC status code -->
   <div
     v-if="hasSpanError && (spanStatusCode || spanGrpcStatusCode)"
-    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-[var(--color-status-error-bg)] border-[var(--color-status-error-text)]"
+    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-status-error-bg border-status-error-text"
     data-test="trace-details-sidebar-error-summary"
   >
     <div class="flex-col items-center gap-1">
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- DB Response Status Code -->
   <div
     v-if="hasSpanError && spanDbResponseStatusCode"
-    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-[var(--color-status-error-bg)] border-[var(--color-status-error-text)]"
+    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-status-error-bg border-status-error-text"
     data-test="trace-details-sidebar-db-response-status-code"
   >
     <div class="flex-col items-center gap-1">
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Process Exit Code -->
   <div
     v-if="hasSpanError && spanProcessExitCode"
-    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-[var(--color-status-error-bg)] border-[var(--color-status-error-text)]"
+    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-status-error-bg border-status-error-text"
     data-test="trace-details-sidebar-process-exit-code"
   >
     <div class="flex-col items-center gap-1">
@@ -105,14 +105,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="
       hasSpanError && (errorBannerTitle || errorBannerMessage || spanErrorType)
     "
-    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-[var(--color-status-error-bg)] border-[var(--color-status-error-text)]"
+    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-status-error-bg border-status-error-text"
     data-test="trace-details-sidebar-error-summary"
   >
     <div class="flex items-center gap-2 mb-[0.25rem]">
       <OIcon
         name="error"
         size="sm"
-        class="text-[var(--color-status-error-text)]"
+        class="text-status-error-text"
       />
       <span
         class="text-[1rem] font-semibold"
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expansion="multiple"
       :expanded-ids="expandedExceptionIds"
       @update:expanded-ids="expandedExceptionIds = $event"
-      class="trace-detail-tab-table w-full border border-solid border-[var(--color-card-glass-border)] tab-content-dynamic-height"
+      class="trace-detail-tab-table w-full border border-solid border-card-glass-border tab-content-dynamic-height"
     >
       <template #cell-@timestamp="{ row }">
         <span>{{ formatTimestamp(row) }}</span>

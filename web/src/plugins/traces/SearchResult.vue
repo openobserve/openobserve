@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-xs rounded! py-[0.4rem]! px-[0.625rem]! text-[0.75rem]!"
           :class="showErrorOnly
             ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'
-            : 'bg-[var(--color-error-tag-bg)]! text-[var(--color-error-tag-text)]!'"
+            : 'bg-error-tag-bg! text-error-tag-text!'"
           @click="toggleErrorOnly"
         >
           {{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex-1" />
 
         <!-- Right: Refresh → Insights → rows per page → pagination (same sequence as logs) -->
-        <div class="inline-flex items-center border border-[var(--color-card-glass-border)] rounded-md px-1 h-6 mr-1 overflow-hidden">
+        <div class="inline-flex items-center border border-card-glass-border rounded-md px-1 h-6 mr-1 overflow-hidden">
           <ORefreshButton
             :last-run-at="searchObj.meta.lastRunAt"
             :loading="searchObj.loading"
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Combined scroll area: RED metrics + trace list scroll together -->
-      <div class="flex-1 overflow-y-auto bg-[var(--color-card-glass-solid)]">
+      <div class="flex-1 overflow-y-auto bg-card-glass-solid">
         <!-- ════════════════════ RED Metrics Section ════════════════════ -->
         <transition
           enter-active-class="transition-all duration-300 ease-in-out"

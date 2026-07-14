@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="ed.id"
         data-test="feature-comparison-table-edition-card"
         :data-test-active="buildType === ed.id ? 'true' : undefined"
-        class="relative flex flex-col bg-(--color-card-glass-bg) rounded-xl p-6 max-[1024px]:p-4 border border-(--color-card-glass-border)"
+        class="relative flex flex-col bg-card-glass-bg rounded-xl p-6 max-[1024px]:p-4 border border-card-glass-border"
         :class="{ 'border-2 border-accent pt-7 max-[1024px]:pt-5': buildType === ed.id }"
       >
         <!-- Your Plan badge (floats above the card top border) -->
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="feature in listFeatures"
             :key="feature.id"
             data-test="feature-comparison-table-feature-item"
-            class="flex items-start gap-2 py-[0.4375rem] text-[0.8125rem] border-b border-(--color-card-glass-border) last:border-b-0"
+            class="flex items-start gap-2 py-[0.4375rem] text-[0.8125rem] border-b border-card-glass-border last:border-b-0"
             :class="{
               'text-text-body': getFeatureStatus(feature, ed.id) !== 'unavailable',
               'text-text-muted': getFeatureStatus(feature, ed.id) === 'unavailable',
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span class="shrink-0 mt-[0.125rem] leading-none"
               :class="{
-                'text-[var(--color-status-positive)]': getFeatureStatus(feature, ed.id) !== 'unavailable',
+                'text-status-positive': getFeatureStatus(feature, ed.id) !== 'unavailable',
                 'text-text-muted': getFeatureStatus(feature, ed.id) === 'unavailable',
               }"
             >
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Footer: license + support + CTA ──────────────────────────── -->
         <div class="mt-4">
-          <div class="h-px bg-(--color-card-glass-border) mb-3"></div>
+          <div class="h-px bg-card-glass-border mb-3"></div>
           <div class="mb-[0.875rem]">
             <div data-test="feature-comparison-table-footer-row" class="flex justify-between items-baseline text-[0.8125rem] py-[0.125rem]">
               <span class="text-text-muted font-medium">{{ t('about.feature_license') }}</span>
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ ed.ctaLabel }}
           </a>
-          <button v-else data-test="feature-comparison-table-cta-btn" data-test-cta="current" class="block w-full py-2 px-4 rounded-md text-sm font-semibold text-center no-underline cursor-default transition-all duration-200 border-[1.5px] border-solid bg-transparent text-text-muted border-(--color-card-glass-border)" disabled>
+          <button v-else data-test="feature-comparison-table-cta-btn" data-test-cta="current" class="block w-full py-2 px-4 rounded-md text-sm font-semibold text-center no-underline cursor-default transition-all duration-200 border-[1.5px] border-solid bg-transparent text-text-muted border-card-glass-border" disabled>
             {{ ed.ctaLabel }}
           </button>
         </div>

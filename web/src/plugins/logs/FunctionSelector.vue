@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(item, i) in filteredFunctionOptions"
             :key="'saved-view-' + i"
             :data-test="`logs-search-saved-function-${item.name}`"
-            class="saved-view-item border-b border-(--color-card-glass-border) rounded-none last:border-none"
+            class="saved-view-item border-b border-card-glass-border rounded-none last:border-none"
             @select="applyFunction(item, true)"
           >
             {{ item.name }}

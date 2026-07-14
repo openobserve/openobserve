@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="play-circle-filled"
               size="md"
-              class="cursor-pointer text-[var(--color-icon-color)] hover:text-button-primary"
+              class="cursor-pointer text-icon-color hover:text-button-primary"
             />
           </template>
         </OTable>

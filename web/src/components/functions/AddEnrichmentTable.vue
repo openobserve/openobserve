@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-gray-500 font-bold text-[0.8125rem]">
               Existing URLs ({{ formData.urlJobs.length }})
             </div>
-            <div class="rounded-md border border-[var(--color-card-glass-border)] bg-gray-50 p-2 flex flex-col gap-1">
+            <div class="rounded-md border border-card-glass-border bg-gray-50 p-2 flex flex-col gap-1">
               <div v-for="(job, index) in formData.urlJobs" :key="job.id">
                 <div class="flex items-center gap-2">
                   <span class="font-medium text-gray-400 text-xs">{{ Number(index) + 1 }}.</span>
@@ -116,8 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     :class="[
                       job.status === 'processing' ? '[animation:rotate_2s_linear_infinite]' : '',
-                      job.status === 'completed' ? 'text-[var(--color-status-positive)]' :
-                      job.status === 'failed' ? 'text-[var(--color-status-negative)]' :
+                      job.status === 'completed' ? 'text-status-positive' :
+                      job.status === 'failed' ? 'text-status-negative' :
                       job.status === 'processing' ? 'text-accent' :
                       'text-gray-500'
                     ]"

@@ -578,7 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div v-if="activeMainTab == 'configuration'">
                   <div class="w-full h-full overflow-y-auto p-4 flex flex-col gap-4">
                     <!-- Configuration Settings Card -->
-                    <div class="rounded-lg border border-[var(--color-card-glass-border)] divide-y divide-[var(--color-card-glass-border)]">
+                    <div class="rounded-lg border border-card-glass-border divide-y divide-card-glass-border">
 
                       <!-- Data Retention -->
                       <div v-if="showDataRetention" class="flex flex-col gap-1 p-3">
@@ -596,7 +596,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <small v-if="dataRetentionDays > 0 && dataRetentionDays != ''">
                           Global retention is {{ store.state.zoConfig.data_retention_days }} days
                         </small>
-                        <small v-if="dataRetentionDays <= 0 || dataRetentionDays == ''" class="text-[var(--color-status-error-text)]">
+                        <small v-if="dataRetentionDays <= 0 || dataRetentionDays == ''" class="text-status-error-text">
                           Retention period must be at least 1 day
                         </small>
                       </div>

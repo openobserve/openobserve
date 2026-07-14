@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Stats grid: Cost · Latency · Tokens · Cache -->
           <div
-            class="grid grid-cols-2 gap-x-3 gap-y-[7px] border-t border-[var(--color-card-glass-border)] pt-[9px]"
+            class="grid grid-cols-2 gap-x-3 gap-y-[7px] border-t border-card-glass-border pt-[9px]"
           >
             <div class="flex items-center justify-between text-[11px]">
               <span class="text-text-muted">{{ t('traces.sessionDetail.stats.cost') }}</span>

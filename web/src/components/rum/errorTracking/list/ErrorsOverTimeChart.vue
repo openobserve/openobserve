@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <small
         v-if="spikeCaption"
-        class="text-right font-semibold text-[var(--color-severity-error-color)]"
+        class="text-right font-semibold text-severity-error-color"
         data-test="rum-errors-over-time-chart-spike-caption"
         >{{ spikeCaption }}</small
       >

@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Advanced Options -->
-          <div class="collapsible-section card-container flex flex-col transition-all overflow-hidden bg-(--color-card-glass-bg) rounded-md shadow-[0_0_5px_1px_var(--color-hover-shadow)] border border-[var(--color-card-glass-border,rgba(0,0,0,0.08))]" data-test="advanced-options-section">
+          <div class="collapsible-section card-container flex flex-col transition-all overflow-hidden bg-card-glass-bg rounded-md shadow-[0_0_5px_1px_var(--color-hover-shadow)] border border-card-glass-border" data-test="advanced-options-section">
             <div
               class="section-header flex items-center justify-between px-4 py-3 cursor-pointer shrink-0 border-b border-[rgba(0,0,0,0.08)] transition-all rounded-t-md select-none hover:bg-[rgba(0,0,0,0.04)] active:bg-[rgba(0,0,0,0.06)]"
               @click="showAdvanced = !showAdvanced"

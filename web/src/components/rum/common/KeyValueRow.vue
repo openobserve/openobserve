@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex py-1 px-1.5 text-xs"
     :class="[
       showBorder
-        ? 'border-b border-solid border-[var(--color-card-glass-border)]'
+        ? 'border-b border-solid border-card-glass-border'
         : '',
     ]"
     :data-test="dataTest"

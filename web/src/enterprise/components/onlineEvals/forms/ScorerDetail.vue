@@ -44,7 +44,7 @@
            consistent. Pinned band (shrink-0) with a bottom divider; the cards
            below carry their own chrome via Tailwind. -->
       <section
-        class="flex-shrink-0 grid grid-cols-4 gap-[0.625rem] px-5 py-4 border-b border-b-[var(--color-dialog-header-border,var(--color-border-default))]"
+        class="flex-shrink-0 grid grid-cols-4 gap-[0.625rem] px-5 py-4 border-b border-b-dialog-header-border"
       >
         <!-- While the KPI query is in flight, show skeleton tiles in place of
              the cards (matches the LLM Insights dashboard pattern). -->
@@ -62,7 +62,7 @@
           </div>
           <div class="flex items-baseline gap-[0.2rem]">
             <span
-              class="text-[1.4rem] font-bold leading-none text-[var(--color-grey-600)]"
+              class="text-[1.4rem] font-bold leading-none text-grey-600"
             >
               {{ card.value }}
             </span>

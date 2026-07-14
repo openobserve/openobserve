@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="flex flex-col shadow-none border border-(--color-card-glass-border) bg-(--color-card-glass-bg) rounded-lg w-full h-full dark:bg-surface-base dark:border-border-default">
+  <OCard class="flex flex-col shadow-none border border-card-glass-border bg-card-glass-bg rounded-lg w-full h-full dark:bg-surface-base dark:border-border-default">
     <div class="flex items-center justify-between px-3 py-2">
       <div>
         <h3 class="pt-2 text-base font-semibold leading-6 text-text-heading m-0">{{ t("billing.proPlanLabel") }}</h3>

@@ -843,7 +843,7 @@ describe("DashboardMapsQueryBuilder", () => {
 
       const nameContainer = wrapper.find('[data-test="dashboard-name-layout"]');
       expect(nameContainer.classes()).toContain(
-        "bg-[var(--color-field-list-row-hover-bg)]",
+        "bg-field-list-row-hover-bg",
       );
     });
 
@@ -857,7 +857,7 @@ describe("DashboardMapsQueryBuilder", () => {
 
       const nameContainer = wrapper.find('[data-test="dashboard-name-layout"]');
       expect(nameContainer.classes()).not.toContain(
-        "bg-[var(--color-field-list-row-hover-bg)]",
+        "bg-field-list-row-hover-bg",
       );
     });
   });

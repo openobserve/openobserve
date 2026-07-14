@@ -9,7 +9,7 @@
     <!-- 1st section - Streams container -->
     <div
       data-test="home-view-skeleton-streams-container"
-      class="feature-card bg-(--tile-bg) border-[0.0625rem] border-(--color-card-glass-border) rounded-lg p-4"
+      class="feature-card bg-(--tile-bg) border-[0.0625rem] border-card-glass-border rounded-lg p-4"
     >
       <!-- Header -->
       <div data-test="home-view-skeleton-streams-header" class="flex justify-between items-center mb-4">
@@ -22,7 +22,7 @@
 
       <!-- Tiles using same grid as HomeView -->
       <div class="tiles-grid grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))">
-        <div v-for="n in 5" :key="n" data-test="home-view-skeleton-tile" class="rounded-[0.325rem] border-[0.0625rem] border-(--color-card-glass-border)">
+        <div v-for="n in 5" :key="n" data-test="home-view-skeleton-tile" class="rounded-[0.325rem] border-[0.0625rem] border-card-glass-border">
           <div
             class="tile-content h-full p-4 rounded-lg gap-2 rounded text-center flex flex-col justify-between bg-(--tile-bg) border border-(--tile-border) text-(--text-primary)"
             :class="
@@ -150,7 +150,7 @@
           class="custom-first-chart my-auto xl:min-h-[200px] h-[calc(100vh-500px)] md:h-[calc(100vh-500px)] lg:h-[calc(100vh-550px)] xl:h-[calc(100vh-645px)] w-full"
         >
           <div
-            class="skeleton-box bg-[var(--color-skeleton-base,#f5f5f5)] relative overflow-hidden rounded-lg"
+            class="skeleton-box bg-skeleton-base relative overflow-hidden rounded-lg"
             style="width: 100%; height: 100%"
           ></div>
         </div>
@@ -202,7 +202,7 @@
           class="custom-second-chart my-auto xl:min-h-[200px] h-[calc(100vh-500px)] md:h-[calc(100vh-500px)] lg:h-[calc(100vh-550px)] xl:h-[calc(100vh-645px)]"
         >
           <div
-            class="skeleton-box bg-[var(--color-skeleton-base,#f5f5f5)] relative overflow-hidden rounded-lg"
+            class="skeleton-box bg-skeleton-base relative overflow-hidden rounded-lg"
             style="width: 100%; height: 100%"
           ></div>
         </div>

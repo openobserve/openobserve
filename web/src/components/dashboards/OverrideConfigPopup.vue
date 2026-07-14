@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               type="button"
               data-test="dashboard-addpanel-config-add-column"
-              class="flex items-center justify-center gap-1.5 w-full shrink-0 p-[9px] rounded-lg border border-dashed border-[rgba(25,118,210,0.5)] bg-transparent cursor-pointer text-[length:var(--text-sm,13px)] font-medium text-[var(--color-primary-600,#1976d2)] transition-colors hover:bg-[rgba(25,118,210,0.05)] hover:border-[var(--color-primary-600,#1976d2)]"
+              class="flex items-center justify-center gap-1.5 w-full shrink-0 p-[9px] rounded-lg border border-dashed border-[rgba(25,118,210,0.5)] bg-transparent cursor-pointer text-[length:var(--text-sm,13px)] font-medium text-primary-600 transition-colors hover:bg-[rgba(25,118,210,0.05)] hover:border-primary-600"
             >
               <OIcon name="add" size="sm" />
               {{ t("dashboard.columnFormattingAddField") }}
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
             <div
               v-if="!availableToAdd.length"
-              class="py-2 px-2.5 text-xs text-[var(--color-text-secondary,#9e9e9e)]"
+              class="py-2 px-2.5 text-xs text-text-secondary"
             >
               {{ t("dashboard.columnFormattingAllAdded") }}
             </div>
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="group relative flex items-center gap-2 w-full py-2 pl-[9px] pr-1.5 rounded-lg border-l-[3px] border-transparent cursor-pointer outline-none transition-colors hover:bg-[rgba(128,128,128,0.05)]"
             :class="
               idx === selectedIdx
-                ? 'bg-[rgba(46,85,163,0.06)] border-l-[var(--color-primary-600,#1976d2)]!'
+                ? 'bg-[rgba(46,85,163,0.06)] border-l-primary-600!'
                 : ''
             "
             @click="selectedIdx = idx"
@@ -115,12 +115,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="format-color-text"
             size="lg"
-            class="text-[var(--color-text-secondary,#b0bec5)]"
+            class="text-text-secondary"
           />
           <div class="font-semibold text-[length:var(--text-sm,13px)]">
             {{ t("dashboard.columnFormattingNoFields") }}
           </div>
-          <div class="text-xs text-[var(--color-text-secondary,#9e9e9e)] leading-[1.4]">
+          <div class="text-xs text-text-secondary leading-[1.4]">
             {{ t("dashboard.columnFormattingNoFieldsHint") }}
           </div>
         </div>
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex flex-col gap-2 min-w-0 overflow-y-auto p-3 border-l border-[rgba(128,128,128,0.18)]"
         >
           <div
-            class="flex items-center gap-[5px] text-[10px] font-bold tracking-[0.06em] uppercase text-[var(--color-text-secondary,#757575)]"
+            class="flex items-center gap-[5px] text-[10px] font-bold tracking-[0.06em] uppercase text-text-secondary"
           >
             <OIcon name="visibility" size="xs" />
             <span>{{ t("dashboard.inlinePreview") }}</span>
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :show-pagination="false"
             />
           </div>
-          <div class="text-[11px] text-[var(--color-text-secondary,#9e9e9e)]">
+          <div class="text-[11px] text-text-secondary">
             {{ t("dashboard.columnFormattingSampleNote") }}
           </div>
         </div>
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #illustration>
             <div
-              class="w-[72px] h-[72px] rounded-2xl bg-[rgba(128,128,128,0.08)] flex items-center justify-center text-[var(--color-text-secondary,#90a4ae)]"
+              class="w-[72px] h-[72px] rounded-2xl bg-[rgba(128,128,128,0.08)] flex items-center justify-center text-text-secondary"
             >
               <OIcon name="tune" size="xl" />
             </div>
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdownItem>
                 <div
                   v-if="!availableToAdd.length"
-                  class="py-2 px-2.5 text-xs text-[var(--color-text-secondary,#9e9e9e)]"
+                  class="py-2 px-2.5 text-xs text-text-secondary"
                 >
                   {{ t("dashboard.columnFormattingAllAdded") }}
                 </div>
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #footer>
       <div class="flex items-center justify-between w-full">
-        <span class="text-xs text-[var(--color-text-secondary,#9e9e9e)]">{{ footerSummary }}</span>
+        <span class="text-xs text-text-secondary">{{ footerSummary }}</span>
         <div class="flex gap-2">
           <OButton
             variant="outline"

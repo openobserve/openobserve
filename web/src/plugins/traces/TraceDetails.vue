@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-if="mode === 'embedded'"
                     data-test="trace-details-trace-id"
-                    class="text-text-primary font-mono cursor-pointer hover:text-[var(--color-theme-accent)] transition-colors"
+                    class="text-text-primary font-mono cursor-pointer hover:text-theme-accent transition-colors"
                     :title="t('traces.openInTraces')"
                     @click="handleExpandToFullView"
                   >
@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   v-if="mode === 'embedded' && showExpandButton"
                   data-test="trace-details-trace-id-open-btn"
-                  class="cursor-pointer hover:text-[var(--color-theme-accent)]"
+                  class="cursor-pointer hover:text-theme-accent"
                   size="xs"
                   name="open-in-new"
                   :title="t('traces.openInTraces')"
@@ -386,7 +386,7 @@ size="xs"
       >
         <!-- Tabs & Search Bar -->
         <div
-          class="py-0 border-b border-border-default flex items-center justify-between bg-white bg-[var(--color-card-glass-bg)]!"
+          class="py-0 border-b border-border-default flex items-center justify-between bg-white bg-card-glass-bg!"
         >
           <div
             class="flex items-center space-x-4 trace-details-view-tabs ml-[0.325rem] py-[0.325rem]"
@@ -465,7 +465,7 @@ size="sm">
                 />
               </div>
               <!-- Search Results Navigation -->
-              <div class="inline-flex items-center bg-transparent px-[0.125rem] [transition:all_0.2s_ease] rounded-[var(--radius-md)] border border-input-border dark:hover:border-[var(--color-theme-accent)] h-8.2! py-[0.125px]!">
+              <div class="inline-flex items-center bg-transparent px-[0.125rem] [transition:all_0.2s_ease] rounded-[var(--radius-md)] border border-input-border dark:hover:border-theme-accent h-8.2! py-[0.125px]!">
                 <div
                   class="flex items-center text-xs font-medium px-1 gap-[0.0625rem] select-none"
                   data-test="trace-details-search-results"
@@ -487,7 +487,7 @@ size="sm">
                     <OIcon name="keyboard-arrow-up" size="sm" />
                     <OTooltip :content="t('traces.previousMatch')" />
                   </OButton>
-                  <div class="w-px h-[1.125rem] bg-[var(--color-card-glass-border)] mx-[0.125rem]"></div>
+                  <div class="w-px h-[1.125rem] bg-card-glass-border mx-[0.125rem]"></div>
                   <OButton
                     data-test="trace-details-search-next-btn"
                     :disabled="
@@ -573,7 +573,7 @@ size="sm">
             <!-- Waterfall View - show for waterfall tab, or when no LLM spans -->
             <div
               v-if="activeTab === 'waterfall'"
-              class="flex h-full bg-[var(--color-card-glass-bg)]!"
+              class="flex h-full bg-card-glass-bg!"
             >
               <div
                 class="flex flex-col min-h-0"
@@ -600,7 +600,7 @@ size="sm">
                   }"
                 >
                   <div
-                    class="pt-0 pb-0 mb-0 min-h-full bg-(--color-card-glass-bg)!"
+                    class="pt-0 pb-0 mb-0 min-h-full bg-card-glass-bg!"
                     data-test="trace-details-tree-container"
                   >
                     <div class="position-relative">
@@ -627,7 +627,7 @@ size="sm">
                         :leftWidth="leftWidth"
                         :scrollContainer="traceScrollContainer"
                         ref="traceTreeRef"
-                        class="bg-[var(--color-card-glass-bg)]!"
+                        class="bg-card-glass-bg!"
                         :search-query="searchQuery"
                         :spanList="spanList"
                         :selectedSpanId="selectedSpanId"
@@ -652,7 +652,7 @@ size="sm">
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="shrink-0 overflow-y-auto overflow-x-hidden min-h-0 transition-all duration-300 border-l border-l-solid border-l-(--color-card-glass-border)"
+                class="shrink-0 overflow-y-auto overflow-x-hidden min-h-0 transition-all duration-300 border-l border-l-solid border-l-card-glass-border"
                 :class="isTimelineExpanded ? '' : 'full'"
                 :style="{
                   width: `calc(100% - ${leftWidth}px)`,
@@ -749,7 +749,7 @@ size="sm">
             <div
               v-if="activeTab === 'flame-graph'"
               style="display: flex; flex: 1; min-height: 0"
-              class="w-full bg-[var(--color-card-glass-bg)]!"
+              class="w-full bg-card-glass-bg!"
             >
               <FlameGraphView
                 :spans="flatSpans"
@@ -780,7 +780,7 @@ size="sm">
             <div
               v-if="config.showLLMUI !== 'false' && activeTab === 'thread'"
               style="display: flex; flex: 1; min-height: 0"
-              class="w-full bg-[var(--color-card-glass-bg)]!"
+              class="w-full bg-card-glass-bg!"
             >
               <div
                 class="thread-left-panel"
@@ -802,7 +802,7 @@ size="sm">
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="border-l border-l-solid border-l-[var(--color-card-glass-border)]"
+                class="border-l border-l-solid border-l-card-glass-border"
                 style="width: 40%; min-width: 300px; height: 100%; overflow: hidden;"
               >
                 <trace-details-sidebar

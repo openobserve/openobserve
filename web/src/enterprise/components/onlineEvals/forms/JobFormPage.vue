@@ -39,7 +39,7 @@
           <div class="job-field">
             <label class="flex items-center text-xs font-semibold text-(--color-text-primary,currentColor) mb-1">
               {{ t("onlineEvals.job.nameLabel") }}
-              <span class="text-(--color-status-error-text) ml-0.5">*</span>
+              <span class="text-status-error-text ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary,var(--color-text-secondary))" />
             </label>
             <OInput
@@ -54,7 +54,7 @@
           <div class="job-field">
             <label class="flex items-center text-xs font-semibold text-(--color-text-primary,currentColor) mb-1">
               {{ t("onlineEvals.job.streamLabel") }}
-              <span class="text-(--color-status-error-text) ml-0.5">*</span>
+              <span class="text-status-error-text ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary,var(--color-text-secondary))" />
             </label>
             <OSelect
@@ -128,7 +128,7 @@
             <div class="job-field">
               <label class="flex items-center text-xs font-semibold text-(--color-text-primary,currentColor) mb-1">
                 {{ t("onlineEvals.job.samplingValueLabel") }}
-                <span v-if="form.samplingMode !== 'all'" class="text-(--color-status-error-text) ml-0.5">*</span>
+                <span v-if="form.samplingMode !== 'all'" class="text-status-error-text ml-0.5">*</span>
               </label>
               <OInput
                 v-model="form.samplingValue"

@@ -75,7 +75,7 @@
           <div class="flex items-center justify-between gap-4 mt-4">
             <div
               data-test="enrichment-schema-total-fields"
-              class="text-sm w-28.75 h-7.5 rounded-sm flex items-center justify-center bg-(--color-theme-accent) text-white"
+              class="text-sm w-28.75 h-7.5 rounded-sm flex items-center justify-center bg-theme-accent text-white"
             >
                 All Fields ({{ schemaData.schema.length }})
             </div>

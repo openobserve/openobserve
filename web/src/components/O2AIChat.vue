@@ -1,6 +1,6 @@
 ﻿<template>
   <div
-    class="chat-container w-full h-full flex flex-col overflow-hidden rounded-md text-[var(--q-primary-text)] bg-[var(--color-card-glass-solid)] [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
+    class="chat-container w-full h-full flex flex-col overflow-hidden rounded-md text-[var(--q-primary-text)] bg-card-glass-solid [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
     :class="[
       { 'chat-open': isOpen },
       store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
@@ -366,10 +366,10 @@
                           block.pendingConfirmation
                             ? block.tool === 'navigation_action'
                               ? 'text-accent'
-                              : 'text-[var(--color-warning)]'
+                              : 'text-warning'
                             : block.success === false
-                              ? 'text-[var(--color-status-negative)]'
-                              : 'text-[var(--color-status-positive)]'
+                              ? 'text-status-negative'
+                              : 'text-status-positive'
                         "
                       />
                       <span class="tool-call-name">
