@@ -157,7 +157,7 @@ export default defineComponent({
       });
     });
 
-    // Handler for OSelect @search event (replaces Quasar @filter)
+    // Handler for OSelect @search event
     const onSearch = (val: string) => {
       currentSearchTerm.value = val;
       updateSearch(val);

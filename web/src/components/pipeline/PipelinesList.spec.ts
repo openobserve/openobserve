@@ -86,7 +86,7 @@ document.createElement = (tag: string) => {
 
 // Stubs for migrated ODialog (Pipeline Error Dialog) and ODrawer (Create Pipeline Drawer)
 // These replace the old q-dialog usages and allow us to assert prop forwarding
-// and drive button clicks via emits instead of relying on Quasar internals.
+// and drive button clicks via emits instead of relying on component internals.
 const ODialogStub = {
   name: "ODialog",
   props: [

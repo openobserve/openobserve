@@ -110,14 +110,6 @@ vi.mock("./llmInsightsDashboard.utils", () => ({
   splitCost: vi.fn((n: number) => ({ value: `$${n}`, unit: "" })),
 }));
 
-// Quasar mock (no longer a dependency)
-vi.mock("quasar", () => ({
-  copyToClipboard: vi.fn().mockResolvedValue(undefined),
-  useQuasar: () => ({
-    notify: vi.fn(),
-  }),
-}));
-
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, vi, beforeEach } from "vitest";

@@ -33,7 +33,7 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
-// Mock toast (component uses toast() from @/lib/feedback/Toast/useToast instead of $q.notify)
+// Mock toast (component uses toast() from @/lib/feedback/Toast/useToast)
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
 }));

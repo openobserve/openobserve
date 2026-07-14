@@ -4,7 +4,7 @@
 // Built via a factory so messages stay i18n-driven (pass useI18n's `t`),
 // matching the t()-factory style used by the other migrated schemas.
 //
-// Restored from the Quasar BEFORE baseline:
+// Field rules:
 //   service — `!!v || 'Service is required'` → z.string().trim().min(1, …)
 //   version — `!!v || 'Version is required'` → z.string().trim().min(1, …)
 // The `.zip` file rule lived in a manual toast (`validateAndSetFile`) — it is

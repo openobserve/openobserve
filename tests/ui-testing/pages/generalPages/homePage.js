@@ -361,7 +361,7 @@ export class HomePage {
      * After Header.vue migration the user profile menu is an ODropdown
      * ([role="menuitem"]) but the language sub-menu was kept in-place (not
      * supported by ODropdown nesting). The data-test attribute is preserved
-     * either on a q-item-section (Quasar) or directly on a menuitem (ODropdown),
+     * either on a q-item-section or directly on a menuitem (ODropdown),
      * so target the element with data-test and walk up to its clickable ancestor.
      * @param {string} langCode - Language code (e.g., 'en-gb', 'de', 'es', 'fr', etc.)
      * @returns {Locator} - Playwright locator for the language option
@@ -387,7 +387,7 @@ export class HomePage {
     /**
      * Opens the language selection submenu
      * Steps: Click profile icon -> Click on language item to open submenu
-     * Note: Quasar menus require click, not hover, to open nested menus
+     * Note: menus require click, not hover, to open nested menus
      */
     async openLanguageMenu() {
         await this.openProfileMenu();

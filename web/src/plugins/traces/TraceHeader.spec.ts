@@ -485,7 +485,7 @@ describe("TraceHeader", () => {
       expect(ticsSection.classes()).toContain("justify-start");
       expect(ticsSection.classes()).toContain("items-center");
       expect(ticsSection.classes()).toContain("flex-nowrap");
-      // Component was migrated from Quasar's `relative-position` to Tailwind `relative`.
+      // Uses the Tailwind `relative` class for positioning.
       expect(ticsSection.classes()).toContain("relative");
     });
 

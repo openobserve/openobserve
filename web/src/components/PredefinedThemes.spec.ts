@@ -29,29 +29,14 @@ const DEFAULT_THEME = getDefaultTheme();
 
 // Use vi.hoisted so these variables are available inside vi.mock() factory functions
 // (vi.mock calls are hoisted to the top of the file before variable declarations)
-const { mockToast, mockNotify } = vi.hoisted(() => ({
+const { mockToast } = vi.hoisted(() => ({
   mockToast: vi.fn(() => vi.fn()),
-  mockNotify: vi.fn(() => vi.fn()),
 }));
 
-// Mock toast — resetToDefaultTheme calls toast(), not useQuasar().notify
+// Mock toast — resetToDefaultTheme calls toast()
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: mockToast,
 }));
-
-// Mock useQuasar
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-      dark: {
-        set: vi.fn(),
-      },
-    }),
-  };
-});
 
 // Mock composable — use vi.fn() so individual tests can override via mockReturnValueOnce
 vi.mock("@/composables/usePredefinedThemes", () => ({
@@ -125,12 +110,6 @@ const createWrapper = (props = {}, options = {}) => {
       plugins: [i18n],
       mocks: {
         $store: mockStore,
-        $q: {
-          notify: mockNotify,
-          dark: {
-            set: vi.fn(),
-          },
-        },
       },
       provide: {
         store: mockStore,
@@ -205,7 +184,7 @@ const createWrapper = (props = {}, options = {}) => {
           props: ["modelValue"],
           emits: ["update:modelValue"],
         },
-        // Legacy Quasar stubs kept for safety (no longer rendered, harmless)
+        // Legacy stubs kept for safety (no longer rendered, harmless)
         QCard: {
           template: '<div data-test-stub="q-card"><slot></slot></div>',
         },

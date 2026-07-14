@@ -48,7 +48,7 @@ const i18n = createI18n({
 });
 
 // The tile — forwards click/keydown like the real MenuLink without rendering
-// its internals (which would need quasar + the full icon registry).
+// its internals (which would need the full icon registry).
 const menuLinkStub = {
   template:
     '<a data-test="tile" href="#" @click.prevent="$emit(\'click\')" @keydown="$emit(\'keydown\', $event)">{{ title }}</a>',

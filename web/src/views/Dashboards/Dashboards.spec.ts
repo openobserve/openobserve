@@ -50,7 +50,7 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((dashboard) => dashboard),
 }));
 
-// Mock DOM methods to prevent Quasar errors
+// Mock DOM methods to prevent errors from missing DOM APIs
 Object.defineProperty(Element.prototype, 'removeAttribute', {
   writable: true,
   value: vi.fn(),
@@ -189,12 +189,10 @@ const createMockI18n = () => {
 };
 
 // Shared stub configuration used across the suite.
-// q-dialog is removed in favor of the migrated overlay primitives ODrawer/ODialog.
 const buildGlobalConfig = (store: any, router: any, i18n: any, routeQuery: any = { folder: "default" }) => ({
   plugins: [store, router, i18n],
   mocks: {
     $route: { query: routeQuery },
-    $q: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() },
   },
   provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
   stubs: {
