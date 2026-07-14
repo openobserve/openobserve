@@ -237,7 +237,7 @@ describe("Stream Component", () => {
       await flushPromises();
       const fns = [
         "sanitizeStreamName", "sanitizeStaticPart", "getStreamList", "updateStreams",
-        "handleCreateStreamName", "getLogStream",
+        "handleCreateStreamName", "getLogStream", "handleSecondaryClick",
         "openCancelDialog", "openDeleteDialog", "deleteNode", "onSubmit",
         "filterColumns",
       ];

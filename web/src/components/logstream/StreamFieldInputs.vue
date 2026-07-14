@@ -1,6 +1,6 @@
 <template>
   <div data-test="add-stream-fields-section">
-    <div v-if="showHeader" data-test="alert-conditions-text" class="text-[var(--o2-text-label)] text-sm">
+    <div v-if="showHeader" data-test="alert-conditions-text" class="o-input-label text-sm font-semibold leading-tight">
       {{ t("logStream.fields") }}
     </div>
     <template v-if="!formRows.length">
@@ -33,7 +33,7 @@
           <OFormInput
             :data-test="`add-stream-field-name-input-${index}`"
             :name="`${formFieldName}[${index}].name`"
-            :placeholder="t('logStream.fieldName') + ' *'"
+            :label="index === 0 ? t('logStream.fieldName') : undefined"
             :help-text="t('logStream.streamNameHelpText')"
             required
             tabindex="0"
@@ -46,10 +46,10 @@
         >
           <OFormSelect
             :name="`${formFieldName}[${index}].index_type`"
+            :label="index === 0 ? t('logStream.indexType') : undefined"
             :options="getIndexTypeOptions(row)"
             multiple
             clearable
-            :placeholder="t('logStream.indexType')"
           />
         </div>
         <div
@@ -59,33 +59,45 @@
           <OFormSelect
             data-test="add-stream-field-data-type-select"
             :name="`${formFieldName}[${index}].type`"
+            :label="index === 0 ? t('logStream.dataType') : undefined"
             :options="dataTypes"
             label-key="label"
             value-key="value"
             clearable
             required
-            :placeholder="t('logStream.dataType') + ' *'"
           />
         </div>
-        <div class="flex items-center gap-1 shrink-0">
-          <OButton
-            data-test="add-stream-add-field-btn"
-            v-if="index === formRows.length - 1"
-            variant="outline"
-            size="icon-sm"
-            :disabled="!String(row.name || '').trim()"
-            :title="t('logStream.addField')"
-            icon-left="add"
-            @click="addRow"
-          />
-          <OButton
-            data-test="add-stream-delete-field-btn"
-            variant="outline-destructive"
-            size="icon-sm"
-            :title="t('logStream.deleteField')"
-            icon-left="delete"
-            @click="removeRow(index)"
-          />
+        <!-- Button column mirrors an input column's `flex flex-col gap-1` so the
+             +/delete buttons line up with the inputs. On the first row an
+             invisible, label-height spacer pushes the buttons down past the
+             header labels — no magic pixel offset (same typography as the real
+             OInput/OSelect labels). -->
+        <div class="flex flex-col gap-1 shrink-0">
+          <span
+            v-if="index === 0"
+            aria-hidden="true"
+            class="text-sm font-semibold leading-tight select-none invisible"
+          >&nbsp;</span>
+          <div class="flex items-center gap-1">
+            <OButton
+              data-test="add-stream-add-field-btn"
+              v-if="index === formRows.length - 1"
+              variant="outline"
+              size="icon-sm"
+              :disabled="!String(row.name || '').trim()"
+              :title="t('logStream.addField')"
+              icon-left="add"
+              @click="addRow"
+            />
+            <OButton
+              data-test="add-stream-delete-field-btn"
+              variant="outline-destructive"
+              size="icon-sm"
+              :title="t('logStream.deleteField')"
+              icon-left="delete"
+              @click="removeRow(index)"
+            />
+          </div>
         </div>
       </div>
     </template>

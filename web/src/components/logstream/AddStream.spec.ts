@@ -233,22 +233,24 @@ describe("AddStream", () => {
       expect(
         wrapper.find('[data-test="add-stream-type-input"]').exists(),
       ).toBe(true);
+      // Pipeline mode renders NO inline Cancel/Save — the parent <ODrawer>
+      // (Stream.vue) owns the built-in footer buttons, and its Save submits this
+      // form via `form-id` (see the id assertion below).
       expect(
         wrapper.find('[data-test="add-stream-cancel-btn"]').exists(),
-      ).toBe(true);
+      ).toBe(false);
       expect(
         wrapper.find('[data-test="add-stream-save-btn"]').exists(),
-      ).toBe(true);
+      ).toBe(false);
     });
 
-    it("inline Save button is a real submit button (Enter works natively)", async () => {
+    it("inline form exposes id=add-stream-node-form so the drawer footer Save can submit it", async () => {
       const wrapper = mountComp(undefined, { isInPipeline: true });
       await flushPromises();
-      const saveBtn = wrapper.find('[data-test="add-stream-save-btn"]');
-      // type="submit" is forwarded to the underlying <button> so Enter submits
-      // the inline form natively (no form-id needed inside the <OForm>).
-      expect(saveBtn.element.tagName).toBe("BUTTON");
-      expect(saveBtn.attributes("type")).toBe("submit");
+      // The parent ODrawer sets `form-id="add-stream-node-form"`; its footer Save
+      // is `type=submit form="add-stream-node-form"`, so this <form> must carry
+      // that id for the cross-DOM submit (and native Enter) to work.
+      expect(wrapper.find("form#add-stream-node-form").exists()).toBe(true);
     });
 
     it("should render data retention input in pipeline mode when enabled", async () => {
@@ -328,12 +330,9 @@ describe("AddStream", () => {
       expect(wrapper.emitted("update:open")!.at(-1)).toEqual([false]);
     });
 
-    it("should emit close when Cancel is clicked in pipeline mode", async () => {
-      const wrapper = mountComp(undefined, { isInPipeline: true });
-      await flushPromises();
-      await wrapper.find('[data-test="add-stream-cancel-btn"]').trigger("click");
-      expect(wrapper.emitted("close")).toBeTruthy();
-    });
+    // Cancel in pipeline mode is now owned by the parent <ODrawer> footer
+    // (Stream.vue's handleSecondaryClick flips back to the select-existing form);
+    // AddStream no longer renders an inline Cancel, so there's nothing to test here.
   });
 
   // ─────────────────────────────────────────────────────────────────────────

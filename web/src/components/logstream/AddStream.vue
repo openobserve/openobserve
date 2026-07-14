@@ -76,11 +76,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </ODialog>
 
-  <!-- Inline form for pipeline usage (no drawer wrapper) -->
+  <!-- Inline form for pipeline usage: rendered inside <ODrawer> in Stream.vue.
+       The drawer owns the footer Cancel/Save (built-in ODrawer footer); its Save
+       submits this form via `form-id="add-stream-node-form"`, so no inline
+       buttons here. -->
     <div v-else class="p-4 w-full">
       <OForm
+        id="add-stream-node-form"
         :form="addStreamForm"
-        v-slot="{ isSubmitting }"
       >
         <div class="mt-2">
           <OFormInput
@@ -122,23 +125,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="mt-4"
           form-field-name="fields"
         />
-
-        <div class="flex justify-start mt-6 gap-2">
-          <OButton
-            data-test="add-stream-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            :disabled="isSubmitting"
-            @click="emits('close')"
-          >{{ t('logStream.cancel') }}</OButton>
-          <OButton
-            data-test="add-stream-save-btn"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            :loading="isSubmitting"
-          >{{ t('common.save') }}</OButton>
-        </div>
       </OForm>
     </div>
 </template>
@@ -152,7 +138,6 @@ import { useStore } from "vuex";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
