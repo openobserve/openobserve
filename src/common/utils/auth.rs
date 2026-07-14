@@ -494,6 +494,23 @@ where
             let access_token = auth_tokens.access_token;
             if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
                 access_token
+            } else if let Some(session_id) = access_token.strip_prefix("session ") {
+                // Opaque OSS login session — resolve the id to the actual
+                // `Basic ...` credential the server stashed at login time.
+                // A missing / deleted row (e.g. after logout) yields an empty
+                // auth string, which fails the "unauthenticated" branch below
+                // and rejects the request. This is what invalidates leaked
+                // pre-logout cookies server-side.
+                match crate::service::db::session::get(session_id).await {
+                    Ok(token) => token,
+                    Err(e) => {
+                        log::debug!(
+                            "OSS auth_tokens cookie references unknown / expired \
+                             session '{session_id}': {e}"
+                        );
+                        "".to_string()
+                    }
+                }
             } else {
                 format!("Bearer {access_token}")
             }
