@@ -119,12 +119,10 @@ export default {
 /* ── Header: "Nodes" title with a purple underline spanning the column
       (matches the pipeline editor's purple accent bar) ───────────────────── */
 .np-header {
-  color: var(--color-grey-800);
-  border-bottom: 2px solid #8b5cf6;
-}
-.body--dark .np-header {
-  color: rgba(255, 255, 255, 0.95);
-  border-bottom-color: #a855f7;
+  /* Theme tokens — no .body--dark override needed. Underline uses the app's
+     brand accent (primary-600, the active-tab/link colour). */
+  color: var(--color-text-heading);
+  border-bottom: 2px solid var(--color-primary-600);
 }
 
 /* ── Frosted-glass panel wrapping the node cards (the original NodeSidebar
