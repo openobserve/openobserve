@@ -6437,8 +6437,8 @@
       "screenshot": "Screenshot",
       "screenshotDescription": "Capture a full-page screenshot at each step.",
       "screenshotDescriptionAlways": "On every step.",
-      "screenshotDescriptionOnFail": "Only on failure.",
-      "screenshotDescriptionOff": "Off.",
+      "screenshotDescriptionOnFail": "Only of failed step.",
+      "screenshotDescriptionOff": "",
       "options": {
         "always": "Always",
         "onFail": "On fail",

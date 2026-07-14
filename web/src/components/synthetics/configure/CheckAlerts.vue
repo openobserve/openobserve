@@ -130,10 +130,10 @@ const silenceMinutes = computed({
 
       <!-- ── Destinations ───────────────────────────────────────────────── -->
       <div>
-        <label class="text-sm font-medium text-[var(--color-text-body)] mb-1 block">
-          {{ t('synthetics.scheduleAlert.destinations') }} *
-        </label>
-        <div class="flex items-center gap-1">
+        <div class="flex items-center gap-2">
+          <label class="text-sm font-medium text-[var(--color-text-body)] mb-1 block w-32">
+            {{ t('synthetics.scheduleAlert.destinations') }} *
+          </label>
           <OSelect
             v-model="localDestinations"
             :options="destinations"
@@ -169,7 +169,7 @@ const silenceMinutes = computed({
       </div>
 
       <!-- ── Cooldown Period ────────────────────────────────────────────── -->
-      <div class="flex items-center gap-0">
+      <div class="flex items-center gap-2">
         <label class="w-32 text-sm font-medium text-[var(--color-text-body)] flex items-center">
           {{ t('synthetics.scheduleAlert.cooldownPeriod') }} *
         </label>
