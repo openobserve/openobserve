@@ -428,13 +428,22 @@ export class AlertDestinationsPage {
         // Type the exact name to narrow to a single matching option (deterministic).
         const searchInput = this.page.locator(this.destinationImportTemplateSearch);
         await searchInput.waitFor({ state: 'visible', timeout: 5000 });
-        await searchInput.fill('');
-        await searchInput.fill(templateName);
 
+        // The parent's `templates` prop is populated async via `getTemplates()`; if
+        // `@search` fires before that resolves, `filteredTemplates` stays empty.
+        // Re-type the filter between attempts so a lost race recovers in place.
         const option = popover.locator(`[data-test-value="${templateName}"]`).first();
-        // The parent's `templates` prop is populated async via `getTemplates()` on the
-        // destinations list view; poll briefly so a newly-created template surfaces.
-        await expect(option).toBeVisible({ timeout: 15000 });
+        let optionVisible = false;
+        for (let attempt = 1; attempt <= 3 && !optionVisible; attempt++) {
+            await searchInput.fill('');
+            await searchInput.fill(templateName);
+            optionVisible = await option.isVisible({ timeout: 5000 }).catch(() => false);
+            if (!optionVisible) {
+                testLogger.warn('Import template option not rendered after search, re-filtering', { templateName, attempt });
+                await this.page.waitForTimeout(1000);
+            }
+        }
+        await expect(option).toBeVisible({ timeout: 5000 });
         await option.click();
         await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         testLogger.debug('Selected import template via OSelect search', { templateName });
@@ -965,32 +974,56 @@ export class AlertDestinationsPage {
      * then clicks the option matching `data-test-value="${templateName}"`. Falls back to scrollAndFindOption.
      */
     async selectDestinationTemplate(templateName) {
-        await this.page.locator(this.templateSelect).click();
+        // Click the OSelect -trigger (not the wrapper div, which doesn't reliably toggle
+        // the popover under load). Retry the open until the popover is visible.
         const popover = this.page.locator(this.templateSelectPopover);
+        const trigger = this.page.locator(this.templateSelect).locator('[data-test$="-trigger"]').first();
+        const opener = (await trigger.count().catch(() => 0)) > 0
+            ? trigger
+            : this.page.locator(this.templateSelect);
+        for (let open = 1; open <= 3; open++) {
+            await opener.click();
+            if (await popover.isVisible({ timeout: 5000 }).catch(() => false)) break;
+            await this.page.waitForTimeout(500);
+        }
         await popover.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Filter the listbox via the search input so virtualised options become visible.
+        // Wait for the option list to render BEFORE filtering — typing into the search
+        // while the list is still empty can leave a stale empty filter on slow
+        // environments, making every subsequent visibility check fail.
+        await popover.locator('[data-test-value]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+
         const search = this.page.locator(this.templateSelectSearch);
         const hasSearch = await search.isVisible({ timeout: 2000 }).catch(() => false);
-        if (hasSearch) {
-            await search.click();
-            await this.page.keyboard.press('Control+A');
-            await this.page.keyboard.press('Backspace');
-            await search.fill(templateName);
-        }
-
-        // Prefer the data-test-value selector (Reka OSelect convention)
         const option = popover.locator(`[data-test-value="${templateName}"]`).first();
-        const found = await option.isVisible({ timeout: 5000 }).catch(() => false);
-        if (found) {
-            await option.click();
-            // popover should dismiss after selection
-            await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-            testLogger.debug('Selected template via data-test-value', { templateName });
-            return;
+
+        // Search + check, re-typing the filter between attempts so a lost race
+        // (filter applied over a not-yet-rendered list) recovers in place.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            if (hasSearch) {
+                await search.click();
+                await this.page.keyboard.press('Control+A');
+                await this.page.keyboard.press('Backspace');
+                await search.fill(templateName);
+            }
+            if (await option.isVisible({ timeout: 5000 }).catch(() => false)) {
+                await option.click();
+                // popover should dismiss after selection
+                await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+                testLogger.debug('Selected template via data-test-value', { templateName, attempt });
+                return;
+            }
+            testLogger.warn('Template option not rendered after search, re-filtering', { templateName, attempt });
+            if (hasSearch) {
+                // Clear the filter so the full list re-renders before the next attempt
+                await search.click();
+                await this.page.keyboard.press('Control+A');
+                await this.page.keyboard.press('Backspace');
+                await this.page.waitForTimeout(1000);
+            }
         }
 
-        // Fallback: scroll the popover and locate via scrollAndFindOption (legacy path)
+        // Fallback: clear any residual filter, then scroll the full list (legacy path)
         await this.commonActions.scrollAndFindOption(templateName, 'template');
     }
 
@@ -1119,7 +1152,17 @@ export class AlertDestinationsPage {
         const saveBtn = this.page.locator(this.saveButton).first();
         // Prebuilt forms can scroll the submit button off-screen — scroll it into view first,
         // then wait for visibility, then force-click to bypass any overlay pointer interception.
-        await saveBtn.scrollIntoViewIfNeeded().catch(() => {});
+        // Under concurrent load the form can transiently re-render (toast/validation),
+        // briefly detaching the button, so retry the scroll+wait a couple of times.
+        let ready = false;
+        for (let attempt = 1; attempt <= 3 && !ready; attempt++) {
+            await saveBtn.scrollIntoViewIfNeeded().catch(() => {});
+            ready = await saveBtn.isVisible({ timeout: 10000 }).catch(() => false);
+            if (!ready) {
+                testLogger.warn('Save button not visible yet, retrying', { attempt });
+                await this.page.waitForTimeout(1000);
+            }
+        }
         await saveBtn.waitFor({ state: 'visible', timeout: 10000 });
         await expect(saveBtn).toBeEnabled({ timeout: 10000 });
         // force-click bypasses any residual toast overlay still occupying pointer events.

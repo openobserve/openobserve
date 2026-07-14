@@ -98,10 +98,12 @@ export class AlertsPage {
             multiTimeRangeDeleteButton: '[data-test="multi-time-range-alerts-delete-btn"]',
             goToViewEditorButton: '[data-test="go-to-view-editor-btn"]',
 
-            // Step 5: Deduplication (Scheduled only, v3 UI — in Advanced tab)
-            stepDeduplication: '.step-deduplication',
-            stepDeduplicationFingerprintSelect: '.step-deduplication .alert-v3-select',
-            stepDeduplicationTimeWindowInput: '.step-deduplication input[type="number"]',
+            // Step 5: Deduplication (Scheduled only — in Advanced tab). Use data-test
+            // hooks from Deduplication.vue; the old `.step-deduplication .alert-v3-select`
+            // class chain no longer exists on newer builds (e.g. alpha pre-cloud).
+            stepDeduplication: '[data-test="alert-dedup-fingerprint-fields"]',
+            stepDeduplicationFingerprintSelect: '[data-test="alert-dedup-fingerprint-fields"]',
+            stepDeduplicationTimeWindowInput: '[data-test="alert-dedup-time-window-field"]',
 
             // Step 6: Advanced settings
             contextAttributesAddButton: '[data-test="alert-variables-add-btn"]',
@@ -2290,7 +2292,14 @@ export class AlertsPage {
 
         const baseUrl = process.env["ZO_BASE_URL"];
         const orgName = process.env["ORGNAME"];
-        const validationDestinationUrl = `${baseUrl}/api/${orgName}/${streamName}/_json`;
+        // On cloud the backend's SSRF guard rejects the self-referencing ingestion URL
+        // (the cluster's own domain resolves to a private IP), so use an inert public
+        // sink instead. Round-trip validation-stream checks are unavailable on cloud —
+        // tests that poll the validation stream must skip there.
+        const isCloud = isCloudEnvironment();
+        const validationDestinationUrl = isCloud
+            ? 'https://httpbin.org/post'
+            : `${baseUrl}/api/${orgName}/${streamName}/_json`;
 
         // Ensure validation template exists with proper JSON array format for ingestion API
         await pm.alertTemplatesPage.ensureValidationTemplateExists(templateName);
@@ -2303,23 +2312,24 @@ export class AlertsPage {
         const destinationFound = await pm.alertDestinationsPage.findDestinationAcrossPages(destinationName);
 
         if (!destinationFound) {
-            // Generate Basic auth header using getAuthHeaders (supports cloud passcode)
-            const headers = getAuthHeaders();
-            const authHeader = headers['Authorization'] || (() => {
-                if (isCloudEnvironment()) {
-                    testLogger.warn('alertsPage: no cloud passcode available for destination creation - Basic auth will not work on cloud OIDC endpoints');
-                }
-                return this.commonActions.constructor.generateBasicAuthHeader(
+            // Self-referencing ingestion needs auth; never attach credentials when the
+            // destination points at the external sink (would leak the passcode).
+            let destinationHeaders = {};
+            if (!isCloud) {
+                // Generate Basic auth header using getAuthHeaders (supports cloud passcode)
+                const headers = getAuthHeaders();
+                const authHeader = headers['Authorization'] || this.commonActions.constructor.generateBasicAuthHeader(
                     process.env["ZO_ROOT_USER_EMAIL"],
                     process.env["ZO_ROOT_USER_PASSWORD"]
                 );
-            })();
+                destinationHeaders = { 'Authorization': authHeader };
+            }
 
             await pm.alertDestinationsPage.createDestinationWithHeaders(
                 destinationName,
                 validationDestinationUrl,
                 templateName,
-                { 'Authorization': authHeader }
+                destinationHeaders
             );
             testLogger.info('Created validation destination', {
                 destinationName,

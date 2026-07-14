@@ -14,7 +14,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
-const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js');
 
 const TEST_STREAM = 'e2e_automate';
 
@@ -234,6 +234,11 @@ test.describe("Alerts Advanced Coverage Tests", () => {
     test("Deduplication validation - verify duplicate alerts are suppressed", {
         tag: ['@alertsAdvanced', '@alerts', '@deduplication', '@dedupValidation', '@enterprise', '@skip']
     }, async ({ page }) => {
+        // Round-trip verification needs a self-referencing destination (alert notification
+        // ingested back into a validation stream). On cloud the SSRF guard blocks the
+        // cluster's own (private-IP) URL at destination-create time, so this cannot run.
+        test.skip(isCloudEnvironment(), 'Self-referencing validation destination is blocked by the SSRF guard on cloud');
+
         test.slow(); // Mark as slow test due to scheduled alert evaluation cycles
 
         // Generate unique suffix (lowercase for API compatibility)

@@ -140,6 +140,38 @@ export class CommonActions {
         // Target the visible dropdown — OSelect (Reka Listbox) post-migration,
         // q-select (.q-menu) pre-migration.
         const dropdown = this.page.locator('[data-test$="-popover"]').first();
+
+        // Fast path for the migrated OSelect: it renders a ListboxFilter search input
+        // (`[data-test$="-search"]`) plus per-option rows whose NAME is on
+        // `data-test-label` (data-test-value carries the option's value/id, which for
+        // folders is a hash, not the name). Filtering by search makes the target render
+        // without manual scroll — the legacy scroll loop below can't drive a
+        // virtualized/searchable OSelect (e.g. folder-move + template dropdowns on newer
+        // builds). Fall through to scrolling if no search input is present.
+        const searchInput = dropdown.locator('[data-test$="-search"], input[type="search"], input[type="text"]').first();
+        if (await searchInput.isVisible({ timeout: 1500 }).catch(() => false)) {
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                await searchInput.fill('');
+                await searchInput.fill(optionName);
+                await this.page.waitForTimeout(800);
+                // Match by label (name), then value, then visible text.
+                const candidates = [
+                    dropdown.locator(`[data-test-label="${optionName}"]`).first(),
+                    dropdown.locator(`[data-test-value="${optionName}"]`).first(),
+                    dropdown.getByText(optionName, { exact: true }).first(),
+                ];
+                for (const option of candidates) {
+                    if (await option.isVisible({ timeout: 1500 }).catch(() => false)) {
+                        await option.click();
+                        testLogger.debug(`Found ${optionType} via OSelect search: ${optionName}`);
+                        await this.page.waitForTimeout(500);
+                        return true;
+                    }
+                }
+            }
+            testLogger.warn(`OSelect search did not surface ${optionType} "${optionName}", falling back to scroll`, {});
+        }
+
         let optionFound = false;
         let maxScrolls = 50;
         let scrollAmount = 1000;
@@ -147,10 +179,12 @@ export class CommonActions {
 
         while (!optionFound && maxScrolls > 0) {
             try {
-                // Try to find and click the option
-                const option = optionType === 'template' 
-                    ? this.page.getByText(optionName, { exact: true })
-                    : this.page.getByRole('option', { name: optionName });
+                // Try to find and click the option — scope to the dropdown so a stray
+                // page-wide text match (list rows behind the form, echoed search text)
+                // can't be clicked and falsely reported as a successful selection.
+                const option = optionType === 'template'
+                    ? dropdown.getByText(optionName, { exact: true })
+                    : dropdown.getByRole('option', { name: optionName });
                 
                 if (await option.isVisible()) {
                     if (optionType === 'template') {
@@ -283,6 +317,28 @@ export class CommonActions {
         });
         const responseData = await response.json().catch(() => ({ error: 'Failed to parse JSON' }));
         testLogger.debug('Stream initialization response', { response: responseData });
+        if (!response.ok()) {
+            throw new Error(`Stream initialization ingest failed for ${streamName}: ${response.status()} ${JSON.stringify(responseData)}`);
+        }
+
+        // Poll the streams API until the new stream is registered. Consumers reload the
+        // page immediately after this call; if the SPA fetches its stream list before
+        // registration completes, the stale list is cached and the alert wizard's
+        // stream dropdown never shows the stream.
+        const listUrl = `${baseUrl}/api/${orgName}/streams?type=logs`;
+        let registered = false;
+        for (let i = 0; i < 15 && !registered; i++) {
+            const listResp = await this.page.request.get(listUrl, { headers }).catch(() => null);
+            if (listResp && listResp.ok()) {
+                const body = await listResp.json().catch(() => null);
+                registered = (body?.list || []).some(s => s.name === streamName);
+            }
+            if (!registered) await this.page.waitForTimeout(1000);
+        }
+        if (!registered) {
+            throw new Error(`Stream ${streamName} did not appear in streams list within 15s of ingestion`);
+        }
+
         testLogger.info(`Successfully initialized stream: ${streamName}`);
         return {
             streamName,

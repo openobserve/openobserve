@@ -26,51 +26,101 @@ export class AlertCreationWizard {
      * Typing the stream name triggers QSelect's built-in filter to narrow results.
      */
     async selectStreamByName(streamName) {
-        const maxRetries = 3;
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        // First, try selecting within the form WITHOUT leaving it. Under concurrent
+        // load the dropdown filter can be slow, so re-open + re-type a few times in
+        // place before resorting to the expensive re-navigation path below. This keeps
+        // spurious slowness from triggering a full wizard re-entry (which is fragile).
+        const popover = this.page.locator(this.locators.streamNamePopover);
+        // Scoped, exact option match by data-test-value — reliable under concurrent load
+        // (page-wide getByText can miss slow renders or match stray text). Fall back to
+        // scoped visible-text if the value attribute isn't present on a given build.
+        const scopedOption = () => this.page
+            .locator(`${this.locators.streamNameOption}[data-test-value="${streamName}"]`)
+            .first();
+        for (let inPlace = 1; inPlace <= 4; inPlace++) {
             await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
             await this.page.locator(this.locators.streamNameDropdown).click();
-            await this.page.waitForTimeout(500);
-            // Clear any previous text in the input
+            // Wait for the popover AND its first option to render before typing, so the
+            // filter isn't applied over a not-yet-populated list (a stale empty filter
+            // under load is the main cause of the stream never appearing).
+            await popover.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+            await this.page.locator(this.locators.streamNameOption).first()
+                .waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
             await this.page.keyboard.press('Control+a');
             await this.page.keyboard.type(streamName, { delay: 30 });
-            await this.page.waitForTimeout(1500);
 
-            const streamOption = this.page.getByText(streamName, { exact: true });
-            if (await streamOption.isVisible({ timeout: 5000 }).catch(() => false)) {
-                await streamOption.click();
-                testLogger.info('Stream selected successfully', { streamName, attempt });
+            const option = scopedOption();
+            if (await option.isVisible({ timeout: 8000 }).catch(() => false)) {
+                await option.click();
+                testLogger.info('Stream selected successfully', { streamName, inPlaceAttempt: inPlace });
+                return;
+            }
+            // Secondary: scoped visible-text within the popover
+            const textOption = popover.getByText(streamName, { exact: true }).first();
+            if (await textOption.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await textOption.click();
+                testLogger.info('Stream selected via popover text', { streamName, inPlaceAttempt: inPlace });
                 return;
             }
 
-            testLogger.warn('Stream not visible in dropdown, retrying', { streamName, attempt, maxRetries });
+            testLogger.warn('Stream not visible in dropdown, retrying in place', { streamName, inPlace });
             await this.page.locator('body').click({ position: { x: 10, y: 10 } });
             await this.page.waitForTimeout(1000);
-
-            if (attempt < maxRetries) {
-                // Navigate back and re-enter to force a fresh stream list fetch
-                await this.page.locator('[data-test="add-alert-back-btn"]').click();
-                await this.page.waitForTimeout(2000);
-                await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-                await this.page.locator(this.locators.addAlertButton).click();
-                await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-                await this.page.waitForTimeout(2000);
-
-                // Re-fill the alert name (it was lost when navigating back)
-                await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
-                await this.page.locator(this.locators.alertNameInput).click();
-                await this.page.locator(this.locators.alertNameInputField).fill(this.currentAlertName);
-
-                // Re-select stream type via OSelect popover pattern (§4)
-                await this.page.locator(this.locators.streamTypeDropdown).click();
-                await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
-                await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
-                await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-                await this.page.waitForTimeout(2000);
-            }
         }
-        // Final attempt - if it still fails, throw the original error
-        await this.page.getByText(streamName, { exact: true }).click();
+
+        // Fallback: close and re-open the form via the wizard back button to force a
+        // fresh stream-list fetch (handles a stale cached list). Uses the back button
+        // (not goto/reload) so we stay in the current folder context — the ui-ops
+        // tests create alerts inside a specific folder, and navigating to the alerts
+        // root would create the alert in the wrong folder and break later assertions.
+        const maxRetries = 2;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            await this.page.locator(this.locators.addAlertBackButton || '[data-test="add-alert-back-btn"]').first().click();
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+            await this.page.waitForTimeout(1500);
+
+            // Re-open a fresh Add Alert form (button enables once destinations/templates load)
+            const addBtn = this.page.locator(this.locators.addAlertButton);
+            await addBtn.waitFor({ state: 'visible', timeout: 20000 });
+            await expect(addBtn).toBeEnabled({ timeout: 20000 });
+            await addBtn.click();
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+            await this.page.waitForTimeout(1500);
+
+            // Re-fill alert name (lost on re-entry)
+            await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
+            await this.page.locator(this.locators.alertNameInputField).fill(this.currentAlertName);
+
+            // Re-select stream type (logs) via OSelect popover pattern (§4)
+            await this.page.locator(this.locators.streamTypeDropdown).click();
+            await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+            await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+            await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
+            await this.page.waitForTimeout(1000);
+
+            // Try the stream selection again after the fresh fetch
+            await this.page.locator(this.locators.streamNameDropdown).click();
+            await popover.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+            await this.page.locator(this.locators.streamNameOption).first()
+                .waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+            await this.page.keyboard.press('Control+a');
+            await this.page.keyboard.type(streamName, { delay: 30 });
+            const option = scopedOption();
+            if (await option.isVisible({ timeout: 8000 }).catch(() => false)) {
+                await option.click();
+                testLogger.info('Stream selected successfully after wizard re-entry', { streamName, attempt });
+                return;
+            }
+            const textOption = popover.getByText(streamName, { exact: true }).first();
+            if (await textOption.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await textOption.click();
+                testLogger.info('Stream selected via popover text after wizard re-entry', { streamName, attempt });
+                return;
+            }
+            testLogger.warn('Stream still not visible after wizard re-entry', { streamName, attempt });
+        }
+        // Final attempt - if it still fails, surface via a scoped click (throws clearly)
+        await scopedOption().click();
     }
 
     /**
@@ -413,7 +463,9 @@ export class AlertCreationWizard {
         // ==================== ALERT SETTINGS ====================
         // SQL tab: threshold row uses data-test="alert-trigger-operator-select" (not alert-threshold-operator-select)
         // The visible "Alert if No. of events" row lives directly on the SQL query config panel.
-        const thresholdOperator = this.page.locator('[data-test="alert-trigger-operator-select"]').first();
+        // OSelect forwards data-test to an inner -trigger button; the wrapper div itself
+        // is not clickable. Target the trigger so the popover actually opens.
+        const thresholdOperator = this.page.locator('[data-test="alert-trigger-operator-select"] [data-test$="-trigger"]').first();
         await thresholdOperator.waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Threshold section visible');
 
@@ -723,64 +775,36 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(2000);
         testLogger.info('Ran SQL query');
 
-        // Close dialog — try back button, then close button
-        try {
-            const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
-            await closeButton.click({ force: true, timeout: 10000 });
-        } catch (error) {
-            testLogger.warn('Close button force-click failed, trying dialog close button', { error: error.message });
-            const dialogCloseBtn = this.page.locator('[data-test="o-dialog-close-btn"]').first();
-            if (await dialogCloseBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-                await dialogCloseBtn.click();
-            }
-            await this.page.waitForTimeout(500);
-        }
+        // Close the query-editor drawer via ITS back button — scope to the
+        // query-editor-dialog container, since an unscoped add-alert-back-btn matches
+        // the wizard's own back arrow and leaves the drawer open to intercept clicks
+        // on the threshold row below. Assert the drawer detaches before proceeding.
+        const editorDialog = this.page.locator('[data-test="query-editor-dialog"]').first();
+        const dialogBackBtn = editorDialog.locator('[data-test="add-alert-back-btn"]').first();
+        await dialogBackBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await dialogBackBtn.click();
+        await expect(editorDialog).not.toBeAttached({ timeout: 10000 });
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(1000);
-
-        // Clean up residual q-portal dialog overlays from the closed SQL Editor,
-        // scoped to already-hidden portals and the Monaco editor's portal specifically
-        // so we don't hide any other legitimately open dialog.
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal--dialog"]').forEach(el => {
-                const isHidden = el.getAttribute('aria-hidden') === 'true';
-                const hasMonaco = el.querySelector('.monaco-editor');
-                if (isHidden || hasMonaco) el.style.display = 'none';
-            });
-        }).catch(e => testLogger.warn('Failed to remove dialog portals', { error: e.message }));
-        await this.page.waitForTimeout(300);
+        await this.page.waitForTimeout(500);
 
         testLogger.info('Closed SQL Editor dialog — portal cleaned up');
 
         // ==================== ALERT SETTINGS ====================
-        // In v3 UI, threshold operator + input are in the Alert Rules tab ("Alert if No. of events *")
-        const thresholdSection = this.page.locator('.alert-condition-row').filter({ hasText: 'No. of events' }).first();
-        await thresholdSection.waitFor({ state: 'visible', timeout: 10000 });
+        // Threshold row via stable data-test hooks (same as createScheduledAlertWithSQL) —
+        // the old `.alert-condition-row`/`.alert-v3-select` class chain no longer exists
+        // on current builds (removed with the alert wizard revamp).
+        // OSelect forwards data-test to an inner -trigger button; the wrapper div itself
+        // is not clickable. Target the trigger so the popover actually opens.
+        const thresholdOperator = this.page.locator('[data-test="alert-trigger-operator-select"] [data-test$="-trigger"]').first();
+        await thresholdOperator.waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info('Threshold section visible');
 
-        const thresholdOperator = thresholdSection.locator('.alert-v3-select').first();
-        await thresholdOperator.waitFor({ state: 'visible', timeout: 5000 });
-        await thresholdOperator.click({ force: true }).catch(async () => {
-            testLogger.info('click failed, trying force click on main element');
-            await thresholdOperator.click({ force: true });
-        });
-        // Wait for the dropdown menu to actually appear before selecting an option
-        await this.page.locator('[data-test$="-popover"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        // Use role-based option selection (bypasses q-portal visibility issues)
-        // Use a flag to track success so the fallback error isn't silently swallowed
-        let operatorSelected = false;
-        try {
-            await this.page.getByRole('option', { name: '>=', exact: true }).click({ timeout: 5000 });
-            operatorSelected = true;
-        } catch {
-            testLogger.warn('Role option not found, trying popover fallback');
-        }
-        if (!operatorSelected) {
-            await this.page.locator('[data-test$="-popover"]').getByText('>=', { exact: true }).click({ timeout: 3000 });
-        }
+        await thresholdOperator.click();
+        await this.page.locator('[data-test="alert-trigger-operator-select-popover"]').first().waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('[data-test="alert-trigger-operator-select-option"][data-test-value=">="]').first().click();
         testLogger.info('Set threshold operator: >=');
 
-        const thresholdInput = thresholdSection.locator('input[type="number"]').first();
+        const thresholdInput = this.page.locator('[data-test="alert-trigger-threshold-input-field"]').first();
         await thresholdInput.waitFor({ state: 'visible', timeout: 5000 });
         await thresholdInput.fill('1');
         testLogger.info('Set threshold value: 1');
@@ -1111,19 +1135,36 @@ export class AlertCreationWizard {
     }
 
     async _switchToTab(tabName) {
-        // v3 UI: tabs are inner divs within the tab header bar (first child of .alert-v3-tabs)
-        // e.g. <div>Alert Rules *</div> and <div>Advanced</div>
-        const tab = this.page.locator('.alert-v3-tabs > div:first-child > div').filter({ hasText: tabName }).first();
-        // Check if this tab is already active (has active-tab class)
-        const isActive = await tab.evaluate(el => el.classList.contains('active-tab')).catch(() => false);
-        if (isActive) {
-            testLogger.info('Tab already active, skipping click', { tabName });
+        // Preferred: stable data-test toggle items from AddAlert.vue
+        // (`add-alert-tab-<key>`, keys: condition = "Alert Rules", advanced = "Advanced").
+        const tabKey = tabName === 'Alert Rules' ? 'condition' : tabName.toLowerCase();
+        const dataTestTab = this.page.locator(`[data-test="add-alert-tab-${tabKey}"]`).first();
+        if (await dataTestTab.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await dataTestTab.click({ force: true });
+            await this.page.waitForTimeout(500);
+            testLogger.info('Switched to tab via data-test', { tabName, tabKey });
             return;
         }
-        await tab.waitFor({ state: 'visible', timeout: 5000 });
-        await tab.click({ force: true });
+
+        // Legacy v3 UI fallback: tabs are inner divs within the tab header bar
+        const tab = this.page.locator('.alert-v3-tabs > div:first-child > div').filter({ hasText: tabName }).first();
+        if (await tab.isVisible({ timeout: 3000 }).catch(() => false)) {
+            // Check if this tab is already active (has active-tab class)
+            const isActive = await tab.evaluate(el => el.classList.contains('active-tab')).catch(() => false);
+            if (isActive) {
+                testLogger.info('Tab already active, skipping click', { tabName });
+                return;
+            }
+            await tab.click({ force: true });
+            await this.page.waitForTimeout(500);
+            testLogger.info('Switched to tab', { tabName });
+            return;
+        }
+
+        // Last resort: click the tab label text (works on builds without either hook)
+        await this.page.getByText(tabName, { exact: false }).first().click({ force: true });
         await this.page.waitForTimeout(500);
-        testLogger.info('Switched to tab', { tabName });
+        testLogger.info('Switched to tab via text fallback', { tabName });
     }
 
     async _switchToAdvancedTab() {
@@ -1259,17 +1300,18 @@ export class AlertCreationWizard {
         // ==================== ALERT SETTINGS (back in Alert Rules tab) ====================
         await this._switchToAlertRulesTab();
 
-        // For SQL mode, the condition row shows "Alert if No. of events *" (not "matching logs")
-        const thresholdSection = this.page.locator('.alert-condition-row').filter({ hasText: 'No. of events' }).first();
-        const thresholdOperator = thresholdSection.locator('.alert-v3-select').first();
-        await thresholdOperator.waitFor({ state: 'visible', timeout: 5000 });
-        await thresholdOperator.click({ force: true });
-        await this.page.waitForTimeout(500);
-        // Scope to visible popover to avoid strict mode violation (selected value + dropdown option)
-        await this.page.locator('[data-test$="-popover"]').getByText('>=', { exact: true }).click();
+        // Threshold row via stable data-test hooks — the old `.alert-condition-row`/
+        // `.alert-v3-select` class chain no longer exists on current builds.
+        // OSelect forwards data-test to an inner -trigger button; the wrapper div itself
+        // is not clickable. Target the trigger so the popover actually opens.
+        const thresholdOperator = this.page.locator('[data-test="alert-trigger-operator-select"] [data-test$="-trigger"]').first();
+        await thresholdOperator.waitFor({ state: 'visible', timeout: 10000 });
+        await thresholdOperator.click();
+        await this.page.locator('[data-test="alert-trigger-operator-select-popover"]').first().waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('[data-test="alert-trigger-operator-select-option"][data-test-value=">="]').first().click();
         testLogger.info('Set threshold operator: >=');
 
-        const thresholdInput = thresholdSection.locator('input[type="number"]').first();
+        const thresholdInput = this.page.locator('[data-test="alert-trigger-threshold-input-field"]').first();
         await thresholdInput.waitFor({ state: 'visible', timeout: 10000 });
         await thresholdInput.fill('1');
         testLogger.info('Set threshold value: 1');

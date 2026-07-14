@@ -2,7 +2,7 @@ const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const logData = require("../../fixtures/log.json");
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
-const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js');
 
 // Test timeout constants (in milliseconds)
 const FIVE_MINUTES_MS = 300000;
@@ -98,18 +98,25 @@ test.describe("Alerts Import/Export", () => {
       { intervals: [2000, 3000, 5000, 5000, 5000, 5000, 5000], timeout: ALERT_REGISTRATION_WAIT_MS }
     ).toBe(true);
 
-    // Trigger and validate alert fires (self-referential destination approach)
-    const triggerResult = await pm.alertsPage.verifyAlertTrigger(
-      pm,
-      alertName,
-      triggerStreamName,
-      column,
-      value,
-      ALERT_TRIGGER_TIMEOUT_MS,
-      validationInfra.streamName
-    );
-    expect(triggerResult.found, `Alert ${alertName} should fire and appear in validation stream`).toBe(true);
-    testLogger.info('Alert trigger validation PASSED', { alertName, triggerResult });
+    // Trigger and validate alert fires (self-referential destination approach).
+    // On cloud the SSRF guard blocks self-referencing destinations, so the validation
+    // destination points at an external sink there and this round-trip check cannot
+    // work — skip it and keep the import/export coverage below.
+    if (!isCloudEnvironment()) {
+      const triggerResult = await pm.alertsPage.verifyAlertTrigger(
+        pm,
+        alertName,
+        triggerStreamName,
+        column,
+        value,
+        ALERT_TRIGGER_TIMEOUT_MS,
+        validationInfra.streamName
+      );
+      expect(triggerResult.found, `Alert ${alertName} should fire and appear in validation stream`).toBe(true);
+      testLogger.info('Alert trigger validation PASSED', { alertName, triggerResult });
+    } else {
+      testLogger.info('Skipping trigger round-trip validation on cloud (SSRF guard blocks self-referencing destination)');
+    }
 
     await pm.commonActions.navigateToAlerts();
     await pm.alertsPage.navigateToFolder(folderName);
