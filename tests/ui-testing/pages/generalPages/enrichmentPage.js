@@ -330,8 +330,10 @@ class EnrichmentPage {
         await openNavFlyoutChild(this.page, 'pipeline');
         await this.enrichmentTableTab.click();
         await listResponse;
-        // Wait for the enrichment tables list page to be visible
-        await this.listPage.waitFor({ state: 'visible', timeout: 10000 });
+        // Wait for the enrichment tables list page to be visible. Alpha nav can be
+        // slow under load — give it room so a transient slow render doesn't abort
+        // callers that poll this (e.g. waitForUrlJobToFinish).
+        await this.listPage.waitFor({ state: 'visible', timeout: 20000 });
     }
 
     async navigateToAddEnrichmentTable() {
@@ -945,7 +947,9 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // the schema button or a status icon (failed) appears. The pentest
         // env may take 30-60s to fetch the CSV from the public URL.
         const schemaBtn = this.getRowSchemaBtn(tableName);
-        const maxAttempts = 12;
+        // 18 × 5s ≈ 90s — the public-URL CSV fetch + async schema build can be
+        // slow on alpha; give it room before giving up.
+        const maxAttempts = 18;
         for (let i = 0; i < maxAttempts; i++) {
             // Use schemaBtn.waitFor with a per-iteration timeout so we
             // deterministically poll for visibility without waitForTimeout.
@@ -2189,16 +2193,23 @@ abc, err = get_enrichment_table_record("${fileName}", {
      * @param {number} pollInterval - Time between polls in ms (default 5000)
      * @returns {Promise<{completed: boolean, hasFailed: boolean, buttonCount: number}>}
      */
-    async waitForUrlJobToFinish(tableName, maxAttempts = 12, pollInterval = 5000) {
+    async waitForUrlJobToFinish(tableName, maxAttempts = 15, pollInterval = 5000) {
         testLogger.info(`Waiting for URL job to finish: ${tableName} (max ${maxAttempts} attempts)`);
 
         for (let i = 0; i < maxAttempts; i++) {
             await this.page.waitForTimeout(pollInterval);
             // Dismiss any open form first (after Save the edit form stays open),
-            // then navigate explicitly to guarantee we're on the enrichment list
-            await this.navigateBackFromFormIfNeeded();
-            await this.navigateToEnrichmentTable();
-            await this.searchEnrichmentTableInList(tableName);
+            // then navigate explicitly to guarantee we're on the enrichment list.
+            // A transient slow nav/render on one poll must not abort the whole
+            // wait — swallow it and retry on the next iteration.
+            try {
+                await this.navigateBackFromFormIfNeeded();
+                await this.navigateToEnrichmentTable();
+                await this.searchEnrichmentTableInList(tableName);
+            } catch (navErr) {
+                testLogger.debug(`Poll ${i + 1}/${maxAttempts}: nav/search transient error, retrying — ${navErr.message}`);
+                continue;
+            }
 
             // Check for warning icon (failed job)
             const hasWarningIcon = await this.isWarningIconVisibleInRow(tableName);

@@ -166,6 +166,11 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.searchEnrichmentTableInList(tableName);
         await enrichmentPage.verifyTableRowVisible(tableName);
 
+        // Step 2.5: The schema button only renders once the async URL-fetch job
+        // completes — wait for it first (as the schema-mismatch test does) so we
+        // don't race the button on a slow alpha public-URL fetch.
+        await enrichmentPage.waitForUrlJobToFinish(tableName);
+
         // Step 3: Click schema button
         await enrichmentPage.clickSchemaButton(tableName);
         testLogger.info('Clicked schema button');
