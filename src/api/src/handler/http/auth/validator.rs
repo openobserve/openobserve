@@ -34,7 +34,7 @@ use crate::{
     common::{
         infra::config::ORG_INGESTION_TOKENS,
         meta::{
-            ingestion::INGESTION_EP,
+            ingestion_routes,
             organization::DEFAULT_ORG,
             user::{
                 AuthTokensExt, TokenValidationResponse, TokenValidationResponseBuilder,
@@ -155,7 +155,14 @@ pub async fn validator(
         let method = req_data.method.to_string();
         validate_credentials_ext(user_id, password, path, auth_token, &method).await
     } else {
-        validate_credentials(user_id, password.trim(), path, auth_info.bypass_check).await
+        validate_credentials(
+            user_id,
+            password.trim(),
+            path,
+            &req_data.method,
+            auth_info.bypass_check,
+        )
+        .await
     } {
         Ok(res) => {
             if res.is_valid {
@@ -241,6 +248,7 @@ pub async fn validate_credentials(
     user_id: &str,
     user_password: &str,
     path: &str,
+    method: &Method,
     from_session: bool,
 ) -> Result<TokenValidationResponse, AuthError> {
     // Strip leading slash if present
@@ -251,6 +259,18 @@ pub async fn validate_credentials(
     {
         path_columns.pop();
     }
+
+    // Decide whether an org ingestion token (`o2oi_`) may be used on this
+    // request. GHSA-wffq-g8qf-ccmv: the previous check accepted the token
+    // whenever an ingestion word appeared *anywhere* in the path for *any*
+    // method, so `GET /{org}/{stream}/traces/latest` (a data-read route that
+    // merely contains the `traces` segment) leaked protected data. The
+    // authoritative ingestion-route table classifies the request by method and
+    // exact path shape, so only real writes and the read-only ES handshake
+    // stubs are accepted — data-read routes are not in the table. `path` (not
+    // the trailing-slash-trimmed `path_columns`) is passed so the ES root ping
+    // `GET /{org}/` stays distinguishable from `/organizations` etc.
+    let is_ingestion_path = ingestion_routes::is_ingestion_allowed(method, path);
 
     // Check org-level ingestion tokens before user lookup.
     // Org tokens are prefixed with "o2oi_" for fast identification —
@@ -270,8 +290,6 @@ pub async fn validate_credentials(
             // are purged from cache at the time of disable/delete).
             if let Some(r) = ORG_INGESTION_TOKENS.get(&cache_key) {
                 let token_name = r.value().clone();
-                let is_ingestion_path = path_columns.len() == 1
-                    || INGESTION_EP.iter().any(|ep| path_columns.contains(ep));
 
                 if !is_ingestion_path {
                     return Ok(TokenValidationResponse {
@@ -306,9 +324,6 @@ pub async fn validate_credentials(
                 Ok(Some(token_record)) => {
                     // Populate cache for future fast lookups
                     ORG_INGESTION_TOKENS.insert(cache_key, token_record.name.clone());
-
-                    let is_ingestion_path = path_columns.len() == 1
-                        || INGESTION_EP.iter().any(|ep| path_columns.contains(ep));
 
                     if !is_ingestion_path {
                         return Ok(TokenValidationResponse {
@@ -481,7 +496,11 @@ pub async fn validate_credentials(
         return Ok(build_token_validation_response(&user));
     }
 
-    if INGESTION_EP.iter().any(|s| path_columns.contains(s)) && user_password.is_empty() {
+    // An empty password on an ingestion request is never valid (blocks
+    // anonymous ingestion). Classified against the ingestion-route table so it
+    // fires for real ingestion endpoints only, not any path that merely
+    // contains an ingestion word.
+    if is_ingestion_path && user_password.is_empty() {
         return Ok(TokenValidationResponse {
             is_valid: false,
             user_email: "".to_string(),
@@ -493,9 +512,14 @@ pub async fn validate_credentials(
         });
     }
 
-    if (path_columns.len() == 1 || INGESTION_EP.iter().any(|s| path_columns.contains(s)))
-        && user.token.eq(&user_password)
-    {
+    // A regular (non-service-account) user's static token is an ingestion-only
+    // credential: it authenticates only on ingestion requests (writes + the ES
+    // handshake stubs). Using the route table here — instead of "any path
+    // containing an ingestion word" — closes the same read-bypass class as
+    // GHSA-wffq-g8qf-ccmv for user tokens (e.g. `GET .../traces/latest` no
+    // longer accepts a user's ingestion token). Service-account tokens, which
+    // are valid across the API, are handled earlier and are unaffected.
+    if is_ingestion_path && user.token.eq(&user_password) {
         return Ok(build_token_validation_response(&user));
     }
 
@@ -709,7 +733,6 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
     {
         path_columns.remove(0);
     }
-    let url_len = path_columns.len();
     if path_columns.len() < 2 || path_columns.first().eq(&Some(&"license")) {
         return Ok(());
     }
@@ -736,8 +759,7 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
         if !cfg.common.create_org_through_ingestion {
             Err(AuthError::NotFound("Organization not found".to_string()))
         } else if is_root_user(user_id)
-            && method.eq(&Method::POST)
-            && INGESTION_EP.contains(&path_columns[url_len - 1])
+            && ingestion_routes::is_ingestion_write(method, path)
             && crate::service::organization::check_and_create_org(org_id)
                 .await
                 .is_ok()
@@ -871,7 +893,9 @@ pub async fn validator_aws(req_data: &RequestData) -> Result<AuthValidationResul
                     .map(|s| s.to_string())
                     .collect::<Vec<String>>();
 
-                match validate_credentials(&creds[0], &creds[1], path, false).await {
+                match validate_credentials(&creds[0], &creds[1], path, &req_data.method, false)
+                    .await
+                {
                     Ok(res) => {
                         if res.is_valid {
                             Ok(AuthValidationResult {
@@ -919,7 +943,7 @@ pub async fn validator_gcp(req_data: &RequestData) -> Result<AuthValidationResul
                 .map(|s| s.to_string())
                 .collect::<Vec<String>>();
 
-            match validate_credentials(&creds[0], &creds[1], path, false).await {
+            match validate_credentials(&creds[0], &creds[1], path, &req_data.method, false).await {
                 Ok(res) => {
                     if res.is_valid {
                         Ok(AuthValidationResult {
@@ -1242,6 +1266,158 @@ mod tests {
         assert!(expected1 == expected2);
     }
 
+    /// Regression test for GHSA-wffq-g8qf-ccmv: an enabled org ingestion token
+    /// (`o2oi_` prefix) must be rejected on data-bearing *read* endpoints whose
+    /// path merely *contains* an ingestion word (e.g. the `traces`/`logs`/
+    /// `metrics` segments), while every legitimate ingestion path the token
+    /// could reach before the fix — POST writes and the static Elasticsearch
+    /// handshake/setup stubs — keeps working.
+    #[tokio::test]
+    async fn test_org_ingestion_token_rejected_on_read_paths() {
+        let org_id = "default";
+        let token = "o2oi_regression_ghsa_wffq_g8qf_ccmv";
+
+        // Seed the org ingestion token cache to hit the enabled-token branch
+        // without a DB lookup (disabled/deleted tokens are never cached).
+        ORG_INGESTION_TOKENS.insert(format!("{org_id}/{token}"), "regression-token".to_string());
+
+        // --- The bypass: data-bearing GET reads must be rejected. ---
+        for path in [
+            "default/mystream/traces/latest", // the exact route from the report
+            "default/mystream/traces/latest_stream",
+            "default/mystream/traces/session",
+            "default/mystream/traces/user",
+            "default/logs/_values",
+            "default/metrics/latest",
+        ] {
+            assert!(
+                !validate_credentials("collector@example.com", token, path, &Method::GET, false,)
+                    .await
+                    .unwrap()
+                    .is_valid,
+                "org ingestion token must not read GET /{path}"
+            );
+        }
+
+        // --- Writes: every real POST ingestion route is accepted, incl. the ES
+        // template/data-stream/ingest-pipeline POST-create stubs (whose `{name}`
+        // is the last segment, so the old last-segment rule would have missed
+        // them — the route table matches them by shape). ---
+        for path in [
+            "default/traces",                      // OTLP/native traces write
+            "default/_bulk",                       // ES bulk
+            "default/mystream/_json",              // JSON ingest
+            "default/_hec",                        // Splunk HEC
+            "default/loki/api/v1/push",            // Loki push
+            "default/v1/logs",                     // OTLP logs
+            "default/prometheus/api/v1/write",     // Prometheus remote-write
+            "default/mystream/_kinesis_firehose",  // AWS Firehose
+            "default/mystream/_sub",               // GCP Pub/Sub push
+            "default/_index_template/filebeat-7",  // ES template create
+            "default/_data_stream/filebeat-7",     // ES data-stream create
+            "default/_ingest/pipeline/filebeat-7", // ES ingest-pipeline create
+        ] {
+            assert!(
+                validate_credentials("collector@example.com", token, path, &Method::POST, false,)
+                    .await
+                    .unwrap()
+                    .is_valid,
+                "org ingestion token must be accepted on POST /{path}"
+            );
+        }
+
+        // A bare `POST /{org}` is NOT a real ingestion route (only `GET /{org}/`
+        // exists — the ES ping), so it must be rejected.
+        assert!(
+            !validate_credentials(
+                "collector@example.com",
+                token,
+                "default",
+                &Method::POST,
+                false,
+            )
+            .await
+            .unwrap()
+            .is_valid,
+            "org ingestion token must not be accepted on bare POST /{{org}}"
+        );
+
+        // --- Reads: only the static Elasticsearch handshake/setup stubs (and
+        // the bare ES root ping) are reachable so ES ingestion clients connect
+        // and load templates. These return no user data. ---
+        for (path, method) in [
+            ("default/", Method::GET),  // ES root version ping `GET /{org}/`
+            ("default/", Method::HEAD), // ES root ping via HEAD
+            ("default/_license", Method::GET),
+            ("default/_xpack", Method::GET),
+            ("default/_ilm/policy/filebeat-7", Method::GET),
+            ("default/_index_template/filebeat-7", Method::GET),
+            ("default/_data_stream/filebeat-7", Method::HEAD),
+            ("default/_ingest/pipeline/filebeat-7", Method::GET),
+        ] {
+            assert!(
+                validate_credentials("collector@example.com", token, path, &method, false,)
+                    .await
+                    .unwrap()
+                    .is_valid,
+                "org ingestion token must be accepted on {method} /{path}"
+            );
+        }
+
+        // The ES ping requires the trailing slash. Bare `GET /{org}` (no slash)
+        // is a single-segment path that must NOT be treated as ingestion — else
+        // the token would authenticate on top-level routes like `/organizations`.
+        assert!(
+            !validate_credentials(
+                "collector@example.com",
+                token,
+                "default",
+                &Method::GET,
+                false,
+            )
+            .await
+            .unwrap()
+            .is_valid,
+            "org ingestion token must not be accepted on bare GET /{{org}} (no trailing slash)"
+        );
+
+        // --- Negatives: a POST to a non-ingestion path, and non-ingestion
+        // methods, stay out. ---
+        assert!(
+            !validate_credentials(
+                "collector@example.com",
+                token,
+                "default/dashboards",
+                &Method::POST,
+                false,
+            )
+            .await
+            .unwrap()
+            .is_valid,
+            "org ingestion token must not POST to non-ingestion paths"
+        );
+
+        // PUT/DELETE are never ingestion, even on a path containing an
+        // ingestion word — the token must not act as a general-purpose key.
+        for method in [Method::PUT, Method::DELETE] {
+            assert!(
+                !validate_credentials(
+                    "collector@example.com",
+                    token,
+                    "default/traces",
+                    &method,
+                    false,
+                )
+                .await
+                .unwrap()
+                .is_valid,
+                "org ingestion token must not be accepted on {method} /default/traces"
+            );
+        }
+
+        ORG_INGESTION_TOKENS.remove(&format!("{org_id}/{token}"));
+    }
+
     #[tokio::test]
     async fn test_validate() {
         let org_id = "default";
@@ -1296,31 +1472,31 @@ mod tests {
         .await;
 
         assert!(
-            validate_credentials(init_user, pwd, "default/_bulk", false)
+            validate_credentials(init_user, pwd, "default/_bulk", &Method::POST, false)
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            !validate_credentials("", pwd, "default/_bulk", false)
+            !validate_credentials("", pwd, "default/_bulk", &Method::POST, false)
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            !validate_credentials("", pwd, "/", false)
+            !validate_credentials("", pwd, "/", &Method::GET, false)
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            !validate_credentials(user_id, pwd, "/", false)
+            !validate_credentials(user_id, pwd, "/", &Method::GET, false)
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            !validate_credentials(user_id, "x", "default/user", false)
+            !validate_credentials(user_id, "x", "default/user", &Method::GET, false)
                 .await
                 .unwrap()
                 .is_valid
