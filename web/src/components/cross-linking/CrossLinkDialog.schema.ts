@@ -3,7 +3,7 @@
 // Validation schema for CrossLinkDialog.vue. Built via a factory so the
 // required messages stay i18n-driven (pass useI18n's `t`).
 //
-// Restored from the Quasar BEFORE baseline:
+// Restored from the BEFORE baseline:
 //   name — `!!v || t('crossLinks.nameRequired')` → z.string().min(1, …)
 //   url  — `!!v || t('crossLinks.urlRequired')`  → z.string().min(1, …)
 //   (No regex on either — matching the BEFORE rows exactly.)

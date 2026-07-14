@@ -88,7 +88,7 @@
 
         <template #cell-version="{ row }">
           <span class="inline-flex items-center gap-1.5 font-[ui-monospace,SFMono-Regular,Menlo,monospace] text-xs">
-            <span class="w-1.5 h-1.5 rounded-full bg-(--o2-status-success-text) inline-block" />v{{ row.version }}
+            <span class="w-1.5 h-1.5 rounded-full bg-(--color-success-600) inline-block" />v{{ row.version }}
           </span>
         </template>
 
@@ -388,9 +388,9 @@ function formatDateShort(value: number) {
 }
 
 function dtypeChipClass(dataType: string): string {
-  if (dataType === 'numeric') return 'bg-[color-mix(in_srgb,var(--o2-status-info-text)_14%,transparent)] text-(--o2-status-info-text)';
-  if (dataType === 'categorical') return 'bg-[color-mix(in_srgb,var(--o2-status-warning-text)_14%,transparent)] text-(--o2-status-warning-text)';
-  if (dataType === 'boolean') return 'bg-[color-mix(in_srgb,var(--o2-status-success-text)_14%,transparent)] text-(--o2-status-success-text)';
+  if (dataType === 'numeric') return 'bg-[color-mix(in_srgb,var(--color-info-700)_14%,transparent)] text-(--color-info-700)';
+  if (dataType === 'categorical') return 'bg-[color-mix(in_srgb,var(--color-warning-700)_14%,transparent)] text-(--color-warning-700)';
+  if (dataType === 'boolean') return 'bg-[color-mix(in_srgb,var(--color-success-600)_14%,transparent)] text-(--color-success-600)';
   return '';
 }
 

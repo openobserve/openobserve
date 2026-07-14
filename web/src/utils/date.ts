@@ -243,8 +243,8 @@ export const isInvalidDate = (date: any) => {
 // ---------------------------------------------------------------------------
 
 /**
- * Normalize Quasar-style format tokens to date-fns (Unicode CLDR) tokens.
- * Quasar uses YYYY/DD whereas date-fns uses yyyy/dd.
+ * Normalize legacy uppercase format tokens to date-fns (Unicode CLDR) tokens.
+ * Legacy formats use YYYY/DD whereas date-fns uses yyyy/dd.
  */
 function normalizeFormat(format: string): string {
   return format
@@ -337,15 +337,36 @@ export function subtractRelativeTime(
 // Legacy / specific helpers
 // ---------------------------------------------------------------------------
 
-export const convertUnixToQuasarFormat = (unixMicroseconds: any) => {
+/** The format every caller used before this took a parameter. */
+export const DATE_TIMESTAMP_FORMAT = "YYYY-MM-DDTHH:mm:ssZ";
+
+/**
+ * Render a microsecond timestamp as a local-time string.
+ *
+ * THE one implementation. It previously existed six times over — here, in
+ * formatters.ts, and inline in four components — and the copies had quietly
+ * drifted: three different output formats behind the same name (the ISO-ish
+ * default, `DD-MM-YYYY` in schema.vue, `YYYY-MM-DD HH:mm:ss` in AlertList.vue).
+ * That is worse than duplication, because a reader has every reason to assume
+ * they agree. The format is a parameter now, so the callers that wanted a
+ * different one say so instead of reimplementing the function to get it.
+ *
+ * Local time is deliberate: these render "created at" / "last triggered at"
+ * columns, which a user reads in their own timezone. The tests pin TZ=UTC for
+ * exactly that reason (see vitest.config.ts).
+ */
+export const convertUnixToDateFormat = (
+  unixMicroseconds: any,
+  format: string = DATE_TIMESTAMP_FORMAT,
+) => {
   try {
     if (!unixMicroseconds) return "";
     const unixSeconds = unixMicroseconds / 1e6;
     const dateToFormat = new Date(unixSeconds * 1000);
     const formattedDate = dateToFormat.toISOString();
-    return formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+    return formatDate(formattedDate, format);
   } catch (error) {
-    console.log("Error converting unix to quasar format");
+    console.log("Error converting unix to date format");
     return "";
   }
 };

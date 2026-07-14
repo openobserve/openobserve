@@ -3,7 +3,7 @@
 // Validation schema for FilterCreatorPopup.vue — the shared field-filter popup.
 // Built via a factory so the required message stays i18n-driven (pass `t`).
 //
-// Restored from the Quasar BEFORE baseline:
+// Restored from the BEFORE baseline:
 //   selectedOperator — `!!v || 'Field is required!'`
 //                    → z.string().min(1, t("validation.fieldRequired")).
 //

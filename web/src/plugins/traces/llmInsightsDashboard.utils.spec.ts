@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Tests for the KPI-card formatting + trend-detection helpers used by
-// LLMInsightsDashboard. Pure functions — no Vue / DOM / quasar.
+// LLMInsightsDashboard. Pure functions — no Vue / DOM.
 
 import { describe, it, expect } from "vitest";
 import {

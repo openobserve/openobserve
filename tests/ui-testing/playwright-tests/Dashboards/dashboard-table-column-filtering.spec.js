@@ -17,6 +17,7 @@ import {
   getColumnFilterBtn,
   openColumnFilter,
   columnFilter,
+  waitForPanelTableSettled,
 } from "../../pages/dashboardPages/dashboard-table-helpers.js";
 const testLogger = require("../utils/test-logger.js");
 
@@ -56,6 +57,11 @@ test.describe("Dashboard Table — Column Filtering (PR #12531)", () => {
     await pm.dashboardPanelConfigs.toggleTableFiltering();
     await pm.dashboardPanelActions.applyDashboardBtn();
 
+    // Apply re-runs the query. Counting rows or clicking a filter value before it lands
+    // works against the previous table, and the value list is rebuilt under the cursor
+    // mid-click — see waitForPanelTableSettled.
+    await waitForPanelTableSettled(page);
+
     const rows = page.locator(TABLE_DATA_ROW_SELECTOR);
     await rows.first().waitFor({ state: "visible", timeout: 15000 });
     const totalRowCount = await rows.count();
@@ -90,6 +96,7 @@ test.describe("Dashboard Table — Column Filtering (PR #12531)", () => {
     await setupTablePanelWithConfig(page, pm, dashboardName);
     await pm.dashboardPanelConfigs.toggleTableFiltering();
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await waitForPanelTableSettled(page);
 
     const rows = page.locator(TABLE_DATA_ROW_SELECTOR);
     await rows.first().waitFor({ state: "visible", timeout: 15000 });
@@ -146,6 +153,7 @@ test.describe("Dashboard Table — Column Filtering (PR #12531)", () => {
     await setupTablePanelWithConfig(page, pm, dashboardName);
     await pm.dashboardPanelConfigs.toggleTableFiltering();
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await waitForPanelTableSettled(page);
 
     const panel = await openColumnFilter(page, 0);
     const items = columnFilter.valueItems(panel);

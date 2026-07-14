@@ -497,7 +497,7 @@ describe("CreateReport", () => {
       w.vm.formData.title = "Test Title";
       w.vm.emails = "user@example.com";
       w.vm.scheduling = { date: "01-01-2025", time: "10:00", timezone: "UTC" };
-      // Quasar form ref not attached in jsdom — mock validate() to return true
+      // Form ref not attached in jsdom — mock validate() to return true
       w.vm.addReportFormRef = { validate: vi.fn().mockResolvedValue(true) };
     }
 

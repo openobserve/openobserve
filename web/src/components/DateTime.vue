@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="disable"
           icon-left="schedule"
         >
-          <span class="date-time-label font-semibold flex-1 text-left">{{ getDisplayValue }}</span>
+          <span class="date-time-label font-semibold flex-1 text-left">{{ triggerLabel }}</span>
           <template #icon-right
             ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow transition-transform duration-250 ml-auto text-[18px]!"
           /></template>
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSeparator />
         <div class="overflow-y-visible">
         <OTabPanels v-model="selectedType" animated>
-          <OTabPanel v-if="!disableRelative" name="relative" class="p-0">
+          <OTabPanel v-if="!disableRelative" name="relative">
             <div class="date-time-table relative flex flex-col">
               <div
                 class="relative-row flex items-center border-b border-(--o2-border) pl-3 py-2"
@@ -488,6 +488,22 @@ export default defineComponent({
 
     const displayValue = ref("");
 
+    /**
+     * The label as of the last APPLY, which is what the trigger button shows.
+     *
+     * `getDisplayValue` reads the picker's *pending* selection — the refs that
+     * clicking "Past 6 Hours" mutates on the spot. With `autoApply` that is also
+     * the applied range, so the two never disagree. WITHOUT it (dashboards, the
+     * metrics explorer) a selection only takes effect when the user presses
+     * Apply, so binding the trigger to the pending label made the button
+     * advertise a window that nothing was querying yet: pick "Past 6 Hours",
+     * don't apply, and the button reads 6h while the panels are still on 15m.
+     *
+     * So the trigger renders this instead: the range that is actually in force.
+     * Every path that genuinely applies a range stamps it via `markApplied`.
+     */
+    const appliedDisplayValue = ref("");
+
     const datePayload = ref({});
 
     const dateLocale = {
@@ -696,8 +712,21 @@ export default defineComponent({
       });
     };
 
+    /**
+     * Promote the pending selection to the applied one, so the trigger button
+     * starts advertising it. Called from every path that actually puts a range
+     * into force — Apply, `refresh()`, mount, and the parent-invoked setters.
+     * Deliberately NOT called from `setRelativeDate` / `onCustomPeriodSelect` /
+     * the popup's absolute inputs when `autoApply` is off: those are pending
+     * until the user presses Apply, and that is exactly the gap the trigger was
+     * lying about.
+     */
+    const markApplied = () => {
+      appliedDisplayValue.value = getDisplayValue.value;
+    };
+
     const saveDate = (dateType) => {
-      // displayValue.value = getDisplayValue();
+      markApplied();
       const date = getConsumableDateTime();
       // if (isNaN(date.endTime) || isNaN(date.startTime)) {
       //   // return false;
@@ -740,6 +769,9 @@ export default defineComponent({
 
       selectedType.value = dateType;
       markProgrammaticDateChange();
+      // A parent-invoked range (chart brush-zoom, saved view) is applied by the
+      // act of setting it — not left pending on an Apply the user never sees.
+      markApplied();
     };
 
     const onBeforeShow = () => {
@@ -772,7 +804,7 @@ export default defineComponent({
         let period = getPeriodLabel.value.toLowerCase();
         let periodValue = relativeValue.value;
 
-        // quasar does not support arithmetic on weeks. convert to days.
+        // arithmetic on weeks is not supported; convert to days.
         if (relativePeriod.value === "w") {
           period = "days";
           periodValue = periodValue * 7;
@@ -897,8 +929,21 @@ export default defineComponent({
         }
       }
 
-      // displayValue.value = getDisplayValue();
+      markApplied();
     };
+
+    /**
+     * What the trigger button renders.
+     *
+     * With `autoApply` the pending selection IS the applied one, so show it live.
+     * Without it, show the range that is in force; see `appliedDisplayValue`.
+     * The `||` fallback covers the first paint, before the mount-time apply.
+     */
+    const triggerLabel = computed(() =>
+      props.autoApply
+        ? getDisplayValue.value
+        : appliedDisplayValue.value || getDisplayValue.value,
+    );
 
     const getDisplayValue = computed(() => {
       if (props.disableRelative) {
@@ -1199,6 +1244,7 @@ export default defineComponent({
       relativeValue,
       getPeriodLabel,
       displayValue,
+      triggerLabel,
       refresh,
       dateLocale,
       resetTime,

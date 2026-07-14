@@ -64,22 +64,6 @@ vi.mock('vue-router', () => ({
   onBeforeRouteLeave: vi.fn((fn) => fn)
 }));
 
-// Mock quasar
-vi.mock('quasar', async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    useQuasar: vi.fn(() => ({
-      notify: vi.fn(() => vi.fn()),
-      platform: {
-        is: { desktop: true },
-        has: { touch: false }
-      }
-    }))
-  };
-});
-
-
 describe("AddFunction Component", () => {
   let wrapper;
   let mockStore;
@@ -130,15 +114,7 @@ describe("AddFunction Component", () => {
         },
         mocks: {
           $router: mockRouter,
-          $store: mockStore,
-          $q: {
-            notify: vi.fn(() => vi.fn()),
-            dialog: vi.fn(),
-            platform: {
-              is: { desktop: true },
-              has: { touch: false }
-            }
-          }
+          $store: mockStore
         },
         stubs: {
           QForm: true,
@@ -213,15 +189,7 @@ describe("AddFunction Component", () => {
           },
           mocks: {
             $router: mockRouter,
-            $store: mockStore,
-            $q: {
-              notify: vi.fn(() => vi.fn()),
-              dialog: vi.fn(),
-              platform: {
-                is: { desktop: true },
-                has: { touch: false }
-              }
-            }
+            $store: mockStore
           },
           stubs: wrapper.vm.$.appContext.app._context.components
         },
@@ -370,15 +338,7 @@ describe("AddFunction Component", () => {
           },
           mocks: {
             $router: mockRouter,
-            $store: mockStore,
-            $q: {
-              notify: vi.fn(() => vi.fn()),
-              dialog: vi.fn(),
-              platform: {
-                is: { desktop: true },
-                has: { touch: false }
-              }
-            }
+            $store: mockStore
           },
           stubs: wrapper.vm.$.appContext.app._context.components
         },

@@ -27,28 +27,6 @@ use crate::{
     service::providers::{self, ProviderError},
 };
 
-impl From<ProviderError> for Response {
-    fn from(value: ProviderError) -> Self {
-        match value {
-            ProviderError::InfraError(err) => {
-                log::error!("[Provider] internal error: {err}");
-                MetaHttpResponse::internal_error("Internal server error")
-            }
-            ProviderError::MissingName => {
-                MetaHttpResponse::bad_request("Provider name cannot be empty")
-            }
-            ProviderError::ProviderNameAlreadyExists => MetaHttpResponse::bad_request(
-                "Provider with this name already exists in this organization",
-            ),
-            ProviderError::NotFound => MetaHttpResponse::not_found("Provider not found"),
-            ProviderError::InvalidConfig(err) => MetaHttpResponse::bad_request(err),
-            ProviderError::ProviderInUse(scorers) => MetaHttpResponse::conflict(format!(
-                "Provider is used by active scorers: {scorers}. Unlink or replace the provider before deleting it."
-            )),
-        }
-    }
-}
-
 /// ListProviders
 #[utoipa::path(
     get,

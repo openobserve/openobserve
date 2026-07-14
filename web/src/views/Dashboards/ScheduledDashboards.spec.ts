@@ -75,7 +75,7 @@ vi.mock('@/utils/zincutils', () => ({
 }));
 
 vi.mock('@/utils/date', () => ({
-  convertUnixToQuasarFormat: vi.fn((timestamp: number) => {
+  convertUnixToDateFormat: vi.fn((timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleString();
   })
 }));

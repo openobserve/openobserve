@@ -1,7 +1,8 @@
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import DashboardQueryBuilder from "./DashboardQueryBuilder.vue";
 import { createI18n } from "vue-i18n";
+import { reactive } from "vue";
 
 // Mock composables
 const mockUseDashboardPanelData = {
@@ -275,7 +276,11 @@ describe("DashboardQueryBuilder", () => {
       });
     }
 
-    mockUseDashboardPanelData.dashboardPanelData = defaultMockData;
+    // REACTIVE, as it is in production (`useDashboardPanel` holds a reactive
+    // object). A plain clone meant no watcher in the component ever fired for a
+    // post-mount mutation, so any test that changes panel state after mounting was
+    // quietly asserting against a component that had stopped listening.
+    mockUseDashboardPanelData.dashboardPanelData = reactive(defaultMockData);
 
     return mount(DashboardQueryBuilder, {
       props: {
@@ -1219,7 +1224,12 @@ describe("DashboardQueryBuilder", () => {
       expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragging).toBe(
         true,
       );
-      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragElement).toBe(
+      // `toEqual`, not `toBe`: the panel data is `reactive`, so what comes back out
+      // is a PROXY of what went in. Identity was only ever holding because the mock
+      // was a plain object — which also meant no watcher fired for a post-mount
+      // mutation, i.e. the harness was not modelling production. The value is what
+      // matters here, not the reference.
+      expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragElement).toEqual(
         testItem,
       );
       expect(wrapper.vm.dashboardPanelData.meta.dragAndDrop.dragSource).toBe(
@@ -1337,6 +1347,184 @@ describe("DashboardQueryBuilder", () => {
       field.args[0].value = "15m";
 
       expect(field.args[0].value).toBe("15m");
+    });
+  });
+  describe("seeding a slot the stream watcher structurally cannot see", () => {
+    const METRIC_STREAMS = [
+      {
+        name: "http_requests_total",
+        stream_type: "metrics",
+        metrics_meta: {
+          metric_type: "Counter",
+          metric_family_name: "http_requests_total",
+          help: "",
+          unit: "",
+        },
+        stats: { doc_num: 100 },
+      },
+    ];
+
+    /**
+     * NOTE: `createWrapper` deep-CLONES the mock panel data and swaps the clone in,
+     * so the object the component mutates is only reachable AFTER mounting — see
+     * `live()`. Reading the pre-mount reference asserts against a discarded object.
+     */
+    const live = () => mockUseDashboardPanelData.dashboardPanelData;
+
+    const promqlPanel = (queries: any[], currentQueryIndex = 0) => {
+      const dpd = mockUseDashboardPanelData.dashboardPanelData;
+      mockUseDashboardPanelData.promqlMode = true;
+      dpd.data.queryType = "promql";
+      dpd.data.type = "bar";
+      dpd.data.queries = queries;
+      dpd.layout.currentQueryIndex = currentQueryIndex;
+      dpd.meta.stream.streamResults = METRIC_STREAMS;
+      dpd.meta.stream.streamResultsType = "metrics";
+      // The PromQL builder's label picker reads this.
+      dpd.meta.streamFields = { groupedFields: [] };
+      return dpd;
+    };
+
+    const slot = (query: string) => ({
+      query,
+      customQuery: false,
+      fields: {
+        stream: "http_requests_total",
+        stream_type: "metrics",
+        x: [], y: [], z: [], breakdown: [],
+        promql_labels: [],
+        promql_operations: [],
+        filter: { filterType: "group", logicalOperator: "AND", conditions: [] },
+      },
+      config: {},
+    });
+
+    afterEach(() => {
+      mockUseDashboardPanelData.promqlMode = false;
+    });
+
+    it("seeds a NEW query tab, whose cloned stream never fires the stream watcher", async () => {
+      // `addQuery` copies `fields.stream` from the current slot, so the value the
+      // stream watcher tracks does not change and it never fires. The tab was left
+      // with an empty query — which renders as a bare `metric{}`: a raw cumulative
+      // counter, exactly what the seeding exists to prevent.
+      promqlPanel([slot("sum(rate(http_requests_total{}[5m]))"), slot("")], 1);
+
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(live().data.queries[1].query).toContain("rate(http_requests_total");
+      expect(live().data.queries[1].fields.promql_operations).toEqual([
+        { id: "rate", params: ["$__rate_interval"] },
+        { id: "sum", params: [[]] },
+      ]);
+    });
+
+    /**
+     * The scalar-math steps were renamed away from the ids panels were saved
+     * under. Rendering an old panel correctly is not enough — if the builder
+     * kept writing the old id back, the compatibility table could never be
+     * retired. Opening the panel has to MIGRATE it.
+     */
+    describe("a panel saved under the previous scalar-math step ids", () => {
+      const savedWithLegacyOps = (ops: any[]) => {
+        const s = slot("http_requests_total{} * 8");
+        s.fields.promql_operations = ops as any;
+        return s;
+      };
+
+      it("rewrites the stored ids, so saving the panel migrates it", async () => {
+        promqlPanel([
+          savedWithLegacyOps([
+            { id: "rate", params: ["$__rate_interval"] },
+            { id: "__multiply_by", params: [8] },
+          ]),
+        ]);
+
+        wrapper = createWrapper();
+        await flushPromises();
+
+        // The panel now holds the CURRENT id: whatever writes the dashboard next
+        // persists `scalar_multiply`, and one more panel stops needing the table.
+        expect(live().data.queries[0].fields.promql_operations).toEqual([
+          { id: "rate", params: ["$__rate_interval"] },
+          { id: "scalar_multiply", params: [8] },
+        ]);
+      });
+
+      it("renders the same query it rendered before the rename", async () => {
+        // The migration must be invisible in the output. If the numbers on the
+        // chart move, we have not migrated the panel — we have broken it.
+        promqlPanel([savedWithLegacyOps([{ id: "__multiply_by", params: [8] }])]);
+
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(live().data.queries[0].query).toBe("http_requests_total{} * 8");
+      });
+
+      it("migrates EVERY query tab, not just the one on screen", async () => {
+        // The builder only loads the tab you are looking at. If migration
+        // followed the same rule, a two-tab panel would be saved half-upgraded
+        // and whether it migrated would depend on which tabs its author clicked
+        // — so the compatibility table could never be retired.
+        promqlPanel(
+          [
+            savedWithLegacyOps([{ id: "__multiply_by", params: [8] }]),
+            savedWithLegacyOps([{ id: "__divide_by", params: [1024] }]),
+          ],
+          0, // tab 2 is never visited
+        );
+
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(live().data.queries[1].fields.promql_operations).toEqual([
+          { id: "scalar_divide", params: [1024] },
+        ]);
+      });
+
+      it("leaves a panel already on the current ids untouched", async () => {
+        promqlPanel([
+          savedWithLegacyOps([{ id: "scalar_multiply", params: [8] }]),
+        ]);
+
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(live().data.queries[0].fields.promql_operations).toEqual([
+          { id: "scalar_multiply", params: [8] },
+        ]);
+        expect(live().data.queries[0].query).toBe("http_requests_total{} * 8");
+      });
+    });
+
+    it("never rewrites a tab that already has a query", async () => {
+      const written = 'sum(rate(http_requests_total{code="500"}[1h]))';
+      promqlPanel([slot("sum(rate(http_requests_total{}[5m]))"), slot(written)], 1);
+
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(live().data.queries[1].query).toBe(written);
+    });
+
+    it("does not write a bare metric{} before the stream list has arrived", async () => {
+      // A panel restored from a URL sets `fields.stream` before `getStreams` resolves.
+      // Seeding then would fall back to the bare selector and never revisit it.
+      const dpd = promqlPanel([slot("")], 0);
+      dpd.meta.stream.streamResults = []; // not loaded yet
+
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(live().data.queries[0].query).not.toBe("http_requests_total{}");
+
+      // ...and once the list lands, the slot gets seeded properly.
+      live().meta.stream.streamResults = METRIC_STREAMS;
+      await flushPromises();
+
+      expect(live().data.queries[0].query).toContain("rate(http_requests_total");
     });
   });
 });

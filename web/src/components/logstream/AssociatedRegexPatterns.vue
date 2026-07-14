@@ -444,7 +444,7 @@
 import { defineComponent, nextTick, onMounted, onBeforeUnmount, PropType, ref, watch, computed } from 'vue';
 import { useStore } from 'vuex';
 import regexPatternsService from '@/services/regex_pattern';
-import { convertUnixToQuasarFormat, getImageURL } from '@/utils/zincutils';
+import { convertUnixToDateFormat, getImageURL } from '@/utils/zincutils';
 import { debounce } from "lodash-es";
 import store from '@/test/unit/helpers/store';
 import { useToast } from '@/lib/feedback/Toast/useToast';
@@ -715,8 +715,8 @@ export default defineComponent({
         allPatterns.value = response.data.patterns.map((pattern: any) => ({
           ...pattern,
           "#": counter <= 9 ? `0${counter++}` : counter++,
-          created_at: convertUnixToQuasarFormat(pattern.created_at),
-          updated_at: convertUnixToQuasarFormat(pattern.updated_at),
+          created_at: convertUnixToDateFormat(pattern.created_at),
+          updated_at: convertUnixToDateFormat(pattern.updated_at),
           pattern_name: pattern.name,
           pattern_id: pattern.id,
           field: props.fieldName,
