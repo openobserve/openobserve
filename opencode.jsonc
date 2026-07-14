@@ -1,6 +1,8 @@
 {
-  // OpenCode configuration for the e2e_ci_council_of_agents pipeline.
-  // Used by .github/workflows/e2e-council.yml to run the CI test-generation agents on DeepSeek.
+  // OpenCode configuration for this repo's CI agents.
+  // - e2e-ci-* agents: used by .github/workflows/e2e-council.yml for CI test-generation, on DeepSeek.
+  // - ai-review-* agents: used by scripts/ai-review/run-review.mjs (dispatched via `opencode serve`)
+  //   for PR code review, on GLM-5.2 (Z.ai).
   // Docs: https://opencode.ai/docs/  — verify provider shape against current docs at build time.
   "$schema": "https://opencode.ai/config.json",
 
@@ -16,6 +18,20 @@
         "deepseek-v4-pro": {
           "name": "DeepSeek-V4-Pro",
           "limit": { "context": 1048576, "output": 262144 }
+        }
+      }
+    },
+    "zai": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Z.AI",
+      "options": {
+        "baseURL": "https://api.z.ai/api/paas/v4",
+        "apiKey": "{env:GLM_API_KEY}"
+      },
+      "models": {
+        "glm-5.2": {
+          "name": "GLM-5.2",
+          "limit": { "context": 1000000, "output": 131072 }
         }
       }
     }
@@ -60,6 +76,47 @@
     "e2e-ci-responder": {
       "mode": "primary",
       "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-responder.md}"
+    },
+
+    // PR review agents. Prompts are assembled at call time in run-review.mjs
+    // (shared-rules.md + agents/<key>.md) and sent via the `system` override on
+    // session.prompt, so no `prompt` is registered here. Read-only: no write/edit/bash,
+    // so a reviewer can inspect real repo context (not just the diff) but can't mutate it.
+    "ai-review-security": {
+      "mode": "primary",
+      "model": "zai/glm-5.2",
+      "variant": "max",
+      "tools": { "write": false, "edit": false, "bash": false, "patch": false }
+    },
+    "ai-review-code-quality": {
+      "mode": "primary",
+      "model": "zai/glm-5.2",
+      "variant": "max",
+      "tools": { "write": false, "edit": false, "bash": false, "patch": false }
+    },
+    "ai-review-performance": {
+      "mode": "primary",
+      "model": "zai/glm-5.2",
+      "variant": "max",
+      "tools": { "write": false, "edit": false, "bash": false, "patch": false }
+    },
+    "ai-review-documentation": {
+      "mode": "primary",
+      "model": "zai/glm-5.2",
+      "variant": "max",
+      "tools": { "write": false, "edit": false, "bash": false, "patch": false }
+    },
+    "ai-review-release": {
+      "mode": "primary",
+      "model": "zai/glm-5.2",
+      "variant": "max",
+      "tools": { "write": false, "edit": false, "bash": false, "patch": false }
+    },
+    "ai-review-coordinator": {
+      "mode": "primary",
+      "model": "zai/glm-5.2",
+      "variant": "max",
+      "tools": { "write": false, "edit": false, "bash": false, "patch": false }
     }
   }
 }
