@@ -13,11 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, hash::Hasher, sync::Arc};
 
-use config::meta::promql::{
-    NAME_LABEL,
-    value::{EvalContext, Label, Labels, LabelsExt, RangeValue, Sample, Value},
+use config::{
+    meta::promql::{
+        NAME_LABEL,
+        value::{EvalContext, Label, Labels, RangeValue, Sample, Value},
+    },
+    utils::hash::gxhash,
 };
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::LabelModifier;
@@ -48,6 +51,9 @@ pub(crate) use stddev::stddev;
 pub(crate) use stdvar::stdvar;
 pub(crate) use sum::sum;
 pub(crate) use topk::topk;
+
+/// Series per parallel partial-aggregation chunk when a single group is large.
+const AGG_PARALLEL_CHUNK: usize = 32768;
 
 /// Trait for PromQL aggregation functions.
 ///
@@ -181,6 +187,27 @@ fn projected_labels(modifier: &Option<LabelModifier>, labels: &Labels) -> Labels
     }
 }
 
+/// Compute the signature of the projected labels without cloning the label
+/// vector and retaining it first. Label order and filtering exactly match
+/// [`projected_labels`], so the grouping key is unchanged.
+fn projected_labels_signature(modifier: &Option<LabelModifier>, labels: &Labels) -> u64 {
+    let mut hasher = gxhash::new_hasher();
+    for label in labels {
+        let keep = match modifier {
+            Some(LabelModifier::Include(include)) => include.labels.contains(&label.name),
+            Some(LabelModifier::Exclude(exclude)) => {
+                !exclude.labels.contains(&label.name) && label.name != NAME_LABEL
+            }
+            None => false,
+        };
+        if keep {
+            hasher.write(label.name.as_bytes());
+            hasher.write(label.value.as_bytes());
+        }
+    }
+    hasher.finish()
+}
+
 /// Groups series indices by their label signatures based on the label modifier
 pub(crate) fn group_series_by_labels(
     matrix: &[RangeValue],
@@ -190,7 +217,7 @@ pub(crate) fn group_series_by_labels(
     // fan it out
     let hashes: Vec<u64> = matrix
         .par_iter()
-        .map(|series| projected_labels(modifier, &series.labels).signature())
+        .map(|series| projected_labels_signature(modifier, &series.labels))
         .collect();
 
     let mut groups: HashMap<u64, Vec<usize>> = HashMap::with_capacity(matrix.len());
@@ -200,9 +227,6 @@ pub(crate) fn group_series_by_labels(
 
     groups
 }
-
-/// Series per parallel partial-aggregation chunk when a single group is large.
-const AGG_PARALLEL_CHUNK: usize = 32768;
 
 /// Processes Matrix input for range queries using the AggFunc trait pattern
 pub(crate) fn eval_aggregate<F>(
@@ -333,6 +357,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use config::meta::promql::value::LabelsExt;
+
     use super::*;
 
     // Test data helpers
@@ -497,6 +523,36 @@ mod tests {
         assert!(!result.iter().any(|l| l.name == "__name__"));
         assert!(result.iter().any(|l| l.name == "instance"));
         assert!(result.iter().any(|l| l.name == "job"));
+    }
+
+    #[test]
+    fn test_projected_labels_signature_matches_materialized_projection() {
+        use promql_parser::label::Labels as ParserLabels;
+
+        let labels = vec![
+            Arc::new(Label::new("__name__", "requests_total")),
+            Arc::new(Label::new("env", "prod")),
+            Arc::new(Label::new("job", "api")),
+            Arc::new(Label::new("zone", "east")),
+        ];
+        let modifiers = vec![
+            None,
+            Some(LabelModifier::Include(ParserLabels { labels: vec![] })),
+            Some(LabelModifier::Include(ParserLabels {
+                labels: vec!["job".to_string(), "missing".to_string()],
+            })),
+            Some(LabelModifier::Exclude(ParserLabels { labels: vec![] })),
+            Some(LabelModifier::Exclude(ParserLabels {
+                labels: vec!["env".to_string(), "missing".to_string()],
+            })),
+        ];
+
+        for modifier in modifiers {
+            assert_eq!(
+                projected_labels_signature(&modifier, &labels),
+                projected_labels(&modifier, &labels).signature()
+            );
+        }
     }
 
     #[test]
