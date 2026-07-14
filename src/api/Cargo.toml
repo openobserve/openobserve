@@ -33,14 +33,14 @@ profiling = [
 ignored = ["tikv-jemalloc-sys"]
 
 [dependencies]
-openobserve-core = { path = "../core" }
+openobserve-core.workspace = true
 axum.workspace = true
 axum-extra.workspace = true
 tower.workspace = true
 tower-http.workspace = true
 http.workspace = true
 http-body-util.workspace = true
-mime_guess = "2.0"
+mime_guess.workspace = true
 ahash.workspace = true
 anyhow.workspace = true
 base64.workspace = true
@@ -54,9 +54,9 @@ arrow-schema.workspace = true
 flate2.workspace = true
 futures.workspace = true
 hashbrown.workspace = true
-http-auth-basic = "0.3"
+http-auth-basic.workspace = true
 itertools.workspace = true
-jsonwebtoken = { version = "10.3", features = ["aws_lc_rs"] }
+jsonwebtoken.workspace = true
 log.workspace = true
 o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
@@ -65,35 +65,23 @@ o2_ratelimit = { workspace = true, optional = true }
 opentelemetry.workspace = true
 opentelemetry-proto.workspace = true
 parking_lot.workspace = true
-promql-parser = { version = "0.6", git = "https://github.com/openobserve/promql-parser", branch = "openobserve" }
+promql-parser.workspace = true
 prost.workspace = true
 proto.workspace = true
 rand.workspace = true
 regex.workspace = true
 reqwest.workspace = true
-rust-embed-for-web = "11.3"
+rust-embed-for-web.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 snap.workspace = true
 svix-ksuid.workspace = true
 time.workspace = true
-tikv-jemalloc-ctl = { version = "0.6", optional = true, features = [
-    "use_std",
-    "stats",
-    "profiling",
-] }
-tikv-jemalloc-sys = { version = "0.6", optional = true, features = [
-    "profiling",
-] }
-jemalloc_pprof = { version = "0.8", optional = true, features = [
-    "symbolize",
-    "flamegraph",
-] }
-pprof = { version = "0.15", optional = true, features = [
-    "flamegraph",
-    "protobuf-codec",
-] }
+tikv-jemalloc-ctl = { workspace = true, optional = true }
+tikv-jemalloc-sys = { workspace = true, optional = true }
+jemalloc_pprof = { workspace = true, optional = true }
+pprof = { workspace = true, optional = true }
 tokio.workspace = true
 tonic.workspace = true
 tracing.workspace = true
@@ -107,15 +95,15 @@ config.workspace = true
 infra.workspace = true
 ingester.workspace = true
 zip.workspace = true
-futures-util = "0.3.31"
+futures-util.workspace = true
 tokio-stream.workspace = true
-mime = "0.3.17"
+mime.workspace = true
 flight.workspace = true
 async-stream.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true
-base64 = "0.22"
-float-cmp = "0.10"
-multer = "3.1"
-rcgen = "0.14.4"
+base64.workspace = true
+float-cmp.workspace = true
+multer.workspace = true
+rcgen.workspace = true

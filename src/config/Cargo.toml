@@ -96,7 +96,7 @@ vortex = { git = "https://github.com/openobserve/vortex", branch = "0.75.0-fix",
 
 [dev-dependencies]
 expect-test.workspace = true
-float-cmp = "0.10"
+float-cmp.workspace = true
 
 [build-dependencies]
 chrono.workspace = true

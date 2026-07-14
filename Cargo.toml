@@ -79,7 +79,7 @@ tower.workspace = true
 tower-http.workspace = true
 http.workspace = true
 http-body-util.workspace = true
-mime_guess = "2.0"
+mime_guess.workspace = true
 ahash.workspace = true
 anyhow.workspace = true
 argon2.workspace = true
@@ -87,7 +87,7 @@ async-trait.workspace = true
 async-recursion.workspace = true
 aws-sdk-sns.workspace = true
 base64.workspace = true
-bitflags = "2.11"
+bitflags.workspace = true
 bytes.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
@@ -99,7 +99,7 @@ clap = { version = "4.5", default-features = false, features = [
     "cargo",
 ] }
 cron.workspace = true
-csv = "1.3"
+csv.workspace = true
 dashmap.workspace = true
 datafusion.workspace = true
 datafusion-proto.workspace = true
@@ -117,11 +117,11 @@ futures.workspace = true
 hashlink.workspace = true
 hashbrown.workspace = true
 hex.workspace = true
-http-auth-basic = "0.3"
+http-auth-basic.workspace = true
 itertools.workspace = true
-jsonwebtoken = { version = "10.3", features = ["aws_lc_rs"] }
+jsonwebtoken.workspace = true
 log.workspace = true
-maxminddb = "0.27"
+maxminddb.workspace = true
 md5.workspace = true
 memchr.workspace = true
 mimalloc = { version = "0.1.48", features = ["v3"], optional = true }
@@ -131,7 +131,7 @@ opentelemetry-otlp.workspace = true
 opentelemetry-proto.workspace = true
 parking_lot.workspace = true
 prometheus.workspace = true
-promql-parser = { version = "0.6", git = "https://github.com/openobserve/promql-parser", branch = "openobserve" }
+promql-parser.workspace = true
 prost.workspace = true
 prost-wkt-types.workspace = true
 proto.workspace = true
@@ -142,7 +142,7 @@ regex.workspace = true
 regex-syntax.workspace = true
 reqwest.workspace = true
 rquickjs.workspace = true
-rust-embed-for-web = "11.3"
+rust-embed-for-web.workspace = true
 rustls.workspace = true
 rustls-native-certs.workspace = true
 webpki-roots.workspace = true
@@ -164,22 +164,10 @@ tikv-jemallocator = { version = "0.6", optional = true, features = [
     "stats",
     "unprefixed_malloc_on_supported_platforms",
 ] }
-tikv-jemalloc-ctl = { version = "0.6", optional = true, features = [
-    "use_std",
-    "stats",
-    "profiling",
-] }
-tikv-jemalloc-sys = { version = "0.6", optional = true, features = [
-    "profiling",
-] }
-jemalloc_pprof = { version = "0.8", optional = true, features = [
-    "symbolize",
-    "flamegraph",
-] }
-pprof = { version = "0.15", optional = true, features = [
-    "flamegraph",
-    "protobuf-codec",
-] }
+tikv-jemalloc-ctl = { workspace = true, optional = true }
+tikv-jemalloc-sys = { workspace = true, optional = true }
+jemalloc_pprof = { workspace = true, optional = true }
+pprof = { workspace = true, optional = true }
 tempfile.workspace = true
 tiktoken-rs.workspace = true
 tokio.workspace = true
@@ -190,13 +178,13 @@ tracing.workspace = true
 tracing-appender.workspace = true
 tracing-opentelemetry.workspace = true
 tracing-subscriber.workspace = true
-uaparser = "0.6.4"
+uaparser.workspace = true
 url.workspace = true
 utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
-version-compare = "0.2.0"
+version-compare.workspace = true
 vector-enrichment.workspace = true
-x509-parser = "0.18.0"
+x509-parser.workspace = true
 vrl.workspace = true
 zstd.workspace = true
 config.workspace = true
@@ -210,22 +198,22 @@ tantivy.workspace = true
 tantivy-fst.workspace = true
 tantivy_utils.workspace = true
 zip.workspace = true
-futures-util = "0.3.31"
+futures-util.workspace = true
 tokio-stream.workspace = true
-mime = "0.3.17"
+mime.workspace = true
 pin-project-lite.workspace = true
 flight.workspace = true
 async-stream.workspace = true
-sourcemap = "9.3.2"
-openobserve-api = { path = "src/api" }
-openobserve-core = { path = "src/core" }
+sourcemap.workspace = true
+openobserve-api.workspace = true
+openobserve-core.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true
-base64 = "0.22"
-float-cmp = "0.10"
-multer = "3.1"
-rcgen = "0.14.4"
+base64.workspace = true
+float-cmp.workspace = true
+multer.workspace = true
+rcgen.workspace = true
 
 [workspace]
 members = [
@@ -256,6 +244,8 @@ proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
 flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
+openobserve-core = { path = "src/core" }
+openobserve-api = { path = "src/api" }
 o2_dex = { path = "src/enterprise/o2_dex" }
 o2_enterprise = { path = "src/enterprise/o2_enterprise", default-features = false }
 o2_openfga = { path = "src/enterprise/o2_openfga" }
@@ -273,6 +263,24 @@ axum-extra = { version = "0.12", features = [
 axum-server = { version = "0.8", features = ["tls-rustls"] }
 axum-client-ip = "1.3"
 async-fs = "2.2"
+bitflags = "2.11"
+csv = "1.3"
+float-cmp = "0.10"
+futures-util = "0.3.31"
+http-auth-basic = "0.3"
+jemalloc_pprof = { version = "0.8", features = ["symbolize", "flamegraph"] }
+jsonwebtoken = { version = "10.3", features = ["aws_lc_rs"] }
+maxminddb = "0.27"
+mime = "0.3.17"
+mime_guess = "2.0"
+multer = "3.1"
+pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"] }
+promql-parser = { version = "0.6", git = "https://github.com/openobserve/promql-parser", branch = "openobserve" }
+rcgen = "0.14.4"
+rust-embed-for-web = "11.3"
+sourcemap = "9.3.2"
+tikv-jemalloc-ctl = { version = "0.6", features = ["use_std", "stats", "profiling"] }
+tikv-jemalloc-sys = { version = "0.6", features = ["profiling"] }
 tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.6", features = [
     "cors",
@@ -410,6 +418,8 @@ rustls = { version = "0.23", default-features = false, features = [
     "tls12",
 ] }
 rustls-native-certs = "0.8"
+uaparser = "0.6.4"
+version-compare = "0.2.0"
 webpki-roots = "1.0"
 sea-orm = { version = "1.1.20", features = [
     "sqlx-postgres",
@@ -479,6 +489,7 @@ vrl = { version = "0.31", features = [
     "compiler",
     "test",
 ] }
+x509-parser = "0.18.0"
 zip = "8.0"
 zstd = "0.13"
 
