@@ -193,18 +193,14 @@ jobs:
         working-directory: web
         run: npm run lint:errors
 
-      # The codebase has a large pre-existing type-error backlog, so a hard
-      # `vue-tsc` gate is not yet possible. Instead, ratchet: fail only when a
-      # change INCREASES the error count above the committed baseline. Lower
-      # web/typecheck-error-baseline.txt as the backlog shrinks.
-      - name: Type-check ratchet (no new errors vs baseline)
+      - name: Type-check gate (no errors above baseline)
         working-directory: web
         run: |
           COUNT=$(npm run --silent type-check:app 2>&1 | grep -c "error TS" || true)
           BASELINE=$(cat typecheck-error-baseline.txt)
           echo "TypeScript errors: $COUNT (baseline: $BASELINE)"
           if [ "$COUNT" -gt "$BASELINE" ]; then
-            echo "::error::This change introduces new TypeScript errors ($COUNT > $BASELINE). Run 'npm run type-check:app' in web/ to see them."
+            echo "::error::This change introduces TypeScript errors ($COUNT > $BASELINE). Run 'npm run type-check:app' in web/ to see them."
             exit 1
           fi
           if [ "$COUNT" -lt "$BASELINE" ]; then

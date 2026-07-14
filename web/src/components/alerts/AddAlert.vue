@@ -322,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-show="activeTab === 'anomaly-alerting'">
             <AnomalyAlerting
               :config="anomalyConfig"
-              :destinations="destinations"
+              :destinations="(destinations as (SelectOption & { name: string })[])"
               @refresh:destinations="$emit('refresh:destinations')"
             />
           </div>
@@ -447,6 +447,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed, watch } from "vue";
+import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
 import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';

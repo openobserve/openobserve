@@ -27,21 +27,6 @@ import {
   DEFAULT_SEARCH_AGG_DATA,
 } from "@/utils/logs/constants";
 
-// A field-row object as rendered in the logs field list. Shapes vary by call
-// site (schema fields, grouped label rows), so extra keys are allowed.
-export interface StreamFieldRow {
-  name: string;
-  type?: string;
-  dataType?: string;
-  ftsKey?: boolean;
-  isSchemaField?: boolean;
-  showValues?: boolean;
-  isInterestingField?: boolean;
-  group?: string;
-  label?: boolean | string;
-  streams?: string[];
-  [key: string]: unknown;
-}
 
 // Cross-link definition returned by the backend cross-linking API.
 export interface CrossLinkField {
@@ -113,7 +98,7 @@ export interface StreamData {
   // site, which only type-checks if elements are any.
   streamLists: any[];
   selectedStream: string[];
-  selectedStreamFields: StreamFieldRow[];
+  selectedStreamFields: any[];
   selectedFields: string[];
   filterField: string;
   addToFilter: string;
@@ -128,8 +113,9 @@ export interface StreamData {
   filteredField: { expr: { value: string } }[];
   missingStreamMultiStreamFilter: string[];
   pipelineQueryStream: string[];
-  // Holds grouped field-row objects at runtime, not plain field names
-  selectedInterestingStreamFields: StreamFieldRow[];
+  // Holds grouped field-row objects at runtime; left as any[] for the same
+  // conflicting-StreamField-shape reason as selectedStreamFields above.
+  selectedInterestingStreamFields: any[];
   interestingExpandedGroupRows: { [key: string]: boolean };
   interestingExpandedGroupRowsFieldCount: { [key: string]: number };
 }
@@ -139,7 +125,7 @@ export interface ResultGrid {
   currentPage: number;
   // Column definitions vary between logs and traces grids; treated opaquely here.
   columns: unknown[];
-  colOrder: { [key: string]: unknown };
+  colOrder: { [key: string]: string[] };
   colSizes: { [key: string]: unknown };
 }
 

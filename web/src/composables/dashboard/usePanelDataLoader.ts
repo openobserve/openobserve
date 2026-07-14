@@ -815,7 +815,12 @@ export const usePanelDataLoader = (
     };
 
     const currentCacheKey = omit(getCacheKey(), keysToIgnore);
-    const savedCacheKey = omit(tempPanelCacheKey, keysToIgnore);
+    // tempPanelCacheKey is untyped (from the panel cache), so mirror the
+    // typed key shape rather than lodash's Omit<any, string> inference.
+    const savedCacheKey: typeof currentCacheKey = omit(
+      tempPanelCacheKey,
+      keysToIgnore,
+    );
 
     // Normalize variables in both keys before comparison
     const normalizedCurrentKey = {

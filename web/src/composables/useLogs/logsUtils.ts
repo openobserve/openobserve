@@ -601,7 +601,9 @@ export const logsUtils = () => {
       selectedStream.length > 0 &&
       typeof selectedStream != "object"
     ) {
-      query["stream"] = selectedStream.join(",");
+      // Dead defensive branch for a legacy non-array shape (TS narrows the
+      // array type to never here); cast keeps it compiling, runtime unchanged.
+      query["stream"] = (selectedStream as string[]).join(",");
     } else if (
       typeof selectedStream == "object" &&
       selectedStream.hasOwnProperty("value")

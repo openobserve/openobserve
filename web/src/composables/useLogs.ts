@@ -534,7 +534,7 @@ const useLogs = () => {
 
     // selectedStream array is coerced to its comma-joined string form as key
     let colOrder = searchObj.data.resultGrid.colOrder[
-      searchObj.data.stream.selectedStream as unknown as string
+      searchObj.data.stream.selectedStream.join(",")
     ].filter(
       (_field) =>
         _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),

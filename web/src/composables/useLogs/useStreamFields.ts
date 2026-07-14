@@ -1232,12 +1232,12 @@ export const useStreamFields = () => {
         if (
           searchObj.data.resultGrid.colSizes &&
           searchObj.data.resultGrid.colSizes.hasOwnProperty(
-            searchObj.data.stream.selectedStream as unknown as string,
+            searchObj.data.stream.selectedStream.join(","),
           )
         ) {
           sizes =
             searchObj.data.resultGrid.colSizes[
-              searchObj.data.stream.selectedStream as unknown as string
+              searchObj.data.stream.selectedStream.join(",")
             ];
         }
 
