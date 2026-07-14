@@ -12,6 +12,7 @@ use serde_json::Value;
 
 use crate::{
     common::infra::config::ALERTS,
+    job::get_nats_lock,
     service::{
         db,
         pipeline::batch_execution::{ExecutablePipeline, WorkflowResult},
@@ -548,6 +549,36 @@ pub async fn send_workflow_trigger(
 }
 
 pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
+    match get_nats_lock(format!(
+        "workflow-trigger-{:?}-handler",
+        trigger.trigger_type
+    ))
+    .await
+    {
+        Err(e) => {
+            log::error!(
+                "error getting lock for workflow handling for event {:?} with trace id {} source id {} for workflow id {}, skipping : {e}",
+                trigger.trigger_type,
+                trigger.trace_id,
+                trigger.source_id,
+                trigger.workflow_id,
+            );
+            return;
+        }
+        Ok(node) => {
+            if node != config::cluster::LOCAL_NODE.uuid {
+                log::debug!(
+                    "lock for workflow handling for event {:?} is obtained by node {node} for trace id {} source id {} for workflow id {}, skipping",
+                    trigger.trigger_type,
+                    trigger.trace_id,
+                    trigger.source_id,
+                    trigger.workflow_id,
+                );
+                return;
+            }
+        }
+    }
+
     let run_id = config::ider::uuid();
     log::info!(
         "received workflow trigger for event {:?} with trace id {} source id {} for workflow id {}, assigning run id {}",

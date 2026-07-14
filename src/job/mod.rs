@@ -249,7 +249,7 @@ async fn get_metering_lock() -> Result<Option<()>, infra::errors::Error> {
 
 // TODO: in a separate PR, replace the metering lock fn with this one instead
 #[cfg(feature = "enterprise")]
-async fn get_nats_lock(key: String) -> Result<String, anyhow::Error> {
+pub async fn get_nats_lock(key: String) -> Result<String, anyhow::Error> {
     use infra::{cluster::get_node_by_uuid, dist_lock};
 
     let db = infra::db::get_db().await;
