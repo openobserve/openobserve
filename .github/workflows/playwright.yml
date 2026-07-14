@@ -1179,6 +1179,7 @@ jobs:
         with:
           path: tests/ui-testing/all-blob-reports
           pattern: blob-report-*-attempt-${{ github.run_attempt }}
+          merge-multiple: true  # flatten blob zips into one dir so merge-reports finds them
 
       - name: Merge blobs and upload to Kinora
         id: kinora
