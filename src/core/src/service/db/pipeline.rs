@@ -440,6 +440,24 @@ async fn upsert_realtime_pipeline_cache(
     vec.push(exec_pl);
 }
 
+/// Removes a realtime pipeline's `ExecutablePipeline` from the stream caches.
+///
+/// Used when a pipeline is disabled or deleted. Returns true if the pipeline was cached.
+async fn remove_realtime_pipeline_cache(pipeline_id: &str) -> bool {
+    let mut pipeline_stream_mapping_cache = PIPELINE_STREAM_MAPPING.write().await;
+    let mut stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.write().await;
+    let Some(removed_stream) = pipeline_stream_mapping_cache.remove(pipeline_id) else {
+        return false;
+    };
+    if let Some(vec) = stream_exec_pl.get_mut(&removed_stream) {
+        vec.retain(|pl| pl.id != pipeline_id);
+        if vec.is_empty() {
+            stream_exec_pl.remove(&removed_stream);
+        }
+    }
+    true
+}
+
 pub async fn watch() -> Result<(), anyhow::Error> {
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(PIPELINES_WATCH_PREFIX).await?;
@@ -490,28 +508,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                     );
                                 }
                             };
-                        } else {
-                            let mut pipeline_stream_mapping_cache =
-                                PIPELINE_STREAM_MAPPING.write().await;
-                            let mut stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.write().await;
-                            if let Some(removed_stream) =
-                                pipeline_stream_mapping_cache.remove(pipeline_id)
-                            {
-                                // Remove this specific pipeline from the Vec
-                                let mut removed = false;
-                                if let Some(vec) = stream_exec_pl.get_mut(&removed_stream) {
-                                    vec.retain(|pl| pl.id != pipeline_id);
-                                    if vec.is_empty() {
-                                        stream_exec_pl.remove(&removed_stream);
-                                    }
-                                    removed = true;
-                                }
-                                if removed {
-                                    log::info!(
-                                        "[Pipeline]: realtime pipeline {pipeline_id} disabled and removed from cache."
-                                    );
-                                }
-                            }
+                        } else if remove_realtime_pipeline_cache(pipeline_id).await {
+                            log::info!(
+                                "[Pipeline]: realtime pipeline {pipeline_id} disabled and removed from cache."
+                            );
                         }
                     }
                     config::meta::pipeline::components::PipelineSource::Scheduled(_) => {
@@ -535,16 +535,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             db::Event::Delete(ev) => {
                 let pipeline_id = ev.key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
                 PIPELINE_ID_TO_ORG.write().await.remove(pipeline_id);
-                if let Some(removed_stream) =
-                    PIPELINE_STREAM_MAPPING.write().await.remove(pipeline_id)
-                {
-                    let mut stream_exec = STREAM_EXECUTABLE_PIPELINES.write().await;
-                    if let Some(vec) = stream_exec.get_mut(&removed_stream) {
-                        vec.retain(|pl| pl.id != pipeline_id);
-                        if vec.is_empty() {
-                            stream_exec.remove(&removed_stream);
-                        }
-                    }
+                if remove_realtime_pipeline_cache(pipeline_id).await {
                     log::info!(
                         "[Pipeline]: realtime pipeline {pipeline_id} deleted and removed from cache."
                     );
@@ -670,6 +661,36 @@ mod tests {
         assert!(cached.iter().any(|pl| pl.id == pipeline_b.id));
 
         clear_realtime_cache_entries(&[&pipeline_a.id, &pipeline_b.id], &[&stream]).await;
+    }
+
+    #[tokio::test]
+    async fn test_remove_realtime_pipeline_cache() {
+        let stream = StreamParams::new("upsert_org_4", "upsert_stream_4", StreamType::Logs);
+        let pipeline_a = realtime_pipeline("upsert_pl_4a", &stream);
+        let pipeline_b = realtime_pipeline("upsert_pl_4b", &stream);
+
+        let exec_a = ExecutablePipeline::new(&pipeline_a).await.unwrap();
+        upsert_realtime_pipeline_cache(&pipeline_a.id, &stream, exec_a).await;
+        let exec_b = ExecutablePipeline::new(&pipeline_b).await.unwrap();
+        upsert_realtime_pipeline_cache(&pipeline_b.id, &stream, exec_b).await;
+
+        // removing one keeps the other
+        assert!(remove_realtime_pipeline_cache(&pipeline_a.id).await);
+        let cached = get_executable_pipelines(&stream).await;
+        assert_eq!(cached.len(), 1);
+        assert_eq!(cached[0].id, pipeline_b.id);
+
+        // removing the last one drops the stream key entirely
+        assert!(remove_realtime_pipeline_cache(&pipeline_b.id).await);
+        assert!(
+            !STREAM_EXECUTABLE_PIPELINES
+                .read()
+                .await
+                .contains_key(&stream)
+        );
+
+        // removing an uncached pipeline is a no-op
+        assert!(!remove_realtime_pipeline_cache(&pipeline_a.id).await);
     }
 
     #[tokio::test]
