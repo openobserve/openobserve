@@ -1263,6 +1263,18 @@ export default defineComponent({
       { immediate: true },
     );
 
+    // Home page has its own inline AI tab (see toggleAIChat's home special-case
+    // above), so the sidebar chat panel is redundant there — close it on
+    // arrival so we don't show both the sidebar and the home AI tab at once.
+    watch(
+      () => router.currentRoute.value.name,
+      (routeName) => {
+        if (routeName === "home" && store.state.isAiChatEnabled) {
+          closeChat();
+        }
+      },
+    );
+
     const showShortcuts = ref(false);
     const openShortcutsList = () => { showShortcuts.value = true; };
 

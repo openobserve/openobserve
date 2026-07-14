@@ -1374,7 +1374,7 @@ import {
   onUnmounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
@@ -1507,6 +1507,7 @@ export default defineComponent({
   },
   setup(props) {
     const router = useRouter();
+    const route = useRoute();
     const inputMessage = ref(
       props.aiChatInputContext ? props.aiChatInputContext : "",
     );
@@ -1864,8 +1865,18 @@ export default defineComponent({
           );
         }
       } else {
-        // Regular text - reveal one character
-        displayedStreamingContent.value = target.slice(0, current.length + 1);
+        // Regular text - reveal one character per tick when caught up, but
+        // catch up faster when a backlog has built up (e.g. the backend
+        // delivered a large chunk in one burst). Without this, a fixed
+        // 1-char-per-tick reveal can lag the actual stream by many seconds
+        // on bursty responses, then "snap" to the full text once the stream
+        // ends and the remaining backlog is force-flushed.
+        const backlog = remaining.length;
+        const revealCount = backlog > 200 ? Math.ceil(backlog / 20) : 1;
+        displayedStreamingContent.value = target.slice(
+          0,
+          current.length + revealCount,
+        );
       }
 
       // Schedule next frame
@@ -2996,6 +3007,11 @@ export default defineComponent({
           }
         }
 
+        // Flush any bytes the decoder held back for a possible multi-byte
+        // UTF-8 sequence split across the last chunk boundary, so the final
+        // SSE event isn't silently truncated when the stream ends mid-character.
+        buffer += decoder.decode();
+
         // Process any remaining complete data in buffer
         if (buffer.trim()) {
           const lines = buffer.split("\n");
@@ -3956,6 +3972,15 @@ export default defineComponent({
     };
 
     const handleNavigationAction = async (action: NavigationAction) => {
+      // Detach the stream before navigating: the route change can unmount/
+      // recreate this component, and onUnmounted aborts currentAbortController
+      // to avoid leaking requests. Without detaching first, that abort races
+      // an in-flight opencode turn and kills any tool calls still queued
+      // after this navigation (e.g. create dashboard -> create alert -> nav).
+      // detachCurrentStream() moves the controller to backgroundStreams so
+      // processStream keeps running and the turn finishes in the background.
+      detachCurrentStream();
+
       // Helper to encode strings for URL (same as search history)
       const encodeForUrl = (str: string) =>
         btoa(unescape(encodeURIComponent(str)));
@@ -5025,6 +5050,16 @@ export default defineComponent({
       },
     );
 
+    // Keep an in-progress stream alive across user-initiated navigation
+    // (e.g. clicking a sidebar link), not just AI-triggered navigation
+    // (handleNavigationAction already detaches for that case).
+    watch(
+      () => route.fullPath,
+      () => {
+        detachCurrentStream();
+      },
+    );
+
     // Only fetch initial message if component starts as open
     onMounted(() => {
       if (props.isOpen) {
@@ -5038,6 +5073,7 @@ export default defineComponent({
           setTimeout(() => {
             componentReady.value = true;
             processPendingChips();
+            focusInput();
           }, 100);
         });
       }
@@ -5050,18 +5086,21 @@ export default defineComponent({
     });
 
     onUnmounted(() => {
-      // Cancel any ongoing requests when component is unmounted to prevent memory leaks
-      if (currentAbortController.value) {
-        currentAbortController.value.abort();
-        currentAbortController.value = null;
-      }
+      // Detach (not abort) any in-flight request on unmount: this component
+      // instance can be torn down by navigation (e.g. the Home page's
+      // v-if="activeHomeTab === 'ai'" O2AIChat, or a route change) and we
+      // want that turn to keep running in the background rather than die
+      // here. Relying solely on the route.fullPath watcher elsewhere in this
+      // file is not enough — Vue gives no ordering guarantee that the watcher
+      // fires before this unmount hook during the same navigation, so this
+      // detach is the backstop that actually prevents the interruption.
+      detachCurrentStream();
 
-      // Abort all background streams to prevent memory leaks
-      for (const controller of backgroundStreams) {
-        controller.abort();
-      }
-      backgroundStreams.clear();
-      backgroundStreamMap.clear();
+      // Note: background streams are intentionally NOT aborted here.
+      // detachCurrentStream() moves a turn's controller into backgroundStreams
+      // specifically so it keeps running after this component instance goes
+      // away (e.g. navigation, logout); aborting them on unmount would defeat
+      // that guarantee in exactly the scenario it exists for.
 
       // Clean up typewriter animation to prevent memory leaks
       if (typewriterAnimationId.value) {
@@ -5100,13 +5139,29 @@ export default defineComponent({
       store.dispatch("setChatUpdated", false);
     });
 
-    // Watch for typewriter animation updates to refresh the displayed text
-    watch(displayedStreamingContent, (newContent) => {
-      if (!isLoading.value) return;
-      // Don't overwrite existing text with empty string when displayedStreamingContent
-      // is reset (e.g., on tool_call). The reset signals "new segment starts" not
-      // "clear previous content".
-      if (!newContent) return;
+    // Writing displayedStreamingContent into chatMessages triggers a
+    // re-render of the message list, which re-runs formatMessage() ->
+    // marked.parse() (incl. hljs.highlight for code blocks) over the WHOLE
+    // accumulated text, not just the new characters. The typewriter ticks
+    // every ~8ms; re-parsing/re-highlighting full markdown at that rate is
+    // O(n^2) over a response and eventually can't keep up with
+    // requestAnimationFrame, so the page appears to hang with data already
+    // in memory but not painted, then "snaps" to the final text once the
+    // stream ends and the last write goes through. Throttle how often the
+    // expensive reactive write happens, independent of how often the cheap
+    // per-character animation ref ticks; the animation itself stays smooth.
+    const STREAMING_RENDER_INTERVAL = 80; // ms between reactive markdown re-renders
+    let lastStreamingRenderTime = 0;
+    let pendingStreamingRenderContent: string | null = null;
+    let streamingRenderFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const flushStreamingRenderNow = (content: string) => {
+      lastStreamingRenderTime = Date.now();
+      pendingStreamingRenderContent = null;
+      if (streamingRenderFlushTimer) {
+        clearTimeout(streamingRenderFlushTimer);
+        streamingRenderFlushTimer = null;
+      }
 
       const lastMessage = chatMessages.value[chatMessages.value.length - 1];
       if (
@@ -5117,8 +5172,36 @@ export default defineComponent({
         const lastBlock =
           lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
         if (lastBlock && lastBlock.type === "text") {
-          lastBlock.text = newContent;
+          lastBlock.text = content;
         }
+      }
+    };
+
+    // Watch for typewriter animation updates to refresh the displayed text
+    watch(displayedStreamingContent, (newContent) => {
+      if (!isLoading.value) return;
+      // Don't overwrite existing text with empty string when displayedStreamingContent
+      // is reset (e.g., on tool_call). The reset signals "new segment starts" not
+      // "clear previous content".
+      if (!newContent) return;
+
+      const now = Date.now();
+      if (now - lastStreamingRenderTime >= STREAMING_RENDER_INTERVAL) {
+        flushStreamingRenderNow(newContent);
+        return;
+      }
+
+      // Trailing edge: make sure the latest content always lands even if
+      // ticks keep arriving faster than the interval.
+      pendingStreamingRenderContent = newContent;
+      if (!streamingRenderFlushTimer) {
+        const delay = STREAMING_RENDER_INTERVAL - (now - lastStreamingRenderTime);
+        streamingRenderFlushTimer = setTimeout(() => {
+          streamingRenderFlushTimer = null;
+          if (pendingStreamingRenderContent !== null) {
+            flushStreamingRenderNow(pendingStreamingRenderContent);
+          }
+        }, delay);
       }
     });
 
@@ -6602,6 +6685,8 @@ export default defineComponent({
   border-radius: 6px;
   font-size: 13px;
   margin-bottom: 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .tool-call-item.has-details {
@@ -6805,6 +6890,10 @@ export default defineComponent({
 .tool-call-item .tool-call-details .detail-value {
   font-size: 12px;
   user-select: text;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .tool-call-item .tool-call-details .detail-value.query-value {
