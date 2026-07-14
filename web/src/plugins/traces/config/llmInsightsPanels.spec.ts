@@ -292,9 +292,12 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
   });
 
   // Time-series panels need a `timeField` so the renderer can pull the
-  // x-axis values out of the result rows.
-  it("stacked-area panels declare a timeField", () => {
-    const areas = LLM_INSIGHTS_PANELS.filter((p) => p.type === "stacked-area");
+  // x-axis values out of the result rows. (The trend panels render as
+  // stacked BARS; stacked-area remains a valid type for any future panel.)
+  it("stacked time-series panels declare a timeField", () => {
+    const areas = LLM_INSIGHTS_PANELS.filter(
+      (p) => p.type === "stacked-area" || p.type === "stacked-bar",
+    );
     expect(areas.length).toBeGreaterThan(0);
     for (const p of areas) {
       expect(p.query.timeField, `panel ${p.id} missing timeField`).toBeTruthy();

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="sessions-list h-full! flex flex-col bg-[var(--o2-card-bg-solid)] card-container"
+    class="sessions-list h-full! flex flex-col bg-[var(--color-surface-base)] card-container"
   >
     <!-- No LLM streams exist in the org at all — nothing to select, so show
          the rich first-run empty state on its own (no table chrome). -->
@@ -199,12 +199,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-firstUserMessage="{ row }">
           <div
             v-if="row.firstUserMessage"
-            class="text-[0.75rem] text-[var(--o2-text-secondary)] truncate w-full"
+            class="text-[0.75rem] text-[var(--color-text-secondary)] truncate w-full"
           >
             {{ row.firstUserMessage }}
             <OTooltip :content="row.firstUserMessage" />
           </div>
-          <span v-else class="text-[0.75rem] text-[var(--o2-text-muted)]">—</span>
+          <span v-else class="text-[0.75rem] text-[var(--color-text-muted)]">—</span>
         </template>
 
         <!-- Turns -->
