@@ -70,3 +70,17 @@ export const buildTestSample = (): unknown[] => {
 // Pretty-printed JSON string for seeding the editor.
 export const buildTestSampleText = (): string =>
   JSON.stringify(buildTestSample(), null, 2);
+
+// The FLATTENED view a Function node sees when "After Flattening" (RAF, the
+// default) is on: the `meta` block becomes `meta_<field>` string columns merged
+// onto each `data[]` row — matching the field names Conditions use. Derived from
+// buildTestSample() so both stay in sync. Meta values are strings (the flattened
+// `meta` block is a string:string map for now).
+export const buildFlatTestSample = (): unknown[] => {
+  const [{ meta, data }] = buildTestSample() as [
+    { meta: Record<string, unknown>; data: Record<string, unknown>[] },
+  ];
+  const metaFlat: Record<string, string> = {};
+  for (const k of Object.keys(meta)) metaFlat[`meta_${k}`] = String(meta[k]);
+  return data.map((row) => ({ ...metaFlat, ...row }));
+};

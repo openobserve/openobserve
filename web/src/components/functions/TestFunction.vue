@@ -338,6 +338,13 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  // Optional sample events to seed the "Events" editor with. When omitted, the
+  // generic log sample is used (pipelines / functions page). Workflows pass the
+  // fired-alert sample payload so the VRL author sees the real structure.
+  sampleEvents: {
+    type: Array,
+    default: undefined,
+  },
 });
 
 const emit = defineEmits(["function-error","sendToAiChat"]);
@@ -478,13 +485,15 @@ onMounted(() => {
 
 const setEventsEditor = () => {
   setTimeout(() => {
-    inputEvents.value = JSON.stringify(
-      JSON.parse(
-        `[{"_timestamp":1735128523652186,"job":"test","level":"info","log":"test message for openobserve"},{"_timestamp":1735128522644223,"job":"test","level":"info","log":"test message for openobserve"}]`,
-      ),
-      null,
-      2,
-    );
+    // Caller-supplied sample (e.g. the workflow alert payload) takes precedence;
+    // otherwise fall back to the generic log sample.
+    const sample =
+      props.sampleEvents && props.sampleEvents.length
+        ? props.sampleEvents
+        : JSON.parse(
+            `[{"_timestamp":1735128523652186,"job":"test","level":"info","log":"test message for openobserve"},{"_timestamp":1735128522644223,"job":"test","level":"info","log":"test message for openobserve"}]`,
+          );
+    inputEvents.value = JSON.stringify(sample, null, 2);
   }, 300);
 };
 

@@ -125,6 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :vrlFunction="formData"
                 @function-error="handleFunctionError"
                 :heightOffset="heightOffset"
+                :sample-events="sampleEvents"
                 @sendToAiChat="sendToAiChat"
               />
             </div>
@@ -209,6 +210,12 @@ export default defineComponent({
     heightOffset: {
       type: Number,
       default: 0,
+    },
+    // Optional sample events for the TestFunction "Events" editor (workflows pass
+    // the alert payload; omitted elsewhere → generic log sample).
+    sampleEvents: {
+      type: Array,
+      default: undefined,
     },
   },
   components: {

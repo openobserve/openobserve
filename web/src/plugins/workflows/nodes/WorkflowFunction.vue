@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="picker"
     :initial-name="savedData.name || ''"
     :initial-after-flatten="savedData.after_flatten ?? true"
+    :sample-events="sampleEvents"
     @expand="onExpand"
   />
 </template>
@@ -34,9 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onBeforeUnmount } from "vue";
 import FunctionPicker from "@/components/flow/forms/FunctionPicker.vue";
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
+import { buildTestSample } from "@/plugins/workflows/testSample";
 
 const savedData: any = workflowObj.currentSelectedNodeData?.data || {};
 const picker = ref<any>(null);
+
+// Seed the inline function editor's "Events" panel with the same fired-alert
+// sample the Test drawer uses, so the VRL author sees the real payload shape.
+const sampleEvents = buildTestSample();
 
 // Inline "Create New Function" widens the drawer + hides its footer (the
 // AddFunction toolbar owns save/cancel).

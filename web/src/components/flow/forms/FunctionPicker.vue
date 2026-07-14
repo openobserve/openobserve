@@ -71,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="addFunctionRef"
           :is-updated="isUpdating"
           :height-offset="75"
+          :sample-events="sampleEvents"
           @update:list="onFunctionCreation"
           @cancel:hideform="cancelFunctionCreation"
         />
@@ -206,6 +207,9 @@ const props = withDefaults(
     showFlatten?: boolean;
     isUpdating?: boolean;
     duplicateNames?: string[];
+    // Sample events to seed the inline function editor's "Events" panel (e.g. the
+    // workflow alert payload). Omitted → the generic log sample.
+    sampleEvents?: any[];
   }>(),
   {
     initialName: "",
@@ -213,6 +217,7 @@ const props = withDefaults(
     showFlatten: true,
     isUpdating: false,
     duplicateNames: () => [],
+    sampleEvents: undefined,
   },
 );
 
