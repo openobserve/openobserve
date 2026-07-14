@@ -32,29 +32,29 @@ export const akeylessLdapUsernameRegex = /^[a-zA-Z0-9._-]+$/;
 // Anti-HTML guard for base_url (the old `!/<[^>]*>/.test(v)` rule).
 const HTML_TAG_REGEX = /<[^>]*>/;
 
-// Built via a factory so the three messages that were i18n-driven before the
-// migration stay translated (pass useI18n's `t`). The remaining messages were
-// hardcoded English in the pre-migration code (validateName / validateAkeyless
-// Fields), so they stay English here — restoring exact parity, not redesigning.
+// Built via a factory so every validation message is i18n-driven (pass useI18n's
+// `t`), matching the other migrated form schemas. The English wording is preserved
+// verbatim in the `cipherKey.*` keys (web/src/locales/languages/en.json): the
+// `providerTypeRequired` / `algorithmRequired` / `secretRequired` keys were already
+// i18n before the migration; the name/store/akeyless messages were hardcoded English
+// in the pre-migration code (validateName / validateAkeylessFields) and are now keyed
+// too — same text, no behavioral change.
 export const makeAddCipherKeySchema = (t: (_key: string) => string) =>
   z
   .object({
     // Always-validated scalars (AddCipherKey's own fields).
     name: z
       .string()
-      .min(1, "Name is required")
-      .max(50, "Name must be 50 characters or less.")
-      .regex(
-        cipherKeyNameRegex,
-        "Only alphanumeric characters, underscores, and hyphens are allowed",
-      )
+      .min(1, t("cipherKey.nameRequired"))
+      .max(50, t("cipherKey.nameMaxLength"))
+      .regex(cipherKeyNameRegex, t("cipherKey.nameInvalidChars"))
       .refine((v) => isValidResourceName(v), {
-        message: "Characters like :, ?, /, #, and spaces are not allowed.",
+        message: t("cipherKey.nameInvalidResource"),
       }),
     key: z.object({
       store: z.object({
         // Store type select (OpenObserve `local` vs `akeyless`) — required.
-        type: z.string().min(1, "Type is required"),
+        type: z.string().min(1, t("cipherKey.typeRequired")),
         // Akeyless sub-tree. Every field is form-owned (R1-strict) but only
         // conditionally required (store.type === "akeyless") via superRefine, so
         // the field-level shape is loose (defaults to "").
@@ -116,19 +116,19 @@ export const makeAddCipherKeySchema = (t: (_key: string) => string) =>
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["key", "store", "akeyless", "base_url"],
-          message: "Base URL is required",
+          message: t("cipherKey.baseURLRequired"),
         });
       } else if (validateUrl(ak.base_url) !== true) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["key", "store", "akeyless", "base_url"],
-          message: "Please provide correct URL.",
+          message: t("cipherKey.baseURLInvalid"),
         });
       } else if (HTML_TAG_REGEX.test(ak.base_url)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["key", "store", "akeyless", "base_url"],
-          message: "HTML tags are not allowed",
+          message: t("cipherKey.baseURLHtmlNotAllowed"),
         });
       }
 
@@ -137,13 +137,13 @@ export const makeAddCipherKeySchema = (t: (_key: string) => string) =>
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["key", "store", "akeyless", "access_id"],
-          message: "Access ID is required",
+          message: t("cipherKey.accessIdRequired"),
         });
       } else if (!akeylessAccessIdRegex.test(ak.access_id)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["key", "store", "akeyless", "access_id"],
-          message: "Access ID should be alphanumeric",
+          message: t("cipherKey.accessIdInvalid"),
         });
       }
 
@@ -152,14 +152,14 @@ export const makeAddCipherKeySchema = (t: (_key: string) => string) =>
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["key", "store", "akeyless", "auth", "type"],
-          message: "Authentication type is required",
+          message: t("cipherKey.authenticationTypeRequired"),
         });
       }
       if (!ak.store.type) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["key", "store", "akeyless", "store", "type"],
-          message: "Secret type is required",
+          message: t("cipherKey.secretTypeRequired"),
         });
       }
 
@@ -168,7 +168,7 @@ export const makeAddCipherKeySchema = (t: (_key: string) => string) =>
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["key", "store", "akeyless", "auth", "access_key"],
-          message: "Access Key is required",
+          message: t("cipherKey.accessKeyRequired"),
         });
       }
 
@@ -178,21 +178,20 @@ export const makeAddCipherKeySchema = (t: (_key: string) => string) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["key", "store", "akeyless", "auth", "ldap", "username"],
-            message: "LDAP Username is required",
+            message: t("cipherKey.ldapUsernameRequired"),
           });
         } else if (!akeylessLdapUsernameRegex.test(ak.auth.ldap.username)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["key", "store", "akeyless", "auth", "ldap", "username"],
-            message:
-              "Username can only contain alphanumeric characters, dots, underscores, and hyphens",
+            message: t("cipherKey.ldapUsernameInvalid"),
           });
         }
         if (!ak.auth.ldap.password) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["key", "store", "akeyless", "auth", "ldap", "password"],
-            message: "LDAP Password is required",
+            message: t("cipherKey.ldapPasswordRequired"),
           });
         }
       }
@@ -202,7 +201,7 @@ export const makeAddCipherKeySchema = (t: (_key: string) => string) =>
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["key", "store", "akeyless", "store", "static_secret"],
-          message: "Static Secret Name is required",
+          message: t("cipherKey.staticSecretNameRequired"),
         });
       }
 
@@ -212,14 +211,14 @@ export const makeAddCipherKeySchema = (t: (_key: string) => string) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["key", "store", "akeyless", "store", "dfc", "name"],
-            message: "DFC Name is required",
+            message: t("cipherKey.dfcNameRequired"),
           });
         }
         if (!ak.store.dfc.encrypted_data) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["key", "store", "akeyless", "store", "dfc", "encrypted_data"],
-            message: "DFC Encrypted Data is required",
+            message: t("cipherKey.dfcEncryptedDataRequired"),
           });
         }
       }
