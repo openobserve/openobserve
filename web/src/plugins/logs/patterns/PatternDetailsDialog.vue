@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="mt-3"
           >
             <div
-              class="rounded border border-solid border-error-300 px-3 py-2 flex gap-3 items-start"
+              class="rounded border border-solid border-status-error-text px-3 py-2 flex gap-3 items-start"
               :class="store.state.theme === 'dark' ? 'bg-gray-800' : 'bg-white'"
             >
               <OIcon name="warning" size="sm" class="mt-0.5 shrink-0" />

@@ -18,7 +18,7 @@
         {{ t("onlineEvals.job.preview.matchedError") }}
       </div>
       <div v-else class="flex items-baseline gap-1.5">
-        <span class="text-2xl font-bold text-grey-600 [font-variant-numeric:tabular-nums]">{{ formattedCount }}</span>
+        <span class="text-2xl font-bold text-text-secondary [font-variant-numeric:tabular-nums]">{{ formattedCount }}</span>
         <span class="text-xs text-(--color-text-secondary,var(--color-text-secondary))">
           {{ t("onlineEvals.job.preview.matchedSuffix") }}
         </span>

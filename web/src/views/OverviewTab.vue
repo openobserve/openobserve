@@ -288,7 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </button>
         <!-- Explore logs -->
         <button v-if="showLogsCard" type="button" class="ov-action-card group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-border-default bg-surface-base shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-primary-400 hover:bg-tabs-hover-bg" data-test="overview-empty-logs-card" @click="goToLogs">
-          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-info-50 text-info-700 group-hover:bg-primary-600 group-hover:text-text-inverse">
+          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-status-info-bg text-status-info-text group-hover:bg-primary-600 group-hover:text-text-inverse">
             <OIcon name="search" size="md" />
           </span>
           <span class="flex-1 min-w-0 flex flex-col gap-[0.125rem]">
@@ -299,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </button>
         <!-- Explore traces -->
         <button v-if="showTracesCard" type="button" class="ov-action-card group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-border-default bg-surface-base shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-primary-400 hover:bg-tabs-hover-bg" data-test="overview-empty-traces-card" @click="goToTraces">
-          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-info-50 text-info-700 group-hover:bg-primary-600 group-hover:text-text-inverse">
+          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-status-info-bg text-status-info-text group-hover:bg-primary-600 group-hover:text-text-inverse">
             <OIcon name="account-tree" size="md" />
           </span>
           <span class="flex-1 min-w-0 flex flex-col gap-[0.125rem]">
@@ -764,14 +764,14 @@ const incidentRowClass = (severity: string) => {
   const s = (severity ?? "").toLowerCase();
   if (s === "p1") return "border-l-error-600";
   if (s === "p2") return "border-l-warning-600";
-  return "border-l-info-700";
+  return "border-l-status-info-text";
 };
 
 const incidentIconClass = (severity: string) => {
   const s = (severity ?? "").toLowerCase();
   if (s === "p1") return "text-error-600";
   if (s === "p2") return "text-warning-600";
-  return "text-info-700";
+  return "text-status-info-text";
 };
 
 const severityBadgeClass = (sev: string): string => {
@@ -779,13 +779,13 @@ const severityBadgeClass = (sev: string): string => {
   if (s === "p1") return "bg-error-50 text-error-600 border border-[0.0625em] border-error-600";
   if (s === "p2") return "bg-warning-50 text-warning-700 border border-[0.0625em] border-warning-600";
   if (s === "p3") return "bg-warning-50 text-warning-700 border border-[0.0625em] border-warning-600";
-  return "bg-info-50 text-info-700 border border-[0.0625em] border-info-700";
+  return "bg-status-info-bg text-status-info-text border border-[0.0625em] border-status-info-text";
 };
 
 const serviceCardClass = (svc: any) => {
   if (svc.errorFlag && svc.error_rate >= 5) return "border-l-[0.1875em] border-l-error-600";
   if (svc.errorFlag || svc.latencyFlag) return "border-l-[0.1875em] border-l-warning-600";
-  return "border-l-[0.1875em] border-l-success-600";
+  return "border-l-[0.1875em] border-l-status-positive";
 };
 
 // ── Navigation ───────────────────────────────────────────────────────────────

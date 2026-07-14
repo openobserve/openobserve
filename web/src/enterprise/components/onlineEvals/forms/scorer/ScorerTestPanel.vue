@@ -69,7 +69,7 @@
           <dl class="eval-test-panel__result-grid grid gap-x-3 gap-y-1 m-0 text-text-secondary text-xs" style="grid-template-columns: max-content 1fr">
             <template v-if="displayValue !== null">
               <dt class="text-text-secondary font-medium">{{ t("onlineEvals.scorer.testPanel.resultScore") }}</dt>
-              <dd class="eval-test-panel__result-score m-0 text-grey-600 font-bold text-[13px] [font-family:var(--font-mono)]">{{ displayValue }}</dd>
+              <dd class="eval-test-panel__result-score m-0 text-text-secondary font-bold text-[13px] [font-family:var(--font-mono)]">{{ displayValue }}</dd>
             </template>
             <template v-if="latencyLabel">
               <dt class="text-text-secondary font-medium">{{ t("onlineEvals.scorer.testPanel.resultLatency") }}</dt>

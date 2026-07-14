@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               // Header-row chrome via centralized token utilities (same tokens
               // OTable uses): background band + full-width underline on the row
               // so it spans past the last column.
-              'bg-table-header-bg border-b border-grey-300',
+              'bg-table-header-bg border-b border-border-default',
             ]"
             :style="{
               width:

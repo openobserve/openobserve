@@ -37,7 +37,7 @@
             {{ kpiTitle(kpi) }}
           </div>
           <div class="flex items-baseline gap-[0.2rem]">
-            <span class="text-[1.4rem] font-bold leading-none text-grey-600">
+            <span class="text-[1.4rem] font-bold leading-none text-text-secondary">
               {{ formatKpi(kpi) }}
             </span>
           </div>
