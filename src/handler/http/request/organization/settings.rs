@@ -27,12 +27,16 @@ use {
 };
 
 use crate::{
-    common::meta::{
-        http::HttpResponse as MetaHttpResponse,
-        organization::{
-            OrganizationSetting, OrganizationSettingPayload, OrganizationSettingResponse,
+    common::{
+        meta::{
+            http::HttpResponse as MetaHttpResponse,
+            organization::{
+                OrganizationSetting, OrganizationSettingPayload, OrganizationSettingResponse,
+            },
         },
+        utils::auth::UserEmail,
     },
+    handler::http::extractors::Headers,
     service::db::organization::{get_org_setting, set_org_setting},
 };
 
@@ -66,8 +70,21 @@ use crate::{
 )]
 pub async fn create(
     Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
     Json(settings): Json<OrganizationSettingPayload>,
 ) -> Response {
+    // Non-enterprise: no RBAC middleware, so enforce Admin/Root role explicitly here.
+    #[cfg(not(feature = "enterprise"))]
+    if let Err(resp) = crate::handler::http::auth::oss_role_gate::assert_admin_role(
+        &org_id,
+        &user_email.user_id,
+    )
+    .await
+    {
+        return resp;
+    }
+    let _ = &user_email; // silence unused warning on enterprise builds
+
     let mut data = match get_org_setting(&org_id).await {
         Ok(data) => data,
         Err(err) => {
@@ -307,6 +324,74 @@ pub async fn delete_logo_text() -> Response {
 
 #[cfg(test)]
 mod tests {
+    /// Regression: OSS `POST /api/{org}/settings` must reject a
+    /// `service_account`-role caller with HTTP 403 before mutating any
+    /// org-level setting. Fails on the unfixed handler (which returned 200
+    /// and persisted the caller's `scrape_interval`) and passes once the
+    /// handler calls `oss_role_gate::assert_admin_role`.
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn service_account_cannot_mutate_org_settings_regression() {
+        use axum::extract::Path;
+        use config::meta::user::UserRole;
+        use infra::table::org_users::OrgUserRecord;
+
+        use super::create;
+        use crate::{
+            common::{
+                infra::config::ORG_USERS,
+                meta::organization::OrganizationSettingPayload,
+                utils::auth::UserEmail,
+            },
+            handler::http::extractors::Headers as HeadersExtractor,
+        };
+
+        let org = "org-settings-regression";
+        let sa_email = "settings-sa-regression@example.test";
+        let key = format!("{org}/{sa_email}");
+        ORG_USERS.insert(
+            key,
+            OrgUserRecord {
+                email: sa_email.to_string(),
+                org_id: org.to_string(),
+                role: UserRole::ServiceAccount,
+                token: "test-token".to_string(),
+                rum_token: None,
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+
+        let payload = OrganizationSettingPayload {
+            scrape_interval: Some(7777),
+            trace_id_field_name: None,
+            span_id_field_name: None,
+            toggle_ingestion_logs: None,
+            streaming_aggregation_enabled: None,
+            enable_streaming_search: None,
+            min_auto_refresh_interval: None,
+            light_mode_theme_color: None,
+            dark_mode_theme_color: None,
+            max_series_per_query: None,
+            usage_stream_enabled: None,
+            cross_links: None,
+        };
+        let resp = create(
+            Path(org.to_string()),
+            HeadersExtractor(UserEmail {
+                user_id: sa_email.to_string(),
+            }),
+            axum::Json(payload),
+        )
+        .await;
+
+        assert_eq!(
+            resp.status().as_u16(),
+            403,
+            "OSS service_account must be blocked from mutating org settings"
+        );
+    }
+
     #[test]
     fn test_max_series_per_query_validation_valid_values() {
         // Test minimum valid value

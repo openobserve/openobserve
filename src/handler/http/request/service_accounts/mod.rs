@@ -77,6 +77,17 @@ pub async fn list(Path(org_id): Path<String>, Headers(user_email): Headers<UserE
         return MetaHttpResponse::forbidden("Service Accounts Not Enabled");
     }
 
+    // Non-enterprise: no RBAC middleware, so enforce Admin/Root role explicitly here.
+    #[cfg(not(feature = "enterprise"))]
+    if let Err(resp) = crate::handler::http::auth::oss_role_gate::assert_admin_role(
+        &org_id,
+        &user_email.user_id,
+    )
+    .await
+    {
+        return resp;
+    }
+
     let user_id = &user_email.user_id;
     let mut _user_list_from_rbac = None;
     // Get List of allowed objects
@@ -461,4 +472,58 @@ pub async fn delete_bulk(
         unsuccessful,
         err,
     })
+}
+
+#[cfg(all(test, not(feature = "enterprise")))]
+mod tests {
+    //! Regression: OSS `GET /api/{org}/service_accounts` (the `list` handler) must
+    //! reject a low-privilege `service_account` principal with HTTP 403 before
+    //! returning any peer service-account metadata or token prefixes.
+    //!
+    //! This test fails on the unfixed `list` handler (which returned 200 with
+    //! the full SA roster) and passes once the handler calls the shared
+    //! `oss_role_gate::assert_admin_role` before doing any lookup.
+    use axum::extract::Path;
+    use config::meta::user::UserRole;
+    use infra::table::org_users::OrgUserRecord;
+
+    use super::*;
+    use crate::{
+        common::infra::config::ORG_USERS, handler::http::extractors::Headers as HeadersExtractor,
+    };
+
+    fn seed_org_user(org_id: &str, email: &str, role: UserRole) {
+        let key = format!("{org_id}/{email}");
+        let record = OrgUserRecord {
+            email: email.to_string(),
+            org_id: org_id.to_string(),
+            role,
+            token: "test-token".to_string(),
+            rum_token: None,
+            created_at: 0,
+            allow_static_token: true,
+        };
+        ORG_USERS.insert(key, record);
+    }
+
+    #[tokio::test]
+    async fn service_account_cannot_list_service_accounts() {
+        let org = "org-list-sa-regression";
+        let sa_email = "list-sa-regression@example.test";
+        seed_org_user(org, sa_email, UserRole::ServiceAccount);
+
+        let resp = list(
+            Path(org.to_string()),
+            HeadersExtractor(UserEmail {
+                user_id: sa_email.to_string(),
+            }),
+        )
+        .await;
+
+        assert_eq!(
+            resp.status().as_u16(),
+            403,
+            "OSS service_account must be blocked from listing service accounts"
+        );
+    }
 }

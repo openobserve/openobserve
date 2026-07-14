@@ -25,7 +25,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    handler::http::extractors::Headers,
     service::enrichment_table::{extract_multipart, save_enrichment_data},
 };
 
@@ -58,6 +59,7 @@ use crate::{
 pub async fn save_enrichment_table(
     Path((org_id, table_name)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
+    Headers(user_email): Headers<UserEmail>,
     headers: HeaderMap,
     payload: Multipart,
 ) -> Response {
@@ -72,6 +74,19 @@ pub async fn save_enrichment_table(
     if let Some(msg) = bad_req_msg {
         return MetaHttpResponse::bad_request(msg);
     }
+
+    // Non-enterprise: no RBAC middleware, so enforce Admin/Root role explicitly here
+    // — before the multipart body is read, so a rejected caller cannot upload data.
+    #[cfg(not(feature = "enterprise"))]
+    if let Err(resp) = crate::handler::http::auth::oss_role_gate::assert_admin_role(
+        &org_id,
+        &user_email.user_id,
+    )
+    .await
+    {
+        return resp;
+    }
+    let _ = &user_email; // silence unused warning on enterprise builds
 
     // Format the table name to normalize it (lowercase, replace special chars)
     let table_name = format_stream_name(table_name.trim().to_string());
