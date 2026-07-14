@@ -206,7 +206,6 @@ import useWorkflowCanvas, {
   nodeMeta,
   ADDABLE_NODE_TYPES,
 } from "@/plugins/workflows/useWorkflowCanvas";
-import { workflowNodeImage } from "@/plugins/workflows/nodeIcons";
 import workflowService from "@/services/workflows";
 
 // Emitted after a successful save so the parent WorkflowsList refreshes its rows.
@@ -234,7 +233,7 @@ const {
 // click-to-append (addNodeToEnd) in addition to drag.
 const paletteCard = (nt: string) => {
   const m = nodeMeta(nt);
-  const img = workflowNodeImage(nt);
+  const img = m?.image;
   return {
     label: t(m?.titleKey || nt),
     icon: img ? "img:" + img : m?.icon || "help",
@@ -265,7 +264,7 @@ const paletteClick = (item: any) => addNodeToEnd(item.subtype);
 const stepItems = computed(() =>
   ADDABLE_NODE_TYPES.map((nt: string) => {
     const m = nodeMeta(nt);
-    const img = workflowNodeImage(nt);
+    const img = m?.image;
     return {
       key: nt,
       title: t(m?.titleKey || nt),

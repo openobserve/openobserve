@@ -156,7 +156,6 @@ import useWorkflowCanvas, {
   workflowObj,
   nodeConfigDetail,
 } from "./useWorkflowCanvas";
-import { workflowNodeImage } from "./nodeIcons";
 
 const props = defineProps<{
   id: string;
@@ -212,7 +211,7 @@ const nodeLabel = computed(() => {
 // Icon for this node type: the pipeline node image as an "img:<url>" string
 // (rendered by OIcon exactly like pipeline canvas nodes), or the OIcon glyph name.
 const nodeIcon = computed(() => {
-  const img = workflowNodeImage(props.data?.node_type);
+  const img = meta.value?.image;
   return img ? `img:${img}` : meta.value?.icon || "help";
 });
 

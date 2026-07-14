@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive } from "vue";
 import { useVueFlow } from "@vue-flow/core";
-import { getUUID } from "@/utils/zincutils";
+import { getUUID, getImageURL } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { detectCycle } from "@/composables/flow/detectCycle";
@@ -50,8 +50,13 @@ export interface WorkflowNodeMeta {
   titleKey: string;
   /** Short description (i18n key), shown in the step picker. */
   descKey: string;
-  /** OIcon registry name for the node's glyph. */
+  /** OIcon registry name for the node's glyph (fallback when no `image`). */
   icon: IconName;
+  /**
+   * Node image URL — reuses the pipeline node images so the two canvases look
+   * consistent. Rendered as an "img:<url>" glyph; falls back to `icon`.
+   */
+  image?: string;
   /**
    * VueFlow render template + handle layout (UI only — NOT persisted).
    *  - "input":  source handle only (the trigger; can't receive).
@@ -73,6 +78,7 @@ export const WORKFLOW_NODE_TYPES: Record<string, WorkflowNodeMeta> = {
     titleKey: "workflow.node.alertTrigger",
     descKey: "workflow.node.triggerBody",
     icon: "notifications-active",
+    image: getImageURL("images/pipeline/input_stream.png"),
     ioType: "input",
   },
   condition: {
@@ -81,6 +87,7 @@ export const WORKFLOW_NODE_TYPES: Record<string, WorkflowNodeMeta> = {
     titleKey: "workflow.node.condition",
     descKey: "workflow.node.conditionDesc",
     icon: "alt-route",
+    image: getImageURL("images/pipeline/transform_condition.png"),
     ioType: "default",
   },
   function: {
@@ -89,6 +96,7 @@ export const WORKFLOW_NODE_TYPES: Record<string, WorkflowNodeMeta> = {
     titleKey: "workflow.node.function",
     descKey: "workflow.node.functionDesc",
     icon: "code",
+    image: getImageURL("images/pipeline/transform_function.png"),
     ioType: "default",
   },
   // `destination_id` holds the Pipeline (remote) Destination's name.
@@ -98,6 +106,7 @@ export const WORKFLOW_NODE_TYPES: Record<string, WorkflowNodeMeta> = {
     titleKey: "workflow.node.sendToDestination",
     descKey: "workflow.node.destinationDesc",
     icon: "share",
+    image: getImageURL("images/pipeline/output_remote.png"),
     ioType: "output",
   },
 };
