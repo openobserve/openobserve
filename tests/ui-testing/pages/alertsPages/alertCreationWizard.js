@@ -26,10 +26,6 @@ export class AlertCreationWizard {
      * Typing the stream name triggers QSelect's built-in filter to narrow results.
      */
     async selectStreamByName(streamName) {
-        // First, try selecting within the form WITHOUT leaving it. Under concurrent
-        // load the dropdown filter can be slow, so re-open + re-type a few times in
-        // place before resorting to the expensive re-navigation path below. This keeps
-        // spurious slowness from triggering a full wizard re-entry (which is fragile).
         const popover = this.page.locator(this.locators.streamNamePopover);
         // Scoped, exact option match by data-test-value — reliable under concurrent load
         // (page-wide getByText can miss slow renders or match stray text). Fall back to
@@ -37,32 +33,18 @@ export class AlertCreationWizard {
         const scopedOption = () => this.page
             .locator(`${this.locators.streamNameOption}[data-test-value="${streamName}"]`)
             .first();
+
+        // In-place attempts: open the dropdown and pick the stream WITHOUT leaving the
+        // form. _pickStreamFromOpenDropdown blocks until the option list has actually
+        // rendered (the fetch completed), which is the key to surviving 5-worker load
+        // where the shared org can take 20s+ to return the stream list.
         for (let inPlace = 1; inPlace <= 4; inPlace++) {
             await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
             await this.page.locator(this.locators.streamNameDropdown).click();
-            // Wait for the popover AND its first option to render before typing, so the
-            // filter isn't applied over a not-yet-populated list (a stale empty filter
-            // under load is the main cause of the stream never appearing).
-            await popover.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-            await this.page.locator(this.locators.streamNameOption).first()
-                .waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-            await this.page.keyboard.press('Control+a');
-            await this.page.keyboard.type(streamName, { delay: 30 });
-
-            const option = scopedOption();
-            if (await option.isVisible({ timeout: 8000 }).catch(() => false)) {
-                await option.click();
+            if (await this._pickStreamFromOpenDropdown(streamName, scopedOption, popover)) {
                 testLogger.info('Stream selected successfully', { streamName, inPlaceAttempt: inPlace });
                 return;
             }
-            // Secondary: scoped visible-text within the popover
-            const textOption = popover.getByText(streamName, { exact: true }).first();
-            if (await textOption.isVisible({ timeout: 2000 }).catch(() => false)) {
-                await textOption.click();
-                testLogger.info('Stream selected via popover text', { streamName, inPlaceAttempt: inPlace });
-                return;
-            }
-
             testLogger.warn('Stream not visible in dropdown, retrying in place', { streamName, inPlace });
             await this.page.locator('body').click({ position: { x: 10, y: 10 } });
             await this.page.waitForTimeout(1000);
@@ -100,27 +82,45 @@ export class AlertCreationWizard {
 
             // Try the stream selection again after the fresh fetch
             await this.page.locator(this.locators.streamNameDropdown).click();
-            await popover.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-            await this.page.locator(this.locators.streamNameOption).first()
-                .waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-            await this.page.keyboard.press('Control+a');
-            await this.page.keyboard.type(streamName, { delay: 30 });
-            const option = scopedOption();
-            if (await option.isVisible({ timeout: 8000 }).catch(() => false)) {
-                await option.click();
+            if (await this._pickStreamFromOpenDropdown(streamName, scopedOption, popover)) {
                 testLogger.info('Stream selected successfully after wizard re-entry', { streamName, attempt });
-                return;
-            }
-            const textOption = popover.getByText(streamName, { exact: true }).first();
-            if (await textOption.isVisible({ timeout: 2000 }).catch(() => false)) {
-                await textOption.click();
-                testLogger.info('Stream selected via popover text after wizard re-entry', { streamName, attempt });
                 return;
             }
             testLogger.warn('Stream still not visible after wizard re-entry', { streamName, attempt });
         }
         // Final attempt - if it still fails, surface via a scoped click (throws clearly)
         await scopedOption().click();
+    }
+
+    /**
+     * Pick a stream from the already-open stream-name dropdown.
+     * Blocks until the option list has actually rendered (the /streams fetch resolved)
+     * BEFORE typing the filter — under concurrent load the list can arrive 20s+ after
+     * the dropdown opens, and filtering an empty list is what left the stream unpickable.
+     * @returns {Promise<boolean>} true if a matching option was clicked.
+     */
+    async _pickStreamFromOpenDropdown(streamName, scopedOption, popover) {
+        await popover.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        // Wait (generously) for the list to populate — resolves as soon as any option
+        // renders, so it doesn't slow the fast path; only waits long when the fetch is slow.
+        const populated = await this.page.locator(this.locators.streamNameOption).first()
+            .isVisible({ timeout: 30000 }).catch(() => false);
+        if (!populated) return false;
+
+        await this.page.keyboard.press('Control+a');
+        await this.page.keyboard.type(streamName, { delay: 30 });
+
+        if (await scopedOption().isVisible({ timeout: 12000 }).catch(() => false)) {
+            await scopedOption().click();
+            return true;
+        }
+        // Secondary: scoped visible-text within the popover (build without data-test-value)
+        const textOption = popover.getByText(streamName, { exact: true }).first();
+        if (await textOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await textOption.click();
+            return true;
+        }
+        return false;
     }
 
     /**

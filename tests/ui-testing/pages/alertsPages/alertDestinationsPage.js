@@ -427,23 +427,24 @@ export class AlertDestinationsPage {
         // Drive `@search` on the OSelect search input so `filteredTemplates` is populated.
         // Type the exact name to narrow to a single matching option (deterministic).
         const searchInput = this.page.locator(this.destinationImportTemplateSearch);
-        await searchInput.waitFor({ state: 'visible', timeout: 5000 });
+        await searchInput.waitFor({ state: 'visible', timeout: 10000 });
 
-        // The parent's `templates` prop is populated async via `getTemplates()`; if
-        // `@search` fires before that resolves, `filteredTemplates` stays empty.
-        // Re-type the filter between attempts so a lost race recovers in place.
+        // The parent's `templates` prop is populated async via `getTemplates()`; under
+        // 5-worker load that fetch is slow, so `filteredTemplates` can stay empty for a
+        // while. Re-type the filter across several attempts with bounded fill timeouts
+        // (so a transient re-render can't hang the 45s action timeout) until it renders.
         const option = popover.locator(`[data-test-value="${templateName}"]`).first();
         let optionVisible = false;
-        for (let attempt = 1; attempt <= 3 && !optionVisible; attempt++) {
-            await searchInput.fill('');
-            await searchInput.fill(templateName);
-            optionVisible = await option.isVisible({ timeout: 5000 }).catch(() => false);
+        for (let attempt = 1; attempt <= 5 && !optionVisible; attempt++) {
+            await searchInput.fill('', { timeout: 5000 }).catch(() => {});
+            await searchInput.fill(templateName, { timeout: 5000 }).catch(() => {});
+            optionVisible = await option.isVisible({ timeout: 8000 }).catch(() => false);
             if (!optionVisible) {
                 testLogger.warn('Import template option not rendered after search, re-filtering', { templateName, attempt });
-                await this.page.waitForTimeout(1000);
+                await this.page.waitForTimeout(1500);
             }
         }
-        await expect(option).toBeVisible({ timeout: 5000 });
+        await expect(option).toBeVisible({ timeout: 8000 });
         await option.click();
         await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         testLogger.debug('Selected import template via OSelect search', { templateName });
@@ -988,25 +989,29 @@ export class AlertDestinationsPage {
         }
         await popover.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Wait for the option list to render BEFORE filtering — typing into the search
-        // while the list is still empty can leave a stale empty filter on slow
-        // environments, making every subsequent visibility check fail.
-        await popover.locator('[data-test-value]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        // Wait (generously) for the option list to render BEFORE filtering. Under 5-worker
+        // load the shared org can take 20s+ to return the template list; typing into the
+        // search over an empty list leaves a stale filter that never matches.
+        await popover.locator('[data-test-value]').first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
 
         const search = this.page.locator(this.templateSelectSearch);
-        const hasSearch = await search.isVisible({ timeout: 2000 }).catch(() => false);
         const option = popover.locator(`[data-test-value="${templateName}"]`).first();
 
-        // Search + check, re-typing the filter between attempts so a lost race
-        // (filter applied over a not-yet-rendered list) recovers in place.
-        for (let attempt = 1; attempt <= 3; attempt++) {
-            if (hasSearch) {
-                await search.click();
-                await this.page.keyboard.press('Control+A');
-                await this.page.keyboard.press('Backspace');
-                await search.fill(templateName);
-            }
-            if (await option.isVisible({ timeout: 5000 }).catch(() => false)) {
+        // Filter + check, re-typing between attempts so a lost race (filter applied over a
+        // not-yet-rendered list) recovers. All search interactions use short, bounded
+        // timeouts + catch so a transient popover re-render can't hang the default
+        // 45s action timeout (which is what stalled the whole spec under load).
+        const typeFilter = async () => {
+            if (!(await search.isVisible({ timeout: 3000 }).catch(() => false))) return false;
+            await search.click({ timeout: 5000 }).catch(() => {});
+            await this.page.keyboard.press('Control+A');
+            await this.page.keyboard.press('Backspace');
+            await search.fill(templateName, { timeout: 5000 }).catch(() => {});
+            return true;
+        };
+        for (let attempt = 1; attempt <= 4; attempt++) {
+            await typeFilter();
+            if (await option.isVisible({ timeout: 6000 }).catch(() => false)) {
                 await option.click();
                 // popover should dismiss after selection
                 await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
@@ -1014,13 +1019,13 @@ export class AlertDestinationsPage {
                 return;
             }
             testLogger.warn('Template option not rendered after search, re-filtering', { templateName, attempt });
-            if (hasSearch) {
-                // Clear the filter so the full list re-renders before the next attempt
-                await search.click();
+            // Clear the filter so the full list re-renders before the next attempt
+            if (await search.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await search.click({ timeout: 5000 }).catch(() => {});
                 await this.page.keyboard.press('Control+A');
                 await this.page.keyboard.press('Backspace');
-                await this.page.waitForTimeout(1000);
             }
+            await this.page.waitForTimeout(1500);
         }
 
         // Fallback: clear any residual filter, then scroll the full list (legacy path)
@@ -1169,16 +1174,16 @@ export class AlertDestinationsPage {
         // Under concurrent load the form can transiently re-render (toast/validation),
         // briefly detaching the button, so retry the scroll+wait a couple of times.
         let ready = false;
-        for (let attempt = 1; attempt <= 3 && !ready; attempt++) {
+        for (let attempt = 1; attempt <= 5 && !ready; attempt++) {
             await saveBtn.scrollIntoViewIfNeeded().catch(() => {});
             ready = await saveBtn.isVisible({ timeout: 10000 }).catch(() => false);
             if (!ready) {
                 testLogger.warn('Save button not visible yet, retrying', { attempt });
-                await this.page.waitForTimeout(1000);
+                await this.page.waitForTimeout(1500);
             }
         }
-        await saveBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await expect(saveBtn).toBeEnabled({ timeout: 10000 });
+        await saveBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await expect(saveBtn).toBeEnabled({ timeout: 15000 });
         // force-click bypasses any residual toast overlay still occupying pointer events.
         await saveBtn.click({ force: true, timeout: 10000 });
         testLogger.debug('Clicked Save button');
