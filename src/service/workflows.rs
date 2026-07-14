@@ -24,6 +24,21 @@ pub enum WorkflowTriggerType {
     AlertFired,
 }
 
+impl Default for WorkflowTriggerType {
+    fn default() -> Self {
+        Self::AlertFired
+    }
+}
+
+impl From<&str> for WorkflowTriggerType {
+    fn from(value: &str) -> Self {
+        match value {
+            "AlertFired" => Self::AlertFired,
+            _ => Self::AlertFired,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct InputMap {
     complete: Vec<Value>,
@@ -532,9 +547,10 @@ pub async fn send_workflow_trigger(
 pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
     let run_id = config::ider::uuid();
     log::info!(
-        "received workflow trigger for event {:?} with trace id {} for workflow id {}, assigning run id {}",
+        "received workflow trigger for event {:?} with trace id {} source id {} for workflow id {}, assigning run id {}",
         trigger.trigger_type,
         trigger.trace_id,
+        trigger.source_id,
         trigger.workflow_id,
         run_id
     );
@@ -589,9 +605,10 @@ pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
         _timestamp: start_time,
         org: trigger.org_id.clone(),
         module: TriggerDataType::Workflow,
+        // this order matters in the workflow history api, as we parse this there
         key: format!(
-            "{}/{:?}/{}",
-            trigger.workflow_id, trigger.trigger_type, run_id
+            "{}/{:?}/{}/{}",
+            trigger.workflow_id, trigger.trigger_type, trigger.source_id, run_id
         ),
         is_realtime: false,
         is_silenced: false,
@@ -599,6 +616,7 @@ pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
         start_time,
         end_time,
         error,
+        source_node: Some(config::cluster::LOCAL_NODE.name.clone()),
         evaluation_took_in_secs: Some((end_time - start_time) as f64 / 1_000_000.0),
         scheduler_trace_id: Some(trace_id.clone()),
         ..Default::default()

@@ -6,14 +6,30 @@ use axum::{
     http::StatusCode,
     response::Response,
 };
-use config::{ider, meta::self_reporting::error::NodeErrors};
+use config::{
+    ider,
+    meta::{
+        search::{Query as SearchQuery, Request as SearchRequest},
+        self_reporting::{error::NodeErrors, usage::TRIGGERS_STREAM},
+        stream::StreamType,
+    },
+    utils::time::now_micros,
+};
 use infra::table::workflows::{Workflow, WorkflowRunErrors};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    common::{
+        meta::http::HttpResponse as MetaHttpResponse,
+        utils::{
+            auth::UserEmail, http::get_or_create_trace_id, stream::get_settings_max_query_range,
+        },
+    },
     handler::http::extractors::Headers,
-    service::workflows,
+    service::{
+        search as SearchService,
+        workflows::{self, WorkflowTriggerType},
+    },
 };
 
 #[derive(Deserialize)]
@@ -37,6 +53,33 @@ pub struct WorkflowErrorList {
 pub struct WorkflowRetryDetails {
     run_id: String,
     from_node: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowHistoryQuery {
+    /// Start time in Unix timestamp microseconds
+    pub start_time: Option<i64>,
+    /// End time in Unix timestamp microseconds
+    pub end_time: Option<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct WorkflowHistoryRow {
+    _timestamp: i64,
+    org: String,
+    start_time: i64,
+    end_time: i64,
+    evaluation_took_in_secs: f64,
+    source_node: String,
+    key: String,
+    #[serde(default)]
+    error: Option<String>,
+    #[serde(default)]
+    event_type: WorkflowTriggerType,
+    #[serde(default)]
+    source_id: String,
+    #[serde(default)]
+    run_id: String,
 }
 
 /// CreateWorkflow
@@ -66,7 +109,6 @@ pub struct WorkflowRetryDetails {
 )]
 pub async fn save_workflow(
     Path(org_id): Path<String>,
-    Query(query): Query<HashMap<String, String>>,
     Json(mut workflow): Json<Workflow>,
 ) -> Response {
     workflow.name = workflow.name.trim().to_lowercase();
@@ -387,4 +429,151 @@ pub async fn enable_workflow(
         Ok(_) => MetaHttpResponse::ok("updated"),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
+}
+
+/// GetWorkflowHistory
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/workflows/{id}/history",
+    context_path = "/api",
+    tag = "Workflows",
+    operation_id = "getWorkflowHistory",
+    summary = "Get history of workflow executions",
+    description = "",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+        ("id" = String, Path, description = "Workflow id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+    )
+)]
+pub async fn get_workflow_history(
+    Path((org_id, workflow_id)): Path<(String, String)>,
+    Query(query): Query<WorkflowHistoryQuery>,
+    Headers(user_email): Headers<UserEmail>,
+    req: axum::http::Request<axum::body::Body>,
+) -> Response {
+    // Set default time range (last 7 days if not specified)
+    let end_time = query.end_time.unwrap_or_else(now_micros);
+    let mut start_time = query.start_time.unwrap_or_else(|| {
+        (chrono::Utc::now() - chrono::Duration::try_days(7).unwrap()).timestamp_micros()
+    });
+
+    // Check the max query range allowed on the triggers stream
+    if let Some(settings) =
+        infra::schema::get_settings(&org_id, TRIGGERS_STREAM, StreamType::Logs).await
+    {
+        let max_query_range = get_settings_max_query_range(
+            settings.max_query_range,
+            &org_id,
+            Some(&user_email.user_id),
+        )
+        .await;
+        if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
+            start_time = end_time - max_query_range * 3600 * 1_000_000;
+            log::warn!(
+                "Start time for alert History api for org {org_id} updated as per max query range set for triggers stream"
+            )
+        }
+    }
+
+    // Validate time range
+    if start_time >= end_time {
+        return MetaHttpResponse::bad_request("start_time must be before end_time");
+    }
+
+    let trace_id = get_or_create_trace_id(req.headers(), &tracing::Span::current());
+
+    let data_sql = format!(
+        "SELECT _timestamp, org, key,  \
+         start_time, end_time, \
+         evaluation_took_in_secs, \
+         source_node, error \
+         FROM \"{TRIGGERS_STREAM}\" \
+         WHERE module = 'workflow' AND org = '{org_id}' \
+         AND key like '{workflow_id}/%'\
+         AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
+    );
+
+    let data_req = SearchRequest {
+        query: SearchQuery {
+            sql: data_sql,
+            start_time,
+            end_time,
+            from: 0,
+            size: -1,
+            ..Default::default()
+        },
+        use_cache: false,
+        ..Default::default()
+    };
+
+    // Execute search against organization's own triggers stream
+    let search_result = match SearchService::search(
+        &trace_id,
+        &org_id,
+        StreamType::Logs,
+        Some(user_email.user_id.clone()),
+        &data_req,
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(e) => {
+            let msg = e.to_string().to_lowercase();
+            if msg.contains("not found") || msg.contains("stream not found") {
+                return MetaHttpResponse::json(Vec::<WorkflowHistoryRow>::new());
+            }
+            log::error!("Failed to search alert history: {}", e);
+            return MetaHttpResponse::internal_error(format!(
+                "Failed to search alert history: {e}"
+            ));
+        }
+    };
+
+    let results = search_result.hits;
+    let parsed_results = match results
+        .into_iter()
+        .map(|v| serde_json::from_value::<WorkflowHistoryRow>(v))
+        .collect::<Result<Vec<_>, _>>()
+    {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error in getting workflow history for {org_id}/{workflow_id} : {e}");
+            return MetaHttpResponse::internal_error(format!(
+                "Failed to search alert history: {e}"
+            ));
+        }
+    };
+
+    let ret: Vec<_> = parsed_results
+        .into_iter()
+        .map(|mut v| {
+            let key_splits: Vec<_> = v.key.split("/").collect();
+
+            if key_splits.len() < 4 {
+                log::warn!(
+                    "unexpected key for workflow history of {org_id}/{workflow_id} : {}",
+                    v.key
+                );
+                return v;
+            }
+
+            v.run_id = key_splits[3].to_string();
+            v.source_id = key_splits[2].to_string();
+            v.event_type = WorkflowTriggerType::from(key_splits[1]);
+            v
+        })
+        .collect();
+
+    MetaHttpResponse::json(ret)
 }
