@@ -55,10 +55,7 @@ pub const V2_API_PREFIX: &str = "v2";
 pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
     if auth_str.starts_with("Basic") {
         let decoded = config::utils::base64::decode(auth_str.strip_prefix("Basic")?.trim()).ok()?;
-        let credentials = std::str::from_utf8(&decoded).ok()?;
-        credentials
-            .split_once(':')
-            .map(|(user, _)| user.to_string())
+        get_user_details(decoded).map(|value| value.0)
     } else if auth_str.starts_with("Bearer") {
         crate::common::utils::jwt::get_user_name_from_token(auth_str).await
     } else if auth_str.starts_with("{\"auth_ext\":") {
@@ -70,13 +67,17 @@ pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
         let decoded =
             config::utils::base64::decode(auth_tokens.auth_ext.strip_prefix("auth_ext")?.trim())
                 .ok()?;
-        let credentials = std::str::from_utf8(&decoded).ok()?;
-        credentials
-            .split_once(':')
-            .map(|(user, _)| user.to_string())
+        get_user_details(decoded).map(|value| value.0)
     } else {
         None
     }
+}
+
+pub(crate) fn get_user_details(decoded: impl AsRef<[u8]>) -> Option<(String, String)> {
+    let credentials = std::str::from_utf8(decoded.as_ref()).ok()?;
+    credentials
+        .split_once(':')
+        .map(|(user, password)| (user.to_string(), password.to_string()))
 }
 
 /// Resolves the effective permission method for write requests (PUT/DELETE/PATCH).

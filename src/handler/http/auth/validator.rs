@@ -29,6 +29,7 @@ use o2_dex::config::get_config as get_dex_config;
 
 #[cfg(feature = "enterprise")]
 pub use crate::common::utils::auth::get_user_email_from_auth_str;
+pub use crate::service::authz::{check_permissions, list_objects_for_user};
 use crate::{
     common::{
         infra::config::ORG_INGESTION_TOKENS,
@@ -41,11 +42,11 @@ use crate::{
             },
         },
         utils::{
-            auth::{AuthExtractor, V2_API_PREFIX, get_hash, is_root_user},
+            auth::{AuthExtractor, V2_API_PREFIX, get_hash, get_user_details, is_root_user},
             redirect_response::RedirectResponseBuilder,
         },
     },
-    service::{authz::check_permissions, db, users},
+    service::{db, users},
 };
 
 pub const PKCE_STATE_ORG: &str = "o2_pkce_state";
@@ -1082,13 +1083,6 @@ async fn oo_validator_internal(
         // Missing or unrecognized auth - return WWW-Authenticate header
         Err(AuthError::Unauthorized("Unauthorized Access".to_string()))
     }
-}
-
-fn get_user_details(decoded: impl AsRef<[u8]>) -> Option<(String, String)> {
-    let credentials = str::from_utf8(decoded.as_ref()).ok()?;
-    credentials
-        .split_once(':')
-        .map(|(u, p)| (u.to_string(), p.to_string()))
 }
 
 /// Validates the authentication information in the incoming request and returns the result if
