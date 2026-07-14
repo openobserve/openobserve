@@ -159,8 +159,8 @@ preferably, Tailwind's spacing/size utilities (which are already rem-based).
 
 ```vue
 <!-- avoid --> <div style="width: 320px; margin-top: 12px">
-<!-- prefer --> <div class="tw:w-80 tw:mt-3">        <!-- 20rem / 0.75rem -->
-<!-- or   -->  <div class="tw:w-[20rem] tw:mt-[0.75rem]">
+<!-- prefer --> <div class="w-80 mt-3">        <!-- 20rem / 0.75rem -->
+<!-- or   -->  <div class="w-[20rem] mt-[0.75rem]">
 ```
 
 **Why.** `px` ignores the user's root font size and breaks the app's ability to
@@ -170,48 +170,58 @@ numeric scale (`p-3`, `w-80`, `gap-2`) already maps to rem, so preferring
 utilities usually removes the temptation entirely.
 
 **How.**
-- Reach for a Tailwind utility first (`tw:` prefix in this project). The numeric
-  scale is `0.25rem`-based: `2 → 0.5rem`, `4 → 1rem`, etc.
+- Reach for a Tailwind utility first — **bare, no `tw:` prefix** (`p-3`, `w-80`,
+  `gap-2`). The numeric scale is `0.25rem`-based: `2 → 0.5rem`, `4 → 1rem`, etc.
 - Need an exact value not on the scale? Use a **rem** arbitrary value:
-  `tw:h-[1.375rem]`, never `tw:h-[22px]`. This applies **inside class strings**
+  `h-[1.375rem]`, never `h-[22px]`. This applies **inside class strings**
   too — a `px` unit in a Tailwind arbitrary value (`w-[320px]`, `text-[13px]`,
   `gap-[6px]`) is just as banned as a `px` in a `style=""`. Convert to rem
   (divide by 16: `320px → 20rem`, `22px → 1.375rem`, `6px → 0.375rem`).
 - **The only accepted `px` is a `1px` hairline border/divider.** Every other `px`
   — inline, in a `<style>` block, or in a class arbitrary value — is a smell.
 
-### 4. No scoped CSS — use inline styles with design tokens
+### 4. No scoped CSS — style with bare Tailwind utilities
 
-**What.** Do not add `<style scoped>` blocks. **Tailwind (`tw:` prefix) and Quasar utilities (`q-*`, `text-*`, `row`, `col`) are NOT available.** Use inline `style="…"` attributes with CSS custom properties and rem units instead.
+**What.** Do not add `<style scoped>` blocks. Style layout/spacing with **bare
+Tailwind utility classes** (`flex flex-col gap-4 p-6`). **Two things are banned:**
+- ❌ the **`tw:` prefix** — it was removed from this project; `tw:flex` no longer
+  resolves. Write `flex`, not `tw:flex`.
+- ❌ **Quasar utilities** — `q-pa-md`, `q-gutter-lg`, `q-mb-sm`, `row`, `col`,
+  `text-weight-bold`, `items-center` as a Quasar class, etc. are NOT available.
 
-**Why.** 
-- Scoped CSS is per-file, invisible override — forks the design system one component at a time.
-- Tailwind and Quasar utilities are not part of the build.
-- Inline styles with design tokens ensure consistency, theme-awareness, and proper spacing.
+Prefer utility classes over inline `style=""`. Reserve inline `style` for the
+rare dynamic value that must be computed in JS (and even then, prefer a bound
+class or CSS custom property).
+
+**Why.** Scoped CSS is a per-file invisible override that forks the design system
+one component at a time. Utility classes keep spacing on one rem-based scale and
+read the same across every screen. Inline `style` blocks carry no token and beat
+everything — they're the last resort, not the default.
 
 **How.**
-- **Layout & spacing**: Use inline `style` with flexbox/grid + rem units:
+- **Layout & spacing**: bare Tailwind utilities on the element:
   ```vue
-  <div style="display: flex; gap: 1rem; padding: 1.5rem">
-    <div style="flex: 1; margin-bottom: 0.5rem">Content</div>
+  <div class="flex flex-col gap-4 p-6">
+    <div class="flex items-center justify-between gap-2">Content</div>
   </div>
   ```
-- **Colors**: Always use CSS custom properties (`--color-*`):
-  ```vue
-  <div style="background: var(--color-surface-subtle); color: var(--color-text-primary)">
-    Content
-  </div>
-  ```
-- **Typography**: Use inline font properties with rem sizing:
-  ```vue
-  <label style="font-size: 0.875rem; font-weight: 500">Label</label>
-  ```
+  This is the exact pattern real components use (e.g. `ModelPricingEditor.vue`,
+  `AddRegexPattern.vue`): `class="flex flex-col gap-4"`, `class="flex items-center gap-2"`.
+- **Colors**: use token-backed utilities (`bg-surface-subtle`,
+  `text-text-secondary`, `border-border-default`) or, when a raw value is
+  unavoidable, the CSS custom property `var(--color-*)`. Never a hex/rgb literal.
+- **Form field spacing**: put `class="flex flex-col gap-5"` (or `gap-6`) on the
+  `<OForm>` — `class`/`style` fall through to its root `<form>`, so its direct
+  children (the `OFormInput`/`OFormSelect` fields) get even vertical spacing.
+  **Without a gap class on OForm, fields render flush with no spacing** — this is
+  the #1 cause of "the dialog/drawer has no spacing".
 - **Never use**:
-  - ❌ `tw:flex`, `tw:gap-2`, `tw:p-4` (Tailwind not available)
-  - ❌ `q-pa-md`, `q-gutter-lg`, `row`, `col` (Quasar utilities not available)
-  - ❌ Hardcoded colors like `#fff`, `rgb(255,255,255)` (use `var(--color-*)`)
-  - ❌ Pixels for sizing except `1px` borders (use `rem` units)
-- **For O2 components**: Pass only `variant` / `size` props — never patch appearance with inline styles or classes.
+  - ❌ `tw:flex`, `tw:gap-2`, `tw:p-4` — the `tw:` prefix is dead; drop it → `flex gap-2 p-4`
+  - ❌ `q-pa-md`, `q-gutter-lg`, `row`, `col`, `text-weight-bold` (Quasar — not available)
+  - ❌ `#fff`, `rgb(...)` literals (use token utilities or `var(--color-*)`)
+  - ❌ `px` for sizing except `1px` borders (use the rem-based scale)
+- **For O2 components**: pass only `variant` / `size` props — never patch
+  appearance with inline styles or ad-hoc classes.
 
 ### 5. No hardcoded colors or sizes — use registered tokens
 
@@ -227,11 +237,12 @@ and changes everywhere at once when design updates it. Hardcoding a color is
 opting a single element out of theming permanently.
 
 **How — using tokens.**
-- Use the modern CSS custom property with inline styles:
-  `var(--color-text-primary)`, `var(--color-surface-base)`, `var(--color-border-default)`, 
-  `var(--color-surface-subtle)`, etc. — theme-aware by construction.
+- Prefer **token-backed Tailwind utilities**: `text-text-primary`,
+  `bg-surface-base`, `bg-surface-subtle`, `border-border-default`,
+  `text-text-secondary`, `text-text-muted` — theme-aware by construction.
+- When a raw variable is unavoidable, use the modern CSS custom property
+  `var(--color-*)` (e.g. in a bound `:style` for a computed value).
 - **Only `--color-*` tokens** — see the `--o2-*` ban below.
-- Example: `style="color: var(--color-text-primary); background: var(--color-surface-base)"`
 
 **How — registering a NEW token / the `--o2-*` ban.** Full details, the token-file
 layout, the 3-step registration, and the `--o2-*` → `--color-*` migration map are
@@ -282,6 +293,116 @@ scattered as a literal at the call site.
 
 ---
 
+## Spacing, Alignment & Layout Patterns
+
+All spacing uses **bare Tailwind utilities** (`flex flex-col gap-*`, `p-*`,
+`mb-*`), never inline `style`, never `tw:`/`q-*`. The rem-based scale keeps every
+screen on the same rhythm: `gap-2` = 0.5rem, `gap-4` = 1rem, `gap-5` = 1.25rem,
+`gap-6` = 1.5rem, `p-6` = 1.5rem.
+
+### Listing Pages (OTable, Lists, Grids)
+
+- Page container: `class="flex flex-col gap-6 p-6"` — one padding, one gap for
+  the whole page. Sections (header, table) sit as direct children.
+- Action columns: keep tight — `class="flex gap-1"` around small icon buttons.
+  Don't bloat rows with wide gaps.
+- Headers use `AppPageHeader` — no custom title styling.
+- Table columns: left-align text, center-align toggles/badges/counts (via the
+  column `meta.align`).
+- **No unnecessary backgrounds.** Don't wrap the table in a card or a
+  `bg-*` div — `OTable` owns its own frame and row hover. A parent background
+  just double-frames it.
+- Search + refresh + new: group in the header `#actions` slot with
+  `class="flex items-center gap-2"`. Never wrap the search input in its own card.
+
+### Dialog Spacing (`ODialog`)
+
+- Title comes from the `:title` prop — don't render a manual `<h*>` title.
+- ODialog already pads its body — **don't add a wrapper with extra padding.**
+- **Field spacing lives on `<OForm>`:** `class="flex flex-col gap-5"`. Its
+  `class` falls through to the root `<form>`, so the `OFormInput`/`OFormSelect`
+  children space evenly. **Omitting this is why a dialog looks cramped with no
+  spacing between fields** — the single most common bug.
+- Tight sub-groups (a label + its custom control, header key/value rows): wrap in
+  `class="flex flex-col gap-2"` or `class="flex items-end gap-2"`.
+- Footer: use ODialog's `:primary-button-label` / `:secondary-button-label` +
+  `:form-id` — never hand-roll or restyle footer buttons.
+
+### Drawer Spacing (`ODrawer`)
+
+- **Detail (read-only) section** at the top: group facts in token-backed cards —
+  `class="flex flex-col gap-1.5 p-3 rounded-md bg-surface-subtle"` per card
+  (label + value). Only distinct groups get a background; don't shade every line.
+- **Separate detail from the edit form** with a divider on the detail wrapper:
+  `class="… mb-8 pb-8 border-b border-border-default"`.
+- **Section heading** for the form: `class="text-base font-semibold mb-4"`.
+- **Edit form**: same as a dialog — `class="flex flex-col gap-5"` on `<OForm>`.
+- Footer: same `:primary-button-label` / `:secondary-button-label` + `:form-id`
+  pattern as ODialog. Don't restyle the buttons.
+
+### Keyboard Shortcuts Pattern
+
+All pages that need shortcuts must register them in the **shortcut registry** (`shortcutRegistry.ts`), not inline:
+
+1. **Add to registry** (`web/src/lib/vue-shortcut-manager/shortcutRegistry.ts`):
+   ```typescript
+   {
+     pageKey: "shortcuts.pages.yourPage",
+     scope: "your-page-scope",
+     shortcuts: [
+       { id: "yourPageNew", key: "n", descriptionKey: "shortcuts.actions.yourPageNew" },
+       { id: "yourPageSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+       { id: "yourPageRefresh", key: "r", descriptionKey: "shortcuts.actions.yourPageRefresh" },
+     ],
+   }
+   ```
+
+2. **Add i18n keys** (`web/src/locales/languages/en.json` → `shortcuts.pages` and `shortcuts.actions`):
+   ```json
+   "pages": { "yourPage": "Your Page Name" },
+   "actions": {
+     "yourPageNew": "Create new item",
+     "yourPageRefresh": "Refresh list"
+   }
+   ```
+
+3. **Register handlers in component** using `useShortcuts()` with guards:
+   ```typescript
+   import { useShortcuts } from "@/lib/vue-shortcut-manager";
+   import { isInputFocused, focusSearchInput } from "@/utils/keyboardShortcuts";
+   
+   useShortcuts([
+     {
+       id: "yourPageNew",
+       handler: () => {
+         if (isInputFocused()) return;  // Guard: don't trigger in text inputs
+         openNewForm();
+       },
+     },
+     {
+       id: "yourPageSearch",
+       handler: () => {
+         focusSearchInput("your-page-search-input");  // Use helper to focus search
+       },
+     },
+     {
+       id: "yourPageRefresh",
+       handler: () => {
+         if (isInputFocused()) return;
+         refresh();
+       },
+     },
+   ]);
+   ```
+
+**Key patterns:**
+- Single-letter shortcuts (n, r, h) must guard with `isInputFocused()` to avoid stealing keystrokes
+- Use `focusSearchInput(dataTest)` helper to focus search fields consistently
+- All shortcuts must have descriptions in i18n for the help cheatsheet
+- Platform-specific combos use `keyForWindows`/`keyForMac` pair (e.g., Ctrl/⌘)
+
+---
+
 ## Working with O2 components
 
 O2 components carry their design internally. That changes how you drive them:
@@ -304,10 +425,10 @@ patching it from outside. Banned on an O2 component:
 | Banned | Why | Instead |
 | --- | --- | --- |
 | `style="color: #fff; padding: 10px"` | hardcoded colors/px, bypasses tokens | use `variant` / `size` / component design |
-| ❌ `class="tw:px-2 tw:text-sm"` | Tailwind utilities not available | use component `variant`/`size` props |
-| ❌ `class="q-pa-md text-weight-bold"` | Quasar utilities not available | use component `variant`/`size` props |
+| `class="tw:px-2 tw:text-sm"` (`tw:` prefix) | prefix removed — `tw:*` doesn't resolve | use component `variant`/`size` props |
+| `class="q-pa-md text-weight-bold"` (Quasar) | Quasar utilities not available | use component `variant`/`size` props |
 | `<style scoped>` targeting its class | invisible fork of the design system | move the intent into a `variant` |
-| `class="q-ml-sm"` / `q-mr-sm` for spacing | Quasar spacing leak | `tw:gap-*` on the parent container |
+| `class="q-ml-sm"` / `q-mr-sm` for spacing | Quasar spacing leak | bare `gap-*` on the parent container |
 
 Decision flow for any visual that differs from the default:
 1. Expressible via `variant` / `size`? → use the prop.
@@ -323,7 +444,7 @@ Every cancel/save pair in a form, dialog, or drawer follows this exact shape —
 it's what makes action rows look identical everywhere:
 
 ```vue
-<div class="tw:flex tw:gap-2">
+<div class="flex gap-2">
   <OButton variant="outline" size="sm-action" @click="cancel">
     {{ t("common.cancel") }}
   </OButton>
@@ -335,7 +456,7 @@ it's what makes action rows look identical everywhere:
 
 - Cancel is **always** `variant="outline"` — never `secondary` or
   `ghost-primary`. Save/Submit/OK is **always** `variant="primary"`.
-- Both use `size="sm-action"`. Space them with `tw:gap-2` on the parent — never
+- Both use `size="sm-action"`. Space them with `gap-2` on the parent — never
   `q-ml-*`/`q-mr-*` on the button, never a `<q-space />` between them.
 - Other actions in the same row (Delete, Reject) keep their own `variant`
   (e.g. `destructive`) but match `size="sm-action"` for alignment.
@@ -395,9 +516,33 @@ before writing a new `O*` component.
 
 ## Choosing components & structure
 
-The five rules above cover *how* you style. This section covers *what* to reach
-for and *where the code lives* — the recurring decisions that otherwise get
-answered differently on every screen.
+The rules above cover *how* you style. This section covers *what* to reach for
+and *where the code lives* — the recurring decisions that otherwise get answered
+differently on every screen.
+
+### Page anatomy & the listing-page recipe
+
+Lay out a whole page from a recipe, not from scratch — full recipes in
+[references/page-recipes.md](references/page-recipes.md). The essentials:
+
+- **Every page** = `AppPageHeader` on top (primary New/Add action in `#actions`)
+  + a body in a `flex flex-col min-h-0` container.
+- **A listing/table page always carries three toolbar affordances** on its
+  `OTable` — don't ship a list without them:
+  - **Search** — built-in `show-global-filter` (+ `v-model:global-filter`), or a
+    custom `OInput` in the `#toolbar` slot for server-driven search.
+  - **Refresh** — an `OButton size="icon-sm" icon-left="refresh" :loading` in the
+    `#toolbar-trailing` slot, wired to the fetch fn, with a tooltip carrying the
+    `r` shortcut.
+  - **Column show/hide toggle** — `OTable` renders it **automatically** when
+    `:persist-columns="true"` + a stable `table-id` + at least one non-action
+    column marked `hideable: true` are all present. Omit any of the three and the
+    button silently won't appear.
+- **Hide non-essential columns by default** via `:column-visibility="{ id: false }"`
+  (keep name/status visible; hide timestamps/ids/counts) — the user can re-show
+  them and the choice persists per `table-id`.
+- Provide `#empty`/`#error` states, put row actions in an `isAction` column, and
+  register `n`/`/`/`r` shortcuts.
 
 ### Tables → `OTable`
 
@@ -566,6 +711,7 @@ markup — don't guess a prop name.
 | [references/keyboard-shortcuts.md](references/keyboard-shortcuts.md) | **Keyboard shortcuts: registry, `useShortcut`/`useShortcuts`, display via `OShortcut`/`shortcut-id`, cheatsheet** |
 | [references/creating-components.md](references/creating-components.md) | **Building a NEW O2 component: lib vs components, folder contract, families, headless-first (reka-ui), no-UI-prop-leakage, strict TS, tokens, form wrappers, workflow, testing** |
 | [references/design-tokens.md](references/design-tokens.md) | **Design tokens: using `--color-*`, the token files, registering a new token, the `--o2-*` ban + full `--o2-*` → `--color-*` migration map** |
+| [references/page-recipes.md](references/page-recipes.md) | **Whole-page layouts: the listing/table page (header + OTable with mandatory search · refresh · column-visibility toggle, default-hidden columns) and the detail/editor page** |
 | [references/overlay-navigation.md](references/overlay-navigation.md) | Dialog, Drawer, Dropdown, Popover, Tooltip · Pagination, Stepper, Tabs |
 | [references/feedback-data.md](references/feedback-data.md) | Banner, Toast (+ useToast), Spinner, Skeleton, InnerLoading · ProgressBar, Timeline, Tree · FieldList |
 
@@ -645,6 +791,10 @@ considering the UI done:
       from `<div>` + utility classes. Classes are for layout only.
 - [ ] Tabular data uses `OTable` with `OTableColumnDef[]` columns (never
       `q-table`); server mode only for backend-paginated data.
+- [ ] Listing page has all three toolbar affordances: **search**, **refresh**
+      (`#toolbar-trailing`, wired to fetch), and the **column show/hide toggle**
+      (`:persist-columns` + `table-id` + a `hideable` column). Non-essential
+      columns hidden by default via `:column-visibility`; `#empty` state present.
 - [ ] Data fetched through a domain service (`src/services`), not raw `http` in
       the component; shared data in Vuex, ephemeral data in local refs.
 - [ ] Form container matches weight: confirm → `ConfirmDialog`, short form →
