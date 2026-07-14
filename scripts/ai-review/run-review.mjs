@@ -949,26 +949,36 @@ function buildFallbackReview(agentResults, tier, failedAgents) {
 LGTM — No issues found by automated reviewers.
 
 <details>
-<summary>Review Details</summary>
+<summary>Review details</summary>
+
 - Risk tier: ${tier}
 ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agentName).join(", ")}` : ""}
+
 </details>`;
   }
 
-  const byCategory = {};
+  const findingLine = f => {
+    const loc = f.file && f.line && f.line !== "0" ? `\`${f.file}:${f.line}\` ` : f.file ? `\`${f.file}\` ` : "";
+    const cat = f.category ? `**[${f.category.charAt(0).toUpperCase() + f.category.slice(1)}]** ` : "";
+    const fix = f.suggestion ? ` (→ ${f.suggestion})` : "";
+    return `- ${loc}${cat}${f.summary}${fix}`;
+  };
+
+  const bySeverity = { critical: [], warning: [], suggestion: [] };
   for (const f of sorted) {
-    const cat = (f.category || "general").toLowerCase();
-    (byCategory[cat] ||= []).push(f);
+    const sev = (f.severity || "suggestion").toLowerCase();
+    (bySeverity[sev in bySeverity ? sev : "suggestion"]).push(f);
   }
 
   const sections = [];
-  for (const [cat, findings] of Object.entries(byCategory)) {
-    sections.push(`### ${cat.charAt(0).toUpperCase() + cat.slice(1)}`);
-    for (const f of findings) {
-      const loc = f.file && f.line ? `\`${f.file}:${f.line}\`` : f.file ? `\`${f.file}\`` : "";
-      sections.push(`- **${(f.severity || "suggestion").toUpperCase()}** ${loc ? `${loc} — ` : ""}${f.summary}`);
-      if (f.suggestion) sections.push(`  - Fix: ${f.suggestion}`);
-    }
+  if (bySeverity.critical.length > 0) {
+    sections.push(`#### 🔴 Blockers`, ...bySeverity.critical.map(findingLine), "");
+  }
+  if (bySeverity.warning.length > 0) {
+    sections.push(`#### 🟡 Warnings`, ...bySeverity.warning.map(findingLine), "");
+  }
+  if (bySeverity.suggestion.length > 0) {
+    sections.push(`#### 🔵 Suggestions`, ...bySeverity.suggestion.map(findingLine), "");
   }
 
   const failureNote = failedAgents.length > 0
@@ -984,15 +994,21 @@ ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agent
 
 ### Decision: approved_with_comments
 
-${deduped.length > 0 ? `Automated review — ${failedAgents.length > 0 ? "some reviewers failed and " : ""}coordinator consolidation was skipped. Findings below are deduplicated but un-judged.` : ""}${failureNote}${dedupNote}
+Automated review — ${failedAgents.length > 0 ? "some reviewers failed and " : ""}coordinator consolidation was skipped. Findings below are deduplicated but un-judged.${failureNote}${dedupNote}
+
+**Findings:** 🔴 ${bySeverity.critical.length} blocker · 🟡 ${bySeverity.warning.length} warning · 🔵 ${bySeverity.suggestion.length} suggestion
+
+<details>
+<summary>Show findings (${sorted.length})</summary>
 
 ${sections.join("\n")}
 
-<details>
-<summary>Review Details</summary>
+---
+
 - Risk tier: ${tier}
 - Reviewers completed: ${agentResults.filter(r => !r.error).map(r => r.agentName).join(", ") || "none"}
 ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agentName).join(", ")}` : ""}
+
 </details>`;
 }
 
