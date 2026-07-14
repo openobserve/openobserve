@@ -6270,6 +6270,9 @@
     "lastRefreshed": "Last refreshed: {time}"
   },
   "synthetics": {
+    "createBrowserTest": {
+      "loading": "Loading check…"
+    },
     "results": {
       "title": "Monitor Results",
       "monitors": "Monitors",

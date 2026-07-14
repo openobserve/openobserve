@@ -2,6 +2,7 @@
 // Copyright 2026 OpenObserve Inc.
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useStore } from 'vuex'
 import type { BrowserCheck, SyntheticsLocation, SyntheticsDevice, SyntheticsFolder } from '@/types/synthetics'
 import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
@@ -21,11 +22,13 @@ import OStepper from '@/lib/navigation/Stepper/OStepper.vue'
 import OStep from '@/lib/navigation/Stepper/OStep.vue'
 import BrowserJourney from '@/components/synthetics/journey/BrowserJourney.vue'
 import CheckConfigure from '@/components/synthetics/configure/CheckConfigure.vue'
+import CreateBrowserTestSkeleton from '@/components/synthetics/CreateBrowserTestSkeleton.vue'
 import EmptyBrowserCheck from '@/lib/core/EmptyState/illustrations/EmptyBrowserCheck.vue'
 
 const router = useRouter()
 const route = useRoute()
 const store = useStore()
+const { t } = useI18n()
 
 // Three top-level phases:
 //   gate            → URL + name inputs
@@ -35,6 +38,7 @@ const phase = ref<'gate' | 'extension-setup' | 'editor'>('gate')
 const headerTitle = computed(() => {
   if (phase.value === 'gate') return 'New browser check'
   if (phase.value === 'extension-setup') return 'Set up the recorder'
+  if (isLoadingEdit.value) return t('synthetics.createBrowserTest.loading')
   return check.value.name || 'Untitled check'
 })
 const folderName = computed(() => {
@@ -116,6 +120,7 @@ async function fetchDestinations() {
 
 async function loadForEdit(id: string) {
   isLoadingEdit.value = true
+  phase.value = 'editor'
   try {
     const org = store.state.selectedOrganization.identifier
     const res = await syntheticsService.get(org, id)
@@ -125,7 +130,6 @@ async function loadForEdit(id: string) {
     startUrl.value = mapped.url
     editId.value = id
     journeyStepDone.value = true
-    phase.value = 'editor'
   } catch (err) {
     console.error('[synthetics] failed to load check for edit', err)
   } finally {
@@ -380,15 +384,8 @@ function onClearResults() {
       class="shrink-0 px-4 border-b border-border-default"
     />
 
-    <main
-      v-if="isLoadingEdit"
-      class="flex-1 flex flex-col items-center justify-center"
-    >
-      <OIcon name="refresh" size="lg" class="text-[var(--o2-primary-color)] animate-spin mb-3" />
-      <span class="text-sm text-[var(--o2-text-secondary)]">Loading check…</span>
-    </main>
     <!-- ── Gate phase: URL + name ── -->
-    <main v-else-if="phase === 'gate'" class="flex-1 flex flex-col items-center justify-center">
+    <main v-if="phase === 'gate'" class="flex-1 flex flex-col items-center justify-center">
       <div class="max-w-[48rem] w-full mx-auto py-4 px-4">
         <div class="flex justify-center mb-6">
           <EmptyBrowserCheck :width="140" />
@@ -572,7 +569,8 @@ function onClearResults() {
 
     <!-- ── Editor phase ── -->
     <template v-else>
-      <div class="flex-1 flex flex-col min-h-0">
+      <CreateBrowserTestSkeleton v-if="isLoadingEdit" :rows="10" />
+      <div v-else class="flex-1 flex flex-col min-h-0">
           <OStepper
             v-model="currentStep"
         :navigable="true"
