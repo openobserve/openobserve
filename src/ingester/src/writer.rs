@@ -436,18 +436,20 @@ impl Writer {
 
     fn preprocess_batch(&self, mut entries: Vec<Entry>) -> Result<crate::ProcessedBatch> {
         let _start_preprocess_batch = Instant::now();
-        // Serialize entries to bytes for WAL writing
-        let bytes_entries = entries
-            .iter_mut()
-            .map(|entry| entry.into_bytes())
-            .collect::<Result<Vec<_>>>()?;
-
         // Bulk convert to Arrow RecordBatch
         let batch_entries = entries
             .iter()
             .map(|entry| {
                 entry.into_batch(self.key.stream_type.clone(), entry.schema.clone().unwrap())
             })
+            .collect::<Result<Vec<_>>>()?;
+
+        // Serialize entries to bytes for WAL writing, reusing the RecordBatch
+        // in Arrow IPC format instead of serializing the data back to JSON
+        let bytes_entries = entries
+            .iter()
+            .zip(batch_entries.iter())
+            .map(|(entry, batch)| entry.into_bytes_arrow(&batch.data))
             .collect::<Result<Vec<_>>>()?;
 
         // Calculate total sizes for rotation check

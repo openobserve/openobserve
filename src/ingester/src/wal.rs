@@ -22,13 +22,16 @@ use std::{
 
 use config::{
     get_config, metrics,
-    utils::{async_walkdir::WalkDir, schema::infer_json_schema_from_values, schema_ext::SchemaExt},
+    utils::{
+        async_walkdir::WalkDir, record_batch_ext::RecordBatchExt,
+        schema::infer_json_schema_from_values, schema_ext::SchemaExt,
+    },
 };
 use futures::StreamExt;
 use hashbrown::HashMap;
 use snafu::ResultExt;
 
-use crate::{errors::*, immutable, memtable, writer::WriterKey};
+use crate::{entry::RecordBatchEntry, errors::*, immutable, memtable, writer::WriterKey};
 
 // check uncompleted parquet files
 // the wal file process have 4 steps:
@@ -180,6 +183,23 @@ pub(crate) async fn replay_wal_files(wal_dir: PathBuf, wal_files: Vec<PathBuf>) 
                 }
             };
             i += 1;
+
+            // entries in Arrow IPC format carry the RecordBatch (with schema),
+            // so they can be written to the memtable directly
+            if let Some(batch) = entry.batch.take() {
+                total += batch.num_rows();
+                let schema = batch.schema();
+                let arrow_size = batch.size();
+                let batch_entry = RecordBatchEntry::new(
+                    key.stream_type.clone(),
+                    batch,
+                    entry.data_size,
+                    arrow_size,
+                );
+                memtable.write(schema, entry, batch_entry)?;
+                continue;
+            }
+
             total += entry.data.len();
 
             // Use Entry org_id if available, otherwise fall back to file path
