@@ -44,7 +44,7 @@
           <div class="job-field">
             <label class="flex items-center text-xs font-semibold text-(--color-text-primary,currentColor) mb-1">
               {{ t("onlineEvals.job.nameLabel") }}
-              <span class="text-(--o2-status-error-text) ml-0.5">*</span>
+              <span class="text-(--color-status-error-text) ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary,var(--o2-text-secondary))" />
             </label>
             <OFormInput
@@ -59,7 +59,7 @@
           <div class="job-field">
             <label class="flex items-center text-xs font-semibold text-(--color-text-primary,currentColor) mb-1">
               {{ t("onlineEvals.job.streamLabel") }}
-              <span class="text-(--o2-status-error-text) ml-0.5">*</span>
+              <span class="text-(--color-status-error-text) ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary,var(--o2-text-secondary))" />
             </label>
             <OFormSelect
@@ -133,7 +133,7 @@
             <div class="job-field">
               <label class="flex items-center text-xs font-semibold text-(--color-text-primary,currentColor) mb-1">
                 {{ t("onlineEvals.job.samplingValueLabel") }}
-                <span v-if="formValues.samplingMode !== 'all'" class="job-field__req">*</span>
+                <span v-if="formValues.samplingMode !== 'all'" class="text-(--color-status-error-text) ml-0.5">*</span>
               </label>
               <OFormInput
                 name="samplingValue"
@@ -162,7 +162,7 @@
       />
     </div>
 
-    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-(--o2-card-bg) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)] shrink-0 z-1">
+    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-(--color-surface-base) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)] shrink-0 z-1">
       <OButton
         data-test="job-form-cancel-btn"
         type="button"

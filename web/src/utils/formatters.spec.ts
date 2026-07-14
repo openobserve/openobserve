@@ -26,7 +26,6 @@ import {
   durationFormatter,
   maskText,
   convertToCamelCase,
-  convertUnixToQuasarFormat,
 } from "./formatters";
 
 // Buffer-based btoa/atob for jsdom
@@ -499,42 +498,5 @@ describe("convertToCamelCase", () => {
 });
 
 // ---------------------------------------------------------------------------
-// convertUnixToQuasarFormat
 // ---------------------------------------------------------------------------
 
-describe("convertUnixToQuasarFormat", () => {
-  beforeEach(() => {
-    vi.mocked(mockFormatDate).mockImplementation(
-      (value: any, _fmt: string) => String(value),
-    );
-  });
-
-  it("returns empty string for 0", () => {
-    expect(convertUnixToQuasarFormat(0)).toBe("");
-  });
-
-  it("returns empty string for null", () => {
-    expect(convertUnixToQuasarFormat(null)).toBe("");
-  });
-
-  it("returns empty string for undefined", () => {
-    expect(convertUnixToQuasarFormat(undefined)).toBe("");
-  });
-
-  it("returns a non-empty string for valid microsecond timestamp", () => {
-    // 1_700_000_000_000_000 microseconds
-    const result = convertUnixToQuasarFormat(1_700_000_000_000_000);
-
-    expect(typeof result).toBe("string");
-    expect(result.length).toBeGreaterThan(0);
-  });
-
-  it("calls formatDate with YYYY-MM-DDTHH:mm:ssZ format", () => {
-    convertUnixToQuasarFormat(1_700_000_000_000_000);
-
-    expect(mockFormatDate).toHaveBeenCalledWith(
-      expect.any(String),
-      "YYYY-MM-DDTHH:mm:ssZ",
-    );
-  });
-});

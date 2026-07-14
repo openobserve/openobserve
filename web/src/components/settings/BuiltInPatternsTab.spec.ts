@@ -35,16 +35,6 @@ vi.mock("@/utils/regexPatternCache", () => ({
   },
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn(),
-    }),
-  };
-});
-
 import regexPatternsService from "@/services/regex_pattern";
 import { RegexPatternCache } from "@/utils/regexPatternCache";
 

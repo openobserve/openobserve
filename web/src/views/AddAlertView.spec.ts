@@ -108,11 +108,6 @@ describe('AddAlertView.vue', () => {
   });
 
   it('should handle getDestinations error', async () => {
-    const mockNotify = vi.fn();
-    const mockQuasar = {
-      notify: mockNotify,
-    };
-
     vi.mocked(destinationService.list).mockRejectedValue(new Error('Network error'));
 
     const wrapper = mount(AddAlertView, {
@@ -121,14 +116,8 @@ describe('AddAlertView.vue', () => {
         stubs: {
           AddAlert: true,
         },
-        provide: {
-          $q: mockQuasar,
-        },
       },
     });
-
-    // Manually inject $q into the component instance
-    wrapper.vm.$q = mockQuasar;
 
     await flushPromises();
 

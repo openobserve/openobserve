@@ -558,8 +558,8 @@ async function save(value: ScoreConfigForm) {
   gap: 10px;
   align-items: flex-start;
   padding: 10px 12px;
-  background: color-mix(in srgb, var(--o2-status-info-text) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--o2-status-info-text) 20%, transparent);
+  background: color-mix(in srgb, var(--color-status-info-text) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-status-info-text) 20%, transparent);
   border-radius: 6px;
   font-size: 12px;
   line-height: 1.5;
@@ -570,7 +570,7 @@ async function save(value: ScoreConfigForm) {
 .sc-callout > :first-child {
   flex-shrink: 0;
   margin-top: 1px;
-  color: var(--o2-status-info-text);
+  color: var(--color-status-info-text);
 }
 
 /* descendant selector: cannot be inlined */
@@ -788,7 +788,7 @@ async function save(value: ScoreConfigForm) {
 /* child selector: cannot be inlined */
 .sc-ht-example > :first-child {
   flex-shrink: 0;
-  color: var(--o2-status-info-text);
+  color: var(--color-status-info-text);
 }
 
 /* descendant selector: cannot be inlined */
@@ -821,7 +821,7 @@ async function save(value: ScoreConfigForm) {
 .sc-ht-check:hover { background: color-mix(in srgb, var(--color-text-primary) 6%, transparent); }
 
 .sc-ht-check--on {
-  background: color-mix(in srgb, color-mix(in srgb, var(--o2-status-success-text) 14%, transparent) 35%, transparent);
+  background: color-mix(in srgb, color-mix(in srgb, var(--color-status-success-text) 14%, transparent) 35%, transparent);
 }
 
 .sc-ht-empty {

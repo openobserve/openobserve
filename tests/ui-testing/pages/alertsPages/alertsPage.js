@@ -1951,7 +1951,7 @@ export class AlertsPage {
     /**
      * Get severity badge text from incident detail header.
      * Header has 3 badges: Status (icon=info), Severity (icon=warning), Alert Count (icon=notifications_active).
-     * Quasar renders OIcon name as <i> text content, NOT as an HTML attribute.
+     * OIcon renders its name as <i> text content, NOT as an HTML attribute.
      * We match the badge that contains a P1/P2/P3/P4 span.
      * @returns {Promise<string>} e.g. "P1", "P2", "P3", "P4"
      */
@@ -2090,7 +2090,7 @@ export class AlertsPage {
         }
 
         // Check for error icon (also acceptable — just means no correlation data)
-        // Note: Quasar renders OIcon name as text content, not HTML attribute
+        // Note: OIcon renders its name as text content, not HTML attribute
         const errorIcon = this.page.locator('.OIcon:has-text("error_outline"), .OIcon:has-text("info_outline")');
         if (await errorIcon.isVisible({ timeout: 1000 }).catch(() => false)) {
             testLogger.info(`Telemetry tab ${tabName}: info/error state`);
@@ -2516,7 +2516,7 @@ export class AlertsPage {
 
     /**
      * Select a stream by name from the dropdown, using keyboard typing to filter
-     * through Quasar's virtual scroll (only rendered items are in the DOM).
+     * through the virtual scroll (only rendered items are in the DOM).
      * @param {string} streamName - Exact stream name to select
      */
     async selectStreamByName(streamName) {

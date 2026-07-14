@@ -2,8 +2,8 @@
 //
 // Unit tests for the AddAiToolset Zod schema — the always-on name/kind rules
 // and the kind-conditional mcp.url / cli.command requireds (superRefine). This
-// is the BEFORE (Quasar) validation baseline re-encoded as Zod
-// (complete-quasar-validation-inventory-BEFORE.md, "4 blocks → 6 sub-rules").
+// is the BEFORE validation baseline re-encoded as Zod
+// ("4 blocks → 6 sub-rules").
 
 import { describe, it, expect } from "vitest";
 import {
