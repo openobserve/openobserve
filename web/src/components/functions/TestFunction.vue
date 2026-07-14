@@ -633,7 +633,7 @@ const getResults = async () => {
     .search({
       org_identifier: store.state.selectedOrganization.identifier,
       query,
-      page_type: "logs",
+      page_type: selectedStream.value.type,
     })
     .then((res: any) => {
       expandState.value.stream = false;
