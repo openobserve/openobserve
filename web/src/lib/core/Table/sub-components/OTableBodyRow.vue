@@ -263,8 +263,8 @@ function onRowBlur() {
       rowClass,
     ]"
     :style="{
-      height: 'var(--o2-table-row-height, 2.25rem)',
-      ...(statusBarColor ? { '--o2-row-status-color': statusBarColor } : {}),
+      height: 'var(--table-row-height, 2.25rem)',
+      ...(statusBarColor ? { '--row-status-color': statusBarColor } : {}),
       ...rowStyle,
     }"
     :data-status-bar="statusBarColor ? 'true' : undefined"
@@ -364,7 +364,7 @@ function onRowBlur() {
         'o2-table-tree-warning-cell relative',
         bordered ? 'border-b border-table-row-divider' : '',
       ]"
-      :style="{ '--o2-tree-connector-x': treeConnectorX + 'px' }"
+      :style="{ '--tree-connector-x': treeConnectorX + 'px' }"
     >
       <div class="relative z-1 flex items-center justify-center">
         <slot name="tree-warning" :row="row.original" />
@@ -396,14 +396,14 @@ function onRowBlur() {
    cell — an extra <td> would add a phantom column on only the rows that have
    a status color and shift their cells out of alignment under table-fixed. */
 .o2-table-row-with-status > td:first-child {
-  box-shadow: inset 0.25rem 0 0 0 var(--o2-row-status-color);
+  box-shadow: inset 0.25rem 0 0 0 var(--row-status-color);
 }
 
 /* Continuation of the tree connector vertical line through the warning row */
 .o2-table-tree-warning-cell::after {
   content: "";
   position: absolute;
-  left: var(--o2-tree-connector-x);
+  left: var(--tree-connector-x);
   top: 0;
   bottom: 0;
   width: 1.5px;

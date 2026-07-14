@@ -320,7 +320,7 @@ const formatEventTimestamp = (ts: number | string | undefined): string => {
 
 <style scoped>
 .source-event-banner {
-  background: var(--color-card-glass-bg, var(--o2-bg-color));
+  background: var(--color-card-glass-bg, var(--color-surface-base));
 }
 .source-event-message {
   display: -webkit-box;

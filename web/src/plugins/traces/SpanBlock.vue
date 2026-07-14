@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex wrap justify-start items-center"
     :class="[
       defocusSpan ? 'opacity-30' : '',
-      store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white',
+      store.state.theme === 'dark' ? 'bg-[var(--color-surface-base,#1a1a1a)]' : 'bg-white',
     ]"
     :style="{
       zIndex: 2,
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       class="flex justify-between items-end cursor-pointer span-block relative-position"
-      :class="[store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white']"
+      :class="[store.state.theme === 'dark' ? 'bg-[var(--color-surface-base,#1a1a1a)]' : 'bg-white']"
       :style="{
         height: spanDimensions.height + 'px',
         width: '100%',

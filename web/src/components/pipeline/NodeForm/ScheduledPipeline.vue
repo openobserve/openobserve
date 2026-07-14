@@ -741,7 +741,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div
                           v-else-if="Number(triggerData.period)"
                           data-test="scheduled-pipeline-period-warning-text"
-                          class="text-[var(--o2-primary)] text-[12px] leading-3 py-0.5"
+                          class="text-[var(--color-accent)] text-[12px] leading-3 py-0.5"
                         >
                           Note: The period should be the same as frequency.
                         </div>
@@ -801,7 +801,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     class="flex justify-start items-end mt-4 pb-4 w-full"
                     :class="
-                      store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'
+                      store.state.theme === 'dark' ? 'bg-[var(--color-surface-base,#1a1a1a)]' : 'bg-white'
                     "
                   ></div>
                 </div>
@@ -938,7 +938,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 class="border-t border-(--color-card-glass-border) sticky bottom-0 px-4 py-3 z-10"
-                :class="store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'"
+                :class="store.state.theme === 'dark' ? 'bg-[var(--color-surface-base,#1a1a1a)]' : 'bg-white'"
               >
                 <div class="flex justify-end gap-2">
                   <OButton

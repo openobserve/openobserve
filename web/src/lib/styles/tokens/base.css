@@ -714,6 +714,60 @@
   --color-indigo-800: #3730a3;
   --color-indigo-900: #312e81;
 
+  /* --- Trace span categorical palette (50 colors) ---
+     Restored from the legacy _variables.scss $o2-span-* set. Theme-neutral
+     (same in light/dark); consumed as --color-span-{n} by utils/traces/traceColors.ts. */
+  --color-span-1: #3B82F6;
+  --color-span-2: #EF4444;
+  --color-span-3: #10B981;
+  --color-span-4: #A855F7;
+  --color-span-5: #F97316;
+  --color-span-6: #06B6D4;
+  --color-span-7: #EC4899;
+  --color-span-8: #84CC16;
+  --color-span-9: #6366F1;
+  --color-span-10: #F59E0B;
+  --color-span-11: #14B8A6;
+  --color-span-12: #D946EF;
+  --color-span-13: #16A34A;
+  --color-span-14: #7C3AED;
+  --color-span-15: #F59E0B;
+  --color-span-16: #0284C7;
+  --color-span-17: #E11D48;
+  --color-span-18: #84CC16;
+  --color-span-19: #6366F1;
+  --color-span-20: #EF4444;
+  --color-span-21: #10B981;
+  --color-span-22: #8B5CF6;
+  --color-span-23: #F97316;
+  --color-span-24: #06B6D4;
+  --color-span-25: #EC4899;
+  --color-span-26: #22C55E;
+  --color-span-27: #A855F7;
+  --color-span-28: #FBBF24;
+  --color-span-29: #3B82F6;
+  --color-span-30: #F43F5E;
+  --color-span-31: #14B8A6;
+  --color-span-32: #D946EF;
+  --color-span-33: #84CC16;
+  --color-span-34: #6366F1;
+  --color-span-35: #FB923C;
+  --color-span-36: #0EA5E9;
+  --color-span-37: #F472B6;
+  --color-span-38: #22D3EE;
+  --color-span-39: #A78BFA;
+  --color-span-40: #34D399;
+  --color-span-41: #FCA5A5;
+  --color-span-42: #818CF8;
+  --color-span-43: #FCD34D;
+  --color-span-44: #2DD4BF;
+  --color-span-45: #F9A8D4;
+  --color-span-46: #67E8F9;
+  --color-span-47: #C4B5FD;
+  --color-span-48: #86EFAC;
+  --color-span-49: #FDE68A;
+  --color-span-50: #FCA5A5;
+
   /* --- White / Black --- */
   --color-white: #ffffff;
   --color-black: #000000;

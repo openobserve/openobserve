@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       Operation Name
       <div
-        class="bg-(--o2-primary) inline-flex items-center justify-center w-5 h-5 rounded-full absolute -right-2.5 -top-0.5 z-10 cursor-col-resize"
+        class="bg-(--color-accent) inline-flex items-center justify-center w-5 h-5 rounded-full absolute -right-2.5 -top-0.5 z-10 cursor-col-resize"
         @mousedown="handleMouseDown"
         data-test="trace-header-resize-btn"
       >

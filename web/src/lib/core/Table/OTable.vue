@@ -902,7 +902,7 @@ defineExpose({
           ...measuredColumnSizeVars,
           ...dynamicSizeVars,
           ...(computedTableWidth ? { width: computedTableWidth } : {}),
-          '--o2-table-row-height': props.rowHeight != null
+          '--table-row-height': props.rowHeight != null
             ? `${props.rowHeight}px`
             : (props.dense ? 'var(--table-row-height-dense, 2.25rem)' : 'var(--table-row-height-normal, 2.75rem)'),
         }"

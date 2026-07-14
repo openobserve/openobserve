@@ -1302,13 +1302,13 @@ const unifiedChips = computed<DimensionChip[]>(() =>
 }
 
 .light-theme {
-  background-color: var(--o2-bg-light);
+  background-color: var(--color-surface-base);
   color: var(--color-text-primary);
 }
 
 .dark-theme {
-  background-color: var(--o2-bg-dark);
-  color: var(--o2-text-primary-dark);
+  background-color: var(--color-surface-base);
+  color: var(--color-text-primary);
 }
 
 // Dimension dropdown styling (matches TelemetryCorrelationDashboard)
@@ -1348,7 +1348,7 @@ const unifiedChips = computed<DimensionChip[]>(() =>
 }
 
 .column-visibility-list .column-item:hover {
-  background-color: var(--o2-hover-bg);
+  background-color: var(--color-interactive-hover-bg);
 }
 
 .column-visibility-list .column-item.dragging {

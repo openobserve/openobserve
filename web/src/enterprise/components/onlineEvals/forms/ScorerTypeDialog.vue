@@ -5,7 +5,7 @@
     aria-modal="true"
     @click.self="$emit('close')"
   >
-    <div class="w-[min(820px,calc(100vw-48px))] bg-card-bg border border-dialog-header-border rounded-lg shadow-(--o2-shadow-lg,0_8px_24px_rgba(0,0,0,0.12),0_2px_6px_rgba(0,0,0,0.08)) px-5.5 pt-5 pb-6 animate-[scorer-type-pop-in_0.18s_ease-out]">
+    <div class="w-[min(820px,calc(100vw-48px))] bg-card-bg border border-dialog-header-border rounded-lg shadow-(--shadow-lg,0_8px_24px_rgba(0,0,0,0.12),0_2px_6px_rgba(0,0,0,0.08)) px-5.5 pt-5 pb-6 animate-[scorer-type-pop-in_0.18s_ease-out]">
       <header class="flex items-center gap-3 pb-3 border-b border-dialog-header-border mb-4">
         <h2 class="flex-1 m-0 text-base font-semibold text-text-primary">{{ t("onlineEvals.scorerTypeDialog.title") }}</h2>
         <button

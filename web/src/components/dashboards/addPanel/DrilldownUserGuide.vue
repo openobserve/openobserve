@@ -26,7 +26,7 @@
     "
     :class="
       store.state.theme == 'dark'
-        ? 'theme-dark bg-[var(--o2-bg-card-dark,#1a1a1a)]'
+        ? 'theme-dark bg-[var(--color-surface-base,#1a1a1a)]'
         : 'theme-light bg-white'
     "
     @mouseleave="showUserGuide = false"

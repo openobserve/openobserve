@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Embedded (logs) header: existing inline header, kept as-is -->
         <header
           v-else
-          class="h-auto py-[0.125rem] flex! items-center justify-between bg-[var(--o2-surface)] pl-1"
+          class="h-auto py-[0.125rem] flex! items-center justify-between bg-[var(--color-surface-base)] pl-1"
         >
           <div class="flex items-center space-x-4 w-fit!">
             <!-- Back button -->
@@ -2980,7 +2980,7 @@ html:has(.trace-details) {
 
 /* Dark mode support */
 body.body--dark .unified-search-group {
-  background-color: var(--o2-dark-page-bg);
+  background-color: var(--color-surface-base);
 }
 
 body.body--dark .unified-search-group:hover,

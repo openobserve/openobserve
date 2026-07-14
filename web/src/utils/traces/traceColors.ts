@@ -1,6 +1,6 @@
 /**
  * Trace Span Color Utilities
- * Provides helper functions to access the 50 span colors defined in _variables.scss
+ * Provides helper functions to access the 50 span colors defined in tokens/base.css (--color-span-*)
  */
 
 /**
@@ -94,7 +94,7 @@ export const DARK_SPAN_COLORS = [
 export const getSpanColor = (index: number): string => {
   // Ensure index is within bounds (1-50)
   const colorIndex = ((index - 1) % 50) + 1;
-  return `var(--o2-span-${colorIndex})`;
+  return `var(--color-span-${colorIndex})`;
 };
 
 /**
@@ -128,7 +128,7 @@ export const getServiceColor = (serviceName: string): string => {
 
   // Map hash to color index (1-50)
   const colorIndex = (Math.abs(hash) % 50) + 1;
-  return `var(--o2-span-${colorIndex})`;
+  return `var(--color-span-${colorIndex})`;
 };
 
 /**
@@ -164,7 +164,7 @@ export const getSpanColorWithOpacity = (
   opacity: number = 1,
 ): string => {
   const colorIndex = ((index - 1) % 50) + 1;
-  return `color-mix(in srgb, var(--o2-span-${colorIndex}) ${opacity * 100}%, transparent)`;
+  return `color-mix(in srgb, var(--color-span-${colorIndex}) ${opacity * 100}%, transparent)`;
 };
 
 /**
@@ -221,7 +221,7 @@ export const generateServiceColorMap = (
     }
 
     usedColors.add(colorIndex);
-    colorMap.set(serviceName, `var(--o2-span-${colorIndex})`);
+    colorMap.set(serviceName, `var(--color-span-${colorIndex})`);
   });
 
   return colorMap;
@@ -242,20 +242,20 @@ export const getContrastTextColor = (backgroundColor: string): string => {
  * Status colors (error, success, warning)
  */
 export const statusColors = {
-  error: "var(--o2-red-800)",
-  success: "var(--o2-green-700)",
-  warning: "var(--o2-yellow-700)",
-  info: "var(--o2-blue-700)",
+  error: "var(--color-status-error-text)",
+  success: "var(--color-status-success-text)",
+  warning: "var(--color-status-warning-text)",
+  info: "var(--color-status-info-text)",
 };
 
 /**
  * Span kind colors (following OpenTelemetry span kinds)
  */
 export const spanKindColors = {
-  client: "var(--o2-span-1)", // Blue
-  server: "var(--o2-span-3)", // Green
-  producer: "var(--o2-span-7)", // Pink
-  consumer: "var(--o2-span-4)", // Purple
-  internal: "var(--o2-span-10)", // Amber
-  unspecified: "var(--o2-gray-700)",
+  client: "var(--color-span-1)", // Blue
+  server: "var(--color-span-3)", // Green
+  producer: "var(--color-span-7)", // Pink
+  consumer: "var(--color-span-4)", // Purple
+  internal: "var(--color-span-10)", // Amber
+  unspecified: "var(--color-text-muted)",
 };

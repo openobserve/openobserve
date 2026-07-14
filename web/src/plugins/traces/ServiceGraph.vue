@@ -225,7 +225,7 @@
         <OCardSection class="p-0 h-full" style="height: 100%">
           <div
             data-test="service-graph-container"
-            class="graph-container h-full w-full rounded overflow-hidden bg-[var(--o2-bg)]"
+            class="graph-container h-full w-full rounded overflow-hidden bg-[var(--color-surface-base)]"
             style="position: relative"
           >
             <div v-if="loading" class="flex items-center justify-center h-full">

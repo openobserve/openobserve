@@ -241,7 +241,7 @@
                   :checked="form.healthyCategories.includes(cat)"
                   @change="toggleHealthyCategory(cat)"
                 />
-                <span class="sc-mono font-[var(--o2-font-mono)]">{{ cat }}</span>
+                <span class="sc-mono font-[var(--font-mono)]">{{ cat }}</span>
               </label>
             </div>
             <div class="sc-ht-example flex items-center gap-1.5 mt-2 text-[11px] text-text-secondary">
@@ -260,7 +260,7 @@
               >
                 <input type="radio" class="sc-radio" :value="true" v-model="form.healthyBool" />
                 <div>
-                  <div class="sc-ht-bool-radio__hd text-text-primary font-[var(--o2-font-mono)]">{{ t("onlineEvals.scoreConfig.trueIsHealthy") }}</div>
+                  <div class="sc-ht-bool-radio__hd text-text-primary font-[var(--font-mono)]">{{ t("onlineEvals.scoreConfig.trueIsHealthy") }}</div>
                   <div class="sc-ht-bool-radio__sub text-[11px] text-text-secondary mt-0.5 leading-[1.4]">{{ t("onlineEvals.scoreConfig.trueIsHealthyHint") }}</div>
                 </div>
               </label>
@@ -270,7 +270,7 @@
               >
                 <input type="radio" class="sc-radio" :value="false" v-model="form.healthyBool" />
                 <div>
-                  <div class="sc-ht-bool-radio__hd text-text-primary font-[var(--o2-font-mono)]">{{ t("onlineEvals.scoreConfig.falseIsHealthy") }}</div>
+                  <div class="sc-ht-bool-radio__hd text-text-primary font-[var(--font-mono)]">{{ t("onlineEvals.scoreConfig.falseIsHealthy") }}</div>
                   <div class="sc-ht-bool-radio__sub text-[11px] text-text-secondary mt-0.5 leading-[1.4]">{{ t("onlineEvals.scoreConfig.falseIsHealthyHint") }}</div>
                 </div>
               </label>
@@ -516,7 +516,7 @@ async function save() {
   padding: 14px 22px;
 }
 
-.sc-mono { font-family: var(--o2-font-mono); }
+.sc-mono { font-family: var(--font-mono); }
 
 .sc-callout {
   display: flex;
@@ -618,7 +618,7 @@ async function save() {
 }
 
 .sc-dtype-radio__hd {
-  font: 700 12.5px var(--o2-font);
+  font: 700 12.5px var(--font-sans);
   color: var(--color-text-primary, currentColor);
 }
 
@@ -760,9 +760,9 @@ async function save() {
 
 /* descendant selector: cannot be inlined */
 .sc-ht-example code {
-  font-family: var(--o2-font-mono);
+  font-family: var(--font-mono);
   font-weight: 700;
-  color: var(--color-text-primary, var(--o2-text));
+  color: var(--color-text-primary, var(--color-text-primary));
 }
 
 .sc-ht-checks {

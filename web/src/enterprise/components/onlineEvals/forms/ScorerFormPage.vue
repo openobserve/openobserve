@@ -636,7 +636,7 @@
       >
         {{ schemaPreviewError }}
       </p>
-      <pre class="m-0 max-h-[60vh] overflow-auto p-3 rounded-md bg-(--color-card-bg-solid) border border-(--color-border) font-normal text-xs font-(family-name:--o2-font-mono) text-text-primary whitespace-pre [tab-size:2]" v-else>{{ schemaPreview }}</pre>
+      <pre class="m-0 max-h-[60vh] overflow-auto p-3 rounded-md bg-(--color-card-bg-solid) border border-(--color-border) font-normal text-xs font-(family-name:--font-mono) text-text-primary whitespace-pre [tab-size:2]" v-else>{{ schemaPreview }}</pre>
 
       <template #footer>
         <div class="flex items-center justify-between gap-2 w-full">

@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-col items-center justify-center h-full gap-4 p-4"
       data-test="rum-player-traces-tab-error"
     >
-      <OIcon name="error-outline" size="lg" class="text-[var(--o2-status-error)]" />
+      <OIcon name="error-outline" size="lg" class="text-[var(--color-status-error-text)]" />
       <p class="text-center">{{ error }}</p>
       <OButton
         variant="outline"
@@ -570,6 +570,6 @@ watch(
 }
 
 :deep(.trace-row--error td:first-child) {
-  border-left: 2px solid var(--o2-status-error);
+  border-left: 2px solid var(--color-status-error-text);
 }
 </style>

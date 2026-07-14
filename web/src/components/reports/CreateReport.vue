@@ -710,7 +710,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="flex justify-end px-3 w-full py-3 card-container sticky! bottom-0 border-t border-[var(--color-card-glass-border)]"
       style="z-index: 2"
-      :class="store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'"
+      :class="store.state.theme === 'dark' ? 'bg-[var(--color-surface-base,#1a1a1a)]' : 'bg-white'"
     >
       <OButton
         data-test="add-report-cancel-btn"

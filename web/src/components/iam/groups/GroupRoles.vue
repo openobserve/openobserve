@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="iam-roles-selection-section" class="flex flex-col h-full p-0" >
     <div
       class="flex justify-start px-3 py-2 card-container shrink-0"
-      :class="store.state.theme === 'dark' ? 'bg-(--o2-bg-card-dark,#1a1a1a)' : 'bg-white'"
+      :class="store.state.theme === 'dark' ? 'bg-(--color-surface-base,#1a1a1a)' : 'bg-white'"
     >
       <div class="mr-3">
         <div

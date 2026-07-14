@@ -365,7 +365,7 @@
                         :class="
                           block.pendingConfirmation
                             ? block.tool === 'navigation_action'
-                              ? 'text-[var(--o2-primary)]'
+                              ? 'text-[var(--color-accent)]'
                               : 'text-[var(--color-warning)]'
                             : block.success === false
                               ? 'text-[var(--color-status-negative)]'

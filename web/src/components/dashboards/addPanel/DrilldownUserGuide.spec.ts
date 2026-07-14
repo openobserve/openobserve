@@ -358,7 +358,7 @@ describe("DrilldownUserGuide", () => {
       const userGuide = getUserGuideEl();
       expect(userGuide).toBeTruthy();
       expect(userGuide!.classList.contains("theme-dark")).toBe(true);
-      // Component uses bg-[var(--o2-bg-card-dark,#1a1a1a)] for dark theme
+      // Component uses bg-[var(--color-surface-base,#1a1a1a)] for dark theme
       expect(
         Array.from(userGuide!.classList).some((c) => c.startsWith("bg-["))
       ).toBe(true);

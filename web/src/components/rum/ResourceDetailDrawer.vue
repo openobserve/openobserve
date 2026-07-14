@@ -69,17 +69,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Resource Details -->
         <div class="mb-3">
-          <div class="text-base text-[var(--o2-text-color)] font-bold ml-1 mb-2">
+          <div class="text-base text-[var(--color-text-primary)] font-bold ml-1 mb-2">
             Resource Information
           </div>
           <div>
             <div class="flex py-2 px-3 border-b border-solid border-[var(--color-card-glass-border)]" v-if="resource.resource_type">
               <div class="w-[150px] text-text-secondary font-medium shrink-0">Type:</div>
-              <div class="flex-1 text-[var(--o2-text-color)] break-words">{{ resource.resource_type }}</div>
+              <div class="flex-1 text-[var(--color-text-primary)] break-words">{{ resource.resource_type }}</div>
             </div>
             <div class="flex py-2 px-3 border-b border-solid border-[var(--color-card-glass-border)]" v-if="resource.resource_size">
               <div class="w-[150px] text-text-secondary font-medium shrink-0">Size:</div>
-              <div class="flex-1 text-[var(--o2-text-color)] break-words">
+              <div class="flex-1 text-[var(--color-text-primary)] break-words">
                 {{ formatBytes(resource.resource_size) }}
               </div>
             </div>
@@ -88,16 +88,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="resource.resource_render_blocking_status"
             >
               <div class="w-[150px] text-text-secondary font-medium shrink-0">Render Blocking:</div>
-              <div class="flex-1 text-[var(--o2-text-color)] break-words">
+              <div class="flex-1 text-[var(--color-text-primary)] break-words">
                 {{ resource.resource_render_blocking_status }}
               </div>
             </div>
             <div class="flex py-2 px-3 border-b border-solid border-[var(--color-card-glass-border)]" v-if="resource.session?.id">
               <div class="w-[150px] text-text-secondary font-medium shrink-0">Session ID:</div>
-              <div class="flex-1 text-[var(--o2-text-color)] break-words">
+              <div class="flex-1 text-[var(--color-text-primary)] break-words">
                 <code
                   data-test="resource-detail-drawer-session-id-text"
-                  class="font-mono text-sm px-2 py-1 bg-surface-accent rounded text-[var(--o2-text-color)]"
+                  class="font-mono text-sm px-2 py-1 bg-surface-accent rounded text-[var(--color-text-primary)]"
                 >{{
                   formatSessionId(resource.session.id)
                 }}</code>
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="flex py-2 px-3" v-if="resource.view?.url">
               <div class="w-[150px] text-text-secondary font-medium shrink-0">Page URL:</div>
-              <div class="flex-1 text-[var(--o2-text-color)] truncate" :title="resource.view.url">
+              <div class="flex-1 text-[var(--color-text-primary)] truncate" :title="resource.view.url">
                 {{ resource.view.url }}
               </div>
             </div>
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Session Context -->
         <div v-if="resource.session?.id" class="mt-3">
           <OSeparator class="my-4" />
-          <div class="text-base text-[var(--o2-text-color)] font-bold ml-1 mb-2">
+          <div class="text-base text-[var(--color-text-primary)] font-bold ml-1 mb-2">
             Session Context
           </div>
           <div class="flex gap-2">

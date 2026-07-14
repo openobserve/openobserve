@@ -122,7 +122,7 @@ function formatTime(ts: string): string {
 
     <!-- Search -->
     <div class="px-2 pb-[0.375em] shrink-0">
-      <div class="flex items-center gap-[0.375em] bg-(--o2-input-bg) rounded-md px-[0.375em]">
+      <div class="flex items-center gap-[0.375em] bg-(--color-input-bg) rounded-md px-[0.375em]">
         <svg
           class="opacity-50 shrink-0"
           width="0.875em"
@@ -170,9 +170,9 @@ function formatTime(ts: string): string {
       <div
         v-for="chat in filtered"
         :key="chat.id"
-        class="group flex items-center gap-1 py-[0.4375em] px-2 rounded-md cursor-pointer transition-[background] duration-[120ms] hover:bg-[var(--o2-hover-color,rgba(128,128,128,0.1))]"
+        class="group flex items-center gap-1 py-[0.4375em] px-2 rounded-md cursor-pointer transition-[background] duration-[120ms] hover:bg-[var(--color-interactive-hover-bg,rgba(128,128,128,0.1))]"
         :class="{
-          'bg-[var(--o2-selected-color,rgba(57,126,246,0.12))]!': activeChatId === chat.id,
+          'bg-[var(--color-primary-100,rgba(57,126,246,0.12))]!': activeChatId === chat.id,
         }"
         @click="selectChat(chat.id)"
       >

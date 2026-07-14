@@ -591,7 +591,7 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
 }
 
 .groups-scroll-container::-webkit-scrollbar-thumb:hover {
-  background: var(--o2-primary-dark, var(--color-accent));
+  background: var(--color-accent, var(--color-accent));
 }
 
 .field-chips-container::-webkit-scrollbar {
