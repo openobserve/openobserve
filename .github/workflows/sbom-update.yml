@@ -1,0 +1,126 @@
+name: Update SBOM
+
+# Regenerates the CycloneDX SBOMs (openobserve.cdx.xml and web/sbom.json) and
+# opens a PR when they change, so the committed SBOMs stay in step with the
+# dependencies of supported releases (see SECURITY.md "Security Updates & SBOM").
+on:
+  release:
+    types: [published]
+  schedule:
+    # Every Monday at 08:00 UTC
+    - cron: '0 8 * * 1'
+  workflow_dispatch: # Allow manual trigger
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  update-sbom:
+    name: Regenerate SBOMs
+    runs-on:
+      labels: ubicloud-standard-8
+    timeout-minutes: 30
+
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create update branch
+        run: |
+          BRANCH_NAME="automated/sbom-update-$(date +%Y%m%d)"
+          git checkout -b "$BRANCH_NAME"
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-05-20
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Regenerate Rust SBOM
+        run: |
+          # rust-toolchain.toml pins the toolchain; install the generator and run it.
+          cargo install cargo-cyclonedx --locked
+          cargo cyclonedx --format xml
+
+      - name: Regenerate JavaScript SBOM
+        run: |
+          cd web
+          npm ci
+          npm install --global @cyclonedx/cyclonedx-npm
+          cyclonedx-npm > sbom.json
+
+      - name: Check for SBOM changes
+        id: check
+        run: |
+          if [[ -n $(git status --porcelain openobserve.cdx.xml web/sbom.json) ]]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "SBOMs are already up to date."
+          fi
+
+      - name: Commit changes
+        if: steps.check.outputs.has_changes == 'true'
+        run: |
+          git add openobserve.cdx.xml web/sbom.json
+          git commit -m "chore: regenerate SBOMs ($(date +%Y-%m-%d))
+
+          Refresh openobserve.cdx.xml and web/sbom.json to match current
+          dependencies.
+
+          🤖 Automated update by GitHub Actions"
+          git push origin "$BRANCH_NAME"
+
+      - name: Create Pull Request
+        if: steps.check.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > /tmp/pr_body.md <<'EOF'
+          ## 🔐 SBOM refresh
+
+          This automated PR regenerates the CycloneDX SBOMs so they match the
+          current dependency set:
+
+          - `openobserve.cdx.xml` (Rust, via `cargo cyclonedx`)
+          - `web/sbom.json` (JavaScript, via `cyclonedx-npm`)
+
+          Keeping these current is what `SECURITY.md` promises under
+          "Security Updates & SBOM". Please review and merge if the diff looks
+          reasonable.
+
+          ---
+
+          🤖 This PR was automatically created by the Update SBOM workflow
+          EOF
+          gh pr create \
+            --title "chore: regenerate SBOMs ($(date +%Y-%m-%d))" \
+            --body-file /tmp/pr_body.md \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --label "auto-generated"
+
+      - name: No changes needed
+        if: steps.check.outputs.has_changes == 'false'
+        run: |
+          echo "✅ SBOMs already match the current dependencies. No PR needed."
