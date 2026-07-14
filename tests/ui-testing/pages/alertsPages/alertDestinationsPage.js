@@ -1032,37 +1032,38 @@ export class AlertDestinationsPage {
      * @param {string} type - Type ID (slack, discord, msteams, email, pagerduty, opsgenie, servicenow, custom)
      */
     async selectDestinationType(type) {
-        // Clean up any q-portal overlays that may intercept clicks
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
-        }).catch(() => {});
-
-        // Wait for selector to be mounted before probing for the card
+        // Wait for the type-selector cards to be mounted.
         await this.page.locator(this.prebuiltDestinationSelector).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
 
-        // Wait for card to be visible first
         const card = this.page.locator(`${this.destinationTypeCard}[data-type="${type}"]`);
-        await card.waitFor({ state: 'visible', timeout: 15000 });
-        // Card list can re-render between waitFor and click (e.g. when prebuilt-templates
-        // load resolves), so retry on detached races before bailing. Use force-click to
-        // bypass actionability checks once the card has stabilised in the second attempt.
-        try {
-            await card.click({ timeout: 10000 });
-        } catch (e) {
-            testLogger.debug('selectDestinationType first click failed, retrying with force', { type, error: e.message });
-            await this.page.locator(this.prebuiltDestinationSelector).waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-            await card.waitFor({ state: 'visible', timeout: 10000 });
-            await card.click({ force: true, timeout: 10000 });
-        }
+        // The type-specific field that only appears once the form has transitioned after
+        // picking a card (custom → URL input; prebuilt → destination name input).
+        const confirmField = type === 'custom'
+            ? this.page.locator(this.urlInput)
+            : this.page.locator(this.destinationNameInput);
 
-        // Wait for either prebuilt form or custom form to appear
-        if (type === 'custom') {
-            await this.page.locator(this.urlInput).waitFor({ state: 'visible', timeout: 15000 });
-        } else {
-            // For prebuilt types, wait for destination name input
-            await this.page.locator(this.destinationNameInput).waitFor({ state: 'visible', timeout: 15000 });
+        // Click the card and CONFIRM the form transitioned. The card list re-renders while
+        // the prebuilt-templates fetch resolves, which can detach the card mid-click or
+        // absorb the click without transitioning — the previous single try/catch could
+        // return with the form still on the selector (or hidden), so the very next
+        // field-fill would time out. Re-click (cards stay visible after selection, so this
+        // is idempotent) until the type-specific field is actually visible.
+        let transitioned = false;
+        for (let attempt = 1; attempt <= 4 && !transitioned; attempt++) {
+            await card.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+            await card.click({ force: true, timeout: 10000 }).catch((e) => {
+                testLogger.debug('selectDestinationType card click attempt failed', { type, attempt, error: e.message });
+            });
+            transitioned = await confirmField.isVisible({ timeout: 5000 }).catch(() => false);
+            if (!transitioned) {
+                testLogger.warn('Destination form did not transition after selecting type, retrying', { type, attempt });
+                await this.page.waitForTimeout(1000);
+            }
         }
-
+        // Final explicit wait so a genuine failure surfaces on the confirm field.
+        if (!transitioned) {
+            await confirmField.waitFor({ state: 'visible', timeout: 15000 });
+        }
         testLogger.debug('Selected destination type and form loaded', { type });
     }
 
@@ -1125,9 +1126,22 @@ export class AlertDestinationsPage {
      * @param {string} name - Destination name
      */
     async fillDestinationName(name) {
-        await this.page.locator(this.destinationNameInputField).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.locator(this.destinationNameInputField).fill(name);
-        await expect(this.page.locator(this.destinationNameInputField)).toHaveValue(name, { timeout: 5000 });
+        const field = this.page.locator(this.destinationNameInputField);
+        // Prebuilt forms scroll the name field around as sections (webhook, template,
+        // headers) render; scroll it into view and retry so a transient re-render can't
+        // fail the visibility wait.
+        let ready = false;
+        for (let attempt = 1; attempt <= 3 && !ready; attempt++) {
+            await field.scrollIntoViewIfNeeded().catch(() => {});
+            ready = await field.isVisible({ timeout: 10000 }).catch(() => false);
+            if (!ready) {
+                testLogger.warn('Destination name field not visible yet, retrying', { attempt });
+                await this.page.waitForTimeout(1000);
+            }
+        }
+        await field.waitFor({ state: 'visible', timeout: 10000 });
+        await field.fill(name);
+        await expect(field).toHaveValue(name, { timeout: 5000 });
         testLogger.debug('Filled destination name', { name });
     }
 
@@ -1576,6 +1590,15 @@ export class AlertDestinationsPage {
         // Wait for the row anchor to detach — this is set by getDestinations() refresh
         // after the delete API returns successfully.
         await expect(deleteBtn).toHaveCount(0, { timeout: 15000 });
+
+        // Clear the search filter so the list returns to its full state. Leaving the
+        // deleted name in the search box strands the list on a "No destinations found"
+        // empty state, which confuses the next create flow (the New-destination form can
+        // open over an empty/transitioning list and mis-render).
+        if (await searchField.isVisible().catch(() => false)) {
+            await searchField.fill('');
+            await this.page.waitForTimeout(500);
+        }
 
         testLogger.info('Destination deleted successfully');
     }
