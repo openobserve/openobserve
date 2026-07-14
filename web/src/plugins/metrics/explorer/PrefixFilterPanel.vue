@@ -65,13 +65,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OCheckbox>
 
+        <!-- The registry's countChip, as every other count in the app. -->
         <OTag
-          variant="default"
+          type="countChip"
+          value="neutral"
           size="xs"
           shape="rounded"
-          :label="String(facet.count)"
           :data-test="`metrics-explorer-${mode}-count-${facet.id}`"
-        />
+          >{{ facet.count }}</OTag
+        >
       </div>
 
       <div

@@ -493,12 +493,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="opacity-70 text-text-secondary">{{ unitLabel }}</span>
         <!-- Badge text is never the sole carrier of meaning — the footer
              function label sits right beside it. -->
-        <span
-          class="text-[10px] font-semibold px-1.5 py-px rounded-lg leading-none"
-          :style="{ color: badge.color, background: badge.background }"
+        <OTag
+          type="metricType"
+          :value="card.typeFilterBucket"
           :data-test="`metrics-explorer-card-badge-${card.name}`"
-          >{{ badgeLabel }}</span
-        >
+        />
       </div>
     </div>
   </div>
@@ -525,11 +524,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { copyToClipboard } from "@/utils/clipboard";
-import {
-  BADGE_LABELS,
-  getBadgeStyle,
-  cardColorForIndex,
-} from "@/utils/metrics/metricPalette";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { BADGE_LABELS, cardColorForIndex } from "@/utils/metrics/metricPalette";
 import { toO2Unit } from "@/utils/metrics/metricDefaults";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import {
@@ -572,6 +568,7 @@ export default defineComponent({
     OSkeleton,
     OEmptyState,
     LoadingProgress,
+    OTag,
     OTooltip,
   },
   props: {
@@ -613,9 +610,8 @@ export default defineComponent({
     const isDark = computed(() => store.state.theme === "dark");
 
     const color = computed(() => cardColorForIndex(props.index, isDark.value));
-    const badge = computed(() =>
-      getBadgeStyle(props.card.typeFilterBucket, isDark.value),
-    );
+    // Kept for the card's aria label; the VISIBLE badge renders through the
+    // registry's metricType group, which owns the label and colour.
     const badgeLabel = computed(
       () => BADGE_LABELS[props.card.typeFilterBucket] ?? "Other",
     );
@@ -759,7 +755,6 @@ export default defineComponent({
       t,
       root,
       color,
-      badge,
       badgeLabel,
       o2Unit,
       bucketO2Unit,

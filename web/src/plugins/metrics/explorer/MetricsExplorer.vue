@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            room between items — and above the FIRST item — to poke into without
            touching a neighbour or the toolbar border. -->
       <nav
-        class="flex flex-col gap-2.5 px-2 pb-2 pt-3 border-r border-border-default"
+        class="flex flex-col gap-2.5 pl-2 pr-3 pb-2 pt-3 border-r border-border-default"
         :aria-label="t('metrics.explorer.railsAriaLabel')"
       >
         <!-- OTooltip nests INSIDE the button and attaches to it — the pattern

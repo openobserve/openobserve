@@ -44,12 +44,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="metrics-fn-metric"
           >{{ card.name }}</span
         >
-        <span
-          class="shrink-0 rounded-full px-1.5 py-px text-[10px] font-semibold"
-          :style="{ color: badge.color, backgroundColor: badge.background }"
+        <!-- The registry's metricType group — same badge the card footer shows. -->
+        <OTag
+          type="metricType"
+          :value="card.typeFilterBucket"
+          class="shrink-0"
           data-test="metrics-fn-badge"
-          >{{ badgeLabel }}</span
-        >
+        />
         <span class="truncate text-xs text-text-secondary">
           {{ t("metrics.explorer.fn.subtitle") }}
         </span>
@@ -222,7 +223,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { computed, defineComponent, ref, watch, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
 import MetricCardChart from "./MetricCardChart.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -231,7 +231,7 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import { BADGE_LABELS, getBadgeStyle } from "@/utils/metrics/metricPalette";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { toO2Unit } from "@/utils/metrics/metricDefaults";
 import { isCancelled } from "@/composables/metrics/useMetricsPreviewQueue";
 import { parseSearchError } from "@/utils/query/searchError";
@@ -273,6 +273,7 @@ export default defineComponent({
     ORadioGroup,
     ORadio,
     OCheckbox,
+    OTag,
   },
   props: {
     modelValue: { type: Boolean, default: false },
@@ -298,15 +299,6 @@ export default defineComponent({
   emits: ["update:modelValue", "apply", "restore"],
   setup(props, { emit }) {
     const { t } = useI18n();
-    const store = useStore();
-    const isDark = computed(() => store.state.theme === "dark");
-
-    const badge = computed(() =>
-      getBadgeStyle(props.card.typeFilterBucket, isDark.value),
-    );
-    const badgeLabel = computed(
-      () => BADGE_LABELS[props.card.typeFilterBucket] ?? "Other",
-    );
 
     const variants = computed<any[]>(() => props.defaults?.variants ?? []);
     const variantById = (id: string) =>
@@ -578,8 +570,6 @@ export default defineComponent({
 
     return {
       t,
-      badge,
-      badgeLabel,
       variants,
       selectedId,
       select,

@@ -32,8 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-for="filter in filters"
         :key="labelFilterKey(filter)"
-        variant="primary"
-        size="sm"
+        type="fieldTag"
+        value="primarysm"
         shape="rounded"
         class="max-w-[250px]"
       >
@@ -52,11 +52,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Keyed and removed by the WHOLE matcher, never by the label: a label can
          carry several of them (`status=~"5.."` and `status!="503"`), and keying
          on the label alone would collide two chips onto one v-for key. -->
+    <!-- The registry's fieldTag/primarysm — the same variant+size the group
+         pins, spelled as type/value instead of loose props. -->
     <OTag
       v-for="filter in shownFilters"
       :key="labelFilterKey(filter)"
-      variant="primary"
-      size="sm"
+      type="fieldTag"
+      value="primarysm"
       shape="rounded"
       class="min-w-0 max-w-[250px]"
       :data-test="`metrics-explorer-label-chip-${filter.label}`"
