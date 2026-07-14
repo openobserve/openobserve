@@ -55,6 +55,11 @@ pub struct EnqueueParams<'a> {
 pub struct JobMetadata {
     #[serde(default)]
     pub tags: Vec<String>,
+    /// The synthetic's check type ("http", "tcp", "browser", …) — copied at
+    /// enqueue time so stream records (including dispatcher error records)
+    /// can carry `type` without a monitor lookup.
+    #[serde(default)]
+    pub synthetic_type: String,
 }
 
 #[derive(Debug, Serialize)]
