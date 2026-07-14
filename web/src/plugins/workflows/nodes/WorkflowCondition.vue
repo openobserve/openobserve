@@ -79,7 +79,9 @@ const savedConditions =
   workflowObj.currentSelectedNodeData?.data?.conditions ?? null;
 
 const builder = ref<any>(null);
-const submit = () => builder.value?.getPayload() ?? null;
+// The builder validates through its zod schema (async) and renders the error
+// inline, returning null when the rule is empty/incomplete.
+const submit = async () => (await builder.value?.submit()) ?? null;
 
 defineExpose({ submit });
 </script>

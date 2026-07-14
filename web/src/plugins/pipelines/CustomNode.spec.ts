@@ -648,7 +648,7 @@ describe("CustomNode.vue", () => {
     it("returns grey for unknown io_type", () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      expect(vm.getNodeColor("unknown")).toBe("#6b7280");
+      expect(vm.getNodeColor("unknown")).toBe("var(--color-grey-500)");
     });
   });
 
@@ -1055,7 +1055,7 @@ describe("CustomNode.vue", () => {
       const vm = wrapper.vm as any;
       vm.updateEdgeColors("node-1", null, true);
       expect(mockPipelineObj.currentSelectedPipeline.edges[0].style.stroke).toBe(
-        "#6b7280"
+        "var(--color-grey-500)"
       );
     });
 

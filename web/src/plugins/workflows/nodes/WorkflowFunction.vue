@@ -54,7 +54,9 @@ onBeforeUnmount(() => {
 });
 
 // Called by WorkflowNodeDrawer on Save — returns the data payload or null.
-const submit = () => picker.value?.getPayload() ?? null;
+// The picker validates through its zod schema (async) and renders required /
+// already-associated inline on the field, returning null when invalid.
+const submit = async () => (await picker.value?.submit()) ?? null;
 
 defineExpose({ submit });
 </script>

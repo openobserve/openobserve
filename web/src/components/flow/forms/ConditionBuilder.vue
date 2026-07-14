@@ -17,7 +17,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   Shared condition/filter builder for the flow canvases (Pipelines + Workflows).
   Wraps the alerts FilterGroup in the V2 condition format, auto-converts saved
-  V0/V1 rules, and exposes the result via `getPayload()`.
+  V0/V1 rules, and hands the result back via the awaited `submit()`.
+
+  Form wiring (the migrated house style, OWNER pattern): this component OWNS the
+  <OForm> and its zod schema, so the "at least one complete condition" rule is
+  enforced by makeConditionSchema — the same schema the pipeline drawer used —
+  instead of an imperative toast. FilterGroup is a composite with no OForm*
+  equivalent, so its model is bridged INTO the form's `conditions` field via a
+  direct setFieldValue from FilterGroup's own change handlers, and the resulting
+  form-level error is surfaced under it by hand.
+
+  Hosts (pipeline Condition drawer / workflow Condition node) just render this
+  and call the exposed async `submit()` from their Save: it validates and returns
+  { version, conditions } — or null, having rendered the error inline.
 
   What each module supplies:
    - `fields`             — the column options for FilterGroup. Pipelines fetch
@@ -31,33 +43,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div data-test="condition-builder" class="w-full">
-    <div class="flow-filter-group-wrapper max-w-full overflow-x-visible!" @submit.stop.prevent>
-      <FilterGroup
-        v-if="conditionGroup && conditionGroup.conditions"
-        :key="filterGroupKey"
-        :stream-fields="fields"
-        :group="conditionGroup"
-        :depth="0"
-        condition-input-width="w-[130px]"
-        :allow-custom-columns="allowCustomColumns"
-        :module="module"
-        @add-condition="(g) => updateGroup(g)"
-        @add-group="(g) => updateGroup(g)"
-        @remove-group="(id) => removeGroup(id)"
-      />
-      <div v-else class="p-3 text-gray-400">{{ t("flow.condition.loading") }}</div>
-    </div>
+    <OForm :form="form">
+      <div class="flow-filter-group-wrapper max-w-full overflow-x-visible!" @submit.stop.prevent>
+        <FilterGroup
+          v-if="conditionGroup && conditionGroup.conditions"
+          :key="filterGroupKey"
+          :stream-fields="fields"
+          :group="conditionGroup"
+          :depth="0"
+          condition-input-width="w-[130px]"
+          :allow-custom-columns="allowCustomColumns"
+          :module="module"
+          @add-condition="(g) => updateGroup(g)"
+          @add-group="(g) => updateGroup(g)"
+          @remove-group="(id) => removeGroup(id)"
+          @input:update="onInputUpdate"
+        />
+        <div v-else class="p-3 text-gray-400">{{ t("flow.condition.loading") }}</div>
+      </div>
 
-    <slot name="guidelines" />
+      <!-- Schema error for the bridged FilterGroup model (no OForm* field
+           renders it, so surface the form-level `conditions` error here). -->
+      <div
+        v-if="conditionsError"
+        class="text-xs text-input-error-text mt-1"
+        data-test="condition-builder-error"
+      >
+        {{ conditionsError }}
+      </div>
+
+      <slot name="guidelines" />
+    </OForm>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import { getUUID } from "@/utils/zincutils";
-import { toast } from "@/lib/feedback/Toast/useToast";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import {
+  makeConditionSchema,
+  type ConditionForm,
+} from "@/components/pipeline/NodeForm/Condition.schema";
 import {
   detectConditionsVersion,
   convertV0ToV2,
@@ -150,35 +181,72 @@ const initGroup = () => {
 
 const conditionGroup = ref<any>(initGroup());
 
+// ── OForm wiring (OWNER pattern) ─────────────────────────────────────────────
+// This component owns <OForm>, so it can surface the form-level `conditions`
+// error under the FilterGroup. The composite FilterGroup has no OForm*
+// equivalent, so its model (`conditionGroup`) is bridged INTO the form's
+// `conditions` field with a direct setFieldValue from FilterGroup's own change
+// handlers — not a watch on a mirror ref. The schema's superRefine ("at least
+// one complete condition") then gates submit.
+const validated = ref<ConditionForm | null>(null);
+
+const form = useOForm<ConditionForm>({
+  defaultValues: { conditions: conditionGroup.value },
+  schema: makeConditionSchema(t),
+  onSubmit: (values) => {
+    validated.value = values;
+  },
+});
+
+const syncConditionsToForm = () => {
+  form.setFieldValue("conditions", conditionGroup.value, {
+    dontUpdateMeta: true,
+  });
+};
+
+// Reactive view of the SAME form (no mirror) — rendered under the FilterGroup.
+const conditionsErrors = form.useStore(
+  (s: any) => s.fieldMeta?.conditions?.errors ?? [],
+);
+const conditionsError = computed(() =>
+  conditionsErrors.value.length
+    ? String(firstFieldError(conditionsErrors.value))
+    : "",
+);
+
 // FilterGroup edits flow through the shared alert utilities, which expect a
 // context shaped like { formData: { query_condition: { conditions } } }.
 const updateGroup = (updatedGroup: any) => {
   const ctx = { formData: { query_condition: { conditions: conditionGroup.value } } };
   updateGroupUtil(updatedGroup, ctx as any);
   conditionGroup.value = ctx.formData.query_condition.conditions;
+  syncConditionsToForm();
 };
 const removeGroup = (groupId: string) => {
   const ctx = { formData: { query_condition: { conditions: conditionGroup.value } } };
   removeConditionGroupUtil(groupId, conditionGroup.value, ctx as any);
   conditionGroup.value = ctx.formData.query_condition.conditions;
+  syncConditionsToForm();
 };
 
-// Validate + return { version, conditions } or null (toasts when empty).
-const getPayload = () => {
-  const conditions = conditionGroup.value?.conditions || [];
-  const hasValid = conditions.some(
-    (item: any) =>
-      (item.filterType === "group" && item.conditions) ||
-      (item.column && item.operator),
-  );
-  if (!hasValid) {
-    toast({ variant: "error", message: t("flow.condition.empty") });
-    return null;
-  }
+// FilterGroup mutates `conditionGroup` in place and emits this on every field
+// edit — bridge the live model in so the schema's superRefine sees column /
+// operator / value changes (and the error clears as the user fixes it).
+const onInputUpdate = (_name?: string, _field?: any) => {
+  syncConditionsToForm();
+};
+
+// Host bridge: validate through the schema and return { version, conditions },
+// or null when invalid (the error renders inline under the FilterGroup).
+const submit = async () => {
+  validated.value = null;
+  syncConditionsToForm();
+  await form.handleSubmit();
+  if (!validated.value) return null;
   return { version: 2, conditions: conditionGroup.value };
 };
 
-defineExpose({ getPayload, conditionGroup });
+defineExpose({ submit, conditionGroup, form });
 </script>
 
 <style>

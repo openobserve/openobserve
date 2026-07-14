@@ -95,23 +95,23 @@ describe("FunctionPicker", () => {
   it("preselects initialName in edit mode", async () => {
     const wrapper = createWrapper({ initialName: "beta" });
     await flushPromises();
-    expect((wrapper.vm as any).selectedFunction ?? "beta").toBeTruthy();
-    // getPayload reflects the preselection
-    expect((wrapper.vm as any).getPayload()).toMatchObject({ name: "beta" });
+    await expect((wrapper.vm as any).submit()).resolves.toMatchObject({
+      name: "beta",
+    });
   });
 
-  it("getPayload returns null and flags an error when nothing is selected", async () => {
+  // Required is now enforced by the shared AssociateFunction schema (min(1)) and
+  // rendered inline on the field — not by a hand-rolled `showRequiredError` flag.
+  it("submit resolves null when nothing is selected", async () => {
     const wrapper = createWrapper();
     await flushPromises();
-    expect((wrapper.vm as any).getPayload()).toBeNull();
-    await flushPromises();
-    expect(wrapper.find(".o-select").attributes("data-error")).toBe("true");
+    await expect((wrapper.vm as any).submit()).resolves.toBeNull();
   });
 
-  it("getPayload returns { name, after_flatten } with the flatten value", async () => {
+  it("submit resolves { name, after_flatten } with the flatten value", async () => {
     const wrapper = createWrapper({ initialName: "alpha", initialAfterFlatten: false });
     await flushPromises();
-    expect((wrapper.vm as any).getPayload()).toEqual({
+    await expect((wrapper.vm as any).submit()).resolves.toEqual({
       name: "alpha",
       after_flatten: false,
     });
@@ -120,22 +120,36 @@ describe("FunctionPicker", () => {
   it("omits after_flatten when showFlatten is false", async () => {
     const wrapper = createWrapper({ initialName: "alpha", showFlatten: false });
     await flushPromises();
-    expect((wrapper.vm as any).getPayload()).toEqual({ name: "alpha" });
+    await expect((wrapper.vm as any).submit()).resolves.toEqual({ name: "alpha" });
   });
 
+  // Uniqueness is the schema's superRefine ("already associated"), replacing the
+  // old `functionExists` computed.
   it("blocks save (null) when the selected name is a duplicate", async () => {
     const wrapper = createWrapper({ initialName: "alpha", duplicateNames: ["alpha"] });
     await flushPromises();
-    expect((wrapper.vm as any).getPayload()).toBeNull();
+    await expect((wrapper.vm as any).submit()).resolves.toBeNull();
   });
 
-  it("emits expand and returns null from getPayload while creating inline", async () => {
+  it("allows a duplicate name while updating (edit mode)", async () => {
+    const wrapper = createWrapper({
+      initialName: "alpha",
+      duplicateNames: ["alpha"],
+      isUpdating: true,
+    });
+    await flushPromises();
+    await expect((wrapper.vm as any).submit()).resolves.toMatchObject({
+      name: "alpha",
+    });
+  });
+
+  it("emits expand and resolves null from submit while creating inline", async () => {
     const wrapper = createWrapper({ initialName: "alpha" });
     await flushPromises();
     // toggle the first switch (create-new)
     await wrapper.findAll(".o-switch")[0].trigger("click");
     expect(wrapper.emitted("expand")?.[0]).toEqual([true]);
-    expect((wrapper.vm as any).getPayload()).toBeNull();
+    await expect((wrapper.vm as any).submit()).resolves.toBeNull();
   });
 
   it("hides the After-Flattening toggle when showFlatten is false", async () => {

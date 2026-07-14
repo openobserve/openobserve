@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import i18n from "@/locales";
 import ConditionBuilder from "./ConditionBuilder.vue";
@@ -87,7 +87,7 @@ describe("ConditionBuilder", () => {
     expect((wrapper.vm as any).conditionGroup.conditions[0].operator).toBe("contains");
   });
 
-  it("getPayload returns { version, conditions } for a valid rule", () => {
+  it("submit resolves { version, conditions } for a valid rule", async () => {
     const saved = {
       filterType: "group",
       conditions: [
@@ -95,20 +95,25 @@ describe("ConditionBuilder", () => {
       ],
     };
     const wrapper = createWrapper({ initialConditions: saved });
-    const payload = (wrapper.vm as any).getPayload();
+    const payload = await (wrapper.vm as any).submit();
     expect(payload.version).toBe(2);
     expect(payload.conditions.conditions[0].column).toBe("level");
   });
 
-  it("getPayload returns null and toasts when the rule is empty", () => {
+  // The zod schema now gates the save: an empty/incomplete rule fails
+  // validation, so submit() resolves null and the message renders inline under
+  // the FilterGroup (the old imperative error toast is gone).
+  it("submit resolves null and shows an inline error when the rule is empty", async () => {
     const wrapper = createWrapper({
       initialConditions: {
         filterType: "group",
         conditions: [{ filterType: "condition", column: "", operator: "" }],
       },
     });
-    expect((wrapper.vm as any).getPayload()).toBeNull();
-    expect(mockToast).toHaveBeenCalledWith(
+    await expect((wrapper.vm as any).submit()).resolves.toBeNull();
+    await flushPromises();
+    expect(wrapper.find('[data-test="condition-builder-error"]').exists()).toBe(true);
+    expect(mockToast).not.toHaveBeenCalledWith(
       expect.objectContaining({ variant: "error" }),
     );
   });
@@ -119,5 +124,105 @@ describe("ConditionBuilder", () => {
     expect(
       wrapper.findComponent({ name: "FilterGroup" }).props("streamFields"),
     ).toEqual(fields);
+  });
+  // ── Ported from pipeline Condition.spec ───────────────────────────────────
+  // These behaviours moved here when pipelines and workflows were put back on
+  // this one shared body; the drawer spec now only covers its own chrome.
+
+  it("loads the V1-backend AND format", () => {
+    const wrapper = createWrapper({
+      initialConditions: {
+        and: [{ column: "level", operator: "=", value: "error" }],
+      },
+    });
+    const g = (wrapper.vm as any).conditionGroup;
+    expect(g.filterType).toBe("group");
+    expect(g.logicalOperator).toBe("AND");
+  });
+
+  it("loads the V1-backend OR format", () => {
+    const wrapper = createWrapper({
+      initialConditions: {
+        or: [{ column: "level", operator: "=", value: "error" }],
+      },
+    });
+    expect((wrapper.vm as any).conditionGroup.logicalOperator).toBe("OR");
+  });
+
+  it("updates the group when FilterGroup emits add-condition", async () => {
+    const wrapper = createWrapper();
+    const root = (wrapper.vm as any).conditionGroup;
+    const updated = {
+      ...JSON.parse(JSON.stringify(root)),
+      logicalOperator: "OR",
+    };
+    await wrapper
+      .findComponent({ name: "FilterGroup" })
+      .vm.$emit("add-condition", updated);
+    expect((wrapper.vm as any).conditionGroup.logicalOperator).toBe("OR");
+  });
+
+  // ── Schema validation matrix (was the drawer's "blocks submit" suite) ─────
+  const rule = (c: any) => ({
+    filterType: "group",
+    logicalOperator: "AND",
+    groupId: "g1",
+    conditions: Array.isArray(c) ? c : [c],
+  });
+  const cond = (o: any) => ({ filterType: "condition", id: "c1", ...o });
+
+  it.each([
+    ["an empty conditions array", rule([])],
+    ["an empty column", cond({ column: "", operator: "=", value: "x" })],
+    ["an empty operator", cond({ column: "lvl", operator: "", value: "x" })],
+    ["a column but no value", cond({ column: "lvl", operator: "=", value: "" })],
+  ])("blocks submit for %s", async (_label, c: any) => {
+    const wrapper = createWrapper({
+      initialConditions: Array.isArray(c?.conditions) ? c : rule(c),
+    });
+    await expect((wrapper.vm as any).submit()).resolves.toBeNull();
+  });
+
+  it("blocks submit when ANY of several conditions is incomplete", async () => {
+    const wrapper = createWrapper({
+      initialConditions: rule([
+        cond({ column: "lvl", operator: "=", value: "error" }),
+        cond({ column: "svc", operator: "=", value: "" }),
+      ]),
+    });
+    await expect((wrapper.vm as any).submit()).resolves.toBeNull();
+  });
+
+  it.each([
+    ["an empty-string value", cond({ column: "lvl", operator: "!=", value: '""' })],
+    ["a null value", cond({ column: "lvl", operator: "!=", value: "null" })],
+  ])("accepts %s as a complete condition", async (_label, c: any) => {
+    const wrapper = createWrapper({ initialConditions: rule(c) });
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload).not.toBeNull();
+    expect(payload.version).toBe(2);
+  });
+
+  it("accepts a nested group as a valid condition", async () => {
+    const wrapper = createWrapper({
+      initialConditions: rule({
+        filterType: "group",
+        logicalOperator: "OR",
+        groupId: "g2",
+        conditions: [cond({ column: "lvl", operator: "=", value: "warn" })],
+      }),
+    });
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload).not.toBeNull();
+  });
+
+  it("preserves ignore_case in the returned payload", async () => {
+    const wrapper = createWrapper({
+      initialConditions: rule(
+        cond({ column: "lvl", operator: "=", value: "error", ignore_case: true }),
+      ),
+    });
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload.conditions.conditions[0].ignore_case).toBe(true);
   });
 });

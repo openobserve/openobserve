@@ -77,22 +77,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <template v-if="!createNewFunction">
-        <OSelect
-          v-model="selectedFunction"
+      <OForm v-if="!createNewFunction" :form="form" class="flex flex-col gap-4">
+        <!-- required + "already associated" are both enforced by the shared
+             AssociateFunction schema, rendered inline on the field. -->
+        <OFormSelect
+          name="selectedFunction"
           :options="functionOptions"
-          :label="t('flow.function.select') + ' *'"
+          :label="t('flow.function.select')"
+          required
           searchable
           :readonly="isUpdating"
           :disabled="isUpdating"
-          :error="functionExists || (showRequiredError && !selectedFunction)"
-          :error-message="
-            functionExists
-              ? t('flow.function.duplicate')
-              : showRequiredError && !selectedFunction
-                ? t('flow.function.required')
-                : ''
-          "
           data-test="function-picker-select"
         />
 
@@ -143,8 +138,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- After-Flattening (RAF/RBF) toggle + guidelines -->
         <div v-if="showFlatten" class="w-full flex flex-col gap-3">
-          <OSwitch
-            v-model="afterFlatten"
+          <OFormSwitch
+            name="afterFlattening"
             :label="t('flow.function.flatten')"
             data-test="function-picker-after-flatten-toggle"
           />
@@ -170,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </template>
+      </OForm>
     </template>
   </div>
 </template>
@@ -186,8 +181,15 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import {
+  makeAssociateFunctionSchema,
+  type AssociateFunctionForm,
+} from "@/components/pipeline/NodeForm/AssociateFunction.schema";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
@@ -236,25 +238,40 @@ const loading = ref(false);
 const functionOptions = ref<string[]>([]);
 const functionDefs = ref<Record<string, string>>({});
 
-const selectedFunction = ref<string>(props.initialName || "");
-const afterFlatten = ref<boolean>(props.initialAfterFlatten);
-const showRequiredError = ref(false);
 const createNewFunction = ref(false);
 const addFunctionRef = ref<any>(null);
 
 watch(createNewFunction, (v) => emit("expand", v));
-watch(selectedFunction, (v) => {
-  if (v) showRequiredError.value = false;
+
+// ── OForm wiring (OWNER pattern) ─────────────────────────────────────────────
+// Owned here so the definition preview can read the live selection reactively.
+// The shared AssociateFunction schema enforces BOTH rules that used to be
+// hand-rolled: required (min(1)) and "already associated" (superRefine over
+// duplicateNames) — both now render inline on the select.
+const validated = ref<AssociateFunctionForm | null>(null);
+
+const form = useOForm<AssociateFunctionForm>({
+  defaultValues: {
+    selectedFunction: props.initialName || "",
+    afterFlattening: props.initialAfterFlatten,
+  },
+  schema: makeAssociateFunctionSchema(
+    t,
+    () => props.duplicateNames,
+    () => props.isUpdating,
+  ),
+  onSubmit: (values) => {
+    validated.value = values;
+  },
 });
+
+// Reactive view of the SAME form (no mirror ref).
+const selectedFunction = form.useStore(
+  (s: any) => s.values?.selectedFunction ?? "",
+);
 
 const selectedDefinition = computed(
   () => functionDefs.value[selectedFunction.value] || "",
-);
-const functionExists = computed(
-  () =>
-    !props.isUpdating &&
-    !!selectedFunction.value &&
-    props.duplicateNames.includes(selectedFunction.value),
 );
 
 // Load saved VRL functions (skip JS functions, trans_type === 1).
@@ -293,7 +310,8 @@ const onFunctionCreation = async (fn: any) => {
   emit("created", fn);
   await getFunctions();
   await nextTick();
-  if (fn?.name) selectedFunction.value = fn.name;
+  // Push the just-created function into the form (the select re-mounts with it).
+  if (fn?.name) form.setFieldValue("selectedFunction", fn.name);
 };
 
 // Inline editor back/cancel: return to the picker (don't close the host drawer).
@@ -301,20 +319,20 @@ const cancelFunctionCreation = () => {
   createNewFunction.value = false;
 };
 
-// Read the current selection as a node payload, or null if invalid.
-const getPayload = () => {
-  if (createNewFunction.value) return null;
-  if (!selectedFunction.value) {
-    showRequiredError.value = true;
-    return null;
-  }
-  if (functionExists.value) return null;
+// Host bridge: validate through the schema and return the node payload, or null
+// when invalid (OForm renders required / already-associated inline on the field).
+const submit = async () => {
+  if (createNewFunction.value) return null; // still in the inline editor
+  validated.value = null;
+  await form.handleSubmit();
+  const values = validated.value;
+  if (!values?.selectedFunction) return null;
   return props.showFlatten
-    ? { name: selectedFunction.value, after_flatten: afterFlatten.value }
-    : { name: selectedFunction.value };
+    ? { name: values.selectedFunction, after_flatten: !!values.afterFlattening }
+    : { name: values.selectedFunction };
 };
 
-defineExpose({ getPayload });
+defineExpose({ submit, createNewFunction, form });
 </script>
 
 <style scoped>

@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     secondary-button-variant="outline"
     :neutral-button-label="pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
     neutral-button-variant="outline-destructive"
-    form-id="condition-form"
+    @click:primary="saveCondition"
     @click:secondary="openCancelDialog"
     @click:neutral="openDeleteDialog"
     @keydown.stop
@@ -55,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
 
 
-    <OForm id="condition-form" :form="form">
     <div class="w-full rounded-lg px-3 stream-routing-container">
       <div>
         <div
@@ -63,36 +62,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-condition-query-input-title"
         >
           <div></div>
-          <!-- Wrapper for FilterGroup with pipeline-specific styling -->
-          <div class="pipeline-filter-group-wrapper max-w-full overflow-x-visible!" @submit.stop.prevent>
-            <FilterGroup
-              v-if="
-                conditionGroup &&
-                (conditionGroup.conditions || conditionGroup.items)
-              "
-              :key="filterGroupKey"
-              :stream-fields="filteredColumns"
-              :group="conditionGroup"
-              :depth="0"
-              condition-input-width="w-[130px]"
-              :allow-custom-columns="true"
-              module="pipelines"
-              @add-condition="(updatedGroup) => updateGroup(updatedGroup)"
-              @add-group="(updatedGroup) => updateGroup(updatedGroup)"
-              @remove-group="(groupId) => removeConditionGroup(groupId)"
-              @input:update="(name, field) => onInputUpdate(name, field)"
-            />
-            <div v-else class="p-3 text-gray-400">Loading conditions...</div>
-          </div>
-          <!-- Schema error for the bridged FilterGroup model (no OForm* field to
-               render it, so surface the form-level `conditions` error here). -->
-          <div
-            v-if="conditionsError"
-            class="text-xs text-input-error-text mt-1"
-            data-test="add-condition-error"
+          <!-- SHARED body: the same ConditionBuilder the workflow Condition node
+               renders. It owns the FilterGroup, the V0/V1→V2 conversion, the zod
+               schema and the inline error. Pipelines only supply the stream
+               fields and these guidelines. -->
+          <ConditionBuilder
+            ref="builder"
+            :fields="filteredColumns"
+            :initial-conditions="initialConditions"
+            module="pipelines"
+            :allow-custom-columns="true"
+            normalize-operators
           >
-            {{ conditionsError }}
-          </div>
+            <template #guidelines>
           <div
             class="note-container bg-[#f9f290] text-[#2d3748] w-full rounded-md p-3 my-3 flex flex-col gap-2"
             data-test="add-condition-note-container"
@@ -140,10 +122,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
+            </template>
+          </ConditionBuilder>
         </div>
       </div>
     </div>
-    </OForm>
   </div>
   </ODrawer>
   <confirm-dialog
@@ -165,12 +148,8 @@ import {
   watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OForm from "@/lib/forms/Form/OForm.vue";
-import { useOForm } from "@/lib/forms/Form/useOForm";
-import { firstFieldError } from "@/lib/forms/Form/fieldError";
-import { makeConditionSchema, type ConditionForm } from "./Condition.schema";
+import ConditionBuilder from "@/components/flow/forms/ConditionBuilder.vue";
 import {
   getTimezoneOffset,
   getUUID,
@@ -185,16 +164,6 @@ import ConfirmDialog from "../../ConfirmDialog.vue";
 import { convertDateToTimestamp } from "@/utils/date";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import {
-  detectConditionsVersion,
-  convertV0ToV2,
-  convertV1ToV2,
-  convertV1BEToV2,
-  updateGroup as updateGroupUtil,
-  removeConditionGroup as removeConditionGroupUtil,
-  ensureIds,
-  type V2Group,
-} from "@/utils/alerts/alertDataTransforms";
 
 const VariablesInput = defineAsyncComponent(
   () => import("@/components/alerts/VariablesInput.vue"),
@@ -321,86 +290,13 @@ const getDefaultStreamRoute: any = () => {
   };
 };
 
-// Backend returns operators in lowercase (e.g. "contains", "not_contains").
-// Normalize them to the canonical casing expected by FilterCondition's triggerOperators.
-const OPERATOR_NORMALIZE_MAP: Record<string, string> = {
-  contains: "Contains",
-  notcontains: "NotContains",
-  not_contains: "NotContains",
-};
-
-const normalizeConditionOperators = (group: any): any => {
-  if (!group || group.filterType !== "group" || !Array.isArray(group.conditions)) return group;
-  group.conditions = group.conditions.map((item: any) => {
-    if (item.filterType === "group") return normalizeConditionOperators(item);
-    if (item.filterType === "condition" && item.operator) {
-      const normalized = OPERATOR_NORMALIZE_MAP[item.operator.toLowerCase()];
-      if (normalized) item.operator = normalized;
-    }
-    return item;
-  });
-  return group;
-};
-
-// Initialize condition group - V2: Auto-convert V0/V1 to V2 format
-// Supports three versions:
-// - V0: Flat array of conditions with implicit AND between all (no groups)
-// - V1: Tree-based structure with {and: [...]} or {or: [...]} or {label, items, groupId}
-// - V2: Linear structure with filterType, logicalOperator per condition
-const getDefaultConditionGroup = (): ConditionGroup => {
-  if (
-    pipelineObj.isEditNode &&
-    pipelineObj.currentSelectedNodeData?.data?.conditions
-  ) {
-    try {
-      // Create a deep copy to avoid mutating the original pipelineObj data
-      const conditions = JSON.parse(
-        JSON.stringify(pipelineObj.currentSelectedNodeData.data.conditions),
-      );
-      const version = detectConditionsVersion(conditions);
-
-      if (version === 0) {
-        // V0: Flat array format - convert to V2
-        // V0 had implicit AND between all conditions (no groups)
-        const converted = convertV0ToV2(conditions);
-        return normalizeConditionOperators(ensureIds(converted) as any);
-      } else if (version === 1) {
-        // V1: Convert to V2
-        let converted;
-        if (conditions.and || conditions.or) {
-          // V1 Backend format
-          converted = convertV1BEToV2(conditions);
-        } else if (conditions.label && conditions.items) {
-          // V1 Frontend format
-          converted = convertV1ToV2(conditions);
-        }
-        return normalizeConditionOperators(ensureIds(converted) as any);
-      } else {
-        // V2: Use as-is, but ensure all groupIds and ids exist recursively
-        return normalizeConditionOperators(ensureIds(conditions) as any);
-      }
-    } catch (error) {
-      console.error("Error converting condition to group format:", error);
-    }
-  }
-  // Default empty V2 group
-  return {
-    filterType: "group",
-    logicalOperator: "AND",
-    groupId: getUUID(),
-    conditions: [
-      {
-        filterType: "condition",
-        column: "",
-        operator: "=",
-        value: "",
-        values: [],
-        logicalOperator: "AND",
-        id: getUUID(),
-      },
-    ],
-  } as any;
-};
+// The SHARED ConditionBuilder owns V0/V1 -> V2 conversion and the lowercase
+// operator normalization; pipelines just hand it the saved rule.
+const initialConditions = computed(() =>
+  pipelineObj.isEditNode
+    ? (pipelineObj.currentSelectedNodeData?.data?.conditions ?? null)
+    : null,
+);
 
 onBeforeMount(async () => {
   await importSqlParser();
@@ -436,62 +332,17 @@ const streamRoute: Ref<StreamRoute> = ref(getDefaultStreamRoute());
 
 const originalStreamRouting: Ref<StreamRoute> = ref(getDefaultStreamRoute());
 
-const conditionGroup: Ref<ConditionGroup> = ref(getDefaultConditionGroup());
+// The shared ConditionBuilder owns the condition tree + its OForm/zod schema.
+// We only hold a ref to it (for submit() and the cancel dirty-check).
+const builder = ref<any>(null);
 
-// Create a deep copy to preserve the original state for comparison
-const originalConditionGroup: Ref<ConditionGroup> = ref(
-  JSON.parse(JSON.stringify(getDefaultConditionGroup())),
-);
-
-// Simple incrementing key to force re-render when needed
-const filterGroupKey = ref(0);
-
-// Watch for label changes specifically to force re-render
-watch(
-  () => conditionGroup.value.label,
-  () => {
-    filterGroupKey.value++;
-  },
-);
-
-// ── OForm wiring (Rule ③ OWNER pattern) ──────────────────────────────────────
-// This component OWNS <OForm> and needs to read the form-level `conditions`
-// error to surface it under the FilterGroup, so it creates the form here with
-// useOForm and reads it reactively via form.useStore — a SINGLE source of truth
-// (no mirror ref, no store.subscribe). The composite FilterGroup has no OForm*
-// equivalent, so its model (`conditionGroup`) is bridged INTO the form as the
-// `conditions` field via a DIRECT form.setFieldValue from the FilterGroup's own
-// change handlers (updateGroup / removeConditionGroup / onInputUpdate) — NOT a
-// watch on a local-ref mirror (Rule ③). The schema's superRefine
-// ("at least one condition") then gates submit (R3/R4).
-const conditionDefaults = computed((): ConditionForm => ({
-  conditions: conditionGroup.value,
-}));
-
-const form = useOForm<ConditionForm>({
-  defaultValues: conditionDefaults.value,
-  schema: makeConditionSchema(t),
-  onSubmit: () => saveCondition(),
+// Snapshot of the rule as first rendered, for the "discard changes?" prompt.
+const originalConditionGroup = ref<any>(null);
+onMounted(() => {
+  originalConditionGroup.value = JSON.parse(
+    JSON.stringify(builder.value?.conditionGroup ?? null),
+  );
 });
-
-// Bridge the composite child's model into the form's `conditions` field. Called
-// from the FilterGroup change handlers (the control's own handlers).
-const syncConditionsToForm = () => {
-  form.setFieldValue("conditions", conditionGroup.value, {
-    dontUpdateMeta: true,
-  });
-};
-
-// Surface the form-level `conditions` error (no OForm* field renders it) — a
-// reactive view of the SAME form, no mirror.
-const conditionsErrors = form.useStore(
-  (s: any) => s.fieldMeta?.conditions?.errors ?? [],
-);
-const conditionsError = computed(() =>
-  conditionsErrors.value.length
-    ? String(firstFieldError(conditionsErrors.value))
-    : "",
-);
 
 const filterColumns = (options: any[], val: String, update: Function) => {
   let filteredOptions: any[] = [];
@@ -624,63 +475,10 @@ const getFields = async () => {
   }
 };
 
-// Group management functions - Using shared utilities from alertDataTransforms
-// These functions are called when FilterGroup emits add-condition, add-group, or remove-group events
-
-const updateGroup = (updatedGroup: any) => {
-  // Create a context object that matches the alert utility's expected structure
-  // The utility expects: context.formData.query_condition.conditions
-  // We need to create a temporary wrapper and then extract the updated value
-  const tempContext = {
-    formData: {
-      query_condition: {
-        conditions: conditionGroup.value,
-      },
-    },
-  };
-
-  // Call the shared utility
-  updateGroupUtil(updatedGroup, tempContext as any);
-
-  // Extract the updated value back
-  conditionGroup.value = tempContext.formData.query_condition.conditions;
-  syncConditionsToForm();
-};
-
-const removeConditionGroup = (targetGroupId: string) => {
-  // Create a context object that matches the alert utility's expected structure
-  const tempContext = {
-    formData: {
-      query_condition: {
-        conditions: conditionGroup.value,
-      },
-    },
-  };
-
-  // Call the shared utility
-  removeConditionGroupUtil(
-    targetGroupId,
-    conditionGroup.value,
-    tempContext as any,
-  );
-
-  // Extract the updated value back
-  conditionGroup.value = tempContext.formData.query_condition.conditions;
-  syncConditionsToForm();
-};
-
-const onInputUpdate = (_name?: string, _field?: any) => {
-  // FilterGroup mutates the passed `conditionGroup` in place and emits this on
-  // every field edit — bridge the live model into the form so the schema's
-  // superRefine sees column/operator changes (Rule ③ direct-handler bridge).
-  syncConditionsToForm();
-};
 
 const closeDialog = () => {
-  // Restore the original condition group when canceling
-  conditionGroup.value = JSON.parse(
-    JSON.stringify(originalConditionGroup.value),
-  );
+  // The builder holds its own deep clone of the rule, so the saved node data was
+  // never mutated — closing simply drops it (no restore needed).
   pipelineObj.userClickedNode = {};
   pipelineObj.userSelectedNode = {};
   internalOpen.value = false;
@@ -692,7 +490,7 @@ const openCancelDialog = () => {
     try {
       if (
         JSON.stringify(originalConditionGroup.value) ===
-        JSON.stringify(conditionGroup.value)
+        JSON.stringify(builder.value?.conditionGroup)
       ) {
         closeDialog();
         return;
@@ -716,12 +514,16 @@ const openCancelDialog = () => {
 // the live `conditionGroup` (the bridged source of truth).
 const saveCondition = async () => {
   try {
-    // V2: Send directly to backend (no transformation needed)
-    // The conditionGroup is already in V2 format which matches backend
-    let conditionData = {
+    // The shared builder validates against the zod schema ("at least one
+    // complete condition") and renders the error inline, returning null when the
+    // rule is empty/incomplete — so an invalid rule simply never gets here.
+    const payload = await builder.value?.submit();
+    if (!payload) return;
+
+    const conditionData = {
       node_type: "condition",
-      version: 2, // Numeric version for consistency with alerts
-      conditions: conditionGroup.value,
+      version: payload.version, // 2
+      conditions: payload.conditions,
     };
 
     // Ensure currentSelectedNodeData has proper structure
@@ -742,9 +544,9 @@ const saveCondition = async () => {
     }
 
     addNode(conditionData);
-    // Update originalConditionGroup to the newly saved state
+    // Snapshot the newly saved state for the discard-changes comparison.
     originalConditionGroup.value = JSON.parse(
-      JSON.stringify(conditionGroup.value),
+      JSON.stringify(payload.conditions),
     );
     emit("cancel:hideform");
   } catch (error) {

@@ -126,7 +126,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 const { onInit } = useVueFlow();
 
 export default {
-  components: { VueFlow, CustomNode, DropzoneBackground, Controls,ControlButton,EdgeWithButton,FlowEdge
+  components: { VueFlow, CustomNode, OIcon, DropzoneBackground, Controls,ControlButton,EdgeWithButton,FlowEdge
    },
   setup() {
     const { t } = useI18n();

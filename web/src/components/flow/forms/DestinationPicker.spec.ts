@@ -47,7 +47,11 @@ function createWrapper(props: Record<string, any> = {}) {
       stubs: {
         OSelect: OSelectStub,
         OSwitch: OSwitchStub,
-        CreateDestinationForm: { template: '<div class="create-destination-stub" />' },
+        CreateDestinationForm: {
+          name: "CreateDestinationForm",
+          emits: ["created", "cancel"],
+          template: '<div class="create-destination-stub" />',
+        },
       },
     },
     props,
@@ -126,5 +130,96 @@ describe("DestinationPicker", () => {
     await flushPromises();
     await wrapper.find(".o-switch").trigger("click");
     expect(wrapper.emitted("expand")?.[0]).toEqual([true]);
+  });
+
+  // ── Ported from ExternalDestination.spec ──────────────────────────────────
+  // These behaviours moved here when pipelines and workflows were put back on
+  // this one shared body; the drawer spec now only covers its own chrome.
+
+  it("fetches with the full expected API parameters", async () => {
+    createWrapper();
+    await flushPromises();
+    expect(mockList).toHaveBeenCalledWith(
+      expect.objectContaining({
+        page_num: 1,
+        page_size: 100000,
+        sort_by: "name",
+        desc: false,
+        module: "pipeline",
+      }),
+    );
+  });
+
+  it("handles a 403 silently (no error toast, no destinations)", async () => {
+    mockList.mockRejectedValueOnce({ response: { status: 403 } });
+    const wrapper = createWrapper();
+    await flushPromises();
+    expect(mockToast).not.toHaveBeenCalled();
+    expect((wrapper.vm as any).destinationOptions).toEqual([]);
+  });
+
+  it("surfaces a non-403 fetch error without crashing", async () => {
+    mockList.mockRejectedValueOnce({ response: { status: 500 } });
+    const wrapper = createWrapper();
+    await flushPromises();
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error" }),
+    );
+    expect((wrapper.vm as any).destinationOptions).toEqual([]);
+  });
+
+  it("returns an empty option list when there are no destinations", async () => {
+    mockList.mockResolvedValueOnce({ data: [] });
+    const wrapper = createWrapper();
+    await flushPromises();
+    expect((wrapper.vm as any).destinationOptions).toEqual([]);
+  });
+
+  it("does not truncate URLs of exactly 70 chars or shorter", async () => {
+    const url70 = "http://x.example.com/" + "a".repeat(70 - 21); // exactly 70
+    mockList.mockResolvedValueOnce({
+      data: [
+        { name: "exact", url: url70 },
+        { name: "short", url: "http://s.example.com" },
+      ],
+    });
+    const wrapper = createWrapper();
+    await flushPromises();
+    const opts = (wrapper.vm as any).destinationOptions;
+    expect(url70.length).toBe(70);
+    expect(opts.find((o: any) => o.value === "exact").subLabel).toBe(url70);
+    expect(opts.find((o: any) => o.value === "short").subLabel).toBe(
+      "http://s.example.com",
+    );
+  });
+
+  it("on @created: selects the new destination, leaves create mode, refetches", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    await wrapper.find(".o-switch").trigger("click"); // into create mode
+    expect((wrapper.vm as any).createNewDestination).toBe(true);
+    mockList.mockClear();
+
+    wrapper.findComponent({ name: "CreateDestinationForm" }).vm.$emit(
+      "created",
+      "sink-a",
+    );
+    await flushPromises();
+
+    expect((wrapper.vm as any).createNewDestination).toBe(false); // back to select
+    expect(mockList).toHaveBeenCalled(); // list refreshed
+    await expect((wrapper.vm as any).submit()).resolves.toMatchObject({
+      destination_name: "sink-a", // and the new one is selected
+    });
+  });
+
+  it("refetches when toggling out of create mode", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    await wrapper.find(".o-switch").trigger("click"); // on
+    mockList.mockClear();
+    await wrapper.find(".o-switch").trigger("click"); // off
+    await flushPromises();
+    expect(mockList).toHaveBeenCalled();
   });
 });
