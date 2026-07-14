@@ -85,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             table-id="workflows-workflow-list"
             width="100%"
             class="tw:w-full tw:h-full"
+            @row-click="openHistory"
           >
             <template #toolbar>
               <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
@@ -167,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <ODropdownItem
                     :data-test="`workflow-list-${row.name}-view-runs`"
-                    @select="viewRuns(row)"
+                    @select="openHistory(row)"
                   >
                     <template #icon-left><OIcon size="sm" name="history" /></template>
                     {{ t("workflow.viewRuns") }}
@@ -228,6 +229,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model="confirmDialogMeta.show"
   />
 
+  <!-- Run history (Executions) — opened by clicking a workflow row. -->
+  <WorkflowHistoryDrawer
+    v-if="showHistory"
+    :open="showHistory"
+    :org-id="orgId"
+    :workflow-id="historyWorkflow.id"
+    :workflow-name="historyWorkflow.name"
+    @open-run="openRunInEditor"
+    @close="showHistory = false"
+  />
 </template>
 
 <script setup lang="ts">
@@ -250,6 +261,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import WorkflowHistoryDrawer from "@/components/workflows/WorkflowHistoryDrawer.vue";
 import WorkflowView from "@/components/workflows/WorkflowView.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
@@ -405,8 +417,29 @@ const editWorkflow = (row: any) => {
 };
 
 // Runs tab is a later slice (#15).
-const viewRuns = (_row: any) =>
-  toast({ message: t("workflow.comingSoon"), variant: "info" });
+// Run-history (Executions) drawer — opened by clicking a workflow row or the
+// "View Runs" menu action (mirrors AlertList's row-click → history drawer).
+const showHistory = ref(false);
+const historyWorkflow = ref<any>({ id: "", name: "" });
+const openHistory = (row: any) => {
+  if (!row?.id) return;
+  historyWorkflow.value = row;
+  showHistory.value = true;
+};
+
+// From the history drawer's "open run" icon: hydrate the editor from the full
+// workflow row and deep-link to the editor with the run_id so it can surface
+// that run's per-node input/output.
+const openRunInEditor = (runId: string) => {
+  const row = historyWorkflow.value;
+  if (!row?.id) return;
+  hydrateWorkflow(row);
+  showHistory.value = false;
+  router.push({
+    name: "workflowEditor",
+    query: { id: row.id, name: row.name, org_identifier: orgId.value, run_id: runId },
+  });
+};
 
 // --- enable / disable (pause / resume) --------------------------------------
 // Simpler than pipelines (no realtime/from-now resume dialog): just flip state.

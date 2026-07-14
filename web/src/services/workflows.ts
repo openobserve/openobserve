@@ -91,20 +91,30 @@ const workflows = {
     return http().post(url, { inputs, from_node });
   },
 
-  // Run/error history for a workflow (Runs tab — not yet wired in the UI).
-  getWorkflowErrors: ({
+  // Run history for a workflow. `start_time`/`end_time` are Unix microseconds;
+  // the backend defaults to the last 7 days when omitted. Returns an array of
+  // runs ({ _timestamp, start_time, end_time, evaluation_took_in_secs, error,
+  // event_type, source_id, run_id, ... }); `error` is null on success.
+  getWorkflowHistory: ({
     org_identifier,
     id,
+    start_time,
+    end_time,
   }: {
     org_identifier: string;
     id: string;
+    start_time?: number;
+    end_time?: number;
   }) => {
-    const url = `/api/${org_identifier}/workflows/${id}/errors`;
+    const params = new URLSearchParams();
+    if (start_time != null) params.set("start_time", String(start_time));
+    if (end_time != null) params.set("end_time", String(end_time));
+    const qs = params.toString();
+    const url = `/api/${org_identifier}/workflows/${id}/history${qs ? `?${qs}` : ""}`;
     return http().get(url);
   },
 
-  // Re-run a failed run, optionally from a specific node (Runs tab — not yet
-  // wired in the UI).
+  // Re-run a failed run, optionally from a specific node.
   retryWorkflow: ({
     org_identifier,
     id,
