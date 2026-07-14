@@ -124,6 +124,8 @@ mod m20260520_000004_create_online_eval_jobs_table;
 mod m20260520_000005_drop_eval_templates_table;
 mod m20260604_000001_add_kind_to_pipeline;
 mod m20260622_000001_add_org_id_to_short_urls;
+mod m20260623_000001_create_org_cleanup_tasks;
+mod m20260623_000002_add_status_and_deleted_at_to_organizations;
 mod m20260629_000001_create_gen_ai_agents_table;
 
 pub struct Migrator;
@@ -238,6 +240,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260520_000005_drop_eval_templates_table::Migration),
             Box::new(m20260604_000001_add_kind_to_pipeline::Migration),
             Box::new(m20260622_000001_add_org_id_to_short_urls::Migration),
+            Box::new(m20260623_000001_create_org_cleanup_tasks::Migration),
+            Box::new(m20260623_000002_add_status_and_deleted_at_to_organizations::Migration),
             Box::new(m20260629_000001_create_gen_ai_agents_table::Migration),
         ]
     }

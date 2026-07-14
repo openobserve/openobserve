@@ -60,8 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <rect x="88" y="98" width="8" height="30" rx="2" fill="var(--color-primary-600)" />
     <rect x="100" y="110" width="8" height="18" rx="2" fill="var(--color-primary-400)" />
 
-    <!-- empty slot (pulses) -->
-    <g class="es-slot [transform-box:fill-box] origin-center [animation:es-slot_2.6s_ease-in-out_infinite]">
+    <!-- empty slot (static — a pulsing plus here read as a clickable button) -->
+    <g opacity="0.75">
       <rect x="124" y="78" width="60" height="58" rx="7" fill="none" stroke="var(--color-primary-400)" stroke-width="1.75" stroke-dasharray="6 6" />
       <line x1="154" y1="97" x2="154" y2="117" stroke="var(--color-primary-500)" stroke-width="3" stroke-linecap="round" />
       <line x1="144" y1="107" x2="164" y2="107" stroke="var(--color-primary-500)" stroke-width="3" stroke-linecap="round" />
@@ -82,17 +82,6 @@ withDefaults(
 </script>
 
 <style>
-@keyframes es-slot {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.6;
-  }
-  50% {
-    transform: scale(1.03);
-    opacity: 1;
-  }
-}
 @keyframes es-twinkle {
   0%,
   100% {
@@ -116,11 +105,11 @@ withDefaults(
   }
 }
 
-.es-static :where(.es-slot, .es-spark, .es-cf) {
+.es-static :where(.es-spark, .es-cf) {
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  :where(.es-slot, .es-spark, .es-cf) {
+  :where(.es-spark, .es-cf) {
     animation: none;
   }
 }

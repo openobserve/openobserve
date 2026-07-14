@@ -22,13 +22,12 @@ use datafusion::{
         tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
     },
     physical_plan::ExecutionPlan,
-    prelude::SessionContext,
 };
-use flight::common::Metrics;
 use parking_lot::Mutex;
 
-use crate::service::search::datafusion::{
-    distributed_plan::remote_scan_exec::RemoteScanExec, peak_memory_pool::PeakMemoryPool,
+use crate::service::search::datafusion::distributed_plan::remote_scan_exec::RemoteScanExec;
+pub use crate::service::search::datafusion::plan_metrics::{
+    get_cluster_metrics, get_peak_memory_from_ctx,
 };
 
 pub fn get_scan_stats(plan: &Arc<dyn ExecutionPlan>) -> Option<Arc<Mutex<ScanStats>>> {
@@ -59,37 +58,6 @@ impl<'n> TreeNodeVisitor<'n> for RemoteScanVisitor {
         } else {
             Ok(TreeNodeRecursion::Continue)
         }
-    }
-}
-
-pub fn get_cluster_metrics(plan: &Arc<dyn ExecutionPlan>) -> Vec<Arc<Mutex<Vec<Metrics>>>> {
-    let mut visitor = MetricsVisitor::new();
-    let _ = plan.visit(&mut visitor);
-    visitor.metrics
-}
-
-struct MetricsVisitor {
-    metrics: Vec<Arc<Mutex<Vec<Metrics>>>>,
-}
-
-impl MetricsVisitor {
-    pub fn new() -> Self {
-        Self {
-            metrics: Vec::new(),
-        }
-    }
-}
-
-impl<'n> TreeNodeVisitor<'n> for MetricsVisitor {
-    type Node = Arc<dyn ExecutionPlan>;
-
-    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
-        let name = node.name();
-        if name == "RemoteScanExec" {
-            let remote_scan_exec = node.downcast_ref::<RemoteScanExec>().unwrap();
-            self.metrics.push(remote_scan_exec.cluster_metrics());
-        }
-        Ok(TreeNodeRecursion::Continue)
     }
 }
 
@@ -152,18 +120,6 @@ impl<'n> TreeNodeVisitor<'n> for PeakMemoryVisitor {
     }
 }
 
-/// Get the peak memory from the SessionContext's memory pool.
-/// This should be called after the query execution to get the peak memory usage.
-pub fn get_peak_memory_from_ctx(ctx: &SessionContext) -> Arc<AtomicUsize> {
-    let memory_pool = ctx.runtime_env().memory_pool.clone();
-
-    memory_pool
-        .downcast_ref::<PeakMemoryPool>()
-        .unwrap()
-        .peak_memory
-        .clone()
-}
-
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -182,12 +138,6 @@ mod tests {
     fn test_remote_scan_visitor_new_has_no_stats() {
         let v = RemoteScanVisitor::new();
         assert!(v.scan_stats.is_none());
-    }
-
-    #[test]
-    fn test_metrics_visitor_new_has_empty_metrics() {
-        let v = MetricsVisitor::new();
-        assert!(v.metrics.is_empty());
     }
 
     #[test]

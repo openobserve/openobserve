@@ -13,11 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, hash::Hasher, sync::Arc};
 
-use config::meta::promql::{
-    NAME_LABEL,
-    value::{EvalContext, Label, Labels, LabelsExt, RangeValue, Sample, Value},
+use config::{
+    meta::promql::{
+        NAME_LABEL,
+        value::{EvalContext, Label, Labels, RangeValue, Sample, Value},
+    },
+    utils::hash::gxhash,
 };
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::LabelModifier;
@@ -48,6 +51,9 @@ pub(crate) use stddev::stddev;
 pub(crate) use stdvar::stdvar;
 pub(crate) use sum::sum;
 pub(crate) use topk::topk;
+
+/// Series per parallel partial-aggregation chunk when a single group is large.
+const AGG_PARALLEL_CHUNK: usize = 32768;
 
 /// Trait for PromQL aggregation functions.
 ///
@@ -80,6 +86,15 @@ pub trait AggFunc: Sync {
     /// collect and aggregate samples. This allows for parallel processing of multiple
     /// label groups.
     fn build(&self) -> Box<dyn Accumulate>;
+
+    /// Whether a huge group may be split into parallel chunks whose partial
+    /// accumulators are combined with [`Accumulate::merge`]. Value-buffering
+    /// accumulators (quantile/stddev/stdvar) opt out: each reduction level
+    /// re-copies every buffered sample, costing `O(N log P)` copying and extra
+    /// transient memory versus the sequential append.
+    fn mergeable(&self) -> bool {
+        true
+    }
 }
 
 /// Trait for accumulating and aggregating time series samples.
@@ -102,7 +117,7 @@ pub trait AggFunc: Sync {
 /// }
 /// let results = acc.evaluate();
 /// ```
-pub trait Accumulate: Sync {
+pub trait Accumulate: Send + Sync {
     /// Adds a sample to this accumulator.
     ///
     /// This method is called for each sample that should be included in the aggregation.
@@ -113,6 +128,26 @@ pub trait Accumulate: Sync {
     ///
     /// * `sample` - The sample to accumulate, containing a timestamp and value
     fn accumulate(&mut self, sample: &Sample);
+
+    /// Folds another accumulator of the same type into this one, as if all of
+    /// its samples had been accumulated here. Lets a large group be
+    /// aggregated in parallel chunks whose partials are merged at the end.
+    ///
+    /// Floating-point caveat: if a partial sum overflows to ±Inf, merging
+    /// opposite infinities yields NaN where a sequential fold may yield ±Inf.
+    /// Summing such inputs is inherently order-dependent (sequentially,
+    /// `MAX, -MAX, MAX, -MAX` gives 0 while `MAX, MAX, -MAX, -MAX` gives
+    /// +Inf), so no chunking-independent result exists; NaN at least signals
+    /// the Inf - Inf cancellation.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `other` is a different accumulator type.
+    fn merge(&mut self, other: Box<dyn Accumulate>);
+
+    /// Upcast used by [`Self::merge`] implementations to downcast `other` to
+    /// their own concrete type.
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any>;
 
     /// Computes and returns the final aggregated results.
     ///
@@ -142,24 +177,51 @@ pub fn labels_to_exclude(
     actual_labels
 }
 
+/// Projects a series' labels onto the grouping set of the label modifier
+/// (`by(...)` keeps them, `without(...)` drops them, none drops all).
+fn projected_labels(modifier: &Option<LabelModifier>, labels: &Labels) -> Labels {
+    match modifier {
+        Some(LabelModifier::Include(include)) => labels_to_include(&include.labels, labels.clone()),
+        Some(LabelModifier::Exclude(exclude)) => labels_to_exclude(&exclude.labels, labels.clone()),
+        None => Labels::default(),
+    }
+}
+
+/// Compute the signature of the projected labels without cloning the label
+/// vector and retaining it first. Label order and filtering exactly match
+/// [`projected_labels`], so the grouping key is unchanged.
+fn projected_labels_signature(modifier: &Option<LabelModifier>, labels: &Labels) -> u64 {
+    let mut hasher = gxhash::new_hasher();
+    for label in labels {
+        let keep = match modifier {
+            Some(LabelModifier::Include(include)) => include.labels.contains(&label.name),
+            Some(LabelModifier::Exclude(exclude)) => {
+                !exclude.labels.contains(&label.name) && label.name != NAME_LABEL
+            }
+            None => false,
+        };
+        if keep {
+            hasher.write(label.name.as_bytes());
+            hasher.write(label.value.as_bytes());
+        }
+    }
+    hasher.finish()
+}
+
 /// Groups series indices by their label signatures based on the label modifier
 pub(crate) fn group_series_by_labels(
     matrix: &[RangeValue],
     modifier: &Option<LabelModifier>,
 ) -> HashMap<u64, Vec<usize>> {
-    let mut groups: HashMap<u64, Vec<usize>> = HashMap::with_capacity(matrix.len());
+    // the signature computation clones and filters every series' labels;
+    // fan it out
+    let hashes: Vec<u64> = matrix
+        .par_iter()
+        .map(|series| projected_labels_signature(modifier, &series.labels))
+        .collect();
 
-    for (idx, series) in matrix.iter().enumerate() {
-        let grouped_labels = match modifier {
-            Some(LabelModifier::Include(labels)) => {
-                labels_to_include(&labels.labels, series.labels.clone())
-            }
-            Some(LabelModifier::Exclude(labels)) => {
-                labels_to_exclude(&labels.labels, series.labels.clone())
-            }
-            None => Labels::default(),
-        };
-        let hash = grouped_labels.signature();
+    let mut groups: HashMap<u64, Vec<usize>> = HashMap::with_capacity(matrix.len());
+    for (idx, hash) in hashes.into_iter().enumerate() {
         groups.entry(hash).or_default().push(idx);
     }
 
@@ -209,64 +271,56 @@ where
         eval_timestamps.len()
     );
 
-    // Step 1: Compute label hash for each series once based on param
-    // This avoids recomputing the hash for every timestamp
+    // Step 1: Group series indices by their projected label signature
     let start1 = std::time::Instant::now();
-    let series_label_hashes: Vec<(u64, Labels)> = matrix
-        .iter()
-        .map(|rv| {
-            let grouped_labels = match param {
-                Some(LabelModifier::Include(labels)) => {
-                    labels_to_include(&labels.labels, rv.labels.clone())
-                }
-                Some(LabelModifier::Exclude(labels)) => {
-                    labels_to_exclude(&labels.labels, rv.labels.clone())
-                }
-                None => Labels::default(),
-            };
-            let hash = grouped_labels.signature();
-            (hash, grouped_labels)
-        })
-        .collect();
+    let groups = group_series_by_labels(&matrix, param);
 
     log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] eval_aggregate({func_name}) computed label hashes in {:?}",
+        "[trace_id: {trace_id}] [PromQL Timing] eval_aggregate({func_name}) grouped {} series into {} groups in {:?}",
+        matrix.len(),
+        groups.len(),
         start1.elapsed()
     );
 
-    // Step 2: Group series indices by their label hash
-    // Build index: label_hash -> Vec<series_idx>
-    let start2 = std::time::Instant::now();
-    let mut groups: HashMap<u64, Vec<usize>> = HashMap::new();
-    for (series_idx, (hash, _)) in series_label_hashes.iter().enumerate() {
-        groups.entry(*hash).or_default().push(series_idx);
-    }
-
-    log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] eval_aggregate({func_name}) built {} groups in {:?}",
-        groups.len(),
-        start2.elapsed()
-    );
-
-    // Step 3: Process each group in parallel
+    // Step 2: Process each group in parallel
     // For each group, aggregate all samples across timestamps
     let start3 = std::time::Instant::now();
     let results: Vec<RangeValue> = groups
         .par_iter()
         .map(|(_, series_indices)| {
             // Get the labels for this group (from the first series in the group)
-            let labels = series_label_hashes[series_indices[0]].1.clone();
+            let labels = projected_labels(param, &matrix[series_indices[0]].labels);
 
-            let mut acc = func.build();
-            // Aggregate samples from all series in this group
-            for &series_idx in series_indices {
-                for sample in &matrix[series_idx].samples {
-                    // Only include timestamps that are in eval_timestamps
-                    if eval_timestamps.contains(&sample.timestamp) {
-                        acc.accumulate(sample);
+            let accumulate_chunk = |chunk: &[usize]| {
+                let mut acc = func.build();
+                for &series_idx in chunk {
+                    for sample in &matrix[series_idx].samples {
+                        // Only include timestamps that are in eval_timestamps
+                        if eval_timestamps.contains(&sample.timestamp) {
+                            acc.accumulate(sample);
+                        }
                     }
                 }
-            }
+                acc
+            };
+
+            // A huge group (e.g. `sum(...)` without a modifier puts every
+            // series in one group) would otherwise aggregate on one thread;
+            // fold it in parallel chunks and merge the partials.
+            let acc = if func.mergeable() && series_indices.len() >= 2 * AGG_PARALLEL_CHUNK {
+                series_indices
+                    .par_chunks(AGG_PARALLEL_CHUNK)
+                    .map(accumulate_chunk)
+                    .reduce(
+                        || func.build(),
+                        |mut a, b| {
+                            a.merge(b);
+                            a
+                        },
+                    )
+            } else {
+                accumulate_chunk(series_indices)
+            };
 
             // Evaluate the aggregated results
             let mut samples = acc.evaluate();
@@ -289,11 +343,22 @@ where
         results.len()
     );
 
+    // Dropping millions of per-series allocations single-threaded can cost
+    // ~1s at high cardinality; free them on the rayon pool instead.
+    let start4 = std::time::Instant::now();
+    matrix.into_par_iter().for_each(drop);
+    log::info!(
+        "[trace_id: {trace_id}] [PromQL Timing] eval_aggregate({func_name}) parallel drop took: {:?}",
+        start4.elapsed()
+    );
+
     Ok(Value::Matrix(results))
 }
 
 #[cfg(test)]
 mod tests {
+    use config::meta::promql::value::LabelsExt;
+
     use super::*;
 
     // Test data helpers
@@ -316,6 +381,120 @@ mod tests {
         assert!(result.iter().any(|l| l.name == "instance"));
         assert!(result.iter().any(|l| l.name == "job"));
         assert!(!result.iter().any(|l| l.name == "__name__"));
+    }
+
+    #[test]
+    fn test_accumulate_merge_matches_sequential() {
+        use super::{avg::Avg, count::Count, group::Group, max::Max, min::Min, sum::Sum};
+
+        // Integer values keep float addition exact regardless of order.
+        let part_a = [(1000, 3.0), (2000, 5.0), (1000, 7.0)];
+        let part_b = [(2000, 11.0), (3000, 2.0), (1000, 4.0)];
+
+        let funcs: Vec<Box<dyn AggFunc>> = vec![
+            Box::new(Sum),
+            Box::new(Count),
+            Box::new(Min),
+            Box::new(Max),
+            Box::new(Avg),
+            Box::new(Group),
+        ];
+        for func in funcs {
+            let mut sequential = func.build();
+            let mut acc_a = func.build();
+            let mut acc_b = func.build();
+            for &(ts, v) in part_a.iter() {
+                sequential.accumulate(&Sample::new(ts, v));
+                acc_a.accumulate(&Sample::new(ts, v));
+            }
+            for &(ts, v) in part_b.iter() {
+                sequential.accumulate(&Sample::new(ts, v));
+                acc_b.accumulate(&Sample::new(ts, v));
+            }
+            acc_a.merge(acc_b);
+
+            let mut expected = sequential.evaluate();
+            let mut merged = acc_a.evaluate();
+            expected.sort_by_key(|s| s.timestamp);
+            merged.sort_by_key(|s| s.timestamp);
+            assert_eq!(expected.len(), merged.len(), "{}", func.name());
+            for (e, m) in expected.iter().zip(merged.iter()) {
+                assert_eq!(e.timestamp, m.timestamp, "{}", func.name());
+                assert_eq!(e.value, m.value, "{}", func.name());
+            }
+        }
+    }
+
+    /// Runs `eval_aggregate` over a single group large enough to take the
+    /// parallel chunked path and returns the lone aggregated value.
+    fn eval_chunked_single_group<F: AggFunc>(values: &[f64], func: F) -> f64 {
+        assert!(values.len() >= 2 * AGG_PARALLEL_CHUNK);
+        let ts = 1000;
+        let matrix: Vec<RangeValue> = values
+            .iter()
+            .map(|&v| RangeValue {
+                labels: Labels::default(),
+                samples: vec![Sample::new(ts, v)],
+                exemplars: None,
+                time_window: None,
+            })
+            .collect();
+        let eval_ctx = EvalContext::new(ts, ts + 1, 1, "test".to_string());
+        match eval_aggregate(&None, Value::Matrix(matrix), func, &eval_ctx).unwrap() {
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 1);
+                m[0].samples
+                    .iter()
+                    .find(|s| s.timestamp == ts)
+                    .expect("sample at eval timestamp")
+                    .value
+            }
+            _ => panic!("Expected Matrix"),
+        }
+    }
+
+    #[test]
+    fn test_eval_aggregate_chunked_sum_avg_numerically_safe() {
+        use super::{avg::Avg, sum::Sum};
+
+        // Catastrophic cancellation across chunk boundaries: a naive chunked
+        // merge collapses `1e16 ... -1e16 ... 1.0` to 0.0 because the lone
+        // 1.0 is rounded away inside the second chunk's partial sum. The
+        // Kahan-compensated state must preserve it, matching the sequential
+        // fold.
+        let n = 2 * AGG_PARALLEL_CHUNK + 1;
+        let mut values = vec![0.0; n];
+        values[0] = 1e16;
+        values[AGG_PARALLEL_CHUNK + 100] = -1e16;
+        values[AGG_PARALLEL_CHUNK + 200] = 1.0;
+
+        assert_eq!(eval_chunked_single_group(&values, Sum), 1.0);
+        assert_eq!(eval_chunked_single_group(&values, Avg), 1.0 / n as f64);
+
+        // An infinite partial sum must stay +Inf through the merge instead of
+        // degrading to NaN via `Inf - Inf` in the compensation term.
+        let mut values = vec![1.0; n];
+        values[0] = f64::INFINITY;
+        assert_eq!(eval_chunked_single_group(&values, Sum), f64::INFINITY);
+
+        // Residuals surviving in the compensation term must themselves be
+        // merged with compensation: a plain `c + other_c` add rounds them
+        // away before the main sums cancel. Four chunks whose partials are
+        // (1e32, 2), (-2e16, 0), (-1e32, 1e16), (1e16 - 4, 0); the exact sum
+        // is -2 and only compensated merging of both components keeps it.
+        let n = 4 * AGG_PARALLEL_CHUNK;
+        let mut values = vec![0.0; n];
+        values[0] = 2.0;
+        values[1] = 1e32;
+        values[AGG_PARALLEL_CHUNK] = -1e16;
+        values[AGG_PARALLEL_CHUNK + 1] = -1e16;
+        values[2 * AGG_PARALLEL_CHUNK] = -1e32;
+        values[2 * AGG_PARALLEL_CHUNK + 1] = 1e16;
+        values[3 * AGG_PARALLEL_CHUNK] = 1e16;
+        values[3 * AGG_PARALLEL_CHUNK + 1] = -4.0;
+
+        assert_eq!(eval_chunked_single_group(&values, Sum), -2.0);
+        assert_eq!(eval_chunked_single_group(&values, Avg), -2.0 / n as f64);
     }
 
     #[test]
@@ -344,6 +523,36 @@ mod tests {
         assert!(!result.iter().any(|l| l.name == "__name__"));
         assert!(result.iter().any(|l| l.name == "instance"));
         assert!(result.iter().any(|l| l.name == "job"));
+    }
+
+    #[test]
+    fn test_projected_labels_signature_matches_materialized_projection() {
+        use promql_parser::label::Labels as ParserLabels;
+
+        let labels = vec![
+            Arc::new(Label::new("__name__", "requests_total")),
+            Arc::new(Label::new("env", "prod")),
+            Arc::new(Label::new("job", "api")),
+            Arc::new(Label::new("zone", "east")),
+        ];
+        let modifiers = vec![
+            None,
+            Some(LabelModifier::Include(ParserLabels { labels: vec![] })),
+            Some(LabelModifier::Include(ParserLabels {
+                labels: vec!["job".to_string(), "missing".to_string()],
+            })),
+            Some(LabelModifier::Exclude(ParserLabels { labels: vec![] })),
+            Some(LabelModifier::Exclude(ParserLabels {
+                labels: vec!["env".to_string(), "missing".to_string()],
+            })),
+        ];
+
+        for modifier in modifiers {
+            assert_eq!(
+                projected_labels_signature(&modifier, &labels),
+                projected_labels(&modifier, &labels).signature()
+            );
+        }
     }
 
     #[test]

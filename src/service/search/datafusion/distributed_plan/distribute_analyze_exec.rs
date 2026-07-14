@@ -35,9 +35,8 @@ use datafusion::{
 use flight::common::Metrics;
 use futures::StreamExt;
 
-use crate::{
-    handler::grpc::flight::visitor::get_cluster_metrics,
-    service::search::datafusion::distributed_plan::display::DisplayableExecutionPlan,
+use crate::service::search::datafusion::{
+    distributed_plan::display::DisplayableExecutionPlan, plan_metrics::get_cluster_metrics,
 };
 
 /// query EXPLAIN ANALYZE in distributed mode

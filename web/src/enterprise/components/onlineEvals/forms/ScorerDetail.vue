@@ -3,27 +3,12 @@
     :open="open"
     side="right"
     :width="70"
-    :title="t('onlineEvals.scorer.detail.eyebrow')"
+    :title="row?.name"
+    :title-data-test="'scorer-detail-name-badge'"
+    :sub-title="t('onlineEvals.scorer.detail.eyebrow')"
     data-test="scorer-detail"
     @update:open="handleOpenChange"
   >
-    <!-- Header: module label as the title + the scorer name as a blue chip,
-         mirroring the Alert History drawer. -->
-    <template #header-left>
-      <span
-        v-if="row.name"
-        :class="[
-          'font-semibold text-[1.125rem] px-2 py-1 rounded-md ml-2 min-w-0 truncate',
-          store.state.theme === 'dark'
-            ? 'text-blue-400 bg-blue-900/50'
-            : 'text-blue-600 bg-blue-50',
-        ]"
-        data-test="scorer-detail-name-badge"
-      >
-        {{ row.name }}
-        <OTooltip v-if="row.name" :content="row.name" />
-      </span>
-    </template>
 
     <!-- Body: the KPI strip + tab bar stay pinned; only the tab content scrolls. -->
     <div class="flex flex-col h-full min-h-0">
@@ -393,7 +378,6 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";

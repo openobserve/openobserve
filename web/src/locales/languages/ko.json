@@ -12,13 +12,20 @@
       "action": "시간 범위 확대",
       "actionDesc": "더 긴 기간에 걸친 검색"
     },
+    "noPatterns": {
+      "title": "패턴을 찾을 수 없음",
+      "description": "시간 범위를 늘리거나 로그 데이터가 더 많은 다른 스트림을 선택해 보세요.패턴 추출은 최소 1,000개의 로그에서 가장 잘 작동합니다.",
+      "logsAnalyzed": "{count} 개의 로그만 분석되었습니다."
+    },
     "noStreamSelected": {
       "title": "시작하려면 스트림을 선택하세요",
       "description": "스트림을 선택한 다음 쿼리를 실행하여 데이터를 탐색합니다.필터와 사용자 지정 시간 범위로 결과를 세분화하세요."
     },
     "noQueryApplied": {
       "title": "쿼리를 실행하여 로그 보기",
-      "description": "필터를 조정하고 '쿼리 실행'을 클릭하여 이 스트림에 대한 이벤트를 로드합니다."
+      "description": "필터를 조정하고 '쿼리 실행'을 클릭하여 이 스트림에 대한 이벤트를 로드합니다.",
+      "action": "쿼리 실행",
+      "actionDesc": "선택한 필터의 로드 이벤트"
     },
     "noDashboards": {
       "title": "첫 대시보드 만들기",
@@ -80,7 +87,9 @@
       "title": "아직 목적지가 없습니다",
       "description": "목적지는 Slack, 이메일, 웹후크 등 경고 알림이 전송되는 위치를 정의합니다.",
       "action": "새 목적지",
-      "actionDesc": "알림 채널 연결"
+      "actionDesc": "알림 채널 연결",
+      "import": "목적지 가져오기",
+      "importDesc": "JSON 파일에서 가져오기"
     },
     "noPipelineDestinations": {
       "title": "아직 목적지가 없습니다",
@@ -92,7 +101,9 @@
       "title": "아직 템플릿이 없습니다",
       "description": "템플릿은 경고 알림 메시지의 형식을 정의합니다.",
       "action": "새 템플릿",
-      "actionDesc": "알림 템플릿 만들기"
+      "actionDesc": "알림 템플릿 만들기",
+      "import": "템플릿 가져오기",
+      "importDesc": "JSON 파일에서 가져오기"
     },
     "noEvalTemplates": {
       "title": "평가 템플릿이 아직 없습니다.",
@@ -142,6 +153,20 @@
       "title": "백필 작업 없음",
       "description": "백필 작업은 파이프라인을 통해 과거 데이터를 재처리합니다.시작하려면 하나를 실행하세요."
     },
+    "noRegexPatterns": {
+      "title": "정규식 패턴은 아직 없습니다",
+      "description": "재사용 가능한 패턴을 만들어 민감한 데이터를 수정하거나 라이브러리에서 가져올 수 있습니다.",
+      "action": "새 패턴",
+      "actionDesc": "새 정규식 패턴 정의",
+      "import": "패턴 가져오기",
+      "importDesc": "라이브러리의 패턴 재사용"
+    },
+    "noStorageConfig": {
+      "title": "버킷이 구성되지 않음",
+      "description": "이 조직의 데이터를 다른 조직 및 글로벌 기본값과 독립적으로 전용 버킷으로 라우팅합니다.",
+      "action": "스토리지 구성",
+      "actionDesc": "S3, GCS 또는 Azure 버킷 연결"
+    },
     "noPipelineHistory": {
       "title": "아직 파이프라인 기록이 없습니다.",
       "description": "파이프라인이 실행되면 파이프라인 실행 기록이 여기에 표시됩니다."
@@ -161,10 +186,12 @@
       "actionDesc": "새 VRL 함수 작성"
     },
     "noStreams": {
-      "title": "첫 번째 데이터를 기다리는 중",
-      "description": "아직 데이터가 도착하지 않았습니다.소스를 연결하면 스트림이 여기에 자동으로 표시됩니다.",
+      "title": "소스를 연결하여 첫 번째 스트림 만들기",
+      "description": "스트림은 데이터가 도착하는 순간 자동으로 생성됩니다.앱, 에이전트 또는 컬렉터에서 수집을 설정하여 시작하세요.",
       "action": "인제스트 설정",
-      "actionDesc": "데이터 소스 연결"
+      "actionDesc": "데이터 소스 연결",
+      "createAction": "새 스트림",
+      "createActionDesc": "스트림 스키마를 수동으로 정의"
     },
     "noAlerts": {
       "title": "첫 번째 알림 만들기",
@@ -174,7 +201,7 @@
     },
     "noIncidents": {
       "title": "활성 인시던트 없음",
-      "description": "당신은 모두 사로잡혔습니다. 지금 당장 주의를 기울일 필요는 없습니다.트리거된 인시던트가 여기에 표시됩니다."
+      "description": "경고가 트리거될 때 인시던트가 생성되며 아직 발생한 인시던트는 없습니다.알림이 설정되면 트리거된 모든 인시던트가 여기에 표시됩니다."
     },
     "noLLMInsights": {
       "title": "LLM 활동이 아직 없습니다",
@@ -191,20 +218,24 @@
     "noScorers": {
       "title": "아직 득점자 없음",
       "description": "채점자는 점수 구성을 기준으로 LLM 응답을 채점합니다. LLM 심사위원으로 시작하거나 라이브러리에서 가져올 수 있습니다.",
-      "action": "채점자 생성",
-      "actionDesc": "LLM 심사위원 또는 원격 채점자 정의"
+      "action": "새 득점자",
+      "actionDesc": "LLM 심사위원 또는 원격 채점자 정의",
+      "import": "채점자 가져오기",
+      "importDesc": "JSON 파일에서 가져오기"
     },
     "noEvalJobs": {
       "title": "아직 평가 작업이 없습니다",
       "description": "작업은 LLM 스트림을 기준으로 채점자를 스케줄링합니다.하나씩 생성하여 단계별로 대화를 채점할 수 있습니다.",
-      "action": "평가 작업 생성",
+      "action": "새 직업",
       "actionDesc": "스트림 선택+득점자+케이던스"
     },
     "noScoreConfigs": {
       "title": "점수 구성이 아직 없습니다",
       "description": "점수 구성은 채점자가 생성하는 스키마 (숫자, 불리언 또는 범주형) 를 정의합니다.하나를 추가하여 채점을 시작하세요.",
-      "action": "점수 구성 생성",
-      "actionDesc": "점수 모양+정상 범위 정의"
+      "action": "새 점수 구성",
+      "actionDesc": "점수 모양+정상 범위 정의",
+      "import": "점수 구성 가져오기",
+      "importDesc": "JSON 파일에서 가져오기"
     },
     "loadError": {
       "title": "뭔가 잘못됐어",
@@ -271,6 +302,7 @@
     },
     "nouns": {
       "logs": "로그",
+      "patterns": "패턴",
       "dashboards": "대시보드",
       "pipelines": "파이프라인",
       "functions": "기능",
@@ -305,7 +337,8 @@
       "scorers": "스코어러",
       "evalJobs": "평가 작업",
       "scoreConfigs": "점수 구성",
-      "pipelineHistory": "파이프라인 기록"
+      "pipelineHistory": "파이프라인 기록",
+      "regexPatterns": "정규식 패턴"
     }
   },
   "common": {
@@ -451,6 +484,10 @@
   },
   "validation": {
     "required": "이 필드는 필수입니다.",
+    "fieldRequired": "필드는 필수입니다!",
+    "alphanumeric": "입력은 영숫자여야 합니다.",
+    "organizationNameRequired": "조직 이름은 필수입니다.",
+    "selectOrganization": "조직을 선택하세요.",
     "invalidFormat": "잘못된 형식",
     "mustBeGreaterThan": "{value} 보다 커야 합니다.",
     "mustBeLessThan": "{value} 보다 작아야 합니다."
@@ -849,6 +886,12 @@
     "webVitals": "웹 바이탈",
     "errors": "오류",
     "api": "API",
+    "uploadSourceMapsForm": {
+      "serviceRequired": "서비스가 필요합니다",
+      "versionRequired": "버전이 필요합니다",
+      "fileRequired": "업로드할 ZIP 파일을 선택하십시오",
+      "fileTypeZip": "ZIP 파일만 허용됩니다"
+    },
     "emptyState": {
       "title": "실제 사용자 모니터링으로 사용자 모니터링",
       "description": "RUM은 페이지 로드, 오류, API 호출 및 세션 재생과 같은 실제 사용자 상호 작용을 추적하므로 사용자가 애플리케이션을 어떻게 경험하는지 정확히 확인할 수 있습니다.",
@@ -1612,6 +1655,11 @@
     "subtitle": "인덱스 관리 및 스트림 구성",
     "streamNameHelpText": "영숫자, 밑줄 및 콜론만 사용하십시오.",
     "search": "검색 스트림",
+    "emptyOr": "또는:",
+    "emptyKubernetes": "쿠버네티스",
+    "emptyAws": "AWS/ 클라우드워치",
+    "emptyLinux": "리눅스",
+    "emptyWindows": "윈도우",
     "name": "이름",
     "docNum": "문서 번호",
     "storageSize": "인제스트된 데이터",
@@ -1653,6 +1701,9 @@
     "labelIndex": "색인",
     "add": "스트림 추가",
     "dataRetention": "데이터 보존 (일 단위)",
+    "streamNameRequired": "스트림 이름은 필수입니다",
+    "streamTypeRequired": "스트림 유형을 선택하세요",
+    "dataRetentionMin": "데이터 보존 기간은 최소 1일이어야 합니다",
     "indexing": "인덱싱",
     "createStream": "스트림 생성",
     "indexType": "색인 유형",
@@ -1792,6 +1843,27 @@
     "dragDropNodesHere": "노드를 여기로 드래그 앤 드롭하세요",
     "promqlOnlyForMetrics": "PromQL은 메트릭 스트림 유형에만 사용할 수 있습니다.",
     "invalidCronExpression": "잘못된 크론 표현식",
+    "cronRequired": "Cron 표현식은 필수입니다",
+    "destResourceNameInvalid": ":, ?, /, # 및 공백과 같은 문자는 허용되지 않습니다.",
+    "urlTrailingSlash": "URL은 슬래시로 끝나면 안 됩니다",
+    "orgRequiredOpenobserve": "OpenObserve에는 조직이 필요합니다",
+    "streamRequiredOpenobserve": "OpenObserve에는 스트림 이름이 필요합니다",
+    "endpointMustStartSlash": "엔드포인트 경로는 /로 시작해야 합니다",
+    "indexRequiredEsbulk": "ESBulk 형식에는 인덱스 이름이 필요합니다",
+    "separatorRequiredStringseparated": "StringSeparated 형식에는 구분자가 필요합니다",
+    "ddSourceRequiredDatadog": "Datadog에는 DD Source가 필요합니다",
+    "ddTagsRequiredDatadog": "Datadog에는 DD Tags가 필요합니다",
+    "periodGreaterThanZero": "기간은 0보다 커야 합니다",
+    "frequencyGreaterThanSeconds": "빈도는 {seconds}초보다 커야 합니다.",
+    "minimumFrequencyMinutes": "최소 빈도는 {minutes}분이어야 합니다",
+    "streamSelectionNameInvalid": "공백 없이 영숫자와 '+=,.@-_' 문자만 사용하세요.",
+    "functionAlreadyAssociated": "함수가 이미 연결되어 있습니다",
+    "atLeastOneCondition": "조건을 하나 이상 추가하세요",
+    "fillAllConditionFields": "모든 조건 필드를 입력하세요(열, 연산자, 값은 필수입니다)",
+    "selectExternalDestination": "목록에서 외부 대상을 선택하세요",
+    "backfillNumericRange": "{min}에서 {max} 사이여야 합니다",
+    "selectValidTimeRange": "유효한 시간 범위를 선택하세요",
+    "startBeforeEndTime": "시작 시간은 종료 시간 이전이어야 합니다.",
     "thresholdShouldNotBeEmpty": "임계값은 비어 있으면 안 됩니다.",
     "errorGettingResults": "결과를 가져오는 중 오류가 발생했습니다.",
     "save": "저장",
@@ -2108,6 +2180,17 @@
     "header": "대시보드",
     "subtitle": "폴더 간에 대시보드 생성, 구성 및 공유",
     "add": "새 대시보드",
+    "setAsHome": "홈 페이지에 고정",
+    "removeFromHome": "홈페이지에서 고정 해제",
+    "isHomeDashboard": "홈 대시보드",
+    "openHomeDashboard": "고정된 대시보드 보기",
+    "pinnedOnHome": "홈페이지에 고정된 대시보드",
+    "deletedSuccessfully": "대시보드가 성공적으로 삭제되었습니다.",
+    "pinnedDeletedPinRemoved": "고정된 대시보드가 삭제되어 홈 핀이 제거되었습니다.",
+    "homePinNotFound": "이 대시보드는 더 이상 존재하지 않으며 홈에서 제거되었습니다.",
+    "homePinUnavailable": "이 대시보드는 더 이상 사용할 수 없으며 홈에서 제거되었습니다.",
+    "setAsHomeDesc": "조직의 모든 사용자를 위해 홈 페이지에 이 대시보드 표시",
+    "moreActions": "추가 작업",
     "save": "저장",
     "cancel": "취소",
     "delete": "대시보드 삭제",
@@ -2177,6 +2260,7 @@
     "selectVariableScope": "변수 범위 선택",
     "variableScopeHelp": "글로벌을 선택하면 변수가 모든 탭과 패널에 적용됩니다.",
     "newTab": "탭 추가",
+    "editTab": "탭 편집",
     "generalSettingsTitle": "일반 설정",
     "tabSettingsTitle": "탭 설정",
     "addGeneralSettings": "일반",
@@ -2551,14 +2635,34 @@
     "editDrilldown": "드릴다운 편집",
     "goTo": "다음으로 이동:",
     "selectLogsMode": "로그 모드 선택:",
-    "enterCustomQuery": "사용자 지정 쿼리 입력:",
-    "enterUrl": "URL 입력:",
+    "enterCustomQuery": "사용자 지정 SQL 쿼리*:",
+    "sqlQueryRequired": "SQL 쿼리가 필요합니다.",
+    "variableNameRequired": "변수 이름이 필요합니다.",
+    "variableNameInvalid": "문자, 숫자, 하이픈 및 밑줄만 사용할 수 있습니다.",
+    "atLeastOneTabRequired": "탭이 하나 이상 필요합니다.",
+    "atLeastOnePanelRequired": "패널이 하나 이상 필요합니다.",
+    "streamTypeRequired": "스트림 유형이 필요합니다.",
+    "streamIndexRequired": "스트림 / 인덱스가 필요합니다.",
+    "fieldRequired": "필드는 필수입니다.",
+    "constantValueRequired": "상수 값이 필요합니다.",
+    "operatorRequired": "연산자가 필요합니다.",
+    "filterValueRequired": "필수",
+    "labelRequired": "레이블이 필요합니다.",
+    "optionValueRequired": "필드는 필수입니다!",
+    "seriesValueRequired": "시리즈 값이 필요합니다",
+    "colorRequired": "색상이 필요합니다",
+    "onlyHttpsUrlsAllowed": "HTTP(S) URL만 허용됩니다",
+    "urlRequired": "URL이 필요합니다",
+    "folderRequired": "폴더가 필요합니다",
+    "dashboardRequired": "대시보드가 필요합니다",
+    "tabRequired": "탭이 필요합니다",
+    "enterUrl": "URL을 입력하세요",
     "invalidUrl": "잘못된 URL",
-    "selectFolderDrilldown": "폴더 선택*:",
+    "selectFolderDrilldown": "폴더 선택",
     "noFoldersAvailable": "사용 가능한 폴더 없음",
-    "selectDashboardDrilldown": "대시보드 선택*:",
+    "selectDashboardDrilldown": "대시보드 선택",
     "noDashboardsAvailable": "사용 가능한 대시보드 없음",
-    "selectTabDrilldown": "탭 선택*:",
+    "selectTabDrilldown": "탭 선택",
     "noTabAvailable": "사용 가능한 탭 없음",
     "variables": "변수:",
     "passAllCurrentVariables": "모든 현재 변수 전달:",
@@ -2681,6 +2785,11 @@
     "operations": "오퍼레이션",
     "promQLBuilder": "프롬QL 빌더",
     "joins": "참여하다",
+    "xAxisShort": "X축",
+    "yAxisShort": "Y축",
+    "rowFields": "행 필드",
+    "valueFields": "값 필드",
+    "noData": "데이터 없음",
     "addJoin": "조인 추가",
     "removeJoin": "제거 조인",
     "leftJoin": "왼쪽 조인",
@@ -2756,6 +2865,7 @@
     "tabAiAssistant": "O2 AI 어시스턴트",
     "tabOverview": "개요",
     "tabUsage": "사용량",
+    "removeHomeDashboard": "홈 대시보드 제거",
     "subtitle": "옵저버빌리티 워크스페이스 한 눈에 보기"
   },
   "overview": {
@@ -2908,6 +3018,9 @@
     "enterpriseNote": "대량 구매가 필요하신가요?스케일에 대해 얘기해 볼까요!맞춤형 솔루션을 원하시면 저희에게 문의하세요.",
     "contactSupport": "지원팀에 문의",
     "totalUsage": "총 사용량",
+    "usageTrends": {
+      "dailyUsage": "일일 사용량"
+    },
     "aiCredits": "AI 크레딧",
     "aiModeFree": "무료",
     "aiModePayAsYouGo": "사용량에 따라 지불",
@@ -2939,6 +3052,7 @@
       "inviteTitle": "조직 초대",
       "inviteOrgIdLabel": "조직 식별자",
       "inviteOrgIdPlaceholder": "조직 식별자 입력",
+      "inviteOrgIdRequired": "조직 식별자가 필요합니다",
       "sendInvite": "초대 보내기",
       "inviteSent": "초대가 성공적으로 전송됨",
       "inviteSameOrg": "조직은 자신을 초대할 수 없습니다",
@@ -3022,9 +3136,9 @@
     "searchAllFolders": "모든 폴더",
     "streamConfig": "스트림 구성",
     "alertRules": "경고 규칙",
-    "noTemplatesMsg": "아직 템플릿을 만들지 않은 것 같습니다.알림을 생성하려면 최소한 하나의 목적지와 하나의 템플릿이 있어야 합니다.",
+    "noTemplatesMsg": "알림을 생성하려면 최소 하나의 템플릿과 하나의 대상이 필요합니다.템플릿은 알림 메시지의 형식을 정의합니다. 먼저 템플릿을 만들어 보세요.",
     "createTemplateBtn": "템플릿 생성",
-    "noDestinationsMsg": "아직 목적지를 만들지 않은 것 같습니다.알림을 생성하려면 최소한 하나의 목적지와 하나의 템플릿이 있어야 합니다.",
+    "noDestinationsMsg": "알림을 생성하려면 적어도 하나의 대상과 하나의 템플릿이 필요합니다.목적지는 알림이 전송되는 위치를 정의합니다. 먼저 알림을 생성하세요.",
     "createDestinationBtn": "목적지 생성",
     "add": "알림 추가",
     "edit": "편집",
@@ -3886,12 +4000,24 @@
     "domainConfiguredCount": "{개수} 개의 도메인이 구성됨",
     "allowAllUsersFromDomain": "{domain} 의 모든 사용자 허용",
     "allowOnlySpecificUsers": "{domain} 의 특정 사용자만 허용",
+    "blockSpecificUsers": "{domain} 에서 특정 사용자만 차단",
+    "blockAllUsersFromDomain": "{domain} 의 모든 사용자 차단",
+    "allUsersBlockedMessage": "이메일 주소가 {domain} 으로 끝나는 모든 외부 SSO 사용자는 시스템에서 차단됩니다 (UI, API 및 통합).",
+    "blockedUsersHint": "차단된 항목은 외부 SSO ID (SSO 사용자 및 SSO/토큰 서비스 계정) 에만 적용됩니다.이는 모든 허용 규칙보다 우선 적용되며 UI, API 및 수집을 포함합니다.네이티브 계정과 API에서 생성한 계정은 영향을 받지 않습니다. 대신 삭제하세요.",
+    "addBlockedEmail": "이메일 차단",
+    "blockedEmailPlaceholder": "예: 사용자 {도메인}",
+    "domainNeedsBlockedEmails": "특정 사용자를 차단하려면 '{domain}' 도메인에 이메일 주소가 하나 이상 있어야 합니다.",
+    "confirmRemoveBlockedEmail": "'{email}' 이메일의 차단을 해제하시겠습니까?",
+    "blockedEmailAdded": "이메일 주소가 성공적으로 차단됨",
+    "blockedEmailRemoved": "이메일 주소가 성공적으로 차단 해제됨",
     "allUsersAllowedMessage": "이메일 주소가 {domain} 으로 끝나는 모든 사용자는 로그인할 수 있습니다.",
     "emailPlaceholder": "예: 사용자 {도메인}",
     "addEmail": "이메일 추가",
     "saveChanges": "저장",
     "invalidDomain": "유효한 도메인 이름을 입력하세요",
     "invalidEmail": "이 도메인의 유효한 이메일 주소를 입력하십시오.",
+    "domainRequired": "도메인이 필요합니다.",
+    "emailRequired": "이메일 주소가 필요합니다.",
     "domainAlreadyExists": "이 도메인은 이미 추가되었습니다",
     "domainAdded": "도메인이 성공적으로 추가되었습니다.",
     "confirmRemoveDomain": "'{domain}' 도메인을 정말로 제거하시겠습니까?",
@@ -3908,6 +4034,7 @@
     "pageSubtitle": "애플리케이션 설정 조정",
     "platformSettings": "플랫폼 설정",
     "scrapeIntervalRequired": "스크래핑 간격이 필요합니다.",
+    "scrapeIntervalPositive": "스크래핑 간격은 양수여야 합니다.",
     "scrapeIntervalDescription": "스크랩 간격은 모니터링 시스템이 메트릭을 수집하는 빈도 (초) 입니다.",
     "maxSeriesPerQueryLabel": "쿼리당 최대 시리즈 수",
     "maxSeriesPerQueryDescription": "단일 PromQL 쿼리에서 반환할 수 있는 최대 시리즈 수입니다.결과 집합이 클 때 UI가 멈추는 것을 방지하는 데 도움이 됩니다.시스템 기본값 (40,000) 을 사용하려면 비워 두십시오.",
@@ -4209,6 +4336,51 @@
     "querySource": "쿼리 소스"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "검색 서비스",
+      "noStreamsDetected": "스트림이 감지되지 않았습니다.서비스 그래프 메트릭에 stream_name 레이블이 포함되어 있는지 확인하세요.",
+      "streamOnlyInfo": "서비스 그래프는 인메모리 상태가 0인 스트림 전용 아키텍처를 사용합니다.",
+      "borderColor": "테두리 색상",
+      "borderColorMetric": "오류",
+      "nodeSize": "노드 크기",
+      "nodeSizeMetric": "요청",
+      "sizeLow": "낮음",
+      "sizeHigh": "높음",
+      "status": {
+        "healthy": "건강한",
+        "degraded": "저하됨",
+        "warning": "경고",
+        "critical": "크리티컬"
+      },
+      "range": {
+        "healthy": "1% 미만",
+        "degraded": "1 — 5%",
+        "warning": "5 — 10%",
+        "critical": "10% 이상"
+      },
+      "entities": "항목",
+      "distribution": "배포",
+      "total": "합계",
+      "showTypes": "유형 보기",
+      "typesFiltered": "일부 유형은 숨겨져 있습니다.열어서 표시된 내용을 변경할 수 있습니다.",
+      "zoomIn": "줌 인",
+      "zoomOut": "줌 아웃",
+      "fitToScreen": "화면에 맞추기",
+      "layout": "레이아웃",
+      "types": "유형",
+      "mode": {
+        "auto": "자동",
+        "expanded": "확장됨",
+        "collapsed": "무너졌다"
+      },
+      "kind": {
+        "service": "서비스",
+        "database": "데이터스토어",
+        "queue": "대기열",
+        "external": "외부",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "전체 화면으로 열기",
     "viewLogs": "로그 보기",
     "viewRelated": "관련 보기",
@@ -4487,6 +4659,7 @@
     "servicesCatalog": {
       "tabLabel": "서비스 카탈로그",
       "title": "서비스 카탈로그",
+      "footerTitle": "서비스",
       "filterPlaceholder": "서비스 이름별 필터링...",
       "noServicesFound": "선택한 시간 범위에서 서비스를 찾을 수 없습니다.",
       "loading": "서비스 로드 중...",
@@ -4513,6 +4686,15 @@
       "servicesLabel": "서비스",
       "viewTraces": "트레이스 보기",
       "exportCsv": "CSV 내보내기",
+      "types": {
+        "all": "모두",
+        "service": "서비스",
+        "datastore": "데이터스토어",
+        "queue": "대기열",
+        "external": "외부",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{개수} {상태}",
       "legend": {
         "title": "오류율"
       }
@@ -4547,6 +4729,9 @@
     "search": "검색 작업",
     "timezone": "타임존",
     "zipFileRequired": "ZIP 파일이 필요합니다!",
+    "fieldRequired": "필드는 필수입니다!",
+    "nameInvalidChars": ":, ?, /, # 및 공백과 같은 문자는 허용되지 않습니다.",
+    "invalidMethodName": "잘못된 메서드 이름입니다. 문자 또는 밑줄로 시작해야 합니다. 문자, 숫자, 밑줄만 사용하세요.",
     "zipFile": "ZIP 파일",
     "frequency": "주파수"
   },
@@ -5214,16 +5399,16 @@
     "loading": "온라인 평가 구성을 로드하는 중...",
     "loadError": "온라인 평가를 로드하지 못했습니다.",
     "deletePrompt": "{name} 을 (를) 삭제하시겠습니까?",
-    "deleteTitle": "{라벨} 삭제",
+    "deleteTitle": "{label} 삭제",
     "deleteConfirmMessage": "정말로 “{name}”을 삭제하시겠습니까?이 작업은 취소할 수 없습니다.",
-    "deleted": "{라벨} 삭제됨",
+    "deleted": "{label} 삭제됨",
     "deleteError": "{label} 을 (를) 삭제하지 못했습니다.",
-    "saved": "{라벨} 저장됨",
-    "newButton": "새 {라벨}",
-    "search": "{라벨} 검색",
+    "saved": "{label} 저장됨",
+    "newButton": "새 {label}",
+    "search": "{label} 검색",
     "refresh": "새로 고침",
     "allStatuses": "모든 상태",
-    "noRowsFound": "{라벨} 을 (를) 찾을 수 없습니다.",
+    "noRowsFound": "{label} 을 (를) 찾을 수 없습니다.",
     "getStartedHint": "하나를 생성하여 온라인 배선 평가를 시작하십시오.",
     "columns": {
       "name": "이름",
@@ -5250,6 +5435,7 @@
     },
     "quality": {
       "scopeLabel": "이 작업 공간의 모든 품질 치수",
+      "agentPlaceholder": "모든 상담원",
       "timeRange": {
         "label": "시간 범위",
         "last1h": "지난 1시간",
@@ -6114,6 +6300,10 @@
       "functions": "함수",
       "reports": "보고서",
       "iam": "IAM",
+      "settings": "설정",
+      "onlineEvals": "온라인 평가",
+      "actions": "액션",
+      "rum": "럼",
       "runningQueries": "쿼리 실행"
     },
     "pages": {
@@ -6139,7 +6329,30 @@
       "panelEditor": "패널 에디터",
       "traceDetail": "트레이스 세부 정보",
       "runningQueries": "쿼리 실행",
-      "ingestionTokens": "IAM — 인제스트 토큰"
+      "ingestionTokens": "IAM — 인제스트 토큰",
+      "alertIncidents": "알림 — 인시던트",
+      "pipelineDestinations": "파이프라인 — 목적지",
+      "enrichmentTables": "강화 테이블",
+      "iamInvitations": "IAM — 초대장",
+      "iamOrganizations": "IAM — 조직",
+      "regexPatterns": "정규식 패턴",
+      "cipherKeys": "암호 키",
+      "nodes": "노드",
+      "modelPricing": "모델 가격",
+      "searchSchedulers": "검색 스케줄러",
+      "searchHistory": "검색 기록",
+      "sessions": "세션",
+      "evalTemplates": "온라인 평가 — 템플릿",
+      "scorers": "온라인 평가 — 득점자",
+      "evalJobs": "온라인 평가 — 채용",
+      "scoreConfigs": "온라인 평가 — 점수 구성",
+      "actions": "액션",
+      "llmProviders": "LLM 제공업체",
+      "aiToolsets": "AI 툴셋",
+      "orgManagement": "조직 관리",
+      "rumErrors": "RUM — 오류 추적",
+      "rumSessions": "럼 — 세션",
+      "sourceMaps": "RUM — 소스 맵"
     },
     "actions": {
       "openCheatsheet": "키보드 단축키 치트시트 열기",
@@ -6219,7 +6432,30 @@
       "logsExport": "결과를 CSV로 내보내기",
       "tableRowOpen": "마우스로 가리킨 행 열기/펼치기",
       "tableRowInspect": "마우스로 가리킨 행 검사",
-      "tracesCopyUrl": "트레이스 공유 URL 복사"
+      "tracesCopyUrl": "트레이스 공유 URL 복사",
+      "alertIncidentsRefresh": "목록 새로 고침",
+      "pipelineDestinationsRefresh": "목록 새로 고침",
+      "enrichmentTablesRefresh": "목록 새로 고침",
+      "iamInvitationsRefresh": "목록 새로 고침",
+      "iamOrganizationsRefresh": "목록 새로 고침",
+      "regexPatternsRefresh": "목록 새로 고침",
+      "cipherKeysRefresh": "목록 새로 고침",
+      "nodesRefresh": "목록 새로 고침",
+      "modelPricingRefresh": "목록 새로 고침",
+      "searchSchedulersRefresh": "목록 새로 고침",
+      "searchHistoryRefresh": "목록 새로 고침",
+      "sessionsRefresh": "목록 새로 고침",
+      "evalTemplatesRefresh": "목록 새로 고침",
+      "scorersRefresh": "목록 새로 고침",
+      "evalJobsRefresh": "목록 새로 고침",
+      "scoreConfigsRefresh": "목록 새로 고침",
+      "actionsRefresh": "목록 새로 고침",
+      "llmProvidersRefresh": "목록 새로 고침",
+      "aiToolsetsRefresh": "목록 새로 고침",
+      "orgManagementRefresh": "목록 새로 고침",
+      "rumErrorsRefresh": "목록 새로 고침",
+      "rumSessionsRefresh": "목록 새로 고침",
+      "sourceMapsRefresh": "목록 새로 고침"
     }
   }
 }

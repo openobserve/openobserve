@@ -212,6 +212,7 @@ the Free Software Foundation, either version 3 of the License, or
             @import-custom="goToImportScoreConfig"
             @export="exportScoreConfigRow"
             @export-bulk="exportScoreConfigBulk"
+            @refresh="loadAll(orgId)"
           />
           <ScorerList
             v-else-if="activeTab === 'scorers'"
@@ -232,6 +233,7 @@ the Free Software Foundation, either version 3 of the License, or
             @export="exportScorerRow"
             @export-bulk="exportScorerBulk"
             @add-provider="goToAddProvider"
+            @refresh="loadAll(orgId)"
           />
           <EvalJobList
             v-else-if="activeTab === 'jobs'"
@@ -246,6 +248,7 @@ the Free Software Foundation, either version 3 of the License, or
             @activate="(row: EvalJob) => activateJob(row)"
             @pause="(row: EvalJob) => pauseJob(row)"
             @delete="(row: EvalJob) => deleteRow(row)"
+            @refresh="loadAll(orgId)"
           />
         </div>
       </section>
@@ -1124,6 +1127,10 @@ function exportScoreConfigBulk(ids: string[]) {
 function syncFromRoute() {
   // Route is the source of truth — reset everything first.
   formPage.value = null;
+  // The import wizard renders off local `importingEntity` (it isn't route-
+  // driven), so it must be torn down here too — otherwise it stays stranded on
+  // screen when the user navigates to another AI section.
+  importingEntity.value = null;
   dialog.value = { open: false, mode: "create", row: null };
   scorerTypeDialog.value = false;
   viewRow.value = null;

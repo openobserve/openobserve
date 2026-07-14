@@ -375,14 +375,14 @@ pub async fn send_to_super_org(org_id: &str, usage: &[json::Value]) -> Result<()
         billings::{MeteringProvider, get_billing_by_org_id},
     };
 
-    let info = get_billing_by_org_id(&org_id).await.inspect_err(|e| {
+    let info = get_billing_by_org_id(org_id).await.inspect_err(|e| {
         log::error!("error getting billing info of {org_id} for super org reporting :{e}");
     })?;
 
     if let Some(billing) = info
         && billing.provider == MeteringProvider::SuperOrg
     {
-        let membership = list_billing_membership_of(&org_id).await.inspect_err(|e| {
+        let membership = list_billing_membership_of(org_id).await.inspect_err(|e| {
             log::error!(
                 "error listing billing membership of {org_id} for super org usage reporting : {e}"
             );

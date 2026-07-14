@@ -32,13 +32,13 @@ use config::{
 use crate::{
     common::{
         self,
-        meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
+        meta::{
+            authz::Authz,
+            http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
+        },
         utils::auth::{remove_ownership, set_ownership},
     },
-    handler::http::{
-        request::search::error_utils::map_error_to_http_response, router::ERROR_HEADER,
-    },
-    service::{db, ingestion::compile_vrl_function},
+    service::{db, http::map_error_to_http_response, ingestion::compile_vrl_function},
 };
 
 const FN_SUCCESS: &str = "Function saved successfully";

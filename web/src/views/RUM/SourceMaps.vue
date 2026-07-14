@@ -68,13 +68,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       </div>
 
-        <!-- Upload Button -->
-
+        <!-- Columns + Refresh + Upload Buttons -->
+        <div class="flex gap-2 items-center">
+          <OTableColumnToggle
+            :columns="columns"
+            :column-visibility="columnVisibility"
+            @update:column-visibility="setColumnVisibility"
+          />
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="isLoading"
+            data-test="source-maps-refresh-btn"
+            @click="fetchSourceMaps"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="sourceMapsRefresh" />
+          </OButton>
           <OButton
             variant="outline"
             size="sm-action"
             @click="navigateToUpload"
           >{{ t('rum.uploadSourceMaps') }}</OButton>
+        </div>
       </div>
     </div>
 
@@ -86,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTable
           :data="groupedSourceMaps"
           :columns="columns"
+          :column-visibility="columnVisibility"
           row-key="id"
           :loading="isLoading"
           pagination="client"
@@ -147,7 +164,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="hero"
               preset="no-source-maps"
               :filtered="!!(filters.version || filters.service || filters.environment)"
-              :hide-action="!(filters.version || filters.service || filters.environment)"
               @action="(id) => id === 'upload' && navigateToUpload()"
             />
           </template>
@@ -178,9 +194,14 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import sourcemapsService from "@/services/sourcemaps";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -310,12 +331,17 @@ const groupedSourceMaps = ref<any[]>([]);
 const expandedIds = ref<string[]>([]);
 
 // Table columns
+const { columnVisibility, setColumnVisibility } = useExternalColumnToggle(
+  "rum-source-maps-list",
+);
+
 const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "service",
     header: t("rum.service"),
     accessorKey: "service",
     sortable: true,
+    hideable: true,
     meta: { align: "left" },
   },
   {
@@ -323,6 +349,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: t("common.version"),
     accessorKey: "version",
     sortable: true,
+    hideable: true,
     meta: { align: "left" },
   },
   {
@@ -330,6 +357,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: t("rum.environment"),
     accessorKey: "env",
     sortable: true,
+    hideable: true,
     meta: { align: "left" },
   },
   {
@@ -337,6 +365,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: t("rum.files"),
     accessorKey: "fileCount",
     sortable: true,
+    hideable: true,
     meta: { align: "right" },
   },
   {
@@ -344,6 +373,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: t("rum.uploadedAt"),
     accessorKey: "uploaded_at",
     sortable: true,
+    hideable: true,
     meta: {
       align: "left",
       format: (_v: any, row: any) => formatTimestamp(row.uploaded_at),
@@ -500,4 +530,8 @@ onMounted(async () => {
   await fetchFilterValues();
   fetchSourceMaps();
 });
+
+useShortcuts([
+  { id: "sourceMapsRefresh", handler: () => { if (!isInputFocused()) fetchSourceMaps(); } },
+]);
 </script>

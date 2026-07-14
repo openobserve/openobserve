@@ -19,24 +19,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <!-- Section header (title + description) is provided full-width by the
          Settings shell; this component renders only the form content. -->
-    <!-- platform settings section -->
-    <div class="">
+    <!-- platform settings section. The page gutter is owned by the Settings
+         shell's ConstrainedPage; this block adds none of its own. -->
+    <div>
       <GroupHeader :title="t('settings.platformSettings')" :showIcon="false" />
       <div class="w-full flex flex-col">
-        <OForm @submit.stop="onSubmit.execute">
+        <OForm
+          :schema="generalSettingsSchema"
+          :default-values="generalSettingsDefaults"
+          @submit="saveGeneralSettings"
+          v-slot="{ isSubmitting }"
+        >
           <!-- scape interval section -->
           <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-(--o2-border-color)">
             <span class="individual-setting-title text-sm font-medium leading-5">
               {{ t("settings.scrapintervalLabel") }}
             </span>
-            <OInput
-              v-model.number="scrapeIntereval"
+            <OFormInput
+              name="scrape_interval"
               type="number"
               min="0"
               class="ml-2"
-              :error="!!scrapeIntervalError"
-              :error-message="scrapeIntervalError"
-              @update:model-value="scrapeIntervalError = ''"
               data-test="general-settings-scrape-interval"
               style="width: 120px"
             />
@@ -50,15 +53,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="individual-setting-title text-sm font-medium leading-5">
               {{ t("settings.maxSeriesPerQueryLabel") }}
             </span>
-            <OInput
-              v-model.number="maxSeriesPerQuery"
+            <OFormInput
+              name="max_series_per_query"
               type="number"
               :min="1000"
               :max="1000000"
               class="ml-2"
-              :error="!!maxSeriesError"
-              :error-message="maxSeriesError"
-              @update:model-value="maxSeriesError = ''"
               :placeholder="'40000 (' + t('settings.systemDefault') + ')'"
               data-test="general-settings-max-series-per-query"
               style="width: 180px"
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip side="top" :content="t('settings.maxSeriesPerQueryTooltip')" />
                 </OIcon>
               </template>
-            </OInput>
+            </OFormInput>
             <span class="individual-setting-description text-[13px] opacity-70">
               {{ t("settings.maxSeriesPerQueryDescription") }}
             </span>
@@ -143,10 +143,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex justify-start">
             <OButton
               data-test="dashboard-add-submit"
-              :loading="onSubmit.isLoading.value"
+              :loading="isSubmitting"
               variant="primary"
               size="sm-action"
-              @click="onSubmit.execute"
+              type="submit"
             >
               {{ t("dashboard.save") }}
             </OButton>
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :showIcon="false"
         />
       </div>
-      <div class="">
+      <div>
         <div class="settings-grid-item no-border-bottom grid grid-cols-3 gap-4 items-center py-4 border-b border-(--o2-border-color)">
           <span class="individual-setting-title text-sm font-medium leading-5">
             {{ t("settings.customLogoText") }}
@@ -192,10 +192,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OButton
                 data-test="settings_ent_logo_custom_text_save_btn"
-                :loading="onSubmit.isLoading.value"
+                :loading="loadingState"
                 variant="outline"
                 size="icon-xs-sq"
-                type="submit"
+                type="button"
                 @click="updateCustomText"
                 icon-left="check"
               />
@@ -217,11 +217,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <OButton
               data-test="settings_ent_logo_custom_text_edit_btn"
-              :loading="onSubmit.isLoading.value"
+              :loading="loadingState"
               variant="outline"
               size="icon-xs-sq"
               class="ml-2"
-              type="submit"
+              type="button"
               @click="editingText = !editingText"
               icon-left="edit"
             />
@@ -286,10 +286,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OButton
                 data-test="settings_ent_logo_custom_light_save_btn"
-                :loading="onSubmit.isLoading.value"
+                :loading="loadingState"
                 variant="outline"
                 size="icon-xs-sq"
-                type="submit"
+                type="button"
                 @click="uploadImage(filesLight, 'light')"
                 icon-left="check"
               />
@@ -357,10 +357,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OButton
                 data-test="settings_ent_logo_custom_dark_save_btn"
-                :loading="onSubmit.isLoading.value"
+                :loading="loadingState"
                 variant="outline"
                 size="icon-xs-sq"
-                type="submit"
+                type="button"
                 @click="uploadImage(filesDark, 'dark')"
                 icon-left="check"
               />
@@ -370,6 +370,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("settings.customLogoDarkDescription") }}
             </span>
           </div>
+      </div>
+    </div>
+
+    <!-- Danger Zone: delete this organization (owner/admin only).
+         Backend gate is the per-org RBAC check on DELETE /api/{org_id}/organizations;
+         this UI gate just hides the action for non-admins of the current org. -->
+    <div
+      id="dangerZone"
+      v-if="canDeleteOrg"
+      data-test="general-settings-danger-zone"
+      class="tw:mt-8"
+    >
+      <!-- Red-accented header signals this section is destructive. -->
+      <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
+        <OIcon name="warning" size="sm" class="tw:text-error" />
+        <span class="tw:text-base tw:font-bold tw:leading-6 tw:text-error">
+          {{ t("settings.dangerZone") }}
+        </span>
+      </div>
+
+      <!-- Bordered, tinted card. Title + description share one row (same layout as
+           the settings rows above), then the destructive action on the next line,
+           left-aligned to match the Save button. -->
+      <div
+        class="tw:rounded-lg tw:border tw:border-error/50 tw:bg-error/[0.06] tw:px-5 tw:py-4"
+      >
+        <div class="tw:grid tw:grid-cols-3 tw:gap-4 tw:items-start">
+          <span class="individual-setting-title tw:text-sm tw:font-medium tw:leading-5 tw:col-span-1">
+            {{ t("settings.deleteOrganization") }}
+          </span>
+          <span class="individual-setting-description tw:text-[13px] tw:opacity-70 tw:col-span-2">
+            {{ t("settings.deleteOrganizationDescription") }}
+          </span>
+        </div>
+        <OButton
+          data-test="general-settings-delete-org-btn"
+          variant="destructive"
+          size="sm-action"
+          class="tw:mt-4"
+          :loading="deleting"
+          @click="confirmDeleteOrg = true"
+        >
+          {{ t("settings.deleteOrganization") }}
+        </OButton>
       </div>
     </div>
   </div>
@@ -401,16 +445,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OColor v-model="tempColor" @update:model-value="updateCustomColor" />
   </ODialog>
+
+  <ODialog
+    data-test="general-delete-org-dialog"
+    v-model:open="confirmDeleteOrg"
+    size="sm"
+    :title="t('settings.deleteOrganization')"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('settings.deleteOrganization')"
+    primary-button-variant="destructive"
+    :primary-button-disabled="!deleteConfirmMatches"
+    @update:open="(v) => !v && (deleteConfirmInput = '')"
+    @click:secondary="confirmDeleteOrg = false"
+    @click:primary="deleteOrg"
+  >
+    <div class="tw:space-y-3">
+      <!-- What will happen -->
+      <p class="tw:text-sm tw:text-text-primary">
+        {{
+          t("settings.deleteOrganizationConfirm", {
+            name: deleteOrgName,
+          })
+        }}
+      </p>
+
+      <!-- Irreversible-action warning callout -->
+      <div
+        class="tw:flex tw:items-start tw:gap-2 tw:rounded tw:border tw:border-error tw:bg-surface-secondary tw:px-3 tw:py-2"
+      >
+        <OIcon name="warning" size="sm" class="tw:text-error tw:mt-0.5 tw:shrink-0" />
+        <div class="tw:space-y-1">
+          <p class="tw:text-xs tw:text-text-secondary">
+            {{ t("settings.deleteOrganizationWarning") }}
+          </p>
+          <p class="tw:text-xs tw:text-text-secondary">
+            {{ t("settings.deleteOrganizationRecoverable") }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Type-to-confirm gate -->
+      <div class="tw:space-y-1">
+        <label class="tw:text-xs tw:text-text-secondary tw:block">
+          <!-- eslint-disable-next-line @intlify/vue-i18n/no-raw-text -->
+          <i18n-t keypath="settings.deleteOrganizationTypeToConfirm" tag="span">
+            <template #name>
+              <span class="tw:font-semibold tw:text-text-primary">{{ deleteOrgName }}</span>
+            </template>
+          </i18n-t>
+        </label>
+        <OInput
+          data-test="general-delete-org-confirm-input"
+          v-model="deleteConfirmInput"
+          :placeholder="deleteOrgName"
+          size="sm"
+          autocomplete="off"
+          @keyup.enter="deleteConfirmMatches && deleteOrg()"
+        />
+      </div>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, onActivated, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, defineComponent, onActivated, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useLoading } from "@/composables/useLoading";
 import organizations from "@/services/organizations";
+import usersService from "@/services/users";
 import settingsService from "@/services/settings";
 import config from "@/aws-exports";
 import configService from "@/services/config";
@@ -418,6 +522,7 @@ import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
 import { applyThemeColors } from "@/utils/theme";
+import { useLocalOrganization } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -426,8 +531,13 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  makeGeneralSettingsSchema,
+  type GeneralSettingsForm,
+} from "./General.schema";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -454,6 +564,7 @@ export default defineComponent({
     OInput,
     OFile,
     OForm,
+    OFormInput,
     OColor,
 },
   setup() {
@@ -461,16 +572,20 @@ export default defineComponent({
 
     const store = useStore();
     const router: any = useRouter();
-    const scrapeIntervalError = ref("");
-    const maxSeriesError = ref("");
-    const scrapeIntereval = ref(
-      store.state?.organizationData?.organizationSettings?.scrape_interval ??
+
+    // Schema-driven validation replaces the manual scrapeIntervalError /
+    // maxSeriesError refs + the imperative if-checks in onSubmit.
+    // Built once from the component's `t` so the messages are localized.
+    const generalSettingsSchema = makeGeneralSettingsSchema(t);
+    // Dynamic defaults (edit-prefill from the store) → a typed computed.
+    const generalSettingsDefaults = computed((): GeneralSettingsForm => ({
+      scrape_interval:
+        store.state?.organizationData?.organizationSettings?.scrape_interval ??
         15,
-    );
-    const maxSeriesPerQuery = ref(
-      store.state?.organizationData?.organizationSettings
-        ?.max_series_per_query ?? null,
-    );
+      max_series_per_query:
+        store.state?.organizationData?.organizationSettings
+          ?.max_series_per_query ?? null,
+    }));
 
     const loadingState = ref(false);
     const customText = ref("");
@@ -514,10 +629,7 @@ export default defineComponent({
      * Priority: Vuex store tempThemeColors > organizationSettings > defaults
      */
     const updateFromStore = () => {
-      // Update scrape interval setting
-      scrapeIntereval.value =
-        store.state?.organizationData?.organizationSettings?.scrape_interval ??
-        15;
+      // (scrape_interval is now form-owned via :default-values — no ref to sync.)
 
       // Get theme colors from store with priority order
       // 1. Check Vuex store for temporary preview colors (highest priority)
@@ -559,9 +671,97 @@ export default defineComponent({
       }
     };
 
+    // ===== Delete organization (Danger Zone) =====
+    // The current user's role in the *currently selected* org. Sourced the same
+    // way IAM Users page does it: match our email in the org members list.
+    const currentUserRole = ref("");
+    const confirmDeleteOrg = ref(false);
+    const deleting = ref(false);
+
+    // Type-to-confirm gate: the destructive action is only enabled once the user
+    // types the exact org name. Guards against accidental clicks on an irreversible
+    // action (same pattern GitHub/Stripe use for delete-repo/close-account).
+    const deleteConfirmInput = ref("");
+    const deleteOrgName = computed(
+      () =>
+        store.state.selectedOrganization?.label ||
+        store.state.selectedOrganization?.identifier ||
+        "",
+    );
+    const deleteConfirmMatches = computed(
+      () => deleteConfirmInput.value.trim() === deleteOrgName.value,
+    );
+
+    // Only cloud builds expose self-service org deletion. Backend enforces the
+    // real per-org RBAC check; this only governs visibility.
+    const canDeleteOrg = computed(() => {
+      if (config.isCloud !== "true") return false;
+      const role = currentUserRole.value?.toLowerCase();
+      return role === "root" || role === "admin";
+    });
+
+    const fetchCurrentUserRole = async () => {
+      const orgId = store.state.selectedOrganization?.identifier;
+      if (!orgId || config.isCloud !== "true") return;
+      try {
+        const res = await usersService.orgUsers(orgId);
+        const me = store.state.userInfo?.email?.toLowerCase();
+        const members = res.data?.data || [];
+        const mine = members.find(
+          (m: any) => m.email?.toLowerCase() === me,
+        );
+        currentUserRole.value = mine?.role?.toLowerCase() || "";
+      } catch {
+        // On error, leave role empty -> button stays hidden.
+        currentUserRole.value = "";
+      }
+    };
+
+    const deleteOrg = async () => {
+      const org = store.state.selectedOrganization;
+      const orgId = org?.identifier;
+      if (!orgId) return;
+      deleting.value = true;
+      try {
+        await organizations.delete_org(orgId);
+        confirmDeleteOrg.value = false;
+        deleteConfirmInput.value = "";
+        toast({
+          variant: "success",
+          message: t("settings.deleteOrganizationInitiated"),
+        });
+        // The just-deleted org is now hidden/blocked by the backend, so we must
+        // move the user off it. Clear the locally-remembered org and re-fetch the
+        // org list (via the update_org flag MainLayout watches): its stale-org
+        // guard then auto-selects a surviving org, or lands on the empty state if
+        // this was the user's only org.
+        useLocalOrganization("");
+        store.dispatch("setSelectedOrganization", {});
+        router.push({
+          path: "/",
+          query: { update_org: Date.now().toString() },
+        });
+      } catch (e: any) {
+        toast({
+          variant: "error",
+          message:
+            e?.response?.data?.message ||
+            e?.message ||
+            t("settings.somethingWentWrong"),
+        });
+      } finally {
+        deleting.value = false;
+      }
+    };
+
+    onMounted(() => {
+      fetchCurrentUserRole();
+    });
+
     onActivated(() => {
       // Initialize from store on mount
       updateFromStore();
+      fetchCurrentUserRole();
     });
 
     // Watch for changes in organization settings (backend config)
@@ -585,44 +785,24 @@ export default defineComponent({
       },
     );
 
-    const onSubmit = useLoading(async () => {
-      // Validate scrape interval
-      if (!scrapeIntereval.value && scrapeIntereval.value !== 0) {
-        scrapeIntervalError.value = t("settings.scrapeIntervalRequired") || "Scrape interval is required";
-        return;
-      }
-      if (scrapeIntereval.value < 0) {
-        scrapeIntervalError.value = t("settings.scrapeIntervalPositive") || "Scrape interval must be a positive number";
-        return;
-      }
-      // Validate max series per query (optional field — only validate when provided)
-      if (
-        maxSeriesPerQuery.value !== null &&
-        maxSeriesPerQuery.value !== undefined &&
-        maxSeriesPerQuery.value !== ""
-      ) {
-        if (maxSeriesPerQuery.value < 1000) {
-          maxSeriesError.value = t("settings.maxSeriesMinError") || "Minimum value is 1000";
-          return;
-        }
-        if (maxSeriesPerQuery.value > 1000000) {
-          maxSeriesError.value = t("settings.maxSeriesMaxError") || "Maximum value is 1000000";
-          return;
-        }
-      }
+    // @submit handler — fires only once the schema passes (scrape_interval
+    // required + ≥0; max_series_per_query optional range). The <input
+    // type="number"> emits a string, so coerce at use. Awaited by OForm so the
+    // inline Save button's spinner spans the POST (no useLoading wrapper).
+    const saveGeneralSettings = async (value: GeneralSettingsForm) => {
+      const maxSeriesRaw = value.max_series_per_query;
+      const maxSeriesNum =
+        maxSeriesRaw === null || maxSeriesRaw === undefined || maxSeriesRaw === ""
+          ? null
+          : Number(maxSeriesRaw);
 
       try {
         //set organizations settings in store
         //scrape interval will be in number
         store.dispatch("setOrganizationSettings", {
           ...store.state?.organizationData?.organizationSettings,
-          scrape_interval: scrapeIntereval.value,
-          max_series_per_query:
-            maxSeriesPerQuery.value === null ||
-            maxSeriesPerQuery.value === undefined ||
-            maxSeriesPerQuery.value === ""
-              ? null
-              : maxSeriesPerQuery.value,
+          scrape_interval: Number(value.scrape_interval),
+          max_series_per_query: maxSeriesNum,
           light_mode_theme_color: customLightColor.value,
           dark_mode_theme_color: customDarkColor.value,
         });
@@ -654,7 +834,7 @@ export default defineComponent({
           message: err?.message || t("settings.somethingWentWrong"),
         });
       }
-    });
+    };
 
     const uploadImage = (fileList: any = null, theme: string = "light") => {
       const selectedFiles = fileList || files.value;
@@ -1024,11 +1204,11 @@ export default defineComponent({
       store,
       config,
       router,
-      scrapeIntereval,
-      scrapeIntervalError,
-      maxSeriesPerQuery,
-      maxSeriesError,
-      onSubmit,
+      // Form wiring (Options-API: schema + defaults MUST be returned so :schema
+      // resolves and validation runs).
+      generalSettingsSchema,
+      generalSettingsDefaults,
+      saveGeneralSettings,
       files,
       filesLight,
       filesDark,
@@ -1069,6 +1249,14 @@ export default defineComponent({
       updateCustomColor,
       resetThemeColors,
       currentPickerMode,
+      // Delete organization (Danger Zone)
+      canDeleteOrg,
+      confirmDeleteOrg,
+      deleting,
+      deleteOrg,
+      deleteConfirmInput,
+      deleteOrgName,
+      deleteConfirmMatches,
     };
   },
 });
@@ -1088,4 +1276,3 @@ export default defineComponent({
   border-color: rgba(255, 255, 255, 0.25);
 }
 </style>
-

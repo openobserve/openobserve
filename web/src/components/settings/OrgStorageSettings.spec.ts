@@ -120,7 +120,7 @@ describe("OrgStorageSettings", () => {
 
     expect(wrapper.text()).toContain("No bucket configured");
     expect(
-      wrapper.find('[data-test="storage-settings-configure-btn"]').exists()
+      wrapper.find('[data-test="org-storage-settings-empty-state"]').exists()
     ).toBe(true);
   });
 
@@ -130,7 +130,7 @@ describe("OrgStorageSettings", () => {
     await nextTick();
 
     await wrapper
-      .find('[data-test="storage-settings-configure-btn"]')
+      .find('[data-test="org-storage-settings-empty-state"] button')
       .trigger("click");
     await nextTick();
 

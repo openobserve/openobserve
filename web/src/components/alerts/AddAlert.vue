@@ -28,45 +28,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           onClick: goBackToAlertsList,
           dataTest: 'add-alert-back-btn',
         }"
+        :subtitle="(beingUpdated || anomalyEditMode) ? activeFolderName : ''"
       >
-        <!-- Inline title editing (name + folder), kept in the header per the
-             AddPanel convention (#tabs slot renders inline beside the back tile). -->
-        <template #tabs>
-          <div class="flex items-center gap-1.5 min-w-0">
-
-          <!-- EDIT MODE: (folder → chevron → name) -->
+        <!-- EDIT MODE: the alert/anomaly name is the title and the folder its
+             subtitle — matching the dashboard header. CREATE MODE keeps the
+             inline name input + folder select in the #tabs area (an <h1> can't
+             host form inputs), per the AddPanel convention. -->
+        <template #title>
           <template v-if="beingUpdated || anomalyEditMode">
             <span
-              class="alert-folder-name text-xl tracking-[0.005em] px-2 cursor-pointer transition-all rounded-sm text-(--o2-menu-color)! hover:rounded-[0.325rem] hover:bg-(--o2-tab-bg)!"
-              @click="goBackToAlertsList"
-            >{{ activeFolderName }}</span>
-            <OIcon name="chevron-right" size="sm" class="text-gray-400 mt-0.5 shrink-0" />
-            <template v-if="!isAnomalyMode">
-              <span class="text-xl tracking-[0.005em] truncate max-w-[200px]">
-                {{ formData.name }}
-                <OTooltip v-if="formData.name?.length > 24" :content="formData.name" />
-              </span>
-            </template>
-            <template v-else>
-              <span class="text-xl tracking-[0.005em] truncate max-w-[200px]">
-                {{ anomalyConfig.name }}
-                <OTooltip v-if="anomalyConfig.name?.length > 24" :content="anomalyConfig.name" />
-              </span>
-              <OTag v-if="anomalyConfig.status" type="anomalyStatus" :value="anomalyConfig.status" />
-              <span
-                v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
-                class="text-[11px] whitespace-nowrap text-text-secondary"
-              >
-                Last run: {{ anomalyFormatTs(anomalyConfig.last_detection_run) }}
-              </span>
-              <OButton v-if="anomalyConfig.status === 'failed'" variant="ghost-destructive" size="xs" :loading="anomalyRetraining" @click="anomalyTriggerRetrain" icon-left="replay">
-                  {{ t('alerts.retry') }}
-                </OButton>
-            </template>
+              v-if="!isAnomalyMode"
+              class="truncate"
+              :title="formData.name"
+            >
+              {{ formData.name }}
+              <OTooltip v-if="formData.name?.length > 24" :content="formData.name" />
+            </span>
+            <span
+              v-else
+              class="truncate"
+              :title="anomalyConfig.name"
+            >
+              {{ anomalyConfig.name }}
+              <OTooltip v-if="anomalyConfig.name?.length > 24" :content="anomalyConfig.name" />
+            </span>
           </template>
+        </template>
 
-          <!-- CREATE MODE: Alert Name + Folder -->
-          <template v-else>
+        <!-- EDIT MODE (anomaly): status + last-run + retry trail the name -->
+        <template #title-trail>
+          <div
+            v-if="(beingUpdated || anomalyEditMode) && isAnomalyMode"
+            class="flex items-center gap-1.5"
+          >
+            <OTag v-if="anomalyConfig.status" type="anomalyStatus" :value="anomalyConfig.status" />
+            <span
+              v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
+              class="text-[11px] whitespace-nowrap text-text-secondary"
+            >
+              Last run: {{ anomalyFormatTs(anomalyConfig.last_detection_run) }}
+            </span>
+            <OButton v-if="anomalyConfig.status === 'failed'" variant="ghost-destructive" size="xs" :loading="anomalyRetraining" @click="anomalyTriggerRetrain" icon-left="replay">
+              {{ t('alerts.retry') }}
+            </OButton>
+          </div>
+        </template>
+
+        <!-- CREATE MODE: Alert Name input + Folder select, inline beside the back tile -->
+        <template #tabs>
+          <div
+            v-if="!(beingUpdated || anomalyEditMode)"
+            class="flex items-center gap-1.5 min-w-0"
+          >
             <div class="flex items-center gap-1.5 shrink-0">
               <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="text-text-primary">*</span></div>
               <OInput
@@ -98,8 +111,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="updateActiveFolderId({ value: $event })"
               />
             </div>
-          </template>
-
           </div>
         </template>
       </AppPageHeader>

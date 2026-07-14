@@ -245,6 +245,16 @@ async fn list_models(
         .await
 }
 
+/// Deletes all folders belonging to the given org.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::delete_many()
+        .filter(Column::Org.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

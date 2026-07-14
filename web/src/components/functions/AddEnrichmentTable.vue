@@ -22,19 +22,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Standard app header: back tile + title (Save/Cancel stay in the footer). -->
     <AppPageHeader
       :title="isUpdating ? t('function.updateEnrichmentTable') : t('function.addEnrichmentTable')"
+      title-data-test="add-enrichment-table-title"
       :back="{
         label: t('function.enrichmentTables'),
         onClick: () => $emit('cancel:hideform'),
         dataTest: 'add-enrichment-table-back-btn',
       }"
       class="-mx-2.5 px-4 border-b border-border-default mb-2 shrink-0"
-    >
-      <template #title>
-        <span data-test="add-enrichment-table-title">{{
-          isUpdating ? t("function.updateEnrichmentTable") : t("function.addEnrichmentTable")
-        }}</span>
-      </template>
-    </AppPageHeader>
+    />
 
     <!-- Inline page form. Save lives in the footer INSIDE the <OForm>, so it is a
          native type="submit" (Enter submits) — no form-id needed. -->

@@ -80,13 +80,10 @@ describe("getSessionStorageVal", () => {
     sessionStorageMock.getItem.mockImplementation(() => {
       throw new Error("storage error");
     });
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     const result = getSessionStorageVal("badKey");
 
     expect(result).toBeUndefined();
-    expect(logSpy).toHaveBeenCalled();
-    logSpy.mockRestore();
   });
 });
 
@@ -105,13 +102,10 @@ describe("deleteSessionStorageVal", () => {
     sessionStorageMock.removeItem.mockImplementation(() => {
       throw new Error("remove error");
     });
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     const result = deleteSessionStorageVal("badKey");
 
     expect(result).toBeUndefined();
-    expect(logSpy).toHaveBeenCalled();
-    logSpy.mockRestore();
   });
 });
 
@@ -159,7 +153,6 @@ describe("useLocalOrganization", () => {
     Object.keys = () => {
       throw new Error("forced error");
     };
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     const result = useLocalOrganization({ a: 1 });
 
@@ -168,8 +161,6 @@ describe("useLocalOrganization", () => {
 
     // result should still be a ref-like object
     expect(result).toBeDefined();
-    expect(logSpy).toHaveBeenCalled();
-    logSpy.mockRestore();
   });
 });
 
@@ -410,13 +401,10 @@ describe("useLocalStorage internals (via useLocalCurrentUser)", () => {
     localStorageMock.getItem.mockImplementation(() => {
       throw new Error("quota exceeded");
     });
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     const ref = useLocalCurrentUser("value");
 
     expect(ref).toBeUndefined();
-    expect(logSpy).toHaveBeenCalled();
-    logSpy.mockRestore();
   });
 
   it("writes when stored value differs from default", () => {

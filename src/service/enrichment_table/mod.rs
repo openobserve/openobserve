@@ -40,8 +40,7 @@ use infra::{
 };
 
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::router::ERROR_HEADER,
+    common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
     service::{
         db,
         enrichment::storage::Values,

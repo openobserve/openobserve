@@ -14,33 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::ider;
-use opentelemetry::propagation::Extractor;
 use proto::cluster_rpc;
 
 pub mod auth;
 pub mod flight;
 pub mod request;
 
-pub struct MetadataMap<'a>(&'a tonic::metadata::MetadataMap);
-
-impl Extractor for MetadataMap<'_> {
-    /// Get a value for a key from the MetadataMap.  If the value can't be
-    /// converted to &str, returns None
-    fn get(&self, key: &str) -> Option<&str> {
-        self.0.get(key).and_then(|metadata| metadata.to_str().ok())
-    }
-
-    /// Collect all the keys from the MetadataMap.
-    fn keys(&self) -> Vec<&str> {
-        self.0
-            .keys()
-            .map(|key| match key {
-                tonic::metadata::KeyRef::Ascii(v) => v.as_str(),
-                tonic::metadata::KeyRef::Binary(v) => v.as_str(),
-            })
-            .collect::<Vec<_>>()
-    }
-}
+pub use crate::common::meta::grpc::MetadataMap;
 
 impl From<crate::service::promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
     fn from(req: crate::service::promql::MetricsQueryRequest) -> Self {

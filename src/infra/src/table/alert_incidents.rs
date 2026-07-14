@@ -636,6 +636,16 @@ pub async fn auto_resolve_stale(
     Ok((count, resolved_ids))
 }
 
+/// Deletes all alert incidents belonging to the given org.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    alert_incidents::Entity::delete_many()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

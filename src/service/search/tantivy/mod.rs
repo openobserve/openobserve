@@ -15,9 +15,12 @@
 
 pub mod cache;
 mod partition;
+mod pruner;
+mod result;
 pub mod search;
+mod warm;
 
-use std::{collections::HashSet, ops::Bound, sync::Arc};
+use std::{ops::Bound, sync::Arc};
 
 use arrow::{
     buffer::{BooleanBuffer, MutableBuffer},
@@ -40,17 +43,15 @@ use futures::{StreamExt, stream};
 use hashbrown::HashMap;
 use infra::{cache::file_data, errors::Error};
 use itertools::Itertools;
-pub use search::{TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult};
+pub use result::{TantivyMultiResult, TantivyMultiResultBuilder};
+pub use search::TantivyResult;
 use tantivy::{
     Directory, ReloadPolicy, Term,
-    query::{BooleanQuery, Occur, Query, RangeQuery},
-    schema::Field,
+    query::{BooleanQuery, Occur, RangeQuery},
 };
 use tantivy_utils::puffin_directory::{
-    PROP_ROW_GROUP_SIZE,
-    caching_directory::CachingDirectory,
-    footer_cache::FooterCache,
-    reader::{PuffinDirReader, warm_up_terms},
+    PROP_ROW_GROUP_SIZE, caching_directory::CachingDirectory, footer_cache::FooterCache,
+    reader::PuffinDirReader,
 };
 use tokio::sync::Semaphore;
 use tokio_stream::StreamExt as _;
@@ -58,6 +59,7 @@ use tokio_stream::StreamExt as _;
 use self::{
     cache::{self as tantivy_result_cache, CacheEntry},
     partition::partition_tantivy_files,
+    warm::WarmPlan,
 };
 use crate::service::search::{
     grpc::{QueryParams, calc_target_partitions, storage::cache_files},
@@ -178,11 +180,12 @@ pub async fn tantivy_search(
     }
     let time_range = query.time_range;
     let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
-    let (index_parquet_files, query_limit) =
+    let index_parquet_files =
         partition_tantivy_files(index_parquet_files, &idx_optimize_mode, target_partitions);
 
     let mut no_more_files = false;
-    let mut tantivy_result_builder = TantivyMultiResultBuilder::new(&idx_optimize_mode);
+    let mut tantivy_result_builder =
+        TantivyMultiResultBuilder::new(&idx_optimize_mode, &index_parquet_files);
     let group_num = index_parquet_files.first().unwrap_or(&vec![]).len();
     let max_group_len = index_parquet_files.len();
 
@@ -190,7 +193,7 @@ pub async fn tantivy_search(
         "[trace_id {trace_id}] search->tantivy: target_partitions: {target_partitions}, group_num: {group_num}, max_group_len: {max_group_len}",
     );
 
-    for file_group in index_parquet_files {
+    for (group_id, file_group) in index_parquet_files.into_iter().enumerate() {
         if no_more_files {
             // delete the rest of the files
             for file in file_group {
@@ -282,11 +285,21 @@ pub async fn tantivy_search(
                             let file = file_list_map.get_mut(&file_name).unwrap();
                             file.with_selection(FileSelection::Rows(row_ids), row_group_size);
                         }
+                        TantivyResult::SelectCandidates {
+                            candidates,
+                            row_group_size,
+                        } => {
+                            tantivy_result_builder.add_select_candidates(
+                                file_name,
+                                candidates,
+                                row_group_size,
+                            );
+                        }
                         TantivyResult::NoMatch => {
                             file_list_map.remove(&file_name);
                         }
                         TantivyResult::Count(count) => {
-                            tantivy_result_builder.add_row_nums(count as u64);
+                            tantivy_result_builder.add_count(count as u64);
                             file_list_map.remove(&file_name); // maybe we do not need to remove it?
                         }
                         TantivyResult::Histogram(histogram) => {
@@ -324,14 +337,14 @@ pub async fn tantivy_search(
                 }
             }
         }
-        // if limit is set and total hits exceed the limit, we stop searching
-        if query_limit > 0 && tantivy_result_builder.num_rows() > query_limit {
+        // only for simple select, stop when reach the limit
+        if tantivy_result_builder.should_prune_remaining_groups(trace_id, group_id) {
             no_more_files = true;
         }
     }
 
-    // get the result
-    let tantivy_result = tantivy_result_builder.build();
+    // get the result; for simple select finalizes the global top-n
+    let tantivy_result = tantivy_result_builder.build(trace_id, &mut file_list_map);
 
     log::info!(
         "{}",
@@ -396,9 +409,13 @@ async fn search_tantivy_index(
         ));
     };
 
+    // when the file is not fully within the time range, add a timestamp filter
+    let (start_time, end_time) = time_range;
+    let file_in_range =
+        parquet_file.meta.min_ts >= start_time && parquet_file.meta.max_ts < end_time;
     let cfg = get_config();
     let mut cache_key = String::new();
-    if cfg.common.inverted_index_result_cache_enabled {
+    if cfg.common.inverted_index_result_cache_enabled && file_in_range {
         metrics::TANTIVY_RESULT_CACHE_REQUESTS_TOTAL
             .with_label_values::<&str>(&[])
             .inc();
@@ -456,10 +473,6 @@ async fn search_tantivy_index(
     let (mut query, has_skipped_conditions) =
         condition.to_tantivy_query(trace_id, tantivy_schema.clone(), fts_field)?;
 
-    // when the file is not fully within the time range, add a timestamp filter
-    let (start_time, end_time) = time_range;
-    let file_in_range =
-        parquet_file.meta.min_ts >= start_time && parquet_file.meta.max_ts < end_time;
     if !file_in_range && let Ok(ts_field) = tantivy_schema.get_field(TIMESTAMP_COL_NAME) {
         let ts_range = RangeQuery::new(
             Bound::Included(Term::from_field_i64(ts_field, start_time)),
@@ -471,49 +484,15 @@ async fn search_tantivy_index(
         ]));
     }
 
-    let need_all_term_fields = condition
-        .need_all_term_fields()
-        .into_iter()
-        .chain(get_simple_distinct_field(&idx_optimize_rule))
-        .filter_map(|filed| tantivy_schema.get_field(&filed).ok())
-        .collect::<HashSet<_>>();
-
-    // warm up the terms in the query
-    let mut warm_terms: HashMap<Field, HashMap<Term, bool>> = HashMap::new();
-    query.query_terms(&mut |term, need_position| {
-        let field = term.field();
-        let entry = warm_terms.entry(field).or_default();
-        entry.insert(term.clone(), need_position);
-    });
-
-    let mut need_fast_field = HashSet::new();
-    if let Some(rule) = &idx_optimize_rule {
-        match rule {
-            IndexOptimizeMode::SimpleHistogram(..) => {
-                need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
-            }
-            IndexOptimizeMode::SimpleMultiHistogram(.., name) => {
-                need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
-                need_fast_field.insert(name.clone());
-            }
-            IndexOptimizeMode::SimpleTopN(fields, ..) => {
-                for field in fields {
-                    need_fast_field.insert(field.clone());
-                }
-            }
-            _ => {}
-        }
-    }
-    if !file_in_range {
-        need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
-    }
-
-    warm_up_terms(
-        &searcher,
-        &warm_terms,
-        need_all_term_fields,
-        need_fast_field,
+    WarmPlan::build(
+        &condition,
+        query.as_ref(),
+        &idx_optimize_rule,
+        &tantivy_schema,
+        file_in_range,
+        has_skipped_conditions,
     )
+    .execute(searcher.segment_reader(0))
     .await?;
 
     // search the index
@@ -522,7 +501,11 @@ async fn search_tantivy_index(
     let res = tokio::task::spawn_blocking(move || match idx_optimize_rule.clone() {
         None => TantivyResult::handle_matched_docs(&searcher, query),
         Some(IndexOptimizeMode::SimpleSelect(limit, ascend)) => {
-            TantivyResult::handle_simple_select(&searcher, query, limit, ascend)
+            if has_skipped_conditions {
+                TantivyResult::handle_matched_docs(&searcher, query)
+            } else {
+                TantivyResult::handle_simple_select(&searcher, query, limit, ascend)
+            }
         }
         Some(IndexOptimizeMode::SimpleCount) => {
             TantivyResult::handle_simple_count(&searcher, query)
@@ -570,11 +553,26 @@ async fn search_tantivy_index(
         TantivyResult::TopN(top_n) => TantivyResult::TopN(top_n),
         TantivyResult::Distinct(distinct) => TantivyResult::Distinct(distinct),
         TantivyResult::RowIds(row_ids) => {
-            match build_row_ids_selection(trace_id, parquet_file, row_ids, row_group_size)? {
-                RowIdsOutcome::Return(key, result, has_skipped) => {
-                    return Ok((key, result, has_skipped));
-                }
-                RowIdsOutcome::Selection { result } => result,
+            let max_doc_id = row_ids.iter().copied().max();
+            match guard_matched_rows(trace_id, parquet_file, row_ids.len(), max_doc_id)? {
+                Some(result) => result,
+                None => TantivyResult::RowIdsSelection {
+                    row_ids: Arc::new(selection_from_row_ids(
+                        parquet_file.meta.records as usize,
+                        row_ids.iter().copied(),
+                    )),
+                    row_group_size,
+                },
+            }
+        }
+        TantivyResult::SelectCandidates { candidates, .. } => {
+            let max_doc_id = candidates.iter().map(|(_, doc_id)| *doc_id).max();
+            match guard_matched_rows(trace_id, parquet_file, candidates.len(), max_doc_id)? {
+                Some(result) => result,
+                None => TantivyResult::SelectCandidates {
+                    candidates,
+                    row_group_size,
+                },
             }
         }
         TantivyResult::RowIdsSelection { .. }
@@ -584,10 +582,13 @@ async fn search_tantivy_index(
         }
     };
 
-    // cache the result if the memory size is less than the limit
-    // Do not cache when conditions were skipped — the result is incomplete.
-    if cfg.common.inverted_index_result_cache_enabled
-        && !cache_key.is_empty()
+    match &result {
+        TantivyResult::NoMatch => return Ok((key, result, false)),
+        TantivyResult::Skipped { .. } => return Ok((String::new(), result, true)),
+        _ => {}
+    }
+
+    if !cache_key.is_empty()
         && !has_skipped_conditions
         && result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
     {
@@ -597,76 +598,49 @@ async fn search_tantivy_index(
     Ok((key, result, has_skipped_conditions))
 }
 
-/// Outcome of turning tantivy row-id hits into a parquet access plan.
-enum RowIdsOutcome {
-    /// Return immediately from `search_tantivy_index`, bypassing the result
-    /// cache (either no match, or too many hits so we fall back to datafusion).
-    Return(String, TantivyResult, bool),
-    /// A row-id selection to cache and return.
-    Selection { result: TantivyResult },
-}
-
-/// Convert the matched tantivy row ids into a `RowIdsSelection` access plan,
-/// or signal an early return when there is no match or too many hits.
-fn build_row_ids_selection(
+/// Common guards for matched row ids: returns `Some(NoMatch)` when there is
+/// nothing to select, `Some(Skipped)` when the match count exceeds the skip
+/// threshold (the caller falls back to datafusion), and an error when a doc
+/// id is out of range.
+fn guard_matched_rows(
     trace_id: &str,
     parquet_file: &FileKey,
-    row_ids: Vec<u32>,
-    row_group_size: Option<u32>,
-) -> anyhow::Result<RowIdsOutcome> {
-    if row_ids.is_empty() || parquet_file.meta.records == 0 {
-        return Ok(RowIdsOutcome::Return(
-            parquet_file.key.to_string(),
-            TantivyResult::NoMatch,
-            false,
-        ));
+    matched: usize,
+    max_doc_id: Option<u32>,
+) -> anyhow::Result<Option<TantivyResult>> {
+    if matched == 0 || parquet_file.meta.records == 0 {
+        return Ok(Some(TantivyResult::NoMatch));
     }
-    // return early if the number of matched docs is too large
     let skip_threshold = get_config().limit.inverted_index_skip_threshold;
-    let row_ids_percent = row_ids.len() as f64 / parquet_file.meta.records as f64 * 100.0;
+    let row_ids_percent = matched as f64 / parquet_file.meta.records as f64 * 100.0;
     if skip_threshold > 0 && row_ids_percent > skip_threshold as f64 {
-        // return empty file name means we need to add filter back and skip tantivy search
         log::info!(
             "[trace_id {trace_id}] search->tantivy: file: {}, result percent {row_ids_percent}% is too large, back to datafusion",
             parquet_file.key
         );
-        return Ok(RowIdsOutcome::Return(
-            "".to_string(),
-            TantivyResult::Skipped {
-                percent: row_ids_percent as usize,
-            },
-            true,
-        ));
+        return Ok(Some(TantivyResult::Skipped {
+            percent: row_ids_percent as usize,
+        }));
     }
-    let max_doc_id = row_ids.iter().copied().max().unwrap() as i64;
-    if max_doc_id >= parquet_file.meta.records {
+    if let Some(max_doc_id) = max_doc_id
+        && max_doc_id as i64 >= parquet_file.meta.records
+    {
         return Err(anyhow::anyhow!(
             "doc_id {max_doc_id} is out of range, records {}",
             parquet_file.meta.records,
         ));
     }
-    let num_rows = parquet_file.meta.records as usize;
-    let mut buffer = MutableBuffer::from_len_zeroed(bit_util::ceil(num_rows, 8));
-    let slice = buffer.as_slice_mut();
-    for &id in &row_ids {
-        bit_util::set_bit(slice, id as usize);
-    }
-    let row_ids = BooleanBuffer::new(buffer.into(), 0, num_rows);
-    Ok(RowIdsOutcome::Selection {
-        result: TantivyResult::RowIdsSelection {
-            row_ids: Arc::new(row_ids),
-            row_group_size,
-        },
-    })
+    Ok(None)
 }
 
-/// if simple distinct without filter, we need to warm up the field
-fn get_simple_distinct_field(idx_optimize_rule: &Option<IndexOptimizeMode>) -> Vec<String> {
-    if let Some(IndexOptimizeMode::SimpleDistinct(field, ..)) = idx_optimize_rule {
-        vec![field.to_string()]
-    } else {
-        vec![]
+/// Build a per-row match bitmap of length `num_rows` from matched row ids.
+fn selection_from_row_ids(num_rows: usize, row_ids: impl Iterator<Item = u32>) -> BooleanBuffer {
+    let mut buffer = MutableBuffer::from_len_zeroed(bit_util::ceil(num_rows, 8));
+    let slice = buffer.as_slice_mut();
+    for id in row_ids {
+        bit_util::set_bit(slice, id as usize);
     }
+    BooleanBuffer::new(buffer.into(), 0, num_rows)
 }
 
 fn get_cache_entry(tantivy_result: TantivyResult) -> CacheEntry {
@@ -674,11 +648,11 @@ fn get_cache_entry(tantivy_result: TantivyResult) -> CacheEntry {
         TantivyResult::RowIdsSelection {
             row_ids,
             row_group_size,
-        } => {
-            // the packed ids are immutable and shared via Arc, so caching is
-            // a refcount bump
-            CacheEntry::RowIds(row_ids, row_group_size)
-        }
+        } => CacheEntry::RowIds(row_ids, row_group_size),
+        TantivyResult::SelectCandidates {
+            candidates,
+            row_group_size,
+        } => CacheEntry::SelectCandidates(candidates, row_group_size),
         TantivyResult::Count(count) => CacheEntry::Count(count),
         TantivyResult::Histogram(histogram) => CacheEntry::Histogram(histogram),
         TantivyResult::MultiHistogram(multi_histogram) => {
@@ -710,6 +684,8 @@ fn generate_cache_key(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use arrow::buffer::BooleanBuffer;
     use config::{TIMESTAMP_COL_NAME, meta::stream::FileMeta};
 
@@ -722,6 +698,7 @@ mod tests {
             meta: FileMeta {
                 min_ts,
                 max_ts,
+                records: 1000,
                 ..Default::default()
             },
             ..Default::default()
@@ -764,33 +741,6 @@ mod tests {
         );
         let histogram = searcher.search(&all_query, &histogram_collector).unwrap();
         assert_eq!(histogram, vec![1, 1, 0, 1]);
-    }
-
-    #[test]
-    fn test_get_simple_distinct_field_none() {
-        let idx_optimize_rule = None;
-        let result = get_simple_distinct_field(&idx_optimize_rule);
-        assert_eq!(result, Vec::<String>::new());
-    }
-
-    #[test]
-    fn test_get_simple_distinct_field_simple_distinct() {
-        let idx_optimize_rule = Some(
-            config::meta::inverted_index::IndexOptimizeMode::SimpleDistinct(
-                "test_field".to_string(),
-                100,
-                false,
-            ),
-        );
-        let result = get_simple_distinct_field(&idx_optimize_rule);
-        assert_eq!(result, vec!["test_field".to_string()]);
-    }
-
-    #[test]
-    fn test_get_simple_distinct_field_other_mode() {
-        let idx_optimize_rule = Some(config::meta::inverted_index::IndexOptimizeMode::SimpleCount);
-        let result = get_simple_distinct_field(&idx_optimize_rule);
-        assert_eq!(result, Vec::<String>::new());
     }
 
     #[test]
@@ -843,6 +793,24 @@ mod tests {
                 assert_eq!(row_group_size, Some(1024));
             }
             _ => panic!("Expected RowIds cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_get_cache_entry_select_candidates() {
+        let candidates = Arc::new(vec![(100i64, 7u32), (99, 3)]);
+        let result = TantivyResult::SelectCandidates {
+            candidates: candidates.clone(),
+            row_group_size: Some(1024),
+        };
+
+        let entry = get_cache_entry(result);
+        match entry {
+            CacheEntry::SelectCandidates(cached, row_group_size) => {
+                assert_eq!(*cached, *candidates);
+                assert_eq!(row_group_size, Some(1024));
+            }
+            _ => panic!("Expected SelectCandidates cache entry"),
         }
     }
 

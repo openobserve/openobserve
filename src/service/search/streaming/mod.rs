@@ -48,6 +48,8 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use vector_enrichment::TableRegistry;
 
+#[cfg(feature = "enterprise")]
+use crate::service::{http::map_error_to_http_response, self_reporting::audit};
 use crate::{
     common::{
         meta::search::{AuditContext, SearchResultType},
@@ -60,11 +62,6 @@ use crate::{
             HistogramIntervalVisitor, validate_and_adjust_histogram_interval,
         },
     },
-};
-#[cfg(feature = "enterprise")]
-use crate::{
-    handler::http::request::search::error_utils::map_error_to_http_response,
-    service::self_reporting::audit,
 };
 
 pub mod cache;
@@ -347,12 +344,15 @@ pub async fn process_search_stream_request(
         if !cached_resp.is_empty() && cached_hits > 0 {
             // `max_query_range` is used initialize `remaining_query_range`
             // set max_query_range to `end_time - start_time` as hour if it is 0, to ensure
-            // unlimited query range for cache only search
-            let remaining_query_range = if max_query_range == 0 {
-                (req.query.end_time - req.query.start_time) / hour_micros(1) + 1
-            } else {
-                max_query_range
-            }; // hours
+            // unlimited query range for cache only search.
+            // Enrichment tables have no retention and must be searched in full, so treat them as
+            // unlimited too (otherwise old enrichment data is dropped by the range budget).
+            let remaining_query_range =
+                if max_query_range == 0 || stream_type == StreamType::EnrichmentTables {
+                    (req.query.end_time - req.query.start_time) / hour_micros(1) + 1
+                } else {
+                    max_query_range
+                }; // hours
 
             let size = req.query.size;
             // Step 1(a): handle cache responses & query the deltas

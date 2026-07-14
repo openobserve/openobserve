@@ -3,27 +3,12 @@
     :open="open"
     side="right"
     :width="70"
-    :title="t('onlineEvals.job.detail.eyebrow')"
+    :title="row?.name"
+    :title-data-test="'eval-job-detail-name-badge'"
+    :sub-title="t('onlineEvals.job.detail.eyebrow')"
     data-test="eval-job-detail"
     @update:open="handleOpenChange"
   >
-    <!-- Header: module label as the title + the job name as a blue chip,
-         mirroring the Alert History drawer. -->
-    <template #header-left>
-      <span
-        v-if="row.name"
-        :class="[
-          'font-semibold text-[1.125rem] px-2 py-1 rounded-md ml-2 min-w-0 truncate',
-          store.state.theme === 'dark'
-            ? 'text-blue-400 bg-blue-900/50'
-            : 'text-blue-600 bg-blue-50',
-        ]"
-        data-test="eval-job-detail-name-badge"
-      >
-        {{ row.name }}
-        <OTooltip v-if="row.name" :content="row.name" />
-      </span>
-    </template>
 
     <!-- Body: the KPI strip + tab bar stay pinned; only the tab content scrolls. -->
     <div class="flex flex-col h-full min-h-0">

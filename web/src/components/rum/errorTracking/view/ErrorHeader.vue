@@ -17,35 +17,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div>
-      <div class="pt-2 pb-1 flex justify-start">
-        <div
-          data-test="back-button"
-          class="flex justify-center items-center mr-3 cursor-pointer hover:text-[var(--o2-primary-btn-bg)]"
-          style="
-            border: 1.5px solid;
-            border-radius: 50%;
-            width: 22px;
-            height: 22px;
-          "
-          title="Go Back"
-          @click="router.back()"
-        >
-          <OIcon name="arrow-back-ios-new" size="xs" />
-        </div>
-        <span class="font-bold">{{ t("rum.eventID") }}:</span>
-        <span
-          data-test="error-id"
-          :title="error.error_id"
-          class="pl-1 cursor-pointer"
-          >{{ error.error_id }}
-          <OIcon
-            size="xs"
-            name="content-copy"
-            class="hover:text-[var(--o2-primary-btn-bg)]"
-            @click="copyErrorId(error.error_id)"
-        /></span>
-        <span class="ml-4">{{ error.timestamp }}</span>
-      </div>
+      <AppPageHeader
+        :back="{ onClick: () => router.back(), dataTest: 'back-button' }"
+      >
+        <template #title>
+          <span class="font-bold">{{ t("rum.eventID") }}:</span>
+          <span
+            data-test="error-id"
+            :title="error.error_id"
+            class="pl-1 cursor-pointer"
+            >{{ error.error_id }}
+            <OIcon
+              size="xs"
+              name="content-copy"
+              class="hover:text-[var(--o2-primary-btn-bg)]"
+              @click="copyErrorId(error.error_id)"
+          /></span>
+        </template>
+        <template #actions>
+          <span>{{ error.timestamp }}</span>
+        </template>
+      </AppPageHeader>
       <div class="flex items-center flex-nowrap my-1">
         <div
           data-test="error-header-error-type"
@@ -76,6 +68,7 @@ import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 const { t } = useI18n();
 const router = useRouter();

@@ -12,13 +12,20 @@
       "action": "Amplia l'intervallo di tempo",
       "actionDesc": "Ricerca su un periodo più lungo"
     },
+    "noPatterns": {
+      "title": "Nessun modello trovato",
+      "description": "Prova ad aumentare l'intervallo di tempo o a selezionare un flusso diverso con più dati di registro. L'estrazione dei pattern funziona meglio con almeno 1.000 log.",
+      "logsAnalyzed": "Sono stati analizzati solo {count} log."
+    },
     "noStreamSelected": {
       "title": "Seleziona uno stream per iniziare",
       "description": "Scegli uno stream, quindi esegui la query per esplorarne i dati. Perfeziona i risultati con filtri e un intervallo di tempo personalizzato."
     },
     "noQueryApplied": {
       "title": "Esegui una query per visualizzare i log",
-      "description": "Modifica i filtri e fai clic su «Esegui query» per caricare gli eventi per questo stream."
+      "description": "Modifica i filtri e fai clic su «Esegui query» per caricare gli eventi per questo stream.",
+      "action": "Esegui interrogazione",
+      "actionDesc": "Carica eventi per i filtri selezionati"
     },
     "noDashboards": {
       "title": "Crea la tua prima dashboard",
@@ -80,7 +87,9 @@
       "title": "Ancora nessuna destinazione",
       "description": "Le destinazioni definiscono dove vengono inviate le notifiche di avviso: Slack, email, webhook e altro ancora.",
       "action": "Nuova destinazione",
-      "actionDesc": "Connetti un canale di notifica"
+      "actionDesc": "Connetti un canale di notifica",
+      "import": "Destinazione dell'importazione",
+      "importDesc": "Importazione da un file JSON"
     },
     "noPipelineDestinations": {
       "title": "Ancora nessuna destinazione",
@@ -92,7 +101,9 @@
       "title": "Non ci sono ancora template",
       "description": "I template definiscono il formato dei messaggi di notifica degli avvisi.",
       "action": "Nuovo template",
-      "actionDesc": "Creare un template di notifica"
+      "actionDesc": "Creare un template di notifica",
+      "import": "Modello di importazione",
+      "importDesc": "Importazione da un file JSON"
     },
     "noEvalTemplates": {
       "title": "Non sono ancora disponibili template di valutazione",
@@ -142,6 +153,20 @@
       "title": "Nessun lavoro di backfill",
       "description": "I lavori di backfill rielaborano i dati storici tramite una pipeline. Eseguine uno per iniziare."
     },
+    "noRegexPatterns": {
+      "title": "Non ci sono ancora modelli regex",
+      "description": "Crea un pattern riutilizzabile per oscurare i dati sensibili o importane uno dalla tua libreria.",
+      "action": "Nuovo modello",
+      "actionDesc": "Definire un nuovo modello regex",
+      "import": "Modello di importazione",
+      "importDesc": "Riutilizza un pattern dalla tua libreria"
+    },
+    "noStorageConfig": {
+      "title": "Nessun bucket configurato",
+      "description": "Indirizza i dati di questa organizzazione a un bucket dedicato, indipendentemente dalle altre organizzazioni e dalle impostazioni predefinite globali.",
+      "action": "Configurazione dello storage",
+      "actionDesc": "Connetti un bucket S3, GCS o Azure"
+    },
     "noPipelineHistory": {
       "title": "Ancora nessuna cronologia delle pipeline",
       "description": "La cronologia delle esecuzioni delle pipeline verrà visualizzata qui una volta eseguite le pipeline."
@@ -161,10 +186,12 @@
       "actionDesc": "Scrivere una nuova funzione VRL"
     },
     "noStreams": {
-      "title": "Aspettando i tuoi primi dati",
-      "description": "Non sono ancora arrivati dati. Collega una fonte e i tuoi stream verranno visualizzati qui automaticamente.",
+      "title": "Collega una fonte per creare il tuo primo stream",
+      "description": "Gli stream vengono creati automaticamente nel momento in cui arrivano i dati. Configura l'inserimento dalla tua app, agente o raccoglitore per iniziare.",
       "action": "Configurare l'ingestione",
-      "actionDesc": "Connetti una fonte di dati"
+      "actionDesc": "Connetti una fonte di dati",
+      "createAction": "Nuovo stream",
+      "createActionDesc": "Definire manualmente uno schema di flusso"
     },
     "noAlerts": {
       "title": "Crea il tuo primo avviso",
@@ -174,7 +201,7 @@
     },
     "noIncidents": {
       "title": "Nessun incidente attivo",
-      "description": "Siete tutti presi, niente ha bisogno della vostra attenzione in questo momento. Gli incidenti attivati verranno visualizzati qui."
+      "description": "Gli incidenti vengono creati quando si attiva un avviso: nessuno è ancora stato attivato. Una volta inseriti gli avvisi, tutti gli incidenti attivati verranno visualizzati qui."
     },
     "noLLMInsights": {
       "title": "Nessuna attività LLM ancora",
@@ -191,20 +218,24 @@
     "noScorers": {
       "title": "Ancora nessun marcatore",
       "description": "I valutatori valutano le risposte LLM in base alle tue configurazioni di punteggio: inizia con un giudice LLM o importane uno dalla libreria.",
-      "action": "Crea segnapunti",
-      "actionDesc": "Definire un giudice LLM o un marcatore remoto"
+      "action": "Nuovo marcatore",
+      "actionDesc": "Definire un giudice LLM o un marcatore remoto",
+      "import": "Importa segnapunti",
+      "importDesc": "Importazione da un file JSON"
     },
     "noEvalJobs": {
       "title": "Non ci sono ancora lavori di valutazione",
       "description": "I punteggi dei job pianificano i punteggi in base a uno stream LLM. Creane uno per iniziare a valutare le conversazioni in base a una cadenza.",
-      "action": "Crea un job di valutazione",
+      "action": "Nuovo lavoro",
       "actionDesc": "Scegli uno stream + marcatori + cadenza"
     },
     "noScoreConfigs": {
       "title": "Nessuna configurazione del punteggio ancora",
       "description": "Le configurazioni dei punteggi definiscono lo schema prodotto dai puntatori: numerico, booleano o categorico. Aggiungine uno per iniziare a segnare.",
-      "action": "Crea configurazione della partitura",
-      "actionDesc": "Definisci la forma del punteggio + un intervallo sano"
+      "action": "Nuova configurazione della partitura",
+      "actionDesc": "Definisci la forma del punteggio + un intervallo sano",
+      "import": "Configurazione del punteggio di importazione",
+      "importDesc": "Importazione da un file JSON"
     },
     "loadError": {
       "title": "Qualcosa è andato storto",
@@ -271,6 +302,7 @@
     },
     "nouns": {
       "logs": "log",
+      "patterns": "modelli",
       "dashboards": "dashboard",
       "pipelines": "pipeline",
       "functions": "funzioni",
@@ -305,7 +337,8 @@
       "scorers": "scorer",
       "evalJobs": "processi di valutazione",
       "scoreConfigs": "configurazioni di punteggio",
-      "pipelineHistory": "cronologia della pipeline"
+      "pipelineHistory": "cronologia della pipeline",
+      "regexPatterns": "modelli regex"
     }
   },
   "common": {
@@ -451,6 +484,10 @@
   },
   "validation": {
     "required": "Questo campo è obbligatorio",
+    "fieldRequired": "Il campo è obbligatorio!",
+    "alphanumeric": "L'input deve essere alfanumerico",
+    "organizationNameRequired": "Il nome dell'organizzazione è obbligatorio",
+    "selectOrganization": "Seleziona un'organizzazione",
     "invalidFormat": "Formato non valido",
     "mustBeGreaterThan": "Deve essere maggiore di {value}",
     "mustBeLessThan": "Deve essere inferiore a {value}"
@@ -849,6 +886,12 @@
     "webVitals": "Web Vitals",
     "errors": "Errori",
     "api": "API",
+    "uploadSourceMapsForm": {
+      "serviceRequired": "Il servizio è obbligatorio",
+      "versionRequired": "La versione è obbligatoria",
+      "fileRequired": "Seleziona un file ZIP da caricare",
+      "fileTypeZip": "Sono consentiti solo file ZIP"
+    },
     "emptyState": {
       "title": "Monitora i tuoi utenti con Real User Monitoring",
       "description": "RUM tiene traccia delle interazioni degli utenti reali (caricamento delle pagine, errori, chiamate API e replay delle sessioni) in modo da poter vedere esattamente come gli utenti percepiscono la tua applicazione.",
@@ -1612,6 +1655,11 @@
     "subtitle": "Gestione degli indici e configurazione dello stream",
     "streamNameHelpText": "Usa solo caratteri alfanumerici, trattini bassi e due punti.",
     "search": "Stream di ricerca",
+    "emptyOr": "Oppure:",
+    "emptyKubernetes": "Kubernetes",
+    "emptyAws": "AWS/CloudWatch",
+    "emptyLinux": "Linux",
+    "emptyWindows": "finestre",
     "name": "Nome",
     "docNum": "Doctor Num",
     "storageSize": "Dati ingeriti",
@@ -1653,6 +1701,9 @@
     "labelIndex": "Indice",
     "add": "Aggiungi stream",
     "dataRetention": "Conservazione dei dati (in giorni)",
+    "streamNameRequired": "Il nome dello stream è obbligatorio",
+    "streamTypeRequired": "Seleziona un tipo di stream",
+    "dataRetentionMin": "La conservazione dei dati deve essere di almeno 1 giorno",
     "indexing": "Indicizzazione",
     "createStream": "Crea stream",
     "indexType": "Tipo di indice",
@@ -1792,6 +1843,27 @@
     "dragDropNodesHere": "Trascina e rilascia i nodi qui",
     "promqlOnlyForMetrics": "ProMQL è disponibile solo per il tipo di flusso di metriche",
     "invalidCronExpression": "Espressione cron non valida",
+    "cronRequired": "L'espressione cron è obbligatoria",
+    "destResourceNameInvalid": "Caratteri come :, ?, /, # e spazi non sono consentiti.",
+    "urlTrailingSlash": "L'URL non deve terminare con una barra",
+    "orgRequiredOpenobserve": "L'organizzazione è obbligatoria per OpenObserve",
+    "streamRequiredOpenobserve": "Il nome dello stream è obbligatorio per OpenObserve",
+    "endpointMustStartSlash": "Il percorso dell'endpoint deve iniziare con /",
+    "indexRequiredEsbulk": "Il nome dell'indice è obbligatorio per il formato ESBulk",
+    "separatorRequiredStringseparated": "Il separatore è obbligatorio per il formato StringSeparated",
+    "ddSourceRequiredDatadog": "DD Source è obbligatorio per Datadog",
+    "ddTagsRequiredDatadog": "I DD Tags sono obbligatori per Datadog",
+    "periodGreaterThanZero": "Il periodo deve essere maggiore di 0",
+    "frequencyGreaterThanSeconds": "La frequenza deve essere maggiore di {seconds} secondi.",
+    "minimumFrequencyMinutes": "La frequenza minima deve essere di {minutes} minuti",
+    "streamSelectionNameInvalid": "Utilizzare solo caratteri alfanumerici e '+=,.@-_', senza spazi.",
+    "functionAlreadyAssociated": "La funzione è già associata",
+    "atLeastOneCondition": "Aggiungi almeno una condizione",
+    "fillAllConditionFields": "Compila tutti i campi della condizione (colonna, operatore e valore sono obbligatori)",
+    "selectExternalDestination": "Seleziona una destinazione esterna dall'elenco",
+    "backfillNumericRange": "Deve essere compreso tra {min} e {max}",
+    "selectValidTimeRange": "Seleziona un intervallo di tempo valido",
+    "startBeforeEndTime": "L'ora di inizio deve essere precedente all'ora di fine",
     "thresholdShouldNotBeEmpty": "La soglia non deve essere vuota",
     "errorGettingResults": "Errore durante l'ottenimento dei risultati",
     "save": "Salva",
@@ -2108,6 +2180,17 @@
     "header": "Dashboard",
     "subtitle": "Crea, organizza e condividi dashboard tra cartelle",
     "add": "Nuova dashboard",
+    "setAsHome": "Aggiungi alla home page",
+    "removeFromHome": "Sblocca dalla home page",
+    "isHomeDashboard": "Pannello di controllo principale",
+    "openHomeDashboard": "Visualizza il pannello di controllo aggiunto",
+    "pinnedOnHome": "Pannello di controllo aggiunto nella home page",
+    "deletedSuccessfully": "Dashboard eliminato con successo.",
+    "pinnedDeletedPinRemoved": "La dashboard bloccata è stata eliminata, quindi il relativo pin Home è stato rimosso.",
+    "homePinNotFound": "Questa dashboard non esiste più ed è stata rimossa dalla Home.",
+    "homePinUnavailable": "Questa dashboard non è più disponibile ed è stata rimossa dalla Home.",
+    "setAsHomeDesc": "Mostra questa dashboard nella home page per tutti i membri dell'organizzazione",
+    "moreActions": "Altre azioni",
     "save": "Salva",
     "cancel": "Annulla",
     "delete": "Elimina dashboard",
@@ -2177,6 +2260,7 @@
     "selectVariableScope": "Seleziona ambito variabile",
     "variableScopeHelp": "Le variabili verranno applicate a tutte le schede e i pannelli se è selezionato globale.",
     "newTab": "Aggiungi scheda",
+    "editTab": "Modifica scheda",
     "generalSettingsTitle": "Impostazioni generali",
     "tabSettingsTitle": "Impostazioni delle schede",
     "addGeneralSettings": "Generale",
@@ -2551,14 +2635,34 @@
     "editDrilldown": "Modifica drilldown",
     "goTo": "Vai a:",
     "selectLogsMode": "Seleziona la modalità Log:",
-    "enterCustomQuery": "Inserisci una query personalizzata:",
-    "enterUrl": "Inserisci l'URL:",
+    "enterCustomQuery": "Query SQL personalizzata *:",
+    "sqlQueryRequired": "La query SQL è obbligatoria",
+    "variableNameRequired": "Il nome della variabile è obbligatorio.",
+    "variableNameInvalid": "Sono consentiti solo lettere, numeri, trattini e trattini bassi",
+    "atLeastOneTabRequired": "È richiesta almeno una scheda.",
+    "atLeastOnePanelRequired": "È richiesto almeno un pannello.",
+    "streamTypeRequired": "Il tipo di stream è obbligatorio.",
+    "streamIndexRequired": "Lo stream / indice è obbligatorio.",
+    "fieldRequired": "Il campo è obbligatorio.",
+    "constantValueRequired": "Il valore costante è obbligatorio.",
+    "operatorRequired": "L'operatore è obbligatorio.",
+    "filterValueRequired": "Obbligatorio",
+    "labelRequired": "L'etichetta è obbligatoria.",
+    "optionValueRequired": "Il campo è obbligatorio!",
+    "seriesValueRequired": "Il valore della serie è obbligatorio",
+    "colorRequired": "Il colore è obbligatorio",
+    "onlyHttpsUrlsAllowed": "Sono consentiti solo URL HTTP(S)",
+    "urlRequired": "L'URL è obbligatorio",
+    "folderRequired": "La cartella è obbligatoria",
+    "dashboardRequired": "La dashboard è obbligatoria",
+    "tabRequired": "La scheda è obbligatoria",
+    "enterUrl": "Inserisci l'URL",
     "invalidUrl": "URL non valido",
-    "selectFolderDrilldown": "Seleziona cartella *:",
+    "selectFolderDrilldown": "Seleziona cartella",
     "noFoldersAvailable": "Nessuna cartella disponibile",
-    "selectDashboardDrilldown": "Seleziona Dashboard *:",
+    "selectDashboardDrilldown": "Seleziona Dashboard",
     "noDashboardsAvailable": "Nessuna dashboard disponibile",
-    "selectTabDrilldown": "Seleziona scheda *:",
+    "selectTabDrilldown": "Seleziona scheda",
     "noTabAvailable": "Nessuna scheda disponibile",
     "variables": "Variabili:",
     "passAllCurrentVariables": "Passa tutte le variabili correnti:",
@@ -2681,6 +2785,11 @@
     "operations": "Operazioni",
     "promQLBuilder": "Generatore ProMQL",
     "joins": "Si unisce",
+    "xAxisShort": "Asse X",
+    "yAxisShort": "Asse Y",
+    "rowFields": "Campi riga",
+    "valueFields": "Campi valore",
+    "noData": "Nessun dato",
     "addJoin": "Aggiungi Unisciti",
     "removeJoin": "Rimuovi Join",
     "leftJoin": "Unisciti a sinistra",
@@ -2703,7 +2812,7 @@
     "enterCustomSql": "Inserisci la tua query SQL personalizzata...",
     "back": "<< Indietro",
     "sqlBuilder": "SQL Builder",
-    "promQL": "ProMQL",
+    "promQL": "PromQL",
     "latitude": "Latitudine",
     "longitude": "Longitudine",
     "weight": "Peso",
@@ -2756,6 +2865,7 @@
     "tabAiAssistant": "Assistente AI O2",
     "tabOverview": "Panoramica",
     "tabUsage": "Utilizzo",
+    "removeHomeDashboard": "Rimuovi la dashboard principale",
     "subtitle": "Il tuo spazio di lavoro per l'osservabilità a colpo d'occhio"
   },
   "overview": {
@@ -2908,6 +3018,9 @@
     "enterpriseNote": "Esigenze di volume elevato? Parliamo di scala! Contattaci per soluzioni su misura.",
     "contactSupport": "Contatta l'assistenza",
     "totalUsage": "Utilizzo totale",
+    "usageTrends": {
+      "dailyUsage": "Uso quotidiano"
+    },
     "aiCredits": "Crediti AI",
     "aiModeFree": "Gratuito",
     "aiModePayAsYouGo": "Paga in base al tuo uso",
@@ -2939,6 +3052,7 @@
       "inviteTitle": "Invita un'organizzazione",
       "inviteOrgIdLabel": "Identificatore dell'organizzazione",
       "inviteOrgIdPlaceholder": "Inserisci l'identificativo dell'organizzazione",
+      "inviteOrgIdRequired": "L'identificatore dell'organizzazione è obbligatorio",
       "sendInvite": "Invia invito",
       "inviteSent": "Invito inviato con successo",
       "inviteSameOrg": "Un'organizzazione non può invitare se stessa",
@@ -3022,9 +3136,9 @@
     "searchAllFolders": "Tutte le cartelle",
     "streamConfig": "Configurazione dello streaming",
     "alertRules": "Regole di avviso",
-    "noTemplatesMsg": "Sembra che tu non abbia ancora creato alcun template. Per creare un avviso, devi disporre di almeno una destinazione e un template",
+    "noTemplatesMsg": "Per creare un avviso sono necessari almeno un modello e una destinazione. I modelli definiscono il formato del messaggio di notifica: inizia con la creazione di uno.",
     "createTemplateBtn": "Crea template",
-    "noDestinationsMsg": "Sembra che tu non abbia ancora creato alcuna destinazione. Per creare un avviso, devi disporre di almeno una destinazione e un template",
+    "noDestinationsMsg": "Per creare un avviso sono necessari almeno una destinazione e un modello. Le destinazioni definiscono dove vengono inviate le notifiche: inizia con la creazione di una.",
     "createDestinationBtn": "Crea destinazione",
     "add": "Aggiungi avviso",
     "edit": "Modifica",
@@ -3886,12 +4000,24 @@
     "domainConfiguredCount": "{count} domini configurati",
     "allowAllUsersFromDomain": "Consenti a tutti gli utenti di {domain}",
     "allowOnlySpecificUsers": "Consenti solo utenti specifici di {domain}",
+    "blockSpecificUsers": "Blocca solo utenti specifici da {domain}",
+    "blockAllUsersFromDomain": "Blocca tutti gli utenti da {domain}",
+    "allUsersBlockedMessage": "Tutti gli utenti SSO esterni con indirizzi email che terminano con {domain} verranno bloccati dal sistema (interfaccia utente, API e ingestion).",
+    "blockedUsersHint": "Le voci bloccate si applicano solo alle identità SSO esterne (utenti SSO e account di servizio SSO/token). Sovrascrivono qualsiasi regola di autorizzazione e coprono l'interfaccia utente, l'API e l'inserimento. Gli account nativi e creati tramite API non sono interessati: eliminali invece.",
+    "addBlockedEmail": "Blocca email",
+    "blockedEmailPlaceholder": "ad esempio user {domain}",
+    "domainNeedsBlockedEmails": "Il dominio '{domain}' deve avere almeno un indirizzo email quando si bloccano utenti specifici",
+    "confirmRemoveBlockedEmail": "Sei sicuro di voler sbloccare l'email '{email}'?",
+    "blockedEmailAdded": "Indirizzo email bloccato con successo",
+    "blockedEmailRemoved": "Indirizzo email sbloccato con successo",
     "allUsersAllowedMessage": "Tutti gli utenti con indirizzi email che terminano con {domain} potranno accedere.",
     "emailPlaceholder": "ad esempio user {domain}",
     "addEmail": "Aggiungi email",
     "saveChanges": "Salva",
     "invalidDomain": "Inserisci un nome di dominio valido",
     "invalidEmail": "Inserisci un indirizzo email valido per questo dominio",
+    "domainRequired": "È richiesto il dominio",
+    "emailRequired": "È richiesto l'indirizzo email",
     "domainAlreadyExists": "Questo dominio è già stato aggiunto",
     "domainAdded": "Dominio aggiunto con successo",
     "confirmRemoveDomain": "Sei sicuro di voler rimuovere il dominio '{domain}'?",
@@ -3908,6 +4034,7 @@
     "pageSubtitle": "Modifica le impostazioni per la tua applicazione",
     "platformSettings": "Impostazioni della piattaforma",
     "scrapeIntervalRequired": "È richiesto l'intervallo di raschiatura",
+    "scrapeIntervalPositive": "L'intervallo di raschiatura deve essere un numero positivo",
     "scrapeIntervalDescription": "L'intervallo di scrape è la frequenza, in secondi, con cui il sistema di monitoraggio raccoglie le metriche.",
     "maxSeriesPerQueryLabel": "Serie massima per query",
     "maxSeriesPerQueryDescription": "Numero massimo di serie che possono essere restituite da una singola query ProMQL. Aiuta a prevenire il blocco dell'interfaccia utente con set di risultati di grandi dimensioni. Lascia vuoto per utilizzare l'impostazione predefinita del sistema (40.000).",
@@ -4209,6 +4336,51 @@
     "querySource": "Fonte della query"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "Servizi di ricerca",
+      "noStreamsDetected": "Non sono stati rilevati stream. Assicurati che le metriche del grafico del servizio includano le etichette stream_name.",
+      "streamOnlyInfo": "Service Graph utilizza un'architettura di solo streaming con zero stati in memoria",
+      "borderColor": "Colore del bordo",
+      "borderColorMetric": "Errori",
+      "nodeSize": "Dimensione del nodo",
+      "nodeSizeMetric": "Richieste",
+      "sizeLow": "Basso",
+      "sizeHigh": "Alto",
+      "status": {
+        "healthy": "Salutare",
+        "degraded": "Degradato",
+        "warning": "Avvertenza",
+        "critical": "Critico"
+      },
+      "range": {
+        "healthy": "< 1%",
+        "degraded": "1-5%",
+        "warning": "5-10%",
+        "critical": "> 10%"
+      },
+      "entities": "entità",
+      "distribution": "Distribuzione",
+      "total": "Totale",
+      "showTypes": "Mostra tipi",
+      "typesFiltered": "Alcuni tipi sono nascosti. Apri per modificare ciò che viene mostrato.",
+      "zoomIn": "Ingrandisci",
+      "zoomOut": "Rimpicciolisci",
+      "fitToScreen": "Adatta allo schermo",
+      "layout": "Layout",
+      "types": "Tipi",
+      "mode": {
+        "auto": "Auto",
+        "expanded": "Espanso",
+        "collapsed": "Crollato"
+      },
+      "kind": {
+        "service": "Servizi",
+        "database": "Datastore",
+        "queue": "Code",
+        "external": "Esterno",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "Apri a piena vista",
     "viewLogs": "Visualizza i log",
     "viewRelated": "Visualizza correlati",
@@ -4487,6 +4659,7 @@
     "servicesCatalog": {
       "tabLabel": "Catalogo dei servizi",
       "title": "Catalogo dei servizi",
+      "footerTitle": "Servizi",
       "filterPlaceholder": "Filtra per nome del servizio...",
       "noServicesFound": "Nessun servizio trovato nell'intervallo di tempo selezionato.",
       "loading": "Caricamento dei servizi...",
@@ -4513,6 +4686,15 @@
       "servicesLabel": "servizi",
       "viewTraces": "Visualizza tracce",
       "exportCsv": "Esporta CSV",
+      "types": {
+        "all": "Tutti",
+        "service": "Servizi",
+        "datastore": "Datastore",
+        "queue": "Code",
+        "external": "Esterno",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{count} {status}",
       "legend": {
         "title": "Tasso di errore"
       }
@@ -4547,6 +4729,9 @@
     "search": "Azione di ricerca",
     "timezone": "Fuso orario",
     "zipFileRequired": "Il file ZIP è obbligatorio!",
+    "fieldRequired": "Il campo è obbligatorio!",
+    "nameInvalidChars": "Caratteri come :, ?, /, # e gli spazi non sono consentiti.",
+    "invalidMethodName": "Nome del metodo non valido. Deve iniziare con una lettera o un trattino basso. Usa solo lettere, numeri e trattini bassi.",
     "zipFile": "File ZIP",
     "frequency": "Frequenza"
   },
@@ -5250,6 +5435,7 @@
     },
     "quality": {
       "scopeLabel": "Tutte le dimensioni di qualità in questo spazio di lavoro",
+      "agentPlaceholder": "Tutti gli agenti",
       "timeRange": {
         "label": "Intervallo di tempo",
         "last1h": "Ultima 1 ora",
@@ -6114,6 +6300,10 @@
       "functions": "Funzioni",
       "reports": "Report",
       "iam": "IAM",
+      "settings": "Impostazioni",
+      "onlineEvals": "Valutazioni online",
+      "actions": "Azioni",
+      "rum": "RUM",
       "runningQueries": "Interrogazioni in esecuzione"
     },
     "pages": {
@@ -6139,7 +6329,30 @@
       "panelEditor": "Editor di pannelli",
       "traceDetail": "Dettaglio della traccia",
       "runningQueries": "Interrogazioni in esecuzione",
-      "ingestionTokens": "IAM — Token di ingestione"
+      "ingestionTokens": "IAM — Token di ingestione",
+      "alertIncidents": "Avvisi - Incidenti",
+      "pipelineDestinations": "Gasdotti — Destinazioni",
+      "enrichmentTables": "Tabelle di arricchimento",
+      "iamInvitations": "IAM — Inviti",
+      "iamOrganizations": "IAM — Organizzazioni",
+      "regexPatterns": "Schemi Regex",
+      "cipherKeys": "Chiavi cifrate",
+      "nodes": "Nodi",
+      "modelPricing": "Prezzi del modello",
+      "searchSchedulers": "Pianificatori di ricerca",
+      "searchHistory": "Cronologia delle ricerche",
+      "sessions": "Sessioni",
+      "evalTemplates": "Valutazioni online — Modelli",
+      "scorers": "Valutazioni online — Marcatori",
+      "evalJobs": "Valutazioni online — Offerte di lavoro",
+      "scoreConfigs": "Valutazioni online — Configurazioni dei punteggi",
+      "actions": "Azioni",
+      "llmProviders": "Fornitori di LLM",
+      "aiToolsets": "Set di strumenti AI",
+      "orgManagement": "Gestione dell'organizzazione",
+      "rumErrors": "RUM — Monitoraggio degli errori",
+      "rumSessions": "RUM — Sessioni",
+      "sourceMaps": "RUM — Source Maps"
     },
     "actions": {
       "openCheatsheet": "Apri il cheatsheet delle scorciatoie da tastiera",
@@ -6219,7 +6432,30 @@
       "logsExport": "Esporta i risultati in formato CSV",
       "tableRowOpen": "Apri/espandi riga al passaggio del mouse",
       "tableRowInspect": "Ispeziona la riga al passaggio del mouse",
-      "tracesCopyUrl": "Copia, traccia, condividi l'URL"
+      "tracesCopyUrl": "Copia, traccia, condividi l'URL",
+      "alertIncidentsRefresh": "Aggiorna elenco",
+      "pipelineDestinationsRefresh": "Aggiorna elenco",
+      "enrichmentTablesRefresh": "Aggiorna elenco",
+      "iamInvitationsRefresh": "Aggiorna elenco",
+      "iamOrganizationsRefresh": "Aggiorna elenco",
+      "regexPatternsRefresh": "Aggiorna elenco",
+      "cipherKeysRefresh": "Aggiorna elenco",
+      "nodesRefresh": "Aggiorna elenco",
+      "modelPricingRefresh": "Aggiorna elenco",
+      "searchSchedulersRefresh": "Aggiorna elenco",
+      "searchHistoryRefresh": "Aggiorna elenco",
+      "sessionsRefresh": "Aggiorna elenco",
+      "evalTemplatesRefresh": "Aggiorna elenco",
+      "scorersRefresh": "Aggiorna elenco",
+      "evalJobsRefresh": "Aggiorna elenco",
+      "scoreConfigsRefresh": "Aggiorna elenco",
+      "actionsRefresh": "Aggiorna elenco",
+      "llmProvidersRefresh": "Aggiorna elenco",
+      "aiToolsetsRefresh": "Aggiorna elenco",
+      "orgManagementRefresh": "Aggiorna elenco",
+      "rumErrorsRefresh": "Aggiorna elenco",
+      "rumSessionsRefresh": "Aggiorna elenco",
+      "sourceMapsRefresh": "Aggiorna elenco"
     }
   }
 }

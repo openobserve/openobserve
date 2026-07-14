@@ -9,8 +9,11 @@ pub struct Model {
     pub identifier: String,
     pub org_name: String,
     pub org_type: i16,
+    pub status: String,
     pub created_at: i64,
     pub updated_at: i64,
+    #[sea_orm(nullable)]
+    pub deleted_at: Option<i64>,
     #[cfg(feature = "cloud")]
     pub trial_ends_at: i64,
 }
@@ -40,8 +43,10 @@ mod tests {
             identifier: "myorg".to_string(),
             org_name: "My Organization".to_string(),
             org_type: 1,
+            status: "active".to_string(),
             created_at: 1000,
             updated_at: 2000,
+            deleted_at: None,
         };
         assert_eq!(m.identifier, "myorg");
         assert_eq!(m.org_name, "My Organization");
@@ -55,8 +60,10 @@ mod tests {
             identifier: "myorg".to_string(),
             org_name: "My Organization".to_string(),
             org_type: 1,
+            status: "active".to_string(),
             created_at: 1000,
             updated_at: 2000,
+            deleted_at: None,
             trial_ends_at: 3000,
         };
         assert_eq!(m.identifier, "myorg");
