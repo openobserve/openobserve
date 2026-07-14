@@ -120,7 +120,7 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-/* Node card frame + per-type colours (mirrors WorkflowFlow / PipelineEditor),
+/* Node card frame + per-type colours (mirrors WorkflowCanvas / PipelineEditor),
    scoped to the preview so they don't leak. */
 .workflow-view-tooltip .vue-flow__node {
   padding: 8px 16px;

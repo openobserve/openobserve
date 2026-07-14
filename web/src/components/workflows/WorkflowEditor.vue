@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Workflow editor shell (todo #5).
 
   Self-contained toolbar (back · name · status · Test · Cancel · Save) + the
-  forked WorkflowFlow canvas + a drawer region (node config forms mount here in
+  forked WorkflowCanvas + a drawer region (node config forms mount here in
   later slices). On create it pre-places the Alert Trigger node (FD: trigger
   anchored, never a blank canvas). The hover-`+` StepMenu (#6), node forms
   (#8-11), save/validation (#13) and Test (#14) arrive in later slices — their
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex-1 tw:relative tw:min-w-0 tw:rounded-xl tw:overflow-hidden tw:mb-3"
         :class="store.state.theme === 'dark' ? '' : 'tw:bg-gray-100'"
       >
-        <WorkflowFlow />
+        <WorkflowCanvas />
       </div>
     </div>
 
@@ -192,7 +192,7 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { getUUID } from "@/utils/zincutils";
 
-import WorkflowFlow from "@/plugins/workflows/WorkflowFlow.vue";
+import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
 import WorkflowTestDialog from "./WorkflowTestDialog.vue";
 import WorkflowStepResultDrawer from "./WorkflowStepResultDrawer.vue";
