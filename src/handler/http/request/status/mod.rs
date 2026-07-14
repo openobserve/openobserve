@@ -608,7 +608,7 @@ pub async fn cache_status() -> impl IntoResponse {
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    // Config caches from src/common/infra/config.rs
+    // Config caches from src/core/src/common/infra/config.rs
     let (len, cap, mem_size) = crate::common::infra::config::KVS.stats();
     stats.insert(
         "KVS_CACHE",
@@ -756,7 +756,7 @@ pub async fn cache_status() -> impl IntoResponse {
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    // File list caches (2) from src/service/db/file_list/mod.rs
+    // File list caches (2) from src/core/src/service/db/file_list/mod.rs
     let (len, cap, mem_size) = crate::service::db::file_list::DELETED_FILES.stats();
     stats.insert(
         "DELETED_FILES",
@@ -769,7 +769,8 @@ pub async fn cache_status() -> impl IntoResponse {
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    // Organization streams cache from src/service/db/compact/organization.rs line 21
+    // Organization streams cache from
+    // src/core/src/service/db/compact/organization.rs line 21
     let (len, cap, mem_size) = crate::service::db::compact::organization::STREAMS.stats();
     stats.insert(
         "COMPACT_ORGANIZATION_STREAMS",

@@ -20,10 +20,7 @@ use axum::{
 use serde::Deserialize;
 #[cfg(feature = "enterprise")]
 use {
-    crate::{
-        common::meta::http::HttpResponse as MetaHttpResponse,
-        service::{ratelimit, ratelimit::rule::RatelimitError},
-    },
+    crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::ratelimit},
     config::meta::ratelimit::{Interval, RatelimitRule, RatelimitRuleUpdater},
     infra::table::ratelimit::RuleEntry,
     o2_ratelimit::dataresource::{
@@ -145,16 +142,6 @@ async fn validate_ratelimit_updater(
     }
 
     Ok(())
-}
-
-#[cfg(feature = "enterprise")]
-impl From<RatelimitError> for Response {
-    fn from(value: RatelimitError) -> Self {
-        match value {
-            RatelimitError::NotFound(_) => MetaHttpResponse::not_found(value),
-            error => MetaHttpResponse::bad_request(error),
-        }
-    }
 }
 
 /// listApiModule

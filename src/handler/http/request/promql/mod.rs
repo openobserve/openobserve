@@ -189,7 +189,7 @@ async fn query(
 
         if !is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.as_str();
-            for name in visitor.name {
+            for name in visitor.into_names() {
                 let user: config::meta::user::User =
                     get_cached_user_org(org_id, user_email).unwrap();
                 if !crate::handler::http::auth::validator::check_permissions(
@@ -479,7 +479,7 @@ async fn query_range(
 
         if !is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.as_str();
-            for name in visitor.name {
+            for name in visitor.into_names() {
                 let user: config::meta::user::User =
                     get_cached_user_org(org_id, user_email).unwrap();
                 if user.is_external

@@ -22,33 +22,16 @@ use axum::{
 use crate::common::utils::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use crate::handler::http::extractors::Headers;
+#[cfg(test)]
+use crate::service::llm_evaluations::eval_jobs::EvalJobError;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::models::eval_jobs::{
         EvalJobRequestBody, EvalJobResponseBody, EvalJobStatusActionResponseBody,
         ListEvalJobsQuery, ListEvalJobsResponseBody,
     },
-    service::llm_evaluations::eval_jobs::{self, EvalJobError},
+    service::llm_evaluations::eval_jobs,
 };
-
-impl From<EvalJobError> for Response {
-    fn from(value: EvalJobError) -> Self {
-        match value {
-            EvalJobError::InfraError(err) => {
-                log::error!("[EvalJob] internal error: {err}");
-                MetaHttpResponse::internal_error("Internal server error")
-            }
-            EvalJobError::NotFound => MetaHttpResponse::not_found(value),
-            EvalJobError::ReconcilerError(err) => {
-                log::error!("[EvalJob] reconciler error: {err}");
-                MetaHttpResponse::internal_error("Internal server error")
-            }
-            EvalJobError::InvalidStatus(_) | EvalJobError::InvalidStatusTransition { .. } => {
-                MetaHttpResponse::bad_request(value)
-            }
-        }
-    }
-}
 
 /// ListEvalJobs
 #[utoipa::path(

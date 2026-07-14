@@ -78,45 +78,6 @@ pub mod history;
 pub mod incidents;
 pub mod templates;
 
-impl From<AlertError> for Response {
-    fn from(value: AlertError) -> Self {
-        match &value {
-            AlertError::InfraError(err) => MetaHttpResponse::internal_error(err),
-            AlertError::CreateDefaultFolderError => MetaHttpResponse::internal_error(value),
-            AlertError::AlertNameMissing => MetaHttpResponse::bad_request(value),
-            AlertError::AlertNameOfgaUnsupported => MetaHttpResponse::bad_request(value),
-            AlertError::AlertNameContainsForwardSlash => MetaHttpResponse::bad_request(value),
-            AlertError::AlertDestinationMissing => MetaHttpResponse::bad_request(value),
-            AlertError::CreateAlreadyExists => MetaHttpResponse::conflict(value),
-            AlertError::CreateFolderNotFound => MetaHttpResponse::not_found(value),
-            AlertError::MoveDestinationFolderNotFound => MetaHttpResponse::not_found(value),
-            AlertError::AlertNotFound => MetaHttpResponse::not_found(value),
-            AlertError::AlertDestinationNotFound { .. } => MetaHttpResponse::not_found(value),
-            AlertError::TemplateNotConfigured { .. } => MetaHttpResponse::bad_request(value),
-            AlertError::AlertTemplateNotFound { .. } => MetaHttpResponse::not_found(value),
-            AlertError::StreamNotFound { .. } => MetaHttpResponse::not_found(value),
-            AlertError::DecodeVrl(err) => MetaHttpResponse::bad_request(err),
-            AlertError::ParseCron(err) => MetaHttpResponse::bad_request(err),
-            AlertError::RealtimeMissingCustomQuery => MetaHttpResponse::bad_request(value),
-            AlertError::SqlMissingQuery => MetaHttpResponse::bad_request(value),
-            AlertError::SqlContainsSelectStar => MetaHttpResponse::bad_request(value),
-            AlertError::PromqlMissingQuery => MetaHttpResponse::bad_request(value),
-            AlertError::SendNotificationError { .. } => MetaHttpResponse::internal_error(value),
-            AlertError::GetDestinationWithTemplateError(err) => {
-                MetaHttpResponse::internal_error(err)
-            }
-            AlertError::PeriodExceedsMaxQueryRange { .. } => MetaHttpResponse::bad_request(value),
-            AlertError::ResolveStreamNameError(_) => MetaHttpResponse::internal_error(value),
-            AlertError::PermittedAlertsMissingUser => MetaHttpResponse::forbidden(""),
-            AlertError::PermittedAlertsValidator(err) => MetaHttpResponse::forbidden(err),
-            AlertError::NotSupportedAlertDestinationType(err) => MetaHttpResponse::forbidden(err),
-            AlertError::PermissionDenied => MetaHttpResponse::forbidden("Unauthorized access"),
-            AlertError::UserNotFound => MetaHttpResponse::forbidden("Unauthorized access"),
-            AlertError::AlertIdMissing => MetaHttpResponse::bad_request(value),
-        }
-    }
-}
-
 /// CreateAlert
 #[utoipa::path(
     post,
