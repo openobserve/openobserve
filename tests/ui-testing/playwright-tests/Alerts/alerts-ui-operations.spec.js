@@ -28,7 +28,7 @@ test.describe("Alerts UI Operations", () => {
    * Self-contained: generates its own random suffix for resource names
    */
   test('Create alert template and destination', {
-    tag: ['@alertTemplate', '@alertDestination', '@all', '@alerts'],
+    tag: ['@alertTemplate', '@alertDestination', '@all', '@alerts', '@serialAlpha1'],
     timeout: THREE_MINUTES_MS
   }, async ({ page }) => {
     const suffix = pm.alertsPage.generateRandomString();

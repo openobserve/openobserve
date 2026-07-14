@@ -41,7 +41,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
     // ==================== ADVANCED CONDITIONS TESTS ====================
 
     test("Create alert with multiple AND conditions", {
-        tag: ['@alertsAdvanced', '@all', '@alerts', '@multiCondition']
+        tag: ['@alertsAdvanced', '@all', '@alerts', '@multiCondition', '@serialAlpha1']
     }, async ({ page }) => {
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);
         testLogger.info('Testing multi-condition alert creation', { uniqueSuffix });
@@ -77,7 +77,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
     });
 
     test("Verify condition operator toggle (AND to OR)", {
-        tag: ['@alertsAdvanced', '@all', '@alerts', '@conditionOperator']
+        tag: ['@alertsAdvanced', '@all', '@alerts', '@conditionOperator', '@serialAlpha1']
     }, async ({ page }) => {
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);
         testLogger.info('Testing condition operator toggle', { uniqueSuffix });
@@ -113,7 +113,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
     // ==================== BULK OPERATIONS TESTS ====================
 
     test("Bulk pause and unpause multiple alerts", {
-        tag: ['@alertsAdvanced', '@all', '@alerts', '@bulkOperations']
+        tag: ['@alertsAdvanced', '@all', '@alerts', '@bulkOperations', '@serialAlpha1']
     }, async ({ page }) => {
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);
         const templateName = 'auto_template_bulk_' + uniqueSuffix;

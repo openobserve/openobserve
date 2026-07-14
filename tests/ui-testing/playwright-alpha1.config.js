@@ -118,6 +118,10 @@ module.exports = defineConfig({
       name: 'chromium-serial',
       grep: SERIAL_TAG,
       fullyParallel: false,
+      // One extra retry for these heaviest, most contention-sensitive specs (e.g. the
+      // P1 prebuilt test does 15 destination operations in one test). Only failing tests
+      // retry, so passing runs are unaffected.
+      retries: process.env.CI ? 2 : 0,
       use: CHROME_USE,
     },
   ],

@@ -49,7 +49,7 @@ test.describe("Alerts Import/Export", () => {
   // Re-enabled from test.skip — API-first fixes (alertTemplatesPage/alertDestinationsPage) resolved
   // the cascading "page context closed" errors that caused this test to fail previously
   test('Import/Export Alert Functionality', {
-    tag: ['@all', '@alerts', '@alertsImportExport'],
+    tag: ['@all', '@alerts', '@alertsImportExport', '@serialAlpha1'],
     timeout: FIVE_MINUTES_MS
   }, async ({ page }) => {
     // This test covers import/export and includes trigger validation
