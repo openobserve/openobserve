@@ -22,7 +22,7 @@ use axum::{
 use config::meta::search::Request;
 #[cfg(feature = "enterprise")]
 use {
-    crate::handler::http::request::search::{
+    crate::search::{
         query_manager::cancel_query_inner,
         utils::{StreamPermissionResourceType, check_stream_permissions},
     },
@@ -53,10 +53,10 @@ use {
 };
 
 #[cfg(feature = "enterprise")]
-use crate::handler::http::request::search::error_utils::map_error_to_http_response;
+use crate::search::error_utils::map_error_to_http_response;
 #[cfg(feature = "cloud")]
 use crate::service::organization::is_org_in_free_trial_period;
-use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
+use crate::{common::utils::auth::UserEmail, extractors::Headers};
 
 // 1. submit
 /// SearchSQL

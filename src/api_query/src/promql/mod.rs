@@ -34,9 +34,8 @@ use crate::{
         meta::{http::HttpResponse as MetaHttpResponse, ingestion::IngestUser},
         utils::{auth::UserEmail, http::get_or_create_trace_id},
     },
-    handler::http::{
-        extractors::Headers, request::search::error_utils::map_error_to_http_response,
-    },
+    extractors::Headers,
+    search::error_utils::map_error_to_http_response,
     service::{metrics, promql},
 };
 
@@ -192,7 +191,7 @@ async fn query(
             for name in visitor.into_names() {
                 let user: config::meta::user::User =
                     get_cached_user_org(org_id, user_email).unwrap();
-                if !crate::handler::http::auth::validator::check_permissions(
+                if !crate::service::authz::check_permissions(
                     user_email,
                     AuthExtractor {
                         auth: "".to_string(),
@@ -483,7 +482,7 @@ async fn query_range(
                 let user: config::meta::user::User =
                     get_cached_user_org(org_id, user_email).unwrap();
                 if user.is_external
-                    && !crate::handler::http::auth::validator::check_permissions(
+                    && !crate::service::authz::check_permissions(
                         user_email,
                         AuthExtractor {
                             auth: "".to_string(),
@@ -678,7 +677,7 @@ pub async fn metadata(
                     org_id
                 ),
             };
-            if !crate::handler::http::auth::validator::check_permissions(
+            if !crate::service::authz::check_permissions(
                 &_user_email.user_id,
                 AuthExtractor {
                     auth: "".to_string(),
@@ -840,7 +839,7 @@ async fn series(
             let user: config::meta::user::User = get_cached_user_org(org_id, _user_email).unwrap();
             let stream_type_str = StreamType::Metrics.as_str();
             if user.is_external
-                && !crate::handler::http::auth::validator::check_permissions(
+                && !crate::service::authz::check_permissions(
                     _user_email,
                     AuthExtractor {
                         auth: "".to_string(),
@@ -981,7 +980,7 @@ async fn labels(
                 None => return MetaHttpResponse::forbidden("Unauthorized Access"),
             };
             let stream_type_str = StreamType::Metrics.as_str();
-            if !crate::handler::http::auth::validator::check_permissions(
+            if !crate::service::authz::check_permissions(
                 _user_email,
                 AuthExtractor {
                     auth: "".to_string(),
@@ -1099,7 +1098,7 @@ pub async fn label_values(
                 None => return MetaHttpResponse::forbidden("Unauthorized Access"),
             };
             let stream_type_str = StreamType::Metrics.as_str();
-            if !crate::handler::http::auth::validator::check_permissions(
+            if !crate::service::authz::check_permissions(
                 &_user_email.user_id,
                 AuthExtractor {
                     auth: "".to_string(),

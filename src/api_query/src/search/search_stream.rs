@@ -47,9 +47,7 @@ use crate::common::utils::http::get_extract_patterns_from_request;
 use crate::{
     common::meta::search::AuditContext,
     common::utils::auth::check_permissions,
-    handler::http::request::search::utils::{
-        StreamPermissionResourceType, check_stream_permissions,
-    },
+    search::utils::{StreamPermissionResourceType, check_stream_permissions},
     service::self_reporting::audit,
 };
 use crate::{
@@ -66,12 +64,10 @@ use crate::{
             },
         },
     },
-    handler::http::{
-        extractors::Headers,
-        request::search::{
-            build_search_request_per_field, error_utils::map_error_to_http_response,
-            utils::SearchStreamGuard,
-        },
+    extractors::Headers,
+    search::{
+        build_search_request_per_field, error_utils::map_error_to_http_response,
+        utils::SearchStreamGuard,
     },
     service::search::{
         streaming::process_search_stream_request, utils::is_permissable_function_error,

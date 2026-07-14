@@ -84,7 +84,7 @@ pub async fn check_stream_permissions(
                 .map_or(stream_type_str, |model| model.key);
         }
 
-        if !crate::handler::http::auth::validator::check_permissions(
+        if !crate::service::authz::check_permissions(
             user_id,
             AuthExtractor {
                 auth: "".to_string(),

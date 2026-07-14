@@ -27,9 +27,8 @@ use crate::{
             http::{get_or_create_trace_id, get_use_cache_from_request},
         },
     },
-    handler::http::{
-        extractors::Headers, request::search::error_utils::map_error_to_http_response,
-    },
+    extractors::Headers,
+    search::error_utils::map_error_to_http_response,
     service::search as SearchService,
 };
 
@@ -123,7 +122,7 @@ pub async fn get_trace_dag(
             let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
             let stream_type_str = StreamType::Traces.as_str();
 
-            if !crate::handler::http::auth::validator::check_permissions(
+            if !crate::service::authz::check_permissions(
                 user_id,
                 AuthExtractor {
                     auth: "".to_string(),

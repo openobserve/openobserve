@@ -219,6 +219,8 @@ rcgen.workspace = true
 [workspace]
 members = [
     "src/api",
+    "src/api_query",
+    "src/api_shared",
     "src/core",
     "src/jobs",
     "src/config",
@@ -248,6 +250,8 @@ flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
 openobserve-core = { path = "src/core" }
 openobserve-api = { path = "src/api" }
+openobserve-api-query = { path = "src/api_query" }
+openobserve-api-shared = { path = "src/api_shared" }
 openobserve-jobs = { path = "src/jobs" }
 o2_dex = { path = "src/enterprise/o2_dex" }
 o2_enterprise = { path = "src/enterprise/o2_enterprise", default-features = false }
