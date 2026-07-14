@@ -3,7 +3,7 @@ name: fe-ui-authoring
 description: >-
   Authoring guardrails for building ANY new frontend UI in the OpenObserve web
   app (web/) — new views, pages, panels, dialogs, feature components, or edits
-  to existing ones. Enforce five house rules the moment you write Vue/template
+  to existing ones. Enforce six house rules the moment you write Vue/template
   markup: (1) use AppPageHeader for every page/module header, (2) build UI from
   O2 library components in web/src/lib — never raw Quasar or bare HTML controls
   when an O2 equivalent exists, (3) no hardcoded px anywhere — including inside
@@ -12,7 +12,10 @@ description: >-
   hardcode colors/sizes — use the modern registered --color-* design tokens and
   register a new --color-* token if one is missing; the legacy --o2-* token
   vocabulary is BANNED (never write var(--o2-*), never define one, never add a
-  .body--dark block — migrate any --o2-* you touch to its --color-* equivalent). It also settles the recurring
+  .body--dark block — migrate any --o2-* you touch to its --color-* equivalent),
+  (6) no hardcoded user-facing text — every label, title, placeholder, and
+  message comes from i18n (useI18n t()) with keys added to
+  web/src/locales/languages/en.json. It also settles the recurring
   structural decisions: use OTable for any tabular data, follow the
   view → service → Vuex/local-ref layering for fetching list data, choose the
   right form container (ConfirmDialog vs ODialog vs ODrawer vs a full in-page
@@ -52,7 +55,7 @@ which reference file to open for any given component.
 
 ---
 
-## The five rules
+## The house rules
 
 Each rule below states **what**, **why**, and **how**. The "why" matters: these
 aren't arbitrary — each one exists because breaking it produces a specific,
@@ -94,9 +97,10 @@ keeps the title's X/Y position identical as a user navigates list → detail →
 edit, which is the whole point.
 
 **How.**
-- Source of truth: [`web/src/components/common/AppPageHeader.vue`](../../../src/components/common/AppPageHeader.vue).
-  Read its top-of-file doc comment before using it — it documents the row
-  contract in detail.
+- The component is `AppPageHeader`, at
+  `web/src/components/common/AppPageHeader.vue`. Its full API — props, slots, and
+  the one-row-content contract — is documented in this rule (below), so you can
+  use it correctly without opening the file.
 - Props: `title`, `subtitle`, `icon` (an `IconName` from
   `@/lib/core/Icon/OIcon.icons`), `breadcrumb` (`BreadcrumbItem[]`),
   `breadcrumbMaxInline`, `back` (`{ label, to | onClick, dataTest }`),
@@ -226,55 +230,52 @@ opting a single element out of theming permanently.
   `var(--color-text-primary)`, `var(--color-surface-base)` — theme-aware by
   construction. **Only `--color-*`** — see the `--o2-*` ban below.
 
-**How — registering a NEW token (when none fits).** The token system is
-plain CSS (Tailwind v4), no SCSS. Files live in
-[`web/src/lib/styles/tokens/`](../../../src/lib/styles/tokens/) and load in order
-via `web/src/styles/tailwind.css`:
+**How — registering a NEW token / the `--o2-*` ban.** Full details, the token-file
+layout, the 3-step registration, and the `--o2-*` → `--color-*` migration map are
+in [references/design-tokens.md](references/design-tokens.md). The rules that must
+stay top-of-mind:
 
-| File | Holds |
-| --- | --- |
-| `base.css` | raw palette primitives (`--color-grey-*`, radius, shadow) + fonts |
-| `semantic.css` | semantic/intent `--color-*` tokens (light `:root`) |
-| `component.css` | per-component `--color-*` tokens |
-| `dark.css` | **all** dark-mode overrides (under `.dark`) |
-
-To add a token (do all three steps, or dark mode / Tailwind utilities silently
-break) — the new token **must** be a `--color-*` name:
-
-1. **Light value** — add it in the appropriate `:root { … }` block (usually
-   `semantic.css` for a general token, `component.css` for a component-scoped
-   one), pointing at a base palette value:
-   `--color-surface-raised: var(--color-grey-50);`
-2. **Register for Tailwind** — re-declare it self-referentially inside that same
-   file's `@theme inline { … }` block so Tailwind emits utilities for it:
-   `--color-surface-raised: var(--color-surface-raised);` — the `inline` keyword
-   is what lets the runtime dark override still win.
-3. **Dark override** — add the dark value in `dark.css` under the modern dark
-   selector **only**: `:root.dark, .dark :root, .dark { … }`. Do **not** add a
-   `.body--dark` block — that is the legacy `--o2-*` path and is being removed.
-
-Then use it as a utility (`tw:bg-surface-raised`) or `var(--color-surface-raised)`.
-Never inline the literal you would have registered.
-
-**⛔ The `--o2-*` token vocabulary is banned — never use it, never add to it.**
-There are two token vocabularies in this codebase: the modern `--color-*` set
-(registered in `@theme inline`, drives Tailwind utilities, proper `.dark`
-overrides) and a legacy `--o2-*` set (Quasar-era, `var()`-only, its own drifting
-`.body--dark` values). The legacy set is **being deleted** — see
-[`web/O2_TOKEN_MIGRATION_PLAN.md`](../../../O2_TOKEN_MIGRATION_PLAN.md), which adds
-stylelint + ESLint rules that **fail the build** on any `--o2-*`. Therefore:
-
-- **Never write `var(--o2-*)`** anywhere — not in a `<style>` block, not in a
-  Tailwind arbitrary value (`bg-[var(--o2-card-bg)]`), not in a `:style` binding.
-  Use the `--color-*` equivalent or a token utility.
-- **Never define a new `--o2-*`** token, and never add a `.body--dark` override.
-  New tokens are `--color-*` only, dark values under `.dark`.
-- **If you touch code that still references an `--o2-*` token**, migrate it to its
-  `--color-*` equivalent as you go (the mapping is in `O2_TOKEN_MIGRATION_PLAN.md`
-  §5 / `web/scripts/o2-token-map.json` — e.g. `--o2-text-primary` →
+- New tokens are **`--color-*` only** — light value in `:root`, registered in the
+  same file's `@theme inline` block, dark override in `dark.css` under `.dark`
+  (never `.body--dark`). Token files live in `web/src/lib/styles/tokens/`.
+- **The `--o2-*` vocabulary is banned — never use it, never add to it.** No
+  `var(--o2-*)` (not in a `<style>` block, not in a Tailwind arbitrary value like
+  `bg-[var(--o2-card-bg)]`, not in `:style`); no new `--o2-*` definition; no
+  `.body--dark` block. It is a legacy set being deleted, with lint/CI that fails
+  the build on any `--o2-*`.
+- **If you touch code that references an `--o2-*` token, migrate it** to its
+  `--color-*` equivalent (the map is in the reference — e.g. `--o2-text-primary` →
   `--color-text-primary`, `--o2-border` → `--color-border-default`,
-  `--o2-primary-background` → `--color-surface-base`). If a mapping is genuinely
-  unclear, flag it rather than leaving the `--o2-*`.
+  `--o2-primary-background` → `--color-surface-base`). If a mapping is unclear,
+  flag it rather than leaving the `--o2-*`.
+
+### 6. No hardcoded user-facing text — use i18n
+
+**What.** Every string a user can read — page titles, field labels, button text,
+placeholders, tooltips, empty-state copy, toast/notification messages, and
+validation messages — comes from the i18n layer via `useI18n()`'s `t()`, keyed
+into `web/src/locales/languages/en.json`. Never write a display string literally
+in a template or script.
+
+**Why.** The app ships in many languages; a hardcoded string is invisible to
+translation and silently serves English to every locale. Centralizing copy in
+`en.json` also keeps wording consistent and reviewable. It's the same principle as
+tokens and variants — a user-facing value lives in one shared place, never
+scattered as a literal at the call site.
+
+**How.**
+- `const { t } = useI18n()` in setup; `{{ t('module.key') }}` in templates,
+  `t('module.key')` in script. Group keys under a sensible namespace
+  (e.g. `notificationChannels.title`).
+- Add new keys **only** to `web/src/locales/languages/en.json` — the other
+  language files follow from there; never hand-edit them.
+- **Validation messages** get localized too: pass `t` into the Zod schema factory
+  (`make…Schema(t)`) so rule messages come from `en.json` — see
+  [references/forms-validation.md](references/forms-validation.md).
+- **Shortcut descriptions** are i18n keys (`shortcuts.actions.*`) — see
+  [references/keyboard-shortcuts.md](references/keyboard-shortcuts.md).
+- Not user-facing text, so these stay literal: `data-test` values, `name=` field
+  keys, icon names, CSS/utility classes, and developer-only console logs.
 
 ---
 
@@ -560,6 +561,7 @@ markup — don't guess a prop name.
 | [references/forms-validation.md](references/forms-validation.md) | **Validating a form: OForm + Zod schema, binding rules, submit/loading, conditional rendering, field arrays, testing** |
 | [references/keyboard-shortcuts.md](references/keyboard-shortcuts.md) | **Keyboard shortcuts: registry, `useShortcut`/`useShortcuts`, display via `OShortcut`/`shortcut-id`, cheatsheet** |
 | [references/creating-components.md](references/creating-components.md) | **Building a NEW O2 component: lib vs components, folder contract, families, headless-first (reka-ui), no-UI-prop-leakage, strict TS, tokens, form wrappers, workflow, testing** |
+| [references/design-tokens.md](references/design-tokens.md) | **Design tokens: using `--color-*`, the token files, registering a new token, the `--o2-*` ban + full `--o2-*` → `--color-*` migration map** |
 | [references/overlay-navigation.md](references/overlay-navigation.md) | Dialog, Drawer, Dropdown, Popover, Tooltip · Pagination, Stepper, Tabs |
 | [references/feedback-data.md](references/feedback-data.md) | Banner, Toast (+ useToast), Spinner, Skeleton, InnerLoading · ProgressBar, Timeline, Tree · FieldList |
 
@@ -662,6 +664,9 @@ considering the UI done:
       `--color-*` equivalent.
 - [ ] Any new color/size needed was **registered as a `--color-*` token** (light
       `:root` + `@theme inline` + dark under `.dark`) before use.
+- [ ] No hardcoded user-facing text — every label, title, placeholder, message,
+      and validation string uses `t()` with keys added to
+      `web/src/locales/languages/en.json`.
 - [ ] `data-test` on every interactive and key output element, pattern
       `<module>-<filename>-<descriptor>` (see the project FE rules).
 - [ ] New component uses `<script setup lang="ts">`, no `// @ts-nocheck`.

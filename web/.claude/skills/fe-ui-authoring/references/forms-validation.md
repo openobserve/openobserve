@@ -1,7 +1,7 @@
 # Form Validation & Binding (OForm + Zod)
 
 How to build a **validated** form in this app. `OForm` wraps
-[TanStack Vue Form](https://tanstack.com/form); validation is a **Zod schema**
+TanStack Vue Form (`@tanstack/vue-form`); validation is a **Zod schema**
 mapped onto fields by `name`. This is the single sanctioned way to do form
 validation — no hand-rolled `xError` refs, no per-field `:rules`, no manual
 `validate()`.

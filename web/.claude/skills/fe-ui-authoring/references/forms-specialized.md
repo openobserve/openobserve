@@ -18,7 +18,7 @@ The `OForm` container + `useOForm` composable own field registration, validation
 
 ## OForm + useOForm
 
-`OForm` is the form **container**. It builds (or accepts) a [TanStack `@tanstack/vue-form`](https://tanstack.com) instance, `provide()`s it under `FORM_CONTEXT_KEY`, and every `OForm*` field wrapper `inject()`s that context and registers itself via `form.Field` keyed by its `name` prop. There is no manual field registration — dropping an `OFormInput :name="..."` inside `<OForm>` is the registration.
+`OForm` is the form **container**. It builds (or accepts) a TanStack `@tanstack/vue-form` instance, `provide()`s it under `FORM_CONTEXT_KEY`, and every `OForm*` field wrapper `inject()`s that context and registers itself via `form.Field` keyed by its `name` prop. There is no manual field registration — dropping an `OFormInput :name="..."` inside `<OForm>` is the registration.
 
 **Validation timing (submit-then-change):** when you pass a `schema`, nothing validates while typing or on blur — the first submit reveals all errors, then every field re-validates live on each change. This is wired with `revalidateLogic({ mode: "submit", modeAfterSubmission: "change" })` and a single `onDynamic`/`onDynamicAsync` validator source; TanStack routes each schema issue to the field whose `name` matches the schema key, so individual fields need no per-field validators.
 

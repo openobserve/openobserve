@@ -150,6 +150,8 @@ Two-way binding uses the standard `modelValue` prop + `update:modelValue` emit (
 ## 7. Design tokens
 
 **Every color and every dimension is a token — no hardcoded values anywhere.**
+(Full token guide, registration steps, and the `--o2-*` → `--color-*` map:
+[design-tokens.md](design-tokens.md).)
 
 - **Colors: only the modern `--color-*` tokens.** Reach them through `tw:` token utilities (`tw:bg-surface-panel`, `tw:text-text-primary`, `tw:bg-button-primary`) or `var(--color-*)` in a CSS file. The legacy `--o2-*` vocabulary is **banned** — never use it, never define it, and never add a `.body--dark` block.
 - **No hardcoded px anywhere** — including inside Tailwind arbitrary values. `tw:w-[320px]` is banned. Use the rem-based scale (`tw:w-80`, `tw:h-10`, `tw:px-4`) or `rem` / `%` / `vh` / `vw`. `1px` hairline borders are the only exception.
