@@ -1193,16 +1193,22 @@ jobs:
             echo "::notice::No blob reports found — skipping Kinora upload (tests may have been skipped)."
             exit 0
           fi
-          # Merge locally so attachment (trace.zip) paths resolve on this runner.
+          # Merge locally so attachment (trace.zip) paths resolve on this runner. JSON is written
+          # to the file via PLAYWRIGHT_JSON_OUTPUT_NAME, so stdout only carries merge progress.
           PLAYWRIGHT_JSON_OUTPUT_NAME=kinora-report.json \
-            npx playwright merge-reports --reporter json ./all-blob-reports > /dev/null
+            npx playwright merge-reports --reporter json ./all-blob-reports
           echo "::group::Uploading to Kinora ($KINORA_PROJECT)"
-          OUT=$(npx --yes @kinora/cli upload kinora-report.json \
-                  --project "$KINORA_PROJECT" \
-                  --git-repo-url "https://github.com/${{ github.repository }}" 2>&1) || true
-          echo "$OUT"
+          if OUT=$(npx --yes @kinora/cli upload kinora-report.json \
+                     --project "$KINORA_PROJECT" \
+                     --git-repo-url "https://github.com/${{ github.repository }}" 2>&1); then
+            echo "$OUT"
+          else
+            echo "::warning::Kinora CLI upload failed (exit $?) — continuing (non-fatal)."
+            echo "$OUT"; echo "::endgroup::"; exit 0
+          fi
           echo "::endgroup::"
-          RUN_ID=$(printf '%s\n' "$OUT" | grep -oiE 'run [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1 | awk '{print $2}')
+          # Match the CLI's "(run <uuid>)" form specifically so stray log text can't match.
+          RUN_ID=$(printf '%s\n' "$OUT" | grep -oiE '\(run [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\)' | head -1 | grep -oiE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
           if [ -n "$RUN_ID" ]; then
             RUN_URL="${KINORA_URL%/}/projects/$KINORA_PROJECT/runs/$RUN_ID"
             echo "run_url=$RUN_URL" >> "$GITHUB_OUTPUT"
@@ -1222,6 +1228,7 @@ jobs:
           RUN_URL: ${{ steps.kinora.outputs.run_url }}
         run: |
           MARKER="<!-- kinora-report -->"
+          # printf only interprets % in the format string; $RUN_URL is a %s arg, so it is safe.
           BODY=$(printf '%s\n### 📊 Kinora report\nPlaywright run uploaded to Kinora — **[View run in Kinora](%s)**\n\n<sub>Updated for `%s` · run attempt %s. This comment updates in place on every push (no new comments).</sub>' \
             "$MARKER" "$RUN_URL" "${HEAD_SHA:0:9}" "${{ github.run_attempt }}")
           CID=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
