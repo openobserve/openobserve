@@ -4182,7 +4182,16 @@
     "dimensionWidth": "幅 (ピクセル)",
     "dimensionHeight": "高さ (ピクセル)",
     "imagePreview": "インラインダッシュボードのプレビュー画像を含める",
-    "customDimensions": "カスタムディメンション (アドバンス)"
+    "customDimensions": "カスタムディメンション (アドバンス)",
+    "validation": {
+      "resourceNameInvalid": ":、?、/、# などの文字とスペースは使用できません。",
+      "invalidCron": "無効な cron 式です。",
+      "cronSixFields": "cron 式は正確に 6 つのフィールドが必要です:[秒] [分] [時] [日] [月] [曜日]",
+      "cronMinInterval": "頻度は {seconds} 秒より大きくする必要があります。",
+      "dateFormat": "日付の形式が正しくありません。",
+      "timeFormat": "時刻の形式が正しくありません。",
+      "invalidEmails": "有効なメールアドレスを追加してください。"
+    }
   },
   "queries": {
     "runningQueries": "実行中のクエリ",

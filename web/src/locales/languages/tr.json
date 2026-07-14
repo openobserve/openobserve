@@ -4182,7 +4182,16 @@
     "dimensionWidth": "Genişlik (piksel)",
     "dimensionHeight": "Yükseklik (piksel)",
     "imagePreview": "Satır içi gösterge paneli önizleme görüntüsünü ekleyin",
-    "customDimensions": "Özel Boyutlar (Gelişmiş)"
+    "customDimensions": "Özel Boyutlar (Gelişmiş)",
+    "validation": {
+      "resourceNameInvalid": ":, ?, /, # gibi karakterlere ve boşluklara izin verilmez.",
+      "invalidCron": "Geçersiz Cron ifadesi!",
+      "cronSixFields": "Cron ifadesi tam olarak 6 alana sahip olmalıdır: [Saniye] [Dakika] [Saat] [Ayın Günü] [Ay] [Haftanın Günü]",
+      "cronMinInterval": "Sıklık {seconds} saniyeden fazla olmalıdır.",
+      "dateFormat": "Tarih biçimi hatalı!",
+      "timeFormat": "Saat biçimi hatalı!",
+      "invalidEmails": "Geçerli e-postalar ekleyin!"
+    }
   },
   "queries": {
     "runningQueries": "Çalışan Sorgular",

@@ -4,8 +4,9 @@
 // complexity) form: a routed create/edit page with an OStepper, a custom
 // frequency/scheduling section, and several composite controls. Built via a
 // factory so the cron min-interval message stays driven by the live zoConfig and
-// the name-required / required-field messages stay i18n-driven (pass useI18n's
-// `t`).
+// every user-facing validation message stays i18n-driven — resolved through the
+// passed-in useI18n `t` (keys under the `reports.validation.*` namespace; the
+// cron min-interval one interpolates `{seconds}`).
 //
 // Migration status (per the form-migration-playbook): the whole form is now
 // FORM-OWNED — there is no bridge left.
@@ -53,11 +54,6 @@ import {
   isAboveMinRefreshInterval,
 } from "@/utils/zincutils";
 
-// Mirrors the old name :rules — required + the resource-name character check
-// ("Characters like :, ?, /, #, and spaces are not allowed.").
-const RESOURCE_NAME_MESSAGE =
-  "Characters like :, ?, /, #, and spaces are not allowed.";
-
 // Email-list regex (one or more emails separated by , or ;). Verbatim from the
 // old `validateReportData` recipients rule.
 export const reportEmailRegex =
@@ -100,13 +96,18 @@ export const makeReportDashboardRowSchema = (requiredMessage: string) =>
   });
 
 export const makeCreateReportSchema = (
-  t: (_key: string) => string,
+  t: (_key: string, _params?: Record<string, unknown>) => string,
   zoConfig?: { min_auto_refresh_interval?: string | number } | null,
 ) => {
   // Required-field message — i18n `validation.required` ("This field is
   // required"), the exact message the pre-migration validateReportData showed
   // via t('validation.required') (asserted verbatim by the reports E2E suite).
   const REQUIRED_MESSAGE = t("validation.required");
+
+  // Resource-name character check message — i18n
+  // `reports.validation.resourceNameInvalid` ("Characters like :, ?, /, #, and
+  // spaces are not allowed."), asserted verbatim by the reports E2E suite.
+  const RESOURCE_NAME_MESSAGE = t("reports.validation.resourceNameInvalid");
 
   return z
     .object({
@@ -173,22 +174,19 @@ export const makeCreateReportSchema = (
       if (val.frequencyType === "cron") {
         const cronStr = String(val.cron ?? "").trim();
         if (!cronStr) {
-          addIssue(["cron"], "Invalid cron expression!");
+          addIssue(["cron"], t("reports.validation.invalidCron"));
         } else {
           let intervalInSecs: number | undefined;
           try {
             intervalInSecs = getCronIntervalDifferenceInSeconds(cronStr);
           } catch {
-            addIssue(["cron"], "Invalid cron expression!");
+            addIssue(["cron"], t("reports.validation.invalidCron"));
           }
           if (intervalInSecs !== undefined) {
             // Single-space split (not /\s+/): the pre-migration 6-field check
             // was `cron.trim().split(" ")`, so doubled spaces fail it.
             if (cronStr.split(" ").length !== 6) {
-              addIssue(
-                ["cron"],
-                "Cron expression must have exactly 6 fields: [Second] [Minute] [Hour] [Day of Month] [Month] [Day of Week]",
-              );
+              addIssue(["cron"], t("reports.validation.cronSixFields"));
             } else if (
               !isAboveMinRefreshInterval(intervalInSecs, zoConfig ?? {})
             ) {
@@ -196,7 +194,9 @@ export const makeCreateReportSchema = (
                 Number(zoConfig?.min_auto_refresh_interval) || 1;
               addIssue(
                 ["cron"],
-                `Frequency should be greater than ${minInterval - 1} seconds.`,
+                t("reports.validation.cronMinInterval", {
+                  seconds: minInterval - 1,
+                }),
               );
             }
           }
@@ -237,10 +237,10 @@ export const makeCreateReportSchema = (
         val.frequencyType !== "cron"
       ) {
         if (!reportDateRegex.test(String(val.date ?? ""))) {
-          addIssue(["date"], "Date format is incorrect!");
+          addIssue(["date"], t("reports.validation.dateFormat"));
         }
         if (!reportTimeRegex.test(String(val.time ?? ""))) {
-          addIssue(["time"], "Time format is incorrect!");
+          addIssue(["time"], t("reports.validation.timeFormat"));
         }
       }
 
@@ -250,7 +250,7 @@ export const makeCreateReportSchema = (
           addIssue(["title"], REQUIRED_MESSAGE);
         }
         if (!reportEmailRegex.test(String(val.emails ?? ""))) {
-          addIssue(["emails"], "Add valid emails!");
+          addIssue(["emails"], t("reports.validation.invalidEmails"));
         }
       }
     });

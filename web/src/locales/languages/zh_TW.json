@@ -3597,7 +3597,16 @@
     "reloadReports": "重新載入報表",
     "moveToFolder": "移動至資料夾",
     "deleteReportsTitle": "刪除報表",
-    "deleteReportsMsg": "您確定要刪除 {count} 個報表嗎？"
+    "deleteReportsMsg": "您確定要刪除 {count} 個報表嗎？",
+    "validation": {
+      "resourceNameInvalid": "不允許使用 :、?、/、# 等字元和空格。",
+      "invalidCron": "無效的 Cron 運算式！",
+      "cronSixFields": "Cron 運算式必須正好包含 6 個欄位：[秒] [分鐘] [小時] [日] [月] [星期]",
+      "cronMinInterval": "頻率應大於 {seconds} 秒。",
+      "dateFormat": "日期格式不正確！",
+      "timeFormat": "時間格式不正確！",
+      "invalidEmails": "請新增有效的電子郵件！"
+    }
   },
   "queries": {
     "runningQueries": "執行中的查詢",

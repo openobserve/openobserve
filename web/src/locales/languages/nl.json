@@ -4182,7 +4182,16 @@
     "dimensionWidth": "Breedte (px)",
     "dimensionHeight": "Hoogte (px)",
     "imagePreview": "Inline voorbeeldafbeelding van het dashboard toevoegen",
-    "customDimensions": "Aangepaste afmetingen (geavanceerd)"
+    "customDimensions": "Aangepaste afmetingen (geavanceerd)",
+    "validation": {
+      "resourceNameInvalid": "Tekens zoals :, ?, /, # en spaties zijn niet toegestaan.",
+      "invalidCron": "Ongeldige cron-expressie!",
+      "cronSixFields": "De cron-expressie moet precies 6 velden bevatten: [Seconde] [Minuut] [Uur] [Dag van de maand] [Maand] [Dag van de week]",
+      "cronMinInterval": "De frequentie moet groter zijn dan {seconds} seconden.",
+      "dateFormat": "De datumnotatie is onjuist!",
+      "timeFormat": "De tijdnotatie is onjuist!",
+      "invalidEmails": "Voeg geldige e-mailadressen toe!"
+    }
   },
   "queries": {
     "runningQueries": "Zoekopdrachten uitvoeren",

@@ -3434,7 +3434,16 @@
     "dimensionWidth": "चौड़ाई (px)",
     "dimensionHeight": "ऊँचाई (px)",
     "imagePreview": "इनलाइन डैशबोर्ड पूर्वावलोकन छवि शामिल करें",
-    "customDimensions": "कस्टम आयाम (उन्नत)"
+    "customDimensions": "कस्टम आयाम (उन्नत)",
+    "validation": {
+      "resourceNameInvalid": ":, ?, /, # जैसे वर्ण और रिक्त स्थान की अनुमति नहीं है।",
+      "invalidCron": "अमान्य Cron expression!",
+      "cronSixFields": "Cron expression में ठीक 6 फ़ील्ड होने चाहिए: [सेकंड] [मिनट] [घंटा] [माह का दिन] [माह] [सप्ताह का दिन]",
+      "cronMinInterval": "आवृत्ति {seconds} सेकंड से अधिक होनी चाहिए।",
+      "dateFormat": "दिनांक प्रारूप गलत है!",
+      "timeFormat": "समय प्रारूप गलत है!",
+      "invalidEmails": "मान्य ईमेल जोड़ें!"
+    }
   },
   "queries": {
     "runningQueries": "Running Queries",
