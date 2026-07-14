@@ -6487,6 +6487,7 @@ dependencies = [
  "object_store",
  "openobserve-api",
  "openobserve-core",
+ "openobserve-jobs",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-proto",
@@ -6739,6 +6740,36 @@ dependencies = [
  "webpki-roots 1.0.6",
  "x509-parser",
  "zip 8.2.0",
+]
+
+[[package]]
+name = "openobserve-jobs"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow",
+ "arrow-schema",
+ "bytes",
+ "chrono",
+ "config",
+ "futures",
+ "hashbrown 0.16.1",
+ "infra",
+ "ingester",
+ "log",
+ "o2_dex",
+ "o2_enterprise",
+ "o2_openfga",
+ "openobserve-core",
+ "prometheus",
+ "proto",
+ "regex",
+ "report_server",
+ "reqwest 0.13.2",
+ "serde_json",
+ "tokio",
+ "tonic",
+ "wal",
 ]
 
 [[package]]
