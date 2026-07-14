@@ -396,7 +396,9 @@ describe("Login", () => {
     const item = { label: "Test Item" };
     wrapper.vm.selected(item);
 
-    expect(mockNotify).toHaveBeenCalledWith('Selected suggestion "Test Item"');
+    expect(mockNotify).toHaveBeenCalledWith({
+      message: 'Selected suggestion "Test Item"',
+    });
   });
 
   // Test 16: successful sign in calls getBasicAuth

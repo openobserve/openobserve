@@ -90,14 +90,15 @@ const mockSearchPartitionMap: Record<
 // Create shared mock functions
 const mockNotifications = {
   showErrorNotification: vi.fn(),
-  showCancelSearchNotification: vi.fn(),
 };
 
+// showCancelSearchNotification is provided by logsUtils, not useNotifications.
 const mockLogsUtils = {
   fnParsedSQL: vi.fn(() => ({})),
   hasAggregation: vi.fn(() => false),
   removeTraceId: vi.fn(),
   updateUrlQueryParams: vi.fn(),
+  showCancelSearchNotification: vi.fn(),
 };
 
 const mockHistogram = {
@@ -196,7 +197,7 @@ describe("useSearchResponseHandler", () => {
 
     // Reset all shared mock functions
     mockNotifications.showErrorNotification.mockClear();
-    mockNotifications.showCancelSearchNotification.mockClear();
+    mockLogsUtils.showCancelSearchNotification.mockClear();
     mockLogsUtils.fnParsedSQL.mockReturnValue({});
     mockLogsUtils.hasAggregation.mockReturnValue(false);
     mockLogsUtils.removeTraceId.mockClear();
@@ -342,7 +343,7 @@ describe("useSearchResponseHandler", () => {
 
       responseHandler.handleSearchError(request, error as any);
 
-      expect(notifications.showCancelSearchNotification).toHaveBeenCalled();
+      expect(mockLogsUtils.showCancelSearchNotification).toHaveBeenCalled();
     });
 
     it("should handle rate limit error", () => {
@@ -570,7 +571,7 @@ describe("useSearchResponseHandler", () => {
 
       expect(mockState.searchObj.loading).toBe(false);
       expect(mockState.searchObj.loadingHistogram).toBe(false);
-      expect(notifications.showCancelSearchNotification).toHaveBeenCalled();
+      expect(mockLogsUtils.showCancelSearchNotification).toHaveBeenCalled();
     });
   });
 

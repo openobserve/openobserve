@@ -190,6 +190,7 @@ describe("SinglePanelMove", () => {
         "update:ok",
         "update:cancel",
         "refresh",
+        "update:modelValue",
       ]);
     });
   });
