@@ -1,35 +1,21 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useStore } from 'vuex'
-import { useRouter } from 'vue-router'
 import type { BrowserCheck, BrowserCheckSchedule } from '@/types/synthetics'
 import OInput from '@/lib/forms/Input/OInput.vue'
 import OSelect from '@/lib/forms/Select/OSelect.vue'
 import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue'
 import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
-import OButton from '@/lib/core/Button/OButton.vue'
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
 import ODate from '@/lib/forms/Date/ODate.vue'
 import OTime from '@/lib/forms/Time/OTime.vue'
 
-const props = defineProps<{
-  check: BrowserCheck
-  destinations: string[]
-}>()
-
-const emit = defineEmits<{
-  'update:check': [value: BrowserCheck]
-  'refresh:destinations': []
-}>()
+const props = defineProps<{ check: BrowserCheck }>()
+const emit = defineEmits<{ 'update:check': [value: BrowserCheck] }>()
 
 const { t } = useI18n()
-const store = useStore()
-const router = useRouter()
-
-// ─── helpers ──────────────────────────────────────────────────────────────────
 
 function updateSchedule(patch: Partial<BrowserCheckSchedule>) {
   emit('update:check', {
@@ -37,7 +23,6 @@ function updateSchedule(patch: Partial<BrowserCheckSchedule>) {
     schedule: { ...props.check.schedule, ...patch },
   })
 }
-
 
 // ─── frequency preset ─────────────────────────────────────────────────────────
 
@@ -55,7 +40,6 @@ const frequencyOptions: { label: string; value: FrequencyPreset }[] = [
 
 function scheduleToPreset(s: BrowserCheckSchedule): FrequencyPreset {
   if (s.type === 'cron') return 'cron'
-  // Explicit "Custom" selection persists regardless of interval values
   if (s.isCustomFrequency) return 'custom'
   const mins =
     s.intervalUnit === 'hours'
@@ -75,11 +59,8 @@ const frequencyPreset = computed<FrequencyPreset>({
     if (v === 'cron') {
       const patch: Partial<BrowserCheckSchedule> = { type: 'cron', isCustomFrequency: false }
       if (!props.check.schedule.timezone) {
-        try {
-          patch.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-        } catch {
-          patch.timezone = 'UTC'
-        }
+        try { patch.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone }
+        catch { patch.timezone = 'UTC' }
       }
       updateSchedule(patch)
     } else if (v === 'custom') {
@@ -127,9 +108,7 @@ function buildTimezoneOptions(): { label: string; value: string }[] {
       }
     }
     return options
-  } catch {
-    // fall through
-  }
+  } catch { /* fall through */ }
   return [{ label: 'UTC', value: 'UTC' }]
 }
 
@@ -138,17 +117,14 @@ const timezoneOptions = buildTimezoneOptions()
 const timezone = computed({
   get: () => {
     if (props.check.schedule.timezone) return props.check.schedule.timezone
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone
-    } catch {
-      return 'UTC'
-    }
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone }
+    catch { return 'UTC' }
   },
   set: (v: string | number | boolean | null | undefined) =>
     updateSchedule({ timezone: v != null ? String(v) : 'UTC' }),
 })
 
-// ─── custom interval inputs (shown when "Custom" frequency selected) ────────────
+// ─── custom interval inputs ───────────────────────────────────────────────────
 
 const customIntervalValue = computed({
   get: () => props.check.schedule.intervalValue ?? 10,
@@ -191,60 +167,6 @@ const startTime = computed({
   get: () => props.check.schedule.startTime ?? '',
   set: (v: string) => updateSchedule({ startTime: v }),
 })
-
-// ─── retries ──────────────────────────────────────────────────────────────────
-
-const retries = computed({
-  get: () => props.check.retries ?? 0,
-  set: (v: string | number) => emit('update:check', { ...props.check, retries: Number(v) }),
-})
-
-const retryDelayMs = computed({
-  get: () => props.check.waitBeforeRetrySecs ?? 0,
-  set: (v: string | number) => emit('update:check', { ...props.check, waitBeforeRetrySecs: Number(v) }),
-})
-
-// ─── alert threshold ──────────────────────────────────────────────────────────
-
-const failureThreshold = computed({
-  get: () => props.check.alertIfFails ?? 1,
-  set: (v: string | number) => emit('update:check', { ...props.check, alertIfFails: Number(v) }),
-})
-
-// ─── destinations ─────────────────────────────────────────────────────────────
-
-const localDestinations = computed({
-  get: () => props.check.notifications.destinations,
-  set: (v: string[]) => {
-    destinationError.value = v.length === 0
-    emit('update:check', { ...props.check, notifications: { destinations: v } })
-  },
-})
-
-const destinationError = ref(false)
-
-function onDestinationsChange(v: string[]) {
-  destinationError.value = v.length === 0
-  emit('update:check', { ...props.check, notifications: { destinations: v } })
-}
-
-function routeToCreateDestination() {
-  const url = router.resolve({
-    name: 'alertDestinations',
-    query: {
-      action: 'add',
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  }).href
-  window.open(url, '_blank')
-}
-
-// ─── cooldown ─────────────────────────────────────────────────────────────────
-
-const silenceMinutes = computed({
-  get: () => props.check.cooldownMins ?? 5,
-  set: (v: string | number) => emit('update:check', { ...props.check, cooldownMins: Number(v) }),
-})
 </script>
 
 <template>
@@ -252,7 +174,7 @@ const silenceMinutes = computed({
     <div class="flex items-center border-b border-[var(--color-border-default)] py-[10px] px-3">
       <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-primary-600)]" />
       <h3 class="text-base font-semibold text-[var(--o2-text-heading)]">
-        {{ t('synthetics.scheduleAlert.title') }}
+        {{ t('synthetics.scheduleAlert.schedule') }}
       </h3>
     </div>
     <div class="px-3 py-2 flex flex-col gap-4">
@@ -267,14 +189,14 @@ const silenceMinutes = computed({
           <OToggleGroup
             v-model="frequencyPreset"
             type="single"
-            data-test="synthetics-schedule-alert-frequency-toggle"
+            data-test="synthetics-check-schedule-frequency-toggle"
           >
             <OToggleGroupItem
               v-for="opt in frequencyOptions"
               :key="opt.value"
               :value="opt.value"
               size="sm"
-              :data-test="`synthetics-schedule-alert-frequency-${opt.value}-item`"
+              :data-test="`synthetics-check-schedule-frequency-${opt.value}-item`"
             >
               {{ opt.label }}
             </OToggleGroupItem>
@@ -286,12 +208,12 @@ const silenceMinutes = computed({
           <OToggleGroup
             v-model="startType"
             type="single"
-            data-test="synthetics-schedule-alert-start-type-toggle"
+            data-test="synthetics-check-schedule-start-type-toggle"
           >
-            <OToggleGroupItem value="now" size="sm" data-test="synthetics-schedule-alert-start-now-item">
+            <OToggleGroupItem value="now" size="sm" data-test="synthetics-check-schedule-start-now-item">
               {{ t('synthetics.scheduleAlert.scheduleNow') }}
             </OToggleGroupItem>
-            <OToggleGroupItem value="later" size="sm" data-test="synthetics-schedule-alert-start-later-item">
+            <OToggleGroupItem value="later" size="sm" data-test="synthetics-check-schedule-start-later-item">
               {{ t('synthetics.scheduleAlert.scheduleLater') }}
             </OToggleGroupItem>
           </OToggleGroup>
@@ -306,25 +228,25 @@ const silenceMinutes = computed({
         </div>
       </div>
 
-      <!-- Cron inputs (shown below the row when cron selected) -->
+      <!-- Cron inputs -->
       <div v-if="check.schedule.type === 'cron'" class="flex items-start gap-3 flex-wrap">
         <OInput
           v-model="cron"
           :label="t('synthetics.scheduleAlert.cronExpression')"
           :placeholder="t('synthetics.scheduleAlert.cronPlaceholder')"
           class="w-83!"
-          data-test="synthetics-schedule-alert-cron-input"
+          data-test="synthetics-check-schedule-cron-input"
         />
         <OSelect
           v-model="timezone"
           :label="t('synthetics.scheduleAlert.timezone')"
           :options="timezoneOptions"
           class="w-64!"
-          data-test="synthetics-schedule-alert-timezone-select"
+          data-test="synthetics-check-schedule-timezone-select"
         />
       </div>
 
-      <!-- Custom interval inputs (shown when "Custom" frequency selected) -->
+      <!-- Custom interval inputs -->
       <div v-if="frequencyPreset === 'custom'" class="flex items-start gap-3 flex-wrap">
         <OInput
           v-model="customIntervalValue"
@@ -332,29 +254,29 @@ const silenceMinutes = computed({
           type="number"
           min="1"
           class="w-40!"
-          data-test="synthetics-schedule-alert-custom-interval-value-input"
+          data-test="synthetics-check-schedule-custom-interval-value-input"
         />
         <OSelect
           v-model="customIntervalUnit"
           :label="t('synthetics.scheduleAlert.customIntervalUnit.label')"
           :options="customIntervalUnitOptions"
           class="w-40!"
-          data-test="synthetics-schedule-alert-custom-interval-unit-select"
+          data-test="synthetics-check-schedule-custom-interval-unit-select"
         />
       </div>
 
-      <!-- Schedule Later date/time pickers (shown below the row when later selected) -->
+      <!-- Schedule Later date/time pickers -->
       <div v-if="startType === 'later' && check.schedule.type !== 'cron'" class="flex items-start gap-3 flex-wrap">
         <ODate
           v-model="startDate"
           :label="t('synthetics.scheduleAlert.startDate')"
-          data-test="synthetics-schedule-alert-start-date-input"
+          data-test="synthetics-check-schedule-start-date-input"
           class="w-40!"
         />
         <OTime
           v-model="startTime"
           :label="t('synthetics.scheduleAlert.startTime')"
-          data-test="synthetics-schedule-alert-start-time-input"
+          data-test="synthetics-check-schedule-start-time-input"
           class="w-40!"
         />
         <OSelect
@@ -362,109 +284,8 @@ const silenceMinutes = computed({
           :label="t('synthetics.scheduleAlert.timezone')"
           :options="timezoneOptions"
           class="w-64!"
-          data-test="synthetics-schedule-alert-start-timezone-select"
+          data-test="synthetics-check-schedule-start-timezone-select"
         />
-      </div>
-
-      <!-- ── Retries ────────────────────────────────────────────────────── -->
-      <div class="flex flex-col gap-2">
-        <div class="flex items-center gap-2 flex-nowrap">
-          <span class="text-sm text-[var(--o2-text-body)] whitespace-nowrap w-32">{{ t('synthetics.scheduleAlert.retriesOnFailure') }}</span>
-          <OInput
-            v-model="retries"
-            type="number"
-            class="w-25!"
-            placeholder="0"
-            data-test="synthetics-schedule-alert-retries-input"
-          />
-          <span class="text-sm text-[var(--o2-text-body)] whitespace-nowrap">{{ t('synthetics.scheduleAlert.retriesOnFailureSuffix') }}</span>
-        </div>
-        <div class="flex items-center gap-2 flex-nowrap">
-          <span class="text-sm text-[var(--o2-text-body)] whitespace-nowrap w-32">{{ t('synthetics.scheduleAlert.retryDelay') }}</span>
-          <OInput
-            v-model="retryDelayMs"
-            type="number"
-            class="w-25!"
-            placeholder="0"
-            data-test="synthetics-schedule-alert-retry-delay-input"
-          />
-          <span class="text-sm text-[var(--o2-text-body)] whitespace-nowrap">{{ t('synthetics.scheduleAlert.retryDelaySuffix') }}</span>
-        </div>
-
-        <!-- ── Alert (grouped with retries — same failure-behavior section) ── -->
-        <div class="flex items-center gap-2 flex-nowrap">
-          <span class="text-sm text-[var(--o2-text-body)] whitespace-nowrap w-32">{{ t('synthetics.scheduleAlert.alertedIfFails') }}</span>
-          <OInput
-            v-model="failureThreshold"
-            type="number"
-            class="w-25!"
-            placeholder="1"
-            data-test="synthetics-schedule-alert-failure-threshold-input"
-          />
-          <span class="text-sm text-[var(--o2-text-body)] whitespace-nowrap">{{ t('synthetics.scheduleAlert.alertedIfFailsSuffix') }}</span>
-        </div>
-      </div>
-
-      <!-- ── Destinations ───────────────────────────────────────────────── -->
-      <div>
-        <label class="text-sm font-medium text-[var(--o2-text-label)] mb-2 block">
-          {{ t('synthetics.scheduleAlert.destinations') }} *
-        </label>
-        <div class="flex items-center gap-1">
-          <OSelect
-            v-model="localDestinations"
-            :options="destinations"
-            multiple
-            :error="destinationError"
-            class="min-w-[180px] max-w-[300px]"
-            data-test="synthetics-schedule-alert-destinations-select"
-            @update:model-value="onDestinationsChange"
-          >
-            <template #empty>{{ t('synthetics.scheduleAlert.noDestinations') }}</template>
-          </OSelect>
-          <OButton
-            variant="ghost"
-            size="icon-circle-sm"
-            :title="t('synthetics.scheduleAlert.refreshDestinations')"
-            data-test="synthetics-schedule-alert-refresh-destinations-btn"
-            @click="emit('refresh:destinations')"
-          >
-            <OIcon name="refresh" size="sm" />
-          </OButton>
-          <OButton
-            variant="outline"
-            size="sm"
-            data-test="synthetics-schedule-alert-add-destination-btn"
-            @click="routeToCreateDestination"
-          >
-            {{ t('synthetics.scheduleAlert.addNewDestination') }}
-          </OButton>
-        </div>
-        <p v-if="destinationError" class="mt-1 text-xs text-[var(--o2-status-error-text)]">
-          {{ t('synthetics.scheduleAlert.destinationRequired') }}
-        </p>
-      </div>
-
-      <!-- ── Cooldown Period ────────────────────────────────────────────── -->
-      <div class="flex items-center gap-0">
-        <div class="w-32 text-sm font-medium text-[var(--o2-text-label)] flex items-center">
-          {{ t('synthetics.scheduleAlert.cooldownPeriod') }} *
-        </div>
-        <div class="flex items-center">
-          <div class="w-[87px]">
-            <OInput
-              v-model="silenceMinutes"
-              type="number"
-              min="0"
-              data-test="synthetics-schedule-alert-cooldown-input"
-            />
-          </div>
-          <div
-            class="flex justify-center items-center text-input-addon-text pl-2 h-7 text-sm"
-          >
-            {{ t('synthetics.scheduleAlert.minutes') }}
-          </div>
-        </div>
       </div>
 
     </div>

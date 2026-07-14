@@ -6330,6 +6330,8 @@
     },
     "scheduleAlert": {
       "title": "Schedule & Alerting",
+      "schedule": "Schedule",
+      "alerts": "Alerts",
       "frequency": "Frequency",
       "frequencyOptions": {
         "1min": "1 min",

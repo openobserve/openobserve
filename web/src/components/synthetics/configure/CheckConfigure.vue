@@ -2,7 +2,8 @@
 // Copyright 2026 OpenObserve Inc.
 import type { BrowserCheck, SyntheticsLocation, SyntheticsFolder, SyntheticsDevice } from '@/types/synthetics'
 import CheckDetails from './CheckDetails.vue'
-import CheckScheduleAlert from './CheckScheduleAlert.vue'
+import CheckSchedule from './CheckSchedule.vue'
+import CheckAlerts from './CheckAlerts.vue'
 import CheckLocations from './CheckLocations.vue'
 import CheckBrowserDevices from './CheckBrowserDevices.vue'
 import CheckRUM from './CheckRUM.vue'
@@ -36,10 +37,15 @@ function handleUpdate(value: BrowserCheck) {
         data-test="synthetics-check-configure-details"
         @update:check="handleUpdate"
       />
-      <CheckScheduleAlert
+      <CheckSchedule
+        :check="check"
+        data-test="synthetics-check-configure-schedule"
+        @update:check="handleUpdate"
+      />
+      <CheckAlerts
         :check="check"
         :destinations="destinations ?? []"
-        data-test="synthetics-check-configure-schedule-alert"
+        data-test="synthetics-check-configure-alerts"
         @update:check="handleUpdate"
         @refresh:destinations="emit('refresh:destinations')"
       />
