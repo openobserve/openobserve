@@ -2364,7 +2364,7 @@ dependencies = [
  "urlencoding",
  "utoipa",
  "uuid",
- "vortex",
+ "vortex 0.1.0 (git+https://github.com/openobserve/vortex?branch=0.75.0-fix)",
  "vrl",
 ]
 
@@ -6631,6 +6631,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "o2_dex"
+version = "0.1.0"
+
+[[package]]
+name = "o2_enterprise"
+version = "0.1.0"
+
+[[package]]
+name = "o2_openfga"
+version = "0.1.0"
+
+[[package]]
 name = "objc2"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6884,6 +6896,7 @@ dependencies = [
  "mime_guess",
  "multer",
  "object_store",
+ "openobserve-core",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-proto",
@@ -6905,7 +6918,6 @@ dependencies = [
  "regex-syntax",
  "report_server",
  "reqwest 0.13.2",
- "roaring",
  "rquickjs",
  "rust-embed-for-web",
  "rustls",
@@ -6956,6 +6968,113 @@ dependencies = [
  "x509-parser",
  "zip 8.2.0",
  "zstd",
+]
+
+[[package]]
+name = "openobserve-core"
+version = "0.1.0"
+dependencies = [
+ "ahash 0.8.12",
+ "anyhow",
+ "argon2",
+ "arrow",
+ "arrow-flight",
+ "arrow-json",
+ "arrow-schema",
+ "async-recursion",
+ "async-stream",
+ "async-trait",
+ "aws-config",
+ "aws-credential-types",
+ "aws-sdk-sns",
+ "axum",
+ "base64 0.22.1",
+ "bytes",
+ "chromiumoxide",
+ "chrono",
+ "config",
+ "cron",
+ "csv",
+ "dashmap",
+ "datafusion",
+ "datafusion-functions-json",
+ "datafusion-proto",
+ "enrichment",
+ "expect-test",
+ "flate2",
+ "flight",
+ "futures",
+ "futures-util",
+ "hashbrown 0.16.1",
+ "hashlink 0.11.0",
+ "hex",
+ "http 1.4.0",
+ "http-body 1.0.1",
+ "http-body-util",
+ "infra",
+ "ingester",
+ "itertools 0.14.0",
+ "jsonwebtoken",
+ "lettre",
+ "log",
+ "maxminddb",
+ "md5",
+ "memchr",
+ "multer",
+ "o2_dex",
+ "o2_enterprise",
+ "o2_openfga",
+ "object_store",
+ "opentelemetry",
+ "opentelemetry-proto",
+ "parking_lot 0.12.5",
+ "parquet",
+ "prometheus",
+ "promql-parser",
+ "prost 0.14.3",
+ "prost-wkt-types",
+ "proto",
+ "rand 0.10.1",
+ "rayon",
+ "rcgen",
+ "regex",
+ "regex-syntax",
+ "report_server",
+ "reqwest 0.13.2",
+ "rquickjs",
+ "rustls",
+ "rustls-native-certs",
+ "sea-orm",
+ "segment",
+ "serde",
+ "serde_json",
+ "sha256",
+ "snap",
+ "sourcemap",
+ "sqlparser",
+ "strum 0.28.0",
+ "svix-ksuid",
+ "tantivy",
+ "tantivy_utils",
+ "thiserror 2.0.18",
+ "tiktoken-rs",
+ "time",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tracing",
+ "tracing-opentelemetry",
+ "uaparser",
+ "url",
+ "utoipa",
+ "version-compare",
+ "vortex 0.1.0",
+ "vortex-datafusion",
+ "vrl",
+ "wal",
+ "webpki-roots 1.0.6",
+ "x509-parser",
+ "zip 8.2.0",
 ]
 
 [[package]]
@@ -11532,6 +11651,10 @@ dependencies = [
 [[package]]
 name = "vortex"
 version = "0.1.0"
+
+[[package]]
+name = "vortex"
+version = "0.1.0"
 source = "git+https://github.com/openobserve/vortex?branch=0.75.0-fix#120c122e211b4dfd0bfc97231d3a27825a6d25d2"
 dependencies = [
  "vortex-alp",
@@ -11712,6 +11835,10 @@ dependencies = [
  "vortex-mask",
  "vortex-utils",
 ]
+
+[[package]]
+name = "vortex-datafusion"
+version = "0.1.0"
 
 [[package]]
 name = "vortex-datetime-parts"

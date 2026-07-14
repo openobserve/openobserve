@@ -21,18 +21,6 @@ import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 
 
-// Mock useQuasar
-const mockNotify = vi.fn(() => vi.fn());
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
-
 // Mock toast
 const { mockToast } = vi.hoisted(() => ({
   mockToast: vi.fn(() => vi.fn()),
@@ -168,9 +156,6 @@ const createWrapper = (props = {}, options = {}) => {
       plugins: [i18n],
       mocks: {
         $store: mockStore,
-        $q: {
-          notify: mockNotify,
-        },
       },
       provide: {
         store: mockStore,

@@ -90,6 +90,6 @@ mod tests {
 
     #[test]
     fn test_metrics_ingester_default() {
-        let _server = MetricsIngester::default();
+        let _server = MetricsIngester;
     }
 }

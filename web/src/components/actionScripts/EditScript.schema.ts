@@ -6,8 +6,7 @@
 // the imperative `validateActionScriptData()` step gates to a single Zod schema
 // on <OForm :schema>.
 //
-// Restores the Quasar BEFORE baseline (complete-quasar-validation-inventory-
-// BEFORE.md → actionScripts/EditScript.vue, 6 rules), honoring the truthy→Zod
+// Restores the BEFORE baseline (actionScripts/EditScript.vue, 6 rules), honoring the truthy→Zod
 // inversion (a `!!v` guard becomes a positive constraint = required):
 //   • name             required + isValidResourceName (custom char rule)
 //   • type             required

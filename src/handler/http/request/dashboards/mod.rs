@@ -34,10 +34,7 @@ use crate::{
         },
         request::{BulkDeleteRequest, BulkDeleteResponse},
     },
-    service::{
-        dashboards::{self, DashboardError},
-        db::dashboards as dashboards_db,
-    },
+    service::{dashboards, db::dashboards as dashboards_db},
 };
 
 pub mod reports;
@@ -45,57 +42,6 @@ pub mod timed_annotations;
 
 async fn ensure_dashboard_in_org(org_id: &str, dashboard_id: &str) -> bool {
     dashboards_db::dashboard_in_org(org_id, dashboard_id).await
-}
-
-impl From<DashboardError> for Response {
-    fn from(value: DashboardError) -> Self {
-        match value {
-            DashboardError::InfraError(err) => MetaHttpResponse::internal_error(err),
-            DashboardError::DashboardNotFound => MetaHttpResponse::not_found("Dashboard not found"),
-            DashboardError::UpdateMissingHash => MetaHttpResponse::internal_error(
-                "Request to update existing dashboard with missing or invalid hash value. BUG",
-            ),
-            DashboardError::UpdateConflictingHash => MetaHttpResponse::conflict(
-                "Conflict: Failed to save due to concurrent changes. Please refresh the page after backing up your work to avoid losing changes.",
-            ),
-            DashboardError::PutMissingTitle => {
-                MetaHttpResponse::internal_error("Dashboard should have title")
-            }
-            DashboardError::MoveMissingFolderParam => MetaHttpResponse::bad_request(
-                "Please specify from & to folder from dashboard movement",
-            ),
-            DashboardError::MoveDestinationFolderNotFound => {
-                MetaHttpResponse::not_found("Folder not found")
-            }
-            DashboardError::CreateFolderNotFound => MetaHttpResponse::not_found("Folder not found"),
-            DashboardError::CreateDefaultFolder => {
-                MetaHttpResponse::internal_error("Error saving default folder")
-            }
-            DashboardError::DistinctValueError => {
-                MetaHttpResponse::internal_error("Error in updating distinct values")
-            }
-            DashboardError::MoveDashboardDeleteOld(dashb_id, folder_id, e) => {
-                MetaHttpResponse::internal_error(format!(
-                    "error deleting the dashboard {dashb_id} from old folder {folder_id} : {e}"
-                ))
-            }
-            DashboardError::ListPermittedDashboardsError(err) => MetaHttpResponse::forbidden(err),
-            DashboardError::UserNotFound => MetaHttpResponse::unauthorized("User not found"),
-            DashboardError::PermissionDenied => MetaHttpResponse::forbidden("Permission denied"),
-            DashboardError::PanelUnsupportedVersion => MetaHttpResponse::bad_request(
-                "Panel operations are only supported for v8 dashboards",
-            ),
-            DashboardError::TabNotFound(tab_id) => {
-                MetaHttpResponse::not_found(format!("Tab not found: {tab_id}"))
-            }
-            DashboardError::PanelNotFound(panel_id) => {
-                MetaHttpResponse::not_found(format!("Panel not found: {panel_id}"))
-            }
-            DashboardError::PanelAlreadyExists(panel_id, tab_id) => MetaHttpResponse::conflict(
-                format!("Panel with id {panel_id} already exists in tab {tab_id}"),
-            ),
-        }
-    }
 }
 
 /// CreateDashboard

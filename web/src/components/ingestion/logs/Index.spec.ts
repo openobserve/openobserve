@@ -22,7 +22,7 @@ vi.mock("../../../aws-exports", () => ({
   },
 }));
 
-// Mock clipboard utility (replaces the removed quasar mock)
+// Mock clipboard utility
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: vi.fn().mockResolvedValue(true),
 }));

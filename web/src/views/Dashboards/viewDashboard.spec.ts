@@ -172,31 +172,6 @@ vi.mock("vue-i18n", async () => {
   };
 });
 
-// Global Quasar mock instances
-const mockQuasarFullscreenRequest = vi.fn().mockReturnValue(Promise.resolve());
-const mockQuasarFullscreenExit = vi.fn().mockReturnValue(Promise.resolve());
-const mockQuasarNotify = vi.fn();
-
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      fullscreen: {
-        isActive: false,
-        request: () => Promise.resolve(),
-        exit: () => Promise.resolve(),
-      },
-      notify: mockQuasarNotify,
-    }),
-  };
-});
-
-// Export Quasar mocks for use in tests
-global.mockQuasarFullscreenRequest = mockQuasarFullscreenRequest;
-global.mockQuasarFullscreenExit = mockQuasarFullscreenExit;
-global.mockQuasarNotify = mockQuasarNotify;
-
 // Global notification mock instances
 const mockShowPositiveNotification = vi.fn();
 const mockShowErrorNotification = vi.fn();
@@ -284,9 +259,6 @@ describe("ViewDashboard", () => {
     global.mockRouterReplace.mockClear();
     global.mockStoreCommit.mockClear();
     global.mockStoreDispatch.mockClear();
-    global.mockQuasarFullscreenRequest.mockClear();
-    global.mockQuasarFullscreenExit.mockClear();
-    global.mockQuasarNotify.mockClear();
     global.mockShowPositiveNotification.mockClear();
     global.mockShowErrorNotification.mockClear();
     global.mockShowConflictErrorNotificationWithRefreshBtn.mockClear();

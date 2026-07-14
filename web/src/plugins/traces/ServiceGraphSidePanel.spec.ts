@@ -41,17 +41,6 @@ vi.mock("vue-i18n", () => ({
   })),
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn(),
-      dialog: vi.fn(),
-    }),
-  };
-});
-
 import searchService from "@/services/search";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
 

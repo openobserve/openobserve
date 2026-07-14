@@ -957,20 +957,15 @@ useShortcuts([
 </script>
 
 <style>
-/* Dark mode for pricing panel table header (th element selector — cannot inline) */
-.body--dark .pricing-panel-table th {
-  background: rgba(255, 255, 255, 0.04);
-}
-
 /* ── Pricing panel table (side panel) child selectors ──────────────── */
 .pricing-panel-table th {
   font-size: 11px;
   font-weight: 600;
-  opacity: 0.5;
+  color: var(--color-table-header-text);
   text-align: left;
   padding: 6px 14px;
-  background: rgba(0, 0, 0, 0.025);
-  border-bottom: 1px solid var(--o2-border-color);
+  background: var(--color-table-header-bg);
+  border-bottom: 1px solid var(--color-table-header-border);
 }
 
 .pricing-panel-table th:last-child {
@@ -980,7 +975,7 @@ useShortcuts([
 .pricing-panel-table td {
   font-size: 13px;
   padding: 8px 14px;
-  border-bottom: 1px solid var(--o2-border-color);
+  border-bottom: 1px solid var(--color-table-row-divider);
 }
 
 .pricing-panel-table td:last-child {
@@ -996,10 +991,11 @@ useShortcuts([
 .pricing-breakdown-table th {
   font-size: 11px;
   font-weight: 600;
-  opacity: 0.65;
+  color: var(--color-table-header-text);
+  background: var(--color-table-header-bg);
   text-align: left;
   padding: 0 16px 4px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 1px solid var(--color-table-header-border);
 }
 
 .pricing-breakdown-table th:last-child {
