@@ -935,7 +935,7 @@ export default defineComponent({
           const data = series.getData();
           const count = data.count();
 
-          // Collect node layout positions + names
+          // Collect node layout positions + names + direction-aware value
           for (let i = 0; i < count; i++) {
             const layout = data.getItemLayout(i);
             if (layout) {
@@ -944,6 +944,7 @@ export default defineComponent({
                 x: layout.x,
                 y: layout.y,
                 name: data.getName(i),
+                value: data.get("value", i) as number,
               });
             }
           }
@@ -1069,6 +1070,7 @@ export default defineComponent({
         mouseX: number,
         mouseY: number,
         nodeName: string,
+        requestsOverride?: number,
       ) => {
         resetToTextTooltip();
 
@@ -1080,10 +1082,15 @@ export default defineComponent({
           return;
         }
 
-        const requests = node.requests || 0;
+        // Use direction-aware value from tree node when available (matches the
+        // label), else fall back to the backend's node-level aggregate.
+        const requests =
+          requestsOverride !== undefined
+            ? requestsOverride
+            : (node.requests || 0);
         const errors = node.errors || 0;
         const errRate =
-          node.error_rate ?? (requests > 0 ? (errors / requests) * 100 : 0);
+          node.error_rate ?? (node.requests > 0 ? (node.errors / node.requests) * 100 : 0);
         tooltipEl.innerHTML = generateNodeTooltipContent(
           nodeName,
           requests,
@@ -1176,7 +1183,7 @@ export default defineComponent({
           }
           const key = `node:${nearestNode.name}`;
           activeKey = key;
-          showNodeTooltip(e.offsetX, e.offsetY, nearestNode.name);
+          showNodeTooltip(e.offsetX, e.offsetY, nearestNode.name, nearestNode.value);
           return;
         }
 
