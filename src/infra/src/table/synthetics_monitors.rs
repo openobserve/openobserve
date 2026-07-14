@@ -133,6 +133,30 @@ pub async fn count<C: ConnectionTrait>(
     Ok(q.count(conn).await?)
 }
 
+/// Counts synthetics (any org) whose `locations` JSON array contains the given
+/// location id — used to reject deleting a location that is still referenced.
+/// Scans the locations column in Rust: the table is small (hundreds of rows)
+/// and JSON LIKE semantics differ across Postgres/MySQL/SQLite.
+pub async fn count_referencing_location<C: ConnectionTrait>(
+    conn: &C,
+    location_id: &str,
+) -> Result<u64, errors::Error> {
+    let rows: Vec<serde_json::Value> = Entity::find()
+        .select_only()
+        .column(Column::Locations)
+        .into_tuple()
+        .all(conn)
+        .await?;
+    Ok(rows
+        .iter()
+        .filter(|locs| {
+            locs.as_array()
+                .map(|a| a.iter().any(|v| v.as_str() == Some(location_id)))
+                .unwrap_or(false)
+        })
+        .count() as u64)
+}
+
 pub async fn create<C: TransactionTrait>(
     conn: &C,
     org_id: &str,
