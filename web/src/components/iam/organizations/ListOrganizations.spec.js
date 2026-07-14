@@ -224,7 +224,8 @@ describe("ListOrganizations", () => {
       expect(organizationsService.get_admin_org).not.toHaveBeenCalled();
     });
 
-    it("should use the _meta admin endpoint when the selected org is _meta", async () => {
+    it("should use the _meta admin endpoint when the selected org is _meta on cloud", async () => {
+      config.isCloud = "true";
       organizationsService.list.mockClear();
       organizationsService.get_admin_org.mockClear();
       organizationsService.get_admin_org.mockResolvedValue(mockOrganizations);
@@ -236,7 +237,7 @@ describe("ListOrganizations", () => {
               ...mockStore,
               state: {
                 ...mockStore.state,
-                // Selecting the _meta org flips isMetaOrg true → admin endpoint.
+                // Selecting the _meta org flips isMetaOrg true → admin endpoint on cloud.
                 selectedOrganization: { identifier: "_meta" },
               },
             },
@@ -247,6 +248,33 @@ describe("ListOrganizations", () => {
       await flushPromises();
       expect(organizationsService.get_admin_org).toHaveBeenCalledWith("_meta");
       expect(organizationsService.list).not.toHaveBeenCalled();
+      metaWrapper.unmount();
+      config.isCloud = "false";
+    });
+
+    it("should fall back to the regular list for _meta off-cloud", async () => {
+      config.isCloud = "false";
+      organizationsService.list.mockClear();
+      organizationsService.get_admin_org.mockClear();
+      organizationsService.list.mockResolvedValue(mockOrganizations);
+      const metaWrapper = mount(ListOrganizations, {
+        global: {
+          plugins: [i18n, router],
+          provide: {
+            store: {
+              ...mockStore,
+              state: {
+                ...mockStore.state,
+                selectedOrganization: { identifier: "_meta" },
+              },
+            },
+          },
+          stubs: { OTable: true },
+        },
+      });
+      await flushPromises();
+      expect(organizationsService.list).toHaveBeenCalled();
+      expect(organizationsService.get_admin_org).not.toHaveBeenCalled();
       metaWrapper.unmount();
     });
 

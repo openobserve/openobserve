@@ -5,7 +5,7 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// This program is distributed in the hope that it will be useful
+// This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
@@ -13,15 +13,4 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#![recursion_limit = "256"]
-
-pub mod cli;
-pub mod migration;
-
-pub use openobserve_api::{handler, router};
-#[cfg(feature = "enterprise")]
-pub use openobserve_core::cipher;
-pub use openobserve_core::{common, job, service};
-
-#[cfg(feature = "enterprise")]
-pub mod super_cluster_queue;
+//! Cargo dependency-resolution stub for the private `o2_ratelimit` crate.
