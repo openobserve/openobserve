@@ -363,3 +363,34 @@ Prebuilt cell components — pass as a column's `cell`. Import individually or f
 - **ODataBarCell** (`@/lib/core/Table/cells/ODataBarCell.vue`) — value with a proportional background bar (width = value/`max`, caller supplies the column max and pre-formatted `display`); `variant` `default`/`warning`/`danger` for threshold columns.
 
 Also exported from the barrel: `statusVariant`, `humanizeStatus` helpers (+ `StatusTone`, `StatusVariantResult` types) for status badge styling.
+
+### Custom cell templates
+
+For renders not covered by prebuilt cells, use a slot template `#cell-{id}`:
+
+```vue
+<OTable :columns="columns" :data="rows">
+  <!-- Slot receives { row } — row is the full data record -->
+  <template #cell-enabled="{ row }">
+    <OSwitch
+      :model-value="row.enabled"
+      @update:model-value="toggleEnabled(row, $event)"
+    />
+  </template>
+
+  <template #cell-status="{ row }">
+    <OBadge :variant="getStatusVariant(row.status)">
+      {{ row.status }}
+    </OBadge>
+  </template>
+
+  <template #cell-actions="{ row }">
+    <div class="tw:flex tw:gap-1">
+      <OButton variant="ghost" size="sm" icon-left="edit" @click="edit(row)" />
+      <OButton variant="ghost" size="sm" icon-left="delete" @click="remove(row)" />
+    </div>
+  </template>
+</OTable>
+```
+
+**Important:** Access row data directly (`row.enabled`, `row.status`, `row.id`), not via `row.original`. The `row` object *is* the data record with all properties accessible.

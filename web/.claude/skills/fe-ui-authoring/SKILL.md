@@ -180,34 +180,38 @@ utilities usually removes the temptation entirely.
 - **The only accepted `px` is a `1px` hairline border/divider.** Every other `px`
   — inline, in a `<style>` block, or in a class arbitrary value — is a smell.
 
-### 4. No scoped CSS, no inline styles
+### 4. No scoped CSS — use inline styles with design tokens
 
-**What.** Do not add `<style scoped>` blocks and do not write `style="…"`
-attributes on elements. Style with Tailwind utilities and design-token-backed
-classes in the template.
+**What.** Do not add `<style scoped>` blocks. **Tailwind (`tw:` prefix) and Quasar utilities (`q-*`, `text-*`, `row`, `col`) are NOT available.** Use inline `style="…"` attributes with CSS custom properties and rem units instead.
 
-**Why.** Scoped CSS and inline styles are per-file, invisible overrides — they
-fork the design system one component at a time and are the primary source of
-"why does this button look different here?" On O2 components specifically, a
-scoped rule targeting the component's class is a design-system violation: the
-intent belongs in a component **variant**, not a local override that the next
-person can't discover. Inline `style` is even worse — it beats everything and
-carries no token.
+**Why.** 
+- Scoped CSS is per-file, invisible override — forks the design system one component at a time.
+- Tailwind and Quasar utilities are not part of the build.
+- Inline styles with design tokens ensure consistency, theme-awareness, and proper spacing.
 
 **How.**
-- Layout, spacing, flex/grid, sizing → Tailwind utilities on the element.
-- A visual difference on an O2 component that a utility can't (legitimately)
-  express → it's a missing **variant**; add the variant to the component source,
-  then use the prop. Never patch it at the call site. See
-  [§ Working with O2 components](#working-with-o2-components) for the decision
-  flow.
-- Genuinely layout-only positioning around an O2 component (e.g. `margin`,
-  `flex-shrink`, a parent-hover reveal) → put it on a plain wrapper
-  `<span>`/`<div>`, never as scoped CSS on the O2 component itself.
-- Dynamic values that truly must be computed at runtime (e.g. a computed
-  pixel-free width from JS) → bind a CSS custom property via `:style` only if
-  there is no class-based way, and prefer a token. This is the rare exception,
-  not a license to reintroduce inline styling.
+- **Layout & spacing**: Use inline `style` with flexbox/grid + rem units:
+  ```vue
+  <div style="display: flex; gap: 1rem; padding: 1.5rem">
+    <div style="flex: 1; margin-bottom: 0.5rem">Content</div>
+  </div>
+  ```
+- **Colors**: Always use CSS custom properties (`--color-*`):
+  ```vue
+  <div style="background: var(--color-surface-subtle); color: var(--color-text-primary)">
+    Content
+  </div>
+  ```
+- **Typography**: Use inline font properties with rem sizing:
+  ```vue
+  <label style="font-size: 0.875rem; font-weight: 500">Label</label>
+  ```
+- **Never use**:
+  - ❌ `tw:flex`, `tw:gap-2`, `tw:p-4` (Tailwind not available)
+  - ❌ `q-pa-md`, `q-gutter-lg`, `row`, `col` (Quasar utilities not available)
+  - ❌ Hardcoded colors like `#fff`, `rgb(255,255,255)` (use `var(--color-*)`)
+  - ❌ Pixels for sizing except `1px` borders (use `rem` units)
+- **For O2 components**: Pass only `variant` / `size` props — never patch appearance with inline styles or classes.
 
 ### 5. No hardcoded colors or sizes — use registered tokens
 
@@ -223,12 +227,11 @@ and changes everywhere at once when design updates it. Hardcoding a color is
 opting a single element out of theming permanently.
 
 **How — using tokens.**
-- Prefer Tailwind token utilities generated from the **modern `--color-*`** design
-  tokens: `tw:bg-surface-base`, `tw:text-text-primary`, `tw:border-border-default`,
-  `tw:bg-tabs-active-bg`, etc. Grep existing views for the names in use.
-- In the rare case you need the raw variable, use the modern CSS custom property:
-  `var(--color-text-primary)`, `var(--color-surface-base)` — theme-aware by
-  construction. **Only `--color-*`** — see the `--o2-*` ban below.
+- Use the modern CSS custom property with inline styles:
+  `var(--color-text-primary)`, `var(--color-surface-base)`, `var(--color-border-default)`, 
+  `var(--color-surface-subtle)`, etc. — theme-aware by construction.
+- **Only `--color-*` tokens** — see the `--o2-*` ban below.
+- Example: `style="color: var(--color-text-primary); background: var(--color-surface-base)"`
 
 **How — registering a NEW token / the `--o2-*` ban.** Full details, the token-file
 layout, the 3-step registration, and the `--o2-*` → `--color-*` migration map are
@@ -300,8 +303,9 @@ patching it from outside. Banned on an O2 component:
 
 | Banned | Why | Instead |
 | --- | --- | --- |
-| `style="color: …"` | bypasses tokens, dead in dark mode | add/choose a `variant` |
-| `class="tw:px-2 tw:text-sm tw:font-bold"` to restyle it | ad-hoc patching | use `size` / `variant` |
+| `style="color: #fff; padding: 10px"` | hardcoded colors/px, bypasses tokens | use `variant` / `size` / component design |
+| ❌ `class="tw:px-2 tw:text-sm"` | Tailwind utilities not available | use component `variant`/`size` props |
+| ❌ `class="q-pa-md text-weight-bold"` | Quasar utilities not available | use component `variant`/`size` props |
 | `<style scoped>` targeting its class | invisible fork of the design system | move the intent into a `variant` |
 | `class="q-ml-sm"` / `q-mr-sm` for spacing | Quasar spacing leak | `tw:gap-*` on the parent container |
 

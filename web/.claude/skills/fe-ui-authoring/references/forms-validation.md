@@ -183,7 +183,8 @@ Save button lives:
   `<form>`) and set the overlay's `form-id="myForm"`. The footer's built-in Save
   button renders as `<button form="myForm" type="submit">`, so it submits the
   form across the DOM boundary. Prefer the overlay's built-in
-  `primary`/`secondary` footer buttons.
+  `primary-button-label`, `secondary-button-label`, and `@click:secondary` props
+  for Cancel.
 
 **Loading and enabled-state are automatic — don't manage them.** `OForm` awaits
 your `@submit` handler, so TanStack's `isSubmitting` stays true for the whole
@@ -195,7 +196,58 @@ save and the Save button shows its spinner on its own. Therefore:
   `:disabled`). Save stays enabled; clicking an invalid form reveals the errors.
   That's the intended UX — a disabled button that never explains itself is worse.
 - The default slot also exposes `{ isSubmitting, canSubmit }` for an inline
-  button that wants the spinner: `<OForm v-slot="{ isSubmitting }">`.
+  button that wants the spinner: `<OForm v-slot="{ isSubmitting }">`
+
+### Dialog + OForm button pattern (required)
+
+When a form lives inside an `ODialog` or `ODrawer`, always use the overlay's
+**built-in button props** — never hand-roll buttons in a template slot:
+
+```vue
+<!-- RIGHT: ODialog manages buttons, wired to form via form-id -->
+<ODialog
+  :open="showDialog"
+  @update:open="showDialog = $event"
+  :title="t('common.edit')"
+  :form-id="FORM_ID"
+  :primary-button-label="t('common.save')"
+  :secondary-button-label="t('common.cancel')"
+  @click:secondary="showDialog = false"
+>
+  <OForm
+    :id="FORM_ID"
+    :schema="schema"
+    :default-values="defaults"
+    @submit="onSubmit"
+  >
+    <OFormInput name="title" :label="t('common.title')" required />
+  </OForm>
+</ODialog>
+
+<!-- WRONG: redundant manual buttons, duplicate the built-in pattern -->
+<ODialog :open="showDialog" @update:open="showDialog = $event">
+  <OForm :schema="schema" @submit="onSubmit">
+    <OFormInput name="title" />
+    <div class="tw:flex tw:gap-2">
+      <OButton variant="outline" @click="showDialog = false">Cancel</OButton>
+      <OButton variant="primary" type="submit">Save</OButton>
+    </div>
+  </OForm>
+</ODialog>
+```
+
+**Why:** The built-in buttons automatically:
+- Render with correct styling (outline/primary per the standard)
+- Wire `:form="formId"` so the primary button's type="submit" submits the form
+- Show the spinner automatically during `@submit` (no manual `:loading`)
+- Align perfectly and spacing is correct
+- Cancel button fires `@click:secondary` so you control the close action
+
+**What the props do:**
+- `:form-id="FORM_ID"` — wires the footer buttons to the `<OForm id="FORM_ID">`
+- `:primary-button-label` — text on the Save button (localized, via `t()`)
+- `:secondary-button-label` — text on the Cancel button
+- `@click:secondary="showDialog = false"` — close the dialog when Cancel is clicked
 
 ## 5. Building the payload
 
@@ -332,6 +384,137 @@ Drive behavior through the **real `<OForm>`**, not internals:
 (See the project's `fe-testing` rules for `data-test` selectors, MSW, and the
 mount helpers — carry every `data-test` verbatim when converting a control.)
 
+## Real-world example: NotificationChannels form
+
+A complex form with non-schema fields (custom headers, reusable secret input) wired via `setFieldValue`:
+
+```ts
+// NotificationChannels.schema.ts
+export const makeNotificationChannelSchema = (t: (key: string) => string) =>
+  z.object({
+    id: z.string().optional(),
+    name: z.string().min(1, { message: t("notificationChannels.validation.nameRequired") }).trim(),
+    type: z.enum(["webhook", "slack", "email"]),
+    destination_url: z.string().min(1).url({ message: t("notificationChannels.validation.invalidUrl") }),
+    auth_token: z.string().optional(),
+    headers: z.record(z.string()).optional().default({}),  // map; convert rows ↔ map at submit
+    retry_count: z.coerce.number().int().min(0).max(10),
+    enabled: z.boolean().default(true),
+  });
+
+export type NotificationChannelForm = z.infer<ReturnType<typeof makeNotificationChannelSchema>>;
+export const notificationChannelDefaults = (): NotificationChannelForm => ({
+  name: "", type: "webhook", destination_url: "", auth_token: "", headers: {},
+  retry_count: 3, enabled: true,
+});
+```
+
+```vue
+<template>
+  <ODialog :form-id="FORM_ID" primary-button-label="Save" secondary-button-label="Cancel">
+    <OForm
+      :id="FORM_ID"
+      :schema="notificationChannelSchema"
+      :default-values="formDefaults"
+      @submit="saveChannel"
+    >
+      <!-- Schema fields: OForm* components with name= -->
+      <OFormInput name="name" :label="t('notificationChannels.name')" required />
+      <OFormSelect name="type" :label="t('notificationChannels.type')" :items="typeOptions" required />
+      <OFormInput name="destination_url" :label="t('notificationChannels.destination')" required />
+      <OFormInput name="retry_count" type="number" :label="t('notificationChannels.retryCount')" required />
+      <OFormCheckbox name="enabled" :label="t('notificationChannels.enabled')" />
+
+      <!-- Non-schema field: reusable SecretInput (custom component) -->
+      <!-- Wired via v-model bridge — auth_token is schema-owned, SecretInput is dumb -->
+      <div class="tw:space-y-2">
+        <label class="tw:text-sm tw:font-medium">{{ t('notificationChannels.authToken') }}</label>
+        <SecretInput
+          :model-value="formInputs.auth_token"
+          @update:model-value="formInputs.auth_token = $event"
+          :placeholder="t('notificationChannels.authToken')"
+        />
+      </div>
+
+      <!-- Dynamic field array: custom headers (map ↔ array conversion at edit/submit) -->
+      <div class="tw:space-y-3">
+        <div class="tw:flex tw:justify-between">
+          <label class="tw:text-sm tw:font-medium">{{ t("notificationChannels.headers") }}</label>
+          <OButton variant="ghost" size="sm" icon-left="add" type="button" @click="addHeader">
+            {{ t("notificationChannels.addHeader") }}
+          </OButton>
+        </div>
+        <!-- Rendered as array of {key, value} rows; converted to map for schema at submit -->
+        <div v-for="(header, idx) in headers" :key="idx" class="tw:flex tw:gap-2">
+          <OInput v-model="header.key" :placeholder="t('notificationChannels.headerKey')" />
+          <OInput v-model="header.value" :placeholder="t('notificationChannels.headerValue')" />
+          <OButton variant="ghost" size="sm" icon-left="delete" type="button" @click="removeHeader(idx)" />
+        </div>
+      </div>
+    </OForm>
+  </ODialog>
+</template>
+
+<script setup lang="ts">
+import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
+import { makeNotificationChannelSchema, notificationChannelDefaults, type NotificationChannelForm } from "./NotificationChannels.schema";
+
+const { t } = useI18n();
+const FORM_ID = "notification-channel-form";
+
+// Schema is computed because it needs t() at every render (translations can change)
+const notificationChannelSchema = computed(() => makeNotificationChannelSchema(t));
+const formDefaults = notificationChannelDefaults();
+const formInputs = ref<NotificationChannelForm>(structuredClone(formDefaults));
+
+// Non-schema state: custom headers as an array of rows (converted to map at submit)
+const headers = ref<Array<{ key: string; value: string }>>([]);
+
+// When editing, prefill schema fields + convert map → array for headers
+const openEditForm = (channel: any) => {
+  formInputs.value = {
+    id: channel.id,
+    name: channel.name,
+    type: channel.type,
+    destination_url: channel.destination_url,
+    auth_token: channel.auth_token || "",
+    headers: channel.headers || {},
+    retry_count: channel.retry_count,
+    enabled: channel.enabled,
+  };
+  // Convert map to array for UI
+  headers.value = Object.entries(channel.headers || {}).map(([key, value]) => ({
+    key,
+    value: value as string,
+  }));
+};
+
+// On submit: the validated schema value, + non-schema rows converted back to map
+async function saveChannel(values: NotificationChannelForm) {
+  const headersObj = Object.fromEntries(
+    headers.value.filter((h) => h.key && h.value).map((h) => [h.key, h.value])
+  );
+  
+  const data = {
+    ...values,
+    headers: headersObj,  // merge the constructed map into the payload
+  };
+  
+  await service.create(data);
+}
+</script>
+```
+
+**Key patterns here:**
+- **Computed schema:** `makeNotificationChannelSchema(t)` wrapped in `computed()` because translations are reactive
+- **Non-schema fields don't go in Zod.** Custom headers, SecretInput are UI-only (converted at edit/submit).
+- **The split:** `formInputs` (schema-owned refs) + `headers` (ephemeral array rows) live side-by-side.
+- **At submit:** merge the rows into a map and combine with validated `values`.
+- **Dialog integration:** `<ODialog :form-id="FORM_ID">` + `<OForm :id="FORM_ID">` wire the footer button to the form.
+
+---
+
 ## Anti-patterns (banned)
 
 | Anti-pattern | Why it's wrong | Do instead |
@@ -346,3 +529,4 @@ mount helpers — carry every `data-test` verbatim when converting a control.)
 | `{ ...value }` as the request body | leaks `.optional()` keys, ships string numbers | explicit keys + `Number()`/`z.coerce.number()` |
 | `uuid` `:key` on a field-array row | mid-list delete shifts/blanks inputs | `:key="index"` + delete test |
 | bare control with no `OForm*` wrapper inside `<OForm>` | unvalidated, unbound | author the `OForm*` wrapper |
+| Schema tied to static `t` | translations don't react | `computed(() => makeSchema(t))` for reactive updates |

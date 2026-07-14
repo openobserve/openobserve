@@ -407,4 +407,115 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
   label="Severity"
 />
 ```
+
+---
+
+## Building custom reusable form controls
+
+When no O2 component fits your use case, **build a reusable control** instead of hand-wiring `v-model` + error handling inline. The pattern:
+
+1. **Decide:** Is it generic/reusable (lives in `web/src/lib/forms/*`), or app-specific (lives in `web/src/components/*`)?
+2. **Build the headless version first** — a plain component that owns its value via `v-model` (props `modelValue`, emits `update:modelValue`). No form knowledge.
+3. **Add the form wrapper** if it will go inside `<OForm>` — a sibling component that `inject(FORM_CONTEXT_KEY)`, renders the headless version inside a `<Field :name="...">`, and wires validation/value/blur to the field.
+
+**Example: SecretInput (app-specific, headless only)**
+
+Used standalone to accept a secret token with reveal/copy controls. Not inside `<OForm>` in the current use case, so only the headless version exists.
+
+```vue
+<!-- web/src/components/common/SecretInput.vue -->
+<template>
+  <div class="tw:flex tw:gap-2 tw:items-end">
+    <OInput
+      :type="revealed ? 'text' : 'password'"
+      :model-value="modelValue"
+      :label="label"
+      :placeholder="placeholder"
+      :required="required"
+      :disabled="disabled"
+      @update:model-value="$emit('update:modelValue', $event)"
+      :data-test="dataTest"
+    />
+    <div class="tw:flex tw:gap-1">
+      <OButton
+        variant="ghost"
+        size="sm"
+        :icon-left="revealed ? 'visibility-off' : 'visibility'"
+        @click="revealed = !revealed"
+        :disabled="!modelValue || disabled"
+        :title="t(revealed ? 'common.hide' : 'common.show')"
+      />
+      <OButton
+        variant="ghost"
+        size="sm"
+        icon-left="content-copy"
+        @click="copyToClipboard"
+        :disabled="!modelValue || disabled"
+        :title="t('common.copy')"
+      />
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref } from "vue";
+import { useI18n } from "vue-i18n";
+import { useToast } from "@/lib/feedback/Toast/useToast";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+
+interface Props {
+  modelValue?: string;
+  label?: string;
+  placeholder?: string;
+  required?: boolean;
+  disabled?: boolean;
+  dataTest?: string;
+}
+
+defineProps<Props>();
+
+defineEmits<{
+  "update:modelValue": [value: string];
+}>();
+
+const { t } = useI18n();
+const toast = useToast();
+const revealed = ref(false);
+
+const copyToClipboard = async () => {
+  try {
+    await navigator.clipboard.writeText(modelValue || "");
+    toast.success(t("common.copiedToClipboard"));
+  } catch {
+    toast.error(t("common.copyFailed"));
+  }
+};
+</script>
+```
+
+**To use outside a form:**
+```vue
+<SecretInput
+  :model-value="authToken"
+  @update:model-value="authToken = $event"
+  label="API Token"
+  placeholder="sk_..."
+/>
+```
+
+**To use inside a form** (if needed later), wire it via the form's `setFieldValue` — don't build an `OFormSecretInput`:
+```vue
+<OForm :schema="schema" :default-values="defaults" @submit="save">
+  <div class="tw:space-y-2">
+    <label>{{ t('field.token') }}</label>
+    <SecretInput
+      :model-value="formInputs.token"
+      @update:model-value="formInputs.token = $event"
+    />
+  </div>
+</OForm>
+```
+
+The component stays stateless; the form owns the value via the `formInputs` ref.
 **Family:** Form wrapper for `OOptionGroup`.
