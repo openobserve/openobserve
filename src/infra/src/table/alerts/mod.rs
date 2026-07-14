@@ -159,6 +159,12 @@ impl TryFrom<alerts::Model> for MetaAlert {
 
         alert.creates_incident = value.creates_incident;
 
+        // Load composite spec if present (NULL for ordinary alerts).
+        alert.composite = value
+            .composite_spec
+            .map(serde_json::from_value)
+            .transpose()?;
+
         Ok(alert)
     }
 }
@@ -686,6 +692,9 @@ fn update_mutable_fields(
             (false, None, None)
         };
 
+    // Serialize composite spec to its own JSONB column (NULL for ordinary alerts).
+    let composite_spec = alert.composite.map(serde_json::to_value).transpose()?;
+
     alert_am.is_real_time = Set(is_real_time);
     alert_am.destinations = Set(destinations);
     alert_am.template = Set(template);
@@ -723,6 +732,7 @@ fn update_mutable_fields(
     alert_am.dedup_time_window_minutes = Set(dedup_time_window_minutes);
     alert_am.dedup_config = Set(dedup_config);
     alert_am.creates_incident = Set(alert.creates_incident);
+    alert_am.composite_spec = Set(composite_spec);
     Ok(())
 }
 
@@ -784,6 +794,7 @@ mod tests {
             dedup_time_window_minutes: None,
             dedup_config: None,
             creates_incident: false,
+            composite_spec: None,
         }
     }
 

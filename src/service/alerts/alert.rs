@@ -76,7 +76,7 @@ use crate::{
         },
     },
     service::{
-        alerts::{QueryConditionExt, build_sql, destinations},
+        alerts::{QueryConditionExt, build_sql, composite_template, destinations},
         db, folders,
         search::sql::RE_ONLY_SELECT,
         short_url,
@@ -193,6 +193,14 @@ pub enum AlertError {
     /// Not support save destination remote pipeline for alert so far
     #[error("Not support save destination {0} type for alert so far")]
     NotSupportedAlertDestinationType(Module),
+
+    /// A composite alert was submitted in a build without the enterprise feature.
+    #[error("Composite alerts are only available in the enterprise edition")]
+    CompositeNotSupported,
+
+    /// A composite alert failed structural validation (§4.2).
+    #[error("Invalid composite alert: {0}")]
+    CompositeInvalid(String),
 }
 
 pub async fn save(
@@ -305,11 +313,36 @@ async fn prepare_alert(
         }
     }
 
-    if alert.name.is_empty() || alert.stream_name.is_empty() {
+    // A composite alert has no single top-level stream (each term carries its
+    // own), so only its name is required here; the per-term stream/query checks
+    // that follow are gated behind `!is_composite`.
+    let is_composite = alert.composite.is_some();
+    if alert.name.is_empty() || (alert.stream_name.is_empty() && !is_composite) {
         return Err(AlertError::AlertNameMissing);
     }
     if alert.name.contains('/') {
         return Err(AlertError::AlertNameContainsForwardSlash);
+    }
+
+    // Composite structural validation + normalization (§4.2). The parser, term
+    // rules and Kleene logic live in the enterprise crate (feature-gated).
+    if is_composite {
+        #[cfg(not(feature = "enterprise"))]
+        {
+            return Err(AlertError::CompositeNotSupported);
+        }
+        #[cfg(feature = "enterprise")]
+        {
+            // Phase 1: composites are scheduled-only.
+            if alert.is_real_time {
+                return Err(AlertError::CompositeInvalid(
+                    "composite alerts must be scheduled, not real-time".to_string(),
+                ));
+            }
+            let spec = alert.composite.as_mut().unwrap();
+            o2_enterprise::enterprise::alerts::composite::validate_and_normalize(spec)
+                .map_err(|e| AlertError::CompositeInvalid(e.to_string()))?;
+        }
     }
 
     if let Some(vrl) = alert.query_condition.vrl_function.as_ref() {
@@ -342,21 +375,27 @@ async fn prepare_alert(
         });
     }
 
-    // before saving alert check alert destination
-    if alert.destinations.is_empty() {
-        return Err(AlertError::AlertDestinationMissing);
-    }
-    for dest in alert.destinations.iter() {
-        match db::alerts::destinations::get(org_id, dest).await {
-            Ok(d) => {
-                if !d.is_alert_destinations() {
-                    return Err(AlertError::NotSupportedAlertDestinationType(d.module));
+    // before saving alert check alert destination. A composite routes via its
+    // `notify` block (on_composite / on_term) rather than the top-level
+    // `destinations`, so validate those instead.
+    if is_composite {
+        validate_composite_destinations(org_id, alert).await?;
+    } else {
+        if alert.destinations.is_empty() {
+            return Err(AlertError::AlertDestinationMissing);
+        }
+        for dest in alert.destinations.iter() {
+            match db::alerts::destinations::get(org_id, dest).await {
+                Ok(d) => {
+                    if !d.is_alert_destinations() {
+                        return Err(AlertError::NotSupportedAlertDestinationType(d.module));
+                    }
                 }
-            }
-            Err(_) => {
-                return Err(AlertError::AlertDestinationNotFound {
-                    dest: dest.to_string(),
-                });
+                Err(_) => {
+                    return Err(AlertError::AlertDestinationNotFound {
+                        dest: dest.to_string(),
+                    });
+                }
             }
         }
     }
@@ -374,6 +413,10 @@ async fn prepare_alert(
         alert.context_attributes = Some(new_attrs);
     }
 
+    // The remaining checks resolve a single top-level stream schema and validate
+    // the top-level query. A composite has neither (each term is validated on
+    // its own query_condition), so they are skipped for composites.
+    if !is_composite {
     // before saving alert check column type to decide numeric condition
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     if stream_name.is_empty() || schema.fields().is_empty() {
@@ -450,6 +493,7 @@ async fn prepare_alert(
         }
         _ => {}
     }
+    } // end if !is_composite
 
     // Commented intentionally - in case the alert period is big and there
     // is huge amount of data within the time period, the below can timeout and return error.
@@ -458,6 +502,50 @@ async fn prepare_alert(
     //     return Err(anyhow::anyhow!("Alert test failed: {}", e));
     // }
 
+    Ok(())
+}
+
+/// Validates the destinations referenced by a composite alert's `notify` block.
+/// `on_composite` must have at least one destination, and every destination
+/// referenced by `on_composite` or any `on_term` entry must exist and be an
+/// alert-type destination.
+async fn validate_composite_destinations(
+    org_id: &str,
+    alert: &Alert,
+) -> Result<(), AlertError> {
+    let notify = &alert
+        .composite
+        .as_ref()
+        .expect("validate_composite_destinations called on a non-composite alert")
+        .notify;
+    if notify.on_composite.is_empty() {
+        return Err(AlertError::CompositeInvalid(
+            "notify.on_composite must have at least one destination".to_string(),
+        ));
+    }
+    // Collect every referenced destination (composite + per-term), de-duplicated.
+    let mut all: Vec<&String> = notify.on_composite.iter().collect();
+    for dests in notify.on_term.values() {
+        for d in dests {
+            if !all.contains(&d) {
+                all.push(d);
+            }
+        }
+    }
+    for dest in all {
+        match db::alerts::destinations::get(org_id, dest).await {
+            Ok(d) => {
+                if !d.is_alert_destinations() {
+                    return Err(AlertError::NotSupportedAlertDestinationType(d.module));
+                }
+            }
+            Err(_) => {
+                return Err(AlertError::AlertDestinationNotFound {
+                    dest: dest.to_string(),
+                });
+            }
+        }
+    }
     Ok(())
 }
 
@@ -1044,97 +1132,120 @@ impl AlertExt for Alert {
         start_time: Option<i64>,
         evaluation_timestamp: i64,
     ) -> Result<(String, String), AlertError> {
-        let mut err_message = "".to_string();
-        let mut success_message = "".to_string();
-        let mut no_of_error = 0;
+        send_to_destinations(
+            self,
+            &self.destinations,
+            rows,
+            rows_end_time,
+            start_time,
+            evaluation_timestamp,
+        )
+        .await
+    }
+}
 
-        // Get alert-level template if specified (takes precedence over destination templates)
-        let alert_template = if let Some(ref template_name) = self.template {
-            Some(
-                db::alerts::templates::get(&self.org_id, template_name)
-                    .await
-                    .map_err(|_| AlertError::AlertTemplateNotFound {
-                        template: template_name.clone(),
-                    })?,
-            )
-        } else {
-            None
+/// Sends the alert notification to an arbitrary subset of destinations, using
+/// the given `rows` as the template context. Extracted from
+/// `AlertExt::send_notification` (which now delegates here with
+/// `self.destinations`) so composite alerts can target their `on_composite` and
+/// per-term `on_term` destination subsets independently (§5 F7/F8).
+pub(crate) async fn send_to_destinations(
+    alert: &Alert,
+    destinations: &[String],
+    rows: &[Map<String, Value>],
+    rows_end_time: i64,
+    start_time: Option<i64>,
+    evaluation_timestamp: i64,
+) -> Result<(String, String), AlertError> {
+    let mut err_message = "".to_string();
+    let mut success_message = "".to_string();
+    let mut no_of_error = 0;
+
+    // Get alert-level template if specified (takes precedence over destination templates)
+    let alert_template = if let Some(ref template_name) = alert.template {
+        Some(
+            db::alerts::templates::get(&alert.org_id, template_name)
+                .await
+                .map_err(|_| AlertError::AlertTemplateNotFound {
+                    template: template_name.clone(),
+                })?,
+        )
+    } else {
+        None
+    };
+
+    for dest_name in destinations.iter() {
+        let (dest, dest_template) =
+            destinations::get_with_template(&alert.org_id, dest_name).await?;
+        let Module::Alert {
+            destination_type, ..
+        } = dest.module
+        else {
+            return Err(AlertError::GetDestinationWithTemplateError(
+                db::alerts::destinations::DestinationError::UnsupportedType,
+            ));
         };
 
-        for dest_name in self.destinations.iter() {
-            let (dest, dest_template) =
-                destinations::get_with_template(&self.org_id, dest_name).await?;
-            let Module::Alert {
-                destination_type, ..
-            } = dest.module
-            else {
-                return Err(AlertError::GetDestinationWithTemplateError(
-                    db::alerts::destinations::DestinationError::UnsupportedType,
-                ));
-            };
+        // Use alert-level template if specified, otherwise fall back to destination template
+        let template = match (&alert_template, &dest_template) {
+            (Some(alert_tpl), _) => alert_tpl,
+            (None, Some(dest_tpl)) => dest_tpl,
+            (None, None) => {
+                no_of_error += 1;
+                err_message = format!(
+                    "{err_message} No template configured for destination {};",
+                    dest.name
+                );
+                log::error!(
+                    "No template configured for alert {}/{}/{}/{} destination {}",
+                    alert.org_id,
+                    alert.stream_type,
+                    alert.stream_name,
+                    alert.name,
+                    dest.name
+                );
+                continue;
+            }
+        };
 
-            // Use alert-level template if specified, otherwise fall back to destination template
-            let template = match (&alert_template, &dest_template) {
-                (Some(alert_tpl), _) => alert_tpl,
-                (None, Some(dest_tpl)) => dest_tpl,
-                (None, None) => {
-                    no_of_error += 1;
-                    err_message = format!(
-                        "{err_message} No template configured for destination {};",
-                        dest.name
-                    );
-                    log::error!(
-                        "No template configured for alert {}/{}/{}/{} destination {}",
-                        self.org_id,
-                        self.stream_type,
-                        self.stream_name,
-                        self.name,
-                        dest.name
-                    );
-                    continue;
-                }
-            };
-
-            match send_notification(
-                self,
-                &destination_type,
-                template,
-                rows,
-                rows_end_time,
-                start_time,
-                evaluation_timestamp,
-            )
-            .await
-            {
-                Ok(resp) => {
-                    success_message =
-                        format!("{success_message} destination {} {resp};", dest.name);
-                }
-                Err(e) => {
-                    log::error!(
-                        "Error sending notification for {}/{}/{}/{} for destination {} err: {}",
-                        self.org_id,
-                        self.stream_type,
-                        self.stream_name,
-                        self.name,
-                        dest.name,
-                        e
-                    );
-                    no_of_error += 1;
-                    err_message = format!(
-                        "{err_message} Error sending notification for destination {} err: {e};",
-                        dest.name
-                    );
-                }
+        match send_notification(
+            alert,
+            &destination_type,
+            template,
+            rows,
+            rows_end_time,
+            start_time,
+            evaluation_timestamp,
+        )
+        .await
+        {
+            Ok(resp) => {
+                success_message = format!("{success_message} destination {} {resp};", dest.name);
+            }
+            Err(e) => {
+                log::error!(
+                    "Error sending notification for {}/{}/{}/{} for destination {} err: {}",
+                    alert.org_id,
+                    alert.stream_type,
+                    alert.stream_name,
+                    alert.name,
+                    dest.name,
+                    e
+                );
+                no_of_error += 1;
+                err_message = format!(
+                    "{err_message} Error sending notification for destination {} err: {e};",
+                    dest.name
+                );
             }
         }
-        if no_of_error == self.destinations.len() {
-            Err(AlertError::SendNotificationError {
-                error_message: err_message,
-            })
-        } else {
-            Ok((success_message, err_message))
-        }
+    }
+    if !destinations.is_empty() && no_of_error == destinations.len() {
+        Err(AlertError::SendNotificationError {
+            error_message: err_message,
+        })
+    } else {
+        Ok((success_message, err_message))
     }
 }
 
@@ -1414,6 +1525,11 @@ fn process_row_template(
         let mut alert_start_time = 0;
         let mut alert_end_time = 0;
         for (key, value) in row.iter() {
+            // The composite context object is resolved by a dedicated scoped
+            // pass below, not the flat substitution.
+            if key == composite_template::COMPOSITE_CONTEXT_KEY {
+                continue;
+            }
             let value = if value.is_string() {
                 value.as_str().unwrap_or_default().to_string()
             } else if value.is_f64() {
@@ -1497,6 +1613,14 @@ fn process_row_template(
             }
         }
 
+        // Composite alerts: resolve namespaced {a.value}/{composite.result}/…
+        // tokens from the context object carried on the row (§6).
+        if alert.composite.is_some()
+            && let Some(cx) = row.get(composite_template::COMPOSITE_CONTEXT_KEY)
+        {
+            resp = composite_template::resolve_composite_vars(&resp, cx);
+        }
+
         // If this is a JSON row template, try to parse it as JSON
         if is_json_template {
             match serde_json::from_str::<Value>(&resp) {
@@ -1543,6 +1667,11 @@ async fn process_dest_template(
     let mut vars = HashMap::with_capacity(rows.len());
     for row in rows.iter() {
         for (key, value) in row.iter() {
+            // The composite context object is resolved by a dedicated scoped
+            // pass at the end, not the flat substitution.
+            if key == composite_template::COMPOSITE_CONTEXT_KEY {
+                continue;
+            }
             let value = if value.is_string() {
                 value.as_str().unwrap_or_default().to_string()
             } else if value.is_f64() {
@@ -1839,6 +1968,17 @@ async fn process_dest_template(
     // credential_priority)
     for (key, value) in metadata.iter() {
         resp = resp.replace(&format!("{{{}}}", key), value);
+    }
+
+    // Composite alerts: resolve namespaced {a.value}/{composite.result}/… tokens
+    // from the context object carried on the synthetic row (§6). Runs last so it
+    // only ever sees tokens the flat substitution left verbatim.
+    if alert.composite.is_some()
+        && let Some(cx) = rows
+            .first()
+            .and_then(|r| r.get(composite_template::COMPOSITE_CONTEXT_KEY))
+    {
+        resp = composite_template::resolve_composite_vars(&resp, cx);
     }
 
     resp

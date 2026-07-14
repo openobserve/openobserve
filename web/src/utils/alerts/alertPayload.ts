@@ -138,6 +138,55 @@ export const getAlertPayload = (
   return payload;
 };
 
+/**
+ * Normalizes a composite alert's terms for the back-end payload:
+ *  - coerces the per-term threshold to an int;
+ *  - wraps each Custom term's conditions as `{ version: 2, conditions }` (the
+ *    same shape the single-alert path uses), clearing them for SQL/PromQL;
+ *  - drops aggregation when no group-by is set;
+ *  - base64-encodes each term's VRL function;
+ *  - strips the query fields not used by the term's query type.
+ *
+ * Mutates `payload.composite` in place. No-op when the alert is not composite.
+ */
+export const transformCompositeTermsForSave = (payload: any): void => {
+  if (!payload?.composite?.terms) return;
+
+  payload.composite.terms.forEach((term: any) => {
+    const qc = term.query_condition || (term.query_condition = {});
+    const type = qc.type || "custom";
+
+    term.threshold = parseInt(term.threshold as any);
+
+    if (type === "custom") {
+      qc.conditions = {
+        version: 2,
+        conditions: qc.conditions,
+      };
+      qc.sql = "";
+      qc.promql = "";
+      qc.promql_condition = null;
+      // Drop aggregation unless a group-by is actually set.
+      if (!(qc.aggregation?.group_by || []).filter((g: string) => g?.trim()).length) {
+        qc.aggregation = null;
+      }
+    } else if (type === "sql") {
+      qc.conditions = null;
+      qc.promql = "";
+      qc.promql_condition = null;
+      qc.aggregation = null;
+    } else if (type === "promql") {
+      qc.conditions = null;
+      qc.sql = "";
+      qc.aggregation = null;
+    }
+
+    if (qc.vrl_function) {
+      qc.vrl_function = b64EncodeUnicode(String(qc.vrl_function).trim());
+    }
+  });
+};
+
 export const prepareAndSaveAlert = async (
   data: any,
   context: SaveAlertContext,

@@ -113,6 +113,8 @@ impl From<AlertError> for Response {
             AlertError::PermissionDenied => MetaHttpResponse::forbidden("Unauthorized access"),
             AlertError::UserNotFound => MetaHttpResponse::forbidden("Unauthorized access"),
             AlertError::AlertIdMissing => MetaHttpResponse::bad_request(value),
+            AlertError::CompositeNotSupported => MetaHttpResponse::forbidden(value),
+            AlertError::CompositeInvalid(_) => MetaHttpResponse::bad_request(value),
         }
     }
 }
@@ -1471,6 +1473,67 @@ pub async fn generate_sql(
             MetaHttpResponse::bad_request(format!("Failed to generate SQL: {}", error_msg))
         }
     }
+}
+
+/// PreviewCompositeAlert
+///
+/// Evaluates a composite alert's terms over the current window WITHOUT saving or
+/// notifying, returning each term's tri-state (TRUE/FALSE/ERROR) + value and the
+/// evaluated composite result, so authors can preview before saving (§8.3).
+#[cfg(feature = "enterprise")]
+pub async fn preview_composite(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(req_body): Json<CreateAlertRequestBody>,
+) -> Response {
+    let mut alert: MetaAlert = req_body.into();
+    alert.org_id = org_id.clone();
+
+    let Some(spec) = alert.composite.as_ref() else {
+        return MetaHttpResponse::bad_request("not a composite alert");
+    };
+
+    // Enforce stream permissions for each Custom-query term (SQL/PromQL terms
+    // are authorized by the search layer when their query runs). §8.2.
+    for term in &spec.terms {
+        if term.query_condition.query_type == config::meta::alerts::QueryType::Custom
+            && let Some(stream) = term.stream_name.as_deref()
+            && let Some(resp) = check_stream_permissions(
+                stream,
+                &org_id,
+                &user_email.user_id,
+                &term.stream_type,
+                StreamPermissionResourceType::Search,
+            )
+            .await
+        {
+            return resp;
+        }
+    }
+
+    // Preview over the alert's own period ending now.
+    let end = chrono::Utc::now().timestamp_micros();
+    let period_minutes = alert.trigger_condition.period.max(1);
+    let start = end - period_minutes * 60 * 1_000_000;
+    let trace_id = config::ider::generate_trace_id();
+
+    match crate::service::alerts::composite::preview_composite(
+        &org_id,
+        &alert,
+        (Some(start), end),
+        Some(trace_id),
+    )
+    .await
+    {
+        Ok(res) => MetaHttpResponse::json(res),
+        Err(e) => MetaHttpResponse::bad_request(format!("Composite preview failed: {e}")),
+    }
+}
+
+/// Composite alerts require the enterprise edition.
+#[cfg(not(feature = "enterprise"))]
+pub async fn preview_composite(Path(_org_id): Path<String>) -> Response {
+    MetaHttpResponse::forbidden("Composite alerts are only available in the enterprise edition")
 }
 
 #[cfg(test)]

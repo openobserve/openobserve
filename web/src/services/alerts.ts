@@ -131,6 +131,11 @@ const alerts = {
     }
     return http().post(url, data);
   },
+  // Evaluates a composite alert's terms without saving/notifying, returning each
+  // term's tri-state + value and the composite result (for the live preview).
+  preview_composite: (org_identifier: string, data: any) => {
+    return http().post(`/api/v2/${org_identifier}/alerts/composite/preview`, data);
+  },
   update_by_alert_id: (org_identifier: string, data: any, folder_id?: any) => {
     let url = `/api/v2/${org_identifier}/alerts/${data.id}`;
     if (folder_id) {

@@ -31,6 +31,7 @@ use crate::{
 };
 
 pub mod alert;
+pub mod composite;
 pub mod deduplication;
 pub mod incidents;
 
