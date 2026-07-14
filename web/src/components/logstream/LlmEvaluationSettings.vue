@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
         class="flex-1 overflow-y-auto rounded-lg border border-solid py-2 m-4"
         :class="
           store.state.theme === 'dark'
-            ? 'border-[#374151] bg-(--color-surface-base)'
+            ? 'border-[#374151] bg-surface-base'
             : 'border-[#e5e7eb] bg-white'
         "
       >

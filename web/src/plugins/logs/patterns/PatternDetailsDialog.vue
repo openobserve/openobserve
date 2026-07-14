@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ patternLevelInfo.level }}
           </span>
-          <h4 class="font-semibold text-[var(--color-text-heading)] truncate min-w-0 text-base leading-tight m-0">
+          <h4 class="font-semibold text-text-heading truncate min-w-0 text-base leading-tight m-0">
             {{ selectedPattern?.pattern?.description || t('search.patternDetailsTitle') }}
           </h4>
           <template v-if="selectedPattern">
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Row 2: full-width module path, truncates at edge -->
         <code
           v-if="selectedPattern && patternPathToken"
-          class="block w-full truncate text-[var(--color-text-code)] font-mono text-[0.6875rem] text-[var(--color-text-caption)]"
+          class="block w-full truncate text-text-code font-mono text-[0.6875rem] text-text-caption"
         >{{ patternPathToken }}</code>
       </div>
     </template>
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.patternVariablesHeader") }}
           </div>
           <div
-            class="px-2.5 py-1.5 rounded border-l-4 border-solid border-l-[var(--color-accent)]"
+            class="px-2.5 py-1.5 rounded border-l-4 border-solid border-l-accent"
             :class="
               store.state.theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'
             "
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.patternTemplate") }}
           </div>
           <div
-            class="px-2.5 py-1.5 font-mono text-[0.8125rem] leading-[1.6] rounded border-l-4 border-solid border-l-[var(--color-accent)] break-all flex flex-wrap items-baseline gap-x-[2px] gap-y-[2px]"
+            class="px-2.5 py-1.5 font-mono text-[0.8125rem] leading-[1.6] rounded border-l-4 border-solid border-l-accent break-all flex flex-wrap items-baseline gap-x-[2px] gap-y-[2px]"
             :class="
               store.state.theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'
             "

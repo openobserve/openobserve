@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <div
-      class="step-content px-3 py-4 rounded-lg h-full overflow-y-auto overflow-x-hidden bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)]"
+      class="step-content px-3 py-4 rounded-lg h-full overflow-y-auto overflow-x-hidden bg-surface-overlay border border-border-default"
     >
       <OForm ref="formRef">
         <!-- Query Mode Tabs -->
@@ -572,7 +572,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="min-h-45 relative flex-1">
                   <div
                     v-if="!previewActive"
-                    class="w-full h-45 flex flex-col items-center justify-center rounded border border-dashed border-(--color-border-default)"
+                    class="w-full h-45 flex flex-col items-center justify-center rounded border border-dashed border-border-default"
                     :class="
                       store.state.theme === 'dark'
                         ? 'text-gray-400'

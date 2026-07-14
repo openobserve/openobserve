@@ -29,14 +29,14 @@ const logoSrc = computed(() =>
       </div>
 
       <div class="welcome-hero__heading-block flex items-center">
-        <div class="welcome-hero__title m-0 text-[32px] font-bold tracking-[-0.01em] leading-[1.15] text-[var(--color-typography-body)] flex items-center gap-2">
+        <div class="welcome-hero__title m-0 text-[32px] font-bold tracking-[-0.01em] leading-[1.15] text-typography-body flex items-center gap-2">
           {{ greeting }}
           <span class="welcome-hero__wave text-[26px] leading-none inline-block [animation:wave_2.4s_ease-in-out_0.4s_2] [transform-origin:70%_70%]" aria-hidden="true">👋</span>
         </div>
       </div>
     </div>
 
-    <div class="welcome-hero__tagline mt-1 text-[13.5px] leading-[1.6] text-[var(--color-typography-meta)] max-w-[38rem] m-0">
+    <div class="welcome-hero__tagline mt-1 text-[13.5px] leading-[1.6] text-typography-meta max-w-[38rem] m-0">
       {{ t("aiAssistant.welcome.taglineLead") }}
       <span class="welcome-hero__highlight font-semibold bg-[linear-gradient(90deg,#f59e0b,#ec4899,#7b61ff)] [background-clip:text] [-webkit-background-clip:text] text-transparent">{{
         t("aiAssistant.welcome.taglineHighlight")
@@ -57,19 +57,19 @@ const logoSrc = computed(() =>
 
     <div v-if="email" class="welcome-hero__meta inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-[0.375rem] mt-[0.375rem] py-[0.375rem] px-3 rounded-full bg-[color-mix(in_srgb,var(--color-border-default)_30%,transparent)] text-[11.5px]">
       <span class="welcome-hero__meta-item inline-flex items-center gap-1">
-        <span class="welcome-hero__meta-label text-[var(--color-typography-meta)]">{{
+        <span class="welcome-hero__meta-label text-typography-meta">{{
           t("aiAssistant.welcome.signedInAs")
         }}</span>
-        <span class="welcome-hero__meta-value text-[var(--color-typography-body)] font-semibold">{{ email }}</span>
+        <span class="welcome-hero__meta-value text-typography-body font-semibold">{{ email }}</span>
       </span>
-      <span v-if="role" class="welcome-hero__meta-dot text-[var(--color-typography-meta)] opacity-50" aria-hidden="true"
+      <span v-if="role" class="welcome-hero__meta-dot text-typography-meta opacity-50" aria-hidden="true"
         >·</span
       >
       <span v-if="role" class="welcome-hero__meta-item inline-flex items-center gap-1">
-        <span class="welcome-hero__meta-label text-[var(--color-typography-meta)]">{{
+        <span class="welcome-hero__meta-label text-typography-meta">{{
           t("aiAssistant.welcome.role")
         }}</span>
-        <span class="welcome-hero__meta-value text-[var(--color-typography-body)] font-semibold">{{ role }}</span>
+        <span class="welcome-hero__meta-value text-typography-body font-semibold">{{ role }}</span>
       </span>
     </div>
   </header>

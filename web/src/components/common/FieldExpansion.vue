@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <span class="w-[0.55rem] shrink-0 flex items-center justify-center mr-1">
           <OIcon
-            class="inline-flex items-center justify-center shrink-0 w-4 text-[var(--color-text-muted)]"
+            class="inline-flex items-center justify-center shrink-0 w-4 text-text-muted"
             :name="isExpanded ? 'expand-more' : 'chevron-right'"
             size="sm"
           />

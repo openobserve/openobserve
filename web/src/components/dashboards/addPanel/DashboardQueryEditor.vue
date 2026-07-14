@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
           >
             <template #separator>
-              <div class="w-1 h-full bg-(--color-border-default) transition-colors hover:bg-[orange]"></div>
+              <div class="w-1 h-full bg-border-default transition-colors hover:bg-[orange]"></div>
             </template>
             <template #before>
               <UnifiedQueryEditor

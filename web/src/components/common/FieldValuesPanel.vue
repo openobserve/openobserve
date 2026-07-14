@@ -38,12 +38,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center gap-1 ">
         <span
           v-if="selectedValues.length > 0"
-          class="selection-count text-3! text-[0.625rem] font-medium text-[var(--color-accent)]"
+          class="selection-count text-3! text-[0.625rem] font-medium text-accent"
           data-test="field-values-panel-selection-count"
         >
           {{ selectedValues.length }} selected
         </span>
-        <span v-else class="selection-hint  text-3! text-[0.625rem] text-[var(--color-text-secondary)]">Select to filter</span>
+        <span v-else class="selection-hint  text-3! text-[0.625rem] text-text-secondary">Select to filter</span>
         <OButton
           v-if="selectedValues.length > 0"
           variant="ghost"
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="w-full flex justify-center border-t border-(--color-card-glass-border) pt-1 px-1"
     >
       <button
-        class="inline-flex items-center gap-1 bg-transparent border-0 text-(--color-accent) text-[0.6875rem] font-[inherit] py-0.5 px-1 cursor-pointer rounded-[0.1875rem] transition-opacity duration-150 hover:opacity-80 hover:bg-(--color-interactive-hover-bg) disabled:opacity-50 disabled:cursor-default"
+        class="inline-flex items-center gap-1 bg-transparent border-0 text-accent text-[0.6875rem] font-[inherit] py-0.5 px-1 cursor-pointer rounded-[0.1875rem] transition-opacity duration-150 hover:opacity-80 hover:bg-interactive-hover-bg disabled:opacity-50 disabled:cursor-default"
         :disabled="isLoadingMore"
         @click="handleLoadMoreClick"
         :data-test="`log-search-subfield-load-more-${fieldName}`"

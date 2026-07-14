@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <div
-      class="step-content px-3 py-4 rounded-lg h-full overflow-y-auto border bg-[var(--color-surface-overlay)] border-[var(--color-border-default)]"
+      class="step-content px-3 py-4 rounded-lg h-full overflow-y-auto border bg-surface-overlay border-border-default"
     >
       <!-- Enable Notifications toggle -->
       <div class="flex items-start mb-6!  pb-0!">

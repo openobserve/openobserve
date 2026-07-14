@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="cloud" size="xl" />
           </div>
           <div class="flex-1">
-            <h5 class="text-lg font-bold m-0 mb-2 title" :class="store.state.theme === 'dark' ? 'text-[var(--color-border-default)]' : 'text-[#1a1a1a]'">
+            <h5 class="text-lg font-bold m-0 mb-2 title" :class="store.state.theme === 'dark' ? 'text-border-default' : 'text-[#1a1a1a]'">
               Azure Function Integration
             </h5>
             <p class="text-sm m-0 mb-4 description" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="service.name"
                     class="w-full col-sm-6"
                   >
-                    <div class="service-item p-2 rounded border transition-all duration-200 ease-in-out" :class="store.state.theme === 'dark' ? 'border-[#404040] bg-[rgba(255,255,255,0.05)]' : 'border-[var(--color-border-default)] bg-[#fafafa]'">
+                    <div class="service-item p-2 rounded border transition-all duration-200 ease-in-out" :class="store.state.theme === 'dark' ? 'border-[#404040] bg-[rgba(255,255,255,0.05)]' : 'border-border-default bg-[#fafafa]'">
                       <div class="flex items-start gap-2">
                         <OIcon
                           :name="getCategoryIcon(service.category)"
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           color="primary"
                         />
                         <div class="flex-1">
-                          <div class="font-medium text-sm service-name" :class="store.state.theme === 'dark' ? 'text-[var(--color-border-default)]' : 'text-[#1a1a1a]'">
+                          <div class="font-medium text-sm service-name" :class="store.state.theme === 'dark' ? 'text-border-default' : 'text-[#1a1a1a]'">
                             {{ service.name }}
                           </div>
                           <div class="text-xs mt-0.5 service-description" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">

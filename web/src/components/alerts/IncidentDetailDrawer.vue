@@ -2668,23 +2668,23 @@ export default defineComponent({
               const cell = token.header[i];
               const content = this.parser.parseInline(cell.tokens);
               const cellClass = i === 0 ? 'rca-first-cell' : '';
-              header += `<th class="px-3 py-2 text-left font-semibold text-sm text-[var(--color-table-header-text)] border-b border-[var(--color-table-header-border)] ${cellClass}">${content}</th>`;
+              header += `<th class="px-3 py-2 text-left font-semibold text-sm text-table-header-text border-b border-table-header-border ${cellClass}">${content}</th>`;
             }
             header += '</tr>';
 
             let body = '';
             for (const row of token.rows) {
-              body += '<tr class="hover:bg-[var(--color-table-row-hover-bg)]">';
+              body += '<tr class="hover:bg-table-row-hover-bg">';
               for (let i = 0; i < row.length; i++) {
                 const cell = row[i];
                 const content = this.parser.parseInline(cell.tokens);
                 const cellClass = i === 0 ? 'rca-first-cell' : '';
-                body += `<td class="px-3 py-2 text-sm border-b border-[var(--color-table-row-divider)] ${cellClass}">${content}</td>`;
+                body += `<td class="px-3 py-2 text-sm border-b border-table-row-divider ${cellClass}">${content}</td>`;
               }
               body += '</tr>';
             }
 
-            return `<div class="rca-table-wrapper my-4 overflow-x-auto"><table class="rca-table w-full border border-[var(--color-table-header-border)] rounded"><thead class="bg-[var(--color-table-header-bg)]">${header}</thead><tbody>${body}</tbody></table></div>`;
+            return `<div class="rca-table-wrapper my-4 overflow-x-auto"><table class="rca-table w-full border border-table-header-border rounded"><thead class="bg-table-header-bg">${header}</thead><tbody>${body}</tbody></table></div>`;
           },
           blockquote({ tokens }: any) {
             const text = this.parser.parse(tokens);

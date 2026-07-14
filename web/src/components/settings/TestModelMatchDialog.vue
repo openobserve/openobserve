@@ -20,7 +20,7 @@
         <div class="w-[340px] shrink-0 overflow-y-auto py-5 pr-5 pl-6 flex flex-col gap-5">
           <!-- Model Name -->
           <div class="flex flex-col gap-[6px]">
-            <label class="text-[13px] font-semibold text-(--color-text-primary)"
+            <label class="text-[13px] font-semibold text-text-primary"
               >{{ t("modelPricing.modelNameInput") }}
               <span class="text-[#ef4444]">*</span></label
             >

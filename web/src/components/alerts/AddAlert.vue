@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Stream Name & Stream Type -->
       <div class="card-container shrink-0 stream-config-card [container-type:inline-size] [container-name:stream-config]">
-        <div class="flex items-center gap-0 py-[10px] px-3 border-b border-[#e6e6e6] dark:border-[var(--color-border-default)]">
+        <div class="flex items-center gap-0 py-[10px] px-3 border-b border-[#e6e6e6] dark:border-border-default">
           <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--q-primary)]" />
           <span class="text-[13px] font-semibold tracking-[0.01em]">{{ t('alerts.streamConfig') }} <span class="text-text-primary">*</span></span>
         </div>

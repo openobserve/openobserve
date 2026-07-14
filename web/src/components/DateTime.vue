@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTabPanel v-if="!disableRelative" name="relative">
             <div class="date-time-table relative flex flex-col">
               <div
-                class="relative-row flex items-center border-b border-(--color-border-default) pl-3 py-2"
+                class="relative-row flex items-center border-b border-border-default pl-3 py-2"
                 v-for="(period, index) in relativePeriods"
                 :key="'date_' + index"
               >
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <div class="relative-row flex items-center border-b border-(--color-border-default) px-3 py-2">
+              <div class="relative-row flex items-center border-b border-border-default px-3 py-2">
                 <div class="text-sm font-semibold min-w-18.75">{{ t("common.custom") }}</div>
                 <OTooltip
                   side="right"

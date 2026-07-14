@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <button
         type="button"
-        class="inline-flex items-center gap-2 py-1.5 px-2.5 mt-3 rounded-md border border-[rgba(128,128,128,0.28)] bg-transparent cursor-pointer text-left transition-colors hover:border-[var(--color-primary-600)]"
+        class="inline-flex items-center gap-2 py-1.5 px-2.5 mt-3 rounded-md border border-[rgba(128,128,128,0.28)] bg-transparent cursor-pointer text-left transition-colors hover:border-primary-600"
         :class="{ 'cf-toggle-active': col.autoColor }"
         :data-test="`o2-format-unique-color-${col.field}`"
         @click="col.autoColor = !col.autoColor"

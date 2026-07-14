@@ -205,13 +205,13 @@ function handleClick() {
       // links/badges override this with their own color.
       'text-text-primary',
       meta?.spacer ? 'px-0 align-middle' : (meta?.compactPadding ? 'px-1 align-middle' : 'px-2 align-middle'),
-      bordered ? 'border-b border-[var(--color-table-row-divider)]' : '',
+      bordered ? 'border-b border-table-row-divider' : '',
       alignClass,
       isAction ? 'w-0 whitespace-nowrap' : '',
        isPinned
         ? (rowSelected
-            ? 'bg-[var(--color-table-row-selected-bg)] group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
-            : 'bg-[var(--color-table-cell-bg)] group-hover/row:bg-[var(--color-table-row-hover-bg)] transition-colors duration-150')
+            ? 'bg-table-row-selected-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
+            : 'bg-table-cell-bg group-hover/row:bg-[var(--color-table-row-hover-bg)] transition-colors duration-150')
         : '',
       wrap
         ? 'break-words whitespace-normal'
@@ -251,7 +251,7 @@ function handleClick() {
         <button
           v-if="treeMeta?.hasChildren"
           type="button"
-          class="inline-flex items-center justify-center w-[18px] h-[18px] p-0 bg-transparent border-0 rounded cursor-pointer text-(--color-text-secondary,#6b7280) hover:bg-(--color-table-row-hover-bg,rgba(0,0,0,0.05)) hover:text-(--color-text-primary)"
+          class="inline-flex items-center justify-center w-[18px] h-[18px] p-0 bg-transparent border-0 rounded cursor-pointer text-(--color-text-secondary,#6b7280) hover:bg-(--color-table-row-hover-bg,rgba(0,0,0,0.05)) hover:text-text-primary"
           :data-test="`o2-table-tree-toggle-${cell.column.id}`"
           :aria-expanded="treeMeta?.isExpanded ? 'true' : 'false'"
           @click="onTreeToggle"
@@ -317,7 +317,7 @@ function handleClick() {
       v-if="enableCellCopy && !$slots.default"
       type="button"
       :data-test="`o2-table-cell-copy-${cell.column.id}`"
-      class="absolute right-1 opacity-0 group-hover:opacity-100 bg-[var(--color-surface-base)] border border-[var(--color-border-default)] rounded cursor-pointer p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] leading-none transition-opacity"
+      class="absolute right-1 opacity-0 group-hover:opacity-100 bg-surface-base border border-border-default rounded cursor-pointer p-0.5 text-text-muted hover:text-text-primary leading-none transition-opacity"
       :title="copied ? 'Copied!' : 'Copy'"
       @click="handleCopy"
     >

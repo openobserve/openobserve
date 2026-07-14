@@ -119,13 +119,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center justify-between gap-[56px] py-[48px] px-[40px] flex-wrap">
           <!-- Left: headline + CTA -->
           <div class="flex-1 min-w-[280px] max-w-[480px]">
-            <div class="inline-flex items-center gap-[6px] text-[0.72rem] font-semibold tracking-[0.4px] text-(--color-primary-600) bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-primary-600)_25%,transparent)] py-1 px-[10px] rounded-full mb-5">
+            <div class="inline-flex items-center gap-[6px] text-[0.72rem] font-semibold tracking-[0.4px] text-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-primary-600)_25%,transparent)] py-1 px-[10px] rounded-full mb-5">
               <OIcon name="verified" size="xs" />
               {{ t("billing.billingGroup.statusActive") }}
             </div>
             <div class="text-[2.4rem] font-bold leading-[1.2] tracking-[-0.6px] mb-4">
               {{ t("billing.billingGroup.childHeadline") }}
-              <span class="text-(--color-tabs-active-text) cursor-pointer inline-block max-w-full overflow-hidden text-ellipsis whitespace-nowrap align-bottom">
+              <span class="text-tabs-active-text cursor-pointer inline-block max-w-full overflow-hidden text-ellipsis whitespace-nowrap align-bottom">
                 {{ payerName }}
                 <OTooltip side="bottom">
                   <template #content>
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Right: membership facts -->
           <div class="w-[340px] shrink-0 flex flex-col gap-[14px]" data-test="org-group-child-details">
             <div class="og-feature flex items-start gap-4 p-[18px_20px] rounded-2xl bg-(--tile-bg) border border-(--color-card-glass-border,rgba(0,0,0,0.08)) transition-all duration-200 hover:shadow-[0_8px_28px_rgba(0,0,0,0.1)] hover:-translate-y-px">
-              <div class="w-10 h-10 rounded-[10px] shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600)">
+              <div class="w-10 h-10 rounded-[10px] shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-primary-600">
                 <OIcon name="person-add" />
               </div>
               <div class="flex-1 min-w-0">
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div class="og-feature flex items-start gap-4 p-[18px_20px] rounded-2xl bg-(--tile-bg) border border-(--color-card-glass-border,rgba(0,0,0,0.08)) transition-all duration-200 hover:shadow-[0_8px_28px_rgba(0,0,0,0.1)] hover:-translate-y-px">
-              <div class="w-10 h-10 rounded-[10px] shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600)">
+              <div class="w-10 h-10 rounded-[10px] shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-primary-600">
                 <OIcon name="how-to-reg" />
               </div>
               <div class="flex-1 min-w-0">
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div class="og-feature flex items-start gap-4 p-[18px_20px] rounded-2xl bg-(--tile-bg) border border-(--color-card-glass-border,rgba(0,0,0,0.08)) transition-all duration-200 hover:shadow-[0_8px_28px_rgba(0,0,0,0.1)] hover:-translate-y-px">
-              <div class="w-10 h-10 rounded-[10px] shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600)">
+              <div class="w-10 h-10 rounded-[10px] shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-primary-600">
                 <OIcon name="schedule" />
               </div>
               <div class="flex-1 min-w-0">
@@ -265,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="w-[100px] h-[100px] rounded-full border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)] flex items-center justify-center mb-[28px]">
             <div class="w-[68px] h-[68px] rounded-full bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border-[1.5px] border-solid border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] flex items-center justify-center">
-              <OIcon name="group-add" size="lg" class="text-(--color-primary-600) opacity-85" />
+              <OIcon name="group-add" size="lg" class="text-primary-600 opacity-85" />
             </div>
           </div>
 

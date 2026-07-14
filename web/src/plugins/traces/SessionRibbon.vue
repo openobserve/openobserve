@@ -21,16 +21,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container rounded-lg border border-[var(--color-border-default)] pt-[1rem] px-[1rem] pb-[0.625rem] flex flex-col"
+    class="card-container rounded-lg border border-border-default pt-[1rem] px-[1rem] pb-[0.625rem] flex flex-col"
     data-test="session-ribbon"
   >
     <!-- Header: title + subtitle (left) · metric toggle (right) -->
     <div class="flex items-baseline justify-between gap-[0.5rem] mb-[0.75rem]">
       <div>
-        <div class="text-[0.85rem] font-semibold text-[var(--color-text-heading)]">
+        <div class="text-[0.85rem] font-semibold text-text-heading">
           {{ t('traces.sessionDetail.ribbon.title') }}
         </div>
-        <div class="text-[0.7rem] leading-normal text-[var(--color-text-secondary)] mt-[0.1rem]">
+        <div class="text-[0.7rem] leading-normal text-text-secondary mt-[0.1rem]">
           {{ t('traces.sessionDetail.ribbon.subtitle') }}
         </div>
       </div>
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- chart region: y-axis labels + bars, sharing the grown height -->
       <div class="flex gap-[0.5rem] flex-1 min-h-0">
         <div
-          class="flex flex-col justify-between items-end h-full w-[2.75rem] flex-shrink-0 text-[0.6rem] text-[var(--color-text-muted)] tabular-nums"
+          class="flex flex-col justify-between items-end h-full w-[2.75rem] flex-shrink-0 text-[0.6rem] text-text-muted tabular-nums"
         >
           <span>{{ maxLabel }}</span>
           <span>{{ midLabel }}</span>
@@ -63,11 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="relative flex-1 min-w-0 min-h-0 flex items-end gap-[3px] border-l border-b border-[var(--color-border-default)]"
+          class="relative flex-1 min-w-0 min-h-0 flex items-end gap-[3px] border-l border-b border-border-default"
         >
           <!-- gridlines (top + mid) to echo the dashboard chart grid -->
-          <div class="absolute inset-x-0 top-0 border-t border-[var(--color-border-default)] opacity-60" />
-          <div class="absolute inset-x-0 top-1/2 border-t border-[var(--color-border-default)] opacity-40" />
+          <div class="absolute inset-x-0 top-0 border-t border-border-default opacity-60" />
+          <div class="absolute inset-x-0 top-1/2 border-t border-border-default opacity-40" />
 
           <TurnPreviewCard
             v-for="bar in detailBars"
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-for="bar in detailBars"
               :key="bar.index"
-              class="flex-1 min-w-0 text-center text-[0.6rem] text-[var(--color-text-muted)] tabular-nums"
+              class="flex-1 min-w-0 text-center text-[0.6rem] text-text-muted tabular-nums"
             >
               {{ detailLabeled.has(bar.index + 1) ? bar.index + 1 : "" }}
             </span>
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- x-axis title — matches the dashboard axis name (nameLocation
                "middle" + nameTextStyle bold/14px). -->
           <div
-            class="text-center text-[14px] font-bold text-[var(--color-text-heading)] mt-[0.25rem]"
+            class="text-center text-[14px] font-bold text-text-heading mt-[0.25rem]"
           >
             {{ t('traces.sessionDetail.turnLabel') }}
           </div>

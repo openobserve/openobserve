@@ -56,7 +56,7 @@ the Free Software Foundation, either version 3 of the License, or
     <template v-else>
       <div v-if="!hideTabBar" class="online-evals__header card-container flex items-center justify-between gap-4 min-h-17 py-2.5 px-4 shrink-0 bg-(--color-card-glass-bg)">
         <div>
-          <h1 class="m-0 text-[var(--text-lg)] font-semibold text-[var(--color-text-heading)] [letter-spacing:0]">{{ t("onlineEvals.title") }}</h1>
+          <h1 class="m-0 text-[var(--text-lg)] font-semibold text-text-heading [letter-spacing:0]">{{ t("onlineEvals.title") }}</h1>
         </div>
       </div>
 
@@ -169,11 +169,11 @@ the Free Software Foundation, either version 3 of the License, or
       </AppPageHeader>
 
       <section class="online-evals__content card-container flex flex-1 flex-col min-h-0 overflow-hidden bg-(--color-card-glass-bg)">
-        <div v-if="!hideTabBar" class="online-evals__tabs flex items-center gap-2 shrink-0 py-0 px-3.5 bg-transparent border-b border-(--color-border-default)">
+        <div v-if="!hideTabBar" class="online-evals__tabs flex items-center gap-2 shrink-0 py-0 px-3.5 bg-transparent border-b border-border-default">
           <button
             v-for="tab in tabs"
             :key="tab.value"
-            class="online-evals__tab inline-flex items-center gap-1.75 h-9.5 py-0 px-3.5 bg-transparent border-0 border-b-2 border-b-transparent text-(--color-text-muted) cursor-pointer font-semibold text-[13px]"
+            class="online-evals__tab inline-flex items-center gap-1.75 h-9.5 py-0 px-3.5 bg-transparent border-0 border-b-2 border-b-transparent text-text-muted cursor-pointer font-semibold text-[13px]"
             :class="activeTab === tab.value ? 'is-active text-[var(--o2-text)] border-b-[var(--o2-brand)] -mb-px' : ''"
             type="button"
             @click="activeTab = tab.value"

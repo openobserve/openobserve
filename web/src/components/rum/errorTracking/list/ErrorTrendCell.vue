@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <span
       v-else
-      class="text-[var(--color-text-muted)]"
+      class="text-text-muted"
       :title="t('rum.trendNoData')"
       data-test="rum-error-trend-cell-empty"
       >—</span

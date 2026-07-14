@@ -208,10 +208,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-for="(domain, index) in domains" :key="domain?.name || `domain-${index}`">
         <div
           v-if="domain && domain.name"
-          class="mb-1 border border-(--color-border-default) rounded-lg"
+          class="mb-1 border border-border-default rounded-lg"
           :class="store.state.theme === 'dark' ? 'border-[#444] bg-[#1e1e1e]' : 'bg-white'"
         >
-          <div class="flex items-center justify-between px-3 py-2 border-b border-b-(--color-border-default) rounded-t-lg" :class="store.state.theme === 'dark' ? 'bg-[#2a2a2a] border-b-[#444]' : 'bg-[#f5f5f5]'">
+          <div class="flex items-center justify-between px-3 py-2 border-b border-b-border-default rounded-t-lg" :class="store.state.theme === 'dark' ? 'bg-[#2a2a2a] border-b-[#444]' : 'bg-[#f5f5f5]'">
           <div
             :data-test="`domain-management-domain-name-${domain.name}`"
             class="text-base font-bold"
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(email, emailIndex) in domain.allowedEmails"
                 :key="email"
-                class="flex items-center justify-between p-2 mb-1 rounded border border-(--color-border-default)"
+                class="flex items-center justify-between p-2 mb-1 rounded border border-border-default"
                 :class="store.state.theme === 'dark' ? 'bg-[#2a2a2a] border-[#444]' : 'bg-[#f9f9f9]'"
               >
                 <div class="text-sm">{{ email }}</div>
@@ -388,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else
       data-test="domain-management-no-domain-message"
-      class="text-xl font-semibold text-gray-400 mt-3 mb-4 w-full text-center p-4 border border-(--color-border-default) rounded-lg"
+      class="text-xl font-semibold text-gray-400 mt-3 mb-4 w-full text-center p-4 border border-border-default rounded-lg"
       :class="store.state.theme === 'dark' ? 'border-[#444] bg-[#1e1e1e]' : 'bg-white'"
     >
       {{ t("settings.noDomainMessage") }}

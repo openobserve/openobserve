@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="card-container groups-scroll-container flex-1 overflow-y-auto overflow-x-hidden p-2">
             <!-- Additions -->
             <div v-if="diffData.additions.length > 0" class="mb-2">
-              <div class="text-sm font-semibold border-b border-[var(--color-separator)] mb-1 text-green-500 p-1">
+              <div class="text-sm font-semibold border-b border-separator mb-1 text-green-500 p-1">
                 <OIcon name="add-circle" size="sm" />
                 New ({{ selectedAdditions.length }}/{{
                   diffData.additions.length
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Modifications -->
             <div v-if="diffData.modifications.length > 0" class="mb-2">
-              <div class="text-sm font-semibold border-b border-[var(--color-separator)] mb-1 text-amber-500 p-1">
+              <div class="text-sm font-semibold border-b border-separator mb-1 text-amber-500 p-1">
                 <OIcon name="edit" size="sm" />
                 Modified ({{ selectedModifications.length }}/{{
                   diffData.modifications.length
@@ -288,7 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-xs mb-1">
           {{ selectedModification?.current.fields.length }} fields
         </div>
-        <div class="field-chips-container max-h-[250px] overflow-y-auto p-2 bg-[var(--color-surface-base)] rounded">
+        <div class="field-chips-container max-h-[250px] overflow-y-auto p-2 bg-surface-base rounded">
           <OTag
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
@@ -305,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-xs mb-1">
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
-        <div class="field-chips-container max-h-[250px] overflow-y-auto p-2 bg-[var(--color-surface-base)] rounded">
+        <div class="field-chips-container max-h-[250px] overflow-y-auto p-2 bg-surface-base rounded">
           <OTag
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"

@@ -1,7 +1,7 @@
 <template>
   <div
     class="h-[calc(100vh-3.75rem)] flex min-h-0"
-    :class="store.state.theme === 'dark' ? 'bg-(--color-surface-base)' : ''"
+    :class="store.state.theme === 'dark' ? 'bg-surface-base' : ''"
   >
     <div class="flex flex-col flex-1 min-h-0 min-w-0">
       <div class="flex flex-col flex-1 min-h-0">

@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="metric-card flex flex-col items-start gap-0.5 text-left rounded-lg border p-3 transition-colors"
       :class="
         card.key === activeCard
-          ? 'border-[var(--color-accent)]'
+          ? 'border-accent'
           : 'border-border-default'
       "
       :aria-pressed="card.key === activeCard"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="card.selectable && emit('select', card.key)"
     >
       <span
-        class="text-xs font-medium uppercase tracking-wide text-[var(--color-text-label)]"
+        class="text-xs font-medium uppercase tracking-wide text-text-label"
         >{{ card.label }}</span
       >
       <span class="flex items-baseline gap-1.5">
@@ -48,11 +48,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <span
           v-if="card.rate"
-          class="text-sm text-[var(--color-text-secondary)] tabular-nums"
+          class="text-sm text-text-secondary tabular-nums"
           >· {{ card.rate }}</span
         >
       </span>
-      <small :class="card.captionClass || 'text-[var(--color-text-caption)]'">{{
+      <small :class="card.captionClass || 'text-text-caption'">{{
         card.caption
       }}</small>
     </button>
@@ -128,7 +128,7 @@ const deltaCaption = (
     // More sessions is neutral; more errors/frustration is bad, fewer is good.
     captionClass:
       suffix === "%"
-        ? "text-[var(--color-text-caption)]"
+        ? "text-text-caption"
         : delta > 0
           ? "text-[var(--color-status-error-text)]"
           : "text-[var(--color-status-success-text)]",
@@ -140,7 +140,7 @@ const cards = computed(() => [
     key: "sessions" as const,
     label: t("rum.sessions"),
     value: props.total.toLocaleString(),
-    valueClass: "text-[var(--color-text-heading)]",
+    valueClass: "text-text-heading",
     rate: "",
     ...deltaCaption(props.sessionsDeltaPct, t("rum.inTimeRange"), "%"),
     selectable: true,
@@ -152,7 +152,7 @@ const cards = computed(() => [
     valueClass:
       props.errorSessions > 0
         ? "text-[var(--color-severity-error-color)]"
-        : "text-[var(--color-text-heading)]",
+        : "text-text-heading",
     rate: rate(props.errorSessions),
     ...deltaCaption(props.errorsDelta, t("rum.sessionsWithErrors")),
     selectable: true,
@@ -164,7 +164,7 @@ const cards = computed(() => [
     valueClass:
       props.frustratedSessions > 0
         ? "text-[var(--color-severity-warning-color)]"
-        : "text-[var(--color-text-heading)]",
+        : "text-text-heading",
     rate: rate(props.frustratedSessions),
     ...deltaCaption(props.frustratedDelta, t("rum.rageDeadClicks")),
     selectable: true,
@@ -173,7 +173,7 @@ const cards = computed(() => [
     key: "duration" as const,
     label: t("rum.avgDuration"),
     value: formatMs(props.avgDurationMs),
-    valueClass: "text-[var(--color-text-heading)]",
+    valueClass: "text-text-heading",
     rate: "",
     caption: `${t("rum.median")} ${formatMs(props.medianDurationMs)}`,
     captionClass: "",
@@ -183,7 +183,7 @@ const cards = computed(() => [
     key: "bounced" as const,
     label: t("rum.bounceRate"),
     value: bounceRate.value,
-    valueClass: "text-[var(--color-text-heading)]",
+    valueClass: "text-text-heading",
     rate: "",
     caption: t("rum.ofTotal", {
       count: props.bouncedSessions,

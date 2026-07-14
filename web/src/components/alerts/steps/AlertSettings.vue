@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-alert-conditions w-full rounded-lg mx-auto bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)]"
+    class="step-alert-conditions w-full rounded-lg mx-auto bg-surface-overlay border border-border-default"
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <!-- Section header -->
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="w-0.75 h-4 rounded-xs mr-2 shrink-0 bg-[var(--q-primary)]" />
       <span
-        class="text-[13px] font-semibold tracking-[0.01em] text-[var(--color-text-primary)]"
+        class="text-[13px] font-semibold tracking-[0.01em] text-text-primary"
       >{{
         t("alerts.alertSettings.sectionTitle")
       }}</span>

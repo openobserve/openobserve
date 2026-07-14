@@ -53,10 +53,10 @@
           v-for="card in kpiCards"
           v-else
           :key="card.label"
-          class="rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--color-surface-base)] border border-[var(--color-border-default)] transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
+          class="rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
         >
           <div
-            class="kpi-label text-[0.7rem] leading-normal font-semibold mb-[0.25rem] text-[var(--color-text-secondary)]"
+            class="kpi-label text-[0.7rem] leading-normal font-semibold mb-[0.25rem] text-text-secondary"
           >
             {{ card.label }}
           </div>
@@ -68,7 +68,7 @@
             </span>
             <span
               v-if="card.unit"
-              class="text-[0.8rem] font-semibold text-[var(--color-text-secondary)]"
+              class="text-[0.8rem] font-semibold text-text-secondary"
             >
               {{ card.unit }}
             </span>
@@ -127,7 +127,7 @@
           <!-- Target -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-[var(--color-text-primary)] border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.targetSection") }}
             </h4>
@@ -170,7 +170,7 @@
           <!-- Scorers -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-[var(--color-text-primary)] border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.scorersSection") }}
               <OTag type="fieldTag" value="soft">{{ resolvedScorers.length }}</OTag>
@@ -264,7 +264,7 @@
           <!-- Sampling -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-[var(--color-text-primary)] border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.samplingSection") }}
             </h4>
@@ -284,7 +284,7 @@
           <!-- Metadata -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-[var(--color-text-primary)] border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.metadataSection") }}
             </h4>
@@ -333,7 +333,7 @@
             class="w-full"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="text-[var(--color-text-secondary)]">{{
+              <span class="text-text-secondary">{{
                 relativeTime(row.timestampMs)
               }}</span>
             </template>
@@ -347,7 +347,7 @@
                 :title="row.targetSpanId"
                 >{{ row.targetSpanId }}</span
               >
-              <span v-else class="text-[var(--color-text-secondary)]">—</span>
+              <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
               <span
@@ -356,7 +356,7 @@
                 :title="row.targetTraceId"
                 >{{ row.targetTraceId }}</span
               >
-              <span v-else class="text-[var(--color-text-secondary)]">—</span>
+              <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
               <span>{{ row.scoreDisplay }}</span>
@@ -395,7 +395,7 @@
             class="w-full"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="text-[var(--color-text-secondary)]">{{
+              <span class="text-text-secondary">{{
                 relativeTime(row.timestampMs)
               }}</span>
             </template>
@@ -409,7 +409,7 @@
                 :title="row.targetSpanId"
                 >{{ row.targetSpanId }}</span
               >
-              <span v-else class="text-[var(--color-text-secondary)]">—</span>
+              <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
               <span
@@ -418,7 +418,7 @@
                 :title="row.targetTraceId"
                 >{{ row.targetTraceId }}</span
               >
-              <span v-else class="text-[var(--color-text-secondary)]">—</span>
+              <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
               <span>{{ row.scoreDisplay }}</span>

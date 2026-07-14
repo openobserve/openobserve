@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ issue.error_type || t("rum.error") }}:</span
       >
       <span
-        class="font-semibold truncate min-w-0 text-[var(--color-text-body)]"
+        class="font-semibold truncate min-w-0 text-text-body"
         :title="issue.error_message"
         data-test="rum-error-issue-cell-message"
         >{{ issue.error_message }}</span

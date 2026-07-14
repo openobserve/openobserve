@@ -34,7 +34,7 @@
                 <strong>{{ nextVersionLabel }}</strong>
               </template>
             </i18n-t>
-            <em class="sc-callout__detail italic font-normal text-(--color-text-secondary)">{{ t("onlineEvals.scoreConfig.editInfoBannerDetail") }}</em>
+            <em class="sc-callout__detail italic font-normal text-text-secondary">{{ t("onlineEvals.scoreConfig.editInfoBannerDetail") }}</em>
           </div>
         </div>
 
@@ -68,7 +68,7 @@
             :rows="3"
             data-test="score-config-description-input"
           />
-          <div v-if="mode === 'edit'" class="sc-field__help text-[11px] text-(--color-text-secondary) mt-1">
+          <div v-if="mode === 'edit'" class="sc-field__help text-[11px] text-text-secondary mt-1">
             {{ t("onlineEvals.scoreConfig.descriptionHelp") }}
           </div>
         </div>
@@ -120,7 +120,7 @@
             {{ t("onlineEvals.scoreConfig.numericRangeLabel") }}
           </label>
           <div class="sc-range-row flex items-center gap-[10px]">
-            <span class="sc-range-row__label text-(--color-text-secondary) text-[11px]">{{ t("onlineEvals.scoreConfig.minLabel") }}</span>
+            <span class="sc-range-row__label text-text-secondary text-[11px]">{{ t("onlineEvals.scoreConfig.minLabel") }}</span>
             <OInput
               v-model.number="form.min"
               type="number"
@@ -128,7 +128,7 @@
               field-width="xs"
               data-test="score-config-min-input"
             />
-            <span class="sc-range-row__label text-(--color-text-secondary) text-[11px]">{{ t("onlineEvals.scoreConfig.maxLabel") }}</span>
+            <span class="sc-range-row__label text-text-secondary text-[11px]">{{ t("onlineEvals.scoreConfig.maxLabel") }}</span>
             <OInput
               v-model.number="form.max"
               type="number"
@@ -156,7 +156,7 @@
         <!-- Boolean info banner -->
         <div
           v-if="form.dataType === 'boolean'"
-          class="sc-callout sc-callout--neutral flex gap-[10px] items-start px-3 py-[10px] bg-[color-mix(in_srgb,var(--color-text-secondary,var(--color-text-secondary))_12%,transparent)] border border-(--color-dialog-header-border) rounded-md text-xs leading-normal text-(--color-text-primary) mb-4"
+          class="sc-callout sc-callout--neutral flex gap-[10px] items-start px-3 py-[10px] bg-[color-mix(in_srgb,var(--color-text-secondary,var(--color-text-secondary))_12%,transparent)] border border-dialog-header-border rounded-md text-xs leading-normal text-text-primary mb-4"
         >
           <OIcon name="info" size="xs" />
           <span>
@@ -183,15 +183,15 @@
 
           <!-- Numeric threshold -->
           <template v-if="form.dataType === 'numeric'">
-            <div class="sc-ht-field-label text-[11.5px] font-semibold text-(--color-text-primary) mb-1.5">{{ t("onlineEvals.scoreConfig.healthyWhenValueIs") }}</div>
+            <div class="sc-ht-field-label text-[11.5px] font-semibold text-text-primary mb-1.5">{{ t("onlineEvals.scoreConfig.healthyWhenValueIs") }}</div>
             <div class="sc-ht-radio-row flex flex-col gap-1.5">
               <label
-                class="sc-ht-num-radio grid grid-cols-[18px_22px_1fr_110px] items-center gap-[10px] px-3 py-1.5 border border-(--color-dialog-header-border) rounded-[5px] bg-(--color-card-bg) cursor-pointer transition-[border-color,background] duration-[120ms]"
+                class="sc-ht-num-radio grid grid-cols-[18px_22px_1fr_110px] items-center gap-[10px] px-3 py-1.5 border border-dialog-header-border rounded-[5px] bg-card-bg cursor-pointer transition-[border-color,background] duration-[120ms]"
                 :class="{ 'sc-ht-num-radio--selected': form.healthyDirection === 'gte' }"
               >
                 <input type="radio" class="sc-radio" value="gte" v-model="form.healthyDirection" />
-                <span class="sc-ht-sym sc-mono text-[17px] font-bold text-(--color-text-primary) text-center">≥</span>
-                <span class="sc-ht-op text-[12.5px] text-(--color-text-primary)">{{ t("onlineEvals.scoreConfig.gteLabel") }}</span>
+                <span class="sc-ht-sym sc-mono text-[17px] font-bold text-text-primary text-center">≥</span>
+                <span class="sc-ht-op text-[12.5px] text-text-primary">{{ t("onlineEvals.scoreConfig.gteLabel") }}</span>
                 <OInput
                   v-model.number="form.healthyGteValue"
                   type="number"
@@ -203,12 +203,12 @@
                 />
               </label>
               <label
-                class="sc-ht-num-radio grid grid-cols-[18px_22px_1fr_110px] items-center gap-[10px] px-3 py-1.5 border border-(--color-dialog-header-border) rounded-[5px] bg-(--color-card-bg) cursor-pointer transition-[border-color,background] duration-[120ms]"
+                class="sc-ht-num-radio grid grid-cols-[18px_22px_1fr_110px] items-center gap-[10px] px-3 py-1.5 border border-dialog-header-border rounded-[5px] bg-card-bg cursor-pointer transition-[border-color,background] duration-[120ms]"
                 :class="{ 'sc-ht-num-radio--selected': form.healthyDirection === 'lte' }"
               >
                 <input type="radio" class="sc-radio" value="lte" v-model="form.healthyDirection" />
-                <span class="sc-ht-sym sc-mono text-[17px] font-bold text-(--color-text-primary) text-center">≤</span>
-                <span class="sc-ht-op text-[12.5px] text-(--color-text-primary)">{{ t("onlineEvals.scoreConfig.lteLabel") }}</span>
+                <span class="sc-ht-sym sc-mono text-[17px] font-bold text-text-primary text-center">≤</span>
+                <span class="sc-ht-op text-[12.5px] text-text-primary">{{ t("onlineEvals.scoreConfig.lteLabel") }}</span>
                 <OInput
                   v-model.number="form.healthyLteValue"
                   type="number"
@@ -224,11 +224,11 @@
 
           <!-- Categorical threshold -->
           <template v-else-if="form.dataType === 'categorical'">
-            <div class="sc-ht-field-label text-[11.5px] font-semibold text-(--color-text-primary) mb-1.5">{{ t("onlineEvals.scoreConfig.healthyCategories") }}</div>
-            <div v-if="form.categories.length === 0" class="sc-ht-empty text-[11.5px] italic text-(--color-text-secondary) px-3 py-[10px] border border-dashed border-(--color-dialog-header-border) rounded-[5px] bg-(--color-card-bg)">
+            <div class="sc-ht-field-label text-[11.5px] font-semibold text-text-primary mb-1.5">{{ t("onlineEvals.scoreConfig.healthyCategories") }}</div>
+            <div v-if="form.categories.length === 0" class="sc-ht-empty text-[11.5px] italic text-text-secondary px-3 py-[10px] border border-dashed border-dialog-header-border rounded-[5px] bg-card-bg">
               {{ t("onlineEvals.scoreConfig.addCategoryPlaceholder") }}…
             </div>
-            <div v-else class="sc-ht-checks flex flex-col gap-0.5 border border-(--color-dialog-header-border) rounded-[5px] bg-(--color-card-bg) p-1">
+            <div v-else class="sc-ht-checks flex flex-col gap-0.5 border border-dialog-header-border rounded-[5px] bg-card-bg p-1">
               <label
                 v-for="cat in form.categories"
                 :key="cat"
@@ -244,7 +244,7 @@
                 <span class="sc-mono font-[var(--o2-font-mono)]">{{ cat }}</span>
               </label>
             </div>
-            <div class="sc-ht-example flex items-center gap-1.5 mt-2 text-[11px] text-(--color-text-secondary)">
+            <div class="sc-ht-example flex items-center gap-1.5 mt-2 text-[11px] text-text-secondary">
               <OIcon name="info" size="xs" />
               <span>{{ t("onlineEvals.scoreConfig.healthyCategoriesHint") }}</span>
             </div>
@@ -252,32 +252,32 @@
 
           <!-- Boolean threshold -->
           <template v-else>
-            <div class="sc-ht-field-label text-[11.5px] font-semibold text-(--color-text-primary) mb-1.5">{{ t("onlineEvals.scoreConfig.healthyValue") }}</div>
+            <div class="sc-ht-field-label text-[11.5px] font-semibold text-text-primary mb-1.5">{{ t("onlineEvals.scoreConfig.healthyValue") }}</div>
             <div class="sc-ht-bool-radios flex flex-col gap-1.5">
               <label
-                class="sc-ht-bool-radio grid grid-cols-[16px_1fr] items-start gap-[10px] px-3 py-[7px] border border-(--color-dialog-header-border) rounded-[5px] bg-(--color-card-bg) cursor-pointer transition-[border-color,background] duration-[120ms]"
+                class="sc-ht-bool-radio grid grid-cols-[16px_1fr] items-start gap-[10px] px-3 py-[7px] border border-dialog-header-border rounded-[5px] bg-card-bg cursor-pointer transition-[border-color,background] duration-[120ms]"
                 :class="{ 'sc-ht-bool-radio--selected': form.healthyBool === true }"
               >
                 <input type="radio" class="sc-radio" :value="true" v-model="form.healthyBool" />
                 <div>
-                  <div class="sc-ht-bool-radio__hd text-(--color-text-primary) font-[var(--o2-font-mono)]">{{ t("onlineEvals.scoreConfig.trueIsHealthy") }}</div>
-                  <div class="sc-ht-bool-radio__sub text-[11px] text-(--color-text-secondary) mt-0.5 leading-[1.4]">{{ t("onlineEvals.scoreConfig.trueIsHealthyHint") }}</div>
+                  <div class="sc-ht-bool-radio__hd text-text-primary font-[var(--o2-font-mono)]">{{ t("onlineEvals.scoreConfig.trueIsHealthy") }}</div>
+                  <div class="sc-ht-bool-radio__sub text-[11px] text-text-secondary mt-0.5 leading-[1.4]">{{ t("onlineEvals.scoreConfig.trueIsHealthyHint") }}</div>
                 </div>
               </label>
               <label
-                class="sc-ht-bool-radio grid grid-cols-[16px_1fr] items-start gap-[10px] px-3 py-[7px] border border-(--color-dialog-header-border) rounded-[5px] bg-(--color-card-bg) cursor-pointer transition-[border-color,background] duration-[120ms]"
+                class="sc-ht-bool-radio grid grid-cols-[16px_1fr] items-start gap-[10px] px-3 py-[7px] border border-dialog-header-border rounded-[5px] bg-card-bg cursor-pointer transition-[border-color,background] duration-[120ms]"
                 :class="{ 'sc-ht-bool-radio--selected': form.healthyBool === false }"
               >
                 <input type="radio" class="sc-radio" :value="false" v-model="form.healthyBool" />
                 <div>
-                  <div class="sc-ht-bool-radio__hd text-(--color-text-primary) font-[var(--o2-font-mono)]">{{ t("onlineEvals.scoreConfig.falseIsHealthy") }}</div>
-                  <div class="sc-ht-bool-radio__sub text-[11px] text-(--color-text-secondary) mt-0.5 leading-[1.4]">{{ t("onlineEvals.scoreConfig.falseIsHealthyHint") }}</div>
+                  <div class="sc-ht-bool-radio__hd text-text-primary font-[var(--o2-font-mono)]">{{ t("onlineEvals.scoreConfig.falseIsHealthy") }}</div>
+                  <div class="sc-ht-bool-radio__sub text-[11px] text-text-secondary mt-0.5 leading-[1.4]">{{ t("onlineEvals.scoreConfig.falseIsHealthyHint") }}</div>
                 </div>
               </label>
             </div>
           </template>
 
-          <div class="sc-ht-section__foot flex items-start gap-1.5 mt-[10px] pt-2 border-t border-dashed border-(--color-dialog-header-border) text-[11px] text-(--color-text-secondary) leading-normal">
+          <div class="sc-ht-section__foot flex items-start gap-1.5 mt-[10px] pt-2 border-t border-dashed border-dialog-header-border text-[11px] text-text-secondary leading-normal">
             <OIcon name="info" size="xs" />
             <span>{{ t("onlineEvals.scoreConfig.thresholdEmptyHint") }}</span>
           </div>

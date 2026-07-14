@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex items-baseline justify-between mb-[0.25rem]">
       <div>
         <div
-          class="text-[0.85rem] font-semibold text-[var(--color-text-heading)]"
+          class="text-[0.85rem] font-semibold text-text-heading"
         >
           {{ displayTitle }}
         </div>

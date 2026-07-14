@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="xs"
                 class="ml-1 pivot-sort-icon"
                 :class="{
-                  'pivot-sort-active text-[var(--color-accent)]': pivotSortState.sortBy === col.name,
+                  'pivot-sort-active text-accent': pivotSortState.sortBy === col.name,
                 }"
               />
             </th>
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="xs"
                 class="ml-1 pivot-sort-icon"
                 :class="{
-                  'pivot-sort-active text-[var(--color-accent)]':
+                  'pivot-sort-active text-accent':
                     pivotSortState.sortBy === cell._sortColumn,
                 }"
               />
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               // Header-row chrome via centralized token utilities (same tokens
               // OTable uses): background band + full-width underline on the row
               // so it spans past the last column.
-              'bg-[var(--color-table-header-bg)] border-b border-[var(--color-grey-300)]',
+              'bg-table-header-bg border-b border-[var(--color-grey-300)]',
             ]"
             :style="{
               width:
@@ -237,8 +237,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="[
                       'rounded-full transition-all duration-150',
                       header.column.getIsResizing()
-                        ? 'w-0.5 h-full bg-[var(--color-table-resize-handle)]'
-                        : 'w-px h-4 bg-[var(--color-border-default)] group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
+                        ? 'w-0.5 h-full bg-table-resize-handle'
+                        : 'w-px h-4 bg-border-default group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
                     ]"
                   />
                 </div>
@@ -253,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       header.column.getToggleSortingHandler(),
                     )
                   "
-                  class="overflow-hidden whitespace-nowrap text-ellipsis! text-[var(--color-table-header-text)] text-xs font-medium capitalize"
+                  class="overflow-hidden whitespace-nowrap text-ellipsis! text-table-header-text text-xs font-medium capitalize"
                 >
                   <FlexRender
                     :render="header.column.columnDef.header"
@@ -278,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test-sort-state="active"
                       :data-test-sort-direction="sortOrder"
                       size="sm"
-                      class="text-[var(--color-accent)]"
+                      class="text-accent"
                     />
                     <OIcon
                       v-else
@@ -313,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OIcon
                           name="filter-list"
                           size="sm"
-                          :class="isColFiltered(header.column.id) ? 'text-[var(--color-primary-600)]' : 'opacity-50'"
+                          :class="isColFiltered(header.column.id) ? 'text-primary-600' : 'opacity-50'"
                         />
                       </OButton>
                     </template>
@@ -353,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <li
                           v-for="rawVal in getFilteredUniqueValues(header.column.id)"
                           :key="String(rawVal)"
-                          class="flex items-center gap-2 px-3 py-1.5 cursor-pointer rounded hover:bg-[var(--color-surface-panel)] transition-colors"
+                          class="flex items-center gap-2 px-3 py-1.5 cursor-pointer rounded hover:bg-surface-panel transition-colors"
                           @click.stop="toggleColFilterValue(header.column.id, rawVal)"
                         >
                           <OCheckbox
@@ -377,7 +377,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Clear filter — always visible at bottom -->
                       <div style="border-top: 1px solid var(--color-table-row-divider)">
                         <div
-                          class="px-3 py-1.5 text-xs cursor-pointer opacity-70 hover:bg-[var(--color-surface-panel)]"
+                          class="px-3 py-1.5 text-xs cursor-pointer opacity-70 hover:bg-surface-panel"
                           @click.stop="clearColFilter(header.column.id)"
                         >
                           {{ t("common.clearFilter") }}
@@ -425,7 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <td
               :colspan="columnOrder.length"
-              class="font-bold bg-[var(--color-table-header-bg)] opacity-70"
+              class="font-bold bg-table-header-bg opacity-70"
             >
               <slot name="loading" />
             </td>
@@ -580,8 +580,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="row.id"
               :data-index="idx"
               :ref="(node: any) => measureDashboardRow(node)"
-              class="dashboard-data-row cursor-pointer hover:bg-[var(--color-table-row-hover-bg)]"
-              :class="{ 'border-b border-[var(--color-table-row-divider)]': !usesSeparateBorders }"
+              class="dashboard-data-row cursor-pointer hover:bg-table-row-hover-bg"
+              :class="{ 'border-b border-table-row-divider': !usesSeparateBorders }"
               data-test="dashboard-data-row"
               tabindex="0"
               @click="handleDataRowClick(row.original, idx as number, $event)"
@@ -781,7 +781,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 formattedRows?.[virtualRow.index]?.original?.isExpandedRow
               "
               :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
-              class="absolute flex w-max items-center justify-start border-b border-b-[var(--color-table-row-divider)] cursor-pointer hover:bg-[var(--color-table-row-hover-bg)] transition-colors duration-150 ease-in-out"
+              class="absolute flex w-max items-center justify-start border-b border-b-table-row-divider cursor-pointer hover:bg-table-row-hover-bg transition-colors duration-150 ease-in-out"
               :class="[
                 defaultColumns &&
                 !wrap &&
@@ -794,7 +794,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ] === highlightTimestamp &&
                 !(formattedRows[virtualRow.index]?.original as any)
                   ?.isExpandedRow
-                  ? 'bg-(--color-table-row-selected-bg)'
+                  ? 'bg-table-row-selected-bg'
                   : '',
                 !(formattedRows[virtualRow.index]?.original as any)
                   ?.isExpandedRow

@@ -16,14 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="step-query-config w-full min-w-0 h-full overflow-auto mx-auto" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content rounded-lg min-h-full w-full min-w-0 overflow-hidden box-border bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)]">
+    <div class="step-content rounded-lg min-h-full w-full min-w-0 overflow-hidden box-border bg-surface-overlay border border-border-default">
       <!-- Section header -->
       <div class="section-header flex items-center gap-0 py-2.5 px-3"
         :class="store.state.theme === 'dark'
           ? 'border-b border-[#343434]'
           : 'border-b border-[#eeeeee]'">
         <div class="section-header-accent w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-[var(--q-primary)]" />
-        <span class="section-header-title text-[13px] font-semibold tracking-[0.01em] text-[var(--color-text-primary)]">{{ t('alerts.queryConfig.sectionTitle') }}</span>
+        <span class="section-header-title text-[13px] font-semibold tracking-[0.01em] text-text-primary">{{ t('alerts.queryConfig.sectionTitle') }}</span>
       </div>
       <div class="px-3 py-2 min-w-0 w-full box-border">
       <!-- Query Mode Tabs (hidden for real-time alerts) -->

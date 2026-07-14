@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             { 'cursor-move': table.getState().columnOrder.length > 1 },
             // Header-row chrome via centralized token utilities (same tokens
             // OTable uses): background band + full-width underline on the row.
-            'bg-[var(--color-table-header-bg)] border-b border-[var(--color-grey-300)]',
+            'bg-table-header-bg border-b border-[var(--color-grey-300)]',
           ]"
           :style="{
             width:
@@ -117,8 +117,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="[
                   'rounded-full transition-all duration-150',
                   header.column.getIsResizing()
-                    ? 'w-0.5 h-full bg-[var(--color-table-resize-handle)]'
-                    : 'w-px h-4 bg-[var(--color-border-default)] group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
+                    ? 'w-0.5 h-full bg-table-resize-handle'
+                    : 'w-px h-4 bg-border-default group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
                 ]"
               />
             </div>
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   header.column.getToggleSortingHandler(),
                 )
               "
-              class="overflow-hidden text-ellipsis text-[var(--color-table-header-text)] text-xs font-medium capitalize"
+              class="overflow-hidden text-ellipsis text-table-header-text text-xs font-medium capitalize"
             >
               <FlexRender
                 :render="header.column.columnDef.header"
@@ -323,7 +323,7 @@ class="mr-1" />
                 store.state.zoConfig.timestamp_column
               ] === highlightTimestamp &&
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? 'bg-(--color-table-row-selected-bg)'
+                ? 'bg-table-row-selected-bg'
                 : !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                   ? 'log-row-base bg-(--color-log-table-row-bg)'
                   : '',

@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <li
             v-for="(pattern, index) in filteredPatterns"
             :key="`${pattern.name}-${pattern.pattern.substring(0, 20)}`"
-            class="flex items-center gap-3 px-4 py-3 transition-colors duration-150 hover:bg-(--color-interactive-hover-bg)"
+            class="flex items-center gap-3 px-4 py-3 transition-colors duration-150 hover:bg-interactive-hover-bg"
             :data-test="`pattern-item-${index}`"
           >
             <div class="flex items-center shrink-0">
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   +{{ pattern.tags.length - 3 }}
                 </OTag>
               </div>
-              <div class="font-mono text-[0.8125rem] leading-[1.4] text-(--color-text-secondary) break-all line-clamp-1">
+              <div class="font-mono text-[0.8125rem] leading-[1.4] text-text-secondary break-all line-clamp-1">
                 {{ pattern.pattern.substring(0, 100)
                 }}{{ pattern.pattern.length > 100 ? "..." : "" }}
               </div>

@@ -29,7 +29,7 @@
           <OTabPanel name="relative">
             <div class="date-time-table relative flex flex-col">
               <div
-                class="relative-row px-3 py-2 flex items-center border-b border-[var(--color-border-default)]"
+                class="relative-row px-3 py-2 flex items-center border-b border-border-default"
                 v-for="(period, periodIndex) in relativePeriods"
                 :key="'date_' + periodIndex"
               >
@@ -51,7 +51,7 @@
                   >
                 </div>
               </div>
-              <div class="relative-row px-3 py-2 flex items-center border-b border-[var(--color-border-default)]">
+              <div class="relative-row px-3 py-2 flex items-center border-b border-border-default">
                 <div class="text-sm font-semibold min-w-18.75">Custom</div>
                 <div class="flex gap-2">
                   <div class="flex flex-col w-20">

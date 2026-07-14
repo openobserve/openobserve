@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <div
-      class="step-content rounded-lg min-h-full bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)]"
+      class="step-content rounded-lg min-h-full bg-surface-overlay border border-border-default"
     >
       <div
         class="section-header flex items-center gap-0 py-2.5 px-3"
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="section-header-accent w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-[var(--q-primary)]" />
         <span
-          class="section-header-title text-[13px] font-semibold text-[var(--color-text-primary)]"
+          class="section-header-title text-[13px] font-semibold text-text-primary"
         >{{
           t("alerts.steps.deduplication")
         }}</span>

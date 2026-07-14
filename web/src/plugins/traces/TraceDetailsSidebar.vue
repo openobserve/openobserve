@@ -399,7 +399,7 @@ class="h-full overflow-y-auto">
                       icon="settings"
                       label="System Instructions"
                     >
-                      <div class="p-2 bg-[var(--color-code-bg)]">
+                      <div class="p-2 bg-code-bg">
                         <LLMContentRenderer
                           :content="JSON.stringify([{ role: 'system', content: parsedSystemInstructions }])"
                           :observation-type="span.gen_ai_operation_name"
@@ -706,7 +706,7 @@ class="h-5! text-[0.75rem]!">
               data-test="trace-details-sidebar-links-table"
             >
               <thead
-                class="thead-sticky text-left bg-(--color-surface-accent)"
+                class="thead-sticky text-left bg-surface-accent"
               >
                 <tr>
                   <th
@@ -728,7 +728,7 @@ class="h-5! text-[0.75rem]!">
                   @click="openReferenceTrace('span', row)"
                   @keydown="onLinkRowKeydown($event, row)"
                   style="cursor: pointer"
-                  class="pointer focus-visible:outline-none focus-visible:bg-(--color-surface-accent)"
+                  class="pointer focus-visible:outline-none focus-visible:bg-surface-accent"
                 >
                   <td
                     v-for="column in linkColumns"

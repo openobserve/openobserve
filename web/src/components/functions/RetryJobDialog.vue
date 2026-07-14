@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="handleBackdropClick"
       >
         <div
-          class="retry-dialog bg-white dark:bg-[#1e1e1e] dark:text-[var(--color-border-default)] rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.15)] w-[90%] max-w-[600px] max-h-[90vh] flex flex-col overflow-hidden"
+          class="retry-dialog bg-white dark:bg-[#1e1e1e] dark:text-border-default rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.15)] w-[90%] max-w-[600px] max-h-[90vh] flex flex-col overflow-hidden"
           ref="dialogRef"
           @click.stop
           role="dialog"
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="retry-dialog-header flex justify-between items-center py-5 px-6 border-b border-[#eaeaea] dark:border-[#3a3a3a]"
           >
             <h3
-              class="retry-dialog-title text-lg font-semibold m-0 text-[#333] dark:text-[var(--color-border-default)]"
+              class="retry-dialog-title text-lg font-semibold m-0 text-[#333] dark:text-border-default"
             >Retry Enrichment Table Job</h3>
             <OButton
               variant="ghost"
@@ -93,11 +93,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="mt-5"
             >
               <p
-                class="options-title font-semibold mb-4 text-[#333] dark:text-[var(--color-border-default)]"
+                class="options-title font-semibold mb-4 text-[#333] dark:text-border-default"
               >How would you like to retry?</p>
 
               <div
-                class="option-card border-2 border-(--color-border-default) dark:border-[#3a3a3a] rounded-lg mb-3 transition-all duration-200 cursor-pointer hover:border-[#1976d2] hover:bg-[#f5f9ff] dark:hover:border-[#1976d2] dark:hover:bg-[#1a2332]"
+                class="option-card border-2 border-border-default dark:border-[#3a3a3a] rounded-lg mb-3 transition-all duration-200 cursor-pointer hover:border-[#1976d2] hover:bg-[#f5f9ff] dark:hover:border-[#1976d2] dark:hover:bg-[#1a2332]"
                 :class="[
                   { selected: !resumeFromLast },
                   !resumeFromLast ? 'border-[#1976d2]! bg-[#e3f2fd]!' : ''
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex flex-col gap-2"
                   >
                     <div
-                      class="option-header flex items-center gap-[10px] font-semibold text-[#333] dark:text-[var(--color-border-default)]"
+                      class="option-header flex items-center gap-[10px] font-semibold text-[#333] dark:text-border-default"
                     >
                       <OIcon name="refresh" size="sm" class="text-[#1976d2]" />
                       <span class="flex-1">Start from Beginning</span>
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div
-                class="option-card border-2 border-(--color-border-default) dark:border-[#3a3a3a] rounded-lg mb-3 transition-all duration-200 cursor-pointer hover:border-[#1976d2] hover:bg-[#f5f9ff] dark:hover:border-[#1976d2] dark:hover:bg-[#1a2332]"
+                class="option-card border-2 border-border-default dark:border-[#3a3a3a] rounded-lg mb-3 transition-all duration-200 cursor-pointer hover:border-[#1976d2] hover:bg-[#f5f9ff] dark:hover:border-[#1976d2] dark:hover:bg-[#1a2332]"
                 :class="[
                   { selected: resumeFromLast },
                   resumeFromLast ? 'border-[#1976d2]! bg-[#e3f2fd]!' : ''
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex flex-col gap-2"
                   >
                     <div
-                      class="option-header flex items-center gap-[10px] font-semibold text-[#333] dark:text-[var(--color-border-default)]"
+                      class="option-header flex items-center gap-[10px] font-semibold text-[#333] dark:text-border-default"
                     >
                       <OIcon name="play-arrow" size="sm" class="text-[#1976d2]" />
                       <span class="flex-1">Resume from Last Position</span>

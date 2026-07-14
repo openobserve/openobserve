@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #top>
-        <div class="flex items-center w-full border-b border-[var(--color-border-default)] pb-2 mb-1">
+        <div class="flex items-center w-full border-b border-border-default pb-2 mb-1">
           <div class="text-[15px] font-[600]" data-test="log-stream-title-text">
             {{ t("logStream.header") }}
           </div>

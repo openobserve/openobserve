@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex py-1 px-1.5 border-b border-solid border-[var(--color-card-glass-border)] text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--color-text-secondary)] shrink-0"
+                  class="w-[100px] font-medium text-text-secondary shrink-0"
                 >
                   Error Type:
                 </div>
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex py-1 px-1.5 border-b border-solid border-[var(--color-card-glass-border)] text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--color-text-secondary)] shrink-0"
+                  class="w-[100px] font-medium text-text-secondary shrink-0"
                 >
                   Message:
                 </div>
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex py-1 px-1.5 border-b border-solid border-[var(--color-card-glass-border)] text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--color-text-secondary)] shrink-0"
+                  class="w-[100px] font-medium text-text-secondary shrink-0"
                 >
                   Handling:
                 </div>
@@ -188,13 +188,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex py-1 px-1.5 text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--color-text-secondary)] shrink-0"
+                  class="w-[100px] font-medium text-text-secondary shrink-0"
                 >
                   Error ID:
                 </div>
                 <div class="flex-1 break-words">
                   <code
-                    class="font-mono text-[10px] px-1 py-0.5 bg-(--color-surface-accent) rounded"
+                    class="font-mono text-[10px] px-1 py-0.5 bg-surface-accent rounded"
                   >
                     {{ formatId(rawEvent.error_id) }}
                   </code>
@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex py-1 px-1.5 border-b border-solid border-[var(--color-card-glass-border)] text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--color-text-secondary)] shrink-0"
+                  class="w-[100px] font-medium text-text-secondary shrink-0"
                 >
                   Loading Type:
                 </div>
@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex py-1 px-1.5 border-b border-solid border-[var(--color-card-glass-border)] text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--color-text-secondary)] shrink-0"
+                  class="w-[100px] font-medium text-text-secondary shrink-0"
                 >
                   URL:
                 </div>
@@ -245,13 +245,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex py-1 px-1.5 text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--color-text-secondary)] shrink-0"
+                  class="w-[100px] font-medium text-text-secondary shrink-0"
                 >
                   View ID:
                 </div>
                 <div class="flex-1 break-words">
                   <code
-                    class="font-mono text-[10px] px-1 py-0.5 bg-(--color-surface-accent) rounded"
+                    class="font-mono text-[10px] px-1 py-0.5 bg-surface-accent rounded"
                   >
                     {{ formatId(rawEvent.view_id) }}
                   </code>
@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="item in relatedResources"
                   :key="item[`${item.type}_id`] || item.id"
-                  class="p-1.5 mb-1 bg-(--color-surface-accent) rounded cursor-pointer hover:bg-[#e0e0e0] transition-colors"
+                  class="p-1.5 mb-1 bg-surface-accent rounded cursor-pointer hover:bg-[#e0e0e0] transition-colors"
                   data-test="related-resource-item"
                   @click="viewResourceDetails(item)"
                 >
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Resource -->
                     <template v-if="item.type === 'resource'">
                       <span
-                        class="mr-1 font-bold text-[10px] text-[var(--color-button-primary)]"
+                        class="mr-1 font-bold text-[10px] text-button-primary"
                       >
                         {{ item.resource_method || "GET" }}
                       </span>
@@ -407,7 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="resource in networkResources"
               :key="resource.resource_id"
-              class="p-2 mb-2 bg-(--color-surface-accent) rounded"
+              class="p-2 mb-2 bg-surface-accent rounded"
               data-test="network-resource-item"
             >
               <div class="flex items-center mb-1">

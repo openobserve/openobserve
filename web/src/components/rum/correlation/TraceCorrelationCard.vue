@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="w-3/4 flex items-center flex-nowrap">
             <code
               data-test="trace-correlation-card-trace-id-text"
-              class="font-mono text-sm py-1 px-2 bg-(--color-surface-accent) rounded text-(--o2-text-color)"
+              class="font-mono text-sm py-1 px-2 bg-surface-accent rounded text-(--o2-text-color)"
             >{{ formatTraceId(traceId) }}</code>
             <OButton
               icon-left="content-copy"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="w-3/4">
             <code
               data-test="trace-correlation-card-span-id-text"
-              class="font-mono text-sm py-1 px-2 bg-(--color-surface-accent) rounded text-(--o2-text-color)"
+              class="font-mono text-sm py-1 px-2 bg-surface-accent rounded text-(--o2-text-color)"
             >{{ formatSpanId(spanId) }}</code>
           </div>
         </div>
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Performance Breakdown -->
         <div v-if="performanceData" class="mb-3">
           <div class="text-gray-400 mb-1">Performance Breakdown:</div>
-          <div class="p-2 bg-(--color-surface-accent) rounded text-sm">
+          <div class="p-2 bg-surface-accent rounded text-sm">
             <div class="flex items-center mb-1">
               <div class="w-5/12 text-gray-500">Total Duration:</div>
               <div class="w-7/12 font-bold">
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Missing trace notice -->
         <div
           v-if="!hasBackendTrace && traceId"
-          class="mt-3 p-2 bg-(--color-surface-accent) rounded"
+          class="mt-3 p-2 bg-surface-accent rounded"
         >
           <div class="flex items-center">
             <OIcon name="info" size="sm" class="mr-2" />

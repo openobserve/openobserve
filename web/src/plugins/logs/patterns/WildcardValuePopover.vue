@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-show="visible && !!anchorEl"
     ref="popoverRef"
-    class="wcp w-72 bg-(--color-card-glass-solid) border border-(--color-border-default) rounded-[0.625rem] overflow-hidden shadow-[0_0.5rem_1.5rem_rgba(0,0,0,0.14),0_0.125rem_0.375rem_rgba(0,0,0,0.06)] [animation:wcpIn_0.15s_ease-out]"
+    class="wcp w-72 bg-(--color-card-glass-solid) border border-border-default rounded-[0.625rem] overflow-hidden shadow-[0_0.5rem_1.5rem_rgba(0,0,0,0.14),0_0.125rem_0.375rem_rgba(0,0,0,0.06)] [animation:wcpIn_0.15s_ease-out]"
     :class="{ '[animation-name:wcpInUp]': flipUpward }"
     :style="popoverStyle"
     data-test="wildcard-value-popover"
@@ -39,17 +39,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="wcp__type-badge shrink-0 font-mono font-bold"
         />
         <span
-          class="wcp__title text-[0.8125rem] font-semibold text-(--color-text-heading) truncate"
+          class="wcp__title text-[0.8125rem] font-semibold text-text-heading truncate"
         >Variable slot · {{ tokenType }}</span>
       </div>
       <div
         class="wcp__header-right flex items-baseline gap-1 shrink-0"
       >
         <span
-          class="wcp__unique-count text-sm font-bold text-(--color-text-heading) [font-variant-numeric:tabular-nums]"
+          class="wcp__unique-count text-sm font-bold text-text-heading [font-variant-numeric:tabular-nums]"
         >{{ displayValues.length }}</span>
         <span
-          class="wcp__unique-label text-[0.6875rem] text-(--color-text-caption)"
+          class="wcp__unique-label text-[0.6875rem] text-text-caption"
         >unique</span>
       </div>
     </div>
@@ -70,10 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="wcp__row-top flex items-baseline justify-between gap-2 mb-1"
         >
           <span
-            class="wcp__row-value text-xs font-semibold font-mono text-(--color-text-body) truncate flex-1 min-w-0"
+            class="wcp__row-value text-xs font-semibold font-mono text-text-body truncate flex-1 min-w-0"
           >{{ item.value || "(empty)" }}</span>
           <span
-            class="wcp__row-count text-[0.8125rem] font-bold text-(--color-text-heading) [font-variant-numeric:tabular-nums] shrink-0"
+            class="wcp__row-count text-[0.8125rem] font-bold text-text-heading [font-variant-numeric:tabular-nums] shrink-0"
           >{{ item.count.toLocaleString() }}</span>
         </div>
         <!-- Full-width progress bar -->
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- Percentage -->
         <div
-          class="wcp__row-pct text-[0.625rem] text-(--color-text-caption) [font-variant-numeric:tabular-nums]"
+          class="wcp__row-pct text-[0.625rem] text-text-caption [font-variant-numeric:tabular-nums]"
         >
           {{ totalOccurrences > 0 ? ((item.count / totalOccurrences) * 100).toFixed(1) + '%' : '' }}
         </div>
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         v-if="displayValues.length === 0"
-        class="wcp__empty py-6 px-3 text-center text-[0.6875rem] text-(--color-text-muted)"
+        class="wcp__empty py-6 px-3 text-center text-[0.6875rem] text-text-muted"
       >
         {{ t("search.patternNoValuesAvailable") }}
       </div>
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="wcp__footer flex items-center justify-end py-[0.4375rem] px-3 border-t border-(--color-card-glass-border)"
     >
       <span
-        class="wcp__occurrences text-[0.6875rem] font-semibold text-(--color-text-caption) [font-variant-numeric:tabular-nums]"
+        class="wcp__occurrences text-[0.6875rem] font-semibold text-text-caption [font-variant-numeric:tabular-nums]"
       >{{ totalOccurrences.toLocaleString() }} occurrences</span>
     </div>
   </div>
@@ -159,7 +159,7 @@ const barColorClass = computed(() => {
   if (cls.includes("green"))  return "bg-(--color-wildcard-bar-green)";
   if (cls.includes("orange")) return "bg-(--color-wildcard-bar-orange)";
   if (cls.includes("purple")) return "bg-(--color-wildcard-bar-purple)";
-  return "bg-(--color-accent)";
+  return "bg-accent";
 });
 
 // ── Positioning ──────────────────────────────────────────────────────────────

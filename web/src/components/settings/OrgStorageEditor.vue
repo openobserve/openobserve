@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'bg-amber-50 border-amber-300'"
             >
               <OIcon name="warning" size="sm" class="flex-shrink-0 mt-px" />
-              <div class="text-[0.82rem] leading-[1.55] text-[var(--color-text-primary)]">
+              <div class="text-[0.82rem] leading-[1.55] text-text-primary">
                 This action is <strong>irreversible</strong>. Once set, you cannot switch to a different storage provider or delete this configuration. To use a different provider, you must create a new organization.
               </div>
             </div>
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'bg-blue-50 border-blue-200'"
             >
               <OIcon name="info" size="sm" class="flex-shrink-0 mt-px" />
-              <div class="text-[0.82rem] leading-[1.55] text-[var(--color-text-primary)]">
+              <div class="text-[0.82rem] leading-[1.55] text-text-primary">
                 Once configured, only credential fields can be updated. All other fields will be locked.
               </div>
             </div>
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   { selected: selectedProvider === provider.value },
                   store.state.theme === 'dark'
                     ? 'bg-[#1e1e1e] border-[#424242] hover:border-[#5d9cec] hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]'
-                    : 'bg-white border-(--color-border-default) hover:border-(--color-card-glass-border) hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
+                    : 'bg-white border-border-default hover:border-(--color-card-glass-border) hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
                 ]"
                 :style="selectedProvider === provider.value && store.state.theme !== 'dark'
                   ? 'border-color: var(--color-card-glass-border); background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%); box-shadow: 0 4px 16px rgba(25,118,210,0.2);'
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="lg"
                   class="mb-2 text-[#666] [transition:color_0.3s_ease] group-[.selected]/card:text-(--color-card-glass-border) dark:group-[.selected]/card:text-[#5d9cec]"
                 />
-                <div class="text-[13px] font-medium text-center [line-height:1.3] mt-1 text-[var(--color-text-primary)] group-[.selected]/card:text-[#333333] dark:group-[.selected]/card:text-white">{{ provider.label }}</div>
+                <div class="text-[13px] font-medium text-center [line-height:1.3] mt-1 text-text-primary group-[.selected]/card:text-[#333333] dark:group-[.selected]/card:text-white">{{ provider.label }}</div>
                 <div
                   v-if="selectedProvider === provider.value"
                   class="check-icon absolute top-[0.375rem] right-[0.375rem] w-[1.25rem] h-[1.25rem] rounded-full overflow-hidden bg-[var(--color-status-positive)] text-white flex items-center justify-center z-[1]"
@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'bg-blue-50 border-blue-200'"
                 >
                   <OIcon name="info" size="sm" class="flex-shrink-0 mt-px" />
-                  <div class="text-[0.82rem] leading-[1.55] text-[var(--color-text-primary)]">
+                  <div class="text-[0.82rem] leading-[1.55] text-text-primary">
                     <template v-if="isCloud">
                       {{ t("storage_settings.awsStsCloudInfo") }}
                     </template>

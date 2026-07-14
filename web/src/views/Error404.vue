@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md flex items-center justify-center min-h-[inherit] bg-(--color-surface-base)">
+  <div class="rounded-md flex items-center justify-center min-h-[inherit] bg-surface-base">
     <div class="flex flex-col items-center text-center max-w-md p-8">
       <div class="mb-8">
         <svg
@@ -25,21 +25,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
-          <circle cx="100" cy="100" r="90" class="fill-none stroke-(--color-border-default) stroke-2" />
+          <circle cx="100" cy="100" r="90" class="fill-none stroke-border-default stroke-2" />
           <text
             x="100"
             y="115"
             text-anchor="middle"
-            class="text-[3.5rem] font-bold fill-(--color-accent) font-[inherit]"
+            class="text-[3.5rem] font-bold fill-accent font-[inherit]"
           >
             404
           </text>
         </svg>
       </div>
 
-      <h1 class="text-2xl font-semibold text-(--color-text-primary) m-0 mb-3">Page not found</h1>
+      <h1 class="text-2xl font-semibold text-text-primary m-0 mb-3">Page not found</h1>
 
-      <p class="text-[0.9375rem] text-(--color-text-secondary) m-0 mb-8 leading-normal">
+      <p class="text-[0.9375rem] text-text-secondary m-0 mb-8 leading-normal">
         The page you're looking for doesn't exist or has been moved.
       </p>
 
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t('common.goBack') }}</OButton>
       </div>
 
-      <p class="text-[0.8125rem] text-(--color-text-secondary) opacity-70 m-0">
+      <p class="text-[0.8125rem] text-text-secondary opacity-70 m-0">
         {{ t('common.redirectingHome', { countdown }) }}
       </p>
     </div>

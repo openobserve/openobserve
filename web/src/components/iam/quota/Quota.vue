@@ -236,14 +236,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #expansion="{ row }">
             <template v-for="(moduleRow, index) in filteredRoleLevelModuleRows" :key="index">
-              <div v-if="!editTable" class="flex items-center px-6 py-1 text-sm border-b border-[var(--color-table-row-divider)]">
+              <div v-if="!editTable" class="flex items-center px-6 py-1 text-sm border-b border-table-row-divider">
                 <span class="w-[200px]">{{ moduleRow.module_name }}</span>
                 <span v-for="col in roleLimitCrudColumnIds" :key="col" class="flex-1 text-center">
                   <template v-if="moduleRow[col] == '-'">-</template>
                   <template v-else>{{ moduleRow[col] }}</template>
                 </span>
               </div>
-              <div v-else class="flex items-center px-6 py-1 text-sm border-b border-[var(--color-table-row-divider)]">
+              <div v-else class="flex items-center px-6 py-1 text-sm border-b border-table-row-divider">
                 <span class="w-[200px]">{{ moduleRow.module_name }}</span>
                 <span v-for="col in roleLimitCrudColumnIds" :key="col" class="flex-1 text-center">
                   <template v-if="moduleRow[col] == '-'">-</template>
@@ -317,7 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         class="flex justify-end w-full ml-auto floating-buttons sticky bottom-0 top-0 z-[100] pr-3 py-2 gap-2 border-t border-border-default"
-        :class="store.state.theme === 'dark' ? 'bg-[var(--color-surface-base)]' : 'bg-white'"
+        :class="store.state.theme === 'dark' ? 'bg-surface-base' : 'bg-white'"
         v-if="editTable && activeType == 'table'"
       >
         <OButton
@@ -338,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         class="flex justify-end w-full ml-auto floating-buttons sticky bottom-0 top-0 z-[100] pr-3 mt-3 gap-2 border-t border-border-default"
-        :class="store.state.theme === 'dark' ? 'bg-[var(--color-surface-base)]' : 'bg-white'"
+        :class="store.state.theme === 'dark' ? 'bg-surface-base' : 'bg-white'"
         v-if="editTable && activeType == 'json'"
       >
         <OButton

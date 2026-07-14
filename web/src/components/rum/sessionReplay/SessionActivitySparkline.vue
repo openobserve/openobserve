@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div ref="rootEl" class="min-h-4">
   <small
     v-if="isBounce"
-    class="italic text-[var(--color-text-muted)]"
+    class="italic text-text-muted"
     data-test="rum-session-activity-bounced"
   >{{ t("rum.noActivityBounced") }}</small>
 
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <small
-      class="text-[var(--color-text-caption)]"
+      class="text-text-caption"
       data-test="rum-session-activity-events-text"
     >{{ t("rum.eventsCount", { count: activity.totalEvents }) }}</small>
   </div>
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <span
     v-else
-    class="text-[var(--color-text-muted)]"
+    class="text-text-muted"
     data-test="rum-session-activity-empty"
   >—</span>
   </div>

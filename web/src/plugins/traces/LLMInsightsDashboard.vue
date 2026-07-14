@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="card in kpiCards"
           :key="card.label"
-          class="card-container rounded-lg flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 bg-(--color-surface-base) border border-(--color-border-default) transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+          class="card-container rounded-lg flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
         >
           <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see
@@ -196,11 +196,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else>
             <div class="flex flex-col gap-[0.25rem]">
               <div class="flex items-center justify-between gap-2 mb-[0.25rem]">
-                <div class="text-[0.7rem] leading-normal font-semibold text-(--color-text-secondary) min-w-0 truncate">
+                <div class="text-[0.7rem] leading-normal font-semibold text-text-secondary min-w-0 truncate">
                   {{ card.label }}
                 </div>
                 <span
-                  class="inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-md bg-(--color-surface-subtle) text-(--color-text-secondary)"
+                  class="inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-md bg-surface-subtle text-text-secondary"
                 >
                   <OIcon :name="card.icon" size="sm" />
                 </span>
@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <span
                   v-if="card.unit"
-                  class="text-[0.8rem] font-semibold text-(--color-text-secondary)"
+                  class="text-[0.8rem] font-semibold text-text-secondary"
                 >
                   {{ card.unit }}
                 </span>

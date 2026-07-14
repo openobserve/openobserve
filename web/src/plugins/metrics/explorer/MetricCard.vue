@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              semibold looked like a different COLOR at this size — denser
              glyphs, same grey-900. -->
         <span
-          class="whitespace-nowrap overflow-hidden text-ellipsis text-[0.8125rem] font-medium text-(--color-text-primary) tracking-[0.02em]"
+          class="whitespace-nowrap overflow-hidden text-ellipsis text-[0.8125rem] font-medium text-text-primary tracking-[0.02em]"
           :title="card.name"
           >{{ card.name }}</span
         >

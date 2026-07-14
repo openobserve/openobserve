@@ -21,7 +21,7 @@
     <!-- Body -->
       <div
         v-if="queryData.length === 0"
-        class="flex flex-col items-center justify-center h-64 text-[var(--color-text-muted)]"
+        class="flex flex-col items-center justify-center h-64 text-text-muted"
       >
         <OIcon name="info" style="width: 48px; height: 48px;" />
         <p class="mt-2">No queries executed for this panel.</p>
@@ -42,7 +42,7 @@
               {{ query.tabName || ('Query ' + (index + 1)) }}
             </span>
             <span
-              class="bg-[var(--color-theme-body-bg-primary)] border border-[var(--color-card-glass-border)] text-[var(--color-text-secondary)] text-[10px] font-bold px-2 py-0.5 rounded-md"
+              class="bg-[var(--color-theme-body-bg-primary)] border border-[var(--color-card-glass-border)] text-text-secondary text-[10px] font-bold px-2 py-0.5 rounded-md"
             >
               {{ getQueryTypeDisplay(query.queryType) }}
             </span>
@@ -120,12 +120,12 @@
                   >Start Time</label
                 >
                 <div
-                  class="text-xs text-[var(--color-text-secondary)] font-medium flex items-center gap-2"
+                  class="text-xs text-text-secondary font-medium flex items-center gap-2"
                 >
                   <OIcon
                     name="login"
                     size="xs"
-                    class="text-[var(--color-text-muted)]"
+                    class="text-text-muted"
                   />
                   {{ formatTimestamp(query.startTime) }}
                 </div>
@@ -137,12 +137,12 @@
                   >End Time</label
                 >
                 <div
-                  class="text-xs text-[var(--color-text-secondary)] font-medium flex items-center gap-2"
+                  class="text-xs text-text-secondary font-medium flex items-center gap-2"
                 >
                   <OIcon
                     name="logout"
                     size="xs"
-                    class="text-[var(--color-text-muted)]"
+                    class="text-text-muted"
                   />
                   {{ formatTimestamp(query.endTime) }}
                 </div>
@@ -166,17 +166,17 @@
                       class="flex items-center gap-2 p-1 rounded-md border border-[var(--color-card-glass-border)] bg-[var(--color-card-glass-bg)] text-xs"
                     >
                       <span
-                        class="font-bold text-[var(--color-text-primary)]"
+                        class="font-bold text-text-primary"
                         >{{ v.name }}</span
                       >
-                      <span class="text-[var(--color-text-muted)]">:</span>
+                      <span class="text-text-muted">:</span>
                       <span
-                        class="text-[var(--color-text-secondary)] italic"
+                        class="text-text-secondary italic"
                         >{{ v.value }}</span
                       >
                     </div>
                   </template>
-                  <span v-else class="text-xs text-[var(--color-text-muted)]"
+                  <span v-else class="text-xs text-text-muted"
                     >-</span
                   >
                 </div>
@@ -195,17 +195,17 @@
                       class="flex items-center gap-2 p-1 rounded-md border border-[var(--color-card-glass-border)] bg-[var(--color-card-glass-bg)] text-xs"
                     >
                       <span
-                        class="font-bold text-[var(--color-text-primary)]"
+                        class="font-bold text-text-primary"
                         >{{ v.name }}</span
                       >
-                      <span class="text-[var(--color-text-muted)]">:</span>
+                      <span class="text-text-muted">:</span>
                       <span
-                        class="text-[var(--color-text-secondary)] italic"
+                        class="text-text-secondary italic"
                         >{{ v.value }}</span
                       >
                     </div>
                   </template>
-                  <span v-else class="text-xs text-[var(--color-text-muted)]"
+                  <span v-else class="text-xs text-text-muted"
                     >-</span
                   >
                 </div>
@@ -226,19 +226,19 @@
                       class="flex items-center gap-2 p-1 rounded-md border border-[var(--color-card-glass-border)] bg-[var(--color-card-glass-bg)] text-xs"
                     >
                       <span
-                        class="font-bold text-[var(--color-text-primary)]"
+                        class="font-bold text-text-primary"
                         >{{ v.name }}</span
                       >
-                      <span class="text-[var(--color-text-muted)]">{{
+                      <span class="text-text-muted">{{
                         v.operator
                       }}</span>
                       <span
-                        class="text-[var(--color-text-secondary)] italic"
+                        class="text-text-secondary italic"
                         >{{ v.value }}</span
                       >
                     </div>
                   </template>
-                  <span v-else class="text-xs text-[var(--color-text-muted)]"
+                  <span v-else class="text-xs text-text-muted"
                     >-</span
                   >
                 </div>

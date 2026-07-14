@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex border-b border-[var(--color-border-default)] cursor-pointer hover:bg-[var(--color-hover-gray)] relative py-1 transition-colors duration-150 ease-in-out"
+    class="flex border-b border-border-default cursor-pointer hover:bg-[var(--color-hover-gray)] relative py-1 transition-colors duration-150 ease-in-out"
     :class="wrap ? 'items-start' : 'items-center'"
     @click="$emit('click', pattern, index)"
     :data-test="`pattern-card-${index}`"
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Count & Percentage Column -->
     <div class="w-24 flex-shrink-0 px-2 text-right">
       <div
-        class="text-[var(--color-text-primary)] font-bold"
+        class="text-text-primary font-bold"
         :data-test="`pattern-card-${index}-frequency`"
       >
         {{ pattern.frequency.toLocaleString() }}

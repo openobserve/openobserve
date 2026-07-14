@@ -30,10 +30,10 @@
         <div
           v-for="kpi in kpis"
           :key="kpi.id"
-          class="kpi-card rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-(--color-surface-base) border border-(--color-border-default) transition-shadow duration-200"
+          class="kpi-card rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-surface-base border border-border-default transition-shadow duration-200"
           :data-test="`quality-detail-kpi-${kpi.id}`"
         >
-          <div class="text-[0.7rem] font-semibold text-[var(--color-text-secondary)]">
+          <div class="text-[0.7rem] font-semibold text-text-secondary">
             {{ kpiTitle(kpi) }}
           </div>
           <div class="flex items-baseline gap-[0.2rem]">
@@ -44,11 +44,11 @@
         </div>
       </div>
 
-      <section v-if="dataType === 'numeric'" class="card-container py-3 px-[14px] pb-[14px] bg-(--color-surface-base) border border-(--color-border-default) rounded-md">
+      <section v-if="dataType === 'numeric'" class="card-container py-3 px-[14px] pb-[14px] bg-surface-base border border-border-default rounded-md">
         <header class="mb-[6px]">
-          <h4 class="m-0 text-[13px] font-semibold text-(--color-text-primary)">
+          <h4 class="m-0 text-[13px] font-semibold text-text-primary">
             {{ t("onlineEvals.quality.detail.trendTitle") }}
-            <span class="font-normal text-(--color-text-secondary) text-[11px]">— {{ config.name }}</span>
+            <span class="font-normal text-text-secondary text-[11px]">— {{ config.name }}</span>
           </h4>
         </header>
         <div class="h-[260px]">
@@ -62,13 +62,13 @@
             :legend-p95="t('onlineEvals.quality.detail.legendP95')"
             :legend-threshold-fmt="t('onlineEvals.quality.detail.legendThreshold')"
           />
-          <p v-else class="m-0 h-full flex items-center justify-center text-xs text-(--color-text-secondary)">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="m-0 h-full flex items-center justify-center text-xs text-text-secondary">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
 
-      <section v-if="dataType === 'numeric'" class="card-container py-3 px-[14px] pb-[14px] bg-(--color-surface-base) border border-(--color-border-default) rounded-md">
+      <section v-if="dataType === 'numeric'" class="card-container py-3 px-[14px] pb-[14px] bg-surface-base border border-border-default rounded-md">
         <header class="mb-[6px]">
-          <h4 class="m-0 text-[13px] font-semibold text-(--color-text-primary)">{{ t("onlineEvals.quality.detail.distributionTitle") }}</h4>
+          <h4 class="m-0 text-[13px] font-semibold text-text-primary">{{ t("onlineEvals.quality.detail.distributionTitle") }}</h4>
         </header>
         <div class="h-[220px]">
           <QualityDistributionChart
@@ -78,15 +78,15 @@
             :legend-healthy="t('onlineEvals.quality.detail.legendHealthy')"
             :legend-unhealthy="t('onlineEvals.quality.detail.legendUnhealthy')"
           />
-          <p v-else class="m-0 h-full flex items-center justify-center text-xs text-(--color-text-secondary)">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="m-0 h-full flex items-center justify-center text-xs text-text-secondary">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
 
-      <section v-if="dataType === 'boolean'" class="card-container py-3 px-[14px] pb-[14px] bg-(--color-surface-base) border border-(--color-border-default) rounded-md">
+      <section v-if="dataType === 'boolean'" class="card-container py-3 px-[14px] pb-[14px] bg-surface-base border border-border-default rounded-md">
         <header class="mb-[6px]">
-          <h4 class="m-0 text-[13px] font-semibold text-(--color-text-primary)">
+          <h4 class="m-0 text-[13px] font-semibold text-text-primary">
             {{ t("onlineEvals.quality.detail.passRateTitle") }}
-            <span class="font-normal text-(--color-text-secondary) text-[11px]">— {{ config.name }}</span>
+            <span class="font-normal text-text-secondary text-[11px]">— {{ config.name }}</span>
           </h4>
         </header>
         <div class="h-[260px]">
@@ -96,13 +96,13 @@
             :points="booleanTrend"
             :legend-pass-rate="t('onlineEvals.quality.detail.legendHealthy')"
           />
-          <p v-else class="m-0 h-full flex items-center justify-center text-xs text-(--color-text-secondary)">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="m-0 h-full flex items-center justify-center text-xs text-text-secondary">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
 
-      <section v-if="dataType === 'boolean'" class="card-container py-3 px-[14px] pb-[14px] bg-(--color-surface-base) border border-(--color-border-default) rounded-md">
+      <section v-if="dataType === 'boolean'" class="card-container py-3 px-[14px] pb-[14px] bg-surface-base border border-border-default rounded-md">
         <header class="mb-[6px]">
-          <h4 class="m-0 text-[13px] font-semibold text-(--color-text-primary)">{{ t("onlineEvals.quality.detail.trueFalseTitle") }}</h4>
+          <h4 class="m-0 text-[13px] font-semibold text-text-primary">{{ t("onlineEvals.quality.detail.trueFalseTitle") }}</h4>
         </header>
         <div class="h-[120px]">
           <QualityBooleanBarsChart
@@ -112,13 +112,13 @@
             :legend-true="`true (${booleanCounts.trueCount})`"
             :legend-false="`false (${booleanCounts.falseCount})`"
           />
-          <p v-else class="m-0 h-full flex items-center justify-center text-xs text-(--color-text-secondary)">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="m-0 h-full flex items-center justify-center text-xs text-text-secondary">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
 
-      <section v-if="dataType === 'categorical'" class="card-container py-3 px-[14px] pb-[14px] bg-(--color-surface-base) border border-(--color-border-default) rounded-md">
+      <section v-if="dataType === 'categorical'" class="card-container py-3 px-[14px] pb-[14px] bg-surface-base border border-border-default rounded-md">
         <header class="mb-[6px]">
-          <h4 class="m-0 text-[13px] font-semibold text-(--color-text-primary)">{{ t("onlineEvals.quality.detail.categoryDistributionTitle") }}</h4>
+          <h4 class="m-0 text-[13px] font-semibold text-text-primary">{{ t("onlineEvals.quality.detail.categoryDistributionTitle") }}</h4>
         </header>
         <div class="h-[260px]">
           <QualityCategoryBarsChart
@@ -126,7 +126,7 @@
             :rows="categoricalRows"
             :healthy-categories="healthyCategories"
           />
-          <p v-else class="m-0 h-full flex items-center justify-center text-xs text-(--color-text-secondary)">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="m-0 h-full flex items-center justify-center text-xs text-text-secondary">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
     </template>

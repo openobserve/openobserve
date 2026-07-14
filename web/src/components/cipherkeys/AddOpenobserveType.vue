@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <label class="flex q-field mb-3">
         <b>{{ t('cipherKey.secret') }}</b>
       </label>
-      <pre class="[text-wrap:auto] break-words border border-(--color-input-border) p-[5px] mb-[5px]">{{ formData.key.store.local }}</pre>
+      <pre class="[text-wrap:auto] break-words border border-input-border p-[5px] mb-[5px]">{{ formData.key.store.local }}</pre>
       <OButton data-test="add-cipher-key-openobserve-secret-input-update" variant="primary" size="sm-action" @click="isUpdate = true">{{ t('common.update') }}</OButton>
     </div>
   </div>

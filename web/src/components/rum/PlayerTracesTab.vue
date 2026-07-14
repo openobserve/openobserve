@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-col items-center justify-center h-full gap-3 p-4"
       data-test="rum-player-traces-tab-empty"
     >
-      <OIcon name="info" size="lg" class="text-[var(--color-text-muted)]" />
-      <p class="text-center text-[var(--color-text-secondary)]">
+      <OIcon name="info" size="lg" class="text-text-muted" />
+      <p class="text-center text-text-secondary">
         {{ t("rum.noCorrelatedTraces") }}
       </p>
     </div>
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon name="arrow-back" size="sm" />
         </OButton>
-        <code class="text-sm text-[var(--color-text-secondary)] truncate min-w-0 flex-1">{{ shortRoute(selectedTrace.route) || selectedTrace.label }}</code>
+        <code class="text-sm text-text-secondary truncate min-w-0 flex-1">{{ shortRoute(selectedTrace.route) || selectedTrace.label }}</code>
         <div class="flex items-center gap-1.5 flex-shrink-0">
           <span
             v-if="selectedTrace.metadata?.errorCount > 0"
@@ -83,26 +83,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <button
             v-if="selectedTrace.metadata?.start_time && props.startTime > 0"
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-(--color-surface-accent) text-[var(--color-text-body)] whitespace-nowrap cursor-pointer hover:bg-[var(--color-card-glass-border)]"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-surface-accent text-text-body whitespace-nowrap cursor-pointer hover:bg-[var(--color-card-glass-border)]"
             :title="t('rum.seekToMoment')"
             data-test="rum-player-traces-tab-seek-btn"
             @click="seekToTrace(selectedTrace)"
           >
-            <OIcon name="play-arrow" size="xs" class="text-[var(--color-text-secondary)]" />
+            <OIcon name="play-arrow" size="xs" class="text-text-secondary" />
             {{ traceTimeOffset(selectedTrace.metadata.start_time) }}
           </button>
           <span
             v-if="selectedTrace.metadata?.e2eDuration"
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-(--color-surface-accent) text-[var(--color-text-body)] whitespace-nowrap"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-surface-accent text-text-body whitespace-nowrap"
           >
-            <OIcon name="timer" size="xs" class="text-[var(--color-text-secondary)]" />
+            <OIcon name="timer" size="xs" class="text-text-secondary" />
             {{ formatTimeWithSuffix(selectedTrace.metadata.e2eDuration * 1000) }}
           </span>
           <span
             v-if="selectedTrace.metadata?.spanCount"
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-(--color-surface-accent) text-[var(--color-text-body)] whitespace-nowrap"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6875rem] bg-surface-accent text-text-body whitespace-nowrap"
           >
-            <OIcon name="lan" size="xs" class="text-[var(--color-text-secondary)]" />
+            <OIcon name="lan" size="xs" class="text-text-secondary" />
             {{ selectedTrace.metadata.spanCount }} {{ selectedTrace.metadata.spanCount === 1 ? t("rum.span") : t("rum.spans") }}
           </span>
           <OButton

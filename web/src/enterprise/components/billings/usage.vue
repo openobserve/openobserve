@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex flex-col justify-between">
                 <!-- Title row -->
                 <div class="flex justify-between items-center">
-                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-(--color-text-heading) text-left"> Action Scripts</div>
+                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-text-heading text-left"> Action Scripts</div>
                   <div style="opacity: 0.8;">
                     <img :src="actionScriptIcon" />
                   </div>
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-(--color-text-heading) text-left flex items-end ">
+            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-text-heading text-left flex items-end ">
               2
             </div>
             </div>
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex flex-col justify-between">
                 <!-- Title row -->
                 <div class="flex justify-between items-center">
-                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-(--color-text-heading) text-left">Error Tracking</div>
+                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-text-heading text-left">Error Tracking</div>
                   <div style="opacity: 0.8;">
                     <img :src="errorTrackingIcon" />
                   </div>
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-(--color-text-heading) text-left flex items-end ">
+            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-text-heading text-left flex items-end ">
               300
             </div>
             </div>
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex flex-col justify-between">
                 <!-- Title row -->
                 <div class="flex justify-between items-center">
-                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-(--color-text-heading) text-left" data-test="billings-usage-tile-title">RUM Session</div>
+                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-text-heading text-left" data-test="billings-usage-tile-title">RUM Session</div>
                   <div style="opacity: 0.8;">
                     <img :src="rumSessionIcon" />
                   </div>
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-(--color-text-heading) text-left flex items-end ">
+            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-text-heading text-left flex items-end ">
               20
             </div>
             </div>
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="flex items-center justify-between gap-2">
               <div
-                class="text-(length:--text-xs) font-medium text-(--color-text-secondary) truncate"
+                class="text-(length:--text-xs) font-medium text-text-secondary truncate"
                 data-test="billings-usage-tile-title"
                 :title="tile.label"
               >
@@ -116,16 +116,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div class="flex items-baseline gap-1 whitespace-nowrap">
-              <span class="text-(length:--text-xl) font-bold text-(--color-text-heading) leading-none">
+              <span class="text-(length:--text-xl) font-bold text-text-heading leading-none">
                 {{ tile.value }}
               </span>
-              <span class="text-(length:--text-xs) font-medium text-(--color-text-secondary)">
+              <span class="text-(length:--text-xs) font-medium text-text-secondary">
                 {{ tile.unit }}
               </span>
             </div>
             <div
               v-if="usageCost[tile.key]"
-              class="text-(length:--text-xs) font-medium text-(--color-text-secondary)"
+              class="text-(length:--text-xs) font-medium text-text-secondary"
             >
               ${{ usageCost[tile.key] }}
             </div>
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="usage-daily-chart"
         class="bg-(--color-card-glass-bg) border border-(--color-card-glass-border) rounded-lg p-4 mt-4"
       >
-        <div class="text-(length:--text-sm) font-semibold text-(--color-text-heading) mb-2">
+        <div class="text-(length:--text-sm) font-semibold text-text-heading mb-2">
           {{ t("billing.usageTrends.dailyUsage") }}
         </div>
         <div class="usage-daily-chart__body w-full">

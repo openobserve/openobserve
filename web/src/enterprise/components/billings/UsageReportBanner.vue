@@ -2,9 +2,9 @@
     <div v-if="showBanner && config.isEnterprise == 'true' && config.isCloud === 'false'" class="w-full rounded-md p-3" :class="bannerClass">
         <div class="flex">
         <div class="flex flex-col">
-        <span class="text-(--text-lg) font-semibold leading-(--leading-xl) text-(--color-text-heading)">{{ message }}</span>
+        <span class="text-(--text-lg) font-semibold leading-(--leading-xl) text-text-heading">{{ message }}</span>
         <br />
-        <span class="text-(--text-md) font-normal leading-(--leading-md) text-(--color-text-body)">{{ subtitle }}</span>
+        <span class="text-(--text-md) font-normal leading-(--leading-md) text-text-body">{{ subtitle }}</span>
         </div>
   </div>
     </div>

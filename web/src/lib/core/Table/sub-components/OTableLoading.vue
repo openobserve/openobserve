@@ -116,7 +116,7 @@ const alignClassFor = (col: Column<any, any>): string => {
         :style="{ width: TABLE_CHECKBOX_COL_SIZE + 'px', minWidth: TABLE_CHECKBOX_COL_SIZE + 'px', maxWidth: TABLE_CHECKBOX_COL_SIZE + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
       >
         <span
-          class="inline-block h-3.5 w-3.5 rounded-[3px] border border-[var(--color-skeleton-base)]"
+          class="inline-block h-3.5 w-3.5 rounded-[3px] border border-skeleton-base"
           aria-hidden="true"
         />
       </td>

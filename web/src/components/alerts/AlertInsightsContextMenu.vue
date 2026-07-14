@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="context-menu fixed z-9999 min-w-55 overflow-hidden bg-white border border-(--color-border-default) rounded-md shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
+    class="context-menu fixed z-9999 min-w-55 overflow-hidden bg-white border border-border-default rounded-md shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
     :class="store.state.theme === 'dark' ? 'dark-theme bg-[#2d2d2d] border-[#444] shadow-[0_4px_12px_rgba(0,0,0,0.4)]' : 'light-theme'"
     :style="{ top: `${y}px`, left: `${x}px` }"
     @click.stop

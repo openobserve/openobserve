@@ -1,5 +1,5 @@
 ﻿<template>
-  <aside class="flex flex-col gap-2.5 p-3 pb-4 bg-(--color-surface-base) border border-dialog-header-border rounded-md min-h-0 max-h-[calc(100vh-var(--navbar-height)-200px)] overflow-hidden" data-test="quality-config-sidebar">
+  <aside class="flex flex-col gap-2.5 p-3 pb-4 bg-surface-base border border-dialog-header-border rounded-md min-h-0 max-h-[calc(100vh-var(--navbar-height)-200px)] overflow-hidden" data-test="quality-config-sidebar">
     <header class="flex items-baseline gap-2">
       <span class="text-[11px] font-semibold text-text-secondary">{{ t("onlineEvals.quality.overview.title") }}</span>
       <span class="text-[11px] text-text-secondary bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] px-1.5 py-px rounded-[4px] [font-variant-numeric:tabular-nums]">{{ filteredRows.length }}</span>
@@ -41,7 +41,7 @@
 
         <div class="qcs-item__main flex-1 min-w-0 flex flex-col gap-1">
           <div class="flex items-center gap-[6px]">
-            <span class="qcs-item__name flex-1 min-w-0 font-semibold text-[13px] text-(--color-text-primary) truncate font-mono">{{ row.name }}</span>
+            <span class="qcs-item__name flex-1 min-w-0 font-semibold text-[13px] text-text-primary truncate font-mono">{{ row.name }}</span>
             <span class="qcs-item__type shrink-0 px-1 rounded-[2px] font-bold text-[4px] leading-[1.4] tracking-[0.02em]" :class="{ 'bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] text-[#4f5bcf]': row.dataType === 'numeric', 'bg-[color-mix(in_srgb,#9333ea_14%,transparent)] text-[#7c3aed]': row.dataType === 'categorical', 'bg-[color-mix(in_srgb,#16a34a_14%,transparent)] text-[#15803d]': row.dataType === 'boolean' }">
               {{ shortType(row.dataType) }}
             </span>
@@ -55,9 +55,9 @@
                 :style="{ width: `${Math.min(100, row.unhealthyPct ?? 0)}%` }"
               />
             </div>
-            <span v-if="row.hasThreshold" class="qcs-item__pct shrink-0 text-[11px] font-semibold text-(--color-warning-700)">{{ formatPct(row.unhealthyPct) }}</span>
-            <span v-else class="qcs-item__pct--muted shrink-0 text-[11px] font-semibold text-(--color-text-secondary)">—</span>
-            <span class="shrink-0 text-[11px] text-(--color-text-secondary)">{{ formatCount(row.totalScores) }}</span>
+            <span v-if="row.hasThreshold" class="qcs-item__pct shrink-0 text-[11px] font-semibold text-warning-700">{{ formatPct(row.unhealthyPct) }}</span>
+            <span v-else class="qcs-item__pct--muted shrink-0 text-[11px] font-semibold text-text-secondary">—</span>
+            <span class="shrink-0 text-[11px] text-text-secondary">{{ formatCount(row.totalScores) }}</span>
           </div>
 
           <svg

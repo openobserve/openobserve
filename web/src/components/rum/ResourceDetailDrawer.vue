@@ -74,11 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div>
             <div class="flex py-2 px-3 border-b border-solid border-[var(--color-card-glass-border)]" v-if="resource.resource_type">
-              <div class="w-[150px] text-[var(--color-text-secondary)] font-medium shrink-0">Type:</div>
+              <div class="w-[150px] text-text-secondary font-medium shrink-0">Type:</div>
               <div class="flex-1 text-[var(--o2-text-color)] break-words">{{ resource.resource_type }}</div>
             </div>
             <div class="flex py-2 px-3 border-b border-solid border-[var(--color-card-glass-border)]" v-if="resource.resource_size">
-              <div class="w-[150px] text-[var(--color-text-secondary)] font-medium shrink-0">Size:</div>
+              <div class="w-[150px] text-text-secondary font-medium shrink-0">Size:</div>
               <div class="flex-1 text-[var(--o2-text-color)] break-words">
                 {{ formatBytes(resource.resource_size) }}
               </div>
@@ -87,24 +87,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex py-2 px-3 border-b border-solid border-[var(--color-card-glass-border)]"
               v-if="resource.resource_render_blocking_status"
             >
-              <div class="w-[150px] text-[var(--color-text-secondary)] font-medium shrink-0">Render Blocking:</div>
+              <div class="w-[150px] text-text-secondary font-medium shrink-0">Render Blocking:</div>
               <div class="flex-1 text-[var(--o2-text-color)] break-words">
                 {{ resource.resource_render_blocking_status }}
               </div>
             </div>
             <div class="flex py-2 px-3 border-b border-solid border-[var(--color-card-glass-border)]" v-if="resource.session?.id">
-              <div class="w-[150px] text-[var(--color-text-secondary)] font-medium shrink-0">Session ID:</div>
+              <div class="w-[150px] text-text-secondary font-medium shrink-0">Session ID:</div>
               <div class="flex-1 text-[var(--o2-text-color)] break-words">
                 <code
                   data-test="resource-detail-drawer-session-id-text"
-                  class="font-mono text-sm px-2 py-1 bg-(--color-surface-accent) rounded text-[var(--o2-text-color)]"
+                  class="font-mono text-sm px-2 py-1 bg-surface-accent rounded text-[var(--o2-text-color)]"
                 >{{
                   formatSessionId(resource.session.id)
                 }}</code>
               </div>
             </div>
             <div class="flex py-2 px-3" v-if="resource.view?.url">
-              <div class="w-[150px] text-[var(--color-text-secondary)] font-medium shrink-0">Page URL:</div>
+              <div class="w-[150px] text-text-secondary font-medium shrink-0">Page URL:</div>
               <div class="flex-1 text-[var(--o2-text-color)] truncate" :title="resource.view.url">
                 {{ resource.view.url }}
               </div>
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- No Trace ID Notice -->
         <div
           v-else
-          class="p-3 text-center bg-(--color-surface-accent) rounded"
+          class="p-3 text-center bg-surface-accent rounded"
         >
           <OIcon name="info" size="md" class="mb-2" />
           <div class="text-gray-400">

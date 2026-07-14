@@ -37,7 +37,7 @@
       <div class="grid grid-cols-3 max-[720px]:grid-cols-1 gap-3">
         <button
           type="button"
-          class="scorer-type-card relative flex flex-col items-start gap-[10px] min-h-[180px] py-4 px-4 pb-[14px] border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-(--color-card-bg) text-(--color-text-primary,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms]"
+          class="scorer-type-card relative flex flex-col items-start gap-[10px] min-h-[180px] py-4 px-4 pb-[14px] border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-card-bg text-(--color-text-primary,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms]"
           data-test="scorer-type-llm-judge"
           @click="$emit('select', 'llm_judge')"
         >
@@ -58,7 +58,7 @@
 
         <button
           type="button"
-          class="scorer-type-card relative flex flex-col items-start gap-[10px] min-h-[180px] py-4 px-4 pb-[14px] border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-(--color-card-bg) text-(--color-text-primary,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms]"
+          class="scorer-type-card relative flex flex-col items-start gap-[10px] min-h-[180px] py-4 px-4 pb-[14px] border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-card-bg text-(--color-text-primary,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms]"
           data-test="scorer-type-remote"
           @click="$emit('select', 'remote')"
         >
@@ -79,7 +79,7 @@
 
         <button
           type="button"
-          class="scorer-type-card scorer-type-card--disabled relative flex flex-col items-start gap-[10px] min-h-[180px] py-4 px-4 pb-[14px] border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-(--color-card-bg) text-(--color-text-primary,currentColor) text-left cursor-not-allowed opacity-60 transition-[border-color,background,box-shadow] duration-[120ms]"
+          class="scorer-type-card scorer-type-card--disabled relative flex flex-col items-start gap-[10px] min-h-[180px] py-4 px-4 pb-[14px] border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-card-bg text-(--color-text-primary,currentColor) text-left cursor-not-allowed opacity-60 transition-[border-color,background,box-shadow] duration-[120ms]"
           data-test="scorer-type-code"
           disabled
         >

@@ -165,13 +165,13 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             v-if="getSortIcon?.(col.id) === 'asc'"
             name="arrow-upward"
             size="sm"
-            class="text-[var(--color-table-sort-icon-active)]"
+            class="text-table-sort-icon-active"
           />
           <OIcon
             v-else-if="getSortIcon?.(col.id) === 'desc'"
             name="arrow-downward"
             size="sm"
-            class="text-[var(--color-table-sort-icon-active)]"
+            class="text-table-sort-icon-active"
           />
           <OIcon
             v-else
@@ -214,13 +214,13 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
           v-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'asc'"
           name="arrow-upward"
           size="sm"
-          class="text-[var(--color-table-sort-icon-active)] ml-1"
+          class="text-table-sort-icon-active ml-1"
         />
         <OIcon
           v-else-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'desc'"
           name="arrow-downward"
           size="sm"
-          class="text-[var(--color-table-sort-icon-active)] ml-1"
+          class="text-table-sort-icon-active ml-1"
         />
         <OIcon
           v-else-if="level.isLeaf && cell._sortColumn"
@@ -238,8 +238,8 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
     v-for="headerGroup in headerGroups"
     :key="headerGroup.id"
     :class="[
-      'bg-[var(--color-table-header-bg)]',
-      'border-b border-[var(--color-table-header-border)]',
+      'bg-table-header-bg',
+      'border-b border-table-header-border',
       stickyHeader ? 'sticky top-0 z-10' : '',
     ]"
     data-test="o2-table-header"
@@ -254,7 +254,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       handle=".table-head"
       tag="tr"
       :class="[
-        'bg-[var(--color-table-header-bg)]',
+        'bg-table-header-bg',
         columnOrder.length > 1 ? 'cursor-move' : '',
       ]"
       :style="{
@@ -267,14 +267,14 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       <!-- Expand placeholder -->
       <th
         v-if="expansionEnabled"
-        class="w-4 min-w-4 px-0 border-b border-[var(--color-table-header-border)]"
+        class="w-4 min-w-4 px-0 border-b border-table-header-border"
         data-test="o2-table-th-expand"
       />
 
       <!-- Selection checkbox header -->
       <th
         v-if="selectionMultiple"
-        class="text-left border-b border-[var(--color-table-header-border)]"
+        class="text-left border-b border-table-header-border"
         :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
         data-test="o2-table-th-select"
       >
@@ -297,9 +297,9 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
           `${headerPaddingClass(header)} text-left font-medium text-table-header-text text-xs select-none relative`,
           'table-head',
           dense ? 'h-8' : 'h-9',
-          'border-b border-[var(--color-table-header-border)]',
+          'border-b border-table-header-border',
           'group',
-          header.column.getIsPinned?.() ? 'bg-[var(--color-table-header-bg)]' : '',
+          header.column.getIsPinned?.() ? 'bg-table-header-bg' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
@@ -351,7 +351,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
                 v-if="getSortIcon(header.id) === 'asc'"
                 name="arrow-upward"
                 size="sm"
-                class="text-[var(--color-table-sort-icon-active)]"
+                class="text-table-sort-icon-active"
                 data-test="o2-table-sort-icon-active"
                 data-test-sort-direction="asc"
               />
@@ -359,7 +359,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
                 v-else-if="getSortIcon(header.id) === 'desc'"
                 name="arrow-downward"
                 size="sm"
-                class="text-[var(--color-table-sort-icon-active)]"
+                class="text-table-sort-icon-active"
                 data-test="o2-table-sort-icon-active"
                 data-test-sort-direction="desc"
               />
@@ -400,8 +400,8 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             :class="[
               'rounded-full transition-all duration-150',
               header.column.getIsResizing()
-                ? 'w-0.5 h-full bg-[var(--color-table-resize-handle)]'
-                : 'w-px h-4 bg-[var(--color-border-default)] group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
+                ? 'w-0.5 h-full bg-table-resize-handle'
+                : 'w-px h-4 bg-border-default group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
             ]"
           />
         </div>
@@ -415,16 +415,16 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
          while the toolbar <div> stays white. -->
     <tr
       v-if="!enableColumnReorder"
-      class="bg-[var(--color-table-header-bg)]"
+      class="bg-table-header-bg"
     >
       <th
         v-if="expansionEnabled"
-        class="w-4 min-w-4 px-0 border-b border-[var(--color-table-header-border)]"
+        class="w-4 min-w-4 px-0 border-b border-table-header-border"
         data-test="o2-table-th-expand"
       />
       <th
         v-if="selectionMultiple"
-        class="text-left border-b border-[var(--color-table-header-border)]"
+        class="text-left border-b border-table-header-border"
         :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
         data-test="o2-table-th-select"
       >
@@ -442,8 +442,8 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :class="[
           `${headerPaddingClass(header)} text-left font-medium text-table-header-text text-xs select-none relative`,
           dense ? 'h-8 group' : 'h-9 group',
-          'border-b border-[var(--color-table-header-border)]',
-          header.column.getIsPinned?.() ? 'bg-[var(--color-table-header-bg)]' : '',
+          'border-b border-table-header-border',
+          header.column.getIsPinned?.() ? 'bg-table-header-bg' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
@@ -489,7 +489,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
                 v-if="getSortIcon(header.id) === 'asc'"
                 name="arrow-upward"
                 size="sm"
-                class="shrink-0 text-[var(--color-table-sort-icon-active)]"
+                class="shrink-0 text-table-sort-icon-active"
                 data-test="o2-table-sort-icon-active"
                 data-test-sort-direction="asc"
               />
@@ -497,7 +497,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
                 v-else-if="getSortIcon(header.id) === 'desc'"
                 name="arrow-downward"
                 size="sm"
-                class="shrink-0 text-[var(--color-table-sort-icon-active)]"
+                class="shrink-0 text-table-sort-icon-active"
                 data-test="o2-table-sort-icon-active"
                 data-test-sort-direction="desc"
               />
@@ -533,8 +533,8 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             :class="[
               'rounded-full transition-all duration-150',
               header.column.getIsResizing()
-                ? 'w-0.5 h-full bg-[var(--color-table-resize-handle)]'
-                : 'w-px h-4 bg-[var(--color-border-default)] group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
+                ? 'w-0.5 h-full bg-table-resize-handle'
+                : 'w-px h-4 bg-border-default group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
             ]"
           />
         </div>

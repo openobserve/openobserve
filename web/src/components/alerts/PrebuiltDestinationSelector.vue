@@ -21,8 +21,8 @@ limitations under the License. -->
         :key="type.id"
         data-test="destination-type-card"
         :data-type="type.id"
-        class="destination-card group/dest-card relative py-5 px-3 border-2 border-[var(--color-card-glass-border)] rounded-xl cursor-pointer transition-all duration-300 [min-height:7.5rem] flex flex-col hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] hover:border-[var(--color-accent)]"
-        :class="selectedType === type.id ? 'selected border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]' : 'bg-[var(--color-card-glass-bg)]'"
+        class="destination-card group/dest-card relative py-5 px-3 border-2 border-[var(--color-card-glass-border)] rounded-xl cursor-pointer transition-all duration-300 [min-height:7.5rem] flex flex-col hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] hover:border-accent"
+        :class="selectedType === type.id ? 'selected border-accent bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]' : 'bg-[var(--color-card-glass-bg)]'"
         @click="selectType(type.id)"
       >
         <!-- Card Content -->
@@ -43,12 +43,12 @@ limitations under the License. -->
           </div>
 
           <!-- Name -->
-          <div data-test="destination-type-name" class="card-title text-[0.8125rem] font-medium mt-1 mb-0 text-[var(--color-text-primary)] [line-height:1.3] text-center">
+          <div data-test="destination-type-name" class="card-title text-[0.8125rem] font-medium mt-1 mb-0 text-text-primary [line-height:1.3] text-center">
             {{ type.name }}
           </div>
 
           <!-- Description -->
-          <div data-test="destination-type-description" class="card-description text-[0.6875rem] text-[var(--color-text-secondary)] mt-1 mb-0 [line-height:1.2] grow text-center hidden">
+          <div data-test="destination-type-description" class="card-description text-[0.6875rem] text-text-secondary mt-1 mb-0 [line-height:1.2] grow text-center hidden">
             {{ type.description }}
           </div>
         </div>
@@ -66,18 +66,18 @@ limitations under the License. -->
       <div
         data-test="destination-type-card"
         data-type="custom"
-        class="destination-card custom-card group/dest-card relative py-5 px-3 border-2 border-[var(--color-card-glass-border)] border-dashed rounded-xl cursor-pointer transition-all duration-300 [min-height:7.5rem] flex flex-col hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] hover:border-[var(--color-accent)]"
-        :class="selectedType === 'custom' ? 'selected border-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]' : 'bg-[var(--color-card-glass-bg)]'"
+        class="destination-card custom-card group/dest-card relative py-5 px-3 border-2 border-[var(--color-card-glass-border)] border-dashed rounded-xl cursor-pointer transition-all duration-300 [min-height:7.5rem] flex flex-col hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] hover:border-accent"
+        :class="selectedType === 'custom' ? 'selected border-accent bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]' : 'bg-[var(--color-card-glass-bg)]'"
         @click="selectType('custom')"
       >
         <div class="card-content flex flex-col items-center text-center h-full relative">
           <div data-test="destination-type-icon" class="mb-2 text-[var(--color-icon-color)] group-[.selected]/dest-card:text-[var(--color-accent)]">
             <OIcon name="settings" size="md" />
           </div>
-          <div data-test="destination-type-name" class="card-title text-[0.8125rem] font-medium mt-1 mb-0 text-[var(--color-text-primary)] [line-height:1.3] text-center">
+          <div data-test="destination-type-name" class="card-title text-[0.8125rem] font-medium mt-1 mb-0 text-text-primary [line-height:1.3] text-center">
             {{ t('alerts.customDestination') }}
           </div>
-          <div data-test="destination-type-description" class="card-description text-[0.6875rem] text-[var(--color-text-secondary)] mt-1 mb-0 [line-height:1.2] grow text-center hidden">
+          <div data-test="destination-type-description" class="card-description text-[0.6875rem] text-text-secondary mt-1 mb-0 [line-height:1.2] grow text-center hidden">
             {{ t('alerts.customDestinationDescription') }}
           </div>
         </div>

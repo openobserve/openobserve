@@ -310,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       name="play-circle-filled"
                       size="md"
-                      class="cursor-pointer session-play-icon text-[var(--color-icon-color)] hover:text-[var(--color-button-primary)]"
+                      class="cursor-pointer session-play-icon text-[var(--color-icon-color)] hover:text-button-primary"
                     />
                   </template>
                   <template #cell-session="{ row }">
@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="font-medium truncate"
                       />
                       <div
-                        class="flex items-center gap-1.5 text-xs text-[var(--color-text-caption)]"
+                        class="flex items-center gap-1.5 text-xs text-text-caption"
                       >
                         <span
                           class="o2-monospace-font"

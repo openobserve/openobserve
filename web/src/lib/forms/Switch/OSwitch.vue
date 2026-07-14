@@ -138,7 +138,7 @@ const hasLabel = computed(
         props.disabled
           ? 'bg-transparent border-switch-disabled-border border-dashed'
           : isChecked
-            ? 'bg-[var(--color-primary-500)] border-switch-border'
+            ? 'bg-primary-500 border-switch-border'
             : 'bg-transparent border-switch-border-off',
         props.disabled ? 'cursor-not-allowed' : 'cursor-pointer',
         'outline-none',

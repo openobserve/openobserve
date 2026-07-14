@@ -6,7 +6,7 @@
     <div
       v-for="n in count"
       :key="n"
-      class="pt-3 px-3.5 pb-2.5 bg-(--color-surface-base) border border-(--color-border-default) rounded-lg flex flex-col gap-2 min-h-24"
+      class="pt-3 px-3.5 pb-2.5 bg-surface-base border border-border-default rounded-lg flex flex-col gap-2 min-h-24"
       :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
       data-test="quality-kpi-skeleton"
     >

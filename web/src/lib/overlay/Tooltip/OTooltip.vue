@@ -118,8 +118,8 @@ const contentStyle = computed(() => ({
 
 const contentClasses = computed(() => [
   "z-[10100] px-2.5 py-1.5",
-  "bg-[var(--color-surface-overlay)] rounded-md",
-  "text-xs text-[var(--color-text-primary)] font-medium leading-relaxed",
+  "bg-surface-overlay rounded-md",
+  "text-xs text-text-primary font-medium leading-relaxed",
   "data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95",
   "data-[state=instant-open]:animate-in data-[state=instant-open]:fade-in-0",
   "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
@@ -163,7 +163,7 @@ const contentClasses = computed(() => [
           <TooltipArrow
             :width="10"
             :height="5"
-            :class="'fill-[var(--color-surface-overlay)]'"
+            :class="'fill-surface-overlay'"
           />
         </TooltipContent>
       </TooltipPortal>
@@ -206,7 +206,7 @@ const contentClasses = computed(() => [
             <TooltipArrow
               :width="10"
               :height="5"
-              :class="'fill-[var(--color-surface-overlay)]'"
+              :class="'fill-surface-overlay'"
             />
           </TooltipContent>
         </TooltipPortal>

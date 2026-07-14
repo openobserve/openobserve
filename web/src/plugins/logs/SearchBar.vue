@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
-              class="p-1! ml-1 [border:0.0625rem_solid_var(--color-button-outline-border)]! rounded-md [transition:all_0.2s_ease] min-h-[1.875rem]! text-xs font-medium hover:bg-(--color-button-outline-hover-bg) element-box-shadow"
+              class="p-1! ml-1 [border:0.0625rem_solid_var(--color-button-outline-border)]! rounded-md [transition:all_0.2s_ease] min-h-[1.875rem]! text-xs font-medium hover:bg-button-outline-hover-bg element-box-shadow"
               icon-left="more-horiz"
               variant="outline"
               size="xs"
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select.prevent="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-(--color-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-text-secondary shrink-0">
                   <OIcon name="code" size="sm" />
                 </span>
               </template>
@@ -284,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="resetFilters"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-(--color-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-text-secondary shrink-0">
                   <OIcon name="restart-alt" size="sm" />
                 </span>
               </template>
@@ -297,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-(--color-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-text-secondary shrink-0">
                   <OIcon name="bar-chart" size="sm" />
                 </span>
               </template>
@@ -329,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select.prevent="handleQuickMode"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-(--color-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-text-secondary shrink-0">
                   <OIcon name="bolt" size="sm" />
                 </span>
               </template>
@@ -361,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select.prevent="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-(--color-text-secondary) shrink-0 [font-family:var(--font-mono,monospace)] text-[var(--text-sm)] italic [font-weight:var(--font-bold)] text-(--color-accent)">fx</span>
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-text-secondary shrink-0 [font-family:var(--font-mono,monospace)] text-[var(--text-sm)] italic [font-weight:var(--font-bold)] text-accent">fx</span>
               </template>
               {{ t('search.functionEditorLabel') }}
               <template #icon-right>
@@ -406,7 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="openSavedViewsList"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-(--color-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-text-secondary shrink-0">
                   <OIcon name="format-list-bulleted" size="sm" />
                 </span>
               </template>
@@ -419,7 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="fnSavedView"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-(--color-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-text-secondary shrink-0">
                   <OIcon name="add" size="sm" />
                 </span>
               </template>
@@ -507,7 +507,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="showSearchHistoryfn"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-(--color-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-text-secondary shrink-0">
                   <OIcon name="history" size="sm" />
                 </span>
               </template>
@@ -525,10 +525,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-disabled="isDownloadDisabled || undefined"
               @mouseenter="!isDownloadDisabled && (showDownloadSubmenu = true)"
               @mouseleave="showDownloadSubmenu = false"
-              class="relative flex items-center gap-2 py-[0.375rem] px-3 text-[var(--text-base)] [line-height:1.2] cursor-pointer select-none hover:bg-(--color-interactive-hover-bg) search-download-item"
-              :class="{ 'cursor-not-allowed! text-(--color-text-muted) hover:bg-transparent!': isDownloadDisabled }"
+              class="relative flex items-center gap-2 py-[0.375rem] px-3 text-[var(--text-base)] [line-height:1.2] cursor-pointer select-none hover:bg-interactive-hover-bg search-download-item"
+              :class="{ 'cursor-not-allowed! text-text-muted hover:bg-transparent!': isDownloadDisabled }"
             >
-              <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-(--color-text-secondary) shrink-0">
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-text-secondary shrink-0">
                 <OIcon size="sm" name="download" />
               </span>
               <span class="flex-1 whitespace-nowrap">{{ t("search.downloadTable") }}</span>
@@ -536,13 +536,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 v-if="showDownloadSubmenu && !isDownloadDisabled"
-                class="search-download-submenu absolute right-full top-0 mr-1 min-w-40 bg-(--color-dropdown-bg) [border:0.063rem_solid_var(--color-card-glass-border)] rounded-md [box-shadow:0_0.5rem_1.5rem_var(--color-hover-shadow)] py-1 px-0 z-[9999]"
+                class="search-download-submenu absolute right-full top-0 mr-1 min-w-40 bg-dropdown-bg [border:0.063rem_solid_var(--color-card-glass-border)] rounded-md [box-shadow:0_0.5rem_1.5rem_var(--color-hover-shadow)] py-1 px-0 z-[9999]"
                 data-test="search-download-submenu"
               >
                 <button
                   type="button"
                   data-test="search-download-csv-btn"
-                  class="flex items-center gap-[0.625rem] w-full py-[0.375rem] px-3 text-[var(--text-base)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-(--color-text-body) hover:bg-(--color-interactive-hover-bg)"
+                  class="flex items-center gap-[0.625rem] w-full py-[0.375rem] px-3 text-[var(--text-base)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-text-body hover:bg-interactive-hover-bg"
                   @click="downloadLogs(searchObj.data.queryResults.hits, 'csv'); showDownloadSubmenu = false"
                 >
                   <OIcon name="grid-on" size="sm" />
@@ -551,7 +551,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <button
                   type="button"
                   data-test="search-download-json-btn"
-                  class="flex items-center gap-[0.625rem] w-full py-[0.375rem] px-3 text-[var(--text-base)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-(--color-text-body) hover:bg-(--color-interactive-hover-bg)"
+                  class="flex items-center gap-[0.625rem] w-full py-[0.375rem] px-3 text-[var(--text-base)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-text-body hover:bg-interactive-hover-bg"
                   @click="downloadLogs(searchObj.data.queryResults.hits, 'json'); showDownloadSubmenu = false"
                 >
                   <OIcon name="data-object" size="sm" />
@@ -566,7 +566,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="toggleCustomDownloadDialog"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-(--color-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-text-secondary shrink-0">
                   <img
                     :src="customRangeIcon"
                     alt="Custom Range"
@@ -590,7 +590,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="createScheduleJob"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-(--color-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-text-secondary shrink-0">
                   <img
                     :src="createScheduledSearchIcon"
                     alt="Create Scheduled Search"
@@ -609,7 +609,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="routeToSearchSchedule"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-(--color-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-text-secondary shrink-0">
                   <img
                     :src="listScheduledSearchIcon"
                     alt="List Scheduled Search"
@@ -638,7 +638,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="openSearchInspectDialog"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-(--color-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-text-secondary shrink-0">
                   <OIcon name="troubleshoot" size="sm" />
                 </span>
               </template>
@@ -660,7 +660,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="openExplainDialog"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-(--color-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--color-section-header-bg) text-text-secondary shrink-0">
                   <OIcon name="lightbulb" size="sm" />
                 </span>
               </template>
@@ -690,7 +690,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :size="toolbarToggleIconOnly ? 'sm' : 'md'"
             @click.stop
           />
-          <span class="[font-family:var(--font-mono,monospace)] text-sm italic font-bold text-(--color-accent) shrink-0">fx</span>
+          <span class="[font-family:var(--font-mono,monospace)] text-sm italic font-bold text-accent shrink-0">fx</span>
           <OTooltip :content="t('search.functionEditorLabel')" />
         </OButton>
 
@@ -783,7 +783,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('search.cancel')"
                   variant="ghost"
                   size="sm-toolbar"
-                  class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--color-cancel-query-bg)]! text-[var(--color-button-primary-foreground)]! element-box-shadow [border-radius:0.375rem_0_0_0.375rem]!"
+                  class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--color-cancel-query-bg)]! text-button-primary-foreground! element-box-shadow [border-radius:0.375rem_0_0_0.375rem]!"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -812,7 +812,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button [border-radius:0.375rem_0_0_0.375rem]!'
-                      : '[font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--color-button-primary)]! text-[var(--color-button-primary-foreground)]! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                      : '[font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
                     '[border-radius:0.375rem_0_0_0.375rem]!',
                   ]"
                   @click="
@@ -839,12 +839,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ) &&
                         config.isEnterprise == 'true' &&
                         visualizeSearchRequestTraceIds.length
-                          ? 'bg-[var(--color-cancel-query-bg)]! text-[var(--color-button-primary-foreground)]!'
+                          ? 'bg-[var(--color-cancel-query-bg)]! text-button-primary-foreground!'
                           : !(
                                 isNaturalLanguageDetected &&
                                 !searchObj.meta.nlpMode
                               )
-                            ? 'bg-[var(--color-button-primary)]! text-[var(--color-button-primary-foreground)]! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
+                            ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
                             : '',
                         '[border-radius:0_0.375rem_0.375rem_0]!',
                       ]"
@@ -871,7 +871,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdownItem>
                   <p
                     v-else
-                    class="text-xs text-[var(--color-text-caption)] text-center px-3 py-2"
+                    class="text-xs text-text-caption text-center px-3 py-2"
                   >
                     {{ t("nlMode.noAdditionalOptions") }}
                   </p>
@@ -885,7 +885,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   :title="t('search.cancel')"
                   size="sm-toolbar"
-                  class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--color-cancel-query-bg)]! text-[var(--color-button-primary-foreground)]! element-box-shadow [border-radius:0.375rem_0_0_0.375rem]!"
+                  class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--color-cancel-query-bg)]! text-button-primary-foreground! element-box-shadow [border-radius:0.375rem_0_0_0.375rem]!"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -915,7 +915,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button [border-radius:0.375rem_0_0_0.375rem]!'
-                      : '[font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--color-button-primary)]! text-[var(--color-button-primary-foreground)]! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                      : '[font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
                     '[border-radius:0.375rem_0_0_0.375rem]!',
                   ]"
                   @click="
@@ -942,12 +942,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ) &&
                         config.isEnterprise == 'true' &&
                         visualizeSearchRequestTraceIds.length
-                          ? 'bg-[var(--color-cancel-query-bg)]! text-[var(--color-button-primary-foreground)]!'
+                          ? 'bg-[var(--color-cancel-query-bg)]! text-button-primary-foreground!'
                           : !(
                                 isNaturalLanguageDetected &&
                                 !searchObj.meta.nlpMode
                               )
-                            ? 'bg-[var(--color-button-primary)]! text-[var(--color-button-primary-foreground)]! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
+                            ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
                             : '',
                         '[border-radius:0_0.375rem_0.375rem_0]!',
                       ]"
@@ -974,7 +974,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdownItem>
                   <p
                     v-else
-                    class="text-xs text-[var(--color-text-caption)] text-center px-3 py-2"
+                    class="text-xs text-text-caption text-center px-3 py-2"
                   >
                     {{ t("nlMode.noAdditionalOptions") }}
                   </p>
@@ -992,7 +992,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 :title="t('search.cancel')"
                 size="sm-toolbar"
-                class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--color-cancel-query-bg)]! text-[var(--color-button-primary-foreground)]! element-box-shadow rounded-md"
+                class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--color-cancel-query-bg)]! text-button-primary-foreground! element-box-shadow rounded-md"
                 @click="cancelPatterns"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -1010,7 +1010,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="primary"
                 :title="t('search.cancel')"
                 size="sm-toolbar"
-                class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--color-cancel-query-bg)]! text-[var(--color-button-primary-foreground)]! element-box-shadow"
+                class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--color-cancel-query-bg)]! text-button-primary-foreground! element-box-shadow"
                 :class="
                   config.isEnterprise == 'true'
                     ? '[border-radius:0.375rem_0_0_0.375rem]!'
@@ -1039,7 +1039,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="[
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
-                    : '[font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--color-button-primary)]! text-[var(--color-button-primary-foreground)]! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                    : '[font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
                   store.state.zoConfig.auto_query_enabled
                     ? '[border-radius:0.375rem_0_0_0.375rem]!'
                     : 'rounded-md',
@@ -1108,12 +1108,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           !!searchObj.data.searchWebSocketTraceIds.length) &&
                         (searchObj.loading == true ||
                           searchObj.loadingHistogram == true))
-                        ? 'bg-[var(--color-cancel-query-bg)]! text-[var(--color-button-primary-foreground)]!'
+                        ? 'bg-[var(--color-cancel-query-bg)]! text-button-primary-foreground!'
                         : !(
                               isNaturalLanguageDetected &&
                               !searchObj.meta.nlpMode
                             )
-                          ? 'bg-[var(--color-button-primary)]! text-[var(--color-button-primary-foreground)]! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
+                          ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
                           : '',
                       store.state.zoConfig.auto_query_enabled
                         ? '[border-radius:0_0.375rem_0.375rem_0]!'
@@ -1174,7 +1174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : t("search.turnOnLiveMode")
                       }}
                     </div>
-                    <div class="text-xs text-[var(--color-text-secondary)]">
+                    <div class="text-xs text-text-secondary">
                       {{ t("search.liveModeTooltip") }}
                     </div>
                   </span>
@@ -1182,7 +1182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- NLP mode: info message -->
                 <p
                   v-if="isNaturalLanguageDetected && !searchObj.meta.nlpMode"
-                  class="text-xs text-[var(--color-text-caption)] text-center px-3 py-2"
+                  class="text-xs text-text-caption text-center px-3 py-2"
                 >
                   {{ t("nlMode.noAdditionalOptions") }}
                 </p>

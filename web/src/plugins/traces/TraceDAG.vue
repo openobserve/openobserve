@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mt-3 text-gray-400">No DAG data available</div>
     </div>
 
-    <div v-else data-test="traces-trace-dag-wrapper" class="w-full h-full min-h-150 border border-(--color-border-default) rounded relative dark:border-[#444]">
+    <div v-else data-test="traces-trace-dag-wrapper" class="w-full h-full min-h-150 border border-border-default rounded relative dark:border-[#444]">
       <VueFlow
         :nodes="nodes"
         :edges="edges"
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <Handle v-if="data.hasIncoming" type="target" :position="Position.Top"
             class="w-2 h-2 bg-[#1976d2] border-2 border-white rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.15)]" />
           <div
-            class="p-[6px_12px] rounded-md bg-white border-2 border-[#1976d2] min-w-[80px] max-w-[180px] min-h-[28px] shadow-[0_2px_6px_rgba(0,0,0,0.1)] transition-all duration-200 cursor-pointer text-center flex flex-col items-center justify-center hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:[transform:translateY(-2px)] dark:bg-[#2a2a2a] dark:border-[#64b5f6] dark:text-[var(--color-border-default)]"
+            class="p-[6px_12px] rounded-md bg-white border-2 border-[#1976d2] min-w-[80px] max-w-[180px] min-h-[28px] shadow-[0_2px_6px_rgba(0,0,0,0.1)] transition-all duration-200 cursor-pointer text-center flex flex-col items-center justify-center hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:[transform:translateY(-2px)] dark:bg-[#2a2a2a] dark:border-[#64b5f6] dark:text-border-default"
             :class="[
               {
                 'border-[#c62828]! bg-[#ffebee]! dark:border-[#ef5350]! dark:bg-[#3a1a1a]!': data.span_status === 'ERROR',

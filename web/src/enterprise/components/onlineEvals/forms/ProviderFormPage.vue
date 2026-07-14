@@ -21,12 +21,12 @@
       <section class="mb-6">
         <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
           <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-[11px] font-[ui-monospace,SFMono-Regular,Menlo,monospace]">01</span>
-          <div class="m-0 text-sm font-semibold text-(--color-text-primary)">{{ t("onlineEvals.provider.sectionTitle") }}</div>
+          <div class="m-0 text-sm font-semibold text-text-primary">{{ t("onlineEvals.provider.sectionTitle") }}</div>
         </div>
 
         <div class="provider-field-row grid grid-cols-2 gap-[14px]">
           <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+            <div class="flex items-center text-xs font-semibold text-text-primary mb-1">
               {{ t("onlineEvals.provider.nameLabel") }}
               <span class="text-(--color-status-error-text) ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
@@ -44,7 +44,7 @@
           </div>
 
           <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+            <div class="flex items-center text-xs font-semibold text-text-primary mb-1">
               {{ t("onlineEvals.provider.typeLabel") }}
               <span class="text-(--color-status-error-text) ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
@@ -60,7 +60,7 @@
         </div>
 
         <div class="mb-3">
-          <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">{{ t("onlineEvals.provider.endpointLabel") }}</div>
+          <div class="flex items-center text-xs font-semibold text-text-primary mb-1">{{ t("onlineEvals.provider.endpointLabel") }}</div>
           <OInput
             v-model.trim="form.endpoint"
             :placeholder="endpointPlaceholder"
@@ -71,7 +71,7 @@
 
         <div class="provider-field-row grid grid-cols-2 gap-[14px]">
           <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+            <div class="flex items-center text-xs font-semibold text-text-primary mb-1">
               {{ t("onlineEvals.provider.defaultModelLabel") }}
               <span class="text-(--color-status-error-text) ml-0.5">*</span>
             </div>
@@ -84,7 +84,7 @@
           </div>
 
           <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">{{ t("onlineEvals.provider.availableModelsLabel") }}</div>
+            <div class="flex items-center text-xs font-semibold text-text-primary mb-1">{{ t("onlineEvals.provider.availableModelsLabel") }}</div>
             <OInput
               v-model.trim="form.availableModels"
               :placeholder="t('onlineEvals.provider.availableModelsPlaceholder')"
@@ -100,16 +100,16 @@
       <section class="mb-6">
         <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
           <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-[11px] font-[ui-monospace,SFMono-Regular,Menlo,monospace]">02</span>
-          <div class="m-0 text-sm font-semibold text-(--color-text-primary)">{{ t("onlineEvals.provider.authSection") }}</div>
+          <div class="m-0 text-sm font-semibold text-text-primary">{{ t("onlineEvals.provider.authSection") }}</div>
         </div>
 
-        <div v-if="mode === 'edit'" class="provider-callout flex gap-2 items-start px-3 py-2 mb-3 bg-[color-mix(in_srgb,var(--color-status-info-text)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_30%,transparent)] rounded-md text-[11.5px] text-(--color-text-primary) leading-[1.4]">
+        <div v-if="mode === 'edit'" class="provider-callout flex gap-2 items-start px-3 py-2 mb-3 bg-[color-mix(in_srgb,var(--color-status-info-text)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_30%,transparent)] rounded-md text-[11.5px] text-text-primary leading-[1.4]">
           <OIcon name="lock" size="xs" class="shrink-0 mt-px text-[var(--color-status-info-text)]" />
           <span>{{ t("onlineEvals.provider.authEditNote") }}</span>
         </div>
 
         <div class="mb-3">
-          <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+          <div class="flex items-center text-xs font-semibold text-text-primary mb-1">
             {{ t("onlineEvals.provider.apiKeyLabel") }}
             <span v-if="mode === 'create'" class="text-(--color-status-error-text) ml-0.5">*</span>
           </div>

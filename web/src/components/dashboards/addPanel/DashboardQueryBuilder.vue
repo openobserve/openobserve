@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
             :class="{
               'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
-              'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
+              'transition-all duration-200 bg-field-list-row-hover-bg':
                 dashboardPanelData.meta.dragAndDrop.dragging &&
                 dashboardPanelData.meta.dragAndDrop.currentDragArea == 'x',
             }"
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
             :class="{
               'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
-              'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
+              'transition-all duration-200 bg-field-list-row-hover-bg':
                 dashboardPanelData.meta.dragAndDrop.dragging &&
                 dashboardPanelData.meta.dragAndDrop.currentDragArea ==
                   'breakdown',
@@ -358,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
         :class="{
           'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
-          'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
+          'transition-all duration-200 bg-field-list-row-hover-bg':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'y',
         }"
@@ -504,7 +504,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
           :class="{
             'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
-            'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
+            'transition-all duration-200 bg-field-list-row-hover-bg':
               dashboardPanelData.meta.dragAndDrop.dragging &&
               dashboardPanelData.meta.dragAndDrop.currentDragArea == 'z',
           }"

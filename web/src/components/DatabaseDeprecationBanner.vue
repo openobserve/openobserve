@@ -26,14 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex items-center">
       <div class="flex flex-col">
         <span
-          class="text-base font-semibold leading-6 text-[var(--color-text-primary)]"
+          class="text-base font-semibold leading-6 text-text-primary"
           data-test="database-deprecation-banner-title"
         >
           ⚠️ MySQL support is DEPRECATED and will be removed in future.
         </span>
         <br />
         <span
-          class="text-sm font-normal leading-5 text-[var(--color-text-secondary)]"
+          class="text-sm font-normal leading-5 text-text-secondary"
           data-test="database-deprecation-banner-subtitle"
         >
           Please migrate to PostgreSQL to ensure continued support.

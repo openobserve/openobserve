@@ -16,7 +16,7 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
       :key="card.id"
       role="button"
       tabindex="0"
-      class="capability-card group/card relative py-4 px-4 pb-[1.125rem] border border-(--color-border-default) rounded-xl cursor-pointer bg-(--color-card-bg) transition-[border-color,box-shadow,translate,background] duration-200 ease-[ease] isolate overflow-hidden min-h-[132px] [--accent:123,97,255] hover:border-[rgba(var(--accent),0.5)] hover:-translate-y-[3px] hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_28px_-10px_rgba(var(--accent),0.35)] focus-visible:outline-none focus-visible:border-[rgba(var(--accent),0.7)] focus-visible:shadow-[0_0_0_2px_rgba(var(--accent),0.45)]"
+      class="capability-card group/card relative py-4 px-4 pb-[1.125rem] border border-border-default rounded-xl cursor-pointer bg-card-bg transition-[border-color,box-shadow,translate,background] duration-200 ease-[ease] isolate overflow-hidden min-h-[132px] [--accent:123,97,255] hover:border-[rgba(var(--accent),0.5)] hover:-translate-y-[3px] hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_28px_-10px_rgba(var(--accent),0.35)] focus-visible:outline-none focus-visible:border-[rgba(var(--accent),0.7)] focus-visible:shadow-[0_0_0_2px_rgba(var(--accent),0.45)]"
       :class="{
         '[--accent:123,97,255]': card.id === 'query',
         '[--accent:245,158,11]': card.id === 'incident',
@@ -37,10 +37,10 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
       >
         <OIcon :name="card.icon" size="md" :class="card.iconColorClass" />
       </div>
-      <div class="capability-card__title relative z-[1] m-0 text-sm font-semibold leading-[1.3] text-[var(--color-typography-body)] whitespace-nowrap overflow-hidden text-ellipsis">
+      <div class="capability-card__title relative z-[1] m-0 text-sm font-semibold leading-[1.3] text-typography-body whitespace-nowrap overflow-hidden text-ellipsis">
         {{ t(`aiAssistant.capabilities.${card.id}.title`) }}
       </div>
-      <div class="capability-card__desc relative z-[1] mt-[0.375rem] mb-0 text-xs leading-[1.45] text-[var(--color-text-secondary)]">
+      <div class="capability-card__desc relative z-[1] mt-[0.375rem] mb-0 text-xs leading-[1.45] text-text-secondary">
         {{ t(`aiAssistant.capabilities.${card.id}.description`) }}
       </div>
       <span

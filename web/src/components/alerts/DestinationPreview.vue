@@ -23,7 +23,7 @@ limitations under the License.
 
     <div data-test="destination-preview-card" class="w-full">
         <!-- Slack Preview -->
-        <div v-if="type === 'slack'" data-test="slack-preview" class="slack-message max-w-[600px] mx-auto bg-white border border-(--color-border-default) rounded-lg p-4 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+        <div v-if="type === 'slack'" data-test="slack-preview" class="slack-message max-w-[600px] mx-auto bg-white border border-border-default rounded-lg p-4 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div class="slack-message-container flex gap-3">
             <div class="slack-avatar">
               <div class="avatar-circle w-[36px] h-[36px] bg-[#4a154b] text-white rounded flex items-center justify-center font-bold text-[0.875rem]">OO</div>

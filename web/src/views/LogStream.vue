@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OCheckbox
             v-model="deleteAssociatedAlertsPipelines"
           />
-          <span class="text-(--color-text-secondary) text-xs font-medium">
+          <span class="text-text-secondary text-xs font-medium">
             {{ t("logStream.deleteAssociatedAlertsPipelines") }}
           </span>
         </div>
@@ -292,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OCheckbox
             v-model="deleteAssociatedAlertsPipelines"
           />
-          <span class="text-(--color-text-secondary) text-xs font-medium">
+          <span class="text-text-secondary text-xs font-medium">
             Delete all Pipelines and Alerts associated with the selected streams
           </span>
         </div>

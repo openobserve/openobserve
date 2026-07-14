@@ -87,7 +87,7 @@
         </span>
         <span
           v-if="selectedConfig?.version"
-          class="qpd-version ml-[6px] text-[11px] text-(--color-text-secondary) [font-variant-numeric:tabular-nums]"
+          class="qpd-version ml-[6px] text-[11px] text-text-secondary [font-variant-numeric:tabular-nums]"
           data-test="quality-detail-version-badge"
           >v{{ selectedConfig.version }}</span
         >

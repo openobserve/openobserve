@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="max-h-[calc(100vh-400px)] overflow-y-auto">
           <!-- Additions -->
           <div v-if="diffData.additions.length > 0" class="mb-3">
-            <div class="text-sm font-semibold border-b border-[var(--color-separator)] text-green-500 p-2">
+            <div class="text-sm font-semibold border-b border-separator text-green-500 p-2">
               <OIcon name="add-circle" size="sm" />
               New ({{ selectedAdditions.length }}/{{
                 diffData.additions.length
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Modifications -->
           <div v-if="diffData.modifications.length > 0" class="mb-3">
-            <div class="text-sm font-semibold border-b border-[var(--color-separator)] text-amber-500 p-2">
+            <div class="text-sm font-semibold border-b border-separator text-amber-500 p-2">
               <OIcon name="edit" size="sm" />
               Modified ({{ selectedModifications.length }}/{{
                 diffData.modifications.length

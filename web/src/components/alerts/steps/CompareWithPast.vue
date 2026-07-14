@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div ref="multiWindowContainerRef" class="step-compare-with-past w-full h-full flex flex-col mx-auto" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content rounded-lg flex-1 min-h-0 overflow-auto bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)]" :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'">
+    <div class="step-content rounded-lg flex-1 min-h-0 overflow-auto bg-surface-overlay border border-border-default" :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'">
       <div class="section-header flex items-center gap-0 py-2.5 px-3" :class="store.state.theme === 'dark' ? 'border-b border-[#343434]' : 'border-b border-[#eeeeee]'">
         <div class="section-header-accent w-0.75 h-4 rounded-xs mr-2 shrink-0 bg-[var(--q-primary)]" />
-        <span class="section-header-title text-[13px] font-semibold text-[var(--color-text-primary)]">{{ t('alerts.steps.compareWithPast') }}</span>
+        <span class="section-header-title text-[13px] font-semibold text-text-primary">{{ t('alerts.steps.compareWithPast') }}</span>
       </div>
       <div class="px-3 pb-2">
       <!-- Alert set for header -->

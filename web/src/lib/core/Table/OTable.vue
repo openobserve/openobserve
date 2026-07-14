@@ -808,7 +808,7 @@ defineExpose({
     <!-- ── Custom toolbar slot (rendered INSIDE the frame, above the table) ── -->
     <div
       v-if="slots.toolbar || slots['toolbar-trailing']"
-      class="flex items-center px-3 py-2 gap-2 border-b border-[var(--color-table-row-divider)]"
+      class="flex items-center px-3 py-2 gap-2 border-b border-table-row-divider"
       data-test="o2-table-toolbar"
     >
       <slot name="toolbar" />
@@ -827,7 +827,7 @@ defineExpose({
     <!-- ── Built-in global search ─────────────────────────── -->
     <div
       v-if="props.showGlobalFilter && !slots.top && !slots.toolbar"
-      class="flex items-center gap-2 px-3 py-2 border-b border-[var(--color-table-row-divider)] bg-[var(--color-table-header-bg)]"
+      class="flex items-center gap-2 px-3 py-2 border-b border-table-row-divider bg-table-header-bg"
       data-test="o2-table-global-filter"
     >
       <div class="relative max-w-xs flex-1">
@@ -1028,7 +1028,7 @@ defineExpose({
           <tr
             v-for="footerGroup in table.getFooterGroups()"
             :key="footerGroup.id"
-            class="bg-[var(--color-table-header-bg)]"
+            class="bg-table-header-bg"
           >
             <!-- Expand placeholder -->
             <th
@@ -1047,7 +1047,7 @@ defineExpose({
               :data-test="`o2-table-footer-cell-${header.id}`"
               :class="[
                 'px-2 py-1 text-left text-text-primary text-xs',
-                'border-t border-[var(--color-table-header-border)]',
+                'border-t border-table-header-border',
                 (header.column.columnDef.meta as any)?.align === 'center' ? 'text-center' : '',
                 (header.column.columnDef.meta as any)?.align === 'right' ? 'text-right' : '',
               ]"
@@ -1115,7 +1115,7 @@ defineExpose({
       <div
         v-if="showStreaming"
         data-test="o2-table-streaming-bar"
-        class="sticky bottom-0 h-1 w-full bg-[var(--color-table-streaming-bar)] animate-pulse z-10"
+        class="sticky bottom-0 h-1 w-full bg-table-streaming-bar animate-pulse z-10"
         aria-label="Data streaming in progress"
       />
     </div>

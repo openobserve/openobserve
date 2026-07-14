@@ -11,7 +11,7 @@
     @click:secondary="$emit('update:open', false)"
     @click:primary="saveChanges()"
   >
-  <div data-test="dashboard-json-editor-container" class="w-[70vw] flex flex-col h-[calc(100vh-116px)]" :class="store.state.theme === 'dark' ? 'bg-(--color-surface-base)' : 'bg-white'">
+  <div data-test="dashboard-json-editor-container" class="w-[70vw] flex flex-col h-[calc(100vh-116px)]" :class="store.state.theme === 'dark' ? 'bg-surface-base' : 'bg-white'">
     <!-- Monaco editor fills remaining space; flex-1 + min-h-0 lets it expand without overflow -->
     <div class="flex-1 min-h-0">
       <query-editor

@@ -34,7 +34,7 @@
         </div>
         <div v-else class="indexDetailsContainer p-5 w-full" style="height: 100vh">
           <div
-            class="titleContainer flex flex-col items-flex-start gap-5 bg-[#00000005] border border-[var(--color-input-border)] rounded-[5px] p-4"
+            class="titleContainer flex flex-col items-flex-start gap-5 bg-[#00000005] border border-input-border rounded-[5px] p-4"
           >
             <div
               data-test="stream-details-container"

@@ -49,7 +49,7 @@
         <!-- Group header -->
         <div
           v-if="row.isGroup"
-          class="o-field-list__group-header h-7 flex items-center justify-between text-[0.6875rem] font-semibold text-(--color-field-list-group-text) cursor-default select-none tracking-[0.01em] sticky top-0 z-[2] bg-transparent"
+          class="o-field-list__group-header h-7 flex items-center justify-between text-[0.6875rem] font-semibold text-field-list-group-text cursor-default select-none tracking-[0.01em] sticky top-0 z-[2] bg-transparent"
           :data-test="`o-field-list-group-${row.groupName}`"
         >
           <slot name="group-header" :row="row" :group-name="row.groupName">
@@ -86,7 +86,7 @@
                   name="drag-indicator"
                   size="sm"
                   :class="[
-                    'shrink-0 inline-flex items-center justify-center w-4 text-[var(--color-field-list-drag-icon)]',
+                    'shrink-0 inline-flex items-center justify-center w-4 text-field-list-drag-icon',
                     isDragEnabled(row, row._index ?? 0)
                       ? 'cursor-grab'
                       : 'cursor-not-allowed opacity-40',
@@ -97,7 +97,7 @@
               </OFieldRow>
             </slot>
           </div>
-          <div v-if="$slots['field-actions']" class="o-field-list__actions flex items-stretch shrink-0 invisible opacity-0 transition-[opacity,visibility] duration-[120ms] ease-[ease] absolute right-1 top-1/2 -translate-y-1/2 border border-(--color-field-list-actions-border) rounded-[0.1875rem] overflow-hidden bg-(--color-field-list-actions-bg)">
+          <div v-if="$slots['field-actions']" class="o-field-list__actions flex items-stretch shrink-0 invisible opacity-0 transition-[opacity,visibility] duration-[120ms] ease-[ease] absolute right-1 top-1/2 -translate-y-1/2 border border-field-list-actions-border rounded-[0.1875rem] overflow-hidden bg-field-list-actions-bg">
             <slot name="field-actions" :row="row" :index="row._index" />
           </div>
         </div>
@@ -105,7 +105,7 @@
         <!-- Expanded content -->
         <div
           v-if="isExpanded(row) && $slots.expansion"
-          class="w-full pt-1 pb-[0.375rem] border border-[var(--color-field-list-expansion-border)] border-t-0 rounded-b-[0.1875rem] mb-[0.375rem] relative z-[1] box-border"
+          class="w-full pt-1 pb-[0.375rem] border border-field-list-expansion-border border-t-0 rounded-b-[0.1875rem] mb-[0.375rem] relative z-[1] box-border"
         >
           <slot name="expansion" :row="row" />
         </div>

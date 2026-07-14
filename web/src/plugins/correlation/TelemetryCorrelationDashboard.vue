@@ -203,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template v-if="group.streams.length > 0">
                         <div
-                          class="flex items-center justify-between py-1.5 px-2 bg-(--color-section-header-bg) border-b border-solid border-(--color-border-default) sticky top-0 z-10 cursor-pointer"
+                          class="flex items-center justify-between py-1.5 px-2 bg-(--color-section-header-bg) border-b border-solid border-border-default sticky top-0 z-10 cursor-pointer"
                           @click="toggleGroupCollapse(group.id)"
                         >
                           <div class="flex items-center gap-[0.375rem] text-[0.6875rem] font-bold uppercase tracking-[0.05em] opacity-75">
@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                           <div class="flex flex-col flex-1 min-w-0">
                             <span
-                              class="truncate cursor-pointer text-[var(--color-text-secondary)]! text-sm"
+                              class="truncate cursor-pointer text-text-secondary! text-sm"
                               >{{ stream.stream_name }}</span
                             >
                           </div>
@@ -293,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- -- Separator -- -->
             <template #separator>
-              <div class="w-px h-full bg-(--color-border-default) cursor-col-resize dark:bg-[rgba(255,255,255,0.12)]" />
+              <div class="w-px h-full bg-border-default cursor-col-resize dark:bg-[rgba(255,255,255,0.12)]" />
             </template>
 
             <!-- -- Right area: group tabs + dashboard -- -->
@@ -705,7 +705,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template v-if="group.streams.length > 0">
                       <div
-                        class="flex items-center justify-between py-1.5 px-2 bg-(--color-section-header-bg) border-b border-solid border-(--color-border-default) sticky top-0 z-10 cursor-pointer"
+                        class="flex items-center justify-between py-1.5 px-2 bg-(--color-section-header-bg) border-b border-solid border-border-default sticky top-0 z-10 cursor-pointer"
                         @click="toggleGroupCollapse(group.id)"
                       >
                         <div class="flex items-center gap-[0.375rem] text-[0.6875rem] font-bold uppercase tracking-[0.05em] opacity-75">
@@ -766,7 +766,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                         <div class="flex flex-col flex-1 min-w-0">
                           <span
-                            class="truncate cursor-pointer text-[var(--color-text-secondary)]! text-sm"
+                            class="truncate cursor-pointer text-text-secondary! text-sm"
                             >{{ stream.stream_name }}</span
                           >
                         </div>
@@ -795,7 +795,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- -- Separator -- -->
           <template #separator>
-            <div class="w-px h-full bg-(--color-border-default) cursor-col-resize dark:bg-[rgba(255,255,255,0.12)]" />
+            <div class="w-px h-full bg-border-default cursor-col-resize dark:bg-[rgba(255,255,255,0.12)]" />
           </template>
 
           <!-- -- Right area: group tabs + dashboard -- -->
@@ -1105,7 +1105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Group section — hidden when no streams match -->
           <template v-if="group.streams.length > 0">
             <!-- Group header -->
-            <div class="flex items-center justify-between py-1.5 px-2 bg-(--color-section-header-bg) border-b border-solid border-(--color-border-default) sticky top-0 z-10">
+            <div class="flex items-center justify-between py-1.5 px-2 bg-(--color-section-header-bg) border-b border-solid border-border-default sticky top-0 z-10">
               <div class="flex items-center gap-[0.375rem] text-[0.6875rem] font-bold uppercase tracking-[0.05em] opacity-75">
                 <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="mr-0.5" />
                 <component v-else :is="group.icon" />
@@ -1139,7 +1139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="stream in group.streams"
               :key="stream.stream_name"
-              class="flex items-center gap-2 py-2 px-4 border-b border-solid border-[var(--color-border-default)] hover:bg-[rgba(0,0,0,0.04)] dark:border-[rgba(255,255,255,0.1)] dark:hover:bg-[rgba(255,255,255,0.05)]"
+              class="flex items-center gap-2 py-2 px-4 border-b border-solid border-border-default hover:bg-[rgba(0,0,0,0.04)] dark:border-[rgba(255,255,255,0.1)] dark:hover:bg-[rgba(255,255,255,0.05)]"
             >
               <div class="flex items-center shrink-0">
                 <OCheckbox

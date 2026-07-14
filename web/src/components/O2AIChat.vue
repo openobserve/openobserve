@@ -53,7 +53,7 @@
               </template>
               <!-- History menu with search -->
               <div class="history-menu-container relative max-h-[450px] flex flex-col w-[300px]">
-                <div class="search-history-bar-sticky sticky top-0 z-[2] bg-[var(--q-page-background)] p-2 border-b border-[var(--color-separator)] shrink-0">
+                <div class="search-history-bar-sticky sticky top-0 z-[2] bg-[var(--q-page-background)] p-2 border-b border-separator shrink-0">
                   <OSearchInput
                     v-model="historySearchTerm"
                     placeholder="Search chat history"
@@ -108,7 +108,7 @@
                 <!-- Clear all conversations button -->
                 <div
                   v-if="filteredChatHistory.length > 0"
-                  class="clear-all-container bg-[var(--q-page-background)] p-2 border-t border-[var(--color-separator)] shrink-0"
+                  class="clear-all-container bg-[var(--q-page-background)] p-2 border-t border-separator shrink-0"
                 >
                   <ODropdownSeparator />
                   <OButton

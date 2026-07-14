@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div>
         <div
-          class="text-[0.85rem] font-semibold text-[var(--color-text-heading)]"
+          class="text-[0.85rem] font-semibold text-text-heading"
         >
           {{ displayTitle }}
         </div>
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Operation is the one cell we colour — it names the failed span, so it
            reads in the error colour. -->
       <template #cell-operation="{ value }">
-        <span class="text-[var(--color-error-600)]">{{ value }}</span>
+        <span class="text-error-600">{{ value }}</span>
       </template>
 
       <!-- Trace id: only a title for the full value on hover; default text. -->

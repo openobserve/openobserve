@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Webinar announcement bar: shown above toolbar for cloud users -->
       <div
         v-if="config.isCloud === 'true'"
-        class="bg-[var(--color-button-primary)] text-[var(--color-button-primary-foreground)] text-center"
+        class="bg-button-primary text-button-primary-foreground text-center"
       >
         <WebinarBanner variant="header" />
       </div>
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="flex flex-col min-h-0 bg-[var(--color-surface-chrome-deeper)] pr-2 pb-2"
+          class="flex flex-col min-h-0 bg-surface-chrome-deeper pr-2 pb-2"
           :style="{
             width:
               store.state.isAiChatEnabled && !store.state.isAiChatExpanded

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <div
-      class="step-content rounded-lg bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)]"
+      class="step-content rounded-lg bg-surface-overlay border border-border-default"
     >
       <!-- Section header -->
       <div
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="section-header-accent w-[3px] h-4 rounded-[2px] mr-2 shrink-0 bg-[var(--q-primary)]" />
         <span
-          class="section-header-title text-[13px] font-semibold text-[var(--color-text-primary)]"
+          class="section-header-title text-[13px] font-semibold text-text-primary"
         >{{
           t("alerts.additional_settings") || "Additional Settings"
         }}</span>

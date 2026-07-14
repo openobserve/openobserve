@@ -146,7 +146,7 @@
             >
               <div class="flex flex-col gap-2">
                 <div class="flex flex-col gap-1">
-                  <span class="individual-section-title text-[12px] font-[500] text-(--color-text-secondary)">
+                  <span class="individual-section-title text-[12px] font-[500] text-text-secondary">
                     {{ t('regex_patterns.pattern_name') }}
                   </span>
                   <span
@@ -160,7 +160,7 @@
                 <OSeparator />
 
                 <div class="flex flex-col gap-1">
-                  <span class="individual-section-title text-[12px] font-[500] text-(--color-text-secondary)">
+                  <span class="individual-section-title text-[12px] font-[500] text-text-secondary">
                     {{ t('regex_patterns.description') }}
                   </span>
                   <span
@@ -189,7 +189,7 @@
               <div class="flex gap-4">
                 <!-- when value matches -->
                 <div class="flex flex-col gap-1.5 flex-1">
-                  <span class="individual-section-title text-[12px] font-[500] text-(--color-text-secondary)">
+                  <span class="individual-section-title text-[12px] font-[500] text-text-secondary">
                     {{ t('regex_patterns.when_value_matches') }}
                   </span>
                   <ORadioGroup v-model="policy">
@@ -229,7 +229,7 @@
 
                 <!-- detect at section -->
                 <div class="flex flex-col gap-1.5 min-w-[120px]">
-                  <span class="individual-section-title text-[12px] font-[500] text-(--color-text-secondary)">
+                  <span class="individual-section-title text-[12px] font-[500] text-text-secondary">
                     {{ t('regex_patterns.detect_at') }}
                   </span>
                   <div class="flex flex-col gap-1.5">
@@ -282,7 +282,7 @@
 
                 <div class="flex flex-col gap-1">
                   <span
-                    class="text-[12px] font-medium leading-6 text-(--color-text-secondary)"
+                    class="text-[12px] font-medium leading-6 text-text-secondary"
                   >
                     {{ t('regex_patterns.regex_pattern_label') }}
                   </span>
@@ -365,7 +365,7 @@
                         class="flex flex-col items-center justify-center h-[111px]"
                         :class="
                           store.state.theme === 'dark'
-                            ? 'bg-[var(--color-surface-base)] [border-left:2px_solid_var(--color-surface-base)] [border-right:2px_solid_var(--color-surface-base)] [border-bottom:2px_solid_var(--color-surface-base)]'
+                            ? 'bg-surface-base [border-left:2px_solid_var(--color-surface-base)] [border-right:2px_solid_var(--color-surface-base)] [border-bottom:2px_solid_var(--color-surface-base)]'
                             : 'bg-[#ffffff] [border-left:1px_solid_#e6e6e6] [border-right:1px_solid_#e6e6e6] [border-bottom:1px_solid_#e6e6e6]'
                         "
                       >

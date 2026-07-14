@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           :title="props.data.title"
-          class="whitespace-nowrap overflow-hidden text-ellipsis text-[0.8125rem] font-medium text-(--color-text-primary) tracking-[0.02em]"
+          class="whitespace-nowrap overflow-hidden text-ellipsis text-[0.8125rem] font-medium text-text-primary tracking-[0.02em]"
           data-test="dashboard-panel-header"
         >
           {{ props.data.title }}
