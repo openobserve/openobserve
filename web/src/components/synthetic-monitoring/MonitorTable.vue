@@ -11,6 +11,8 @@
     row-key="id"
     selection="multiple"
     :show-global-filter="false"
+    :persist-columns="true"
+    table-id="synthetic-monitoring-table"
     :enable-column-resize="true"
     :footer-title="footerTitle"
     :empty-message="emptyMessage"
@@ -18,6 +20,14 @@
     :horizontal-scroll="true"
     @row-click="(row: any) => emit('row-click', row)"
   >
+    <!-- Toolbar slots (passthrough to parent) -->
+    <template #toolbar>
+      <slot name="toolbar" />
+    </template>
+    <template #toolbar-trailing>
+      <slot name="toolbar-trailing" />
+    </template>
+
     <!-- Status dot -->
     <template #cell-status="{ row }">
       <span class="dot" :class="'dot--' + (row as any).status.toLowerCase()" />
@@ -60,7 +70,7 @@
 
     <!-- Type badge (monitors mode) -->
     <template #cell-type="{ row }">
-      <OBadge :variant="typeBadgeVariant((row as any).type)" size="sm">{{ (row as any).type }}</OBadge>
+      <OBadge :variant="typeBadgeVariant((row as any).type)" size="sm">{{ formatType((row as any).type) }}</OBadge>
     </template>
 
     <!-- History sparkbars -->
@@ -291,7 +301,7 @@ const props = withDefaults(defineProps<{
   showFolderColumn?: boolean
 }>(), {
   loading: false,
-  footerTitle: 'Monitors',
+  footerTitle: 'Checks',
   emptyMessage: 'No results found.',
   dataTest: 'monitor-table',
   toggleLoadingMap: () => ({}),
@@ -325,74 +335,74 @@ const STATUS_COL: OTableColumnDef = {
   meta: { align: 'center', cellClass: 'px-0' },
 }
 const NAME_COL: OTableColumnDef = {
-  id: 'name', header: 'Monitor', accessorKey: 'name',
-  size: 200, minSize: 120, sortable: true,
+  id: 'name', header: 'Check', accessorKey: 'name',
+  size: 200, minSize: 120, sortable: true, hideable: true,
   meta: { isName: true, flex: true },
 }
 const TEST_NAME_COL: OTableColumnDef = {
   id: 'name', header: 'Test name', accessorKey: 'name',
-  size: 200, minSize: 120, sortable: true,
+  size: 200, minSize: 120, sortable: true, hideable: true,
   meta: { isName: true, flex: true },
 }
 const URL_COL: OTableColumnDef = {
   id: 'url', header: 'URL', accessorKey: 'url',
-  size: 220, minSize: 140, sortable: false,
+  size: 220, minSize: 140, sortable: false, hideable: true,
 }
 const ENDPOINT_COL: OTableColumnDef = {
   id: 'url', header: 'Endpoint', accessorKey: 'url',
-  size: 240, minSize: 140, sortable: false,
+  size: 240, minSize: 140, sortable: false, hideable: true,
 }
 const TYPE_COL: OTableColumnDef = {
   id: 'type', header: 'Type', accessorKey: 'type',
-  size: 88, minSize: 72, sortable: true,
+  size: 88, minSize: 72, sortable: true, hideable: true,
 }
 const HISTORY_COL: OTableColumnDef = {
   id: 'history', header: 'Status · Last 24h', accessorKey: 'history',
-  size: 180, minSize: 140, sortable: false,
+  size: 180, minSize: 140, sortable: false, hideable: true,
 }
 const RESPONSE_TIME_COL: OTableColumnDef = {
   id: 'responseTime', header: 'Response', accessorKey: 'responseTime',
-  size: 90, minSize: 72, sortable: true, meta: { align: 'right' },
+  size: 90, minSize: 72, sortable: true, meta: { align: 'right' }, hideable: true,
 }
 const PAGE_LOAD_COL: OTableColumnDef = {
   id: 'responseTime', header: 'Page load', accessorKey: 'responseTime',
-  size: 110, minSize: 80, sortable: true, meta: { align: 'right' },
+  size: 110, minSize: 80, sortable: true, meta: { align: 'right' }, hideable: true,
 }
 const P50_COL: OTableColumnDef = {
   id: 'responseTime', header: 'P50', accessorKey: 'responseTime',
-  size: 80, minSize: 64, sortable: true, meta: { align: 'right' },
+  size: 80, minSize: 64, sortable: true, meta: { align: 'right' }, hideable: true,
 }
 const UPTIME_COL: OTableColumnDef = {
   id: 'uptime', header: 'Uptime 7d', accessorKey: 'uptime',
-  size: 130, minSize: 100, sortable: true, meta: { align: 'right' },
+  size: 130, minSize: 100, sortable: true, meta: { align: 'right' }, hideable: true,
 }
 const LOCATIONS_COL: OTableColumnDef = {
   id: 'locations', header: 'Locations', accessorKey: 'locations',
-  size: 120, minSize: 90, sortable: false,
+  size: 120, minSize: 90, sortable: false, hideable: true,
 }
 const INTERVAL_COL: OTableColumnDef = {
   id: 'interval', header: 'Interval', accessorKey: 'interval',
-  size: 72, minSize: 60, sortable: false,
+  size: 72, minSize: 60, sortable: false, hideable: true,
 }
 const LAST_CHECK_COL: OTableColumnDef = {
   id: 'lastCheck', header: 'Last check', accessorKey: 'lastCheck',
-  size: 90, minSize: 72, sortable: false,
+  size: 90, minSize: 72, sortable: false, hideable: true,
 }
 const LAST_RUN_COL: OTableColumnDef = {
-  id: 'lastCheck', header: 'Last run', accessorKey: 'lastCheck',
-  size: 100, minSize: 72, sortable: false,
+  id: 'lastCheck', header: 'Last check', accessorKey: 'lastCheck',
+  size: 100, minSize: 72, sortable: false, hideable: true,
 }
 const STEPS_COL: OTableColumnDef = {
   id: 'steps', header: 'Steps', accessorKey: 'steps',
-  size: 72, minSize: 60, sortable: false,
+  size: 72, minSize: 60, sortable: false, hideable: true,
 }
 const METHOD_COL: OTableColumnDef = {
   id: 'method', header: 'Method', accessorKey: 'method',
-  size: 64, minSize: 56, sortable: false,
+  size: 64, minSize: 56, sortable: false, hideable: true,
 }
 const ASSERTIONS_COL: OTableColumnDef = {
   id: 'assertions', header: 'Assertions', accessorKey: 'assertions',
-  size: 90, minSize: 72, sortable: false,
+  size: 90, minSize: 72, sortable: false, hideable: true,
 }
 const ACTIONS_COL: OTableColumnDef = {
   id: 'actions', header: '', accessorKey: 'id',
@@ -433,6 +443,10 @@ const typeBadgeVariant = (type: string): string => {
     TCP: 'orange-soft', PING: 'default-soft', DNS: 'amber-soft',
   }
   return map[type.toUpperCase()] ?? 'default-soft'
+}
+
+const formatType = (type: string): string => {
+  return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase()
 }
 
 // ── Locations tooltip ─────────────────────────────────────────────────
@@ -478,6 +492,8 @@ onUnmounted(() => {
   if (locHideTimer) clearTimeout(locHideTimer)
   if (sparkHideTimer) clearTimeout(sparkHideTimer)
 })
+
+
 </script>
 
 <style scoped>

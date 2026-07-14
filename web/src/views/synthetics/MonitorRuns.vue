@@ -567,10 +567,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
                 <template #cell-duration="{ row }">
-                  <span
-                    class="font-mono tabular-nums text-xs"
-                    :style="{ color: (row as VisibleRun).durColor }"
-                  >
+                  <span class="font-mono tabular-nums text-xs">
                     {{ (row as VisibleRun).duration }}
                   </span>
                 </template>
@@ -1704,7 +1701,6 @@ interface VisibleRun {
   lastRunTs: number;
   triggerType: string;
   duration: string;
-  durColor: string;
   location: string;
   browser: string;
   device: string;
@@ -1724,7 +1720,6 @@ const visibleRuns = computed<VisibleRun[]>(() => {
       lastRunTs: run.timestamp,
       triggerType: run.triggerType === "manual" ? "Manual" : "Schedule",
       duration: fmtDur(run.duration),
-      durColor: isFail ? "var(--o2-status-error-text)" : "var(--o2-text-body)",
       location: run.location,
       browser: run.browser,
       device: run.device,

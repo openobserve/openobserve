@@ -382,12 +382,10 @@ function onClearResults() {
 
     <main
       v-if="isLoadingEdit"
-      class="min-h-full flex items-center justify-center bg-[var(--o2-body-primary-bg)]"
+      class="flex-1 flex flex-col items-center justify-center"
     >
-      <div class="flex flex-col items-center gap-3">
-        <OIcon name="hourglass-empty" size="lg" class="text-[var(--o2-primary-color)] animate-spin" />
-        <p class="text-[var(--o2-text-secondary)]">Loading check…</p>
-      </div>
+      <OIcon name="refresh" size="lg" class="text-[var(--o2-primary-color)] animate-spin mb-3" />
+      <span class="text-sm text-[var(--o2-text-secondary)]">Loading check…</span>
     </main>
     <!-- ── Gate phase: URL + name ── -->
     <main v-else-if="phase === 'gate'" class="flex-1 flex flex-col items-center justify-center">
@@ -574,8 +572,9 @@ function onClearResults() {
 
     <!-- ── Editor phase ── -->
     <template v-else>
-      <OStepper
-        v-model="currentStep"
+      <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0">
+          <OStepper
+            v-model="currentStep"
         :navigable="true"
         class="flex-1 overflow-y-auto min-h-0 my-2 h-full"
       >

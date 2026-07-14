@@ -8,7 +8,7 @@
           <OIcon name="radar" size="md" />
         </div>
         <div>
-          <div class="syn-title">Synthetic Monitoring</div>
+          <div class="syn-title">Synthetic Checks</div>
           <div class="syn-sub">Proactively monitor uptime, performance, and user journeys from global locations</div>
         </div>
       </div>
@@ -23,7 +23,7 @@
           Geo Map
         </OButton>
         <OButton size="sm" variant="primary" @click="openCreate">
-          New Monitor
+          New Check
         </OButton>
       </div>
     </div>
@@ -41,11 +41,9 @@
 
       <!-- RIGHT MAIN: filter bar + table -->
       <div class="syn-main">
-        <!-- FILTER BAR -->
-        <div class="syn-filter-bar">
-          <!-- View switcher -->
+        <!-- Tab switcher (only visible when multi-type tests are enabled) -->
+        <div v-if="areMultiTypeTestEnabled" class="flex items-center gap-2 px-3 py-2 border-b border-[var(--o2-border-color)]">
           <OToggleGroup
-            v-if="areMultiTypeTestEnabled"
             :model-value="activeTab"
             @update:model-value="(v) => { activeTab = v as string }"
           >
@@ -53,92 +51,23 @@
               {{ tab.label }}
             </OToggleGroupItem>
           </OToggleGroup>
-
-          <div v-if="areMultiTypeTestEnabled" class="syn-filter-sep" />
-
-          <!-- Status filter — only on All Monitors tab -->
-          <template v-if="activeTab === 'monitors'">
-            <OToggleGroup
-              :model-value="statusFilter"
-              @update:model-value="(v) => { statusFilter = v as string }"
-            >
-              <OToggleGroupItem v-for="s in statusTabs" :key="s.filter" :value="s.filter" size="sm">
-                <span v-if="s.filter !== 'all'" class="syn-pill-dot" :class="'sdot-' + s.filter.toLowerCase()" />
-                {{ s.label }} <span class="syn-pill-count">{{ s.count }}</span>
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <div class="syn-filter-sep" />
-          </template>
-
-          <!-- Search with folder scope toggle -->
-          <template v-if="activeTab !== 'private'">
-            <OInput
-              v-model="search"
-              :placeholder="searchAcrossFolders ? 'Search across all folders...' : activeTab === 'browser' ? 'Search browser tests...' : activeTab === 'api' ? 'Search API tests...' : 'Search this folder...'"
-              data-test="synthetic-monitoring-search-input"
-            >
-              <template #icon-right>
-                <OToggleGroup
-                  :model-value="searchAcrossFolders ? 'all' : 'this'"
-                  @update:model-value="(v) => { searchAcrossFolders = v === 'all' }"
-                >
-                  <OToggleGroupItem value="this" size="xs" icon-left="folder-outline" data-test="synthetic-monitoring-search-this-folder-btn">
-                    This folder
-                  </OToggleGroupItem>
-                  <OToggleGroupItem value="all" size="xs" icon-left="search" data-test="synthetic-monitoring-search-all-folders-btn">
-                    All folders
-                  </OToggleGroupItem>
-                </OToggleGroup>
-              </template>
-            </OInput>
-          </template>
-
-          <!-- Type + Location dropdowns -->
-          <template v-if="activeTab === 'monitors'">
-            <OSelect
-              v-if="areMultiTypeTestEnabled"
-              v-model="typeFilter"
-              :options="typeOpts"
-              size="md"
-              />
-            <OSelect
-              v-if="areMultiTypeTestEnabled"
-              v-model="locationFilter"
-              :options="locationOpts"
-              size="md"
-            />
-          </template>
-
-          <div class="tw:flex-1" />
-
           <template v-if="activeTab === 'private'">
+            <div class="tw:flex-1" />
             <OButton variant="primary">
               <template #icon-left><OIcon name="add" size="sm" /></template>
               Add Location
             </OButton>
           </template>
-
-          <!-- Refresh button -->
-          <OButton
-            variant="outline"
-            size="icon-sm"
-            class="tw:w-12!"
-            icon-left="refresh"
-            :loading="loading"
-            title="Refresh"
-            data-test="synthetic-monitoring-refresh-btn"
-            @click="loadMonitors()"
-          />
         </div>
 
-        <!-- ── MONITORS TABLE (All Monitors / Browser Tests / API Tests) ── -->
+        <!-- ── CHECKS TABLE (All Checks / Browser Tests / API Tests) ── -->
         <MonitorTable
           v-if="activeTab === 'monitors' || activeTab === 'browser' || activeTab === 'api'"
           :mode="monitorTableMode"
           :data="activeTab === 'browser' ? browserMonitors : activeTab === 'api' ? apiMonitors : filteredMonitors"
           :loading="loading"
-          :footer-title="activeTab === 'browser' ? 'Browser Tests' : activeTab === 'api' ? 'API Tests' : 'Monitors'"
-          :empty-message="activeTab === 'browser' ? 'No browser tests found.' : activeTab === 'api' ? 'No API tests found.' : 'No monitors found. Adjust filters or create your first monitor.'"
+          :footer-title="activeTab === 'browser' ? 'Browser Tests' : activeTab === 'api' ? 'API Tests' : 'Checks'"
+          :empty-message="activeTab === 'browser' ? 'No browser tests found.' : activeTab === 'api' ? 'No API tests found.' : 'No checks found. Adjust filters or create your first check.'"
           :selected-ids="selectedMonitorIds"
           :show-folder-column="searchAcrossFolders"
           data-test="synthetic-monitoring-monitors-table"
@@ -153,7 +82,78 @@
           @delete-selected="openBulkDeleteConfirm"
           @move-selected="moveMultipleMonitors"
           @navigate-to-folder="(id) => { searchAcrossFolders = false; updateActiveFolderId(id) }"
-        />
+        >
+          <!-- Toolbar content rendered inside OTable's toolbar bar -->
+          <template #toolbar>
+            <div class="flex items-center gap-2 w-full">
+              <!-- Status filter -- only on All Checks tab -->
+              <template v-if="activeTab === 'monitors'">
+                <OToggleGroup
+                  :model-value="statusFilter"
+                  @update:model-value="(v) => { statusFilter = v as string }"
+                >
+                  <OToggleGroupItem v-for="s in statusTabs" :key="s.filter" :value="s.filter" size="sm">
+                    <span v-if="s.filter !== 'all'" class="syn-pill-dot" :class="'sdot-' + s.filter.toLowerCase()" />
+                    {{ s.label }} <span class="syn-pill-count">{{ s.count }}</span>
+                  </OToggleGroupItem>
+                </OToggleGroup>
+              </template>
+
+              <!-- Search -->
+              <div class="flex-1 min-w-0">
+                <OInput
+                  v-model="search"
+                  :placeholder="searchAcrossFolders ? 'Search across all folders...' : activeTab === 'browser' ? 'Search browser tests...' : activeTab === 'api' ? 'Search API tests...' : 'Search this folder...'"
+                  data-test="synthetic-monitoring-search-input"
+                  class="w-full"
+                >
+                  <template #icon-right>
+                    <OToggleGroup
+                      :model-value="searchAcrossFolders ? 'all' : 'this'"
+                      @update:model-value="(v) => { searchAcrossFolders = v === 'all' }"
+                    >
+                      <OToggleGroupItem value="this" size="xs" icon-left="folder-outline" data-test="synthetic-monitoring-search-this-folder-btn">
+                        This folder
+                      </OToggleGroupItem>
+                      <OToggleGroupItem value="all" size="xs" icon-left="search" data-test="synthetic-monitoring-search-all-folders-btn">
+                        All folders
+                      </OToggleGroupItem>
+                    </OToggleGroup>
+                  </template>
+                </OInput>
+              </div>
+
+              <!-- Type + Location dropdowns -- only on All Checks tab -->
+              <template v-if="activeTab === 'monitors'">
+                <OSelect
+                  v-if="areMultiTypeTestEnabled"
+                  v-model="typeFilter"
+                  :options="typeOpts"
+                  size="md"
+                />
+                <OSelect
+                  v-if="areMultiTypeTestEnabled"
+                  v-model="locationFilter"
+                  :options="locationOpts"
+                  size="md"
+                />
+              </template>
+            </div>
+          </template>
+
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              class="tw:w-12!"
+              icon-left="refresh"
+              :loading="loading"
+              title="Refresh"
+              data-test="synthetic-monitoring-refresh-btn"
+              @click="loadMonitors()"
+            />
+          </template>
+        </MonitorTable>
 
         <!-- ── PRIVATE LOCATIONS ── -->
         <PrivateLocations
@@ -180,7 +180,7 @@
         </div>
         <div class="stt-divider"/>
         <div class="map-tip-row"><span>Uptime</span><span class="map-tip-val">{{ mapTip.stat.uptime }}%</span></div>
-        <div class="map-tip-row"><span>Monitors</span><span class="map-tip-val">{{ mapTip.stat.total }}</span></div>
+        <div class="map-tip-row"><span>Checks</span><span class="map-tip-val">{{ mapTip.stat.total }}</span></div>
         <div v-if="mapTip.stat.downCt" class="map-tip-row"><span>Down</span><span class="map-tip-val c-r">{{ mapTip.stat.downCt }}</span></div>
         <div v-if="mapTip.stat.degCt" class="map-tip-row"><span>Degraded</span><span class="map-tip-val c-a">{{ mapTip.stat.degCt }}</span></div>
         <div class="map-tip-row"><span>City</span><span class="map-tip-val">{{ mapTip.stat.city }}</span></div>
@@ -235,7 +235,7 @@
                   {{ issue.level==='error' ? issue.stat.downCt + ' down' : issue.stat.degCt + ' degraded' }}
                 </span>
                 <div class="issues-uptime" :class="issue.level==='error'?'c-r':'c-a'">{{ issue.stat.uptime }}% uptime</div>
-                <div class="issues-total">{{ issue.stat.total }} monitors</div>
+                <div class="issues-total">{{ issue.stat.total }} checks</div>
               </div>
             </div>
           </div>
@@ -252,11 +252,11 @@
       @save="() => {}"
     />
 
-    <!-- Duplicate monitor dialog -->
+    <!-- Duplicate check dialog -->
     <ODialog
       v-model:open="showDuplicateDialog"
       size="sm"
-      title="Duplicate Monitor"
+      title="Duplicate Check"
       primary-button-label="Save"
       secondary-button-label="Cancel"
       :primary-button-disabled="isDuplicating || !duplicateName.trim()"
@@ -268,7 +268,7 @@
         <OInput
           v-model="duplicateName"
           label="Name"
-          placeholder="Monitor name"
+          placeholder="Check name"
           data-test="synthetic-monitoring-duplicate-name-input"
         />
         <OInput
@@ -284,7 +284,7 @@
     <ODialog
       v-model:open="showBulkDeleteConfirm"
       size="sm"
-      title="Delete Monitors"
+      title="Delete Checks"
       primary-button-label="Delete"
       secondary-button-label="Cancel"
       primary-button-variant="destructive"
@@ -297,7 +297,7 @@
       </p>
     </ODialog>
 
-    <!-- Move monitors dialog -->
+    <!-- Move checks dialog -->
     <MoveAcrossFolders
       type="synthetics"
       :module-id="monitorsToMove"
@@ -331,6 +331,7 @@ import MonitorFormDrawer from '@/components/synthetic-monitoring/MonitorFormDraw
 import syntheticsService from '@/services/synthetics'
 import { getFoldersListByType } from '@/utils/commons'
 import { toast } from '@/lib/feedback/Toast/useToast'
+
 
 const router  = useRouter();
 const route   = useRoute();
@@ -499,18 +500,18 @@ const openBulkDeleteConfirm = () => {
 
 const bulkDeleteMonitors = async () => {
   const org = orgIdentifier.value
-  const dismiss = toast({ variant: 'loading', message: 'Deleting monitors…', timeout: 0 })
+  const dismiss = toast({ variant: 'loading', message: 'Deleting checks…', timeout: 0 })
   try {
     await syntheticsService.bulkDelete(org, { ids: selectedMonitorIds.value }, searchAcrossFolders.value ? undefined : activeFolderId.value)
     selectedMonitorIds.value = []
     dismiss()
-    toast({ variant: 'success', message: 'Monitors deleted successfully.' })
+    toast({ variant: 'success', message: 'Checks deleted successfully.' })
     await loadMonitors()
   } catch (err: any) {
     dismiss()
     toast({
       variant: 'error',
-      message: err?.response?.data?.message || err?.response?.data?.error || 'Failed to delete monitors.',
+      message: err?.response?.data?.message || err?.response?.data?.error || 'Failed to delete checks.',
     })
     console.error('[synthetics] bulk delete failed', err)
   } finally {
@@ -619,7 +620,7 @@ const getHeatmapOption = () => {
         const d = params.data;
         const col = d.health === "up" ? "#22c55e" : d.health === "down" ? "#ef4444" : "#f59e0b";
         const label = d.health === "up" ? "Healthy" : d.health === "down" ? "Outage" : "Degraded";
-        return `<div style="font-size:12px;line-height:1.7"><b>${d.flag} ${d.name}</b><br/><span style="color:${col}">${label}</span><br/>Uptime: ${d.uptime}%<br/>Monitors: ${d.total}</div>`;
+        return `<div style="font-size:12px;line-height:1.7"><b>${d.flag} ${d.name}</b><br/><span style="color:${col}">${label}</span><br/>Uptime: ${d.uptime}%<br/>Checks: ${d.total}</div>`;
       },
       backgroundColor: isDark ? "#1e2d3d" : "#ffffff",
       borderColor:     isDark ? "#2d4560" : "#e2e8f0",
@@ -711,7 +712,7 @@ const openDetail = (monitor: any) => {
 
 
 const tabs = [
-  { key:"monitors", label:"All Monitors",     count:30   },
+  { key:"monitors", label:"All Checks",     count:30   },
   { key:"browser",  label:"Browser Tests",    count:5    },
   { key:"api",      label:"API Tests",        count:6    },
   { key:"private",  label:"Private Locations",count:null },
@@ -896,10 +897,6 @@ async function deleteMonitor(m: any) {
 .syn-content { display:flex; flex:1; overflow:hidden; }
 .syn-sidebar { width:230px; flex-shrink:0; border-right:1px solid var(--o2-border-color); overflow-y:auto; }
 .syn-main    { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
-
-/* ── FILTER BAR ── */
-.syn-filter-bar  { display:flex; align-items:center; gap:5px; padding:6px 14px; border-bottom:1px solid var(--o2-border-color); flex-shrink:0; background:var(--o2-card-background); }
-.syn-filter-sep  { width:1px; height:18px; background:var(--o2-border-color); flex-shrink:0; margin:0 2px; }
 
 .syn-pill-count      { font-size:11px; font-weight:700; }
 .syn-pill-dot    { width:6px; height:6px; border-radius:50%; flex-shrink:0; }

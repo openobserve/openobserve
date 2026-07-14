@@ -139,8 +139,7 @@ const timezone = computed({
   get: () => {
     if (props.check.schedule.timezone) return props.check.schedule.timezone
     try {
-      const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone
-      return `Browser Time (${browserTz})`
+      return Intl.DateTimeFormat().resolvedOptions().timeZone
     } catch {
       return 'UTC'
     }
