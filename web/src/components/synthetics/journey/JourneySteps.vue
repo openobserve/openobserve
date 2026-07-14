@@ -123,16 +123,16 @@ const ACTION_ICON_MAP: Record<string, IconName> = {
 };
 
 const ACTION_LABEL_MAP: Record<string, string> = {
-  navigate: "NAVIGATE",
-  click: "CLICK",
-  type: "TYPE",
-  select: "SELECT",
-  press: "PRESS",
-  hover: "HOVER",
-  scroll: "SCROLL",
-  wait: "WAIT",
-  assert: "ASSERT",
-  screenshot: "SCREENSHOT",
+  navigate: "Navigate",
+  click: "Click",
+  type: "Type",
+  select: "Select",
+  press: "Press",
+  hover: "Hover",
+  scroll: "Scroll",
+  wait: "Wait",
+  assert: "Assert",
+  screenshot: "Screenshot",
 };
 
 function actionIcon(row: TData): IconName {
@@ -142,7 +142,7 @@ function actionIcon(row: TData): IconName {
 
 function actionLabel(row: TData): string {
   const action: string = row[props.actionKey] ?? "";
-  return ACTION_LABEL_MAP[action] ?? action.toUpperCase();
+  return ACTION_LABEL_MAP[action] ?? action.charAt(0).toUpperCase() + action.slice(1);
 }
 
 function stepName(row: TData): string {

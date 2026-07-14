@@ -11,6 +11,7 @@ import OInput from '@/lib/forms/Input/OInput.vue'
 import OSelect from '@/lib/forms/Select/OSelect.vue'
 import OBadge from '@/lib/core/Badge/OBadge.vue'
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue'
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import JourneySteps from './JourneySteps.vue'
 
@@ -321,9 +322,9 @@ const selectorActions = SELECTOR_ACTIONS
 const valueActions = VALUE_ACTIONS
 
 const ACTION_LABEL_MAP: Record<string, string> = {
-  navigate: 'NAVIGATE', click: 'CLICK', type: 'TYPE', select: 'SELECT',
-  press: 'PRESS', hover: 'HOVER', scroll: 'SCROLL', wait: 'WAIT',
-  assert: 'ASSERT', screenshot: 'SCREENSHOT',
+  navigate: 'Navigate', click: 'Click', type: 'Type', select: 'Select',
+  press: 'Press', hover: 'Hover', scroll: 'Scroll', wait: 'Wait',
+  assert: 'Assert', screenshot: 'Screenshot',
 }
 
 const VALUE_LABEL_MAP: Record<string, string> = {
@@ -346,6 +347,23 @@ const selectorTypeOptions = [
 
 function valueActionLabel(action: string): string {
   return VALUE_LABEL_MAP[action] || 'Value'
+}
+
+const VALUE_WIDTH_MAP: Record<string, string> = {
+  wait: 'w-50!',
+}
+
+function valueWidthClass(action: string): string {
+  return VALUE_WIDTH_MAP[action] || 'w-152!'
+}
+
+const VALUE_TOOLTIP_MAP: Record<string, string> = {
+  press: 'Press a keyboard key by its key name, e.g. "Enter", "Tab", "Escape", "ArrowDown".',
+  assert: 'Assertion expression, e.g. "text=Hello" or "visible" to check element visibility.',
+}
+
+function valueTooltip(action: string): string | undefined {
+  return VALUE_TOOLTIP_MAP[action]
 }
 
 function handleStepUpdate(row: BrowserStep, patch: Partial<BrowserStep>) {
@@ -682,30 +700,33 @@ function openChromeExtensions() {
       <!-- Inline editor (expanded content) -->
       <template #expansion="{ row }">
         <div class="pt-3 pb-3 px-8 flex flex-col gap-3">
-          <!-- Action select -->
-          <OSelect
-            :model-value="row.action"
-            label="Action"
-            :options="actionOptions"
-            data-test="synthetics-journey-step-action-select"
-            @update:model-value="(v: any) => handleStepUpdate(row, { action: v as any })"
-          />
-          <!-- Step name -->
-          <OInput
-            :model-value="row.name ?? ''"
-            label="Step name (optional)"
-            placeholder="Enter a descriptive name"
-            data-test="synthetics-journey-step-name-input"
-            @update:model-value="(v: any) => handleStepUpdate(row, { name: v })"
-          />
+          <!-- Action + Step name in one row -->
+          <div class="flex gap-2">
+            <OSelect
+              :model-value="row.action"
+              label="Action"
+              :options="actionOptions"
+              class="w-50! shrink-0"
+              data-test="synthetics-journey-step-action-select"
+              @update:model-value="(v: any) => handleStepUpdate(row, { action: v as any })"
+            />
+            <OInput
+              :model-value="row.name ?? ''"
+              label="Step name (optional)"
+              placeholder="Enter a descriptive name"
+              class="w-100!"
+              data-test="synthetics-journey-step-name-input"
+              @update:model-value="(v: any) => handleStepUpdate(row, { name: v })"
+            />
+          </div>
           <!-- Selector type + selector (when applicable) -->
           <template v-if="selectorActions.includes(row.action)">
-            <div class="flex gap-2">
+            <div class="flex gap-2 w-fit!">
               <OSelect
                 :model-value="row.selectorType ?? 'CSS'"
                 label="Selector type"
                 :options="selectorTypeOptions"
-                class="w-32! shrink-0"
+                class="w-50! shrink-0"
                 data-test="synthetics-journey-step-selector-type-select"
                 @update:model-value="(v: any) => handleStepUpdate(row, { selectorType: v })"
               />
@@ -713,7 +734,7 @@ function openChromeExtensions() {
                 :model-value="row.selector ?? ''"
                 label="Selector"
                 placeholder="#my-button or .class-name"
-                class="flex-1"
+                class="w-100!"
                 data-test="synthetics-journey-step-selector-input"
                 @update:model-value="(v: any) => handleStepUpdate(row, { selector: v })"
               />
@@ -725,15 +746,21 @@ function openChromeExtensions() {
             :model-value="row.value ?? ''"
             :label="valueActionLabel(row.action)"
             :placeholder="valueActionLabel(row.action)"
+            :class="valueWidthClass(row.action)"
             data-test="synthetics-journey-step-value-input"
             @update:model-value="(v: any) => handleStepUpdate(row, { value: v })"
-          />
+          >
+            <template v-if="valueTooltip(row.action)" #tooltip>
+              <OTooltip :content="valueTooltip(row.action)!" />
+            </template>
+          </OInput>
           <!-- Timeout -->
           <OInput
             :model-value="String(row.timeout ?? '')"
             label="Timeout (ms)"
             placeholder="30000"
             type="number"
+            class="w-50!"
             data-test="synthetics-journey-step-timeout-input"
             @update:model-value="(v: any) => handleStepUpdate(row, { timeout: v ? Number(v) : undefined })"
           />
