@@ -265,7 +265,7 @@ import searchService from "@/services/search";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTime from "@/components/DateTime.vue";
 import { useI18n } from "vue-i18n";
-import { formatDate } from "@/utils/date";
+import { convertUnixToQuasarFormat } from "@/utils/date";
 import type { Ref } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
@@ -771,13 +771,6 @@ export default defineComponent({
       }
     };
 
-    function convertUnixToQuasarFormat(unixMicroseconds: any) {
-      if (!unixMicroseconds) return "";
-      const unixSeconds = unixMicroseconds / 1e6;
-      const dateToFormat = new Date(unixSeconds * 1000);
-      const formattedDate = dateToFormat.toISOString();
-      return formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
-    }
     const fetchSearchResults = (row) => {
       searchObj.meta.jobId = row.id;
       goToLogs(row);

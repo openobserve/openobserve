@@ -21,6 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       :title="t('search.metrics')"
       icon="bar-chart"
+      :back="{
+        label: t('search.metrics'),
+        onClick: goBackToExplorer,
+        dataTest: 'metrics-editor-back-btn',
+      }"
       class="shrink-0 px-4 border-b border-border-default"
     >
       <template #actions>
@@ -598,6 +603,24 @@ export default defineComponent({
       showAddToDashboardDialog.value = false;
     };
 
+    const goBackToExplorer = () => {
+      const back = router.options?.history?.state?.back;
+      if (
+        typeof back === "string" &&
+        back.startsWith("/metrics") &&
+        !back.startsWith("/metrics/editor")
+      ) {
+        router.back();
+        return;
+      }
+      router.push({
+        name: "metrics",
+        query: {
+          org_identifier: store.state.selectedOrganization?.identifier,
+        },
+      });
+    };
+
     // [END] cancel running queries
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
@@ -637,6 +660,7 @@ export default defineComponent({
       showAddToDashboardDialog,
       addPanelToDashboard,
       addToDashboard,
+      goBackToExplorer,
       refreshInterval,
       panelEditorRef,
       metricsShareUrl,

@@ -112,6 +112,37 @@ function ghSilent(args) {
   }
 }
 
+function git(args) {
+  return execSync(`git ${args}`, {
+    encoding: "utf-8",
+    maxBuffer: 50 * 1024 * 1024,
+    stdio: ["pipe", "pipe", "pipe"],
+  }).trim();
+}
+
+function execErrorText(err) {
+  return [err?.message, err?.stderr?.toString(), err?.stdout?.toString()].filter(Boolean).join(" ");
+}
+
+// The API refuses to render a diff over 20k lines (HTTP 406). GitHub still publishes the
+// merge commit for the PR, and its first parent is the merge base, so diffing the two
+// reproduces the same three-dot diff with no size ceiling.
+function diffFromMergeRef(prNumber) {
+  git(`fetch --no-tags --depth=2 origin "refs/pull/${prNumber}/merge"`);
+  return git("diff FETCH_HEAD^1 FETCH_HEAD");
+}
+
+function fetchPrDiff(prNumber) {
+  try {
+    return gh(`pr diff "${prNumber}"`);
+  } catch (err) {
+    const detail = execErrorText(err);
+    if (!/exceeded the maximum number of lines|HTTP 406/i.test(detail)) throw err;
+    console.log(`[${isoNow()}] PR diff is too large for the GitHub API; rebuilding it from the merge ref`);
+    return diffFromMergeRef(prNumber);
+  }
+}
+
 function readPrompt(name) {
   const path = resolve(__dirname, name);
   if (!existsSync(path)) return "";
@@ -938,14 +969,15 @@ async function main() {
     let diff;
     const diffSpan = TRACE.startSpan("github.pr.diff", { "github.pr.number": prNumber }, rootSpan);
     try {
-      diff = gh(`pr diff "${prNumber}"`);
+      diff = fetchPrDiff(prNumber);
       const diffStats = diff.split("\n").length;
       TRACE.endSpan(diffSpan, { "diff.raw_lines": diffStats });
       console.log(`[${isoNow()}] Raw diff: ${diffStats} lines`);
     } catch (err) {
-      console.error("Failed to fetch PR diff");
+      const detail = execErrorText(err);
+      console.error(`Failed to fetch PR diff: ${detail}`);
       TRACE.endSpan(diffSpan, {}, err);
-      throw new Error("Failed to fetch PR diff");
+      throw new Error(`Failed to fetch PR diff: ${detail}`);
     }
 
     // 2. Filter diff
