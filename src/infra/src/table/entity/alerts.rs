@@ -50,6 +50,9 @@ pub struct Model {
     pub dedup_config: Option<Json>,
     pub creates_incident: bool,
     pub workflows: Json,
+    /// JSONB serialization of `CompositeSpec`. `NULL` for ordinary (non-composite)
+    /// alerts. Threaded via `try_from` (load) and `update_mutable_fields` (save).
+    pub composite_spec: Option<Json>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -123,6 +126,7 @@ mod tests {
             dedup_config: None,
             creates_incident: false,
             workflows: serde_json::json!(vec!["abc123"]),
+            composite_spec: None,
         };
         assert_eq!(m.id, "alert-1");
         assert_eq!(m.name, "High Error Rate");

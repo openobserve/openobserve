@@ -145,12 +145,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="border-border-default flex items-center gap-0 border-b px-3 py-2.5">
               <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact font-semibold tracking-[0.01em]"
-                >{{ t("alerts.streamConfig") }} <span class="text-text-body">*</span></span
+                >{{ isComposite ? t("alerts.composite.mode") : t("alerts.streamConfig") }}
+                <span v-if="!isComposite" class="text-text-body">*</span></span
               >
             </div>
             <div class="flex items-center gap-4 px-3 py-2">
+              <!-- Simple | Composite mode toggle -->
+              <div v-if="!isAnomalyMode" class="flex items-center gap-1.5">
+                <OToggleGroup
+                  :model-value="isComposite ? 'composite' : 'simple'"
+                  :disabled="beingUpdated || anomalyEditMode"
+                  @update:model-value="(val) => toggleComposite(val as string)"
+                >
+                  <OToggleGroupItem value="simple" size="sm" data-test="add-alert-mode-simple">
+                    {{ t("alerts.composite.simple") }}
+                  </OToggleGroupItem>
+                  <OToggleGroupItem
+                    value="composite"
+                    size="sm"
+                    data-test="add-alert-mode-composite"
+                  >
+                    {{ t("alerts.composite.composite") }}
+                  </OToggleGroupItem>
+                </OToggleGroup>
+                <template v-if="isComposite">
+                  <OIcon
+                    name="info"
+                    size="sm"
+                    class="text-text-secondary hover:text-text-heading cursor-pointer"
+                    data-test="add-alert-mode-info"
+                    @click="setCompositeInfoDismissed(!compositeInfoDismissed)"
+                  />
+                  <OTooltip
+                    side="bottom"
+                    align="start"
+                    :max-width="'20rem'"
+                    :content="t('alerts.composite.toggleInfo')"
+                  />
+                </template>
+              </div>
+
               <!-- Stream Type -->
-              <div class="flex items-center gap-1.5">
+              <div v-if="!isComposite" class="flex items-center gap-1.5">
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.streamType") }} <span class="text-text-body">*</span>
                 </div>
@@ -167,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Stream Name -->
-              <div class="flex items-center gap-1.5">
+              <div v-if="!isComposite" class="flex items-center gap-1.5">
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.stream_name") }} <span class="text-text-body">*</span>
                 </div>
@@ -188,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Alert Type -->
-              <div class="flex items-center gap-1.5">
+              <div v-if="!isComposite" class="flex items-center gap-1.5">
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.alertType") }}
                 </div>
@@ -243,6 +279,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-tab-pane="condition"
                 class="flex flex-col gap-4"
               >
+                <!-- Composite mode: term cards + expression + notifications -->
+                <CompositeAlert
+                  v-if="isComposite"
+                  :composite="formData.composite"
+                  :triggerCondition="formData.trigger_condition"
+                  :destinations="getFormattedDestinations"
+                  :streamTypes="streamTypes"
+                  :beingUpdated="beingUpdated"
+                  :infoDismissed="compositeInfoDismissed"
+                  @update:infoDismissed="setCompositeInfoDismissed"
+                  @refresh:destinations="refreshDestinations"
+                />
+                <template v-else>
                 <div>
                   <QueryConfig
                     ref="step2Ref"
@@ -300,6 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:workflows="updateWorkflows"
                   />
                 </div>
+                </template>
               </div>
 
               <div
@@ -435,7 +485,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </div>
             <div class="min-h-0 flex-1 overflow-hidden">
-              <template v-if="isAnomalyMode">
+              <template v-if="isComposite">
+                <CompositePreview
+                  :composite="formData.composite"
+                  :triggerCondition="formData.trigger_condition"
+                />
+              </template>
+              <template v-else-if="isAnomalyMode">
                 <!-- editor-height is QueryEditor's own API for this; a class cannot
                    win against the inline height its rootStyle always sets. -->
                 <QueryEditor
@@ -482,9 +538,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-sm font-medium">{{ t("alerts.summary.title") }}</span>
             </div>
             <div class="min-h-0 flex-1 overflow-auto">
+              <CompositeSummary
+                v-if="isComposite"
+                class="h-full"
+                :name="formData.name"
+                :composite="formData.composite"
+                :triggerCondition="formData.trigger_condition"
+              />
               <AnomalySummary
                 class="h-full overflow-auto"
-                v-if="isAnomalyMode"
+                v-else-if="isAnomalyMode"
                 :config="anomalyConfig"
                 :destinations="destinations"
                 :wizard-step="3"
@@ -525,7 +588,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, watch, provide } from "vue";
+import { defineComponent, computed, watch, provide, ref } from "vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -538,6 +601,9 @@ import AlertSettings from "./steps/AlertSettings.vue";
 import CompareWithPast from "./steps/CompareWithPast.vue";
 import Deduplication from "./steps/Deduplication.vue";
 import Advanced from "./steps/Advanced.vue";
+import CompositeAlert, { makeDefaultComposite } from "./composite/CompositeAlert.vue";
+import CompositePreview from "./composite/CompositePreview.vue";
+import CompositeSummary from "./composite/CompositeSummary.vue";
 import InlineSelectFolderDropdown from "../common/sidebar/InlineSelectFolderDropdown.vue";
 import PreviewAlert from "./PreviewAlert.vue";
 import AlertSummary from "./AlertSummary.vue";
@@ -585,6 +651,9 @@ export default defineComponent({
     CompareWithPast,
     Deduplication,
     Advanced,
+    CompositeAlert,
+    CompositePreview,
+    CompositeSummary,
     PreviewAlert,
     AlertSummary,
     AnomalyDetectionConfig,
@@ -637,6 +706,44 @@ export default defineComponent({
     const activeEvaluationStatus = computed(
       () => alertForm.previewAlertRef.value?.evaluationStatus || null,
     );
+
+    // Composite alerts: a self-scheduled alert owning an ordered set of terms.
+    const isComposite = computed(
+      () => alertForm.formData.value.composite != null,
+    );
+    const toggleComposite = (mode: string) => {
+      if (mode === "composite") {
+        if (!alertForm.formData.value.composite) {
+          alertForm.formData.value.composite = makeDefaultComposite();
+          // A composite is scheduled and has no single top-level stream.
+          alertForm.formData.value.is_real_time = "false";
+        }
+      } else {
+        alertForm.formData.value.composite = null;
+      }
+    };
+
+    // Info banner visibility, persisted so repeat authors aren't shown it. The
+    // banner lives in CompositeAlert but is re-opened from the info icon here.
+    const COMPOSITE_INFO_KEY = "composite_alert_info_dismissed";
+    const compositeInfoDismissed = ref(
+      (() => {
+        try {
+          return localStorage.getItem(COMPOSITE_INFO_KEY) === "1";
+        } catch {
+          return false;
+        }
+      })(),
+    );
+    const setCompositeInfoDismissed = (val: boolean) => {
+      compositeInfoDismissed.value = val;
+      try {
+        if (val) localStorage.setItem(COMPOSITE_INFO_KEY, "1");
+        else localStorage.removeItem(COMPOSITE_INFO_KEY);
+      } catch {
+        /* ignore storage failures */
+      }
+    };
     const alertTypeOptions = computed(() => [
       { label: alertForm.t("alerts.scheduled"), value: "false" },
       { label: alertForm.t("alerts.realTime"), value: "true" },
@@ -699,6 +806,10 @@ export default defineComponent({
       goBackToAlertsList,
       onStreamTypeChange,
       activeEvaluationStatus,
+      isComposite,
+      toggleComposite,
+      compositeInfoDismissed,
+      setCompositeInfoDismissed,
     };
   },
 });

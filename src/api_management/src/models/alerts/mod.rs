@@ -145,6 +145,12 @@ pub struct Alert {
     #[serde(default)]
     #[schema(example = json!(["abcde12345"]))]
     pub workflows: Vec<String>,
+
+    /// When present, this alert is a composite alert: an ordered set of named
+    /// terms whose tri-state results are combined by a boolean expression.
+    /// Absent for ordinary single-query alerts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composite: Option<meta_alerts::composite::CompositeSpec>,
 }
 
 /// Configuration for when and how an alert should be triggered.
@@ -449,6 +455,7 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             deduplication: alert.deduplication,
             creates_incident: alert.creates_incident,
             workflows: alert.workflows,
+            composite: alert.composite,
         }
     }
 }
@@ -631,6 +638,7 @@ impl From<Alert> for meta_alerts::alert::Alert {
         alert.deduplication = value.deduplication;
         alert.creates_incident = value.creates_incident;
         alert.workflows = value.workflows;
+        alert.composite = value.composite;
 
         alert
     }

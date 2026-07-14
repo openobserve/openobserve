@@ -73,6 +73,7 @@ impl From<AlertError> for Response {
             | AlertError::SqlContainsSelectStar
             | AlertError::PromqlMissingQuery
             | AlertError::PeriodExceedsMaxQueryRange { .. }
+            | AlertError::CompositeInvalid(_)
             | AlertError::AlertIdMissing => MetaHttpResponse::bad_request(value),
             AlertError::CreateAlreadyExists => MetaHttpResponse::conflict(value),
             AlertError::CreateFolderNotFound
@@ -93,6 +94,7 @@ impl From<AlertError> for Response {
             AlertError::PermittedAlertsMissingUser => MetaHttpResponse::forbidden(""),
             AlertError::PermittedAlertsValidator(err) => MetaHttpResponse::forbidden(err),
             AlertError::NotSupportedAlertDestinationType(err) => MetaHttpResponse::forbidden(err),
+            AlertError::CompositeNotSupported => MetaHttpResponse::forbidden(value),
             AlertError::PermissionDenied | AlertError::UserNotFound => {
                 MetaHttpResponse::forbidden("Unauthorized access")
             }

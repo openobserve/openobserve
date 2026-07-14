@@ -61,12 +61,14 @@ import {
   getAlertPayload as getAlertPayloadUtil,
   prepareAndSaveAlert as prepareAndSaveAlertUtil,
   stripFormExtras,
+  transformCompositeTermsForSave,
   type PayloadContext,
   type PayloadFormData,
   type SaveAlertContext,
 } from "@/utils/alerts/alertPayload";
 // Pure cron helpers — used by the cron save gate in runImperativeQueryChecks.
 import { getCronIntervalDifferenceInSeconds, isAboveMinRefreshInterval } from "@/utils/queryUtils";
+import { validateCompositeExpression } from "@/utils/alerts/compositeExpression";
 import {
   getParser as getParserUtil,
   addHavingClauseToQuery,
@@ -153,6 +155,9 @@ export const defaultAlertValue: any = () => {
     lastEditedBy: "",
     folder_id: "",
     creates_incident: false,
+    // Present only for composite alerts (Simple | Composite toggle). `null`
+    // means an ordinary single-query alert.
+    composite: null,
   };
 };
 
@@ -1201,6 +1206,57 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // Regex matching backend RE_OFGA_UNSUPPORTED_NAME in src/common/utils/auth.rs
   const ALERT_NAME_UNSUPPORTED_CHARS = /[:#?\s'"%&]+/;
 
+  // Validates a composite alert before save (mirrors the back-end §4.2 rules).
+  const validateCompositeAlert = (): boolean => {
+    const c = formData.value.composite;
+    if (!c || !Array.isArray(c.terms) || c.terms.length < 2) {
+      toast({ variant: "error", message: t("alerts.composite.minTermsError") });
+      return false;
+    }
+    if (c.terms.length > 10) {
+      toast({ variant: "error", message: t("alerts.composite.maxTermsError") });
+      return false;
+    }
+    const names = new Set<string>();
+    for (const term of c.terms) {
+      if (!/^[a-zA-Z0-9_]+$/.test(term.name)) {
+        toast({ variant: "error", message: t("alerts.composite.invalidTermName", { name: term.name }) });
+        return false;
+      }
+      if (names.has(term.name)) {
+        toast({ variant: "error", message: t("alerts.composite.duplicateTermName", { name: term.name }) });
+        return false;
+      }
+      names.add(term.name);
+      const type = term.query_condition?.type || "custom";
+      if (type === "custom" && !term.stream_name) {
+        toast({ variant: "error", message: t("alerts.composite.termStreamRequired", { name: term.name }) });
+        return false;
+      }
+      if (type === "sql" && !term.query_condition?.sql?.trim()) {
+        toast({ variant: "error", message: t("alerts.composite.termSqlRequired", { name: term.name }) });
+        return false;
+      }
+      if (type === "promql" && !term.query_condition?.promql?.trim()) {
+        toast({ variant: "error", message: t("alerts.composite.termPromqlRequired", { name: term.name }) });
+        return false;
+      }
+    }
+    const res = validateCompositeExpression(
+      c.expression || "",
+      c.terms.map((tm: any) => tm.name),
+    );
+    if (!res.valid) {
+      toast({ variant: "error", message: res.error || t("alerts.composite.invalidExpression") });
+      return false;
+    }
+    if (!c.notify?.on_composite?.length) {
+      toast({ variant: "error", message: t("alerts.composite.onCompositeRequired") });
+      return false;
+    }
+    return true;
+  };
+
   // Schema-driven validity predicate (validation ONLY — never triggers the save;
   // the real save path is handleSave → form.handleSubmit). The ONE composed
   // schema owns name/stream + the step field rules, so this just runs the
@@ -1220,6 +1276,24 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       }
       return true;
     }
+
+    // Composite alerts validate their terms + expression + destinations rather
+    // than a single top-level stream/query/settings, so they bypass the
+    // single-alert schema entirely and only share the name rules with it.
+    if (formData.value.composite) {
+      if (!formData.value.name?.trim()) {
+        toast({ variant: "error", message: t("alerts.nameRequired") });
+        focusTopbarField(step1Ref);
+        return false;
+      }
+      if (ALERT_NAME_UNSUPPORTED_CHARS.test(formData.value.name)) {
+        toast({ variant: "error", message: t("alerts.nameNoSpecialChars") });
+        focusTopbarField(step1Ref);
+        return false;
+      }
+      return validateCompositeAlert();
+    }
+
     if (!runImperativeQueryChecks()) return false;
     const parsed = addAlertSchema.safeParse(form.state.values);
     if (!parsed.success) {
@@ -1298,6 +1372,71 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const retransformBEToFE = (data: any) => {
     return retransformBEToFEUtil(data);
+  };
+
+  // Normalizes a query_condition's `conditions` from any persisted back-end
+  // shape into the front-end builder group (mirrors the top-level edit-load
+  // rehydration). Used to rehydrate each composite term on edit.
+  const normalizeConditionsForLoad = (conditions: any): any => {
+    if (conditions?.version === "2" || conditions?.version === 2) {
+      return ensureIds(conditions.conditions);
+    }
+    if (
+      conditions &&
+      !Array.isArray(conditions) &&
+      Object.keys(conditions).length != 0
+    ) {
+      const version = detectConditionsVersion(conditions);
+      if (version === 0) return ensureIds(convertV0ToV2(conditions));
+      if (version === 1) {
+        if (conditions.and || conditions.or)
+          return ensureIds(convertV1BEToV2(conditions));
+        if (conditions.label && conditions.items)
+          return ensureIds(convertV1ToV2(conditions));
+        return ensureIds(conditions);
+      }
+      return ensureIds(conditions);
+    }
+    if (Array.isArray(conditions) && conditions.length > 0) {
+      return ensureIds(convertV0ToV2(conditions));
+    }
+    return {
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: [],
+      groupId: getUUID(),
+    };
+  };
+
+  // Rehydrates a composite alert's terms from the persisted back-end shape into
+  // the front-end form so the query builder renders the saved state. Inverse of
+  // `transformCompositeTermsForSave`.
+  const rehydrateCompositeTerms = (composite: any) => {
+    if (!composite || !Array.isArray(composite.terms)) return;
+    composite.terms.forEach((term: any) => {
+      const qc = term.query_condition || (term.query_condition = {});
+      if (!qc.type) qc.type = "custom";
+
+      // Conditions: back-end `{version, conditions}` → builder group.
+      qc.conditions = normalizeConditionsForLoad(qc.conditions);
+
+      // VRL: base64 → plain text for the editor.
+      if (qc.vrl_function) {
+        qc.vrl_function = smartDecodeVrlFunction(qc.vrl_function);
+      }
+
+      // PromQL condition defaults (parity with the single-alert load path).
+      if (qc.promql_condition) {
+        if (!qc.promql_condition.column) qc.promql_condition.column = "value";
+        if (!qc.promql_condition.operator) qc.promql_condition.operator = ">=";
+        if (
+          qc.promql_condition.value === undefined ||
+          qc.promql_condition.value === null
+        ) {
+          qc.promql_condition.value = 1;
+        }
+      }
+    });
   };
 
   // ── UI Update Methods ───────────────────────────────────────────────────
@@ -2154,6 +2293,12 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       conditions: form.state.values.query_condition.conditions,
     };
 
+    // Composite alerts carry their query on each term, not the top-level
+    // query_condition. Normalize each term for the back-end payload.
+    if (payload.composite) {
+      transformCompositeTermsForSave(payload);
+    }
+
     if (beingUpdated.value) {
       payload.folder_id = router.currentRoute.value.query.folder || "default";
       callAlert = alertsService.update_by_alert_id(
@@ -2317,6 +2462,12 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         data.query_condition.vrl_function = smartDecodeVrlFunction(
           data.query_condition.vrl_function,
         );
+      }
+
+      // Composite alerts: rehydrate each term's query (BE→FE) so the builder
+      // renders the saved conditions/VRL — inverse of the save transform.
+      if (formData.value.composite) {
+        rehydrateCompositeTerms(formData.value.composite);
       }
     }
 

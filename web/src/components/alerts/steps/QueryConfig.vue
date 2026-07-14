@@ -526,7 +526,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <!-- Check every row -->
-              <div class="rounded-default text-compact flex items-start gap-3 px-3 py-2">
+              <div
+                v-if="!hideSchedule"
+                class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
+              >
                 <span
                   class="text-text-heading text-compact min-w-22.5 shrink-0 leading-7 font-bold whitespace-nowrap"
                 >
@@ -913,7 +916,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- SQL/PromQL condition rows (scheduled only): Check every + Alert if in one block -->
             <div v-if="isRealTime === 'false'" class="mt-2 flex flex-col gap-0 px-1">
               <!-- Check every -->
-              <div class="rounded-default text-compact flex items-start gap-3 px-3 py-2">
+              <div
+                v-if="!hideSchedule"
+                class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
+              >
                 <span
                   class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-7 font-bold whitespace-nowrap"
                 >
@@ -1300,6 +1306,12 @@ export default defineComponent({
     triggerCondition: {
       type: Object as PropType<any>,
       default: null,
+    },
+    /** Hide the per-query "Check every" schedule row. Used by composite term
+     * cards, where the schedule is shared across all terms (one trigger). */
+    hideSchedule: {
+      type: Boolean,
+      default: false,
     },
   },
   emits: [
