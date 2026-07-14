@@ -175,8 +175,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="flex flex-1 min-h-0">
+      <!-- gap-2.5 / pt-3, not gap-1 / p-2: the corner count badges straddle
+           each button's top-right edge with an 8px overhang, and they need the
+           room between items — and above the FIRST item — to poke into without
+           touching a neighbour or the toolbar border. -->
       <nav
-        class="flex flex-col gap-1 p-2 border-r border-border-default"
+        class="flex flex-col gap-2.5 px-2 pb-2 pt-3 border-r border-border-default"
         :aria-label="t('metrics.explorer.railsAriaLabel')"
       >
         <!-- OTooltip nests INSIDE the button and attaches to it — the pattern
@@ -188,30 +192,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              the underscore's position does. The OTooltip comes FIRST so that,
              having no preceding sibling, it attaches to the whole button rather
              than to the glyph span. -->
-        <OButton
-          v-for="rail in rails"
-          :key="rail.id"
-          :variant="grid.activeRail.value === rail.id ? 'primary' : 'ghost'"
-          size="icon"
-          :icon-left="rail.icon"
-          :aria-label="rail.label"
-          :aria-pressed="String(grid.activeRail.value === rail.id)"
-          :data-test="`metrics-explorer-rail-${rail.id}`"
-          @click="toggleRail(rail.id)"
-        >
-          <OTooltip :content="rail.label" side="right" />
-          <span
-            v-if="rail.glyph"
-            class="font-mono text-[11px] font-semibold leading-none tracking-tight"
-            aria-hidden="true"
-            >{{ rail.glyph }}</span
+        <div v-for="rail in rails" :key="rail.id" class="relative">
+          <OButton
+            :variant="grid.activeRail.value === rail.id ? 'primary' : 'ghost'"
+            size="icon"
+            :icon-left="rail.icon"
+            :aria-label="rail.label"
+            :aria-pressed="String(grid.activeRail.value === rail.id)"
+            :data-test="`metrics-explorer-rail-${rail.id}`"
+            @click="toggleRail(rail.id)"
           >
-        </OButton>
+            <OTooltip :content="rail.label" side="right" />
+            <span
+              v-if="rail.glyph"
+              class="font-mono text-[11px] font-semibold leading-none tracking-tight"
+              aria-hidden="true"
+              >{{ rail.glyph }}</span
+            >
+          </OButton>
+          <!-- The registry's countChip at its own xs size, exactly as every
+               other count badge in the app renders it — this wrapper only
+               POSITIONS it, straddling the button's corner notification-style.
+               The overhang fits the rail's gap-2.5 / pt-3 breathing room. -->
+          <OTag
+            v-if="rail.count"
+            type="countChip"
+            value="primary"
+            size="xs"
+            class="absolute -top-2 -right-2 z-10 pointer-events-none"
+            :data-test="`metrics-explorer-rail-count-${rail.id}`"
+            >{{ rail.count }}</OTag
+          >
+        </div>
 
         <!-- Favorites is not a fourth selector: it narrows the grid to pinned
              metrics and composes with whatever the three panels have selected.
              Hence the divider. -->
-        <div class="my-1 border-t border-border-default" />
+        <!-- Negative margin claws back most of the rail's gap-2.5 on either
+             side — the divider is a hairline, not a section break. -->
+        <div class="-my-1.5 border-t border-border-default" />
 
         <OButton
           :variant="grid.showFavoritesOnly.value ? 'primary' : 'ghost'"
@@ -437,6 +456,9 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
+import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -505,6 +527,7 @@ export default defineComponent({
     OSearchInput,
     OSpinner,
     OEmptyState,
+    OTag,
     OTooltip,
     OToggleGroup,
     OToggleGroupItem,
@@ -650,24 +673,29 @@ export default defineComponent({
       Array<{
         id: string;
         label: string;
-        icon?: string;
+        icon?: IconName;
         glyph?: string;
+        /** Active selections in this rail's panel — the icon's corner badge. */
+        count: number;
       }>
     >(() => [
       {
         id: "prefix",
         glyph: "A_",
         label: t("metrics.explorer.filterByPrefix"),
+        count: grid.selectedPrefixes.value.size,
       },
       {
         id: "suffix",
         glyph: "_Z",
         label: t("metrics.explorer.filterBySuffix"),
+        count: grid.selectedSuffixes.value.size,
       },
       {
         id: "type",
         icon: "filter-list",
         label: t("metrics.explorer.metricType"),
+        count: grid.selectedTypes.value.size,
       },
     ]);
 
@@ -732,12 +760,7 @@ export default defineComponent({
      * OEmptyState's action cards run titleKey/descriptionKey through t().
      */
     const noMatchActions = computed(() => {
-      const actions: Array<{
-        id: string;
-        icon: string;
-        titleKey: string;
-        descriptionKey: string;
-      }> = [];
+      const actions: EmptyStateAction[] = [];
       if (grid.searchTerm.value) {
         actions.push({
           id: "clear-search",
