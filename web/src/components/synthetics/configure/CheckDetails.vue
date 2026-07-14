@@ -75,9 +75,12 @@ function handleTagKeydown(event: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="rounded-lg border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] p-6 mb-4">
-    <h3 class="text-base font-semibold text-[var(--o2-text-heading)] mb-4">Check Details</h3>
-    <div class="flex flex-col gap-4">
+  <div class="rounded-lg border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] mb-4">
+    <div class="flex items-center border-b border-[var(--color-border-default)] py-[10px] px-3">
+      <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-primary-600)]" />
+      <h3 class="text-base font-semibold text-[var(--o2-text-heading)]">Check Details</h3>
+    </div>
+    <div class="px-3 py-2 flex flex-col gap-4">
       <OInput
         v-model="name"
         label="Name"

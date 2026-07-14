@@ -83,14 +83,16 @@ function toggle(browserId: string, deviceId: string) {
 
 <template>
   <div
-    class="rounded-lg border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] p-6 mb-4"
+    class="rounded-lg border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] mb-4"
     data-test="synthetics-check-browser-devices"
   >
-    <h3 class="text-base font-semibold text-[var(--o2-text-heading)] pb-4">
-      {{ t('synthetics.browserDevices.title') }}
-    </h3>
-
-    <div class="flex flex-col gap-3">
+    <div class="flex items-center border-b border-[var(--color-border-default)] py-[10px] px-3">
+      <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-primary-600)]" />
+      <h3 class="text-base font-semibold text-[var(--o2-text-heading)]">
+        {{ t('synthetics.browserDevices.title') }}
+      </h3>
+    </div>
+    <div class="px-3 py-2 flex flex-col gap-3">
       <!-- Device column headers -->
       <div class="flex items-center gap-10 pl-36 pb-2">
         <div
@@ -126,6 +128,7 @@ function toggle(browserId: string, deviceId: string) {
           />
         </div>
       </div>
+    </div>
     </div>
   </div>
 </template>
