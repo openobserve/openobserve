@@ -1,16 +1,18 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { BrowserCheck, SyntheticsFolder } from '@/types/synthetics'
 import OInput from '@/lib/forms/Input/OInput.vue'
 import OSelect from '@/lib/forms/Select/OSelect.vue'
 import OSwitch from '@/lib/forms/Switch/OSwitch.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
-import CheckAuthNetwork from './CheckAuthNetwork.vue'
 
 const props = defineProps<{ check: BrowserCheck; folders?: SyntheticsFolder[] }>()
 const emit = defineEmits<{ 'update:check': [value: BrowserCheck] }>()
+
+const { t } = useI18n()
 
 function update(patch: Partial<BrowserCheck>) {
   emit('update:check', { ...props.check, ...patch })
@@ -45,7 +47,6 @@ const tagInput = ref('')
 
 const folderOptions = computed(() => {
   const opts = (props.folders ?? []).map((f) => ({ label: f.name, value: f.folderId }))
-  // Defensive fallback so the bound value always has a matching option.
   return opts.length ? opts : [{ label: 'Default', value: 'default' }]
 })
 
@@ -75,63 +76,57 @@ function handleTagKeydown(event: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="rounded-lg border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] mb-4">
+  <div class="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-card-bg)] mb-4">
     <div class="flex items-center border-b border-[var(--color-border-default)] py-[10px] px-3">
       <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-primary-600)]" />
-      <h3 class="text-base font-semibold text-[var(--o2-text-heading)]">Check Details</h3>
+      <h3 class="text-base font-semibold text-[var(--color-text-heading)]">{{ t('synthetics.checkDetails.title') }}</h3>
     </div>
     <div class="px-3 py-2 flex flex-col gap-4">
       <OInput
         v-model="name"
-        label="Name"
+        :label="t('synthetics.checkDetails.name')"
         required
-        placeholder="My browser check"
+        :placeholder="t('synthetics.checkDetails.namePlaceholder')"
         data-test="synthetics-check-details-name-input"
       />
 
       <OSelect
         v-model="folder"
-        label="Folder"
+        :label="t('synthetics.checkDetails.folder')"
         :options="folderOptions"
-        placeholder="Select folder"
+        :placeholder="t('synthetics.checkDetails.folderPlaceholder')"
         data-test="synthetics-check-details-folder-select"
       />
 
       <OSwitch
         v-model="enabled"
-        label="Enabled"
+        :label="t('synthetics.checkDetails.enabled')"
         data-test="synthetics-check-details-enabled-switch"
       />
 
       <OInput
         v-model="url"
-        label="Starting URL"
+        :label="t('synthetics.checkDetails.startingUrl')"
         required
-        placeholder="https://example.com"
+        :placeholder="t('synthetics.checkDetails.startingUrlPlaceholder')"
         data-test="synthetics-check-details-url-input"
-      />
-
-      <CheckAuthNetwork
-        :check="check"
-        data-test="synthetics-check-details-auth-network"
-        @update:check="emit('update:check', $event)"
       />
 
       <OInput
         v-model="description"
         type="textarea"
-        label="Description"
-        placeholder="Optional description"
+        :label="t('synthetics.checkDetails.description')"
+        :placeholder="t('synthetics.checkDetails.descriptionPlaceholder')"
         :rows="3"
         data-test="synthetics-check-details-description-textarea"
       />
 
       <div>
-        <label class="text-sm font-medium text-[var(--o2-text-label)] mb-1 block">Tags</label>
+        <label class="text-sm font-medium text-[var(--color-text-label)] mb-1 block">{{ t('synthetics.checkDetails.tags') }}</label>
         <div class="flex items-center gap-2 mb-2">
           <OInput
             v-model="tagInput"
-            placeholder="Add a tag and press Enter"
+            :placeholder="t('synthetics.checkDetails.tagPlaceholder')"
             data-test="synthetics-check-details-tag-input"
             class="flex-1"
             @keydown="handleTagKeydown"
@@ -142,21 +137,21 @@ function handleTagKeydown(event: KeyboardEvent) {
             data-test="synthetics-check-details-add-tag-btn"
             @click="addTag"
           >
-            Add
+            {{ t('synthetics.checkDetails.add') }}
           </OButton>
         </div>
         <ul v-if="check.tags.length > 0" class="flex flex-wrap gap-2">
           <li
             v-for="(tag, index) in check.tags"
             :key="tag"
-            class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] text-[var(--o2-text-body)]"
+            class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs bg-[var(--color-card-bg)] border border-[var(--color-border-default)] text-[var(--color-text-body)]"
           >
             <span>{{ tag }}</span>
             <button
               type="button"
-              :aria-label="`Remove tag ${tag}`"
+              :aria-label="t('synthetics.checkDetails.removeTag', { tag })"
               :data-test="`synthetics-check-details-remove-tag-${index}-btn`"
-              class="flex items-center text-[var(--o2-text-muted)] hover:text-[var(--o2-text-body)] transition-colors"
+              class="flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-text-body)] transition-colors"
               @click="removeTag(index)"
             >
               <OIcon name="close" size="xs" />

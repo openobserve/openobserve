@@ -80,10 +80,10 @@ const silenceMinutes = computed({
 </script>
 
 <template>
-  <div class="rounded-lg border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] mb-4">
+  <div class="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-card-bg)] mb-4">
     <div class="flex items-center border-b border-[var(--color-border-default)] py-[10px] px-3">
       <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-primary-600)]" />
-      <h3 class="text-base font-semibold text-[var(--o2-text-heading)]">
+      <h3 class="text-base font-semibold text-[var(--color-text-heading)]">
         {{ t('synthetics.scheduleAlert.alerts') }}
       </h3>
     </div>
@@ -92,7 +92,7 @@ const silenceMinutes = computed({
       <!-- ── Retries ────────────────────────────────────────────────────── -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2 flex-nowrap">
-          <span class="text-sm text-[var(--o2-text-body)] whitespace-nowrap w-32">{{ t('synthetics.scheduleAlert.retriesOnFailure') }}</span>
+          <span class="text-sm text-[var(--color-text-body)] whitespace-nowrap w-32">{{ t('synthetics.scheduleAlert.retriesOnFailure') }}</span>
           <OInput
             v-model="retries"
             type="number"
@@ -100,10 +100,10 @@ const silenceMinutes = computed({
             placeholder="0"
             data-test="synthetics-check-alerts-retries-input"
           />
-          <span class="text-sm text-[var(--o2-text-body)] whitespace-nowrap">{{ t('synthetics.scheduleAlert.retriesOnFailureSuffix') }}</span>
+          <span class="text-sm text-[var(--color-text-body)] whitespace-nowrap">{{ t('synthetics.scheduleAlert.retriesOnFailureSuffix') }}</span>
         </div>
         <div class="flex items-center gap-2 flex-nowrap">
-          <span class="text-sm text-[var(--o2-text-body)] whitespace-nowrap w-32">{{ t('synthetics.scheduleAlert.retryDelay') }}</span>
+          <span class="text-sm text-[var(--color-text-body)] whitespace-nowrap w-32">{{ t('synthetics.scheduleAlert.retryDelay') }}</span>
           <OInput
             v-model="retryDelayMs"
             type="number"
@@ -111,12 +111,12 @@ const silenceMinutes = computed({
             placeholder="0"
             data-test="synthetics-check-alerts-retry-delay-input"
           />
-          <span class="text-sm text-[var(--o2-text-body)] whitespace-nowrap">{{ t('synthetics.scheduleAlert.retryDelaySuffix') }}</span>
+          <span class="text-sm text-[var(--color-text-body)] whitespace-nowrap">{{ t('synthetics.scheduleAlert.retryDelaySuffix') }}</span>
         </div>
 
         <!-- ── Failure threshold ────────────────────────────────────────── -->
         <div class="flex items-center gap-2 flex-nowrap">
-          <span class="text-sm text-[var(--o2-text-body)] whitespace-nowrap w-32">{{ t('synthetics.scheduleAlert.alertedIfFails') }}</span>
+          <span class="text-sm text-[var(--color-text-body)] whitespace-nowrap w-32">{{ t('synthetics.scheduleAlert.alertedIfFails') }}</span>
           <OInput
             v-model="failureThreshold"
             type="number"
@@ -124,13 +124,13 @@ const silenceMinutes = computed({
             placeholder="1"
             data-test="synthetics-check-alerts-failure-threshold-input"
           />
-          <span class="text-sm text-[var(--o2-text-body)] whitespace-nowrap">{{ t('synthetics.scheduleAlert.alertedIfFailsSuffix') }}</span>
+          <span class="text-sm text-[var(--color-text-body)] whitespace-nowrap">{{ t('synthetics.scheduleAlert.alertedIfFailsSuffix') }}</span>
         </div>
       </div>
 
       <!-- ── Destinations ───────────────────────────────────────────────── -->
       <div>
-        <label class="text-sm font-medium text-[var(--o2-text-label)] mb-2 block">
+        <label class="text-sm font-medium text-[var(--color-text-label)] mb-2 block">
           {{ t('synthetics.scheduleAlert.destinations') }} *
         </label>
         <div class="flex items-center gap-1">
@@ -163,16 +163,16 @@ const silenceMinutes = computed({
             {{ t('synthetics.scheduleAlert.addNewDestination') }}
           </OButton>
         </div>
-        <p v-if="destinationError" class="mt-1 text-xs text-[var(--o2-status-error-text)]">
+        <p v-if="destinationError" class="mt-1 text-xs text-[var(--color-status-error-text)]">
           {{ t('synthetics.scheduleAlert.destinationRequired') }}
         </p>
       </div>
 
       <!-- ── Cooldown Period ────────────────────────────────────────────── -->
       <div class="flex items-center gap-0">
-        <div class="w-32 text-sm font-medium text-[var(--o2-text-label)] flex items-center">
+        <label class="w-32 text-sm font-medium text-[var(--color-text-label)] flex items-center">
           {{ t('synthetics.scheduleAlert.cooldownPeriod') }} *
-        </div>
+        </label>
         <div class="flex items-center">
           <div class="w-[87px]">
             <OInput
@@ -183,7 +183,7 @@ const silenceMinutes = computed({
             />
           </div>
           <div
-            class="flex justify-center items-center text-input-addon-text pl-2 h-7 text-sm"
+            class="flex justify-center items-center text-[var(--color-text-muted)] pl-2 h-7 text-sm"
           >
             {{ t('synthetics.scheduleAlert.minutes') }}
           </div>

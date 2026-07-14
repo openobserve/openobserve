@@ -27,22 +27,22 @@ const screenshot = computed({
 </script>
 
 <template>
-  <div class="rounded-lg border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] mb-4">
+  <div class="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-card-bg)] mb-4">
     <div class="flex items-center border-b border-[var(--color-border-default)] py-[10px] px-3">
       <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-primary-600)]" />
-      <h3 class="text-base font-semibold text-[var(--o2-text-heading)]">{{ t('synthetics.capture.title') }}</h3>
+      <h3 class="text-base font-semibold text-[var(--color-text-heading)]">{{ t('synthetics.capture.title') }}</h3>
     </div>
     <div class="px-3 py-2 flex flex-col gap-4">
 
       <div class="flex items-center gap-4">
-        <label class="text-sm text-[var(--o2-text-label)] w-24 shrink-0">{{ t('synthetics.capture.screenshot') }}</label>
+        <label class="text-sm font-medium text-[var(--color-text-label)] w-24 shrink-0">{{ t('synthetics.capture.screenshot') }}</label>
         <OSelect
           v-model="screenshot"
           :options="captureOptions"
           class="w-40!"
           data-test="synthetics-check-capture-screenshot"
         />
-        <p class="text-xs text-[var(--o2-text-secondary)]">
+        <p class="text-xs text-[var(--color-text-secondary)]">
           {{ t('synthetics.capture.screenshotDescription') }}
         </p>
       </div>

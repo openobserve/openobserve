@@ -2,6 +2,7 @@
 // Copyright 2026 OpenObserve Inc.
 import type { BrowserCheck, SyntheticsLocation, SyntheticsFolder, SyntheticsDevice } from '@/types/synthetics'
 import CheckDetails from './CheckDetails.vue'
+import CheckAuthNetwork from './CheckAuthNetwork.vue'
 import CheckSchedule from './CheckSchedule.vue'
 import CheckAlerts from './CheckAlerts.vue'
 import CheckLocations from './CheckLocations.vue'
@@ -35,6 +36,11 @@ function handleUpdate(value: BrowserCheck) {
         :check="check"
         :folders="folders ?? []"
         data-test="synthetics-check-configure-details"
+        @update:check="handleUpdate"
+      />
+      <CheckAuthNetwork
+        :check="check"
+        data-test="synthetics-check-configure-auth-network"
         @update:check="handleUpdate"
       />
       <CheckSchedule
