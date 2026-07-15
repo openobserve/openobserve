@@ -72,6 +72,7 @@
           :show-folder-column="searchAcrossFolders"
           data-test="synthetic-monitoring-monitors-table"
           :toggle-loading-map="toggleLoadingMap"
+          :trigger-loading-map="triggerLoadingMap"
           @row-click="openDetail"
           @edit="openEdit"
           @toggle-enabled="toggleEnabled"
@@ -842,6 +843,7 @@ const openEdit = (m: any) => {
 }
 
 const toggleLoadingMap = ref<Record<string, boolean>>({})
+const triggerLoadingMap = ref<Record<string, boolean>>({})
 
 async function toggleEnabled(m: any) {
   const org = orgIdentifier.value
@@ -905,18 +907,36 @@ async function saveDuplicate() {
 
 async function runMonitor(m: any) {
   const org = orgIdentifier.value
-  const dismiss = toast({ variant: 'loading', message: 'Triggering monitor…', timeout: 0 })
+  const id = String(m.id)
+  const name = m.name || 'Unknown'
+
+  // Prevent duplicate triggers while already running
+  if (triggerLoadingMap.value[id]) return
+
+  // Check if monitor is disabled/paused
+  if (!m.enabled) {
+    toast({
+      variant: 'error',
+      message: `Cannot trigger "${name}" — monitor is paused. Enable it first.`,
+    })
+    return
+  }
+
+  triggerLoadingMap.value[id] = true
+  const dismiss = toast({ variant: 'loading', message: `Triggering "${name}"…`, timeout: 0 })
   try {
-    await syntheticsService.run(org, String(m.id), {})
+    await syntheticsService.run(org, id, {})
     dismiss()
-    toast({ variant: 'success', message: 'Monitor triggered successfully.' })
+    toast({ variant: 'success', message: `Run triggered for "${name}".` })
   } catch (err: any) {
     dismiss()
     toast({
       variant: 'error',
-      message: err?.response?.data?.message || err?.response?.data?.error || 'Failed to trigger monitor.',
+      message: err?.response?.data?.message || `Failed to trigger "${name}".`,
     })
     console.error('[synthetics] run failed', err)
+  } finally {
+    triggerLoadingMap.value[id] = false
   }
 }
 

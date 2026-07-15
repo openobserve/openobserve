@@ -196,7 +196,17 @@
         <!-- More menu: Trigger + Delete -->
         <ODropdown>
           <template #trigger>
+            <!-- Show spinner when trigger is in flight for this row -->
+            <div
+              v-if="props.triggerLoadingMap[(row as any).id]"
+              class="flex items-center justify-center w-7 h-8"
+              :data-test="`${dataTest}-trigger-spinner`"
+            >
+              <OSpinner size="xs" />
+              <OTooltip side="bottom" content="Triggering…" />
+            </div>
             <OButton
+              v-else
               variant="ghost"
               size="icon-sm"
               icon-left="more-vert"
@@ -207,7 +217,11 @@
             </OButton>
           </template>
 
-          <ODropdownItem :data-test="`${dataTest}-run-item`" @select="emit('run', row)">
+          <ODropdownItem
+            :data-test="`${dataTest}-run-item`"
+            :disabled="!!props.triggerLoadingMap[(row as any).id]"
+            @select="emit('run', row)"
+          >
             <template #icon-left>
               <OIcon name="sound-sampler" size="sm" />
             </template>
@@ -335,6 +349,7 @@ const props = withDefaults(defineProps<{
   emptyMessage?: string
   dataTest?: string
   toggleLoadingMap?: Record<string, boolean>
+  triggerLoadingMap?: Record<string, boolean>
   selectedIds?: string[]
   showFolderColumn?: boolean
 }>(), {
@@ -343,6 +358,7 @@ const props = withDefaults(defineProps<{
   emptyMessage: 'No results found.',
   dataTest: 'monitor-table',
   toggleLoadingMap: () => ({}),
+  triggerLoadingMap: () => ({}),
   selectedIds: () => [],
   showFolderColumn: false,
 })
