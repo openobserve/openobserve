@@ -1,4 +1,5 @@
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
+const fs = require('fs');
 const logData = require("../../fixtures/log.json");
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
@@ -125,6 +126,19 @@ test.describe("Alerts Import/Export", () => {
     const download = await pm.alertsPage.exportAlerts();
     const downloadPath = `./alerts-${new Date().toISOString().split('T')[0]}-${triggerStreamName}.json`;
     await download.saveAs(downloadPath);
+
+    // Explicit export assertion — the one that runs on BOTH cloud and non-cloud.
+    // On cloud the trigger round-trip above is skipped, so without this the test
+    // would carry no in-body assertion; verify the exported file is present, is
+    // valid JSON, and actually contains the alert we just exported.
+    const exportedRaw = fs.readFileSync(downloadPath, 'utf8');
+    expect(exportedRaw.length, 'Exported alerts file should not be empty').toBeGreaterThan(0);
+    const exportedJson = JSON.parse(exportedRaw);
+    expect(
+      JSON.stringify(exportedJson).includes(alertName),
+      `Exported alerts file should contain alert ${alertName}`
+    ).toBe(true);
+    testLogger.info('Alert export artifact validated', { alertName, downloadPath });
 
     // Delete the original alert before importing to avoid duplicate ID/name conflicts.
     // The import API (POST /api/v2/{org}/alerts) creates a new alert — if the same
