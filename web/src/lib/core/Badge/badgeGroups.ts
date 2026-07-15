@@ -943,12 +943,12 @@ export const BADGE_GROUPS = {
   },
 
   // Threshold-declaration flag (Score Config detail → Healthy threshold section).
-  // Muted, extra-small, rounded — its own group so the xs/rounded sizing stays
-  // scoped here and never leaks into the shared `fieldTag` chips.
+  // Muted, its own group so the label mapping stays scoped and never leaks into
+  // the shared `fieldTag` chips. Uses the default sm/pill sizing so it reads as a
+  // normal status chip, consistent with the sibling `evalDataType`/`evalStatus`.
   thresholdFlag: {
     mode: "plain",
-    shape: "rounded",
-    size: "xs",
+    shape: "pill",
     values: {
       notdeclared: { variant: "default-soft", labelKey: "onlineEvals.scoreConfig.detail.noThreshold" },
     },
