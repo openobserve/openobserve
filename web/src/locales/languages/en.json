@@ -168,6 +168,12 @@
       "action": "Configure storage",
       "actionDesc": "Connect an S3, GCS, or Azure bucket"
     },
+    "noModelPricing": {
+      "title": "No model pricing definitions",
+      "description": "Add a custom pricing definition to track LLM token costs.",
+      "action": "New model",
+      "actionDesc": "Define custom per-token pricing for a model"
+    },
     "noPipelineHistory": {
       "title": "No pipeline history yet",
       "description": "Pipeline execution history will appear here once your pipelines run."
@@ -339,7 +345,8 @@
       "evalJobs": "evaluation jobs",
       "scoreConfigs": "score configs",
       "pipelineHistory": "pipeline history",
-      "regexPatterns": "regex patterns"
+      "regexPatterns": "regex patterns",
+      "modelPricing": "model pricing definitions"
     }
   },
   "common": {
