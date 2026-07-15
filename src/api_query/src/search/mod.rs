@@ -63,7 +63,7 @@ use crate::{
             stream::get_settings_max_query_range,
         },
     },
-    handler::http::extractors::Headers,
+    extractors::Headers,
     service::{
         db::enrichment_table,
         search::{
@@ -75,7 +75,7 @@ use crate::{
 };
 
 pub(crate) mod around;
-pub(crate) mod error_utils;
+pub mod error_utils;
 pub mod multi_streams;
 pub mod query_manager;
 pub mod saved_view;
@@ -83,7 +83,7 @@ pub mod saved_view;
 pub mod search_inspector;
 pub mod search_job;
 pub mod search_stream;
-pub(crate) mod utils;
+pub mod utils;
 
 async fn can_use_distinct_stream(
     org_id: &str,
@@ -455,7 +455,7 @@ pub async fn search(
                     let user: config::meta::user::User =
                         get_user(Some(&org_id), user_id).await.unwrap();
 
-                    if !crate::handler::http::auth::validator::check_permissions(
+                    if !crate::service::authz::check_permissions(
                         user_id,
                         AuthExtractor {
                             auth: "".to_string(),
@@ -1979,7 +1979,7 @@ pub async fn result_schema(
                     let user: config::meta::user::User =
                         get_user(Some(&org_id), user_id).await.unwrap();
 
-                    if !crate::handler::http::auth::validator::check_permissions(
+                    if !crate::service::authz::check_permissions(
                         user_id,
                         AuthExtractor {
                             auth: "".to_string(),

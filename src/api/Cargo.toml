@@ -15,11 +15,24 @@ enterprise = [
     "dep:o2_enterprise",
     "dep:o2_openfga",
     "dep:o2_ratelimit",
+    "openobserve-api-query/enterprise",
     "openobserve-core/enterprise",
 ]
-cloud = ["enterprise", "o2_enterprise/cloud", "openobserve-core/cloud"]
-vectorscan = ["openobserve-core/vectorscan"]
-vortex = ["config/vortex", "openobserve-core/vortex"]
+cloud = [
+    "enterprise",
+    "o2_enterprise/cloud",
+    "openobserve-api-query/cloud",
+    "openobserve-core/cloud",
+]
+vectorscan = [
+    "openobserve-api-query/vectorscan",
+    "openobserve-core/vectorscan",
+]
+vortex = [
+    "config/vortex",
+    "openobserve-api-query/vortex",
+    "openobserve-core/vortex",
+]
 profiling = [
     "dep:tikv-jemalloc-ctl",
     "dep:tikv-jemalloc-sys",
@@ -34,6 +47,8 @@ ignored = ["tikv-jemalloc-sys"]
 
 [dependencies]
 openobserve-core.workspace = true
+openobserve-api-query.workspace = true
+openobserve-api-common.workspace = true
 axum.workspace = true
 axum-extra.workspace = true
 tower.workspace = true
