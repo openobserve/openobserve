@@ -61,7 +61,10 @@ const mockSearchObj = reactive({
 });
 
 vi.mock("@/composables/useTraces", () => ({
-  default: () => ({ searchObj: mockSearchObj }),
+  default: () => ({
+    searchObj: mockSearchObj,
+    tracesParser: { value: null },
+  }),
 }));
 
 vi.mock("@/composables/useNotifications", () => ({
