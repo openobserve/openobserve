@@ -140,8 +140,8 @@ const useEnterpriseRoutes = () => {
       {
         path: "synthetic/new",
         name: "synthetic-new",
-        component: () => import("@/views/synthetics/CreateBrowserTest.vue"),
-        meta: { title: "New Browser Check" },
+        component: () => import("@/views/synthetics/CreateCheck.vue"),
+        meta: { title: "New Check" },
         beforeEnter(to: any, from: any, next: any) {
           syntheticsRouteGuard(to, from, next);
         },

@@ -26,7 +26,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- Protocol runs (http/tcp/tls/ssh) have no steps/replay — dedicated view -->
+  <ProtocolRunSummary
+    v-if="monitorType && monitorType !== 'browser'"
+    :monitor-id="monitorId"
+    :run-id="runIdParam"
+    :execution-id="executionIdParam"
+    :drawer-mode="drawerMode"
+    @update-status="emit('update-status', $event)"
+  />
   <div
+    v-else
     class="run-detail flex flex-col h-full min-h-0"
     data-test="synthetics-run-detail"
   >
@@ -574,6 +584,7 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import JourneySteps from "@/components/synthetics/journey/JourneySteps.vue";
 import type { StepDotState } from "@/components/synthetics/journey/JourneySteps.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
+import ProtocolRunSummary from "@/components/synthetics/results/ProtocolRunSummary.vue";
 import type {
   SyntheticRunDetail,
   RecordedStep,
@@ -634,6 +645,21 @@ const executionIdParam = computed(() =>
 
 // ── Composable ─────────────────────────────────────────────────────────────
 const synthetics = useSyntheticResults();
+
+// ── Monitor type — protocol runs render ProtocolRunSummary instead ──────────
+// null until resolved; browser view only fetches once known (avoids running
+// the steps/screenshot query for protocol runs).
+const monitorType = ref<string | null>(null);
+
+async function resolveMonitorType() {
+  try {
+    const org = store.state.selectedOrganization.identifier;
+    const res = await syntheticsService.get(org, monitorId.value);
+    monitorType.value = (res.data as any)?.type ?? "browser";
+  } catch {
+    monitorType.value = "browser";
+  }
+}
 
 // ── Action icon map ────────────────────────────────────────────────────────
 const ACTION_META: Record<string, string> = {
@@ -1088,6 +1114,11 @@ watch(
 // ── Fetch data on mount / route change ────────────────────────────────────
 async function loadRun() {
   if (!runIdParam.value || !executionIdParam.value) return;
+  // Resolve the monitor type first — protocol runs are rendered by
+  // ProtocolRunSummary (which fetches its own row), so skip the browser
+  // steps/screenshot query for them.
+  if (monitorType.value === null) await resolveMonitorType();
+  if (monitorType.value !== "browser") return;
   const endTime = Date.now() * 1000; // µs
   const startTime = endTime - 30 * 24 * 3600 * 1000 * 1000; // 30 days
   await synthetics.fetchRun(

@@ -13,6 +13,9 @@ const props = defineProps<{
   check: BrowserCheck
   folders?: SyntheticsFolder[]
   validationErrors?: Record<string, string>
+  /** Override the target field label/placeholder (protocol checks take a host, not a URL). */
+  targetLabel?: string
+  targetPlaceholder?: string
 }>()
 const emit = defineEmits<{ 'update:check': [value: BrowserCheck] }>()
 
@@ -112,11 +115,11 @@ function handleTagKeydown(event: KeyboardEvent) {
 
       <OInput
         v-model="url"
-        :label="t('synthetics.checkDetails.startingUrl')"
+        :label="targetLabel ?? t('synthetics.checkDetails.startingUrl')"
         required
         :error="!!props.validationErrors?.url"
         :error-message="props.validationErrors?.url"
-        :placeholder="t('synthetics.checkDetails.startingUrlPlaceholder')"
+        :placeholder="targetPlaceholder ?? t('synthetics.checkDetails.startingUrlPlaceholder')"
         data-test="synthetics-check-details-url-input"
       />
 

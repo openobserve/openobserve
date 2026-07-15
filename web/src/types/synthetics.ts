@@ -159,6 +159,70 @@ export type RecorderPortInbound =
   | RecorderPortMessage
   | { type: 'synthetics-response'; response: unknown }
 
+/**
+ * Check types creatable from the UI. Only types both the control plane and the
+ * probes run end-to-end today — dns/ping/api exist server-side but have no
+ * probe support yet, so they are deliberately absent.
+ */
+export type SyntheticCheckType = 'browser' | 'http' | 'tcp' | 'tls' | 'ssh'
+
+export const SYNTHETIC_CHECK_TYPES: SyntheticCheckType[] = ['browser', 'http', 'tcp', 'tls', 'ssh']
+
+/** Non-browser check types — configured on the shared configure page, no journey step. */
+export type ProtocolCheckType = Exclude<SyntheticCheckType, 'browser'>
+
+// ── Per-type protocol configs (UI models; wire shapes live in buildPayload) ──
+
+export interface HttpAssertion {
+  field: string
+  operator: string
+  value: string
+}
+
+export interface HttpCheckConfig {
+  method: string
+  headers: { name: string; value: string }[]
+  body: string
+  follow_redirects: boolean
+  timeout_ms: number
+  assertions: HttpAssertion[]
+}
+
+export interface TcpCheckConfig {
+  port: number | null
+  timeout_ms: number
+  response_contains: string
+}
+
+export interface TlsCheckConfig {
+  port: number
+  timeout_ms: number
+  min_days_until_expiry: number
+  verify_chain: boolean
+  verify_hostname: boolean
+}
+
+export interface SshCheckConfig {
+  port: number
+  username: string
+  authType: 'password' | 'private_key'
+  secret: string
+  timeout_ms: number
+}
+
+/**
+ * Protocol check model — the shared BrowserCheck fields (details, schedule,
+ * alerts, locations…) plus exactly one per-type config, discriminated by
+ * `checkType`. `journey`/`rum`/`capture` stay empty/unused for these types.
+ */
+export interface ProtocolCheck extends BrowserCheck {
+  checkType: ProtocolCheckType
+  http?: HttpCheckConfig
+  tcp?: TcpCheckConfig
+  tls?: TlsCheckConfig
+  ssh?: SshCheckConfig
+}
+
 export interface BrowserCheckFrequency {
   type: 'minutes' | 'hours' | 'seconds' | 'days' | 'weeks' | 'months' | 'cron'
   interval?: number      // value in the unit specified by type

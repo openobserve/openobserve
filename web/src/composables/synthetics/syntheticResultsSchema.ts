@@ -126,6 +126,44 @@ export interface SyntheticRunDetail extends SyntheticRun {
   traceKey: string | null;
 }
 
+/** One timing phase of a protocol run (dns/connect/tls/ttfb), for waterfall display. */
+export interface ProtocolTiming {
+  phase: "dns" | "connect" | "tls" | "ttfb";
+  ms: number;
+}
+
+/**
+ * Detail row for a protocol (http/tcp/tls/ssh) run — flat fields from the
+ * probe's result record; no steps/screenshots/replay.
+ */
+export interface ProtocolRunDetail {
+  timestamp: number; // ms
+  scheduledTs: number; // ms
+  startedTs: number; // ms
+  completedTs: number; // ms
+  status: string; // up | down | degraded
+  error: string;
+  errorClass: string;
+  assertionsPassed: boolean | null;
+  statusCode: number | null;
+  responseTimeMs: number;
+  responseBytes: number | null;
+  timings: ProtocolTiming[];
+  totalMs: number;
+  tlsCertExpiry: number | null; // µs epoch
+  initMs: number | null;
+  location: string;
+  probeId: string;
+  runtime: string;
+  triggerType: string;
+  target: string;
+  type: string;
+  monitorName: string;
+  jobId: string;
+  runId: string;
+  executionId: string;
+}
+
 export interface RecordedStep {
   id: string;
   action: string;
@@ -457,6 +495,25 @@ WHERE ${F.monitorId} = '${id}' AND run_id = '${rid}' AND execution_id = '${eid}'
 ORDER BY ${F.location} ASC`;
 }
 
+/**
+ * Full row for a protocol (http/tcp/tls/ssh) run. `SELECT *` on purpose —
+ * protocol columns (timings_ms_*, status_code, tls_cert_expiry, …) only exist
+ * in the stream schema once a protocol record has been ingested, so naming
+ * them explicitly would fail on browser-only deployments.
+ */
+export function buildProtocolRunDetailSql(
+  monitorId: string,
+  runId: string,
+  executionId: string,
+): string {
+  const id = escapeSqlLiteral(monitorId);
+  const rid = escapeSqlLiteral(runId);
+  const eid = escapeSqlLiteral(executionId);
+  return `SELECT * FROM ${TABLE}
+WHERE ${F.monitorId} = '${id}' AND run_id = '${rid}' AND execution_id = '${eid}'
+LIMIT 1`;
+}
+
 // ── Adapters (raw hits → typed models) ────────────────────────────────────
 
 export function mapKpi(
@@ -537,6 +594,47 @@ export function mapRunDetail(
     network: null,
     webVitals: null,
     traceKey: rawHit.trace_key ? str(rawHit.trace_key) : null,
+  };
+}
+
+export function mapProtocolRunDetail(
+  rawHit: Record<string, unknown>,
+): ProtocolRunDetail | null {
+  if (!rawHit) return null;
+
+  const timings: ProtocolTiming[] = [];
+  for (const phase of ["dns", "connect", "tls", "ttfb"] as const) {
+    const v = rawHit[`timings_ms_${phase}`];
+    if (v != null) timings.push({ phase, ms: num(v) });
+  }
+
+  return {
+    timestamp: num(rawHit._timestamp) / 1000,
+    scheduledTs: num(rawHit.scheduled_ts) / 1000,
+    startedTs: num(rawHit.started_ts) / 1000,
+    completedTs: num(rawHit.completed_ts) / 1000,
+    status: str(rawHit.status),
+    error: str(rawHit.error),
+    errorClass: str(rawHit.error_class),
+    assertionsPassed:
+      rawHit.assertions_passed == null ? null : Boolean(rawHit.assertions_passed),
+    statusCode: rawHit.status_code == null ? null : num(rawHit.status_code),
+    responseTimeMs: num(rawHit.response_time_ms),
+    responseBytes: rawHit.response_bytes == null ? null : num(rawHit.response_bytes),
+    timings,
+    totalMs: num(rawHit.timings_ms_total ?? rawHit.response_time_ms),
+    tlsCertExpiry: rawHit.tls_cert_expiry == null ? null : num(rawHit.tls_cert_expiry),
+    initMs: rawHit.init_ms == null ? null : num(rawHit.init_ms),
+    location: str(rawHit.location),
+    probeId: str(rawHit.probe_id),
+    runtime: str(rawHit.runtime),
+    triggerType: str(rawHit.trigger_type) || "schedule",
+    target: str(rawHit.target),
+    type: str(rawHit.type),
+    monitorName: str(rawHit.synthetics_name),
+    jobId: str(rawHit.job_id),
+    runId: str(rawHit.run_id),
+    executionId: str(rawHit.execution_id),
   };
 }
 

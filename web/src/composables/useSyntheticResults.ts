@@ -24,11 +24,14 @@ import {
   buildLastRunSql,
   buildRunsSql,
   buildRunDetailSql,
+  buildProtocolRunDetailSql,
   mapHistogram,
   mapKpi,
+  mapProtocolRunDetail,
   mapRun,
   mapRunDetail,
   SYNTHETIC_RESULTS_STREAM,
+  type ProtocolRunDetail,
   type StepStatsResult,
   type SyntheticBucket,
   type SyntheticKpi,
@@ -61,6 +64,7 @@ export function useSyntheticResults() {
   const buckets = ref<SyntheticBucket[]>([]);
   const runs = ref<SyntheticRun[]>([]);
   const runDetail = ref<SyntheticRunDetail | null>(null);
+  const protocolRunDetail = ref<ProtocolRunDetail | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
   const hasLoadedOnce = ref(false);
@@ -307,6 +311,37 @@ export function useSyntheticResults() {
     }
   }
 
+  /** Detail row for a protocol (http/tcp/tls/ssh) run — no steps/replay. */
+  async function fetchProtocolRun(
+    monitorId: string,
+    runId: string,
+    executionId: string,
+    startTime: number,
+    endTime: number,
+  ): Promise<void> {
+    if (!monitorId || !runId || !executionId) return;
+    loading.value = true;
+    error.value = null;
+    protocolRunDetail.value = null;
+    try {
+      const rows = await executeQuery(
+        buildProtocolRunDetailSql(monitorId, runId, executionId),
+        startTime,
+        endTime,
+        "logs",
+      );
+      if (rows.length > 0) {
+        protocolRunDetail.value = mapProtocolRunDetail(rows[0]);
+      }
+    } catch (e: unknown) {
+      error.value = e instanceof Error ? e.message : "Failed to load run";
+      protocolRunDetail.value = null;
+    } finally {
+      loading.value = false;
+      hasLoadedOnce.value = true;
+    }
+  }
+
   async function fetchSteps(
     monitorId: string,
     startTime: number,
@@ -329,6 +364,7 @@ export function useSyntheticResults() {
     buckets,
     runs,
     runDetail,
+    protocolRunDetail,
     loading,
     error,
     hasLoadedOnce,
@@ -348,6 +384,7 @@ export function useSyntheticResults() {
     effectiveP95Ms,
     fetchAll,
     fetchRun,
+    fetchProtocolRun,
     fetchSteps,
     cancelAll,
   };

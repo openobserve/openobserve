@@ -6283,6 +6283,112 @@
       "selectorRequired": "Selector is required for \"{step}\"",
       "firstStepMustNavigate": "First step must be \"Navigate\""
     },
+    "newCheck": {
+      "button": "New Check",
+      "browser": "Browser Test",
+      "http": "HTTP / API",
+      "tcp": "TCP Port",
+      "tls": "SSL / TLS Certificate",
+      "ssh": "SSH",
+      "pageTitle": "New {label} Check",
+      "back": "Checks",
+      "saving": "Saving check…",
+      "saved": "Check saved successfully.",
+      "updated": "Check updated successfully.",
+      "saveFailed": "Failed to save check.",
+      "saveCheck": "Save check",
+      "updateCheck": "Update check",
+      "unsavedTitle": "Unsaved changes",
+      "unsavedBody": "You have unsaved changes. Are you sure you want to leave?",
+      "leave": "Leave",
+      "stay": "Stay"
+    },
+    "protocolConfig": {
+      "timeoutMs": "Timeout (ms)",
+      "port": "Port",
+      "http": {
+        "title": "HTTP Request",
+        "method": "Method",
+        "followRedirects": "Follow redirects",
+        "headers": "Headers",
+        "headerName": "Name",
+        "headerValue": "Value",
+        "addHeader": "Add header",
+        "body": "Request body",
+        "bodyPlaceholder": "{\"key\": \"value\"}",
+        "assertions": "Assertions",
+        "assertionValue": "Value",
+        "addAssertion": "Add assertion",
+        "fields": {
+          "status_code": "Status code",
+          "body": "Response body",
+          "response_time_ms": "Response time (ms)"
+        },
+        "operators": {
+          "eq": "equals",
+          "ne": "not equals",
+          "lt": "less than",
+          "gt": "greater than",
+          "contains": "contains",
+          "not_contains": "does not contain"
+        }
+      },
+      "tcp": {
+        "title": "TCP Connection",
+        "responseContains": "Response contains (optional)",
+        "responseContainsPlaceholder": "Expected substring in the first response bytes"
+      },
+      "tls": {
+        "title": "TLS Certificate",
+        "minDays": "Alert when expiring within (days)",
+        "verifyChain": "Verify certificate chain",
+        "verifyHostname": "Verify hostname"
+      },
+      "ssh": {
+        "title": "SSH",
+        "username": "Username",
+        "authType": "Authentication",
+        "password": "Password",
+        "privateKey": "Private key",
+        "privateKeyPlaceholder": "-----BEGIN OPENSSH PRIVATE KEY-----"
+      }
+    },
+    "protocolRun": {
+      "up": "Up",
+      "down": "Down",
+      "degraded": "Degraded",
+      "notFound": "Run not found",
+      "result": "Result",
+      "status": "Status",
+      "statusCode": "Status code",
+      "responseTime": "Response time",
+      "responseSize": "Response size",
+      "error": "Error",
+      "timings": "Timing breakdown",
+      "phase": {
+        "dns": "DNS",
+        "connect": "Connect",
+        "tls": "TLS",
+        "ttfb": "TTFB",
+        "total": "Total"
+      },
+      "assertions": "Assertions",
+      "assertionsPassed": "Passed",
+      "assertionsFailed": "Failed",
+      "tlsCert": "TLS certificate",
+      "certExpires": "Expires {date}",
+      "daysRemaining": "{days} days remaining",
+      "probe": "Probe",
+      "location": "Location",
+      "runtime": "Runtime",
+      "init": "init",
+      "probeId": "Probe ID",
+      "trigger": "Trigger",
+      "timeline": "Timeline",
+      "scheduled": "scheduled",
+      "started": "started",
+      "completed": "completed"
+    },
     "results": {
       "title": "Monitor Results",
       "monitors": "Monitors",
@@ -6393,6 +6499,10 @@
       "namePlaceholder": "My browser check",
       "folder": "Folder",
       "folderPlaceholder": "Select folder",
+      "hostTarget": "Host",
+      "hostTargetPlaceholder": "example.com or example.com:8443",
+      "urlTarget": "URL",
+      "urlTargetPlaceholder": "https://api.example.com/health",
       "enabled": "Enabled",
       "startingUrl": "Starting URL",
       "startingUrlPlaceholder": "https://example.com",

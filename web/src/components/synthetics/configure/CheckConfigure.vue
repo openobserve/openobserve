@@ -1,6 +1,8 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import type { BrowserCheck, SyntheticsLocation, SyntheticsFolder, SyntheticsDevice } from '@/types/synthetics'
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+import type { BrowserCheck, SyntheticCheckType, SyntheticsLocation, SyntheticsFolder, SyntheticsDevice } from '@/types/synthetics'
 import CheckDetails from './CheckDetails.vue'
 import CheckAuthNetwork from './CheckAuthNetwork.vue'
 import CheckSchedule from './CheckSchedule.vue'
@@ -12,7 +14,7 @@ import CheckCapture from './CheckCapture.vue'
 
 const props = defineProps<{
   check: BrowserCheck
-  checkType?: 'browser' | 'api'
+  checkType?: SyntheticCheckType | 'api'
   locations?: SyntheticsLocation[]
   browsers?: string[]
   devices?: SyntheticsDevice[]
@@ -20,6 +22,25 @@ const props = defineProps<{
   folders?: SyntheticsFolder[]
   validationErrors?: Record<string, string>
 }>()
+
+const { t } = useI18n()
+
+// Browser/http take a full URL; tcp/tls/ssh take a bare host (the server
+// rejects URLs for those types — validate_host_target).
+const isHostTarget = computed(() => ['tcp', 'tls', 'ssh'].includes(props.checkType ?? 'browser'))
+// Target field wording: browser keeps "Starting URL"; http is a plain "URL".
+const targetLabel = computed(() => {
+  if (isHostTarget.value) return t('synthetics.checkDetails.hostTarget')
+  if (props.checkType === 'http' || props.checkType === 'api') return t('synthetics.checkDetails.urlTarget')
+  return undefined
+})
+const targetPlaceholder = computed(() => {
+  if (isHostTarget.value) return t('synthetics.checkDetails.hostTargetPlaceholder')
+  if (props.checkType === 'http' || props.checkType === 'api') return t('synthetics.checkDetails.urlTargetPlaceholder')
+  return undefined
+})
+// Basic auth + variables only make sense where the probe sends them today.
+const showAuthNetwork = computed(() => ['browser', 'http', 'api'].includes(props.checkType ?? 'browser'))
 const emit = defineEmits<{
   'update:check': [value: BrowserCheck]
   'refresh:destinations': []
@@ -37,10 +58,15 @@ function handleUpdate(value: BrowserCheck) {
         :check="check"
         :folders="folders ?? []"
         :validation-errors="props.validationErrors ?? {}"
+        :target-label="targetLabel"
+        :target-placeholder="targetPlaceholder"
         data-test="synthetics-check-configure-details"
         @update:check="handleUpdate"
       />
+      <!-- Per-type request/config card (protocol checks) — filled by the parent view -->
+      <slot name="type-config" />
       <CheckAuthNetwork
+        v-if="showAuthNetwork"
         :check="check"
         data-test="synthetics-check-configure-auth-network"
         @update:check="handleUpdate"

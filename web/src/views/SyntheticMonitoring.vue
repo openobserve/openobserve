@@ -22,9 +22,23 @@
           <template #icon-left><OIcon name="language" size="xs" /></template>
           Geo Map
         </OButton>
-        <OButton size="sm" variant="primary" @click="openCreate">
-          New Check
-        </OButton>
+        <ODropdown align="end">
+          <template #trigger>
+            <OButton size="sm" variant="primary" data-test="synthetic-monitoring-new-check-dropdown">
+              {{ t('synthetics.newCheck.button') }}
+              <template #icon-right><OIcon name="keyboard-arrow-down" size="xs" /></template>
+            </OButton>
+          </template>
+          <ODropdownItem
+            v-for="ct in SYNTHETIC_CHECK_TYPES"
+            :key="ct"
+            :icon-left="checkTypeIcons[ct]"
+            :data-test="`synthetic-monitoring-new-check-${ct}`"
+            @select="openCreate(ct)"
+          >
+            {{ t(`synthetics.newCheck.${ct}`) }}
+          </ODropdownItem>
+        </ODropdown>
       </div>
     </div>
 
@@ -333,10 +347,15 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import MonitorTable from "@/components/synthetic-monitoring/MonitorTable.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
 import { mapResponseToBrowserCheck, buildCreateBrowserTestPayload } from '@/utils/synthetics/buildPayload'
+import { SYNTHETIC_CHECK_TYPES, type SyntheticCheckType } from '@/types/synthetics'
+import type { IconName } from '@/lib/core/Icon/OIcon.icons'
+import { useI18n } from 'vue-i18n'
 import PrivateLocations, { type PrivateLocation } from '@/components/synthetic-monitoring/PrivateLocations.vue'
 import MonitorFormDrawer from '@/components/synthetic-monitoring/MonitorFormDrawer.vue'
 import syntheticsService from '@/services/synthetics'
@@ -347,6 +366,15 @@ import { toast } from '@/lib/feedback/Toast/useToast'
 const router  = useRouter();
 const route   = useRoute();
 const store   = useStore();
+const { t }   = useI18n();
+
+const checkTypeIcons: Record<SyntheticCheckType, IconName> = {
+  browser: 'open-in-browser',
+  http: 'network-check',
+  tcp: 'bolt',
+  tls: 'shield',
+  ssh: 'keyboard',
+}
 
 // ── API types ──────────────────────────────────────────────────────────
 interface ApiMonitorFrequency {
@@ -912,8 +940,8 @@ async function bulkTriggerMonitors() {
   selectedMonitorIds.value = []
 }
 
-const openCreate = () =>
-  router.push({ name: 'synthetic-new', query: { folder: activeFolderId.value } })
+const openCreate = (type: SyntheticCheckType = 'browser') =>
+  router.push({ name: 'synthetic-new', query: { folder: activeFolderId.value, type } })
 const openEdit = (m: any) => {
   router.push({
     name: 'synthetic-new',

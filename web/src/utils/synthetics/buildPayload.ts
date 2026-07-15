@@ -1,6 +1,16 @@
 // Copyright 2026 OpenObserve Inc.
 import { DateTime } from 'luxon'
-import type { BrowserCheck, BrowserCheckFrequency, BrowserCheckSchedule } from '@/types/synthetics'
+import type {
+  BrowserCheck,
+  BrowserCheckFrequency,
+  BrowserCheckSchedule,
+  HttpCheckConfig,
+  ProtocolCheck,
+  ProtocolCheckType,
+  SshCheckConfig,
+  TcpCheckConfig,
+  TlsCheckConfig,
+} from '@/types/synthetics'
 import { convertDateToTimestamp } from '@/utils/timezone'
 import { journeyToWireSteps, mapWireSteps } from './mapRecordedStep'
 import { useLocalTimezone } from '../storage'
@@ -30,39 +40,42 @@ function buildFrequency(s: BrowserCheckSchedule): BrowserCheckFrequency {
   return freq
 }
 
-export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<string, unknown> {
-  const {
-    journey, schedule, rum, capture, auth, variables, secrets, headers, cookies, notifications,
-    url, folder, browserDevices, retries, waitBeforeRetrySecs, cooldownMins, alertIfFails,
-    tz_offset,
-    ...rest
-  } = check
-
-  // Compute start (microseconds, top-level — always set, matches reports pattern)
-  let start: number
-  let resolvedTzOffset = tz_offset ?? 0
-
+/**
+ * Computes the top-level `start` (microseconds) + tz_offset from the schedule.
+ * NOTE: for "Schedule Now" this also writes the browser timezone back onto
+ * `check.schedule.timezone` (pre-existing behavior the browser flow relies on).
+ */
+function computeStart(check: BrowserCheck): { start: number; tz_offset: number } {
+  const { schedule, tz_offset } = check
   if (schedule.startType === 'later' && schedule.startDate && schedule.startTime) {
     // Schedule Later: use the user-chosen date/time/timezone
     const [y, m, d] = schedule.startDate.split('-')
     const dateForConversion = `${d}-${m}-${y}` // ISO → DD-MM-YYYY
     const converted = convertDateToTimestamp(dateForConversion, schedule.startTime, schedule.timezone ?? 'UTC')
-    start = converted.timestamp
-    resolvedTzOffset = converted.offset
-  } else {
-    // Schedule Now: always use browser timezone (matches CreateReport.vue)
-    const now = new Date()
-    const dd = String(now.getDate()).padStart(2, '0')
-    const mm = String(now.getMonth() + 1).padStart(2, '0')
-    const yyyy = now.getFullYear()
-    const hh = String(now.getHours()).padStart(2, '0')
-    const min = String(now.getMinutes()).padStart(2, '0')
-    const browserTz = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone
-    const converted = convertDateToTimestamp(`${dd}-${mm}-${yyyy}`, `${hh}:${min}`, browserTz)
-    start = converted.timestamp;
-    resolvedTzOffset = converted.offset;
-    check.schedule.timezone = browserTz;
+    return { start: converted.timestamp, tz_offset: converted.offset }
   }
+  // Schedule Now: always use browser timezone (matches CreateReport.vue)
+  const now = new Date()
+  const dd = String(now.getDate()).padStart(2, '0')
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const yyyy = now.getFullYear()
+  const hh = String(now.getHours()).padStart(2, '0')
+  const min = String(now.getMinutes()).padStart(2, '0')
+  const browserTz = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone
+  const converted = convertDateToTimestamp(`${dd}-${mm}-${yyyy}`, `${hh}:${min}`, browserTz)
+  check.schedule.timezone = browserTz
+  return { start: converted.timestamp, tz_offset: converted.offset ?? tz_offset ?? 0 }
+}
+
+export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<string, unknown> {
+  const {
+    journey, schedule, rum, capture, auth, variables, secrets, headers, cookies, notifications,
+    url, folder, browserDevices, retries, waitBeforeRetrySecs, cooldownMins, alertIfFails,
+    tz_offset: _tz_offset,
+    ...rest
+  } = check
+
+  const { start, tz_offset: resolvedTzOffset } = computeStart(check)
 
   return {
     ...rest,                          // name, description, enabled, tags, locations
@@ -112,6 +125,142 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
         password: auth.password,
       },
     }),
+  }
+}
+
+// ── Outbound: ProtocolCheck (http/tcp/tls/ssh) → API payload ─────────────────
+
+/** Assertion values ride as JSON — send numerics as numbers ("200" → 200). */
+function coerceAssertionValue(value: string): string | number {
+  const trimmed = value.trim()
+  if (trimmed !== '' && !Number.isNaN(Number(trimmed))) return Number(trimmed)
+  return value
+}
+
+function buildProtocolConfig(check: ProtocolCheck): Record<string, unknown> {
+  switch (check.checkType) {
+    case 'http': {
+      const c = check.http as HttpCheckConfig
+      return {
+        method: c.method,
+        timeout_ms: c.timeout_ms,
+        follow_redirects: c.follow_redirects,
+        headers: c.headers
+          .filter((h) => h.name.trim())
+          .map(({ name, value }) => ({ name, value })),
+        ...(c.body.trim() && { body: c.body }),
+        assertions: c.assertions
+          .filter((a) => a.field)
+          .map((a) => ({
+            field: a.field,
+            operator: a.operator,
+            value: coerceAssertionValue(a.value),
+          })),
+      }
+    }
+    case 'tcp': {
+      const c = check.tcp as TcpCheckConfig
+      return {
+        port: c.port,
+        timeout_ms: c.timeout_ms,
+        ...(c.response_contains.trim() && { response_contains: c.response_contains }),
+      }
+    }
+    case 'tls': {
+      const c = check.tls as TlsCheckConfig
+      return {
+        port: c.port,
+        timeout_ms: c.timeout_ms,
+        min_days_until_expiry: c.min_days_until_expiry,
+        verify_chain: c.verify_chain,
+        verify_hostname: c.verify_hostname,
+      }
+    }
+    case 'ssh': {
+      const c = check.ssh as SshCheckConfig
+      return {
+        port: c.port,
+        username: c.username,
+        auth: { type: c.authType, secret: c.secret },
+        timeout_ms: c.timeout_ms,
+      }
+    }
+  }
+}
+
+export function buildCreateProtocolCheckPayload(check: ProtocolCheck): Record<string, unknown> {
+  const { start, tz_offset } = computeStart(check)
+
+  return {
+    name: check.name,
+    description: check.description ?? '',
+    tags: check.tags,
+    type: check.checkType,
+    target: check.url,
+    enabled: check.enabled,
+    folder_id: check.folder,
+    tz_offset,
+    start,
+    locations: check.locations,
+
+    retries: check.retries ?? 0,
+    wait_before_retry_secs: check.waitBeforeRetrySecs ?? 5,
+    alert_if_fails: check.alertIfFails ?? 1,
+    cooldown_mins: check.cooldownMins ?? 0,
+
+    destinations: check.notifications.destinations,
+
+    variables: (check.variables ?? []).map(({ name, value, secure, example }) => ({
+      name,
+      value,
+      secure: secure ?? false,
+      example: example ?? '',
+    })),
+
+    frequency: buildFrequency(check.schedule),
+    config: buildProtocolConfig(check),
+
+    ...(check.checkType === 'http' && check.auth && {
+      auth: {
+        type: check.auth.type,
+        username: check.auth.username,
+        password: check.auth.password,
+      },
+    }),
+  }
+}
+
+// ── Per-type defaults for a fresh protocol check ─────────────────────────────
+
+export function defaultProtocolConfig(type: ProtocolCheckType): Partial<ProtocolCheck> {
+  switch (type) {
+    case 'http':
+      return {
+        http: {
+          method: 'GET',
+          headers: [],
+          body: '',
+          follow_redirects: true,
+          timeout_ms: 10000,
+          assertions: [{ field: 'status_code', operator: 'eq', value: '200' }],
+        },
+      }
+    case 'tcp':
+      return { tcp: { port: null, timeout_ms: 10000, response_contains: '' } }
+    case 'tls':
+      return {
+        tls: {
+          port: 443,
+          timeout_ms: 10000,
+          min_days_until_expiry: 30,
+          verify_chain: true,
+          verify_hostname: true,
+        },
+      }
+    case 'ssh':
+      return {
+        ssh: { port: 22, username: '', authType: 'password', secret: '', timeout_ms: 10000 },
+      }
   }
 }
 
@@ -213,4 +362,56 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
     ...(config?.headers && { headers: config.headers }),
     ...(config?.cookies && { cookies: config.cookies }),
   } as BrowserCheck
+}
+
+// ── Inbound: API response → ProtocolCheck (http/tcp/tls/ssh edits) ───────────
+
+export function mapResponseToProtocolCheck(data: Record<string, unknown>): ProtocolCheck {
+  const base = mapResponseToBrowserCheck(data)
+  const type = (data as any).type as ProtocolCheckType
+  const cfg = ((data as any).config ?? {}) as Record<string, any>
+  const check: ProtocolCheck = { ...base, checkType: type }
+
+  switch (type) {
+    case 'http':
+      check.http = {
+        method: cfg.method ?? 'GET',
+        headers: (cfg.headers ?? []).map((h: any) => ({ name: h.name ?? '', value: h.value ?? '' })),
+        body: cfg.body ?? '',
+        follow_redirects: cfg.follow_redirects ?? true,
+        timeout_ms: cfg.timeout_ms ?? 10000,
+        assertions: (cfg.assertions ?? []).map((a: any) => ({
+          field: a.field ?? '',
+          operator: a.operator ?? 'eq',
+          value: a.value != null ? String(a.value) : '',
+        })),
+      }
+      break
+    case 'tcp':
+      check.tcp = {
+        port: cfg.port ?? null,
+        timeout_ms: cfg.timeout_ms ?? 10000,
+        response_contains: cfg.response_contains ?? '',
+      }
+      break
+    case 'tls':
+      check.tls = {
+        port: cfg.port ?? 443,
+        timeout_ms: cfg.timeout_ms ?? 10000,
+        min_days_until_expiry: cfg.min_days_until_expiry ?? 30,
+        verify_chain: cfg.verify_chain ?? true,
+        verify_hostname: cfg.verify_hostname ?? true,
+      }
+      break
+    case 'ssh':
+      check.ssh = {
+        port: cfg.port ?? 22,
+        username: cfg.username ?? '',
+        authType: cfg.auth?.type === 'private_key' ? 'private_key' : 'password',
+        secret: cfg.auth?.secret ?? '',
+        timeout_ms: cfg.timeout_ms ?? 10000,
+      }
+      break
+  }
+  return check
 }
