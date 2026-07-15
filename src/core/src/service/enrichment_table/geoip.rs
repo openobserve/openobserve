@@ -15,7 +15,12 @@
 //
 // The file re-use code snippets from https://github.com/vectordotdev/vector/blob/master/src/enrichment_tables/geoip.rs ,modified to suit openobserve needs
 
-use std::{fs, net::IpAddr, sync::Arc, time::SystemTime};
+use std::{
+    fs,
+    net::IpAddr,
+    sync::{Arc, LazyLock},
+    time::SystemTime,
+};
 
 use config::{MMDB_CITY_FILE_NAME, get_config};
 #[cfg(feature = "enterprise")]
@@ -25,8 +30,12 @@ use maxminddb::{
     geoip2::{City, ConnectionType, Isp},
 };
 use serde::{Deserialize, Serialize};
+use tokio::sync::Notify;
 use vector_enrichment::{Case, Condition, IndexHandle, Table};
 use vrl::value::{ObjectMap, Value};
+
+/// Signals that the initial MaxMind database download and client setup finished.
+pub static MMDB_INIT_NOTIFIER: LazyLock<Arc<Notify>> = LazyLock::new(|| Arc::new(Notify::new()));
 
 // MaxMind GeoIP database files have a type field we can use to recognize
 // specific products. If we encounter one of these two types, we look for

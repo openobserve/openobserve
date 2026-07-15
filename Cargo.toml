@@ -17,16 +17,33 @@ keywords = [
 license = "AGPL-3.0"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.92.0"
+version = "0.93.0"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
 default = []
-enterprise = ["openobserve-api/enterprise", "openobserve-core/enterprise"]
-vectorscan = ["openobserve-api/vectorscan", "openobserve-core/vectorscan"]
-cloud = ["openobserve-api/cloud", "openobserve-core/cloud"]
-vortex = ["config/vortex", "openobserve-api/vortex", "openobserve-core/vortex"]
+enterprise = [
+    "openobserve-api/enterprise",
+    "openobserve-core/enterprise",
+    "openobserve-jobs/enterprise",
+]
+vectorscan = [
+    "openobserve-api/vectorscan",
+    "openobserve-core/vectorscan",
+    "openobserve-jobs/vectorscan",
+]
+cloud = [
+    "openobserve-api/cloud",
+    "openobserve-core/cloud",
+    "openobserve-jobs/cloud",
+]
+vortex = [
+    "config/vortex",
+    "openobserve-api/vortex",
+    "openobserve-core/vortex",
+    "openobserve-jobs/vortex",
+]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = [
@@ -63,7 +80,6 @@ inherits = "release"
 debug = true
 strip = false
 codegen-units = 4
-split-debuginfo = "packed"
 
 # tikv-jemalloc-sys is a link-time dependency: it forces the "profiling"
 # feature on the jemalloc sys crate that jemalloc_pprof requires.
@@ -207,6 +223,7 @@ async-stream.workspace = true
 sourcemap.workspace = true
 openobserve-api.workspace = true
 openobserve-core.workspace = true
+openobserve-jobs.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true
@@ -218,7 +235,11 @@ rcgen.workspace = true
 [workspace]
 members = [
     "src/api",
+    "src/api_management",
+    "src/api_query",
+    "src/api_common",
     "src/core",
+    "src/jobs",
     "src/config",
     "src/infra",
     "src/ingester",
@@ -246,6 +267,10 @@ flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
 openobserve-core = { path = "src/core" }
 openobserve-api = { path = "src/api" }
+openobserve-api-management = { path = "src/api_management" }
+openobserve-api-query = { path = "src/api_query" }
+openobserve-api-common = { path = "src/api_common" }
+openobserve-jobs = { path = "src/jobs" }
 o2_dex = { path = "src/enterprise/o2_dex" }
 o2_enterprise = { path = "src/enterprise/o2_enterprise", default-features = false }
 o2_openfga = { path = "src/enterprise/o2_openfga" }
@@ -279,7 +304,11 @@ promql-parser = { version = "0.6", git = "https://github.com/openobserve/promql-
 rcgen = "0.14.4"
 rust-embed-for-web = "11.3"
 sourcemap = "9.3.2"
-tikv-jemalloc-ctl = { version = "0.6", features = ["use_std", "stats", "profiling"] }
+tikv-jemalloc-ctl = { version = "0.6", features = [
+    "use_std",
+    "stats",
+    "profiling",
+] }
 tikv-jemalloc-sys = { version = "0.6", features = ["profiling"] }
 tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.6", features = [
