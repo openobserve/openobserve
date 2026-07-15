@@ -18,21 +18,19 @@ pub mod action_server;
 pub mod actions;
 #[cfg(feature = "enterprise")]
 pub mod ai;
-pub mod alerts;
+pub use openobserve_api_management::request::{
+    alerts, authz, dashboards, folders, organization, users,
+};
 #[cfg(feature = "enterprise")]
 pub mod anomaly_detection;
-pub mod authz;
 #[cfg(feature = "cloud")]
 pub mod cloud;
 pub mod clusters;
-pub mod dashboards;
 #[cfg(feature = "enterprise")]
 pub mod domain_management;
 pub mod enrichment_table;
 #[cfg(feature = "enterprise")]
 pub mod eval_jobs;
-#[allow(deprecated)]
-pub mod folders;
 pub mod functions;
 pub mod gen_ai;
 pub mod keys;
@@ -43,7 +41,6 @@ pub mod logs;
 pub mod mcp;
 pub mod metrics;
 pub mod model_pricing;
-pub mod organization;
 pub mod patterns;
 pub mod pipeline;
 pub mod pipelines;
@@ -66,7 +63,6 @@ pub mod short_url;
 pub mod sourcemaps;
 pub mod status;
 pub mod stream;
-pub mod users;
 
 pub use openobserve_api_common::request::{BulkDeleteRequest, BulkDeleteResponse};
 
