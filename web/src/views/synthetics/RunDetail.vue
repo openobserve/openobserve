@@ -870,12 +870,12 @@ function toDisplayRun(detail: SyntheticRunDetail | null): DisplayRun {
 const activeTab = ref("summary");
 const stackOpen = ref(true);
 
-/** Multi-expand: set of expanded step IDs. */
-const expandedStepIds = ref(new Set<number>());
+/** Multi-expand: set of expanded step IDs (strings — OTable composable uses string keys via getRowId().toString()). */
+const expandedStepIds = ref(new Set<string>());
 const expandedStepIdsArr = computed(() => Array.from(expandedStepIds.value));
 
 function handleUpdateExpanded(ids: string[]) {
-  expandedStepIds.value = new Set(ids.map(Number));
+  expandedStepIds.value = new Set(ids);
 }
 
 function stepDotState(row: any): StepDotState | undefined {
@@ -989,8 +989,8 @@ watch(steps, (newSteps) => {
   const next = new Set(expandedStepIds.value);
   let changed = false;
   for (const st of newSteps) {
-    if (st.status === 'fail' && !next.has(st.id)) {
-      next.add(st.id);
+    if (st.status === 'fail' && !next.has(String(st.id))) {
+      next.add(String(st.id));
       changed = true;
     }
   }
