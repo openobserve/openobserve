@@ -128,7 +128,7 @@ fn create_synthetics_jobs_table() -> TableCreateStatement {
                 .null(),
         )
         .col(
-            ColumnDef::new(SyntheticsJobs::Attempts)
+            ColumnDef::new(SyntheticsJobs::DispatchAttempts)
                 .integer()
                 .not_null()
                 .default(0_i32),
@@ -235,7 +235,7 @@ enum SyntheticsJobs {
     ClaimedBy,
     ClaimedAt,
     LeaseExpiresAt,
-    Attempts,
+    DispatchAttempts,
     RunId,
     BrowserDevices,
     Metadata,
@@ -274,7 +274,7 @@ mod tests {
                 "claimed_by" varchar(256),
                 "claimed_at" bigint,
                 "lease_expires_at" bigint,
-                "attempts" integer NOT NULL DEFAULT 0,
+                "dispatch_attempts" integer NOT NULL DEFAULT 0,
                 "run_id" varchar(27) NOT NULL DEFAULT '',
                 "browser_devices" text,
                 "metadata" text NOT NULL DEFAULT '{}',
@@ -324,7 +324,7 @@ mod tests {
                 "claimed_by" varchar(256),
                 "claimed_at" bigint,
                 "lease_expires_at" bigint,
-                "attempts" integer NOT NULL DEFAULT 0,
+                "dispatch_attempts" integer NOT NULL DEFAULT 0,
                 "run_id" varchar(27) NOT NULL DEFAULT '',
                 "browser_devices" text,
                 "metadata" text NOT NULL DEFAULT '{}',

@@ -19,7 +19,10 @@ pub struct Model {
     pub claimed_by: Option<String>,
     pub claimed_at: Option<i64>,
     pub lease_expires_at: Option<i64>,
-    pub attempts: i32,
+    /// How many times the control plane has tried to *dispatch* this job to a
+    /// runner (Lambda invoke failed, or invoked-but-never-acked timeout).
+    /// Unrelated to Playwright-level journey retries — see `Synthetic.retries`.
+    pub dispatch_attempts: i32,
     /// KSUID of the parent run (all jobs for one scheduled slot share this).
     pub run_id: String,
     /// JSON array of BrowserDevice {execution_id, engine, device} — browser monitors only.
@@ -58,7 +61,7 @@ mod tests {
             claimed_by: None,
             claimed_at: None,
             lease_expires_at: None,
-            attempts: 0,
+            dispatch_attempts: 0,
             run_id: "3Fzn001XXXXXXXXXXXXXXXX".to_string(),
             browser_devices: Some(
                 r#"[{"execution_id":"3Fze001XX","engine":"chromium","device":"desktop"}]"#

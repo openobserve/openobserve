@@ -73,7 +73,7 @@ pub struct LeasedRow {
     pub scheduled_ts: i64,
     pub valid_until: i64,
     /// Current attempt number (1-indexed). 1 = first dispatch, 2+ = retry after reaper requeue.
-    pub attempts: i32,
+    pub dispatch_attempts: i32,
     pub run_id: String,
     pub browser_devices: Option<String>,
     pub metadata: String,
@@ -87,7 +87,7 @@ pub struct DeadLetteredRow {
     pub synthetics_name: String,
     pub org_id: String,
     pub location: String,
-    pub attempts: i32,
+    pub dispatch_attempts: i32,
     pub run_id: String,
     pub metadata: String,
 }
@@ -104,7 +104,7 @@ pub async fn enqueue<C: ConnectionTrait>(
     let sql = r#"
         INSERT INTO synthetics_jobs
             (id, synthetics_id, synthetics_name, org_id, location, pool,
-             scheduled_ts, valid_until, status, attempts, run_id, browser_devices, metadata)
+             scheduled_ts, valid_until, status, dispatch_attempts, run_id, browser_devices, metadata)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, 0, $9, $10, $11)
         ON CONFLICT (synthetics_id, location, scheduled_ts) DO NOTHING
     "#;
@@ -140,7 +140,7 @@ pub async fn get_by_id<C: ConnectionTrait>(
 ) -> Result<Option<LeasedRow>, errors::Error> {
     let sql = r#"
         SELECT id, synthetics_id, synthetics_name, org_id, location, pool,
-               scheduled_ts, valid_until, attempts, run_id, browser_devices, metadata
+               scheduled_ts, valid_until, dispatch_attempts, run_id, browser_devices, metadata
         FROM synthetics_jobs
         WHERE id = $1
     "#;
@@ -164,7 +164,7 @@ pub async fn get_by_id<C: ConnectionTrait>(
                 pool: row.try_get("", "pool")?,
                 scheduled_ts: row.try_get("", "scheduled_ts")?,
                 valid_until: row.try_get("", "valid_until")?,
-                attempts: row.try_get("", "attempts")?,
+                dispatch_attempts: row.try_get("", "dispatch_attempts")?,
                 run_id: row.try_get("", "run_id")?,
                 browser_devices: row.try_get("", "browser_devices")?,
                 metadata: row.try_get("", "metadata").unwrap_or_default(),
@@ -229,12 +229,15 @@ pub async fn lease_batch<C: ConnectionTrait>(
         .col_expr(Column::ClaimedBy, Expr::value(claimed_by))
         .col_expr(Column::ClaimedAt, Expr::value(now_us))
         .col_expr(Column::LeaseExpiresAt, Expr::value(lease_expires_at))
-        .col_expr(Column::Attempts, Expr::col(Column::Attempts).add(1i32))
+        .col_expr(
+            Column::DispatchAttempts,
+            Expr::col(Column::DispatchAttempts).add(1i32),
+        )
         .filter(Column::Id.is_in(ids.clone()))
         .exec(conn)
         .await?;
 
-    // Step 3: return the leased rows (attempts already incremented).
+    // Step 3: return the leased rows (dispatch_attempts already incremented).
     let models = Entity::find()
         .filter(Column::Id.is_in(ids))
         .all(conn)
@@ -251,7 +254,7 @@ pub async fn lease_batch<C: ConnectionTrait>(
             pool: m.pool,
             scheduled_ts: m.scheduled_ts,
             valid_until: m.valid_until,
-            attempts: m.attempts,
+            dispatch_attempts: m.dispatch_attempts,
             run_id: m.run_id,
             browser_devices: m.browser_devices,
             metadata: m.metadata,
@@ -309,7 +312,7 @@ pub async fn ack_complete<C: ConnectionTrait>(
 
 // ── Reaper ────────────────────────────────────────────────────────────────────
 
-/// Resets expired leases back to Pending (status=0) when attempts < max_attempts.
+/// Resets expired leases back to Pending (status=0) when dispatch_attempts < max_attempts.
 pub async fn requeue_expired<C: ConnectionTrait>(
     conn: &C,
     now_us: i64,
@@ -320,7 +323,7 @@ pub async fn requeue_expired<C: ConnectionTrait>(
         SET status = 0, claimed_by = NULL, claimed_at = NULL, lease_expires_at = NULL
         WHERE status = 1
           AND lease_expires_at < $1
-          AND attempts < $2
+          AND dispatch_attempts < $2
     "#;
     let res = conn
         .execute(Statement::from_sql_and_values(
@@ -332,7 +335,7 @@ pub async fn requeue_expired<C: ConnectionTrait>(
     Ok(res.rows_affected())
 }
 
-/// Marks permanently failed rows as Dead (status=2) when attempts >= max_attempts.
+/// Marks permanently failed rows as Dead (status=2) when dispatch_attempts >= max_attempts.
 /// Returns the affected rows so the reaper can update monitor status and write to streams.
 pub async fn dead_letter_expired<C: ConnectionTrait>(
     conn: &C,
@@ -341,11 +344,11 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
 ) -> Result<Vec<DeadLetteredRow>, errors::Error> {
     // Step 1: find candidates before marking them dead.
     let select_sql = r#"
-        SELECT id, synthetics_id, synthetics_name, org_id, location, attempts, run_id, metadata
+        SELECT id, synthetics_id, synthetics_name, org_id, location, dispatch_attempts, run_id, metadata
         FROM synthetics_jobs
         WHERE status = 1
           AND lease_expires_at < $1
-          AND attempts >= $2
+          AND dispatch_attempts >= $2
     "#;
     let rows = conn
         .query_all(Statement::from_sql_and_values(
@@ -368,7 +371,7 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
                 synthetics_name: row.try_get("", "synthetics_name").ok()?,
                 org_id: row.try_get("", "org_id").ok()?,
                 location: row.try_get("", "location").ok()?,
-                attempts: row.try_get("", "attempts").ok()?,
+                dispatch_attempts: row.try_get("", "dispatch_attempts").ok()?,
                 run_id: row.try_get("", "run_id").ok()?,
                 metadata: row.try_get("", "metadata").unwrap_or_default(),
             })
@@ -395,6 +398,51 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
     .await?;
 
     Ok(dead)
+}
+
+/// Outcome of `fail_dispatch` — whether the job gets another dispatch attempt
+/// or has exhausted its budget.
+#[derive(Debug, PartialEq, Eq)]
+pub enum DispatchFailureOutcome {
+    /// Reset to Pending; a future lease will retry it.
+    Requeued,
+    /// Budget exhausted. Pure decision — no DB write here. The caller already
+    /// owns terminating the job (status + run counter + monitor status, e.g.
+    /// via the dispatcher's existing `mark_failure`), so writing an
+    /// intermediate status here would just be overwritten and wastes a query.
+    DeadLettered,
+}
+
+/// Called when dispatching a leased job failed *before* the probe could run
+/// (e.g. the Lambda invoke call itself was rejected — not a lease timeout).
+///
+/// Mirrors the per-row actions inside `requeue_expired`/`dead_letter_expired`,
+/// but acts on one row immediately instead of waiting for the lease to expire,
+/// and shares the same `dispatch_attempts` budget — so a job gets the same
+/// total number of tries whether it fails by timing out (reaper's path) or by
+/// a rejected invoke (this path).
+pub async fn fail_dispatch<C: ConnectionTrait>(
+    conn: &C,
+    job_id: &str,
+    current_attempts: i32,
+    max_attempts: i32,
+) -> Result<DispatchFailureOutcome, errors::Error> {
+    if current_attempts < max_attempts {
+        let sql = r#"
+            UPDATE synthetics_jobs
+            SET status = 0, claimed_by = NULL, claimed_at = NULL, lease_expires_at = NULL
+            WHERE id = $1
+        "#;
+        conn.execute(Statement::from_sql_and_values(
+            conn.get_database_backend(),
+            sql,
+            [Value::from(job_id.to_owned())],
+        ))
+        .await?;
+        Ok(DispatchFailureOutcome::Requeued)
+    } else {
+        Ok(DispatchFailureOutcome::DeadLettered)
+    }
 }
 
 /// Deletes stale Pending rows whose valid_until has passed (missed entirely).
@@ -450,7 +498,7 @@ mod tests {
             pool: "aws-browser".to_string(),
             scheduled_ts: 1750000000000000,
             valid_until: 1750000300000000,
-            attempts: 1,
+            dispatch_attempts: 1,
             run_id: "3Fzn001XXXXXXXXXXXXXXXX".to_string(),
             browser_devices: None,
             metadata: "{}".to_string(),
@@ -458,6 +506,6 @@ mod tests {
         assert_eq!(row.id, "2MNfNTxePfZ1pnY5gKVLkwsVRXv");
         assert_eq!(row.synthetics_id, "mon-1");
         assert_eq!(row.run_id, "3Fzn001XXXXXXXXXXXXXXXX");
-        assert_eq!(row.attempts, 1);
+        assert_eq!(row.dispatch_attempts, 1);
     }
 }
