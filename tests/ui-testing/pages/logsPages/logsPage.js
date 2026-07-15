@@ -4358,6 +4358,16 @@ export class LogsPage {
     }
 
     /**
+     * Multistream variant: hover the LAST rendered field row (a field can appear
+     * once per selected stream, so target the last occurrence) to render its
+     * action buttons, then click the interesting-field (ⓘ) toggle on that row.
+     */
+    async hoverAndClickInterestingFieldLast(field) {
+        await this.page.locator(this.fieldListItem(field)).last().hover();
+        await this.page.locator(this.interestingFieldBtn(field)).last().click({ force: true });
+    }
+
+    /**
      * Idempotent version of clickInterestingFieldButton: only clicks if the field is
      * NOT already marked as interesting.  Use this when the goal is to guarantee the
      * field is in interestingFieldList, not to toggle it.  If the button's title

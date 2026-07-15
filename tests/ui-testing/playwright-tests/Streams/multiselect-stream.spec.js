@@ -245,8 +245,7 @@ async function multistreamselect(page) {
     await page.waitForTimeout(2000);
 
     // Hover the field row so its action buttons render, then click ⓘ
-    await page.locator('[data-test="logs-field-list-item-job"]').last().hover();
-    await page.locator('[data-test="log-search-index-list-interesting-job-field-btn"]').last().click({ force: true });
+    await pageManager.logsPage.hoverAndClickInterestingFieldLast('job');
 
     // Enable SQL mode using POM
     await pageManager.logsPage.enableSQLMode();
@@ -256,7 +255,7 @@ async function multistreamselect(page) {
     await pageManager.logsPage.clickSearchBarRefreshButton();
 
     // Click on first result
-    await page.locator('[data-test="log-table-column-0-source"]').click({ force: true });
+    await pageManager.logsPage.clickLogTableColumnSource();
 
     // Verify table is visible
     await pageManager.logsPage.expectLogsTableVisible();
