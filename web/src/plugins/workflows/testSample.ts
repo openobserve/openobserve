@@ -16,55 +16,50 @@
 // Builds the sample `inputs[]` payload prefilled into the Test drawer's editor.
 //
 // Derived from TRIGGER_META_VARS so the sample's `meta` keys stay in sync with
-// the Alert-Trigger schema reference. Shape = "Option A" envelope per firing:
-//   [ { meta: { ...fixed alert fields }, data: [ { ...one result row } ] } ]
-// NOTE: the exact runtime shape (envelope vs flat row) is still being confirmed
-// with the backend — this sample is a starting point the user edits, and will be
-// pinned once the contract is final.
+// the Alert-Trigger schema reference. Shape matches a real alert firing (verified
+// against live payload):
+//   [ { meta: { ...fixed alert fields, all STRING values }, data: [ { ...rows } ] } ]
+// The `meta` block is a string:string map — even numeric fields (count,
+// threshold, period) and the microsecond-epoch timestamps are quoted strings.
+// `data[]` rows keep their native column types (the alert query's result rows).
 import { TRIGGER_META_VARS } from "./alertFields";
 
 const SAMPLE_TS = 1700000000000000; // microsecond epoch, matches alert timestamps
 
 // A readable placeholder per meta field, keyed by the field name (ref minus the
-// "meta." prefix). Falls back to a type-based default for anything unmapped.
-const NAMED_DEFAULTS: Record<string, unknown> = {
-  org_name: "default",
+// "meta." prefix). All values are STRINGS to match the real payload. Falls back
+// to "" for anything unmapped.
+const NAMED_DEFAULTS: Record<string, string> = {
+  org_id: "default",
   stream_type: "logs",
   stream_name: "default",
   alert_name: "High Error Rate",
   alert_type: "scheduled",
   alert_operator: ">=",
-  alert_period: 10,
-  alert_threshold: 100,
-  alert_count: 137,
-  alert_start_time: SAMPLE_TS,
-  alert_end_time: SAMPLE_TS + 600000000,
+  alert_period: "10",
+  alert_threshold: "100",
+  alert_count: "137",
+  alert_start_time: String(SAMPLE_TS),
+  alert_end_time: String(SAMPLE_TS + 600000000),
 };
 
-const typeDefault = (v: { type: string; enumValues?: string[] }) => {
-  if (v.enumValues?.length) return v.enumValues[0];
-  switch (v.type) {
-    case "number":
-      return 0;
-    case "datetime":
-      return SAMPLE_TS;
-    default:
-      return "";
-  }
-};
+const typeDefault = (v: { enumValues?: string[] }) =>
+  v.enumValues?.length ? v.enumValues[0] : "";
 
 export const buildTestSample = (): unknown[] => {
-  const meta: Record<string, unknown> = {};
+  const meta: Record<string, string> = {};
   for (const v of TRIGGER_META_VARS) {
     const key = v.ref.replace(/^meta\./, "");
     meta[key] = key in NAMED_DEFAULTS ? NAMED_DEFAULTS[key] : typeDefault(v);
   }
-  return [
-    {
-      meta,
-      data: [{ _timestamp: SAMPLE_TS, host: "web-01", status_code: 500 }],
-    },
-  ];
+  // Two illustrative result rows — real columns come from the alert's query.
+  const row = (ts: number) => ({
+    _timestamp: ts,
+    job: "test",
+    level: "info",
+    log: "test message for openobserve",
+  });
+  return [{ meta, data: [row(SAMPLE_TS), row(SAMPLE_TS - 200000)] }];
 };
 
 // Pretty-printed JSON string for seeding the editor.

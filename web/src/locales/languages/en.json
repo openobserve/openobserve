@@ -1835,7 +1835,7 @@
       "webhookDesc": "Run On An Incoming Webhook"
     },
     "triggerMeta": {
-      "orgName": "Organization the alert belongs to.",
+      "orgId": "Organization ID the alert belongs to.",
       "streamType": "Stream type — logs, metrics, or traces.",
       "streamName": "Stream the alert monitors.",
       "alertName": "Name of the alert that fired.",

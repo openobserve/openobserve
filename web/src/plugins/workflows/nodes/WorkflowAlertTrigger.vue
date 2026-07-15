@@ -149,9 +149,10 @@ const dataOpen = ref(true);
 // record; the rest are illustrative — the real columns come from the alert's
 // query (called out in triggerDataExampleNote).
 const dataExample: { key: string; value: string; kind: "string" | "number" }[] = [
-  { key: "_timestamp", value: "1719400000000000", kind: "number" },
-  { key: "host", value: '"api-01"', kind: "string" },
-  { key: "status_code", value: "500", kind: "number" },
+  { key: "_timestamp", value: "1784027838234393", kind: "number" },
+  { key: "job", value: '"test"', kind: "string" },
+  { key: "level", value: '"info"', kind: "string" },
+  { key: "log", value: '"test message for openobserve"', kind: "string" },
 ];
 
 // The field key without the `meta.` prefix (shown in the tree).

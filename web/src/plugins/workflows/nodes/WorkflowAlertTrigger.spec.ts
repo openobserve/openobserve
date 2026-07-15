@@ -92,21 +92,21 @@ describe("WorkflowAlertTrigger", () => {
       ).toBe(TRIGGER_META_VARS.length);
     });
 
-    it("renders a plain type for non-enum fields", () => {
+    it("renders every non-enum field as string (the real payload's meta is all strings)", () => {
       const wrapper = createWrapper();
       expect(
-        wrapper.find('[data-test="workflow-trigger-field-org_name"]').text(),
+        wrapper.find('[data-test="workflow-trigger-field-org_id"]').text(),
       ).toContain("string");
       expect(
         wrapper
           .find('[data-test="workflow-trigger-field-alert_period"]')
           .text(),
-      ).toContain("number");
+      ).toContain("string");
       expect(
         wrapper
           .find('[data-test="workflow-trigger-field-alert_start_time"]')
           .text(),
-      ).toContain("datetime");
+      ).toContain("string");
     });
 
     it('renders enum fields Datadog-style as `"a" | "b"`', () => {
@@ -136,7 +136,7 @@ describe("WorkflowAlertTrigger", () => {
     it("is expanded by default", () => {
       const wrapper = createWrapper();
       expect(
-        wrapper.find('[data-test="workflow-trigger-field-org_name"]').exists(),
+        wrapper.find('[data-test="workflow-trigger-field-org_id"]').exists(),
       ).toBe(true);
       expect(
         wrapper
@@ -153,7 +153,7 @@ describe("WorkflowAlertTrigger", () => {
         .trigger("click");
 
       expect(
-        wrapper.find('[data-test="workflow-trigger-field-org_name"]').exists(),
+        wrapper.find('[data-test="workflow-trigger-field-org_id"]').exists(),
       ).toBe(false);
       const toggle = wrapper.find('[data-test="workflow-trigger-meta-toggle"]');
       expect(toggle.text()).toContain("{…}");
@@ -167,7 +167,7 @@ describe("WorkflowAlertTrigger", () => {
       await toggle.trigger("click");
       await toggle.trigger("click");
       expect(
-        wrapper.find('[data-test="workflow-trigger-field-org_name"]').exists(),
+        wrapper.find('[data-test="workflow-trigger-field-org_id"]').exists(),
       ).toBe(true);
     });
   });
@@ -179,10 +179,11 @@ describe("WorkflowAlertTrigger", () => {
         '[data-test="workflow-trigger-structure"]',
       ).text();
       expect(text).toContain("_timestamp");
-      expect(text).toContain("host");
-      expect(text).toContain("status_code");
-      expect(text).toContain('"api-01"');
-      expect(text).toContain("1719400000000000");
+      expect(text).toContain("job");
+      expect(text).toContain("level");
+      expect(text).toContain("log");
+      expect(text).toContain('"test message for openobserve"');
+      expect(text).toContain("1784027838234393");
     });
 
     it("renders the dynamic-columns note when expanded", () => {
@@ -199,7 +200,7 @@ describe("WorkflowAlertTrigger", () => {
         '[data-test="workflow-trigger-structure"]',
       ).text();
       expect(text).not.toContain("_timestamp");
-      expect(text).not.toContain("status_code");
+      expect(text).not.toContain('"test message for openobserve"');
       expect(wrapper.find(".schema-note").exists()).toBe(false);
     });
 

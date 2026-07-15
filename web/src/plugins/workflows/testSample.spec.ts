@@ -49,37 +49,37 @@ describe("buildTestSample", () => {
     expect(Object.keys(firing.meta)).toEqual(expectedKeys);
   });
 
-  it("prefills the documented named defaults", () => {
+  it("prefills the documented named defaults (all string values, matching the real payload)", () => {
     const [firing] = buildTestSample() as [Envelope];
     expect(firing.meta).toEqual({
-      org_name: "default",
+      org_id: "default",
       stream_type: "logs",
       stream_name: "default",
       alert_name: "High Error Rate",
       alert_type: "scheduled",
-      alert_period: 10,
+      alert_period: "10",
       alert_operator: ">=",
-      alert_threshold: 100,
-      alert_count: 137,
-      alert_start_time: SAMPLE_TS,
-      alert_end_time: SAMPLE_TS + 600000000,
+      alert_threshold: "100",
+      alert_count: "137",
+      alert_start_time: String(SAMPLE_TS),
+      alert_end_time: String(SAMPLE_TS + 600000000),
     });
   });
 
   it("uses microsecond-epoch timestamps 10 minutes apart", () => {
     const [firing] = buildTestSample() as [Envelope];
-    expect(firing.meta.alert_start_time).toBe(SAMPLE_TS);
+    expect(firing.meta.alert_start_time).toBe(String(SAMPLE_TS));
     expect(
-      (firing.meta.alert_end_time as number) -
-        (firing.meta.alert_start_time as number),
+      Number(firing.meta.alert_end_time) - Number(firing.meta.alert_start_time),
     ).toBe(600000000);
   });
 
-  it("keeps numeric meta fields as numbers (not stringified) in the envelope sample", () => {
+  it("emits every meta field as a string (the real payload's meta is a string:string map)", () => {
     const [firing] = buildTestSample() as [Envelope];
-    expect(typeof firing.meta.alert_period).toBe("number");
-    expect(typeof firing.meta.alert_threshold).toBe("number");
-    expect(typeof firing.meta.alert_count).toBe("number");
+    expect(typeof firing.meta.alert_period).toBe("string");
+    expect(typeof firing.meta.alert_threshold).toBe("string");
+    expect(typeof firing.meta.alert_count).toBe("string");
+    expect(typeof firing.meta.alert_start_time).toBe("string");
   });
 
   it("uses a valid enum member for alert_type", () => {
@@ -90,13 +90,14 @@ describe("buildTestSample", () => {
     expect(enumValues).toContain(firing.meta.alert_type);
   });
 
-  it("seeds a single sample result row on data[]", () => {
+  it("seeds sample result rows on data[] with the real payload's columns", () => {
     const [firing] = buildTestSample() as [Envelope];
-    expect(firing.data).toHaveLength(1);
+    expect(firing.data).toHaveLength(2);
     expect(firing.data[0]).toEqual({
       _timestamp: SAMPLE_TS,
-      host: "web-01",
-      status_code: 500,
+      job: "test",
+      level: "info",
+      log: "test message for openobserve",
     });
   });
 
@@ -140,7 +141,7 @@ describe("buildTestSampleText", () => {
 describe("buildFlatTestSample", () => {
   it("returns one flat row per data[] row", () => {
     const flat = buildFlatTestSample();
-    expect(flat).toHaveLength(1);
+    expect(flat).toHaveLength(2);
   });
 
   it("merges every meta field onto the row as a `meta_<field>` column", () => {
@@ -167,9 +168,10 @@ describe("buildFlatTestSample", () => {
   it("preserves the original row columns with their original types", () => {
     const [row] = buildFlatTestSample() as [Record<string, unknown>];
     expect(row._timestamp).toBe(SAMPLE_TS);
-    expect(row.host).toBe("web-01");
-    expect(row.status_code).toBe(500);
-    expect(typeof row.status_code).toBe("number");
+    expect(row.job).toBe("test");
+    expect(row.level).toBe("info");
+    expect(row.log).toBe("test message for openobserve");
+    expect(typeof row._timestamp).toBe("number");
   });
 
   it("produces exactly the meta columns plus the row columns", () => {
@@ -178,8 +180,9 @@ describe("buildFlatTestSample", () => {
       [
         ...TRIGGER_META_VARS.map((v) => v.ref.replace(/^meta\./, "meta_")),
         "_timestamp",
-        "host",
-        "status_code",
+        "job",
+        "level",
+        "log",
       ].sort(),
     );
   });
@@ -188,7 +191,7 @@ describe("buildFlatTestSample", () => {
     const [row] = buildFlatTestSample() as [Record<string, unknown>];
     expect(row).toHaveProperty("meta_alert_name", "High Error Rate");
     expect(row).toHaveProperty("meta_stream_type", "logs");
-    expect(row).toHaveProperty("meta_org_name", "default");
+    expect(row).toHaveProperty("meta_org_id", "default");
   });
 
   it("has no nested `meta` key left over", () => {
@@ -236,25 +239,22 @@ describe("type-based fallbacks for unmapped meta fields", () => {
     expect((build() as any)[0].meta).toEqual({ new_enum: "first" });
   });
 
-  it("ignores an empty enumValues array and falls through to the type default", async () => {
+  it("ignores an empty enumValues array and falls through to an empty string", async () => {
     const { buildTestSample: build } = await loadWith([
-      { ref: "meta.new_enum", type: "number", descKey: "x", enumValues: [] },
+      { ref: "meta.new_enum", type: "string", descKey: "x", enumValues: [] },
     ]);
-    expect((build() as any)[0].meta).toEqual({ new_enum: 0 });
+    expect((build() as any)[0].meta).toEqual({ new_enum: "" });
   });
 
-  it("defaults an unmapped number field to 0", async () => {
+  it("defaults any unmapped non-enum field to an empty string (meta is string:string)", async () => {
     const { buildTestSample: build } = await loadWith([
       { ref: "meta.new_number", type: "number", descKey: "x" },
-    ]);
-    expect((build() as any)[0].meta).toEqual({ new_number: 0 });
-  });
-
-  it("defaults an unmapped datetime field to the sample microsecond timestamp", async () => {
-    const { buildTestSample: build } = await loadWith([
       { ref: "meta.new_datetime", type: "datetime", descKey: "x" },
     ]);
-    expect((build() as any)[0].meta).toEqual({ new_datetime: SAMPLE_TS });
+    expect((build() as any)[0].meta).toEqual({
+      new_number: "",
+      new_datetime: "",
+    });
   });
 
   it("defaults an unmapped string field to an empty string", async () => {
@@ -273,9 +273,9 @@ describe("type-based fallbacks for unmapped meta fields", () => {
 
   it("still prefers the named default over the type default when the key is mapped", async () => {
     const { buildTestSample: build } = await loadWith([
-      { ref: "meta.alert_count", type: "number", descKey: "x" },
+      { ref: "meta.alert_count", type: "string", descKey: "x" },
     ]);
-    expect((build() as any)[0].meta).toEqual({ alert_count: 137 });
+    expect((build() as any)[0].meta).toEqual({ alert_count: "137" });
   });
 
   it("produces an empty meta block when the schema is empty", async () => {
@@ -284,21 +284,33 @@ describe("type-based fallbacks for unmapped meta fields", () => {
     );
     expect((build() as any)[0].meta).toEqual({});
     expect(flat()).toEqual([
-      { _timestamp: SAMPLE_TS, host: "web-01", status_code: 500 },
+      {
+        _timestamp: SAMPLE_TS,
+        job: "test",
+        level: "info",
+        log: "test message for openobserve",
+      },
+      {
+        _timestamp: SAMPLE_TS - 200000,
+        job: "test",
+        level: "info",
+        log: "test message for openobserve",
+      },
     ]);
   });
 
-  it("stringifies the type-defaulted values in the flattened sample", async () => {
+  it("carries the empty-string defaults through to the flattened sample", async () => {
     const { buildFlatTestSample: flat } = await loadWith([
       { ref: "meta.new_number", type: "number", descKey: "x" },
       { ref: "meta.new_datetime", type: "datetime", descKey: "x" },
     ]);
-    expect(flat()[0]).toEqual({
-      meta_new_number: "0",
-      meta_new_datetime: String(SAMPLE_TS),
+    expect(flat()[0]).toMatchObject({
+      meta_new_number: "",
+      meta_new_datetime: "",
       _timestamp: SAMPLE_TS,
-      host: "web-01",
-      status_code: 500,
+      job: "test",
+      level: "info",
+      log: "test message for openobserve",
     });
   });
 });

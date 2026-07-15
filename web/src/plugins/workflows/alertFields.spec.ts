@@ -32,7 +32,7 @@ describe("alertFields", () => {
 
     it("lists exactly the expected refs, in schema order", () => {
       expect(TRIGGER_META_VARS.map((v) => v.ref)).toEqual([
-        "meta.org_name",
+        "meta.org_id",
         "meta.stream_type",
         "meta.stream_name",
         "meta.alert_name",
@@ -69,30 +69,9 @@ describe("alertFields", () => {
       });
     });
 
-    it("only uses the string / number / datetime types", () => {
+    it("types every meta field as string (the real payload's meta is a string:string map)", () => {
       const types = new Set(TRIGGER_META_VARS.map((v) => v.type));
-      expect([...types].sort()).toEqual(["datetime", "number", "string"]);
-    });
-
-    it("types the numeric fields as number", () => {
-      const numeric = TRIGGER_META_VARS.filter((v) => v.type === "number").map(
-        (v) => v.ref,
-      );
-      expect(numeric.sort()).toEqual([
-        "meta.alert_count",
-        "meta.alert_period",
-        "meta.alert_threshold",
-      ]);
-    });
-
-    it("types the time fields as datetime", () => {
-      const datetimes = TRIGGER_META_VARS.filter(
-        (v) => v.type === "datetime",
-      ).map((v) => v.ref);
-      expect(datetimes.sort()).toEqual([
-        "meta.alert_end_time",
-        "meta.alert_start_time",
-      ]);
+      expect([...types]).toEqual(["string"]);
     });
 
     it("declares enumValues only on meta.alert_type", () => {
@@ -137,7 +116,7 @@ describe("alertFields", () => {
         "meta_alert_period",
         "meta_stream_name",
         "meta_stream_type",
-        "meta_org_name",
+        "meta_org_id",
         "meta_alert_start_time",
         "meta_alert_end_time",
         "meta_alert_trigger_time",

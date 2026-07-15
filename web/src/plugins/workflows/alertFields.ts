@@ -46,8 +46,14 @@ export interface TriggerOutputVar {
   enumValues?: string[];
 }
 
+// Every value in the emitted `meta` block is a STRING — the backend serialises
+// the whole block as a string:string map, so numeric-looking fields (count,
+// threshold, period) and the microsecond-epoch timestamps arrive quoted (e.g.
+// `"alert_count": "8"`, `"alert_start_time": "1784027820000000"`). Types below
+// say `string` to match that real payload, so a Condition author isn't misled
+// into a numeric comparison. Confirmed against a live alert firing.
 export const TRIGGER_META_VARS: TriggerOutputVar[] = [
-  { ref: "meta.org_name", type: "string", descKey: "workflow.triggerMeta.orgName" },
+  { ref: "meta.org_id", type: "string", descKey: "workflow.triggerMeta.orgId" },
   { ref: "meta.stream_type", type: "string", descKey: "workflow.triggerMeta.streamType" },
   { ref: "meta.stream_name", type: "string", descKey: "workflow.triggerMeta.streamName" },
   { ref: "meta.alert_name", type: "string", descKey: "workflow.triggerMeta.alertName" },
@@ -57,12 +63,12 @@ export const TRIGGER_META_VARS: TriggerOutputVar[] = [
     descKey: "workflow.triggerMeta.alertType",
     enumValues: ["realtime", "scheduled"],
   },
-  { ref: "meta.alert_period", type: "number", descKey: "workflow.triggerMeta.alertPeriod" },
+  { ref: "meta.alert_period", type: "string", descKey: "workflow.triggerMeta.alertPeriod" },
   { ref: "meta.alert_operator", type: "string", descKey: "workflow.triggerMeta.alertOperator" },
-  { ref: "meta.alert_threshold", type: "number", descKey: "workflow.triggerMeta.alertThreshold" },
-  { ref: "meta.alert_count", type: "number", descKey: "workflow.triggerMeta.alertCount" },
-  { ref: "meta.alert_start_time", type: "datetime", descKey: "workflow.triggerMeta.alertStartTime" },
-  { ref: "meta.alert_end_time", type: "datetime", descKey: "workflow.triggerMeta.alertEndTime" },
+  { ref: "meta.alert_threshold", type: "string", descKey: "workflow.triggerMeta.alertThreshold" },
+  { ref: "meta.alert_count", type: "string", descKey: "workflow.triggerMeta.alertCount" },
+  { ref: "meta.alert_start_time", type: "string", descKey: "workflow.triggerMeta.alertStartTime" },
+  { ref: "meta.alert_end_time", type: "string", descKey: "workflow.triggerMeta.alertEndTime" },
 ];
 
 // All fields are `Utf8` for now — the flattened `meta` block is a string:string
@@ -77,7 +83,7 @@ export const ALERT_PAYLOAD_FIELDS: WorkflowFieldOption[] = [
   { label: "meta_alert_period", value: "meta_alert_period", type: "Utf8" },
   { label: "meta_stream_name", value: "meta_stream_name", type: "Utf8" },
   { label: "meta_stream_type", value: "meta_stream_type", type: "Utf8" },
-  { label: "meta_org_name", value: "meta_org_name", type: "Utf8" },
+  { label: "meta_org_id", value: "meta_org_id", type: "Utf8" },
   { label: "meta_alert_start_time", value: "meta_alert_start_time", type: "Utf8" },
   { label: "meta_alert_end_time", value: "meta_alert_end_time", type: "Utf8" },
   { label: "meta_alert_trigger_time", value: "meta_alert_trigger_time", type: "Utf8" },

@@ -47,16 +47,17 @@ const picker = ref<any>(null);
 // return it. The example (in comments) mirrors the sample payload fields.
 const JS_DEFAULT_CODE = `// Transform the fired-alert payload before it continues to the next step.
 // \`row\` is the whole event: { meta: {...}, data: [ ...records ] }.
-// Mutate it and return it.
+// Every meta value is a STRING (e.g. row.meta.alert_count is "8"), so convert
+// before comparing numerically. Mutate \`row\` and return it.
 //
 // Example — derive a severity from the alert, then enrich each record that
 // tripped it:
 //   row.meta.severity =
-//     row.meta.alert_count >= 100 ? "critical" : "warning";
+//     Number(row.meta.alert_count) >= 100 ? "critical" : "warning";
 //
 //   row.data = row.data.map((record) => {
 //     record.env = "production";
-//     if (record.status_code >= 500) record.needs_attention = true;
+//     if (record.level === "error") record.needs_attention = true;
 //     return record;
 //   });
 //
