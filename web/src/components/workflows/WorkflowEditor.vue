@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="workflow-editor-page"
-    class="flex flex-col h-[calc(100vh-var(--navbar-height,2.25rem))] min-h-0"
+    class="flex flex-col h-full min-h-0"
   >
     <!-- Toolbar — the shared AppPageHeader (same as the pipeline editor): a
          back chevron in the module-icon slot, the workflow name input inline
