@@ -73,6 +73,7 @@
           data-test="synthetic-monitoring-monitors-table"
           :toggle-loading-map="toggleLoadingMap"
           :trigger-loading-map="triggerLoadingMap"
+          :bulk-action-loading="bulkActionLoading"
           @row-click="openDetail"
           @edit="openEdit"
           @toggle-enabled="toggleEnabled"
@@ -82,6 +83,9 @@
           @update:selected-ids="selectedMonitorIds = $event"
           @delete-selected="openBulkDeleteConfirm"
           @move-selected="moveMultipleMonitors"
+          @pause-selected="bulkPauseMonitors"
+          @enable-selected="bulkEnableMonitors"
+          @trigger-selected="bulkTriggerMonitors"
           @navigate-to-folder="(id) => { searchAcrossFolders = false; updateActiveFolderId(id) }"
           @empty-action="(actionId) => { if (actionId === 'create') openCreate() }"
         >
@@ -833,6 +837,81 @@ const filteredMonitors = computed(() =>
   )
 )
 
+// ── Selected monitors (resolved from IDs) ────────────────────────────────
+const selectedMonitors = computed(() =>
+  enrichedMonitors.value.filter(m => selectedMonitorIds.value.includes(String(m.id)))
+)
+
+// ── Bulk actions ─────────────────────────────────────────────────────────
+
+async function bulkPauseMonitors() {
+  const toPause = selectedMonitors.value.filter(m => m.enabled)
+  if (toPause.length === 0) {
+    toast({ variant: 'error', message: 'No enabled checks selected to pause.' })
+    return
+  }
+  bulkActionLoading.value = true
+  const dismiss = toast({ variant: 'loading', message: `Pausing ${toPause.length} check(s)…`, timeout: 0 })
+  const results = await Promise.allSettled(
+    toPause.map(m => syntheticsService.enable(orgIdentifier.value, String(m.id), { enabled: false }))
+  )
+  dismiss()
+  const failed = results.filter(r => r.status === 'rejected').length
+  if (failed > 0) {
+    toast({ variant: 'warning', message: `${toPause.length - failed} succeeded, ${failed} failed.` })
+  } else {
+    toast({ variant: 'success', message: `Paused ${toPause.length} check(s).` })
+  }
+  bulkActionLoading.value = false
+  selectedMonitorIds.value = []
+  await loadMonitors()
+}
+
+async function bulkEnableMonitors() {
+  const toEnable = selectedMonitors.value.filter(m => !m.enabled)
+  if (toEnable.length === 0) {
+    toast({ variant: 'error', message: 'No disabled checks selected to enable.' })
+    return
+  }
+  bulkActionLoading.value = true
+  const dismiss = toast({ variant: 'loading', message: `Enabling ${toEnable.length} check(s)…`, timeout: 0 })
+  const results = await Promise.allSettled(
+    toEnable.map(m => syntheticsService.enable(orgIdentifier.value, String(m.id), { enabled: true }))
+  )
+  dismiss()
+  const failed = results.filter(r => r.status === 'rejected').length
+  if (failed > 0) {
+    toast({ variant: 'warning', message: `${toEnable.length - failed} succeeded, ${failed} failed.` })
+  } else {
+    toast({ variant: 'success', message: `Enabled ${toEnable.length} check(s).` })
+  }
+  bulkActionLoading.value = false
+  selectedMonitorIds.value = []
+  await loadMonitors()
+}
+
+async function bulkTriggerMonitors() {
+  const toTrigger = selectedMonitors.value.filter(m => m.enabled)
+  if (toTrigger.length === 0) {
+    toast({ variant: 'error', message: 'No enabled checks selected to trigger.' })
+    return
+  }
+  bulkActionLoading.value = true
+  const dismiss = toast({ variant: 'loading', message: `Triggering ${toTrigger.length} check(s)…`, timeout: 0 })
+  const results = await Promise.allSettled(
+    toTrigger.map(m => syntheticsService.run(orgIdentifier.value, String(m.id), {}))
+  )
+  dismiss()
+  const failed = results.filter(r => r.status === 'rejected').length
+  if (failed > 0) {
+    toast({ variant: 'warning', message: `${toTrigger.length - failed} succeeded, ${failed} failed.` })
+  } else {
+    toast({ variant: 'success', message: `Triggered ${toTrigger.length} check(s).` })
+  }
+  bulkActionLoading.value = false
+  selectedMonitorIds.value = []
+}
+
 const openCreate = () =>
   router.push({ name: 'synthetic-new', query: { folder: activeFolderId.value } })
 const openEdit = (m: any) => {
@@ -844,6 +923,7 @@ const openEdit = (m: any) => {
 
 const toggleLoadingMap = ref<Record<string, boolean>>({})
 const triggerLoadingMap = ref<Record<string, boolean>>({})
+const bulkActionLoading = ref(false)
 
 async function toggleEnabled(m: any) {
   const org = orgIdentifier.value

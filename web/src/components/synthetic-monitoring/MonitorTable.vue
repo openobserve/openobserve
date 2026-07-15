@@ -257,27 +257,50 @@
 
     <!-- Footer with count + bulk action buttons -->
     <template #bottom>
-      <div class="flex w-full justify-between items-center h-[48px]">
-        <span class="text-sm text-secondary">{{ data.length }} {{ footerTitle }}</span>
+      <div class="flex w-full justify-between items-center h-12 gap-1">
+        <span class="text-xs text-secondary min-w-25">
+          <template v-if="localSelectedIds.length > 0">{{ localSelectedIds.length }} of {{ data.length }} selected</template>
+          <template v-else>{{ data.length }} {{ footerTitle }}</template>
+        </span>
         <template v-if="localSelectedIds.length > 0">
           <OButton
             variant="outline"
             size="sm"
+            icon-left="pause"
+            :data-test="`${dataTest}-pause-selected-btn`"
+            :disabled="!!props.bulkActionLoading"
+            @click="emit('pause-selected')"
+          >{{ t('synthetics.table.pause') }}</OButton>
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="play-arrow"
+            :data-test="`${dataTest}-enable-selected-btn`"
+            :disabled="!!props.bulkActionLoading"
+            @click="emit('enable-selected')"
+          >{{ t('synthetics.table.enable') }}</OButton>
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="sound-sampler"
+            :data-test="`${dataTest}-trigger-selected-btn`"
+            :disabled="!!props.bulkActionLoading"
+            @click="emit('trigger-selected')"
+          >{{ t('synthetics.table.trigger') }}</OButton>
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="drive-file-move"
             :data-test="`${dataTest}-move-selected-btn`"
             @click="emit('move-selected')"
-          >
-            <OIcon name="drive-file-move" size="sm" />
-            <span class="ml-1">{{ t('synthetics.table.move') }}</span>
-          </OButton>
+          >{{ t('synthetics.table.move') }}</OButton>
           <OButton
             variant="outline-destructive"
             size="sm"
+            icon-left="delete"
             :data-test="`${dataTest}-delete-selected-btn`"
             @click="emit('delete-selected')"
-          >
-            <OIcon name="delete" size="sm" />
-            <span class="ml-1">{{ t('synthetics.table.delete') }}</span>
-          </OButton>
+          >{{ t('synthetics.table.delete') }}</OButton>
         </template>
       </div>
     </template>
@@ -352,6 +375,7 @@ const props = withDefaults(defineProps<{
   triggerLoadingMap?: Record<string, boolean>
   selectedIds?: string[]
   showFolderColumn?: boolean
+  bulkActionLoading?: boolean
 }>(), {
   loading: false,
   footerTitle: 'Checks',
@@ -361,6 +385,7 @@ const props = withDefaults(defineProps<{
   triggerLoadingMap: () => ({}),
   selectedIds: () => [],
   showFolderColumn: false,
+  bulkActionLoading: false,
 })
 
 const emit = defineEmits<{
@@ -373,6 +398,9 @@ const emit = defineEmits<{
   'update:selectedIds': [ids: string[]]
   'delete-selected': []
   'move-selected': []
+  'pause-selected': []
+  'enable-selected': []
+  'trigger-selected': []
   'navigate-to-folder': [folderId: string]
   'empty-action': [actionId: string]
 }>()

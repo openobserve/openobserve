@@ -6484,7 +6484,20 @@
       "more": "More",
       "trigger": "Trigger",
       "delete": "Delete",
-      "move": "Move"
+      "move": "Move",
+      "pauseAll": "Pause All",
+      "enableAll": "Enable All",
+      "triggerAll": "Trigger All",
+      "bulkPauseToast": "Pausing {count} check(s)…",
+      "bulkEnableToast": "Enabling {count} check(s)…",
+      "bulkTriggerToast": "Triggering {count} check(s)…",
+      "bulkPauseSuccess": "Paused {count} check(s).",
+      "bulkEnableSuccess": "Enabled {count} check(s).",
+      "bulkTriggerSuccess": "Triggered {count} check(s).",
+      "bulkPartialSuccess": "{success} succeeded, {fail} failed.",
+      "noEnabledToPause": "No enabled checks selected to pause.",
+      "noDisabledToEnable": "No disabled checks selected to enable.",
+      "noEnabledToTrigger": "No enabled checks selected to trigger."
     }
   },
   "shortcuts": {
