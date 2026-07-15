@@ -91,10 +91,20 @@ describe("addCipherKeySchema", () => {
       expect(messageFor(v, "name")).toBe("Name must be 50 characters or less.");
     });
 
-    it("rejects characters outside [a-zA-Z0-9_-]", () => {
+    // The two "bad characters" messages are ordered: anything isValidResourceName
+    // rejects (: ? / # & % quotes, whitespace) reports nameInvalidResource, and
+    // cipherKeyNameRegex only speaks for the characters it alone rejects.
+    it("rejects resource-name characters with the resource-name message", () => {
       const v = validLocal();
       v.name = "has space";
-      // regex fires before the resource-name refine.
+      expect(messageFor(v, "name")).toBe(
+        "Characters like :, ?, /, #, and spaces are not allowed.",
+      );
+    });
+
+    it("rejects characters outside [a-zA-Z0-9_-]", () => {
+      const v = validLocal();
+      v.name = "bad!name";
       expect(messageFor(v, "name")).toBe(
         "Only alphanumeric characters, underscores, and hyphens are allowed",
       );

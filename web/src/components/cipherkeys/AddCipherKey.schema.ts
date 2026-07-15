@@ -43,14 +43,21 @@ export const makeAddCipherKeySchema = (t: (_key: string) => string) =>
   z
   .object({
     // Always-validated scalars (AddCipherKey's own fields).
-    name: z
-      .string()
-      .min(1, t("cipherKey.nameRequired"))
-      .max(50, t("cipherKey.nameMaxLength"))
-      .regex(cipherKeyNameRegex, t("cipherKey.nameInvalidChars"))
-      .refine((v) => isValidResourceName(v), {
-        message: t("cipherKey.nameInvalidResource"),
-      }),
+    // Hand-rolled cascade rather than `.min().max().regex().refine()`: the field
+    // reports only its FIRST issue, and the old validateName reported these four
+    // in this exact order. Chained ZodString checks always run before a trailing
+    // `.refine`, which would surface nameInvalidChars where the old form said
+    // nameInvalidResource (and make nameInvalidResource unreachable, since
+    // cipherKeyNameRegex is strictly stricter than isValidResourceName).
+    name: z.string().superRefine((v, ctx) => {
+      const fail = (message: string) =>
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+
+      if (!v) return fail(t("cipherKey.nameRequired"));
+      if (!isValidResourceName(v)) return fail(t("cipherKey.nameInvalidResource"));
+      if (v.length > 50) return fail(t("cipherKey.nameMaxLength"));
+      if (!cipherKeyNameRegex.test(v)) return fail(t("cipherKey.nameInvalidChars"));
+    }),
     key: z.object({
       store: z.object({
         // Store type select (OpenObserve `local` vs `akeyless`) — required.
