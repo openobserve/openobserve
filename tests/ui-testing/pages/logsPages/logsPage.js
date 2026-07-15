@@ -5111,23 +5111,26 @@ export class LogsPage {
     }
 
     async enableQuickModeIfDisabled() {
-        // The "interesting fields" toggle button in FieldListPagination only renders
-        // when showQuickMode = true — use it as a fast pre-check before opening the menu.
-        // Post-FieldListPagination migration the data-test gained a `logs-page-` prefix;
-        // match both so the helper works for both legacy and current builds.
+        // Fast pre-check: the "interesting fields" toggle item (data-test
+        // "logs-interesting-fields-btn") is rendered by FieldListPagination ONLY in the
+        // no-user-defined-schema branch AND only when showQuickMode is true, so its
+        // presence is a reliable "quick mode already on" signal. It is intentionally
+        // absent on user-defined-schema streams (cloud/enterprise) — in that case we
+        // fall through and verify the actual switch state via the utilities menu.
         const quickModeIndicator = this.page.locator(
-            '[data-test="logs-page-interesting-fields-btn"], [data-test="logs-interesting-fields-btn"]',
+            '[data-test="logs-interesting-fields-btn"]',
         ).first();
-        // Quick Mode may also be implicitly "on" when the user-defined-schema toggle
-        // group is rendered — in that case the interesting-fields button is intentionally
-        // hidden and there's nothing to enable.
-        const toggleGroupIndicator = this.page.locator(
-            '[data-test="logs-page-fields-list-user-defined-schema-toggle"], [data-test="logs-page-field-list-user-defined-schema-toggle"]',
-        ).first();
+        // NOTE: the user-defined-schema toggle group (data-test
+        // "logs-page-field-list-user-defined-schema-toggle") is NOT a reliable
+        // quick-mode signal — FieldListPagination renders it whenever the stream
+        // exposes a user-defined schema (showUserDefinedSchemaToggle), regardless of
+        // searchObj.meta.quickMode. The per-field interesting (star) buttons are gated
+        // purely on quickMode (FieldRow/FieldExpansion `v-if="showQuickMode"`), so we
+        // must verify the actual Quick Mode switch state via the utilities menu rather
+        // than infer "quick mode is on" from the sidebar toggle group. Treating the
+        // toggle group as an indicator made all interesting-field tests fail on cloud/
+        // enterprise streams (which always surface a user-defined schema).
         if (await quickModeIndicator.isVisible().catch(() => false)) {
-            return;
-        }
-        if (await toggleGroupIndicator.isVisible().catch(() => false)) {
             return;
         }
 
@@ -5174,11 +5177,15 @@ export class LogsPage {
         // popper still intercepts pointer events on the page (query editor clicks fail).
         await quickModeItem.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
 
-        // Wait deterministically for either field-list branch to surface in the sidebar.
-        await Promise.any([
-            quickModeIndicator.waitFor({ state: 'visible', timeout: 8000 }),
-            toggleGroupIndicator.waitFor({ state: 'visible', timeout: 8000 }),
-        ]).catch(() => {});
+        // Confirm Quick Mode actually took effect: the per-field interesting (star)
+        // buttons only render when searchObj.meta.quickMode is true. Wait for one to
+        // surface (best-effort — ensureFieldIsInteresting has its own retry loop that
+        // re-applies the field-search filter if the button hasn't appeared yet).
+        await this.page
+            .locator('[data-test^="log-search-index-list-interesting-"]')
+            .first()
+            .waitFor({ state: 'visible', timeout: 8000 })
+            .catch(() => {});
     }
 
     async clickTimestampField() {
