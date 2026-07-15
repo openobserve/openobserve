@@ -804,6 +804,13 @@ export class AlertCreationWizard {
         await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
         await monacoEditor.click({ force: true });
         await this.page.waitForTimeout(500);
+        // Clear the editor's pre-populated default query (`SELECT * FROM "<stream>"`) first —
+        // typing without clearing concatenates into malformed SQL
+        // (`SELECT * FROM "..."SELECT ...` → ParserError → the form blocks save with
+        // "Please fix the SQL error before saving." and no success toast ever appears).
+        await this.page.keyboard.press('ControlOrMeta+A');
+        await this.page.keyboard.press('Delete');
+        await this.page.waitForTimeout(300);
         await this.page.keyboard.type(`SELECT kubernetes_labels_name FROM "${streamName}" where kubernetes_labels_name = 'ziox-querier'`);
         testLogger.info('Entered SQL query');
 
@@ -923,7 +930,17 @@ export class AlertCreationWizard {
         }
 
         // ==================== SUBMIT ALERT ====================
-        await this.page.locator(this.locators.alertSubmitButton).click();
+        // The submit button sits inside a scroll container that clips it from the viewport
+        // — worse here because the Advanced/deduplication tab lengthens the form. Playwright's
+        // .click() (even force:true) doesn't bypass scroll-container clipping, so the click
+        // silently misses, the alert never saves, and the success toast never appears (the
+        // exact alpha1 failure). Use a native DOM click via evaluate() — the same reliable
+        // submit the non-dedup scheduled-alert path (createScheduledAlertWithSQL) uses.
+        await this.page.locator(this.locators.alertSubmitButton).waitFor({ state: 'attached', timeout: 10000 });
+        await this.page.evaluate((selector) => {
+            const btn = document.querySelector(selector);
+            if (btn) btn.click();
+        }, this.locators.alertSubmitButton);
         // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
         // visible message div) — scope to the visible `o-toast-message` data-test to avoid
         // strict-mode violation per AGENT_RULES §2.
