@@ -204,7 +204,7 @@ describe("LoadingProgress", () => {
       },
     });
 
-    expect(wrapper.html()).toContain("bg-gray-700");
+    expect(wrapper.html()).toContain("bg-progress-bar-track");
   });
 
   it("should use light theme colors when theme is light", () => {
@@ -218,7 +218,7 @@ describe("LoadingProgress", () => {
       },
     });
 
-    expect(wrapper.html()).toContain("bg-gray-200");
+    expect(wrapper.html()).toContain("bg-progress-bar-track");
   });
 
   it("should show shimmer animation during loading", () => {

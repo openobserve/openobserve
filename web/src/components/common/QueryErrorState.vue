@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </button>
       <div
         v-if="showDetail"
-        class="rounded bg-surface-panel border border-border-default px-3 py-2 max-h-40 overflow-y-auto"
+        class="rounded-sm bg-surface-panel border border-border-default px-3 py-2 max-h-40 overflow-y-auto"
         data-test="query-error-detail-expanded"
       >
         <p

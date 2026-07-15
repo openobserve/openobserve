@@ -79,7 +79,7 @@ describe("SkeletonBox", () => {
       },
     });
 
-    expect(wrapper.find(".skeleton-box").classes()).toContain("rounded-[3px]");
+    expect(wrapper.find(".skeleton-box").classes()).toContain("rounded-sm");
   });
 
   it("should apply title variant class", () => {
@@ -92,7 +92,7 @@ describe("SkeletonBox", () => {
       },
     });
 
-    expect(wrapper.find(".skeleton-box").classes()).toContain("rounded");
+    expect(wrapper.find(".skeleton-box").classes()).toContain("rounded-sm");
   });
 
   it("should apply button variant class", () => {
@@ -144,7 +144,7 @@ describe("SkeletonBox", () => {
       },
     });
 
-    expect(wrapper.find(".skeleton-box").classes()).toContain("rounded-lg");
+    expect(wrapper.find(".skeleton-box").classes()).toContain("rounded-sm");
   });
 
   it("should apply circle class when circle prop is true", () => {
@@ -271,7 +271,7 @@ describe("SkeletonBox", () => {
 
     const skeletonBox = wrapper.find(".skeleton-box");
     expect(skeletonBox.classes()).toContain("rounded-md");
-    expect(skeletonBox.classes()).toContain("rounded-lg");
+    expect(skeletonBox.classes()).toContain("rounded-sm");
     expect(skeletonBox.classes()).toContain("rounded-full");
     expect(skeletonBox.classes()).toContain("aspect-square");
   });

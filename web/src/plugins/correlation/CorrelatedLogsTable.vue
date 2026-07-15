@@ -137,9 +137,9 @@ class="mr-1" />
 
       <!-- Show skeleton while loading -->
       <div v-else class="flex items-center gap-3 flex-wrap p-3">
-        <OSkeleton class="w-[200px] h-8" />
-        <OSkeleton class="w-[200px] h-8" />
-        <OSkeleton class="w-[200px] h-8" />
+        <OSkeleton class="w-50 h-8" />
+        <OSkeleton class="w-50 h-8" />
+        <OSkeleton class="w-50 h-8" />
       </div>
 
       <!-- Results Summary Row -->
@@ -156,7 +156,7 @@ class="mr-1" />
           </template>
           <OSkeleton
             v-else-if="isLoading"
-            class="w-[200px] h-[14px]"
+            class="w-50 h-3.5"
           />
         </div>
       </div> -->

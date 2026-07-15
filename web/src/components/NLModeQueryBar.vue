@@ -25,7 +25,7 @@
         <!-- NL Mode Toggle (always visible when AI enabled and enterprise) -->
         <div
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-          class="flex items-center gap-2 py-1 px-2 rounded element-box-shadow"
+          class="flex items-center gap-2 py-1 px-2 rounded-sm element-box-shadow"
           style="background-color: var(--q-dark-page)"
         >
           <OSwitch
@@ -104,10 +104,10 @@
           class="p-3 bg-[linear-gradient(135deg,rgba(139,92,246,0.05)_0%,rgba(236,72,153,0.05)_100%)] border-b border-card-glass-border"
         >
           <!-- Show streaming status with spinner -->
-          <div v-if="isGenerating" class="ai-bar-streaming flex items-center gap-2 bg-white rounded-lg py-2 px-3 text-(--q-primary)">
+          <div v-if="isGenerating" class="ai-bar-streaming flex items-center gap-2 bg-surface-base rounded-lg py-2 px-3 text-(--q-primary)">
             <img :src="nlpIcon" alt="AI" class="w-5 h-5" />
             <OSpinner variant="dots" size="xs" />
-            <span class="text-sm text-[#666]">{{ aiStatusText || t('search.analyzingQuery') }}</span>
+            <span class="text-sm text-text-secondary">{{ aiStatusText || t('search.analyzingQuery') }}</span>
           </div>
           <!-- Normal input when not generating -->
           <OInput
@@ -148,6 +148,7 @@
 import { ref, computed } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
+import { useTheme } from '@/composables/useTheme';
 import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODropdown from '@/lib/overlay/Dropdown/ODropdown.vue';
@@ -213,6 +214,7 @@ const emit = defineEmits<{
 
 const store = useStore();
 const { t } = useI18n();
+const { isDark } = useTheme();
 
 const nlpMode = ref(false);
 const isNaturalLanguageDetected = ref(false);
@@ -224,7 +226,7 @@ const aiInputText = ref('');
 const aiStatusText = ref('');
 
 const nlpIcon = computed(() => {
-  return store.state.theme === 'dark'
+  return isDark.value
     ? getImageURL('images/common/ai_icon_dark.svg')
     : getImageURL('images/common/ai_icon_gradient.svg');
 });
@@ -241,9 +243,9 @@ const buttonClasses = computed(() => {
   ];
 
   if (isAIMode.value) {
-    classes.push('bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! text-white! border-none! text-[0.6875rem]! font-semibold! leading-[1rem]! transition-all! duration-300! ease-[ease]! shadow-[0_0.25rem_0.9375rem_0_rgba(139,92,246,0.3)]! px-3! w-[92px]! hover:shadow-[0_0.375rem_1.25rem_0_rgba(139,92,246,0.5)]! hover:-translate-y-px active:translate-y-0');
+    classes.push('bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! text-text-inverse! border-none! text-2xs! font-semibold! leading-[1rem]! transition-all! duration-300! ease-[ease]! shadow-[0_0.25rem_0.9375rem_0_rgba(139,92,246,0.3)]! px-3! w-23! hover:shadow-[0_0.375rem_1.25rem_0_rgba(139,92,246,0.5)]! hover:-translate-y-px active:translate-y-0');
   } else {
-    classes.push('w-[92px]!', 'o2-color-primary');
+    classes.push('w-23!', 'o2-color-primary');
   }
 
   if (props.borderRadius === 'enterprise') {

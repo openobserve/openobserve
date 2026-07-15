@@ -201,7 +201,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   ].join(" "),
   // webinar-dismiss: Inline text-link style for the webinar top bar banner dismiss button
   "webinar-dismiss": [
-    "bg-transparent border-0 text-[#1e3a8a] underline font-bold text-[0.8125rem] whitespace-nowrap",
+    "bg-transparent border-0 text-[#1e3a8a] underline font-bold text-compact whitespace-nowrap",
     "!h-auto !p-0",
     "enabled:hover:text-[#1e40af]",
     "disabled:opacity-60",
@@ -218,7 +218,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   // pricing-chip: Pill-shaped toggle chip for model pricing quick-setup template selection
   "pricing-chip": [
     "bg-transparent text-inherit border border-border-default",
-    "!rounded-[20px] !text-xs !font-medium !h-auto !py-[5px] !px-[14px] !gap-[6px]",
+    "!rounded-full !text-xs !font-medium !h-auto !py-[5px] !px-3.5 !gap-1.5",
     "transition-colors duration-150",
     "enabled:hover:border-primary-600 enabled:hover:text-primary-600 enabled:hover:bg-button-ghost-hover-bg",
     "disabled:opacity-60",
@@ -226,7 +226,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
 };
 
 const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
-  xs: "h-7 ps-2.5 pe-2.5 text-xs gap-1.5 rounded",
+  xs: "h-7 ps-2.5 pe-2.5 text-xs gap-1.5 rounded-sm",
   // 34px control height per HANDOFF §11 — the workhorse compact button that
   // pairs with 34px inputs in toolbars/headers. (radius 8 = rounded-lg per §11.)
   sm: "h-[2.125rem] ps-3 pe-3 text-sm gap-2 rounded-lg",
@@ -235,22 +235,22 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
     "h-[1.875rem] ps-2 pe-2 text-xs gap-1.5 rounded-md",
   // Compact labeled size for inline field chips (axis items) — ~28px, matches the dense button size
   // Extra-compact chip size — 24px height for axis field chips in query builder
-  chip: "h-6 ps-2 pe-1.5 text-xs gap-1 rounded leading-none",
+  chip: "h-6 ps-2 pe-1.5 text-xs gap-1 rounded-sm leading-none",
   // Same as chip but with fixed 12px font — for dashboard query builder axis field chips
   // (needed because the html font-size is 14px, making text-xs = 10.5px instead of 12px)
-  "chip-12": "h-6 ps-2 pe-1.5 !text-[12px] gap-1 rounded leading-none",
+  "chip-12": "h-6 ps-2 pe-1.5 !text-xs gap-1 rounded-sm leading-none",
   "sm-action":
-    "h-[2.125rem] ps-3 pe-3 min-w-[80px] text-sm gap-2 rounded-lg",
+    "h-[2.125rem] ps-3 pe-3 min-w-20 text-sm gap-2 rounded-lg",
   md: "h-10 ps-4 pe-4 text-sm gap-2 rounded-lg",
   lg: "h-12 ps-6 pe-6 text-base gap-3 rounded-lg",
   icon: "size-6 p-0 rounded-md gap-x-0",
-  "icon-xs": "h-[30px] px-2 text-[18px] rounded-md gap-x-0",
+  "icon-xs": "h-7.5 px-2 text-[18px] rounded-md gap-x-0",
   // 24px round circle — for small inline add/action icon buttons (e.g. + Joins, + Filters)
   "icon-xs-circle": "size-6 p-0 rounded-full gap-x-0",
   // 28px square — matches xs chip height for paired close/remove buttons
   "icon-xs-sq": "h-7 w-7 p-0 rounded-md gap-x-0",
   // 24px square — matches chip size for paired close/remove buttons
-  "icon-chip": "h-6 w-6 p-0 rounded gap-x-0",
+  "icon-chip": "h-6 w-6 p-0 rounded-sm gap-x-0",
   "icon-sm": "h-8 w-8 p-0 rounded-md gap-x-0",
   "icon-md": "h-10 w-10 p-0 rounded-lg gap-x-0",
   "icon-lg": "h-12 w-12 p-0 rounded-lg gap-x-0",

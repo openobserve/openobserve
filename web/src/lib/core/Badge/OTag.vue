@@ -47,7 +47,7 @@ const props = withDefaults(
     /** Raw value (string | boolean | number). Optional for manual badges. */
     value?: unknown;
     size?: BadgeSize;
-    /** Override the corner shape (pill | rounded | square). */
+    /** Override the corner shape (pill | rounded-sm | square). */
     shape?: BadgeShape;
     /** Override the resolved label with dynamic/runtime text. */
     label?: string;
@@ -107,7 +107,7 @@ const size = computed<BadgeSize>(
 );
 // Shape precedence: prop → registry group → "pill". `main`'s OBadge was always
 // rounded-full (pill); only a few chips (logs/traces counts, status codes) were
-// rounded, and those groups set `shape:"rounded"` explicitly.
+// rounded, and those groups set `shape:"rounded-sm"` explicitly.
 const shape = computed<BadgeShape>(
   () => props.shape ?? resolved.value.shape ?? "pill",
 );

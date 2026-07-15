@@ -1,5 +1,5 @@
 <template>
-  <section class="flex flex-col gap-[10px] min-h-0 flex-1" data-test="quality-score-configs-overview">
+  <section class="flex flex-col gap-2.5 min-h-0 flex-1" data-test="quality-score-configs-overview">
     <div v-if="isLoading && rows.length === 0" class="flex flex-col items-center gap-2 py-8 px-3 border border-dashed border-dialog-header-border rounded-md text-center text-text-secondary">
       <OSpinner size="sm" />
       <span>{{ t("onlineEvals.quality.loading") }}</span>
@@ -105,7 +105,7 @@
         </template>
 
         <template #cell-updated="{ row }">
-          <span v-if="row.lastUpdatedMs" class="text-[11px] text-text-secondary [font-variant-numeric:tabular-nums]">
+          <span v-if="row.lastUpdatedMs" class="text-2xs text-text-secondary [font-variant-numeric:tabular-nums]">
             {{ relativeTime(row.lastUpdatedMs) }}
           </span>
           <span v-else class="text-text-secondary">—</span>

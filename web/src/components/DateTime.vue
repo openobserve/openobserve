@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="{
             [selectedType + 'type']: !disableRelative,
             hideRelative: disableRelative,
-            'min-w-[286px]': !disableRelative && selectedType === 'absolute',
+            'min-w-71.5': !disableRelative && selectedType === 'absolute',
             'w-fit': disableRelative,
           }"
           :disabled="disable"

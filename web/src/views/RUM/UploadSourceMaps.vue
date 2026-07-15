@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- File Upload Area (form-owned `file` field, schema-validated) -->
           <div class="mb-6">
-            <div class="text-sm font-medium text-weight-medium mb-2">Source Map ZIP File *</div>
+            <div class="text-sm font-medium font-medium mb-2">Source Map ZIP File *</div>
             <SourceMapDropzone name="file" />
           </div>
         </div>

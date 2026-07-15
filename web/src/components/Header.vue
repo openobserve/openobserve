@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
           <img
             data-test="header-openobserve-logo"
-            class="openobserve-logo cursor-pointer h-8 max-w-[150px] block transition-opacity duration-200 hover:opacity-80"
+            class="openobserve-logo cursor-pointer h-8 max-w-37.5 block transition-opacity duration-200 hover:opacity-80"
             :src="
               getImageURL(
                 store.state.theme === 'dark'
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
         <img
           data-test="header-openobserve-logo"
-          class="openobserve-logo cursor-pointer h-8 max-w-[150px] block transition-opacity duration-200 hover:opacity-80"
+          class="openobserve-logo cursor-pointer h-8 max-w-37.5 block transition-opacity duration-200 hover:opacity-80"
           :src="
             getImageURL(
               store.state.theme === 'dark'
@@ -253,7 +253,7 @@ size="xs" class="warning" />{{
             <OTooltip side="top" align="center" :content="t('menu.help')" />
           </OButton>
         </template>
-        <div class="header-menu-bar min-w-[250px]">
+        <div class="header-menu-bar min-w-62.5">
           <!-- OpenAPI link (only for non-cloud deployments) -->
           <template
             v-if="
@@ -321,7 +321,7 @@ size="xs" class="warning" />{{
             <OTooltip side="top" align="center" :content="user.given_name ? user.given_name + ' ' + user.family_name : user.email" />
           </OButton>
         </template>
-        <div class="header-menu-bar min-w-[250px]">
+        <div class="header-menu-bar min-w-62.5">
           <!-- User information (non-clickable info row) -->
           <div class="flex items-center gap-3 px-3 py-2">
             <OIcon
@@ -339,7 +339,7 @@ size="xs" class="warning" />{{
           <!-- Language selector — nested sub-dropdown (click to open) -->
           <div
             data-test="header-language-submenu-trigger"
-            class="relative flex items-center gap-3 py-1.5 px-3 text-sm leading-[1.2] cursor-pointer select-none hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+            class="relative flex items-center gap-3 py-1.5 px-3 text-sm leading-[1.2] cursor-pointer select-none hover:bg-dropdown-item-hover-bg"
             @click.stop="showLanguageSubmenu = !showLanguageSubmenu"
           >
             <OIcon size="xs" name="language" class="padding-none" />
@@ -364,10 +364,7 @@ size="xs" class="warning" />{{
             <!-- Submenu — absolutely positioned to the left of parent dropdown -->
             <div
               v-if="showLanguageSubmenu"
-              class="absolute right-full top-0 mr-1 min-w-50 border rounded-md py-1 z-9999"
-              :class="store.state.theme === 'dark'
-                ? 'bg-[#1f2937] border-[rgba(255,255,255,0.12)] shadow-[0_8px_24px_rgba(0,0,0,0.5)]'
-                : 'bg-white border-black/12 shadow-[0_8px_24px_rgba(0,0,0,0.15)]'"
+              class="absolute right-full top-0 mr-1 min-w-50 border rounded-md py-1 z-9999 bg-dropdown-bg border-dropdown-border shadow-[0_8px_24px_rgba(0,0,0,0.15)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
               data-test="language-dropdown-item"
               @click.stop
             >
@@ -378,9 +375,7 @@ size="xs" class="warning" />{{
                 :data-test="`language-dropdown-item-${lang.code}`"
                 class="flex items-center gap-2.5 w-full py-1.5 px-3 text-sm leading-[1.2] text-left bg-transparent border-0 cursor-pointer text-inherit"
                 :class="[
-                  store.state.theme === 'dark'
-                    ? 'hover:bg-[rgba(255,255,255,0.08)]'
-                    : 'hover:bg-[rgba(0,0,0,0.05)]',
+                  'hover:bg-dropdown-item-hover-bg',
                   { 'font-semibold': selectedLanguage.code === lang.code },
                 ]"
                 @click="changeLanguage(lang); showLanguageSubmenu = false"
@@ -454,6 +449,7 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 
 import { getImageURL } from "@/utils/zincutils";
+import { chartColor } from "@/utils/chartTheme";
 
 export default defineComponent({
   name: "HeaderComponent",
@@ -596,8 +592,8 @@ export default defineComponent({
     // Computed property for ingestion quota warning color
     const ingestionQuotaColor = computed(() => {
       return props.store.state.zoConfig.ingestion_quota_used >= 95
-        ? "red"
-        : "orange";
+        ? chartColor("--color-status-negative")
+        : chartColor("--color-status-warning-text");
     });
 
     // Event handlers that emit to parent component

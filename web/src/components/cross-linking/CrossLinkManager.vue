@@ -60,7 +60,7 @@
                 v-for="(field, fIdx) in link.fields"
                 :key="fIdx"
                 type="fieldTag"
-                class="max-w-[200px]"
+                class="max-w-50"
                 :data-test="`cross-link-field-chip-${fIdx}`"
               >
                 <span class="truncate text-xs" :title="field.name">{{ field.name }}</span>

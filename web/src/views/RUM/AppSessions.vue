@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   'solid',
                   'border-card-glass-border',
                   'p-[0.25rem]',
-                  'rounded-[0.375rem]',
+                  'rounded-md',
                   'overflow-y-auto',
                   queryEditorHeight,
                 ]"

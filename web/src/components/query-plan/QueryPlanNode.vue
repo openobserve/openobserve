@@ -18,19 +18,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="plan-node" data-test="query-plan-node">
     <!-- Node content -->
     <div
-      class="node-line flex items-center gap-0 py-[2px] whitespace-pre"
+      class="node-line flex items-center gap-0 py-0.5 whitespace-pre"
     >
       <!-- Parent prefix indentation -->
       <span
         v-if="parentPrefix"
         data-test="query-plan-node-tree-indent"
-        class="text-[rgba(0,0,0,0.3)] font-bold select-none whitespace-pre dark:text-[rgba(255,255,255,0.3)]"
+        class="text-text-muted font-bold select-none whitespace-pre"
       >{{ parentPrefix }}</span>
 
       <!-- Tree connector -->
       <span
         data-test="query-plan-node-tree-connector"
-        class="text-[rgba(0,0,0,0.3)] font-bold select-none pr-1 dark:text-[rgba(255,255,255,0.3)]"
+        class="text-text-muted font-bold select-none pr-1"
       >{{ connector }}</span>
 
       <!-- Expand/collapse icon for nodes with children -->
@@ -51,16 +51,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Operator name -->
       <span
         data-test="query-plan-node-operator-name"
-        class="font-semibold text-[rgba(0,0,0,0.87)] pl-1 dark:text-[rgba(255,255,255,0.87)]"
+        class="font-semibold text-text-primary pl-1"
       >{{ node.name }}</span>
 
       <!-- Inline details (clickable to expand if truncated) -->
       <span
         v-if="inlineDetails"
-        class="inline-details text-[rgba(0,0,0,0.7)] font-normal text-xs italic dark:text-[rgba(255,255,255,0.7)]"
+        class="inline-details text-text-secondary font-normal text-xs italic"
         :class="{
           'cursor-pointer': hasLongDetails,
-          'whitespace-nowrap overflow-hidden [text-overflow:ellipsis] max-w-[600px] truncated': !detailsExpanded && hasLongDetails,
+          'whitespace-nowrap overflow-hidden [text-overflow:ellipsis] max-w-150 truncated': !detailsExpanded && hasLongDetails,
           clickable: hasLongDetails,
         }"
         data-test="query-plan-node-inline-details"
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span
         v-if="inlineDetails && (isAnalyze && hasMetrics)"
         data-test="query-plan-node-separator"
-        class="text-[rgba(0,0,0,0.4)] px-2 font-normal select-none dark:text-[rgba(255,255,255,0.4)]"
+        class="text-text-muted px-2 font-normal select-none"
       >·</span>
 
       <!-- Metrics (for ANALYZE mode) -->
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           v-if="node.metrics.output_rows !== undefined"
           data-test="query-plan-node-metric-badge"
-          class="inline-flex items-center gap-1 py-[2px] px-2 bg-[rgba(var(--q-primary-rgb),0.1)] rounded text-[11px] font-medium text-(--q-primary) whitespace-nowrap dark:bg-[rgba(var(--q-primary-rgb),0.2)]"
+          class="inline-flex items-center gap-1 py-0.5 px-2 bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] rounded-sm text-2xs font-medium text-(--q-primary) whitespace-nowrap dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_20%,transparent)]"
         >
           <OIcon name="format-list-numbered" size="xs" />
           {{ formatNumber(node.metrics.output_rows) }} rows
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           v-if="node.metrics.elapsed_compute"
           data-test="query-plan-node-metric-badge"
-          class="inline-flex items-center gap-1 py-[2px] px-2 bg-[rgba(var(--q-primary-rgb),0.1)] rounded text-[11px] font-medium text-(--q-primary) whitespace-nowrap dark:bg-[rgba(var(--q-primary-rgb),0.2)]"
+          class="inline-flex items-center gap-1 py-0.5 px-2 bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] rounded-sm text-2xs font-medium text-(--q-primary) whitespace-nowrap dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_20%,transparent)]"
         >
           <OIcon name="schedule" size="xs" />
           {{ node.metrics.elapsed_compute }}
@@ -105,10 +105,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="detailsExpanded && hasLongDetails"
       data-test="query-plan-node-details"
-      class="pt-[2px] pb-[2px] text-[rgba(0,0,0,0.7)] text-xs italic whitespace-pre-wrap break-words dark:text-[rgba(255,255,255,0.7)]"
+      class="pt-0.5 pb-0.5 text-text-secondary text-xs italic whitespace-pre-wrap break-words"
     >
       <span
-        class="text-[rgba(0,0,0,0.3)] font-bold select-none whitespace-pre dark:text-[rgba(255,255,255,0.3)]"
+        class="text-text-muted font-bold select-none whitespace-pre"
       >{{ childPrefix }}  </span>
       <span>{{ inlineDetails }}</span>
     </div>
@@ -236,12 +236,8 @@ export default defineComponent({
 });
 </script>
 
-<style>
+<style scoped>
 .plan-node .node-line .inline-details.clickable:hover {
-  color: rgba(0, 0, 0, 0.9);
-}
-
-.body--dark .plan-node .node-line .inline-details.clickable:hover {
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--color-text-primary);
 }
 </style>

@@ -95,7 +95,7 @@ function resetToDefault(): void {
         <li
           v-for="col in toggleableColumns"
           :key="col.id"
-          class="flex items-center gap-2 px-3 py-1.5 cursor-pointer rounded hover:bg-surface-panel transition-colors"
+          class="flex items-center gap-2 px-3 py-1.5 cursor-pointer rounded-sm hover:bg-surface-panel transition-colors"
           :data-test="`o2-table-column-toggle-item-${col.id}`"
           @click.stop="toggleColumn(col.id)"
         >
@@ -119,7 +119,7 @@ function resetToDefault(): void {
       >
         <button
           v-if="hiddenCount > 0"
-          class="flex items-center gap-2 px-3 py-1.5 w-full text-sm cursor-pointer rounded hover:bg-surface-panel transition-colors text-text-primary"
+          class="flex items-center gap-2 px-3 py-1.5 w-full text-sm cursor-pointer rounded-sm hover:bg-surface-panel transition-colors text-text-primary"
           data-test="o2-table-column-toggle-reset-btn"
           @click="resetToDefault"
         >
@@ -128,7 +128,7 @@ function resetToDefault(): void {
         </button>
         <button
           v-if="props.hasResizedColumns"
-          class="flex items-center gap-2 px-3 py-1.5 w-full text-sm cursor-pointer rounded hover:bg-surface-panel transition-colors text-text-primary"
+          class="flex items-center gap-2 px-3 py-1.5 w-full text-sm cursor-pointer rounded-sm hover:bg-surface-panel transition-colors text-text-primary"
           data-test="o2-table-column-resize-reset-btn"
           @click="emit('reset:columnSizes')"
         >

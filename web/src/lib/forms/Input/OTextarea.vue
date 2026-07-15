@@ -161,7 +161,7 @@ const wrapperClasses = computed(() => [
           'text-input-text placeholder:text-input-placeholder',
           'disabled:cursor-not-allowed',
           'py-2 px-3 text-sm',
-          fill ? 'h-full min-h-0 resize-none' : 'min-h-[80px]',
+          fill ? 'h-full min-h-0 resize-none' : 'min-h-20',
           !fill && (autogrow ? 'resize-none' : 'resize-y'),
         ]"
         @input="

@@ -15,7 +15,7 @@
               <!-- Sample Log 1 -->
               <div class="log-line group p-4 bg-(--q-dark-page,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-(--q-primary) hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog1)">
                 <div class="log-timestamp font-mono text-xs text-[var(--q-primary)] mb-2">2025-12-02 10:23:45</div>
-                <div class="log-content flex flex-col gap-1 text-[13px]">
+                <div class="log-content flex flex-col gap-1 text-compact">
                   <div><strong>service.name:</strong> checkout-api</div>
                   <div><strong>k8s.cluster:</strong> prod-us-west</div>
                   <div><strong>k8s.deployment.name:</strong> checkout-v2</div>
@@ -30,7 +30,7 @@
               <!-- Sample Log 2 -->
               <div class="log-line group p-4 bg-(--q-dark-page,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-(--q-primary) hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog2)">
                 <div class="log-timestamp font-mono text-xs text-[var(--q-primary)] mb-2">2025-12-02 10:24:12</div>
-                <div class="log-content flex flex-col gap-1 text-[13px]">
+                <div class="log-content flex flex-col gap-1 text-compact">
                   <div><strong>service.name:</strong> inventory-service</div>
                   <div><strong>k8s.cluster:</strong> prod-us-east</div>
                   <div><strong>environment:</strong> production</div>
@@ -44,7 +44,7 @@
               <!-- Sample Log 3 -->
               <div class="log-line group p-4 bg-(--q-dark-page,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-(--q-primary) hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog3)">
                 <div class="log-timestamp font-mono text-xs text-[var(--q-primary)] mb-2">2025-12-02 10:25:30</div>
-                <div class="log-content flex flex-col gap-1 text-[13px]">
+                <div class="log-content flex flex-col gap-1 text-compact">
                   <div><strong>service.name:</strong> user-auth</div>
                   <div><strong>k8s.cluster:</strong> prod-us-west</div>
                   <div><strong>region:</strong> us-west-2</div>
@@ -82,7 +82,7 @@
                 Service Streams: Disabled
               </OTag>
             </div>
-            <div class="mt-1 text-xs text-gray-400">
+            <div class="mt-1 text-xs text-text-caption">
               Note: This is a demo using simulated data. In production,
               correlation will use real service_streams data.
             </div>
@@ -104,7 +104,7 @@
         <OCard v-if="!showCorrelation">
           <OCardSection class="text-center p-6">
             <OIcon name="info" size="lg" />
-            <div class="text-gray-400 mt-3">
+            <div class="text-text-muted mt-3">
               Click a log line to see related telemetry
             </div>
           </OCardSection>
@@ -122,11 +122,11 @@
       @click:primary="showQueryDialog = false"
     >
       <div>
-        <div class="text-xs text-gray-400 mb-2">
+        <div class="text-xs text-text-caption mb-2">
           This query would be executed to fetch related
           {{ queryPreview.type }}:
         </div>
-        <pre class="query-preview bg-(--q-dark-page,#f5f5f5) p-4 rounded font-mono text-xs overflow-x-auto whitespace-pre-wrap wrap-break-word">{{ queryPreview.sql }}</pre>
+        <pre class="query-preview bg-(--q-dark-page,#f5f5f5) p-4 rounded-sm font-mono text-xs overflow-x-auto whitespace-pre-wrap wrap-break-word">{{ queryPreview.sql }}</pre>
       </div>
     </ODialog>
   </div>
@@ -201,7 +201,7 @@ function selectLog(log: any) {
 
 .log-line .log-content strong {
   min-width: 150px;
-  color: var(--q-text-secondary, #757575);
+  color: var(--color-text-secondary);
 }
 
 </style>

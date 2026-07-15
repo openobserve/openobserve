@@ -10,7 +10,7 @@ const props = withDefaults(defineProps<SkeletonProps>(), {
 const shapeClasses: Record<NonNullable<SkeletonProps["type"]>, string> = {
   rect: "rounded-md w-full",
   circle: "rounded-full aspect-square",
-  text: "rounded w-full h-4",
+  text: "rounded-sm w-full h-4",
 };
 
 const animationClasses: Record<NonNullable<SkeletonProps["animation"]>, string> = {

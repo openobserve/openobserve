@@ -123,7 +123,7 @@ const heightClasses = computed<string>(() => {
   if (isVertical.value) {
     return isDense.value ? 'py-1.5' : 'py-2'
   }
-  return isDense.value ? 'h-[32px]' : 'h-[40px]'
+  return isDense.value ? 'h-8' : 'h-10'
 })
 </script>
 

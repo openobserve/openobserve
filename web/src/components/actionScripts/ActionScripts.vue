@@ -147,11 +147,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #bottom>
               <div
-                class="flex items-center justify-between w-full h-[48px]"
+                class="flex items-center justify-between w-full h-12"
               >
                 <div class="flex items-center gap-2">
                   <div
-                    class="o2-table-footer-title flex items-center w-[80px] mr-md"
+                    class="o2-table-footer-title flex items-center w-20 mr-md"
                   >
                     {{ resultTotal }} {{ t("actions.header") }}
                   </div>

@@ -23,16 +23,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-col items-center justify-center text-center min-h-[calc(100vh-var(--navbar-height)-200px)] py-12 px-6"
       data-test="plans-managed-billing-panel"
     >
-      <div class="w-[100px] h-[100px] rounded-full border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)] flex items-center justify-center mb-7">
-        <div class="w-[68px] h-[68px] rounded-full bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border-[1.5px] border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] border-solid flex items-center justify-center">
+      <div class="w-25 h-25 rounded-full border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)] flex items-center justify-center mb-7">
+        <div class="w-17 h-17 rounded-full bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border-[1.5px] border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] border-solid flex items-center justify-center">
           <OIcon name="account-balance" size="lg" class="text-primary-600 opacity-85" />
         </div>
       </div>
 
-      <div class="text-[1.2rem] font-bold tracking-[-0.2px] mb-[10px]">
+      <div class="text-[1.2rem] font-bold tracking-[-0.2px] mb-2.5">
         {{ t("billing.billingGroup.plansManagedTitle") }}
       </div>
-      <div class="text-[0.88rem] leading-[1.65] opacity-65 max-w-[440px] mb-6">
+      <div class="text-[0.88rem] leading-[1.65] opacity-65 max-w-110 mb-6">
         {{
           t("billing.billingGroup.plansManagedDescription", {
             name: membership?.payer_org_name,
@@ -42,15 +42,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class="flex items-center gap-2 flex-wrap justify-center mb-8">
-        <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--color-card-glass-border,rgba(0,0,0,0.1)) rounded-[20px] py-1 px-3">
+        <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--color-card-glass-border,rgba(0,0,0,0.1)) rounded-full py-1 px-3">
           <OIcon name="receipt-long" size="xs" />
           {{ t("billing.billingGroup.chipConsolidatedBill") }}
         </span>
-        <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--color-card-glass-border,rgba(0,0,0,0.1)) rounded-[20px] py-1 px-3">
+        <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--color-card-glass-border,rgba(0,0,0,0.1)) rounded-full py-1 px-3">
           <OIcon name="lock" size="xs" />
           {{ t("billing.billingGroup.chipPlanManaged") }}
         </span>
-        <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--color-card-glass-border,rgba(0,0,0,0.1)) rounded-[20px] py-1 px-3">
+        <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--color-card-glass-border,rgba(0,0,0,0.1)) rounded-full py-1 px-3">
           <OIcon name="description" size="xs" />
           {{ t("billing.billingGroup.chipNoInvoices") }}
         </span>
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-2xl font-semibold leading-7 text-text-heading text-left flex items-end">
             {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }} credits used
           </div>
-          <div v-if="aiUsage.mode === 'exhausted'" class="text-red-500 mt-2" style="font-size: 13px;">
+          <div v-if="aiUsage.mode === 'exhausted'" class="text-status-error-text mt-2" style="font-size: 13px;">
             {{ t("billing.aiExhaustedMessage") }}
           </div>
           <div v-else-if="aiUsage.mode === 'pay_as_you_go'" class="text-info mt-2" style="font-size: 13px;">
@@ -112,12 +112,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         store.state.selectedOrganization.hasOwnProperty('note') &&
         store.state.selectedOrganization.note
       "
-      class="flex justify-start items-center gap-2 text-red-500 text-xl font-semibold pl-6 pb-4"
+      class="flex justify-start items-center gap-2 text-status-error-text text-xl font-semibold pl-6 pb-4"
     >
       <OIcon name="warning" size="sm" class="pt-2" />
       >{{ store.state.selectedOrganization.note }}
     </div>
-    <div v-if="loading" class="text-xl font-semibold text-weight-medium text-center">
+    <div v-if="loading" class="text-xl font-semibold font-medium text-center">
       <OSpinner size="md" class="mx-auto block text-center mt-3" />
     </div>
     <div v-else class="grid grid-cols-2 gap-3 mt-3">
@@ -148,6 +148,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import BillingService from "@/services/billings";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import { useLocalOrganization, convertToTitleCase, getImageURL } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
@@ -372,6 +373,7 @@ export default defineComponent({
   setup() {
     const { t } = useI18n();
     const store = useStore();
+    const { isDark } = useTheme();
     const frmPayment = ref();
     const planType = ref("");
     const isActiveSubscription = ref(false);
@@ -386,7 +388,7 @@ export default defineComponent({
     const subscriptionType = ref("");
     const aiUsage = ref<any>(null);
     const aiIcon = computed(() =>
-      store.state.theme === "dark"
+      isDark.value
         ? getImageURL("images/common/ai_icon_dark.svg")
         : getImageURL("images/common/ai_icon_gradient.svg")
     );

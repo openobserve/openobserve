@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToIncidentList">{{ t('overview.viewAll') }} →</button>
       </div>
-      <div class="flex flex-col border border-[0.0625em] border-border-default rounded-[0.375rem] overflow-hidden">
+      <div class="flex flex-col border border-[0.0625em] border-border-default rounded-md overflow-hidden">
         <div
           v-for="inc in incidents"
           :key="inc.id"
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="svc in services"
           :key="svc.id"
-          class="py-3 px-[0.875rem] rounded-[0.375rem] border border-[0.0625em] border-border-default bg-surface-base transition-[background] duration-150 basis-40 grow-0 shrink-0 min-w-40 max-w-40 cursor-pointer hover:bg-table-row-hover-bg"
+          class="py-3 px-[0.875rem] rounded-md border border-[0.0625em] border-border-default bg-surface-base transition-[background] duration-150 basis-40 grow-0 shrink-0 min-w-40 max-w-40 cursor-pointer hover:bg-table-row-hover-bg"
           :class="[serviceCardClass(svc), { 'bg-table-row-hover-bg outline outline-[0.125em] outline-primary-600 [outline-offset:-0.0625em]': selectedService?.id === svc.id && servicePanelVisible }]"
           @click="openServicePanel(svc)"
         >
@@ -145,19 +145,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex flex-col gap-1 mt-2">
             <div class="flex items-baseline justify-between gap-2">
-              <span class="text-[0.6875rem] font-semibold tracking-[0.04em] text-text-secondary">{{ t('overview.colErrorRate') }}</span>
+              <span class="text-2xs font-semibold tracking-[0.04em] text-text-secondary">{{ t('overview.colErrorRate') }}</span>
               <span class="text-sm font-medium text-text-body" :class="svc.errorFlag ? 'text-error-600' : ''">
                 {{ svc.error_rate != null ? svc.error_rate.toFixed(1) + '%' : '—' }}
               </span>
             </div>
             <div class="flex items-baseline justify-between gap-2">
-              <span class="text-[0.6875rem] font-semibold tracking-[0.04em] text-text-secondary">{{ t('overview.colLatency') }}</span>
+              <span class="text-2xs font-semibold tracking-[0.04em] text-text-secondary">{{ t('overview.colLatency') }}</span>
               <span class="text-sm font-medium text-text-body" :class="svc.latencyFlag ? 'text-warning-700' : ''">
                 {{ svc.latencyMultiplier ? svc.latencyMultiplier + 'x' : '—' }}
               </span>
             </div>
             <div class="flex items-baseline justify-between gap-2">
-              <span class="text-[0.6875rem] font-semibold tracking-[0.04em] text-text-secondary">{{ t('overview.colReqs') }}</span>
+              <span class="text-2xs font-semibold tracking-[0.04em] text-text-secondary">{{ t('overview.colReqs') }}</span>
               <span class="text-sm font-medium text-text-body">{{ formatReqRate(svc.requests) }}</span>
             </div>
           </div>
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="item in anomalies"
           :key="item.id"
-          class="ov-alert-row flex items-center gap-3 py-[0.625rem] px-[0.875rem] rounded-[0.375rem] border border-[0.0625em] border-border-default bg-surface-base transition-[background] duration-150 hover:bg-table-row-hover-bg"
+          class="ov-alert-row flex items-center gap-3 py-[0.625rem] px-[0.875rem] rounded-md border border-[0.0625em] border-border-default bg-surface-base transition-[background] duration-150 hover:bg-table-row-hover-bg"
           :class="severityRowClass(item.severity)"
         >
           <span class="shrink-0 flex items-center" :class="severityIconClass(item.severity)">
@@ -243,11 +243,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAlertList">{{ t('overview.viewAll') }} →</button>
       </div>
-      <div class="flex flex-col gap-0 border border-[0.0625em] border-border-default rounded-[0.375rem] overflow-hidden bg-surface-base">
+      <div class="flex flex-col gap-0 border border-[0.0625em] border-border-default rounded-md overflow-hidden bg-surface-base">
         <div
           v-for="ev in recentEvents"
           :key="ev.id"
-          class="ov-event-row flex items-center gap-3 py-2 px-[0.875rem] border-b border-b-[0.0625em] border-b-border-default text-[0.8125rem] transition-[background] duration-150 hover:bg-table-row-hover-bg"
+          class="ov-event-row flex items-center gap-3 py-2 px-[0.875rem] border-b border-b-[0.0625em] border-b-border-default text-compact transition-[background] duration-150 hover:bg-table-row-hover-bg"
         >
           <OTag type="eventStatus" :value="ev.typeLabel" class="shrink-0" />
           <span class="font-medium text-text-heading whitespace-nowrap min-w-[7.5em] max-w-[12.5em] overflow-hidden text-ellipsis">{{ ev.service }}</span>

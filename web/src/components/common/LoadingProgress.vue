@@ -7,15 +7,12 @@
     }"
   >
     <div
-      class="w-full h-[2px] relative overflow-x-hidden"
-      :class="
-        store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
-      "
+      class="w-full h-0.5 relative overflow-x-hidden bg-progress-bar-track"
     >
       <div
         class="h-full relative overflow-hidden"
         :class="
-          store.state.theme === 'dark' ? 'bg-[#5960B2]' : 'bg-[#5960B2]'
+          'bg-brand-indigo'
         "
         :style="{
           width: `${displayPercentage}%`,
@@ -27,12 +24,7 @@
         }"
       >
         <div
-          class="absolute inset-0 bg-gradient-to-r from-transparent to-transparent "
-          :class="
-            store.state.theme === 'dark'
-              ? 'via-gray-300/40'
-              : 'via-white/40'
-          "
+          class="absolute inset-0 bg-gradient-to-r from-transparent to-transparent via-white/40 dark:via-gray-300/40"
           :style="{
             animation: 'shimmer 1.5s infinite linear',
             width: '200%',
@@ -42,9 +34,9 @@
       </div>
       <!-- Moving circle indicator -->
       <div
-        class="absolute top-0 w-[3px] h-[2px] rounded-full shadow-[0_0_10px_2px_rgba(89,96,178,0.5)] transform translate-x-[-50%]"
+        class="absolute top-0 w-[3px] h-0.5 rounded-full shadow-[0_0_10px_2px_rgba(89,96,178,0.5)] transform translate-x-[-50%]"
         :class="
-          store.state.theme === 'dark' ? 'bg-[#5960B2]' : 'bg-[#5960B2]'
+          'bg-brand-indigo'
         "
         :style="{
           left: `${displayPercentage}%`,
@@ -54,12 +46,7 @@
         }"
       >
         <div
-          class="absolute inset-0 rounded-full animate-pulse"
-          :class="
-            store.state.theme === 'dark'
-              ? 'bg-gray-300/20'
-              : 'bg-white/20'
-          "
+          class="absolute inset-0 rounded-full animate-pulse bg-white/20 dark:bg-gray-300/20"
         ></div>
       </div>
     </div>
@@ -68,7 +55,6 @@
 
 <script lang="ts">
 import { defineComponent, computed, ref, watch, onUnmounted } from "vue";
-import { useStore } from "vuex";
 
 export default defineComponent({
   name: "LoadingProgress",
@@ -87,7 +73,6 @@ export default defineComponent({
   },
 
   setup(props) {
-    const store = useStore();
     const lastLoadingState = ref(props.loading);
     const internalPercentage = ref(props.loadingProgressPercentage);
     const isFadingOut = ref(false);
@@ -134,7 +119,6 @@ export default defineComponent({
     });
 
     return {
-      store,
       displayPercentage,
       shouldAnimate,
       isFadingOut,

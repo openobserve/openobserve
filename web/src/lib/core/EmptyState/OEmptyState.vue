@@ -324,7 +324,7 @@ const SIZE_MAP: Record<
   }
 > = {
   hero: {
-    root: "w-full h-full min-h-[320px] px-6 py-12",
+    root: "w-full h-full min-h-80 px-6 py-12",
     stack: "gap-7",
     copy: "gap-2.5",
     actions: "gap-3 pt-1",
@@ -335,7 +335,7 @@ const SIZE_MAP: Record<
     iconWrap: "",
   },
   block: {
-    root: "w-full min-h-[260px] px-6 py-10",
+    root: "w-full min-h-65 px-6 py-10",
     stack: "gap-5",
     copy: "gap-2",
     actions: "gap-2.5 pt-0.5",
@@ -346,7 +346,7 @@ const SIZE_MAP: Record<
     iconWrap: "",
   },
   inline: {
-    root: "w-full min-h-[160px] px-4 py-8",
+    root: "w-full min-h-40 px-4 py-8",
     stack: "gap-3",
     copy: "gap-1",
     actions: "gap-2 pt-1",

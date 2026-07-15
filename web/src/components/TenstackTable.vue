@@ -353,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <li
                           v-for="rawVal in getFilteredUniqueValues(header.column.id)"
                           :key="String(rawVal)"
-                          class="flex items-center gap-2 px-3 py-1.5 cursor-pointer rounded hover:bg-surface-panel transition-colors"
+                          class="flex items-center gap-2 px-3 py-1.5 cursor-pointer rounded-sm hover:bg-surface-panel transition-colors"
                           @click.stop="toggleColFilterValue(header.column.id, rawVal)"
                         >
                           <OCheckbox
@@ -401,12 +401,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="(header.column.columnDef.meta as any).closable"
                     :data-test="`o2-table-th-remove-${header.column.columnDef.header}-btn`"
                     name="cancel"
-                    class="m-0 close-icon cursor-pointer"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'text-white'
-                        : 'text-gray-400'
-                    "
+                    class="m-0 close-icon cursor-pointer text-icon-color"
                     :title="t('common.close')"
                     size="sm"
                     @click="closeColumn(header.column.columnDef)"
@@ -442,7 +437,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="font-bold"
               style="opacity: 0.7"
             >
-              <div class="text-sm font-medium text-weight-bold bg-amber-500">
+              <div class="text-sm font-medium font-bold bg-warning">
                 <OIcon size="sm" name="warning" class="mr-1" />
                 {{ errMsg }}
               </div>
@@ -455,12 +450,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="opacity: 0.6"
             >
               <div
-                class="text-sm font-medium text-weight-bold pl-2"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'bg-yellow-600'
-                    : 'bg-amber-300'
-                "
+                class="text-sm font-medium font-bold pl-2 bg-warning"
               >
                 <OButton
                   variant="ghost"
@@ -486,12 +476,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <td
               :colspan="columnOrder.length"
               style="opacity: 0.7"
-              class="px-2"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'bg-yellow-600'
-                  : 'bg-amber-300'
-              "
+              class="px-2 bg-warning"
             >
               <pre>{{ functionErrorMsg }}</pre>
             </td>
@@ -667,7 +652,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         variant="ghost"
                         size="icon-xs-sq"
-                        class="h-[16px]! w-[16px]! min-h-0!"
+                        class="h-4! w-4! min-h-0!"
                         @click.stop="
                           copyCellContent(
                             getCellDisplayValue(cell),
@@ -721,7 +706,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         variant="ghost"
                         size="icon-xs-sq"
-                        class="h-[16px]! w-[16px]! min-h-0!"
+                        class="h-4! w-4! min-h-0!"
                         @click.stop="
                           copyCellContent(
                             getCellDisplayValue(cell),
@@ -976,7 +961,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OButton
                             variant="ghost"
                             size="icon-xs-sq"
-                            class="h-[16px]! w-[16px]! min-h-0!"
+                            class="h-4! w-4! min-h-0!"
                             @click.stop="
                               copyCellContent(
                                 getCellDisplayValue(cell),
@@ -1069,7 +1054,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OButton
                             variant="ghost"
                             size="icon-xs-sq"
-                            class="h-[16px]! w-[16px]! min-h-0!"
+                            class="h-4! w-4! min-h-0!"
                             @click.stop="
                               copyCellContent(
                                 getCellDisplayValue(cell),
@@ -1117,7 +1102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <td
               v-for="col in (columns as any[]) || []"
               :key="'ft_' + col.name"
-              class="px-2 bg-[#f5f5f5] sticky bottom-0"
+              class="px-2 bg-surface-subtle sticky bottom-0"
               :class="[
                 col.align === 'right'
                   ? 'text-right'

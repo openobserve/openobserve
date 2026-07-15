@@ -163,7 +163,7 @@ const wrapperClasses = computed(() => [
         >
           <span
             :class="[
-              'rounded border border-datepicker-border shadow-sm',
+              'rounded-sm border border-datepicker-border shadow-sm',
               swatchSize[size ?? 'md'],
             ]"
             :style="{ background: swatchHex }"
@@ -185,7 +185,7 @@ const wrapperClasses = computed(() => [
             color-space="hsb"
             x-channel="saturation"
             y-channel="brightness"
-            class="w-full rounded overflow-hidden relative"
+            class="w-full rounded-sm overflow-hidden relative"
             style="height: 140px"
             @update:model-value="handlePickerChange"
             v-slot="{ style: areaStyle }"
@@ -201,10 +201,10 @@ const wrapperClasses = computed(() => [
             :model-value="pickerColor"
             color-space="hsb"
             channel="hue"
-            class="relative flex items-center w-full h-4 rounded"
+            class="relative flex items-center w-full h-4 rounded-sm"
             @update:model-value="handlePickerChange"
           >
-            <ColorSliderTrack class="w-full h-3 rounded overflow-hidden" />
+            <ColorSliderTrack class="w-full h-3 rounded-sm overflow-hidden" />
             <ColorSliderThumb
               class="size-4 rounded-full border-2 border-colorpicker-thumb shadow outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring transition-[box-shadow] duration-150"
             />
@@ -217,7 +217,7 @@ const wrapperClasses = computed(() => [
             maxlength="7"
             placeholder="#000000"
             :disabled="disabled"
-            class="w-full rounded border px-2 py-1 text-xs font-mono outline-none text-datepicker-text placeholder:text-datepicker-placeholder bg-datepicker-bg border-datepicker-border focus:border-datepicker-focus-border"
+            class="w-full rounded-sm border px-2 py-1 text-xs font-mono outline-none text-datepicker-text placeholder:text-datepicker-placeholder bg-datepicker-bg border-datepicker-border focus:border-datepicker-focus-border"
             @input="handleText"
           />
         </PopoverContent>

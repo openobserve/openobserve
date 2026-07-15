@@ -1,9 +1,9 @@
 <template>
   <div
-    class="skeleton-box bg-skeleton-base relative overflow-hidden rounded"
+    class="skeleton-box bg-skeleton-base relative overflow-hidden rounded-sm"
     :class="[
       variantClass,
-      rounded && 'rounded-lg',
+      rounded-sm && 'rounded-lg',
       circle && 'rounded-full aspect-square'
     ]"
     :style="{
@@ -48,8 +48,8 @@ const store = useStore()
 
 const variantClass = computed(() => {
   switch (props.variant) {
-    case 'text':    return 'rounded-[3px]'
-    case 'title':   return 'rounded'
+    case 'text':    return 'rounded-sm'
+    case 'title':   return 'rounded-sm'
     case 'button':  return 'rounded-md'
     case 'avatar':  return 'rounded-full'
     case 'image':   return 'rounded-lg'
@@ -106,7 +106,7 @@ const computedHeight = computed(() => {
     90deg,
     transparent       0%,
     transparent      30%,
-    var(--color-skeleton-shimmer, rgba(255, 255, 255, 0.8)) 50%,
+    var(--color-skeleton-shimmer) 50%,
     transparent      70%,
     transparent     100%
   );

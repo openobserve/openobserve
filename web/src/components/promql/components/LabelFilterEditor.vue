@@ -20,7 +20,7 @@
                 <OButton
                   variant="primary"
                   size="chip"
-                  class="!text-[12px]"
+                  class="!text-xs"
                   :data-test="`promql-label-filter-${index}`"
                 >
                   {{ computedLabel(label) }}

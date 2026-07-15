@@ -410,7 +410,7 @@ function onChildMouseenter(event: MouseEvent) {
         @keydown="onFlyoutKeydown"
       >
         <div
-          class="px-3 pt-1.5 pb-1 text-[11px] font-semibold"
+          class="px-3 pt-1.5 pb-1 text-2xs font-semibold"
           :class="flyoutTextClass"
         >
           {{ title }}

@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            chart is appended below. -->
       <div>
         <div v-if="Object.keys(usageData).length === 0" >
-          <div class="text-xl font-semibold text-weight-medium text-center">
+          <div class="text-xl font-semibold font-medium text-center">
             {{ t("billing.messageDataNotFound") }}
           </div>
         </div>
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
       </div>
-      <div v-if="dataLoading" class="text-xl font-semibold text-weight-medium text-center">
+      <div v-if="dataLoading" class="text-xl font-semibold font-medium text-center">
         <OSpinner size="md" class="mx-auto block text-center mt-3" />
       </div>
 
@@ -214,6 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <script lang="ts">
   import { defineComponent, ref, onMounted, defineAsyncComponent, watch, computed, onUnmounted, onActivated   , onBeforeMount, nextTick, inject } from "vue";
   import { useStore } from "vuex";
+  import useTheme from "@/composables/useTheme";
   import { useI18n } from "vue-i18n";
   import BillingService from "@/services/billings";
   import organizations from "@/services/organizations";
@@ -249,6 +250,7 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
     setup() {
       const { t } = useI18n();
       const store = useStore();
+      const { isDark } = useTheme();
       const router = useRouter();
       const dataLoading = ref(false);
       const lastUsageUpdated = ref(0);
@@ -488,7 +490,7 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
       const remotePipelineIcon = getImageURL("images/usage/remote_pipeline.svg");
       const dataRetentionIcon = getImageURL("images/usage/data_retention.svg");
       const aiIcon = computed(() =>
-        store.state.theme === "dark"
+        isDark.value
           ? getImageURL("images/common/ai_icon_dark.svg")
           : getImageURL("images/common/ai_icon_gradient.svg")
       );

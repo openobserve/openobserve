@@ -34,14 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSeparator class="my-2" />
 
     <div class="px-3 py-2">
-      <h4 class="text-[0.8125rem] font-semibold leading-[0.983rem] text-text-heading m-0">{{ t("billing.features") }}</h4>
-      <p class="mb-3 mt-1 text-[0.8125rem] font-normal leading-4.5 text-text-secondary m-0">
+      <h4 class="text-compact font-semibold leading-[0.983rem] text-text-heading m-0">{{ t("billing.features") }}</h4>
+      <p class="mb-3 mt-1 text-compact font-normal leading-4.5 text-text-secondary m-0">
         {{ t("billing.included") }}
       </p>
 
       <div
         v-if="pricingError && !features?.length"
-        class="flex items-center mb-2 text-red-500"
+        class="flex items-center mb-2 text-status-error-text"
       >
         <OIcon name="warning" size="sm" class="mr-2" />
         <span class="text-[0.938rem] leading-5.5 text-text-body"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="feature.is_parent"
             name="check-circle"
             size="md"
-            class="mr-2 text-green-500 check-icon"
+            class="mr-2 text-status-positive check-icon"
           />
           <div class="text-[0.938rem] leading-5.5 text-text-body" :class="{ 'ml-6': !feature.is_parent }">{{ feature.name }}</div>
         </div>
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OSeparator />
 
-    <p class="px-3 pt-2 text-[0.8125rem] font-normal leading-4.5 text-text-secondary m-0">
+    <p class="px-3 pt-2 text-compact font-normal leading-4.5 text-text-secondary m-0">
       {{ t("billing.unlimitedNote") }}<br />
       {{ t("billing.paymentNote") }}
     </p>
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="check-circle" size="xs" />
           </template>
         </OTag>
-        <div class="text-xs text-gray-400 mt-2">
+        <div class="text-xs text-text-caption mt-2">
           Billing is handled through your AWS account
         </div>
       </div>
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="check-circle" size="xs" />
           </template>
         </OTag>
-        <div class="text-xs text-gray-400 mt-2">
+        <div class="text-xs text-text-caption mt-2">
           Billing is handled through your Azure account
         </div>
       </div>
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="description" size="xs" />
           </template>
         </OTag>
-        <div class="text-xs text-gray-400 mt-2">
+        <div class="text-xs text-text-caption mt-2">
           Billing is handled through your contract — contact your account
           manager for changes
         </div>

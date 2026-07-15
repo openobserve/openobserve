@@ -41,12 +41,12 @@
         <!-- ─────────── OVERVIEW TAB ─────────── -->
         <template v-if="activeTab === 'overview'">
           <section v-if="row.description" class="flex flex-col gap-2">
-            <h4 class="scd-section__title m-0 font-semibold text-[13px] leading-normal text-text-primary pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5">{{ t("onlineEvals.scoreConfig.detail.descriptionSection") }}</h4>
-            <p class="m-0 text-[13px] leading-[1.55] text-text-primary">{{ row.description }}</p>
+            <h4 class="scd-section__title m-0 font-semibold text-compact leading-normal text-text-primary pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5">{{ t("onlineEvals.scoreConfig.detail.descriptionSection") }}</h4>
+            <p class="m-0 text-compact leading-[1.55] text-text-primary">{{ row.description }}</p>
           </section>
 
           <section class="flex flex-col gap-2">
-            <h4 class="scd-section__title m-0 font-semibold text-[13px] leading-normal text-text-primary pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5">{{ t("onlineEvals.scoreConfig.detail.configurationSection") }}</h4>
+            <h4 class="scd-section__title m-0 font-semibold text-compact leading-normal text-text-primary pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5">{{ t("onlineEvals.scoreConfig.detail.configurationSection") }}</h4>
             <dl class="scd-kv grid gap-x-3.5 gap-y-1.5 m-0" style="grid-template-columns: 120px 1fr;">
               <dt>{{ t("onlineEvals.scoreConfig.detail.dataTypeLabel") }}</dt>
               <dd>
@@ -73,7 +73,7 @@
           </section>
 
           <section class="flex flex-col gap-2">
-            <h4 class="scd-section__title m-0 font-semibold text-[13px] leading-normal text-text-primary pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5">
+            <h4 class="scd-section__title m-0 font-semibold text-compact leading-normal text-text-primary pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5">
               {{ t("onlineEvals.scoreConfig.detail.thresholdSection") }}
               <OTag v-if="!healthyLabel" type="thresholdFlag" value="notdeclared" />
             </h4>
@@ -83,15 +83,15 @@
             >
               <span class="text-lg font-bold text-status-success-text">{{ thresholdSign }}</span>
               <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] font-bold text-sm text-text-primary">{{ healthyLabel }}</span>
-              <span class="ml-auto text-[11px] text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.thresholdHint") }}</span>
+              <span class="ml-auto text-2xs text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.thresholdHint") }}</span>
             </div>
-            <p v-else class="m-0 text-[13px] leading-[1.55] text-text-secondary">
+            <p v-else class="m-0 text-compact leading-[1.55] text-text-secondary">
               {{ t("onlineEvals.scoreConfig.detail.noThresholdHint") }}
             </p>
           </section>
 
           <section class="flex flex-col gap-2">
-            <h4 class="scd-section__title m-0 font-semibold text-[13px] leading-normal text-text-primary pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5">{{ t("onlineEvals.scoreConfig.detail.metadataSection") }}</h4>
+            <h4 class="scd-section__title m-0 font-semibold text-compact leading-normal text-text-primary pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5">{{ t("onlineEvals.scoreConfig.detail.metadataSection") }}</h4>
             <dl class="scd-kv grid gap-x-3.5 gap-y-1.5 m-0" style="grid-template-columns: 120px 1fr;">
               <dt>{{ t("onlineEvals.scoreConfig.detail.statusLabel") }}</dt>
               <dd>
@@ -119,10 +119,10 @@
               class="p-[12px_14px] bg-card-bg border border-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_5%,var(--color-card-bg))]! rounded-md"
             >
               <div class="flex items-center gap-2">
-                <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums] font-bold text-[13px] text-text-primary">v{{ row.version }}</span>
+                <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums] font-bold text-compact text-text-primary">v{{ row.version }}</span>
                 <OTag type="activeVersionFlag" value="active" />
               </div>
-              <div v-if="updatedAt" class="mt-1.5 text-[11.5px] text-text-secondary">
+              <div v-if="updatedAt" class="mt-1.5 text-2xs text-text-secondary">
                 {{ t("onlineEvals.scoreConfig.detail.lastUpdated") }}
                 <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">{{ formatTimestamp(updatedAt) }}</span>
               </div>
@@ -135,7 +135,7 @@
           <p class="m-0 text-xs leading-normal text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.usedByIntro") }}</p>
           <div
             v-if="usedByScorers.length === 0"
-            class="inline-flex items-center gap-1.5 p-[8px_10px] bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,transparent)] rounded-[5px] text-xs text-text-secondary"
+            class="inline-flex items-center gap-1.5 p-[8px_10px] bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,transparent)] rounded-md text-xs text-text-secondary"
           >
             <OIcon name="info" size="xs" />
             <span>{{ t("onlineEvals.scoreConfig.detail.usedByEmpty") }}</span>
@@ -150,9 +150,9 @@
               >
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
-                    <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums] font-bold text-[13px] text-text-primary">{{ scorer.name }}</span>
+                    <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums] font-bold text-compact text-text-primary">{{ scorer.name }}</span>
                     <OTag type="scorerType" :value="scorerTypeOf(scorer)" />
-                    <span class="text-[11px] text-text-secondary [font-variant-numeric:tabular-nums]">v{{ scorer.version }}</span>
+                    <span class="text-2xs text-text-secondary [font-variant-numeric:tabular-nums]">v{{ scorer.version }}</span>
                   </div>
                 </div>
                 <OIcon name="chevron-right" size="sm" class="scd-used-card__chevron shrink-0 text-text-secondary opacity-50" />

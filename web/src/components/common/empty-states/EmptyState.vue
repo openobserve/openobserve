@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="h-px flex-1 bg-border-default" />
           <span
-            class="text-[0.6875rem] font-semibold text-text-secondary whitespace-nowrap"
+            class="text-2xs font-semibold text-text-secondary whitespace-nowrap"
             >{{ actionsLabel }}</span
           >
           <span class="h-px flex-1 bg-border-default" />

@@ -2,7 +2,7 @@
   <div class="mb-4">
     <div class="flex flex-col gap-0.5 mb-2">
       <span class="text-xs font-semibold text-text-primary">{{ t("onlineEvals.job.filter.title") }}</span>
-      <span class="text-[11.5px] text-text-secondary">{{ t("onlineEvals.job.filter.hint") }}</span>
+      <span class="text-2xs text-text-secondary">{{ t("onlineEvals.job.filter.hint") }}</span>
     </div>
     <div class="job-filter__group min-w-0">
       <FilterGroup
@@ -11,7 +11,7 @@
         :stream-fields="streamFields"
         :stream-fields-map="streamFieldsMap"
         :show-sql-preview="true"
-        condition-input-width="w-[150px]"
+        condition-input-width="w-37.5"
         :allow-custom-columns="true"
         module="alerts"
         @add-condition="handleUpdate"

@@ -116,7 +116,7 @@
               :options="agentOptions"
               labelKey="label"
               valueKey="value"
-              class="w-full rounded"
+              class="w-full rounded-sm"
               data-test="eval-job-detail-runs-agent-filter"
             />
           </div>
@@ -127,7 +127,7 @@
           <!-- Target -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.targetSection") }}
             </h4>
@@ -170,7 +170,7 @@
           <!-- Scorers -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.scorersSection") }}
               <OTag type="fieldTag" value="soft">{{ resolvedScorers.length }}</OTag>
@@ -245,7 +245,7 @@
                     </div>
                   </div>
                   <span
-                    class="jd-scorers__cta text-[0.6875rem] font-semibold"
+                    class="jd-scorers__cta text-2xs font-semibold"
                   >
                     <span class="jd-scorers__cta-label">
                       {{ t("onlineEvals.job.detail.viewScorerHint") }}
@@ -264,7 +264,7 @@
           <!-- Sampling -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.samplingSection") }}
             </h4>
@@ -284,7 +284,7 @@
           <!-- Metadata -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.metadataSection") }}
             </h4>

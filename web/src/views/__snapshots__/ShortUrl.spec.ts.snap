@@ -3,6 +3,6 @@
 exports[`ShortUrl > should match snapshot 1`] = `
 "<div data-test="loading-container" class="h-[100vh] flex flex-col items-center justify-center">
   <!-- Ring variant --><span class="inline-flex items-center justify-center shrink-0 size-12" role="status" aria-label="Loading" aria-live="polite" data-test="spinner"><svg class="animate-spin size-full text-spinner" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><!-- Track --><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-20"></circle><!-- Spinning arc --><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" class="text-spinner"></path></svg></span>
-  <div data-test="message" class="text-base text-[#666]">Redirecting...</div>
+  <div data-test="message" class="text-base text-text-secondary">Redirecting...</div>
 </div>"
 `;

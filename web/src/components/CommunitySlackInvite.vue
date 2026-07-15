@@ -242,7 +242,7 @@ const joinSlack = () => {
             v-for="(bg, i) in avatarBgClasses"
             :key="i"
             :class="[
-              'flex h-7 w-7 items-center justify-center rounded-full text-white ring-2 ring-surface-panel',
+              'flex h-7 w-7 items-center justify-center rounded-full text-text-inverse ring-2 ring-surface-panel',
               bg,
               i > 0 ? '-ml-2' : '',
             ]"

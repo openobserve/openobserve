@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <h1 class="text-2xl font-semibold text-text-primary m-0 mb-3">Page not found</h1>
 
-      <p class="text-[0.9375rem] text-text-secondary m-0 mb-8 leading-normal">
+      <p class="text-sm text-text-secondary m-0 mb-8 leading-normal">
         The page you're looking for doesn't exist or has been moved.
       </p>
 
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t('common.goBack') }}</OButton>
       </div>
 
-      <p class="text-[0.8125rem] text-text-secondary opacity-70 m-0">
+      <p class="text-compact text-text-secondary opacity-70 m-0">
         {{ t('common.redirectingHome', { countdown }) }}
       </p>
     </div>

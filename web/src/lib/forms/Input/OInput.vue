@@ -271,7 +271,7 @@ const wrapperClasses = computed(() => [
       <!-- Inside label: floating mini-label at the top of the input border -->
       <span
         v-if="label && labelPosition === 'inside' && !isTextarea"
-        class="absolute top-1 start-3 end-7 text-[0.6875rem] font-medium leading-none text-text-secondary select-none pointer-events-none whitespace-nowrap overflow-hidden text-ellipsis"
+        class="absolute top-1 start-3 end-7 text-2xs font-medium leading-none text-text-secondary select-none pointer-events-none whitespace-nowrap overflow-hidden text-ellipsis"
       >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span>
 
       <!-- Icon-left slot (inside border, left — matches OButton #icon-left pattern) -->

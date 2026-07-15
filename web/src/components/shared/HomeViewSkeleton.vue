@@ -24,12 +24,7 @@
       <div class="tiles-grid grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))">
         <div v-for="n in 5" :key="n" data-test="home-view-skeleton-tile" class="rounded-[0.325rem] border-[0.0625rem] border-card-glass-border">
           <div
-            class="tile-content h-full p-4 rounded-lg gap-2 rounded text-center flex flex-col justify-between bg-(--tile-bg) border border-(--tile-border) text-(--text-primary)"
-            :class="
-              store.state.theme === 'dark'
-                ? '[--tile-bg:#2b2c2d] [--tile-border:#444444] [--text-primary:#cccfd1]'
-                : '[--tile-bg:#ffffff] [--tile-border:#e7eaee] [--text-primary:#2e3133]'
-            "
+            class="tile-content h-full p-4 rounded-lg gap-2 rounded-sm text-center flex flex-col justify-between bg-surface-base border border-border-default text-text-primary"
           >
             <!-- Top Section (60%) -->
             <div class="flex flex-col justify-between">
@@ -56,12 +51,7 @@
         <!-- Functions tile -->
         <div class="tile-wrapper flex-1 flex min-w-0 w-full">
           <div
-            class="feature-card bg-(--tile-bg) border-[0.0625rem] border-(--tile-border) rounded-lg p-4 w-full rounded text-center flex flex-col justify-between text-(--text-primary)"
-            :class="
-              store.state.theme === 'dark'
-                ? '[--tile-bg:#2b2c2d] [--tile-border:#444444] [--text-primary:#cccfd1]'
-                : '[--tile-bg:#ffffff] [--tile-border:#e7eaee] [--text-primary:#2e3133]'
-            "
+            class="feature-card bg-surface-base border-[0.0625rem] border-border-default rounded-lg p-4 w-full rounded-sm text-center flex flex-col justify-between text-text-primary"
           >
             <div class="flex flex-col justify-between">
               <div
@@ -81,12 +71,7 @@
         <!-- Dashboards tile -->
         <div class="tile-wrapper flex-1 flex min-w-0 w-full">
           <div
-            class="feature-card bg-(--tile-bg) border-[0.0625rem] border-(--tile-border) rounded-lg p-4 w-full rounded text-center flex flex-col justify-between text-(--text-primary)"
-            :class="
-              store.state.theme === 'dark'
-                ? '[--tile-bg:#2b2c2d] [--tile-border:#444444] [--text-primary:#cccfd1]'
-                : '[--tile-bg:#ffffff] [--tile-border:#e7eaee] [--text-primary:#2e3133]'
-            "
+            class="feature-card bg-surface-base border-[0.0625rem] border-border-default rounded-lg p-4 w-full rounded-sm text-center flex flex-col justify-between text-text-primary"
           >
             <div class="flex flex-col justify-between">
               <div
@@ -106,12 +91,7 @@
 
       <!-- Alerts Chart -->
       <div
-        class="feature-card first-chart-container bg-(--tile-bg) border-[0.0625rem] border-(--tile-border) rounded-lg rounded p-4"
-        :class="
-          store.state.theme === 'dark'
-            ? '[--tile-bg:#2b2c2d] [--tile-border:#444444]'
-            : '[--tile-bg:#ffffff] [--tile-border:#e7eaee]'
-        "
+        class="feature-card first-chart-container bg-surface-base border-[0.0625rem] border-border-default rounded-lg rounded-sm p-4"
       >
         <div class="details-container flex flex-col gap-3 mb-4">
           <!-- Header -->
@@ -147,7 +127,7 @@
         </div>
         <!-- Chart area -->
         <div
-          class="custom-first-chart my-auto xl:min-h-[200px] h-[calc(100vh-500px)] md:h-[calc(100vh-500px)] lg:h-[calc(100vh-550px)] xl:h-[calc(100vh-645px)] w-full"
+          class="custom-first-chart my-auto xl:min-h-50 h-[calc(100vh-500px)] md:h-[calc(100vh-500px)] lg:h-[calc(100vh-550px)] xl:h-[calc(100vh-645px)] w-full"
         >
           <div
             class="skeleton-box bg-skeleton-base relative overflow-hidden rounded-lg"
@@ -158,12 +138,7 @@
 
       <!-- Pipelines Chart -->
       <div
-        class="feature-card second-chart-container bg-(--tile-bg) border-[0.0625rem] border-(--tile-border) rounded-lg rounded p-4"
-        :class="
-          store.state.theme === 'dark'
-            ? '[--tile-bg:#2b2c2d] [--tile-border:#444444]'
-            : '[--tile-bg:#ffffff] [--tile-border:#e7eaee]'
-        "
+        class="feature-card second-chart-container bg-surface-base border-[0.0625rem] border-border-default rounded-lg rounded-sm p-4"
       >
         <div class="details-container flex flex-col gap-3 mb-4">
           <!-- Header -->
@@ -199,7 +174,7 @@
         </div>
         <!-- Chart area -->
         <div
-          class="custom-second-chart my-auto xl:min-h-[200px] h-[calc(100vh-500px)] md:h-[calc(100vh-500px)] lg:h-[calc(100vh-550px)] xl:h-[calc(100vh-645px)]"
+          class="custom-second-chart my-auto xl:min-h-50 h-[calc(100vh-500px)] md:h-[calc(100vh-500px)] lg:h-[calc(100vh-550px)] xl:h-[calc(100vh-645px)]"
         >
           <div
             class="skeleton-box bg-skeleton-base relative overflow-hidden rounded-lg"
@@ -212,11 +187,8 @@
 </template>
 
 <script setup lang="ts">
-import { useStore } from "vuex";
 import SkeletonBox from "./SkeletonBox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-
-const store = useStore();
 </script>
 
 <style>
@@ -247,21 +219,6 @@ const store = useStore();
    component so they don't leak to other SkeletonBox usages. The explicit
    colours guard against this legacy view loading before the token root. */
 .home-view-skeleton .skeleton-box {
-  background-color: #f5f5f5;
-}
-
-.dark .home-view-skeleton .skeleton-box {
-  background-color: #262626;
-}
-
-.dark .home-view-skeleton .skeleton-box::after {
-  background: linear-gradient(
-    90deg,
-    transparent                   0%,
-    transparent                  30%,
-    rgba(255, 255, 255, 0.07)    50%,
-    transparent                  70%,
-    transparent                 100%
-  );
+  background-color: var(--color-skeleton-base);
 }
 </style>

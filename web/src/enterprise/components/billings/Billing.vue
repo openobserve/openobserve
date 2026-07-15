@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 labelKey="label"
                 valueKey="value"
                 @update:model-value="selectUsageDate"
-                class="p-0 mx-0 h-[40px] mt-1"
+                class="p-0 mx-0 h-10 mt-1"
               >
                 <template v-slot:prepend>
                   <OIcon name="schedule" size="xs" class="mr-2 mt-1" @click.stop.prevent />
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @hide="onRangeChange"
             />
             <div class="flex items-center">
-              <div class="app-tabs-container h-[36px]">
+              <div class="app-tabs-container h-9">
                 <AppTabs class="tabs-selection-container" :tabs="tabs" :activeTab="usageDataType" @update:activeTab="(value: any) => updateActiveTab(value)" />
               </div>
             </div>
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex-1 min-h-0 pr-[0.625rem] pb-[0.625rem] flex gap-[0.625rem]">
             <div
               v-if="isUsageRoute && billingMembers.length > 0"
-              class="w-[260px] shrink-0 h-full"
+              class="w-65 shrink-0 h-full"
               data-test="usage-member-list"
             >
               <UsageMemberList

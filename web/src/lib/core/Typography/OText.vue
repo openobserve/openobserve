@@ -55,7 +55,7 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
 
   // Section group label (gray eyebrow). Recedes via color + size, not weight.
   "section": [
-    "text-[11.5px] font-medium",
+    "text-2xs font-medium",
     "text-typography-section",
     "leading-none",
   ].join(" "),

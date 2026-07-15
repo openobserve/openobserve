@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="state === 'no_token'" class="text-center">
         <OIcon name="warning" style="width: 80px; height: 80px;" />
         <h5 class="mt-3">No Marketplace Token Found</h5>
-        <p class="text-gray-400">
+        <p class="text-text-secondary">
           Please start the registration process from Azure Marketplace.
         </p>
         <OButton
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="state === 'select_org'" class="text-center">
         <OIcon name="cloud" style="width: 60px; height: 60px;" />
         <h4 class="mt-3">Complete Azure Marketplace Setup</h4>
-        <p class="text-gray-400 mb-4">
+        <p class="text-text-secondary mb-4">
           Link your Azure Marketplace subscription to an organization
         </p>
 
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OCard class="rounded-lg transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] mb-4">
             <OCardSection role="body">
               <div class="text-xl font-semibold">Create New Organization</div>
-              <p class="text-gray-400">
+              <p class="text-text-secondary">
                 Create a new organization with Azure Marketplace billing
               </p>
               <OForm
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OCardSection role="body">
               <div class="text-xl font-semibold">Link to Existing Organization</div>
-              <p class="text-gray-400">
+              <p class="text-text-secondary">
                 Link Azure billing to an existing organization
               </p>
               <OForm
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="state === 'processing'" class="text-center">
         <OSpinner variant="dots" size="xl" />
         <h5 class="mt-3">Setting up your subscription...</h5>
-        <p class="text-gray-400">Please wait while we configure your account.</p>
+        <p class="text-text-secondary">Please wait while we configure your account.</p>
       </div>
 
 
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="state === 'success'" class="text-center">
         <OIcon name="check-circle" style="width: 80px; height: 80px;" />
         <h4 class="mt-3">Subscription Activated!</h4>
-        <p class="text-gray-400">
+        <p class="text-text-secondary">
           Your Azure Marketplace subscription is now active.
         </p>
         <OButton
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="state === 'payment_failed'" class="text-center">
         <OIcon name="error" style="width: 80px; height: 80px;" />
         <h5 class="mt-3">Payment Failed</h5>
-        <p class="text-gray-400">
+        <p class="text-text-secondary">
           There was an issue with activating Azure subscription. Please check
           your Azure account or contact support.
         </p>

@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Table footer: pagination + bulk actions -->
                 <template #bottom="scope">
-                  <div class="flex items-center justify-between w-full h-[48px]">
+                  <div class="flex items-center justify-between w-full h-12">
                     <!-- Left: count + action buttons grouped together -->
                     <div class="flex items-center gap-2">
                       <div class="o2-table-footer-title flex items-center whitespace-nowrap">

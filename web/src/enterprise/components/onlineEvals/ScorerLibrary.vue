@@ -21,7 +21,7 @@ the Free Software Foundation, either version 3 of the License, or
       data-test="scorer-library-error"
     >
       <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
-      <div class="text-red-500">{{ loadError }}</div>
+      <div class="text-status-error-text">{{ loadError }}</div>
       <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
         Retry
       </OButton>
@@ -86,7 +86,7 @@ the Free Software Foundation, either version 3 of the License, or
             <span class="font-medium text-text-secondary">({{ group.entries.length }})</span>
           </h4>
           <ul
-            class="flex flex-col rounded border border-border-default"
+            class="flex flex-col rounded-sm border border-border-default"
           >
             <li
               v-for="entry in group.entries"

@@ -93,7 +93,6 @@ function formatTime(ts: string): string {
 <template>
   <div
     class="flex flex-col h-full text-base w-[15em] shrink-0 border-r border-r-[0.0625em] border-card-glass-border bg-card-glass-bg overflow-hidden"
-    :class="store.state.theme === 'dark' ? 'hch-dark' : 'hch-light'"
   >
     <!-- Header -->
     <div class="flex items-center justify-between px-3 pt-[0.625em] pb-[0.375em] shrink-0">

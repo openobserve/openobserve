@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-if="badge && badge > 0"
-          class="menu-badge absolute -top-1 -right-2 min-w-4 h-4 px-1 bg-[linear-gradient(135deg,#ef4444_0%,#ec4899_100%)] border-2 border-[#0f172a] rounded-full text-[9px] font-bold text-white flex items-center justify-center leading-none shadow-[0_4px_8px_rgba(239,68,68,0.5)] animate-pulse z-1"
+          class="menu-badge absolute -top-1 -right-2 min-w-4 h-4 px-1 bg-[linear-gradient(135deg,#ef4444_0%,#ec4899_100%)] border-2 border-[#0f172a] rounded-full text-[9px] font-bold text-text-inverse flex items-center justify-center leading-none shadow-[0_4px_8px_rgba(239,68,68,0.5)] animate-pulse z-1"
           aria-live="polite"
           :aria-label="`${badge} notifications`"
         >
@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterLink } from "vue-router";
+import { useTheme } from "@/composables/useTheme";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
@@ -180,7 +181,7 @@ export default defineComponent({
     // with primary-coloured text/icon; DARK uses the tinted "selected" pill
     // (matching the dashboard-folder selection) with white text/icon — because
     // surface-base is black in dark mode, a white pill there would vanish.
-    const isDark = computed(() => store.state.theme === "dark");
+    const { isDark } = useTheme();
     const activePillClass = computed(() =>
       isDark.value
         ? "text-tabs-active-text bg-tabs-active-bg shadow-sm border-l-2 border-primary-400"

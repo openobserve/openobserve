@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="datetimeBtn"
         data-cy="date-time-button"
         variant="outline"
-        class="date-time-button h-[30px] min-h-[30px] rounded-[3px] py-0 px-[5px] min-w-auto justify-start!"
+        class="date-time-button h-7.5 min-h-7.5 rounded-sm py-0 px-[5px] min-w-auto justify-start!"
         icon-left="schedule"
       >
         <span class="date-time-label font-semibold flex-1 text-left">{{ displayValue }}</span>

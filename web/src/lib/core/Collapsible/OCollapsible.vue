@@ -100,7 +100,7 @@ watch(
         'hover:bg-collapsible-trigger-hover-bg active:bg-collapsible-trigger-active-bg',
         'focus-visible:ring-2 focus-visible:ring-collapsible-trigger-focus-ring focus-visible:ring-offset-1',
         variant === 'sidebar'
-          ? 'px-3 py-0 min-h-[36px] rounded-none'
+          ? 'px-3 py-0 min-h-9 rounded-none'
           : 'px-2 py-2 rounded-md',
         triggerClass,
       ]"
@@ -140,7 +140,7 @@ watch(
           <span
             :class="[
               'font-medium text-collapsible-label truncate',
-              variant === 'sidebar' ? 'text-[13px]' : 'text-sm',
+              variant === 'sidebar' ? 'text-compact' : 'text-sm',
             ]"
             >{{ label }}</span
           >

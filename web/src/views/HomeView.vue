@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <button
                 v-if="tab.id.startsWith('dash:')"
                 type="button"
-                class="home-tab-close q-ml-xs"
+                class="home-tab-close ml-1"
                 :data-test="`home-tab-close-${tab.id}`"
                 :aria-label="t('home.removeHomeDashboard')"
                 @mousedown.stop.prevent

@@ -72,10 +72,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :aria-label="`Apply ${themeDisplayName(theme.name)} theme`"
             @click="applyTheme(theme, mode)"
           >
-            <span class="w-8 h-8 rounded border border-card-glass-border shrink-0 relative" :style="swatchStyle(theme[mode])" />
+            <span class="w-8 h-8 rounded-sm border border-card-glass-border shrink-0 relative" :style="swatchStyle(theme[mode])" />
             <span class="ml-2 min-w-0 flex-1 text-left">
               <span class="block text-sm font-medium truncate">{{ themeDisplayName(theme.name) }}</span>
-              <span class="block text-xs text-gray-400 truncate">{{ theme[mode].themeColor }}</span>
+              <span class="block text-xs text-text-caption truncate">{{ theme[mode].themeColor }}</span>
             </span>
             <OTag
               v-if="isThemeApplied(theme, mode)"
@@ -101,14 +101,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span
               :data-test="`predefined-themes-custom-color-preview-${mode}`"
-              class="w-8 h-8 rounded border border-card-glass-border shrink-0 relative"
+              class="w-8 h-8 rounded-sm border border-card-glass-border shrink-0 relative"
               :style="{ backgroundColor: mode === 'light' ? customLightColor : customDarkColor }"
             >
               <OIcon name="colorize" size="sm" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
             </span>
             <span class="ml-2 min-w-0 flex-1 text-left">
               <span class="block text-sm font-medium truncate">Custom Color</span>
-              <span class="block text-xs text-gray-400 truncate">
+              <span class="block text-xs text-text-caption truncate">
                 {{ isCustomThemeApplied(mode)
                   ? (mode === 'light' ? customLightColor : customDarkColor)
                   : 'Pick any brand hex' }}
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OCardSection class="pt-0 pb-2 px-2">
       <OSeparator class="mb-2" />
       <div
-        class="text-xs text-gray-400 flex items-start gap-1 italic"
+        class="text-xs text-text-caption flex items-start gap-1 italic"
       >
         <OIcon name="info-outline" size="xs" class="mt-0.5" />
         <span

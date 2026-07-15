@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog v-model:open="showDialog" data-test="enterprise-upgrade-dialog" :show-close="false" :width="75" @update:open="(v) => !v && onDialogHide()">
     <div class="enterprise-dialog-v3 overflow-hidden relative -my-(--spacing-dialog-content-py) -mx-(--spacing-dialog-content-px)">
       <!-- Close Button -->
-      <div class="absolute top-4 right-4 z-[100]" :class="isDark ? 'text-[rgba(255,255,255,0.7)] hover:text-[rgba(255,255,255,0.95)]' : 'text-[rgba(0,0,0,0.6)] hover:text-[rgba(0,0,0,0.87)]'">
+      <div class="absolute top-4 right-4 z-[100] text-text-secondary hover:text-text-primary">
         <OButton
           variant="ghost"
           size="icon"
@@ -30,10 +30,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="dialog-split-layout flex max-h-[92vh]" :class="{ 'cloud-layout': dialogConfig.isCloudLayout }">
         <!-- Left Panel - Hero Section (hidden for Cloud) -->
-        <div v-if="!dialogConfig.isCloudLayout" class="hero-panel [flex:0_0_35%] bg-[linear-gradient(135deg,var(--q-primary)_0%,color-mix(in_srgb,var(--q-primary)_85%,black_15%)_100%)] p-[40px] flex flex-col relative text-white overflow-y-auto min-h-0">
+        <div v-if="!dialogConfig.isCloudLayout" class="hero-panel [flex:0_0_35%] bg-[linear-gradient(135deg,var(--q-primary)_0%,color-mix(in_srgb,var(--q-primary)_85%,black_15%)_100%)] p-10 flex flex-col relative text-white overflow-y-auto min-h-0">
 
-          <div class="flex-1 flex flex-col justify-center items-center max-w-[400px] w-full m-auto">
-            <div class="w-[80px] h-[80px] bg-[rgba(255,255,255,0.15)] rounded-[16px] flex items-center justify-center mb-6 backdrop-blur-[10px]">
+          <div class="flex-1 flex flex-col justify-center items-center max-w-100 w-full m-auto">
+            <div class="w-20 h-20 bg-[rgba(255,255,255,0.15)] rounded-[16px] flex items-center justify-center mb-6 backdrop-blur-[10px]">
               <OIcon name="workspace-premium" size="xl" />
             </div>
 
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Loaded State: Show actual data -->
               <template v-else>
-                <div data-test="enterprise-upgrade-offer-badge" class="inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] py-[10px] px-5 rounded-[24px] font-bold text-[15px] backdrop-blur-[10px] text-white shadow-[0_4px_16px_rgba(34,197,94,0.4)]" :class="{ 'bg-[rgba(255,255,255,0.2)]! shadow-[0_4px_12px_rgba(0,0,0,0.15)]!': dialogConfig.isLicensed }">
+                <div data-test="enterprise-upgrade-offer-badge" class="inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] py-2.5 px-5 rounded-[24px] font-bold text-sm backdrop-blur-[10px] text-white shadow-[0_4px_16px_rgba(34,197,94,0.4)]" :class="{ 'bg-[rgba(255,255,255,0.2)]! shadow-[0_4px_12px_rgba(0,0,0,0.15)]!': dialogConfig.isLicensed }">
                   <OIcon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="md" class="mr-1" />
                   <span>{{ dialogConfig.badgeText }}</span>
                 </div>
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Usage Chart (only for Enterprise with license) -->
-            <div v-if="dialogConfig.isLicensed" class="w-full mb-6 bg-[rgba(255,255,255,0.1)] rounded-[12px] p-4 backdrop-blur-[10px] border border-[rgba(255,255,255,0.2)]">
+            <div v-if="dialogConfig.isLicensed" class="w-full mb-6 bg-[rgba(255,255,255,0.1)] rounded-xl p-4 backdrop-blur-[10px] border border-[rgba(255,255,255,0.2)]">
               <!-- Loading skeleton -->
               <template v-if="isLoadingLicense">
                 <OSkeleton
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Loaded chart -->
               <template v-else-if="chartData">
                 <div class="relative w-full">
-                  <div class="usage-chart-container w-full overflow-visible p-0 mx-auto min-h-[150px] max-h-[150px]" style="height: 150px; width: 100%;">
+                  <div class="usage-chart-container w-full overflow-visible p-0 mx-auto min-h-37.5 max-h-37.5" style="height: 150px; width: 100%;">
                     <ChartRenderer
                       :key="dashboardRenderKey"
                       :data="chartData"
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 @click="handlePrimaryButtonClick"
                 data-test="enterprise-upgrade-download-btn"
-                class="bg-white! text-[var(--q-primary)]! font-bold! py-[10px] px-8 text-[15px] rounded-lg! shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] [letter-spacing:0.3px] hover:[transform:translateY(-3px)_scale(1.02)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.25)] active:[transform:translateY(-1px)_scale(0.98)]"
+                class="bg-white! text-[var(--q-primary)]! font-bold! py-2.5 px-8 text-sm rounded-lg! shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] [letter-spacing:0.3px] hover:[transform:translateY(-3px)_scale(1.02)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.25)] active:[transform:translateY(-1px)_scale(0.98)]"
               >
                 {{ dialogConfig.primaryButtonText }}
                 <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="on-dark-ghost"
                 size="lg"
                 @click="contactSales"
-                class="font-semibold! py-[10px] px-6 text-[15px] rounded-lg! border-2 border-[rgba(255,255,255,0.3)] transition-all duration-300 bg-transparent [letter-spacing:0.2px] hover:bg-[rgba(255,255,255,0.15)] hover:border-[rgba(255,255,255,0.5)] hover:[transform:translateX(4px)] active:[transform:scale(0.96)]"
+                class="font-semibold! py-2.5 px-6 text-sm rounded-lg! border-2 border-[rgba(255,255,255,0.3)] transition-all duration-300 bg-transparent [letter-spacing:0.2px] hover:bg-[rgba(255,255,255,0.15)] hover:border-[rgba(255,255,255,0.5)] hover:[transform:translateX(4px)] active:[transform:scale(0.96)]"
               >
                 {{ t('about.enterprise_offer.buttons.contact_sales') }}
               </OButton>
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 @click="openDocsLink"
                 data-test="enterprise-upgrade-learn-more-btn"
-                class="font-semibold! py-[10px] px-6 text-[15px] rounded-lg! border-2 border-[rgba(255,255,255,0.3)] transition-all duration-300 bg-transparent [letter-spacing:0.2px] hover:bg-[rgba(255,255,255,0.15)] hover:border-[rgba(255,255,255,0.5)] hover:[transform:translateX(4px)] active:[transform:scale(0.96)]"
+                class="font-semibold! py-2.5 px-6 text-sm rounded-lg! border-2 border-[rgba(255,255,255,0.3)] transition-all duration-300 bg-transparent [letter-spacing:0.2px] hover:bg-[rgba(255,255,255,0.15)] hover:border-[rgba(255,255,255,0.5)] hover:[transform:translateX(4px)] active:[transform:scale(0.96)]"
               >
                 {{ t('about.enterprise_offer.buttons.learn_more') }}
               </OButton>
@@ -131,10 +131,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Right Panel - Features List -->
-        <div class="flex-1 flex flex-col overflow-hidden" :class="[isDark ? 'bg-[#1e1e1e]' : 'bg-white', { 'max-w-full': dialogConfig.isCloudLayout }]">
-          <div class="pt-4 pb-3 px-8 sticky top-0 z-10 border-b text-center" :class="isDark ? 'bg-[#1e1e1e] border-b-[rgba(255,255,255,0.1)]' : 'bg-white border-b-[rgba(0,0,0,0.08)]'">
-            <div data-test="enterprise-upgrade-features-title" class="text-[18px] font-bold mb-1 [letter-spacing:-0.3px]" :class="isDark ? 'text-[rgba(255,255,255,0.95)]' : 'text-[rgba(0,0,0,0.9)]'">{{ dialogConfig.featuresTitle }}</div>
-            <div class="text-xs font-medium" :class="isDark ? 'text-[rgba(255,255,255,0.6)]' : 'text-[rgba(0,0,0,0.6)]'">{{ dialogConfig.featuresSubtitle }}</div>
+        <div class="flex-1 flex flex-col overflow-hidden bg-surface-base" :class="[{ 'max-w-full': dialogConfig.isCloudLayout }]">
+          <div class="pt-4 pb-3 px-8 sticky top-0 z-10 border-b text-center bg-surface-base border-border-default">
+            <div data-test="enterprise-upgrade-features-title" class="text-[18px] font-bold mb-1 [letter-spacing:-0.3px] text-text-heading">{{ dialogConfig.featuresTitle }}</div>
+            <div class="text-xs font-medium text-text-secondary">{{ dialogConfig.featuresSubtitle }}</div>
           </div>
 
           <!-- Cloud 3-column layout -->
@@ -144,28 +144,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="feature in coreFeatures"
               :key="feature.name"
               data-test="enterprise-upgrade-feature-item"
-              class="flex gap-[10px] p-[8px_12px] rounded-md border transition-all duration-200"
+              class="flex gap-2.5 p-[8px_12px] rounded-md border transition-all duration-200"
               :class="[
-                isDark ? 'border-[rgba(255,255,255,0.12)]' : 'border-[rgba(0,0,0,0.08)]',
+                'border-border-default',
                 feature.link
                   ? (isDark
-                    ? 'cursor-pointer hover:bg-[rgba(var(--q-primary-rgb),0.1)] hover:border-[rgba(var(--q-primary-rgb),0.4)] hover:[transform:translateX(2px)] active:[transform:translateX(0)]'
-                    : 'cursor-pointer hover:bg-[rgba(var(--q-primary-rgb),0.05)] hover:border-[rgba(var(--q-primary-rgb),0.3)] hover:[transform:translateX(2px)] active:[transform:translateX(0)]')
+                    ? 'cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:[transform:translateX(2px)] active:[transform:translateX(0)]'
+                    : 'cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:[transform:translateX(2px)] active:[transform:translateX(0)]')
                   : (isDark
                     ? 'hover:bg-[rgba(255,255,255,0.05)]'
                     : 'hover:bg-[rgba(0,0,0,0.03)] hover:border-[rgba(0,0,0,0.12)]')
               ]"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="shrink-0 w-[30px] h-[30px] rounded-lg flex items-center justify-center text-[var(--q-primary)]" :class="isDark ? 'bg-[rgba(var(--q-primary-rgb),0.15)]' : 'bg-[rgba(var(--q-primary-rgb),0.1)]'">
+              <div class="shrink-0 w-7.5 h-7.5 rounded-lg flex items-center justify-center text-[var(--q-primary)]" :class="isDark ? 'bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]' : 'bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]'">
                 <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="flex-1 min-w-0">
-                <div class="text-[13px] font-semibold mb-0.5 leading-[1.25] flex items-center gap-1.5" :class="isDark ? 'text-[rgba(255,255,255,0.95)]' : 'text-[rgba(0,0,0,0.87)]'">
+                <div class="text-compact font-semibold mb-0.5 leading-[1.25] flex items-center gap-1.5" :class="'text-text-primary'">
                   {{ feature.name }}
                   <OIcon v-if="feature.link" name="open-in-new" size="xs" class="opacity-60 ml-1 align-middle" />
                 </div>
-                <div class="text-[11px] leading-[1.25]" :class="isDark ? 'text-[rgba(255,255,255,0.55)]' : 'text-[rgba(0,0,0,0.55)]'">{{ feature.note }}</div>
+                <div class="text-2xs leading-[1.25]" :class="'text-text-secondary'">{{ feature.note }}</div>
               </div>
             </div>
 
@@ -175,29 +175,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-show="!feature.cloudHidden"
               :key="feature.name"
               data-test="enterprise-upgrade-feature-item"
-              class="flex gap-[10px] p-[8px_12px] rounded-md border transition-all duration-200"
+              class="flex gap-2.5 p-[8px_12px] rounded-md border transition-all duration-200"
               :class="[
-                isDark ? 'border-[rgba(255,255,255,0.12)]' : 'border-[rgba(0,0,0,0.08)]',
+                'border-border-default',
                 feature.link
                   ? (isDark
-                    ? 'cursor-pointer hover:bg-[rgba(var(--q-primary-rgb),0.1)] hover:border-[rgba(var(--q-primary-rgb),0.4)] hover:[transform:translateX(2px)] active:[transform:translateX(0)]'
-                    : 'cursor-pointer hover:bg-[rgba(var(--q-primary-rgb),0.05)] hover:border-[rgba(var(--q-primary-rgb),0.3)] hover:[transform:translateX(2px)] active:[transform:translateX(0)]')
+                    ? 'cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:[transform:translateX(2px)] active:[transform:translateX(0)]'
+                    : 'cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:[transform:translateX(2px)] active:[transform:translateX(0)]')
                   : (isDark
                     ? 'hover:bg-[rgba(255,255,255,0.05)]'
                     : 'hover:bg-[rgba(0,0,0,0.03)] hover:border-[rgba(0,0,0,0.12)]')
               ]"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="shrink-0 w-[30px] h-[30px] rounded-lg flex items-center justify-center text-[var(--q-primary)]" :class="isDark ? 'bg-[rgba(var(--q-primary-rgb),0.15)]' : 'bg-[rgba(var(--q-primary-rgb),0.1)]'">
+              <div class="shrink-0 w-7.5 h-7.5 rounded-lg flex items-center justify-center text-[var(--q-primary)]" :class="isDark ? 'bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]' : 'bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]'">
                 <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="flex-1 min-w-0">
-                <div class="text-[13px] font-semibold mb-0.5 leading-[1.25] flex items-center gap-1.5" :class="isDark ? 'text-[rgba(255,255,255,0.95)]' : 'text-[rgba(0,0,0,0.87)]'">
+                <div class="text-compact font-semibold mb-0.5 leading-[1.25] flex items-center gap-1.5" :class="'text-text-primary'">
                   {{ feature.name }}
                   <OIcon v-if="feature.link" name="open-in-new" size="xs" class="opacity-60 ml-1 align-middle" />
                   <OTag v-if="feature.beta" type="featureFlag" value="beta" data-test="enterprise-upgrade-feature-beta-badge" />
                 </div>
-                <div class="text-[11px] leading-[1.25]" :class="isDark ? 'text-[rgba(255,255,255,0.55)]' : 'text-[rgba(0,0,0,0.55)]'">{{ feature.note }}</div>
+                <div class="text-2xs leading-[1.25]" :class="'text-text-secondary'">{{ feature.note }}</div>
               </div>
             </div>
           </div>
@@ -209,24 +209,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-show="!feature.cloudOnly"
               :key="feature.name"
               data-test="enterprise-upgrade-feature-item"
-              class="flex gap-[10px] p-[8px_12px] rounded-md border transition-all duration-200"
+              class="flex gap-2.5 p-[8px_12px] rounded-md border transition-all duration-200"
               :class="[
-                isDark ? 'border-[rgba(255,255,255,0.12)]' : 'border-[rgba(0,0,0,0.08)]',
+                'border-border-default',
                 feature.link
                   ? (isDark
-                    ? 'cursor-pointer hover:bg-[rgba(var(--q-primary-rgb),0.1)] hover:border-[rgba(var(--q-primary-rgb),0.4)] hover:[transform:translateX(2px)] active:[transform:translateX(0)]'
-                    : 'cursor-pointer hover:bg-[rgba(var(--q-primary-rgb),0.05)] hover:border-[rgba(var(--q-primary-rgb),0.3)] hover:[transform:translateX(2px)] active:[transform:translateX(0)]')
+                    ? 'cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:[transform:translateX(2px)] active:[transform:translateX(0)]'
+                    : 'cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:[transform:translateX(2px)] active:[transform:translateX(0)]')
                   : (isDark
                     ? 'hover:bg-[rgba(255,255,255,0.05)]'
                     : 'hover:bg-[rgba(0,0,0,0.03)] hover:border-[rgba(0,0,0,0.12)]')
               ]"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="shrink-0 w-[30px] h-[30px] rounded-lg flex items-center justify-center text-[var(--q-primary)]" :class="isDark ? 'bg-[rgba(var(--q-primary-rgb),0.15)]' : 'bg-[rgba(var(--q-primary-rgb),0.1)]'">
+              <div class="shrink-0 w-7.5 h-7.5 rounded-lg flex items-center justify-center text-[var(--q-primary)]" :class="isDark ? 'bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]' : 'bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]'">
                 <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="flex-1 min-w-0">
-                <div data-test="enterprise-upgrade-feature-name" class="text-[13px] font-semibold mb-0.5 leading-[1.25] flex items-center gap-1.5" :class="isDark ? 'text-[rgba(255,255,255,0.95)]' : 'text-[rgba(0,0,0,0.87)]'">
+                <div data-test="enterprise-upgrade-feature-name" class="text-compact font-semibold mb-0.5 leading-[1.25] flex items-center gap-1.5" :class="'text-text-primary'">
                   {{ feature.name }}
                   <OIcon v-if="feature.link" name="open-in-new" size="xs" data-test="enterprise-upgrade-feature-external-link" class="opacity-60 ml-1 align-middle" />
                   <OTag v-if="feature.beta" type="featureFlag" value="beta" data-test="enterprise-upgrade-feature-beta-badge" />
@@ -235,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTooltip side="top" align="center" :sideOffset="8" :content="t('about.enterprise_offer.tooltip.high_availability_mode_only')" />
                   </span>
                 </div>
-                <div class="text-[11px] leading-[1.25]" :class="isDark ? 'text-[rgba(255,255,255,0.55)]' : 'text-[rgba(0,0,0,0.55)]'">{{ feature.note }}</div>
+                <div class="text-2xs leading-[1.25]" :class="'text-text-secondary'">{{ feature.note }}</div>
               </div>
             </div>
           </div>
@@ -248,6 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, PropType, watch, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
@@ -333,9 +334,9 @@ export default defineComponent({
     const chartData = ref<any>(null);
     const dashboardRenderKey = ref(0);
 
-    // dark: variants generate empty CSS in this project, so derive dark mode
-    // from the store and toggle classes via :class bindings instead.
-    const isDark = computed(() => store.state.theme === 'dark');
+    // Dark-mode flag from the sanctioned theme seam; used to toggle classes via
+    // :class bindings for the few genuinely theme-divergent (translucent) styles.
+    const { isDark } = useTheme();
 
     // Fetch license data when dialog opens for Enterprise with license
     const fetchLicenseData = async () => {

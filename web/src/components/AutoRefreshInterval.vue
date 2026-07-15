@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'mr-0.5',
               ]"
             />
-            <div class="text-center text-[0.8125rem] leading-4">{{ selectedLabel }}</div>
+            <div class="text-center text-compact leading-4">{{ selectedLabel }}</div>
             <OIcon name="arrow-drop-down" size="sm" class="ml-0.5" />
           </div>
         </OButton>

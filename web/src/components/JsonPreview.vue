@@ -39,7 +39,7 @@
             <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
           </OButton>
         </template>
-        <div class="logs-table-list min-w-[180px]">
+        <div class="logs-table-list min-w-45">
           <slot name="field-dropdown"
 :field="key"
 :value="value[key]" />

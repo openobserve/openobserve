@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="searchFieldOptions"
                 labelKey="label"
                 valueKey="value"
-                class="p-0 w-[140px]"
+                class="p-0 w-35"
                 data-test="running-queries-search-fields-select"
                 @update:model-value="filterQuery = ''"
               />
@@ -69,14 +69,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('queries.search')"
               data-test="running-queries-search-input"
             />
-            <div v-else class="o2-select-input o2-input w-[250px]">
+            <div v-else class="o2-select-input o2-input w-62.5">
               <OSelect
                 v-model="filterQuery"
                 placeholder="Select option"
                 :options="otherFieldOptions"
                 labelKey="label"
                 valueKey="value"
-                class="no-border search-input w-[250px]"
+                class="no-border search-input w-62.5"
                 data-test="running-queries-search-input"
               />
             </div>

@@ -21,9 +21,9 @@ describe("OSkeleton", () => {
       expect(wrapper.find("span").classes()).toContain("aspect-square");
     });
 
-    it("applies rounded and h-4 for type=text", () => {
+    it("applies rounded-sm and h-4 for type=text", () => {
       const wrapper = mount(OSkeleton, { props: { type: "text" } });
-      expect(wrapper.find("span").classes()).toContain("rounded");
+      expect(wrapper.find("span").classes()).toContain("rounded-sm");
       expect(wrapper.find("span").classes()).toContain("h-4");
     });
   });

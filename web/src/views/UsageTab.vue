@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Streams overview section -->
       <div
-        class="rounded p-4 bg-card-glass-bg border border-card-glass-border"
+        class="rounded-sm p-4 bg-card-glass-bg border border-card-glass-border"
         role="region"
         aria-label="Streams overview section"
       >
@@ -49,11 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-circle"
-            :class="
-              store.state.theme === 'dark'
-                ? 'view-button-dark'
-                : 'view-button-light'
-            "
+            class="view-button"
             aria-label="View all streams"
             :title="t('home.viewButton')"
             data-test="home-usage-tab-view-streams-btn"
@@ -92,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-status-success-bg border border-card-glass-border text-status-success-text"
+                  class="rounded-full w-40 px-2 flex items-center text-xs! bg-status-success-bg border border-card-glass-border text-status-success-text"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 2.89% from last
                   week
@@ -123,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-status-success-bg border border-card-glass-border text-status-success-text"
+                  class="rounded-full w-40 px-2 flex items-center text-xs! bg-status-success-bg border border-card-glass-border text-status-success-text"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 2.89% from last
                   week
@@ -156,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-status-error-bg border border-card-glass-border text-status-error-text"
+                  class="rounded-full w-40 px-2 flex items-center text-xs! bg-status-error-bg border border-card-glass-border text-status-error-text"
                 >
                   <OIcon name="arrow-downward" size="xs" /> 2.89% from last
                   week
@@ -189,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-status-success-bg border border-card-glass-border text-status-success-text"
+                  class="rounded-full w-40 px-2 flex items-center text-xs! bg-status-success-bg border border-card-glass-border text-status-success-text"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 2.89% from last
                   week
@@ -220,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-status-success-bg border border-card-glass-border text-status-success-text"
+                  class="rounded-full w-40 px-2 flex items-center text-xs! bg-status-success-bg border border-card-glass-border text-status-success-text"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 0.00% from last
                   week
@@ -244,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex flex-col gap-4 w-full">
           <div class="flex-1 flex min-w-0 w-full">
             <div
-              class="rounded p-4 w-full bg-card-glass-bg border border-card-glass-border text-center flex flex-col justify-between"
+              class="rounded-sm p-4 w-full bg-card-glass-bg border border-card-glass-border text-center flex flex-col justify-between"
               role="article"
               aria-label="Functions count statistics"
             >
@@ -266,13 +262,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     variant="ghost"
                     size="icon-circle"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'view-button-dark'
-                        : 'view-button-light'
-                    "
                     aria-label="View all functions"
-                    class="flex-shrink-0"
+                    class="view-button flex-shrink-0"
                     :title="t('home.viewButton')"
                     data-test="home-usage-tab-view-functions-btn"
                   >
@@ -305,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="flex-1 flex min-w-0 w-full">
             <div
-              class="rounded p-4 w-full bg-card-glass-bg border border-card-glass-border text-center flex flex-col justify-between"
+              class="rounded-sm p-4 w-full bg-card-glass-bg border border-card-glass-border text-center flex flex-col justify-between"
               role="article"
               aria-label="Dashboards count statistics"
             >
@@ -327,13 +318,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     variant="ghost"
                     size="icon-circle"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'view-button-dark'
-                        : 'view-button-light'
-                    "
                     aria-label="View all dashboards"
-                    class="flex-shrink-0"
+                    class="view-button flex-shrink-0"
                     :title="t('home.viewButton')"
                     data-test="home-usage-tab-view-dashboards-btn"
                   >
@@ -367,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Alerts chart -->
         <div
-          class="rounded p-4 bg-card-glass-bg border border-card-glass-border flex flex-col min-h-0"
+          class="rounded-sm p-4 bg-card-glass-bg border border-card-glass-border flex flex-col min-h-0"
           role="region"
           aria-label="Alerts overview section"
         >
@@ -382,11 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-circle"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'view-button-dark'
-                    : 'view-button-light'
-                "
+                class="view-button"
                 aria-label="View all alerts"
                 :title="t('home.viewButton')"
                 data-test="home-usage-tab-view-alerts-btn"
@@ -434,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="custom-first-chart flex-1 min-h-[200px] w-full"
+            class="custom-first-chart flex-1 min-h-50 w-full"
           >
             <CustomChartRenderer
               :key="alertsPanelDataKey"
@@ -446,7 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Pipelines chart -->
         <div
-          class="rounded p-4 bg-card-glass-bg border border-card-glass-border flex flex-col min-h-0"
+          class="rounded-sm p-4 bg-card-glass-bg border border-card-glass-border flex flex-col min-h-0"
           role="region"
           aria-label="Pipelines overview section"
         >
@@ -461,11 +443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-circle"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'view-button-dark'
-                    : 'view-button-light'
-                "
+                class="view-button"
                 aria-label="View all pipelines"
                 :title="t('home.viewButton')"
                 data-test="home-usage-tab-view-pipelines-btn"
@@ -515,7 +493,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="custom-second-chart flex-1 min-h-[200px] w-full"
+            class="custom-second-chart flex-1 min-h-50 w-full"
           >
             <CustomChartRenderer
               :key="pipelinesPanelDataKey"
@@ -554,6 +532,8 @@ import orgService from "@/services/organizations";
 import configService from "@/services/config";
 import config from "@/aws-exports";
 import { formatSizeFromMB, getImageURL } from "@/utils/zincutils";
+import { chartColor } from "@/utils/chartTheme";
+import useTheme from "@/composables/useTheme";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
@@ -568,6 +548,7 @@ import HomeNoDataState from "@/views/HomeNoDataState.vue";
 
 const { t } = useI18n();
 const store = useStore();
+const { isDark } = useTheme();
 const router = useRouter();
 
 const summary = ref<any>([]);
@@ -791,7 +772,7 @@ const alertsPanelData = computed(() => {
         textStyle: {
           fontSize: 16,
           fontWeight: "normal",
-          color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+          color: chartColor("--color-text-secondary"),
         },
       },
     };
@@ -806,7 +787,7 @@ const alertsPanelData = computed(() => {
       textStyle: {
         fontSize: 16,
         fontWeight: "normal",
-        color: store.state.theme === "dark" ? "#D9D9D9" : "#262626",
+        color: chartColor("--color-text-primary"),
       },
     },
     tooltip: {
@@ -817,7 +798,7 @@ const alertsPanelData = computed(() => {
       orient: "vertical",
       left: "65%",
       textStyle: {
-        color: store.state.theme === "dark" ? "#DCDCDC" : "#232323",
+        color: chartColor("--color-text-primary"),
       },
     },
     series: [
@@ -832,7 +813,7 @@ const alertsPanelData = computed(() => {
           formatter: "{d}%",
           show: true,
           fontSize: 14,
-          color: store.state.theme === "dark" ? "#ffffff" : "#000000",
+          color: chartColor("--color-text-primary"),
         },
         labelLine: {
           show: true,
@@ -878,7 +859,7 @@ const pipelinesPanelData = computed(() => {
         textStyle: {
           fontSize: 16,
           fontWeight: "normal",
-          color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+          color: chartColor("--color-text-secondary"),
         },
       },
     };
@@ -895,11 +876,11 @@ const pipelinesPanelData = computed(() => {
       nameTextStyle: {
         fontSize: 16,
         fontWeight: "normal",
-        color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+        color: chartColor("--color-text-secondary"),
       },
       axisLabel: {
         fontSize: 14,
-        color: store.state.theme === "dark" ? "#CCCFD1" : "#2E3133",
+        color: chartColor("--color-text-body"),
       },
     },
     yAxis: {
@@ -917,15 +898,15 @@ const pipelinesPanelData = computed(() => {
       nameTextStyle: {
         fontSize: 16,
         fontWeight: "normal",
-        color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+        color: chartColor("--color-text-secondary"),
       },
       axisLabel: {
         fontSize: 12,
-        color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+        color: chartColor("--color-text-secondary"),
       },
       splitLine: {
         lineStyle: {
-          color: store.state.theme === "dark" ? "#444" : "#e0e0e0",
+          color: chartColor("--color-border-subtle"),
         },
       },
       offset: -20,
@@ -940,7 +921,7 @@ const pipelinesPanelData = computed(() => {
           position: "top",
           fontSize: 14,
           fontWeight: "bold",
-          color: store.state.theme === "dark" ? "#CCCFD1" : "#2E3133",
+          color: chartColor("--color-text-body"),
         },
         itemStyle: {
           color: function (params: any) {
@@ -955,7 +936,7 @@ const pipelinesPanelData = computed(() => {
 
 const compressedSizeIcon = computed(() => {
   const icon =
-    store.state.theme === "dark"
+    isDark.value
       ? "images/home/compressed_size_dark.svg"
       : "images/home/compressed_size.svg";
   return getImageURL(icon);
@@ -963,7 +944,7 @@ const compressedSizeIcon = computed(() => {
 
 const ingestedSizeIcon = computed(() => {
   const icon =
-    store.state.theme === "dark"
+    isDark.value
       ? "images/home/ingested_size_dark.svg"
       : "images/home/ingested_size.svg";
   return getImageURL(icon);
@@ -971,7 +952,7 @@ const ingestedSizeIcon = computed(() => {
 
 const indexSizeIcon = computed(() => {
   const icon =
-    store.state.theme === "dark"
+    isDark.value
       ? "images/home/index_size_dark.svg"
       : "images/home/index_size.svg";
   return getImageURL(icon);
@@ -979,7 +960,7 @@ const indexSizeIcon = computed(() => {
 
 const recordsIcon = computed(() => {
   const icon =
-    store.state.theme === "dark"
+    isDark.value
       ? "images/home/records_dark.svg"
       : "images/home/records.svg";
   return getImageURL(icon);
@@ -987,7 +968,7 @@ const recordsIcon = computed(() => {
 
 const streamsIcon = computed(() => {
   const icon =
-    store.state.theme === "dark"
+    isDark.value
       ? "images/home/streams_dark.svg"
       : "images/home/streams.svg";
   return getImageURL(icon);
@@ -995,7 +976,7 @@ const streamsIcon = computed(() => {
 
 const functionsIcon = computed(() => {
   const icon =
-    store.state.theme === "dark"
+    isDark.value
       ? "images/home/function_tile_icon_dark.svg"
       : "images/home/function_tile_icon.svg";
   return getImageURL(icon);
@@ -1003,7 +984,7 @@ const functionsIcon = computed(() => {
 
 const dashboardsIcon = computed(() => {
   const icon =
-    store.state.theme === "dark"
+    isDark.value
       ? "images/home/dashboards_tile_icon.svg"
       : "images/home/dashboards_tile_icon.svg";
   return getImageURL(icon);
@@ -1120,17 +1101,10 @@ watch(orgId, (newVal, oldVal) => {
   margin-bottom: 0.75rem;
 }
 
-.view-button-light {
-  cursor: pointer;
-  padding: 0;
-}
-.view-button-dark {
+.view-button {
   cursor: pointer;
   padding: 0;
   margin: 0;
-}
-.view-button-light,
-.view-button-dark {
   position: relative;
   overflow: hidden;
   transition: all 0.3s ease;
@@ -1152,8 +1126,7 @@ watch(orgId, (newVal, oldVal) => {
   z-index: 1;
 }
 
-.view-button-light:hover .view-arrow-icon,
-.view-button-dark:hover .view-arrow-icon {
+.view-button:hover .view-arrow-icon {
   transform: translateX(1.25rem);
   opacity: 0;
 }
@@ -1171,8 +1144,7 @@ watch(orgId, (newVal, oldVal) => {
   z-index: 1;
 }
 
-.view-button-light:hover .view-arrow-icon-in,
-.view-button-dark:hover .view-arrow-icon-in {
+.view-button:hover .view-arrow-icon-in {
   transform: translate(-50%, -50%) translateX(0);
   opacity: 1;
 }
@@ -1202,15 +1174,14 @@ watch(orgId, (newVal, oldVal) => {
 
 /* ===== 4. Interactive States ===== */
 
-.view-button-light:focus-visible,
-.view-button-dark:focus-visible {
+.view-button:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
   border-radius: 0.25rem;
 }
 
-a:focus-visible,
-button:focus-visible {
+.usage-tab a:focus-visible,
+.usage-tab button:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }

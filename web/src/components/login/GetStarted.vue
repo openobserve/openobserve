@@ -34,7 +34,7 @@
     <!-- Form Section -->
 <!-- Form Section -->
 <div class="w-full flex justify-center">
-  <div class="w-full max-w-[500px] flex flex-col items-center gap-y-2 px-4">
+  <div class="w-full max-w-125 flex flex-col items-center gap-y-2 px-4">
     <OForm ref="formRef" :schema="getStartedSchema" :default-values="getStartedDefaults()" @submit="doSubmit" v-slot="{ isSubmitting }" class="w-full flex flex-col gap-y-2">
     <OFormInput
       name="hearAboutUs"
@@ -84,7 +84,7 @@
 
 
     <!-- Footer -->
-    <div class="absolute bottom-5 text-sm mb-[16px]"
+    <div class="absolute bottom-5 text-sm mb-4"
     :class="[
       store.state.theme == 'dark' ? 'text-[#ffffff]' : 'text-[#767676]'
     ]"

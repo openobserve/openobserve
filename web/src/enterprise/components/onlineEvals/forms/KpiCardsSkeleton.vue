@@ -11,8 +11,8 @@
     class="kpi-card-skeleton rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.5rem] bg-surface-base border border-border-default"
     data-test="kpi-cards-skeleton"
   >
-    <SkeletonBox width="55%" height="12px" rounded />
-    <SkeletonBox width="45%" height="22px" rounded />
+    <SkeletonBox width="55%" height="12px" rounded-sm />
+    <SkeletonBox width="45%" height="22px" rounded-sm />
   </div>
 </template>
 

@@ -121,7 +121,7 @@
               :options="agentOptions"
               labelKey="label"
               valueKey="value"
-              class="w-full rounded"
+              class="w-full rounded-sm"
               data-test="scorer-detail-runs-agent-filter"
             />
           </div>
@@ -166,7 +166,7 @@
 
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.scorer.detail.producesSection") }}
             </h4>
@@ -197,7 +197,7 @@
 
           <section v-if="row.template" class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{
                 scorerType === "llm_judge"
@@ -216,7 +216,7 @@
 
           <section v-if="outputSchemaPretty" class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.scorer.detail.outputSchemaSection") }}
             </h4>
@@ -225,7 +225,7 @@
 
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.scorer.detail.metadataSection") }}
             </h4>

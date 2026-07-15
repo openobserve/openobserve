@@ -1116,14 +1116,14 @@ const fieldWidthClass = computed(() => {
                     >
                       <span
                         :key="`${idx}-${String(labelText ?? '')}`"
-                        class="inline-flex items-center rounded px-2 py-0.5 text-xs leading-none bg-select-item-selected-bg text-select-item-selected-text max-w-40 truncate shrink-0"
+                        class="inline-flex items-center rounded-sm px-2 py-0.5 text-xs leading-none bg-select-item-selected-bg text-select-item-selected-text max-w-40 truncate shrink-0"
                       >
                         {{ labelText }}
                       </span>
                     </slot>
                     <span
                       v-if="overflowSelectedCount > 0"
-                      class="inline-flex items-center rounded px-2 py-0.5 text-xs bg-select-item-hover-bg text-select-text shrink-0"
+                      class="inline-flex items-center rounded-sm px-2 py-0.5 text-xs bg-select-item-hover-bg text-select-text shrink-0"
                       data-test="o-select-overflow-chip"
                     >
                       +{{ overflowSelectedCount }} more
@@ -1480,7 +1480,7 @@ const fieldWidthClass = computed(() => {
                               <span class="truncate font-medium" :title="optionTooltip ? filteredOptions[vRow.index].label : undefined">{{ filteredOptions[vRow.index].label }}</span>
                               <span
                                 v-if="filteredOptions[vRow.index].badge"
-                                class="shrink-0 rounded border border-solid"
+                                class="shrink-0 rounded-sm border border-solid"
                                 :class="[
                                   filteredOptions[vRow.index].badgeTitle ? 'cursor-help' : undefined,
                                   filteredOptions[vRow.index].badgeStyle
@@ -1551,7 +1551,7 @@ const fieldWidthClass = computed(() => {
                 class="flex items-center gap-2 px-3 py-2 select-none pointer-events-none shrink-0"
               >
                 <!-- Checkbox zone hint -->
-                <span class="flex items-center gap-1.5 text-[0.6875rem] text-select-placeholder shrink-0">
+                <span class="flex items-center gap-1.5 text-2xs text-select-placeholder shrink-0">
                   <span
                     class="inline-flex items-center justify-center size-3.5 rounded-sm border border-select-placeholder shrink-0"
                     aria-hidden="true"
@@ -1566,7 +1566,7 @@ const fieldWidthClass = computed(() => {
                 <span class="w-px h-3.5 bg-input-border shrink-0" aria-hidden="true" />
 
                 <!-- Name zone hint -->
-                <span class="flex items-center gap-1.5 text-[0.6875rem] text-select-placeholder shrink-0">
+                <span class="flex items-center gap-1.5 text-2xs text-select-placeholder shrink-0">
                   <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="size-3 shrink-0" aria-hidden="true">
                     <path d="M4 2h6M4 5h6M4 8h3" />
                   </svg>

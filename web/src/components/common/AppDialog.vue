@@ -20,12 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="modelValue"
         data-test="common-app-dialog-backdrop"
-        class="fixed inset-0 bg-black/50 flex justify-center items-center z-9999"
+        class="fixed inset-0 bg-dialog-overlay flex justify-center items-center z-9999"
         @click="handleBackdropClick"
       >
         <div
           data-test="common-app-dialog"
-          class="bg-white rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.15)] w-[90%] max-w-150 max-h-[90vh] flex flex-col overflow-hidden"
+          class="bg-dialog-bg rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.15)] w-[90%] max-w-150 max-h-[90vh] flex flex-col overflow-hidden"
           ref="dialogRef"
           @click.stop
           role="dialog"

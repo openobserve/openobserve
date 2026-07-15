@@ -243,12 +243,12 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
         <div
           class="flex items-center justify-between gap-2 px-3 pt-2 pb-1.5"
         >
-          <span class="text-[13px] font-semibold text-text-primary">
+          <span class="text-compact font-semibold text-text-primary">
             {{ t("organization.header") }}
           </span>
           <span
             data-test="organization-menu-count"
-            class="shrink-0 text-[11px] font-semibold leading-none px-2 py-1 rounded-full bg-select-item-hover-bg text-text-secondary"
+            class="shrink-0 text-2xs font-semibold leading-none px-2 py-1 rounded-full bg-select-item-hover-bg text-text-secondary"
           >
             {{
               searchQuery
@@ -305,13 +305,13 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
                    to whatever space is left. -->
               <div class="flex items-baseline gap-2 min-w-0 flex-1">
                 <span
-                  class="flex-none max-w-full min-w-0 truncate text-[13px] font-medium leading-tight"
+                  class="flex-none max-w-full min-w-0 truncate text-compact font-medium leading-tight"
                 >
                   {{ row.org.label }}
                 </span>
                 <span
                   v-if="row.org.identifier && row.org.identifier !== row.org.label"
-                  class="shrink min-w-0 truncate text-[11px] font-mono leading-tight text-text-secondary"
+                  class="shrink min-w-0 truncate text-2xs font-mono leading-tight text-text-secondary"
                 >
                   {{ row.org.identifier }}
                 </span>
@@ -349,7 +349,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
         <div
           v-else
           data-test="organization-menu-no-data"
-          class="w-full text-center py-7 text-[13px] text-text-secondary"
+          class="w-full text-center py-7 text-compact text-text-secondary"
         >
           No organizations found
         </div>

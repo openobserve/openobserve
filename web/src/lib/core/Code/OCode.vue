@@ -48,7 +48,7 @@ async function copy() {
       v-if="copyable"
       type="button"
       :aria-label="copied ? 'Copied!' : 'Copy to clipboard'"
-      class="absolute top-2 right-2 rounded p-1 transition-colors duration-150 text-code-copy-icon hover:text-code-copy-hover-icon hover:bg-code-copy-hover-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+      class="absolute top-2 right-2 rounded-sm p-1 transition-colors duration-150 text-code-copy-icon hover:text-code-copy-hover-icon hover:bg-code-copy-hover-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
       @click.prevent="copy"
     ><OIcon
         :name="copied ? 'check' : 'content-copy'"
@@ -62,7 +62,7 @@ async function copy() {
     ref="codeRef"
     :class="[
       'inline-flex items-center gap-1',
-      'rounded border border-code-border bg-code-bg text-code-text',
+      'rounded-sm border border-code-border bg-code-bg text-code-text',
       'px-1 py-px',
       'text-xs [font-family:var(--font-mono)] leading-none',
       truncate ? 'max-w-full truncate' : '',
@@ -73,7 +73,7 @@ async function copy() {
       v-if="copyable"
       type="button"
       :aria-label="copied ? 'Copied!' : 'Copy'"
-      class="shrink-0 rounded p-px transition-colors duration-150 text-code-copy-icon hover:text-code-copy-hover-icon hover:bg-code-copy-hover-bg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-400"
+      class="shrink-0 rounded-sm p-px transition-colors duration-150 text-code-copy-icon hover:text-code-copy-hover-icon hover:bg-code-copy-hover-bg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-400"
       @click.prevent="copy"
     >
       <OIcon

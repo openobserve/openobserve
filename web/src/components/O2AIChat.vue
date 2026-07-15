@@ -1,6 +1,6 @@
 ﻿<template>
   <div
-    class="chat-container w-full h-full flex flex-col overflow-hidden rounded-md text-[var(--q-primary-text)] bg-card-glass-solid [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
+    class="chat-container w-full h-full flex flex-col overflow-hidden rounded-md text-[var(--color-button-primary-foreground)] bg-card-glass-solid [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
     :class="[
       { 'chat-open': isOpen },
       store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
@@ -30,9 +30,9 @@
                   size="sm"
                   class="chat-title-dropdown"
                 >
-                  <div class="flex items-center gap-2 max-w-[220px]">
+                  <div class="flex items-center gap-2 max-w-55">
                     <span
-                      class="chat-title-text text-[14px] font-medium truncate block"
+                      class="chat-title-text text-sm font-medium truncate block"
                     >
                       {{ displayedTitle || "New Chat" }}
                       <OTooltip
@@ -52,8 +52,8 @@
                 </OButton>
               </template>
               <!-- History menu with search -->
-              <div class="history-menu-container relative max-h-[450px] flex flex-col w-[300px]">
-                <div class="search-history-bar-sticky sticky top-0 z-[2] bg-[var(--q-page-background)] p-2 border-b border-separator shrink-0">
+              <div class="history-menu-container relative max-h-112.5 flex flex-col w-75">
+                <div class="search-history-bar-sticky sticky top-0 z-[2] bg-[var(--color-surface-base)] p-2 border-b border-separator shrink-0">
                   <OSearchInput
                     v-model="historySearchTerm"
                     placeholder="Search chat history"
@@ -61,7 +61,7 @@
                   />
                 </div>
                 <div
-                  class="history-list-container flex-1 overflow-y-auto overflow-x-hidden max-h-[350px]"
+                  class="history-list-container flex-1 overflow-y-auto overflow-x-hidden max-h-87.5"
                   style="
                     min-width: 200px;
                     width: 300px;
@@ -79,10 +79,10 @@
                       class="flex items-center justify-between w-full"
                     >
                       <div class="flex-1 overflow-hidden">
-                        <div class="text-[13px] truncate">
+                        <div class="text-compact truncate">
                           {{ chat.title }}
                         </div>
-                        <div class="text-[11px] text-gray-500">
+                        <div class="text-2xs text-text-caption">
                           {{ formatTime(chat.timestamp) }}
                         </div>
                       </div>
@@ -99,7 +99,7 @@
                   </ODropdownItem>
                   <div
                     v-if="filteredChatHistory.length === 0"
-                    class="text-center text-gray-500 p-2"
+                    class="text-center text-text-muted p-2"
                   >
                     No matching chats found
                   </div>
@@ -108,12 +108,12 @@
                 <!-- Clear all conversations button -->
                 <div
                   v-if="filteredChatHistory.length > 0"
-                  class="clear-all-container bg-[var(--q-page-background)] p-2 border-t border-separator shrink-0"
+                  class="clear-all-container bg-[var(--color-surface-base)] p-2 border-t border-separator shrink-0"
                 >
                   <ODropdownSeparator />
                   <OButton
                     variant="ghost"
-                    class="clear-all-btn w-full text-[var(--q-negative)] text-[13px] hover:bg-[rgba(var(--q-negative-rgb),0.1)]"
+                    class="clear-all-btn w-full text-[var(--q-negative)] text-compact hover:bg-[color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
                     @click.stop="clearAllConversations"
                   >
                     <template #icon-left>
@@ -164,7 +164,7 @@
           </div>
         </div>
       </div>
-      <OSeparator class="bg-[#DBDBDB]" />
+      <OSeparator class="bg-separator" />
 
       <!-- History Panel -->
       <ODrawer data-test="o2-ai-chat-history-drawer" v-model:open="showHistory" size="sm" title="Chat History">
@@ -272,10 +272,10 @@
                 <img :src="o2AiTitleLogo" />
                 <div class="relative inline-block">
                   <span
-                    class="text-[14px] font-[600] ml-[30px] text-center"
+                    class="text-sm font-[600] ml-7.5 text-center"
                     >O2 Assistant</span
                   >
-                  <span class="o2-ai-beta-text ml-[8px] relative text-[var(--q-primary)] text-[8px] px-1 rounded-[10px] text-center border border-[var(--q-primary)] uppercase font-semibold [letter-spacing:0.5px] w-[34px]">BETA</span>
+                  <span class="o2-ai-beta-text ml-2 relative text-[var(--q-primary)] text-[8px] px-1 rounded-lg text-center border border-[var(--q-primary)] uppercase font-semibold [letter-spacing:0.5px] w-8.5">BETA</span>
                 </div>
               </div>
             </div>
@@ -292,17 +292,12 @@
             <div class="message-content">
               <div
                 v-if="message.role === 'user'"
-                class="inline-flex items-center justify-center w-6 h-6 rounded-full text-white"
-                :class="
-                  store.state.theme == 'dark'
-                    ? '[background:linear-gradient(135deg,#4c63d2_0%,#5a67d8_100%)]'
-                    : '[background:linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)]'
-                "
+                class="inline-flex items-center justify-center w-6 h-6 rounded-full text-text-inverse [background:linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)] dark:[background:linear-gradient(135deg,#4c63d2_0%,#5a67d8_100%)]"
               >
                 <OIcon
                   size="sm"
                   name="person"
-                  class='text-white'
+                  class='text-text-inverse'
                 />
               </div>
               <div
@@ -313,7 +308,7 @@
                 "
               >
                 <!-- Loading indicator inside message box for empty assistant messages -->
-                <div v-if="message.role === 'assistant' && (!message.contentBlocks || message.contentBlocks.length === 0) && (!message.content || message.content.trim() === '') && isLoading" class="inline-loading flex items-center gap-[10px] py-2 text-[#6b7280] text-sm">
+                <div v-if="message.role === 'assistant' && (!message.contentBlocks || message.contentBlocks.length === 0) && (!message.content || message.content.trim() === '') && isLoading" class="inline-loading flex items-center gap-2.5 py-2 text-text-secondary text-sm">
                   <OSpinner variant="dots" size="sm" />
                   <span>{{ currentAnalyzingMessage }}</span>
                 </div>
@@ -1002,7 +997,7 @@
                       <img
                         :src="'data:' + img.mimeType + ';base64,' + img.data"
                         :alt="img.filename"
-                        class="max-w-[200px] max-h-[150px] object-contain rounded-lg border border-gray-300 cursor-pointer [transition:transform_0.2s_ease,box-shadow_0.2s_ease]"
+                        class="max-w-50 max-h-37.5 object-contain rounded-lg border border-border-strong cursor-pointer [transition:transform_0.2s_ease,box-shadow_0.2s_ease]"
                         @click="openImagePreview(img)"
                       />
                       <OTooltip :content="img.filename" />
@@ -1180,7 +1175,7 @@
         </div>
 
         <!-- Scroll to bottom button -->
-        <div v-show="showScrollToBottom" class="scroll-to-bottom-container absolute bottom-[10px] left-1/2 -translate-x-1/2 z-[1000] pointer-events-none [transition:all_0.3s_ease]">
+        <div v-show="showScrollToBottom" class="scroll-to-bottom-container absolute bottom-2.5 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none [transition:all_0.3s_ease]">
           <OButton
             variant="ghost"
             size="icon-sm"
@@ -1249,12 +1244,12 @@
               <img
                 :src="'data:' + img.mimeType + ';base64,' + img.data"
                 :alt="img.filename"
-                class="preview-image w-16 h-16 object-cover rounded-lg border border-[#d1d5db] [transition:transform_0.2s_ease]"
+                class="preview-image w-16 h-16 object-cover rounded-lg border border-border-default [transition:transform_0.2s_ease]"
               />
               <OButton
                 variant="ghost"
                 size="icon-xs-circle"
-                class="image-remove-btn absolute! top-[-6px]! right-[-6px]! w-5! h-5! min-w-5! min-h-5! p-0! bg-[#ef4444]! z-10"
+                class="image-remove-btn absolute! top-[-6px]! right-[-6px]! w-5! h-5! min-w-5! min-h-5! p-0! bg-status-negative! z-10"
                 @click.stop="removeImage(index)"
               >
                 <OIcon name="close" size="xs" />
@@ -1292,7 +1287,7 @@
                 <OIcon
                   name="image"
                   size="sm"
-                  :class="store.state.theme == 'dark' ? 'text-white' : 'text-gray-600'"
+                  class="text-icon-color"
                 />
                 <OTooltip :content="t('aiAssistant.attachImageTooltip')" />
               </OButton>
@@ -1304,7 +1299,7 @@
                 @click.stop="isAutoNavigationEnabled = !isAutoNavigationEnabled"
                 variant="ghost"
                 size="sm"
-                class="auto-nav-toggle-btn flex items-center gap-1.5 px-2 py-1 rounded-md transition-all duration-200 hover:bg-[#f3f4f6] dark:hover:bg-[#374151]"
+                class="auto-nav-toggle-btn flex items-center gap-1.5 px-2 py-1 rounded-md transition-all duration-200 hover:bg-surface-subtle"
                 :class="{ 'auto-nav-enabled': isAutoNavigationEnabled }"
               >
                 <OIcon
@@ -1316,12 +1311,10 @@
                   size="sm"
                   :class="[
                     'auto-nav-icon',
-                    !isAutoNavigationEnabled
-                      ? store.state.theme == 'dark' ? 'text-gray-400' : 'text-gray-600'
-                      : ''
+                    !isAutoNavigationEnabled ? 'text-icon-color' : ''
                   ]"
                 />
-                <span class="auto-nav-label ml-1 text-xs font-medium text-[#6b7280] dark:text-[#9ca3af]">{{ t('aiAssistant.autoNavigation.label') }}</span>
+                <span class="auto-nav-label ml-1 text-xs font-medium text-text-secondary">{{ t('aiAssistant.autoNavigation.label') }}</span>
                 <OTooltip
                   :content="
                     isAutoNavigationEnabled
@@ -1385,6 +1378,7 @@ import DOMPurify from "dompurify";
 import { useStore } from "vuex";
 import useAiChat from "@/composables/useAiChat";
 import { getImageURL, getUUIDv7 } from "@/utils/zincutils";
+import { chartColor } from "@/utils/chartTheme";
 import {
   ChatMessage,
   ChatHistoryEntry,
@@ -4621,7 +4615,7 @@ export default defineComponent({
             imageRefSpan.contentEditable = "false";
             imageRefSpan.className = "image-reference";
             imageRefSpan.style.cssText =
-              "display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; margin: 0 2px; background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 4px; font-size: 13px; color: #2e7d32; user-select: none;";
+              `display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; margin: 0 2px; background: ${chartColor("--color-status-success-bg")}; border: 1px solid ${chartColor("--color-success-200")}; border-radius: 4px; font-size: 13px; color: ${chartColor("--color-status-success-text")}; user-select: none;`;
 
             // Add image icon
             const imageIcon = document.createElement("span");
@@ -4636,14 +4630,14 @@ export default defineComponent({
             const removeBtn = document.createElement("button");
             removeBtn.textContent = "×";
             removeBtn.style.cssText =
-              "display: flex; align-items: center; justify-content: center; width: 14px; height: 14px; padding: 0; margin-left: 2px; background: transparent; border: none; border-radius: 3px; font-size: 16px; line-height: 1; cursor: pointer; color: #2e7d32; transition: all 0.15s ease;";
+              `display: flex; align-items: center; justify-content: center; width: 14px; height: 14px; padding: 0; margin-left: 2px; background: transparent; border: none; border-radius: 3px; font-size: 16px; line-height: 1; cursor: pointer; color: ${chartColor("--color-status-success-text")}; transition: all 0.15s ease;`;
             removeBtn.onmouseover = () => {
-              removeBtn.style.background = "#c62828";
-              removeBtn.style.color = "white";
+              removeBtn.style.background = chartColor("--color-status-negative");
+              removeBtn.style.color = chartColor("--color-white");
             };
             removeBtn.onmouseout = () => {
               removeBtn.style.background = "transparent";
-              removeBtn.style.color = "#2e7d32";
+              removeBtn.style.color = chartColor("--color-status-success-text");
             };
             removeBtn.onclick = (e) => {
               e.preventDefault();
@@ -5801,7 +5795,7 @@ export default defineComponent({
   align-items: end;
   border-bottom: 1px solid var(--color-separator);
   flex-shrink: 0;
-  background: var(--q-page-background);
+  background: var(--color-surface-base);
   z-index: 2;
 }
 
@@ -5822,11 +5816,11 @@ export default defineComponent({
 }
 
 .chat-container .chat-header .chat-title-dropdown:hover {
-  background-color: var(--q-hover-color);
+  background-color: var(--color-interactive-hover-bg);
 }
 
 .chat-container .chat-header .chat-title-dropdown span {
-  color: var(--q-primary-text);
+  color: var(--color-button-primary-foreground);
 }
 
 .chat-container .chat-header .chat-title-dropdown .chat-title-text {
@@ -5846,20 +5840,19 @@ export default defineComponent({
   border-bottom: 1px solid var(--color-separator);
 }
 
-.chat-container .chat-session-title.light-mode {
-  color: #1a202c;
+.chat-container .chat-session-title {
+  color: var(--color-text-primary);
   background: linear-gradient(
     to right,
-    rgba(99, 102, 241, 0.08),
+    color-mix(in srgb, var(--color-theme-accent) 8%, transparent),
     transparent
   );
 }
 
-.chat-container .chat-session-title.dark-mode {
-  color: #e2e8f0;
+.dark .chat-container .chat-session-title {
   background: linear-gradient(
     to right,
-    rgba(99, 102, 241, 0.15),
+    color-mix(in srgb, var(--color-theme-accent) 15%, transparent),
     transparent
   );
 }
@@ -5913,8 +5906,8 @@ export default defineComponent({
   padding: 24px;
   background: linear-gradient(
     to right,
-    rgba(var(--q-primary-rgb), 0.05),
-    rgba(var(--q-primary-rgb), 0.1)
+    color-mix(in srgb, var(--color-theme-accent) 5%, transparent),
+    color-mix(in srgb, var(--color-theme-accent) 10%, transparent)
   );
   border-radius: 8px;
   margin-bottom: 24px;
@@ -6006,7 +5999,7 @@ export default defineComponent({
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 4px;
-  background: rgba(var(--q-primary-rgb), 0.1);
+  background: color-mix(in srgb, var(--color-theme-accent) 10%, transparent);
   color: var(--q-primary);
   font-weight: 500;
 }
@@ -6040,24 +6033,14 @@ export default defineComponent({
   gap: 12px;
 }
 
-.chat-container .unified-input-box.light-mode {
-  background: #ffffff;
-  border: 1px solid #e4e7ec;
+.chat-container .unified-input-box {
+  background: var(--color-surface-base);
+  border: 1px solid var(--color-border-default);
 }
 
-.chat-container .unified-input-box.light-mode:focus-within {
+.chat-container .unified-input-box:focus-within {
   border: 1px solid transparent;
-  box-shadow: 0 0 0 2px #8b5cf6;
-}
-
-.chat-container .unified-input-box.dark-mode {
-  background: #191919;
-  border: 1px solid #323232;
-}
-
-.chat-container .unified-input-box.dark-mode:focus-within {
-  border: 1px solid transparent;
-  box-shadow: 0 0 0 2px #5a6ec3;
+  box-shadow: 0 0 0 2px var(--color-accent);
 }
 
 .chat-container .unified-input-box .rich-text-input-wrapper {
@@ -6280,7 +6263,7 @@ export default defineComponent({
   font-weight: 600;
   padding: 2px 6px;
   border-radius: 4px;
-  background: rgba(var(--q-primary-rgb), 0.1);
+  background: color-mix(in srgb, var(--color-theme-accent) 10%, transparent);
 }
 
 .code-type-label {
@@ -6337,7 +6320,7 @@ export default defineComponent({
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
-  color: var(--q-primary-text);
+  color: var(--color-button-primary-foreground);
   margin-left: 0;
   width: 100%;
 }
@@ -6947,46 +6930,26 @@ export default defineComponent({
 }
 
 .log-entry-item .log-entry-content .log-entry-code .json-key {
-  color: #0066cc;
+  color: var(--color-json-key);
   font-weight: 600;
 }
 
 .log-entry-item .log-entry-content .log-entry-code .json-string {
-  color: #22863a;
+  color: var(--color-json-string);
 }
 
 .log-entry-item .log-entry-content .log-entry-code .json-number {
-  color: #005cc5;
+  color: var(--color-json-number);
 }
 
 .log-entry-item .log-entry-content .log-entry-code .json-boolean {
-  color: #d73a49;
+  color: var(--color-json-boolean);
   font-weight: 600;
 }
 
 .log-entry-item .log-entry-content .log-entry-code .json-null {
-  color: #6f42c1;
+  color: var(--color-json-null);
   font-weight: 600;
-}
-
-.dark .log-entry-code .json-key {
-  color: #60a5fa;
-}
-
-.dark .log-entry-code .json-string {
-  color: #86efac;
-}
-
-.dark .log-entry-code .json-number {
-  color: #7dd3fc;
-}
-
-.dark .log-entry-code .json-boolean {
-  color: #fca5a5;
-}
-
-.dark .log-entry-code .json-null {
-  color: #c4b5fd;
 }
 
 .tool-call-item .tool-response-hits {

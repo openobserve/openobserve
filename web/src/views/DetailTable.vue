@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OCardSection role="header">
       <div class="flex items-center flex-nowrap">
         <div class="flex flex-col">
-          <div class="text-base font-bold text-gray-800">
+          <div class="text-base font-bold text-text-heading">
             {{ t("search.rowDetail") }}
           </div>
         </div>
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </OCardSection>
     <OSeparator />
-    <OTabs v-model="tab" dense class="text-gray-500" align="justify">
+    <OTabs v-model="tab" dense class="text-text-secondary" align="justify">
       <OTab name="table" :label="t('common.table')" />
       <OTab name="json" :label="t('common.json')" />
     </OTabs>

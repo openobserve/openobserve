@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </g>
     </g>
 
-    <!-- dashed flowchart connectors: right-angle routing with rounded elbows,
+    <!-- dashed flowchart connectors: right-angle routing with rounded-sm elbows,
          merging onto the database like a real diagram, not diagonal lines -->
     <g stroke="var(--color-primary-300)" stroke-width="1.75" stroke-dasharray="4 5" stroke-linecap="round" fill="none">
       <path d="M52 46 L52 64 Q52 70 58 70 L98 70 Q104 70 104 76 L104 104" />

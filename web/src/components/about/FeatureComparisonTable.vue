@@ -52,20 +52,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Edition name + hosting + price ────────────────────────────── -->
         <div class="mb-5">
           <div class="text-base font-bold text-text-heading m-0 mb-[0.125rem]">{{ ed.shortName }}</div>
-          <div class="text-[0.8125rem] text-text-muted m-0 mb-[0.875rem]">{{ ed.hosting }}</div>
+          <div class="text-compact text-text-muted m-0 mb-[0.875rem]">{{ ed.hosting }}</div>
           <div class="text-[1.75rem] font-bold text-accent m-0 mb-1 tracking-[-0.03em] leading-[1.1]">{{ ed.price }}</div>
-          <div class="text-[0.8125rem] text-text-muted m-0 leading-[1.4]">{{ ed.priceSub }}</div>
+          <div class="text-compact text-text-muted m-0 leading-[1.4]">{{ ed.priceSub }}</div>
         </div>
 
         <!-- All Five Pillars chips ────────────────────────────────────── -->
         <div class="bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))] border border-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] rounded-lg p-3 mb-4">
           <div class="text-[0.5625rem] font-bold uppercase tracking-[0.12em] text-text-label m-0 mb-2">ALL FIVE PILLARS</div>
           <div class="flex flex-wrap gap-1.5 mb-1.5">
-            <span v-for="pillarId in PILLAR_IDS" :key="pillarId" data-test="feature-comparison-table-pillar-chip" class="inline-flex items-center py-[0.1875rem] px-2 rounded text-[0.6875rem] font-medium bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] text-accent border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] mr-[0.375rem] mb-[0.375rem]">
+            <span v-for="pillarId in PILLAR_IDS" :key="pillarId" data-test="feature-comparison-table-pillar-chip" class="inline-flex items-center py-[0.1875rem] px-2 rounded-sm text-2xs font-medium bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] text-accent border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] mr-[0.375rem] mb-[0.375rem]">
               {{ t(`about.feature_${pillarId}`) }}
             </span>
           </div>
-          <span class="inline-flex items-center py-[0.1875rem] px-2 rounded text-[0.6875rem] font-medium bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] text-accent border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] mr-[0.375rem] mb-[0.375rem]">{{ t('about.feature_dashboards') }}</span>
+          <span class="inline-flex items-center py-[0.1875rem] px-2 rounded-sm text-2xs font-medium bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] text-accent border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] mr-[0.375rem] mb-[0.375rem]">{{ t('about.feature_dashboards') }}</span>
         </div>
 
         <!-- Feature list ───────────────────────────────────────────────── -->
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="feature in listFeatures"
             :key="feature.id"
             data-test="feature-comparison-table-feature-item"
-            class="flex items-start gap-2 py-[0.4375rem] text-[0.8125rem] border-b border-card-glass-border last:border-b-0"
+            class="flex items-start gap-2 py-[0.4375rem] text-compact border-b border-card-glass-border last:border-b-0"
             :class="{
               'text-text-body': getFeatureStatus(feature, ed.id) !== 'unavailable',
               'text-text-muted': getFeatureStatus(feature, ed.id) === 'unavailable',
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <span class="flex flex-col gap-[0.0625rem]">
               <span class="leading-[1.45]">{{ t(getFeatureNameKey(feature)) }}</span>
-              <span v-if="getFeatureNote(feature, ed.id)" class="text-[0.6875rem] text-text-muted italic">
+              <span v-if="getFeatureNote(feature, ed.id)" class="text-2xs text-text-muted italic">
                 {{ getFeatureNote(feature, ed.id) }}
               </span>
             </span>
@@ -110,11 +110,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="mt-4">
           <div class="h-px bg-card-glass-border mb-3"></div>
           <div class="mb-[0.875rem]">
-            <div data-test="feature-comparison-table-footer-row" class="flex justify-between items-baseline text-[0.8125rem] py-[0.125rem]">
+            <div data-test="feature-comparison-table-footer-row" class="flex justify-between items-baseline text-compact py-[0.125rem]">
               <span class="text-text-muted font-medium">{{ t('about.feature_license') }}</span>
               <span class="text-text-body font-semibold">{{ ed.license }}</span>
             </div>
-            <div data-test="feature-comparison-table-footer-row" class="flex justify-between items-baseline text-[0.8125rem] py-[0.125rem]">
+            <div data-test="feature-comparison-table-footer-row" class="flex justify-between items-baseline text-compact py-[0.125rem]">
               <span class="text-text-muted font-medium">{{ t('about.feature_support') }}</span>
               <span class="text-text-body font-semibold">{{ ed.support }}</span>
             </div>

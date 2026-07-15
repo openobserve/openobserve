@@ -32,12 +32,12 @@
         </button>
       </header>
 
-      <p class="m-0 mb-4 text-text-secondary text-[13px] leading-normal">{{ t("onlineEvals.scorerTypeDialog.intro") }}</p>
+      <p class="m-0 mb-4 text-text-secondary text-compact leading-normal">{{ t("onlineEvals.scorerTypeDialog.intro") }}</p>
 
       <div class="grid grid-cols-3 max-[720px]:grid-cols-1 gap-3">
         <button
           type="button"
-          class="scorer-type-card relative flex flex-col items-start gap-[10px] min-h-[180px] py-4 px-4 pb-[14px] border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-card-bg text-(--color-text-primary,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms]"
+          class="scorer-type-card relative flex flex-col items-start gap-2.5 min-h-45 py-4 px-4 pb-3.5 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-card-bg text-(--color-text-primary,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms]"
           data-test="scorer-type-llm-judge"
           @click="$emit('select', 'llm_judge')"
         >
@@ -58,7 +58,7 @@
 
         <button
           type="button"
-          class="scorer-type-card relative flex flex-col items-start gap-[10px] min-h-[180px] py-4 px-4 pb-[14px] border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-card-bg text-(--color-text-primary,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms]"
+          class="scorer-type-card relative flex flex-col items-start gap-2.5 min-h-45 py-4 px-4 pb-3.5 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-card-bg text-(--color-text-primary,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms]"
           data-test="scorer-type-remote"
           @click="$emit('select', 'remote')"
         >
@@ -79,11 +79,11 @@
 
         <button
           type="button"
-          class="scorer-type-card scorer-type-card--disabled relative flex flex-col items-start gap-[10px] min-h-[180px] py-4 px-4 pb-[14px] border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-card-bg text-(--color-text-primary,currentColor) text-left cursor-not-allowed opacity-60 transition-[border-color,background,box-shadow] duration-[120ms]"
+          class="scorer-type-card scorer-type-card--disabled relative flex flex-col items-start gap-2.5 min-h-45 py-4 px-4 pb-3.5 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-card-bg text-(--color-text-primary,currentColor) text-left cursor-not-allowed opacity-60 transition-[border-color,background,box-shadow] duration-[120ms]"
           data-test="scorer-type-code"
           disabled
         >
-          <span class="absolute top-3 right-3 py-[2px] px-2 rounded text-[11px] font-semibold leading-normal bg-[color-mix(in_srgb,var(--color-status-warning-text)_14%,transparent)] text-status-warning-text">
+          <span class="absolute top-3 right-3 py-0.5 px-2 rounded-sm text-2xs font-semibold leading-normal bg-[color-mix(in_srgb,var(--color-status-warning-text)_14%,transparent)] text-status-warning-text">
             {{ t("onlineEvals.scorerTypeDialog.comingSoonBadge") }}
           </span>
           <div class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600,#3F7994)">

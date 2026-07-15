@@ -53,7 +53,7 @@ const isDestructiveIcon = computed<boolean>(() =>
     :class="[
       sizeClasses[size],
       isDestructiveIcon
-        ? 'text-error-500 rounded transition-colors hover:bg-error-100'
+        ? 'text-error-500 rounded-sm transition-colors hover:bg-error-100'
         : '',
     ]"
     :data-destructive-icon="isDestructiveIcon ? 'true' : undefined"

@@ -76,7 +76,7 @@ const actionDimsFor = (col: Column<any, any>): string => {
   const s = (defOf(col).meta as any)?.actionSize;
   if (s === "button") return "h-7 w-7 rounded-md";
   if (s === "pill") return "h-5 w-12 rounded-md";
-  return "h-[22px] w-[22px] rounded-md"; // icon (Vercel/GitHub style)
+  return "h-5.5 w-5.5 rounded-md"; // icon (Vercel/GitHub style)
 };
 
 const alignClassFor = (col: Column<any, any>): string => {
@@ -116,7 +116,7 @@ const alignClassFor = (col: Column<any, any>): string => {
         :style="{ width: TABLE_CHECKBOX_COL_SIZE + 'px', minWidth: TABLE_CHECKBOX_COL_SIZE + 'px', maxWidth: TABLE_CHECKBOX_COL_SIZE + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
       >
         <span
-          class="inline-block h-3.5 w-3.5 rounded-[3px] border border-skeleton-base"
+          class="inline-block h-3.5 w-3.5 rounded-sm border border-skeleton-base"
           aria-hidden="true"
         />
       </td>
@@ -144,7 +144,7 @@ const alignClassFor = (col: Column<any, any>): string => {
             aria-hidden="true"
           />
         </span>
-        <!-- Data column → chunky rounded bar with shimmer; td text-align positions it -->
+        <!-- Data column → chunky rounded-sm bar with shimmer; td text-align positions it -->
         <span
           v-else
           class="o2-skel-pill inline-block h-3 rounded-md align-middle [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]"

@@ -16,7 +16,7 @@
           <OIcon :name="isDropdownOpen ? 'expand-less' : 'expand-more'" size="xs" />
         </OButton>
       </template>
-      <div class="logs-table-list min-w-[180px]">
+      <div class="logs-table-list min-w-45">
         <slot name="dropdown" :field="field" :value="value" />
       </div>
     </ODropdown>

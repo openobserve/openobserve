@@ -21,7 +21,7 @@
           >
             <span
               data-test="promql-builder-options-field-label"
-              class="text-[11px] font-medium whitespace-nowrap opacity-85"
+              class="text-2xs font-medium whitespace-nowrap opacity-85"
             >{{ t("dashboard.legendLabel") }}</span>
             <div
               data-test="promql-builder-options-field-input-wrapper"
@@ -64,7 +64,7 @@
           >
             <span
               data-test="promql-builder-options-field-label"
-              class="text-[11px] font-medium whitespace-nowrap opacity-85"
+              class="text-2xs font-medium whitespace-nowrap opacity-85"
             >{{ t("dashboard.stepValue") }}</span>
             <OInput
               v-model="
@@ -101,7 +101,7 @@
           >
             <span
               data-test="promql-builder-options-field-label"
-              class="text-[11px] font-medium whitespace-nowrap opacity-85"
+              class="text-2xs font-medium whitespace-nowrap opacity-85"
             >{{ t("common.type") }}</span>
             <OSelect
               v-model="

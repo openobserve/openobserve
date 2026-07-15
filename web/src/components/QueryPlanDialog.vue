@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </header>
             <div class="flex-1 overflow-y-auto p-4">
-              <pre class="sql-query-text [font-family:var(--font-mono)] text-[0.8125rem] leading-[1.6] m-0 py-3.5 px-4 whitespace-pre-wrap wrap-break-word bg-code-bg border border-solid border-card-glass-border rounded-md text-text-code min-h-full box-border"><code class="[font-family:inherit] text-inherit bg-transparent p-0">{{ sqlQuery }}</code></pre>
+              <pre class="sql-query-text [font-family:var(--font-mono)] text-compact leading-[1.6] m-0 py-3.5 px-4 whitespace-pre-wrap wrap-break-word bg-code-bg border border-solid border-card-glass-border rounded-md text-text-code min-h-full box-border"><code class="[font-family:inherit] text-inherit bg-transparent p-0">{{ sqlQuery }}</code></pre>
             </div>
           </section>
         </template>

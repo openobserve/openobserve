@@ -30,12 +30,12 @@
             </div>
             <div>
               <div
-                class="text-[15px] font-semibold leading-tight text-text-primary"
+                class="text-sm font-semibold leading-tight text-text-primary"
               >
                 {{ t("shortcuts.title") }}
               </div>
               <div
-                class="text-[11px] text-text-secondary mt-0.5"
+                class="text-2xs text-text-secondary mt-0.5"
               >
                 {{ t("shortcuts.subtitle") }}
               </div>
@@ -87,7 +87,7 @@
     <div class="contents">
       <div
         v-if="!hasResults"
-        class="text-center py-10 text-[13px] text-text-secondary"
+        class="text-center py-10 text-compact text-text-secondary"
         data-test="shortcut-cheatsheet-no-results"
       >
         {{ t("shortcuts.noResults") }}
@@ -114,7 +114,7 @@
               data-test="shortcut-cheatsheet-module"
             >
               <span
-                class="text-[12px] font-semibold tracking-wide text-accent"
+                class="text-xs font-semibold tracking-wide text-accent"
               >
                 {{ m.title }}
               </span>
@@ -137,7 +137,7 @@
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                 >
                   <span
-                    class="text-[13px] text-text-primary truncate leading-snug"
+                    class="text-compact text-text-primary truncate leading-snug"
                     >{{ entry.label }}</span
                   >
                   <div
@@ -154,7 +154,7 @@
                       >
                       <kbd
                         v-else
-                        class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 bg-surface-base border border-border-default rounded font-mono text-[11px] font-medium text-text-secondary whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
+                        class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 bg-surface-base border border-border-default rounded-sm font-mono text-2xs font-medium text-text-secondary whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
                         >{{ part }}</kbd
                       >
                     </template>
@@ -187,7 +187,7 @@
               data-test="shortcut-cheatsheet-module"
             >
               <span
-                class="text-[12px] font-semibold tracking-wide text-accent"
+                class="text-xs font-semibold tracking-wide text-accent"
               >
                 {{ m.title }}
               </span>
@@ -210,7 +210,7 @@
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                 >
                   <span
-                    class="text-[13px] text-text-primary truncate leading-snug"
+                    class="text-compact text-text-primary truncate leading-snug"
                     >{{ entry.label }}</span
                   >
                   <div
@@ -227,7 +227,7 @@
                       >
                       <kbd
                         v-else
-                        class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 bg-surface-base border border-border-default rounded font-mono text-[11px] font-medium text-text-secondary whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
+                        class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 bg-surface-base border border-border-default rounded-sm font-mono text-2xs font-medium text-text-secondary whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
                         >{{ part }}</kbd
                       >
                     </template>
@@ -243,17 +243,17 @@
     <!-- ── Sticky footer ── -->
     <template #footer>
       <div
-        class="flex justify-between items-center text-[11px] text-text-secondary"
+        class="flex justify-between items-center text-2xs text-text-secondary"
       >
         <div class="flex items-center gap-1.5 flex-wrap">
           <kbd
-            class="inline-flex items-center justify-center h-5 px-1.5 bg-surface-base border border-border-default rounded font-mono text-[11px] shadow-[0_1px_0_0_var(--color-border-default)]"
+            class="inline-flex items-center justify-center h-5 px-1.5 bg-surface-base border border-border-default rounded-sm font-mono text-2xs shadow-[0_1px_0_0_var(--color-border-default)]"
             >Esc</kbd
           >
           <span>{{ t("shortcuts.footerClose") }}</span>
           <span class="opacity-40">·</span>
           <kbd
-            class="inline-flex items-center justify-center h-5 px-1.5 bg-surface-base border border-border-default rounded font-mono text-[11px] shadow-[0_1px_0_0_var(--color-border-default)]"
+            class="inline-flex items-center justify-center h-5 px-1.5 bg-surface-base border border-border-default rounded-sm font-mono text-2xs shadow-[0_1px_0_0_var(--color-border-default)]"
             >?</kbd
           >
           <span>{{ t("shortcuts.footerReopen") }}</span>

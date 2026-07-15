@@ -41,7 +41,7 @@
         <div class="text-base font-medium mb-2">Generated PromQL Query:</div>
         <OCard class="bg-surface-panel">
           <OCardSection>
-            <pre class="m-0 p-3 font-mono text-sm leading-relaxed whitespace-pre-wrap wrap-break-word text-[#1976d2] font-medium">{{ generatedQuery || "No query built yet" }}</pre>
+            <pre class="m-0 p-3 font-mono text-sm leading-relaxed whitespace-pre-wrap wrap-break-word text-text-link font-medium">{{ generatedQuery || "No query built yet" }}</pre>
           </OCardSection>
         </OCard>
 
@@ -80,7 +80,7 @@
         <div class="text-base font-medium mb-2">Query Result Preview:</div>
         <OCard class="bg-surface-panel">
           <OCardSection>
-            <pre class="m-0 p-3 font-mono text-sm leading-relaxed whitespace-pre-wrap wrap-break-word text-[#424242] max-h-100 overflow-y-auto">{{ queryResult }}</pre>
+            <pre class="m-0 p-3 font-mono text-sm leading-relaxed whitespace-pre-wrap wrap-break-word text-text-body max-h-100 overflow-y-auto">{{ queryResult }}</pre>
           </OCardSection>
         </OCard>
       </OCardSection>

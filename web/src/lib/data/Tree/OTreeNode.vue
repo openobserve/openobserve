@@ -110,7 +110,7 @@ function onTickChange(newVal: CheckboxModelValue) {
   >
     <!-- Node row ────────────────────────────────────────────────────── -->
     <div
-      class="flex items-center gap-1 min-h-7 px-1 rounded select-none transition-colors duration-100"
+      class="flex items-center gap-1 min-h-7 px-1 rounded-sm select-none transition-colors duration-100"
       :class="
         !isLeaf
           ? 'cursor-pointer hover:bg-tree-node-hover-bg'

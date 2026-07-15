@@ -46,7 +46,7 @@
                 v-for="(field, idx) in formFields"
                 :key="idx"
                 type="selectionChip"
-                class="max-w-[250px]"
+                class="max-w-62.5"
                 :data-test="`cross-link-field-chip-${idx}`"
               >
                 <span class="truncate text-xs" :title="field.name">{{ field.name }}</span>

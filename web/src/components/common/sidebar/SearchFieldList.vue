@@ -21,7 +21,7 @@
         <!-- Group header (only rendered for grouped/label rows) -->
         <template #group-header="{ row, groupName }">
           <div
-            class="field-group-header h-full w-full flex justify-between items-center rounded-[0.25rem]"
+            class="field-group-header h-full w-full flex justify-between items-center rounded-sm"
             :data-test="`search-field-list-group-${row.group}-header`"
             @click="toggleGroup(row.group)"
           >

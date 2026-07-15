@@ -18,6 +18,7 @@ import { mount, shallowMount } from "@vue/test-utils";
 import i18n from "@/locales";
 import Header from "@/components/Header.vue";
 import * as cookies from "@/utils/cookies";
+import { chartColor } from "@/utils/chartTheme";
 
 
 // Mock the cookies module
@@ -393,7 +394,7 @@ describe("Header Component", () => {
       quotaWrapper.unmount();
     });
 
-    it("should return orange color when quota is 85-94%", () => {
+    it("should return warning token color when quota is 85-94%", () => {
       const quotaWrapper = createWrapper({
         storeOverrides: {
           state: {
@@ -404,10 +405,12 @@ describe("Header Component", () => {
         },
       });
 
-      expect(quotaWrapper.vm.ingestionQuotaColor).toBe("orange");
+      expect(quotaWrapper.vm.ingestionQuotaColor).toBe(
+        chartColor("--color-status-warning-text"),
+      );
     });
 
-    it("should return red color when quota is >= 95%", () => {
+    it("should return negative token color when quota is >= 95%", () => {
       const quotaWrapper = createWrapper({
         storeOverrides: {
           state: {
@@ -418,7 +421,9 @@ describe("Header Component", () => {
         },
       });
 
-      expect(quotaWrapper.vm.ingestionQuotaColor).toBe("red");
+      expect(quotaWrapper.vm.ingestionQuotaColor).toBe(
+        chartColor("--color-status-negative"),
+      );
     });
 
     it("should not display quota icon when quota < 85%", async () => {
@@ -1187,8 +1192,10 @@ describe("Header Component", () => {
         }
       });
 
-      // Verify the computed property returns red color
-      expect(wrapper.vm.ingestionQuotaColor).toBe("red");
+      // Verify the computed property returns the negative token color
+      expect(wrapper.vm.ingestionQuotaColor).toBe(
+        chartColor("--color-status-negative"),
+      );
 
       // Verify the computed percentage
       expect(wrapper.vm.ingestionQuotaPercentage).toBe(95.0);

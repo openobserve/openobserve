@@ -49,7 +49,7 @@
         <!-- Group header -->
         <div
           v-if="row.isGroup"
-          class="o-field-list__group-header h-7 flex items-center justify-between text-[0.6875rem] font-semibold text-field-list-group-text cursor-default select-none tracking-[0.01em] sticky top-0 z-[2] bg-transparent"
+          class="o-field-list__group-header h-7 flex items-center justify-between text-2xs font-semibold text-field-list-group-text cursor-default select-none tracking-[0.01em] sticky top-0 z-[2] bg-transparent"
           :data-test="`o-field-list-group-${row.groupName}`"
         >
           <slot name="group-header" :row="row" :group-name="row.groupName">
@@ -62,7 +62,7 @@
         <!-- Field row -->
         <div
           v-else
-          class="o-field-list__row mt-[0.25rem] flex items-center w-full min-h-[24px] p-0 relative cursor-pointer rounded-[0.1875rem] text-xs leading-[0.8rem]"
+          class="o-field-list__row mt-[0.25rem] flex items-center w-full min-h-6 p-0 relative cursor-pointer rounded-[0.1875rem] text-xs leading-[0.8rem]"
           :class="{ 'o-field-list__row--draggable': draggable }"
           :data-test="`o-field-list-row-${row.name}`"
           :draggable="draggable && isDragEnabled(row, row._index ?? 0)"
@@ -406,10 +406,10 @@ defineExpose({ scrollToTop });
   opacity: 1;
 }
 
-/* Make each chip flush (no individual border, no rounded corners),
+/* Make each chip flush (no individual border, no rounded-sm corners),
    and put a vertical separator between adjacent chips.
    `!important` overrides Tailwind utility classes on the OButton root
-   (`border-0`, `rounded`, etc.) which otherwise win on specificity. */
+   (`border-0`, `rounded-sm`, etc.) which otherwise win on specificity. */
 .o-field-list__actions > * {
   border: 0 !important;
   border-radius: 0 !important;

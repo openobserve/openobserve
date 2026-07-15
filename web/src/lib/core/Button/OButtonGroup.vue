@@ -10,7 +10,7 @@ const props = withDefaults(defineProps<ButtonGroupProps>(), {
 defineSlots<ButtonGroupSlots>();
 
 const radiusClasses: Record<NonNullable<ButtonGroupProps["radius"]>, string> = {
-  sm: "rounded",
+  sm: "rounded-sm",
   md: "rounded-md",
   lg: "rounded-lg",
 };

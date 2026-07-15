@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex gap-4">
     <!-- Priority Order (Left) -->
-    <div class="flex-1 border rounded p-4">
+    <div class="flex-1 border rounded-sm p-4">
       <div class="text-sm font-semibold mb-3">{{ leftTitle }}</div>
       <OSearchInput v-model="searchLeft" placeholder="Search..." class="mb-3" />
-      <div class="border rounded min-h-80 max-h-96 overflow-auto">
+      <div class="border rounded-sm min-h-80 max-h-96 overflow-auto">
         <ul class="flex flex-col">
           <li
             v-for="(item, index) in filteredSelected"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </li>
           <li
             v-if="filteredSelected.length === 0"
-            class="flex items-center gap-2 px-3 py-2 text-gray-400 text-center text-sm justify-center"
+            class="flex items-center gap-2 px-3 py-2 text-text-muted text-center text-sm justify-center"
           >
             No items selected
           </li>
@@ -113,10 +113,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Available Items (Right) -->
-    <div class="flex-1 border rounded p-4">
+    <div class="flex-1 border rounded-sm p-4">
       <div class="text-sm font-semibold mb-3">{{ rightTitle }}</div>
       <OSearchInput v-model="searchRight" placeholder="Search..." class="mb-3" />
-      <div class="border rounded min-h-80 max-h-96 overflow-auto">
+      <div class="border rounded-sm min-h-80 max-h-96 overflow-auto">
         <ul class="flex flex-col">
           <li
             v-for="item in filteredAvailable"
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </li>
           <li
             v-if="filteredAvailable.length === 0"
-            class="flex items-center gap-2 px-3 py-2 text-gray-400 text-center text-sm justify-center"
+            class="flex items-center gap-2 px-3 py-2 text-text-muted text-center text-sm justify-center"
           >
             No items available
           </li>

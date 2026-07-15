@@ -158,7 +158,7 @@ function handleRangeChange(value: DateRange | undefined) {
         class="flex items-center justify-between mb-3"
       >
         <RangeCalendarPrev
-          class="flex items-center justify-center size-7 rounded transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed data-[disabled]:pointer-events-none"
+          class="flex items-center justify-center size-7 rounded-sm transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed data-[disabled]:pointer-events-none"
           data-test="daterangecalendar-prev"
         >
           <svg
@@ -180,7 +180,7 @@ function handleRangeChange(value: DateRange | undefined) {
           data-test="daterangecalendar-heading"
         />
         <RangeCalendarNext
-          class="flex items-center justify-center size-7 rounded transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed data-[disabled]:pointer-events-none"
+          class="flex items-center justify-center size-7 rounded-sm transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed data-[disabled]:pointer-events-none"
           data-test="daterangecalendar-next"
         >
           <svg
@@ -227,7 +227,7 @@ function handleRangeChange(value: DateRange | undefined) {
                 :data-test="`daterangecalendar-cell-${d.toString()}`"
                 :data-preview="isCellInPreview(d) ? '' : undefined"
                 @mouseenter="handleCellMouseEnter(d)"
-                class="flex items-center justify-center size-8 rounded text-xs cursor-pointer outline-none transition-[color,background-color,border-color,box-shadow] duration-150 ring-offset-1 ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-today:border data-today:border-datepicker-day-today-border data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text data-unavailable:cursor-not-allowed data-unavailable:pointer-events-none data-disabled:text-datepicker-day-disabled-text data-disabled:cursor-not-allowed data-disabled:pointer-events-none data-highlighted:bg-datepicker-day-range-bg data-highlighted:text-datepicker-day-range-text data-selection-start:bg-datepicker-day-selected-bg data-selection-start:text-datepicker-day-selected-text data-selection-end:bg-datepicker-day-selected-bg data-selection-end:text-datepicker-day-selected-text"
+                class="flex items-center justify-center size-8 rounded-sm text-xs cursor-pointer outline-none transition-[color,background-color,border-color,box-shadow] duration-150 ring-offset-1 ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-today:border data-today:border-datepicker-day-today-border data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text data-unavailable:cursor-not-allowed data-unavailable:pointer-events-none data-disabled:text-datepicker-day-disabled-text data-disabled:cursor-not-allowed data-disabled:pointer-events-none data-highlighted:bg-datepicker-day-range-bg data-highlighted:text-datepicker-day-range-text data-selection-start:bg-datepicker-day-selected-bg data-selection-start:text-datepicker-day-selected-text data-selection-end:bg-datepicker-day-selected-bg data-selection-end:text-datepicker-day-selected-text"
                 >{{ d.day }}</RangeCalendarCellTrigger
               >
             </RangeCalendarCell>

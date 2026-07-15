@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="authTypeError = ''"
     />
     <fieldset
-      class="q-fieldset p-3 w-full border border-[lightgray] rounded relative"
+      class="q-fieldset p-3 w-full border border-[lightgray] rounded-sm relative"
       v-if="formData.key.store.akeyless.auth.type != ''"
     >
       <legend class="q-caption px-2 text-xs text-(--q-color-dark) ml-2 py-0 px-1">
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="secretTypeError = ''"
     />
     <fieldset
-      class="q-fieldset p-3 w-full border border-[lightgray] rounded relative"
+      class="q-fieldset p-3 w-full border border-[lightgray] rounded-sm relative"
       v-if="formData.key.store.akeyless.store.type != ''"
     >
       <legend class="q-caption px-2 text-xs text-(--q-color-dark) ml-2 py-0 px-1">

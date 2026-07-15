@@ -34,7 +34,7 @@
                     <OButton
                       variant="primary"
                       size="chip"
-                      class="!text-[12px]"
+                      class="!text-xs"
                       :no-wrap="true"
                       :data-test="`promql-operation-${index}`"
                     >
@@ -49,7 +49,7 @@
                     :data-test="`promql-operation-${index}-menu`"
                   >
                     <div style="width: 350px">
-                      <div class="text-weight-medium">
+                      <div class="font-medium">
                         {{ getStepSpec(element.id)?.name || element.id }}
                       </div>
                       <div class="text-xs text-gray-400">

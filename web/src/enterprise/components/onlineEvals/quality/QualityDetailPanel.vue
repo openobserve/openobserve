@@ -44,14 +44,14 @@
         </div>
       </div>
 
-      <section v-if="dataType === 'numeric'" class="card-container py-3 px-[14px] pb-[14px] bg-surface-base border border-border-default rounded-md">
-        <header class="mb-[6px]">
-          <h4 class="m-0 text-[13px] font-semibold text-text-primary">
+      <section v-if="dataType === 'numeric'" class="card-container py-3 px-3.5 pb-3.5 bg-surface-base border border-border-default rounded-md">
+        <header class="mb-1.5">
+          <h4 class="m-0 text-compact font-semibold text-text-primary">
             {{ t("onlineEvals.quality.detail.trendTitle") }}
-            <span class="font-normal text-text-secondary text-[11px]">— {{ config.name }}</span>
+            <span class="font-normal text-text-secondary text-2xs">— {{ config.name }}</span>
           </h4>
         </header>
-        <div class="h-[260px]">
+        <div class="h-65">
           <QualityTrendChart
             v-if="numericTrend.length > 0"
             :points="numericTrend"
@@ -66,11 +66,11 @@
         </div>
       </section>
 
-      <section v-if="dataType === 'numeric'" class="card-container py-3 px-[14px] pb-[14px] bg-surface-base border border-border-default rounded-md">
-        <header class="mb-[6px]">
-          <h4 class="m-0 text-[13px] font-semibold text-text-primary">{{ t("onlineEvals.quality.detail.distributionTitle") }}</h4>
+      <section v-if="dataType === 'numeric'" class="card-container py-3 px-3.5 pb-3.5 bg-surface-base border border-border-default rounded-md">
+        <header class="mb-1.5">
+          <h4 class="m-0 text-compact font-semibold text-text-primary">{{ t("onlineEvals.quality.detail.distributionTitle") }}</h4>
         </header>
-        <div class="h-[220px]">
+        <div class="h-55">
           <QualityDistributionChart
             v-if="numericDistribution.length > 0"
             :buckets="numericDistribution"
@@ -82,14 +82,14 @@
         </div>
       </section>
 
-      <section v-if="dataType === 'boolean'" class="card-container py-3 px-[14px] pb-[14px] bg-surface-base border border-border-default rounded-md">
-        <header class="mb-[6px]">
-          <h4 class="m-0 text-[13px] font-semibold text-text-primary">
+      <section v-if="dataType === 'boolean'" class="card-container py-3 px-3.5 pb-3.5 bg-surface-base border border-border-default rounded-md">
+        <header class="mb-1.5">
+          <h4 class="m-0 text-compact font-semibold text-text-primary">
             {{ t("onlineEvals.quality.detail.passRateTitle") }}
-            <span class="font-normal text-text-secondary text-[11px]">— {{ config.name }}</span>
+            <span class="font-normal text-text-secondary text-2xs">— {{ config.name }}</span>
           </h4>
         </header>
-        <div class="h-[260px]">
+        <div class="h-65">
           <QualityBooleanTrendChart
             v-if="booleanTrendSeries.length > 0"
             :series="booleanTrendSeries"
@@ -100,11 +100,11 @@
         </div>
       </section>
 
-      <section v-if="dataType === 'boolean'" class="card-container py-3 px-[14px] pb-[14px] bg-surface-base border border-border-default rounded-md">
-        <header class="mb-[6px]">
-          <h4 class="m-0 text-[13px] font-semibold text-text-primary">{{ t("onlineEvals.quality.detail.trueFalseTitle") }}</h4>
+      <section v-if="dataType === 'boolean'" class="card-container py-3 px-3.5 pb-3.5 bg-surface-base border border-border-default rounded-md">
+        <header class="mb-1.5">
+          <h4 class="m-0 text-compact font-semibold text-text-primary">{{ t("onlineEvals.quality.detail.trueFalseTitle") }}</h4>
         </header>
-        <div class="h-[120px]">
+        <div class="h-30">
           <QualityBooleanBarsChart
             v-if="booleanCounts.trueCount + booleanCounts.falseCount > 0"
             :true-count="booleanCounts.trueCount"
@@ -116,11 +116,11 @@
         </div>
       </section>
 
-      <section v-if="dataType === 'categorical'" class="card-container py-3 px-[14px] pb-[14px] bg-surface-base border border-border-default rounded-md">
-        <header class="mb-[6px]">
-          <h4 class="m-0 text-[13px] font-semibold text-text-primary">{{ t("onlineEvals.quality.detail.categoryDistributionTitle") }}</h4>
+      <section v-if="dataType === 'categorical'" class="card-container py-3 px-3.5 pb-3.5 bg-surface-base border border-border-default rounded-md">
+        <header class="mb-1.5">
+          <h4 class="m-0 text-compact font-semibold text-text-primary">{{ t("onlineEvals.quality.detail.categoryDistributionTitle") }}</h4>
         </header>
-        <div class="h-[260px]">
+        <div class="h-65">
           <QualityCategoryBarsChart
             v-if="categoricalRows.length > 0"
             :rows="categoricalRows"

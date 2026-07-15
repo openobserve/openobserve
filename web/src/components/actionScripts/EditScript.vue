@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :options="actionTypes"
                   labelKey="label"
                   valueKey="value"
-                  class="showLabelOnTop no-case w-[400px]"
+                  class="showLabelOnTop no-case w-100"
                   :disabled="isEditingActionScript"
                 />
               </div>

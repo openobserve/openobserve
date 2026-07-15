@@ -21,14 +21,14 @@ the Free Software Foundation, either version 3 of the License, or
       <div class="w-full h-full flex flex-col" style="min-width: 380px">
         <div
           v-if="errors.length"
-          class="text-center text-[0.9375rem] font-semibold text-text-heading py-3 shrink-0"
+          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
           data-test="score-config-import-errors-title"
         >
           {{ t("onlineEvals.scoreConfig.import.errors.title") }}
         </div>
         <div
           v-else
-          class="text-center text-[0.9375rem] font-semibold text-text-heading py-3 shrink-0"
+          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
           data-test="score-config-import-output-title"
         >
           {{ t("onlineEvals.scoreConfig.import.outputMessages") }}

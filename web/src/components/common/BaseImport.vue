@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="w-full h-full flex flex-col border-r border-border-default">
               <!-- Tabs Section -->
               <div class="card-container py-2 px-2 mb-1 shrink-0">
-                <div class="app-tabs-container h-[36px] w-fit">
+                <div class="app-tabs-container h-9 w-fit">
                   <app-tabs
                     :data-test="`${testPrefix}-import-tabs`"
                     class="tabs-selection-container"
@@ -168,10 +168,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <slot name="output-section">
                 <!-- Default output section - only shown if slot not used -->
                 <slot name="output-content">
-                  <div class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0">Output Messages</div>
+                  <div class="text-center text-sm font-semibold text-text-primary py-3 shrink-0">Output Messages</div>
                   <OSeparator class="mt-1 shrink-0" />
                   <div class="error-report-container flex-1 min-h-0 overflow-auto">
-                    <div class="text-center p-3 text-gray-400">
+                    <div class="text-center p-3 text-text-muted">
                       No messages to display
                     </div>
                   </div>

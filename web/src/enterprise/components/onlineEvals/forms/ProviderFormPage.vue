@@ -17,14 +17,14 @@
       </template>
     </AppPageHeader>
 
-    <div class="flex-1 min-h-0 overflow-auto px-6 py-4.5 [&_textarea]:max-h-[220px] [&_textarea]:overflow-y-auto [&_textarea]:font-mono">
+    <div class="flex-1 min-h-0 overflow-auto px-6 py-4.5 [&_textarea]:max-h-55 [&_textarea]:overflow-y-auto [&_textarea]:font-mono">
       <section class="mb-6">
         <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
-          <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-[11px] font-[ui-monospace,SFMono-Regular,Menlo,monospace]">01</span>
+          <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-[ui-monospace,SFMono-Regular,Menlo,monospace]">01</span>
           <div class="m-0 text-sm font-semibold text-text-primary">{{ t("onlineEvals.provider.sectionTitle") }}</div>
         </div>
 
-        <div class="provider-field-row grid grid-cols-2 gap-[14px]">
+        <div class="provider-field-row grid grid-cols-2 gap-3.5">
           <div class="mb-3">
             <div class="flex items-center text-xs font-semibold text-text-primary mb-1">
               {{ t("onlineEvals.provider.nameLabel") }}
@@ -38,7 +38,7 @@
               :disabled="mode === 'edit'"
               data-test="provider-form-name-input"
             />
-            <div v-if="mode === 'edit'" class="text-[11.5px] text-text-secondary mt-1">
+            <div v-if="mode === 'edit'" class="text-2xs text-text-secondary mt-1">
               {{ t("onlineEvals.provider.cannotRename") }}
             </div>
           </div>
@@ -69,7 +69,7 @@
           />
         </div>
 
-        <div class="provider-field-row grid grid-cols-2 gap-[14px]">
+        <div class="provider-field-row grid grid-cols-2 gap-3.5">
           <div class="mb-3">
             <div class="flex items-center text-xs font-semibold text-text-primary mb-1">
               {{ t("onlineEvals.provider.defaultModelLabel") }}
@@ -91,7 +91,7 @@
               size="sm"
               data-test="provider-form-available-models-input"
             />
-            <div class="text-[11.5px] text-text-secondary mt-1">{{ t("onlineEvals.provider.availableModelsHelp") }}</div>
+            <div class="text-2xs text-text-secondary mt-1">{{ t("onlineEvals.provider.availableModelsHelp") }}</div>
           </div>
         </div>
 
@@ -99,11 +99,11 @@
 
       <section class="mb-6">
         <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
-          <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-[11px] font-[ui-monospace,SFMono-Regular,Menlo,monospace]">02</span>
+          <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-[ui-monospace,SFMono-Regular,Menlo,monospace]">02</span>
           <div class="m-0 text-sm font-semibold text-text-primary">{{ t("onlineEvals.provider.authSection") }}</div>
         </div>
 
-        <div v-if="mode === 'edit'" class="provider-callout flex gap-2 items-start px-3 py-2 mb-3 bg-[color-mix(in_srgb,var(--color-status-info-text)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_30%,transparent)] rounded-md text-[11.5px] text-text-primary leading-[1.4]">
+        <div v-if="mode === 'edit'" class="provider-callout flex gap-2 items-start px-3 py-2 mb-3 bg-[color-mix(in_srgb,var(--color-status-info-text)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_30%,transparent)] rounded-md text-2xs text-text-primary leading-[1.4]">
           <OIcon name="lock" size="xs" class="shrink-0 mt-px text-status-info-text" />
           <span>{{ t("onlineEvals.provider.authEditNote") }}</span>
         </div>
@@ -120,7 +120,7 @@
             :placeholder="t('onlineEvals.provider.apiKeyPlaceholder')"
             data-test="provider-form-api-key-input"
           />
-          <div class="text-[11.5px] text-text-secondary mt-1">{{ t("onlineEvals.provider.apiKeyHelp") }}</div>
+          <div class="text-2xs text-text-secondary mt-1">{{ t("onlineEvals.provider.apiKeyHelp") }}</div>
         </div>
       </section>
     </div>

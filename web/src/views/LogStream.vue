@@ -262,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-col gap-3 py-1">
         <p class="text-sm">{{ t("logStream.confirmDeleteMsg") }}</p>
         <div
-          class="w-full flex items-center gap-2 text-sm text-gray-500"
+          class="w-full flex items-center gap-2 text-sm text-text-secondary"
         >
           <OCheckbox
             v-model="deleteAssociatedAlertsPipelines"
@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-col gap-3 py-1">
         <p class="text-sm">{{ t("logStream.confirmBatchDeleteMsg") }}</p>
         <div
-          class="w-full flex items-center gap-2 text-sm text-gray-500"
+          class="w-full flex items-center gap-2 text-sm text-text-secondary"
         >
           <OCheckbox
             v-model="deleteAssociatedAlertsPipelines"

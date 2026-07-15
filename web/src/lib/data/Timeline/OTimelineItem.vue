@@ -51,7 +51,7 @@ const isOIcon = computed<boolean>(() =>
         />
         <span
           v-else-if="icon"
-          class="material-icons text-[14px] leading-none text-timeline-dot-fg select-none"
+          class="material-icons text-sm leading-none text-timeline-dot-fg select-none"
         >{{ icon }}</span>
       </div>
 

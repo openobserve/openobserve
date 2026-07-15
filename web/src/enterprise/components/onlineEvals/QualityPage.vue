@@ -1,6 +1,6 @@
 <template>
   <div
-    class="quality-page flex flex-col gap-[14px] p-[14px_16px_18px] min-h-0 flex-1"
+    class="quality-page flex flex-col gap-3.5 p-[14px_16px_18px] min-h-0 flex-1"
     data-test="quality-page"
   >
     <!-- Agent filter — right-aligned at the top of the content container so it
@@ -14,7 +14,7 @@
           v-if="agentsLoading"
           width="100%"
           height="2.125rem"
-          rounded
+          rounded-sm
           data-test="quality-agent-filter-skeleton"
         />
         <OSelect
@@ -26,7 +26,7 @@
           :options="agentOptions || []"
           labelKey="label"
           valueKey="value"
-          class="rounded"
+          class="rounded-sm"
           data-test="quality-agent-filter"
         />
       </div>
@@ -37,7 +37,7 @@
       :count="visibleKpis.length"
       class="px-4"
     />
-    <section v-else class="quality-page__kpis grid gap-[10px] px-4" aria-label="Tier 1 KPIs"
+    <section v-else class="quality-page__kpis grid gap-2.5 px-4" aria-label="Tier 1 KPIs"
       style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr))"
     >
       <QualityKpiCard
@@ -82,7 +82,7 @@
         />
         <span
           v-if="selectedConfig?.version"
-          class="qpd-version ml-[6px] text-[11px] text-text-secondary [font-variant-numeric:tabular-nums]"
+          class="qpd-version ml-1.5 text-2xs text-text-secondary [font-variant-numeric:tabular-nums]"
           data-test="quality-detail-version-badge"
           >v{{ selectedConfig.version }}</span
         >

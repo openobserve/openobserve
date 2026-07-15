@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(value, key) in matchedDimensions"
               :key="`matched-${key}`"
-              class="flex items-center gap-3 p-3 border border-solid border-card-glass-border rounded"
+              class="flex items-center gap-3 p-3 border border-solid border-card-glass-border rounded-sm"
               :data-test="`matched-dimension-${key}`"
             >
               <div class="flex-1 flex items-center gap-3">
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(value, key) in additionalDimensions"
               :key="`additional-${key}`"
-              class="flex items-center gap-3 p-3 border border-solid border-card-glass-border rounded bg-surface-panel"
+              class="flex items-center gap-3 p-3 border border-solid border-card-glass-border rounded-sm bg-surface-panel"
               :data-test="`additional-dimension-${key}`"
             >
               <div class="flex-1 flex flex-col gap-2">
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- No Additional Dimensions Message -->
         <div
           v-else
-          class="p-3 border border-dashed border-gray-300 rounded text-center text-sm text-gray-500"
+          class="p-3 border border-dashed border-gray-300 rounded-sm text-center text-sm text-gray-500"
         >
           {{ t('correlation.logs.filters.noAdditionalDimensions') }}
         </div>

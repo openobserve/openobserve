@@ -9,10 +9,10 @@
       <template #left>
         <div
           v-if="loading"
-          class="text-weight-bold flex items-center text-gray-500 ml-2 text-[13px]"
+          class="font-bold flex items-center text-gray-500 ml-2 text-compact"
         >
           <OSpinner size="xs" data-test="script-editor-loading-indicator" />
-          <div class="relative top-[2px]">
+          <div class="relative top-0.5">
             {{ t("confirmDialog.loading") }}
           </div>
         </div>
@@ -34,7 +34,7 @@
         data-test="vrl-function-test-events-editor"
         ref="eventsEditorRef"
         :editor-id="`test-function-events-input-editor-${file.name}`"
-        class="test-function-input-editor w-full min-h-40 rounded h-full"
+        class="test-function-input-editor w-full min-h-40 rounded-sm h-full"
         v-model:query="inputScript"
         :language="file.language"
       />

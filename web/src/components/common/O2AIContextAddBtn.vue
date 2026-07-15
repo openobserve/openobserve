@@ -21,6 +21,7 @@ import { computed } from 'vue';
 import { useStore } from 'vuex';
 import config from '@/aws-exports';
 import OButton from '@/lib/core/Button/OButton.vue';
+import useTheme from '@/composables/useTheme';
 //we can pass class to the button to make it customized
 //all of the props are optional
 const props = defineProps({
@@ -56,8 +57,9 @@ const props = defineProps({
 //once user clicks on the button, it will emit the event to the parent component
 const emit = defineEmits(["sendToAiChat"]);
 const store = useStore();
+const { isDark } = useTheme();
 const getBtnLogo = computed(() => {
-    return store.state.theme === 'dark'
+    return isDark.value
     ? getImageURL('images/common/ai_icon_dark.svg')
     : getImageURL('images/common/ai_icon_gradient.svg')
 })
