@@ -248,8 +248,7 @@ describe("TraceHeader", () => {
       );
       const ticLines = wrapper.findAll('[data-test^="trace-header-tic-line-"]');
       ticLines.forEach((tic) => {
-        expect(tic.classes()).toContain("bg-[#cacaca]");
-        expect(tic.classes()).not.toContain("bg-[#3c3c3c]");
+        expect(tic.classes()).toContain("bg-border-default");
       });
     });
 
@@ -288,7 +287,8 @@ describe("TraceHeader", () => {
         '[data-test^="trace-header-tic-line-"]',
       );
       ticLines.forEach((tic) => {
-        expect(tic.classes()).toContain("bg-[#3c3c3c]");
+        // Token-based utility handles dark mode; class is identical in both themes.
+        expect(tic.classes()).toContain("bg-border-default");
       });
 
       darkWrapper.unmount();
@@ -329,7 +329,8 @@ describe("TraceHeader", () => {
         '[data-test^="trace-header-tic-line-"]',
       );
       ticLines.forEach((tic) => {
-        expect(tic.classes()).toContain("bg-[#3c3c3c]");
+        // Token-based utility handles dark mode; class is identical in both themes.
+        expect(tic.classes()).toContain("bg-border-default");
       });
 
       darkWrapper.unmount();

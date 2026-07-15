@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="chip in filterChips"
               :key="chip.key"
-              class="inline-flex items-center gap-1 rounded border border-border-default px-2 py-[0.325rem] text-[0.7rem] leading-none text-text-primary"
+              class="inline-flex items-center gap-1 rounded-sm border border-border-default px-2 py-[0.325rem] text-[0.7rem] leading-none text-text-primary"
               :data-test="`service-graph-filter-chip-${chip.key}`"
               :class="
                 chip.type === 'duration'
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     )"
                     :key="cfg.id"
                     :data-test="`service-graph-node-panel-workload-field-${cfg.id}`"
-                    class="px-[0.325rem]! h-[30px]! min-h-[30px]!"
+                    class="px-[0.325rem]! h-7.5! min-h-7.5!"
                     @select="(e) => { e.preventDefault(); toggleWorkloadField(cfg.id); }"
                   >
                     <template #icon-left>
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                   v-else-if="recentOperations.length > 0 || loadingOperations"
-                  class="overflow-hidden rounded"
+                  class="overflow-hidden rounded-sm"
                   data-test="service-graph-side-panel-operations-table"
                 >
                   <TenstackTable
@@ -357,7 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-else-if="resourceTabData[cfg.id]?.length > 0 || resourceTabLoading[cfg.id]"
-                class="overflow-hidden rounded"
+                class="overflow-hidden rounded-sm"
                 :data-test="`service-graph-side-panel-${cfg.id}-table`"
               >
                 <TenstackTable

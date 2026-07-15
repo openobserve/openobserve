@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="!streamsLoaded"
                 width="100%"
                 height="2.125rem"
-                rounded
+                rounded-sm
               />
               <OSelect
                 v-else
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="availableStreams.map((s) => ({ label: s, value: s }))"
                 labelKey="label"
                 valueKey="value"
-                class="w-full rounded"
+                class="w-full rounded-sm"
                 @update:model-value="onStreamChange"
               />
             </div>
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="!agentsLoaded"
                 width="100%"
                 height="2.125rem"
-                rounded
+                rounded-sm
               />
               <OSelect
                 v-else
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="agentSelectOptions"
                 labelKey="label"
                 valueKey="value"
-                class="w-full rounded"
+                class="w-full rounded-sm"
                 @update:model-value="onAgentChange"
               />
             </div>
@@ -174,14 +174,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
         <!-- Timestamp -->
         <template #cell-firstSeenNanos="{ row }">
-          <span class="text-[0.75rem] tabular-nums">
+          <span class="text-xs tabular-nums">
             {{ formatTimestamp(row.firstSeenNanos) }}
           </span>
         </template>
 
         <!-- Session ID -->
         <template #cell-sessionId="{ row }">
-          <div class="text-[0.75rem] truncate w-full">
+          <div class="text-xs truncate w-full">
             {{ row.sessionId }}
             <OTooltip :content="row.sessionId" />
           </div>
@@ -199,22 +199,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-firstUserMessage="{ row }">
           <div
             v-if="row.firstUserMessage"
-            class="text-[0.75rem] text-text-secondary truncate w-full"
+            class="text-xs text-text-secondary truncate w-full"
           >
             {{ row.firstUserMessage }}
             <OTooltip :content="row.firstUserMessage" />
           </div>
-          <span v-else class="text-[0.75rem] text-text-muted">—</span>
+          <span v-else class="text-xs text-text-muted">—</span>
         </template>
 
         <!-- Turns -->
         <template #cell-turns="{ row }">
-          <span class="text-[0.75rem]">{{ row.turns }}</span>
+          <span class="text-xs">{{ row.turns }}</span>
         </template>
 
         <!-- Duration -->
         <template #cell-durationNanos="{ row }">
-          <span class="text-[0.75rem]">
+          <span class="text-xs">
             {{ formatDuration(row.durationNanos) }}
             <OTooltip :content="`${row.durationNanos.toLocaleString()} ${t('traces.sessionsList.durationNs')}`" />
           </span>
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Tokens -->
         <template #cell-tokens="{ row }">
-          <span class="text-[0.75rem] tabular-nums">
+          <span class="text-xs tabular-nums">
             {{ formatTokens(row.inputTokens) }} → {{ formatTokens(row.outputTokens) }} = {{ formatTokens(row.tokens) }}
             <OTooltip :content="t('traces.sessionsList.tokenTooltip', { input: row.inputTokens.toLocaleString(), output: row.outputTokens.toLocaleString(), total: row.tokens.toLocaleString() })" />
           </span>
@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Cost -->
         <template #cell-cost="{ row }">
-          <span class="text-[0.75rem]">${{ row.cost.toFixed(4) }}</span>
+          <span class="text-xs">${{ row.cost.toFixed(4) }}</span>
         </template>
 
         <!-- Status (derived from error_count) -->

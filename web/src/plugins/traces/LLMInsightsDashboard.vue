@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded"
+          class="w-full rounded-sm"
           @update:model-value="onStreamChange"
         />
       </div>
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!agentsLoaded"
           width="100%"
           height="2.125rem"
-          rounded
+          rounded-sm
         />
         <OSelect
           v-else
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="agentSelectOptions"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded"
+          class="w-full rounded-sm"
           @update:model-value="onAgentChange"
         />
       </div>
@@ -180,16 +180,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                showing a chart before the number reads as ready, so we hold both. -->
           <template v-if="card.loading">
             <div class="flex flex-col gap-[0.25rem]">
-              <SkeletonBox width="60%" height="12px" rounded />
-              <SkeletonBox width="55%" height="22px" rounded />
+              <SkeletonBox width="60%" height="12px" rounded-sm />
+              <SkeletonBox width="55%" height="22px" rounded-sm />
             </div>
-            <div class="flex items-end gap-[0.15rem] h-[32px] mt-auto">
+            <div class="flex items-end gap-[0.15rem] h-8 mt-auto">
               <SkeletonBox
                 v-for="bar in 16"
                 :key="bar"
                 width="100%"
                 :height="`${30 + ((bar * 23) % 65)}%`"
-                rounded
+                rounded-sm
               />
             </div>
           </template>

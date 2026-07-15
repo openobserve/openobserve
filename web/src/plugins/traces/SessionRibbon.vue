@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- x-axis title — matches the dashboard axis name (nameLocation
                "middle" + nameTextStyle bold/14px). -->
           <div
-            class="text-center text-[14px] font-bold text-text-heading mt-[0.25rem]"
+            class="text-center text-sm font-bold text-text-heading mt-[0.25rem]"
           >
             {{ t('traces.sessionDetail.turnLabel') }}
           </div>
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="w-[2.75rem] flex-shrink-0" />
       <div
         ref="overviewTrackRef"
-        class="relative flex-1 min-w-0 h-[26px] flex items-end gap-[1px] select-none touch-none"
+        class="relative flex-1 min-w-0 h-6.5 flex items-end gap-[1px] select-none touch-none"
         :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
         @pointerdown="onTrackPointerDown"
         data-test="session-ribbon-overview"
@@ -143,24 +143,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <!-- selected window: drag the body to pan, or either edge to resize -->
         <div
-          class="absolute top-0 bottom-0 rounded-[2px] border border-[color-mix(in_srgb,var(--color-text-heading)_45%,transparent)] bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)]"
+          class="absolute top-0 bottom-0 rounded-sm border border-[color-mix(in_srgb,var(--color-text-heading)_45%,transparent)] bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)]"
           :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
           :style="{ left: brushLeftPct + '%', width: brushWidthPct + '%' }"
           @pointerdown.stop="(e) => beginDrag('pan', e)"
         >
           <!-- left resize handle (overhangs the edge so it's easy to grab) -->
           <div
-            class="absolute top-0 bottom-0 -left-[4px] w-[9px] cursor-ew-resize flex items-center justify-center"
+            class="absolute top-0 bottom-0 -left-1 w-[9px] cursor-ew-resize flex items-center justify-center"
             @pointerdown.stop="(e) => beginDrag('resize-left', e)"
           >
-            <div class="w-[2px] h-[55%] rounded bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />
+            <div class="w-0.5 h-[55%] rounded-sm bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />
           </div>
           <!-- right resize handle -->
           <div
-            class="absolute top-0 bottom-0 -right-[4px] w-[9px] cursor-ew-resize flex items-center justify-center"
+            class="absolute top-0 bottom-0 -right-1 w-[9px] cursor-ew-resize flex items-center justify-center"
             @pointerdown.stop="(e) => beginDrag('resize-right', e)"
           >
-            <div class="w-[2px] h-[55%] rounded bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />
+            <div class="w-0.5 h-[55%] rounded-sm bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />
           </div>
         </div>
       </div>

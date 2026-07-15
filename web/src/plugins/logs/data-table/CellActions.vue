@@ -1,6 +1,6 @@
 <template>
   <div
-    class="field_overlay absolute right-0 top-[50%] table-cell-actions translate-y-[-50%] h-full! flex! items-center justify-center rounded max-h-10! px-2"
+    class="field_overlay absolute right-0 top-[50%] table-cell-actions translate-y-[-50%] h-full! flex! items-center justify-center rounded-sm max-h-10! px-2"
     :class="backgroundClass"
     :title="row[column.id]"
     :data-test="`log-add-data-from-column-${row[column.id]}`"
@@ -50,7 +50,7 @@
     <O2AIContextAddBtn
       v-if="!hideAi"
       @send-to-ai-chat="sendToAiChat(JSON.stringify(row[column.id]))"
-      :style="'border: 1px solid #fff;'"
+      :style="'border: 1px solid var(--color-white);'"
       :size="'6px'"
       :imageHeight="'16px'"
       :imageWidth="'16px'"
@@ -61,7 +61,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { PropType } from "vue";
-import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
@@ -92,8 +91,6 @@ const props = defineProps({
   },
 });
 
-const store = useStore();
-
 const emit = defineEmits([
   "copy",
   "addSearchTerm",
@@ -112,9 +109,7 @@ const addSearchTerm = (
   emit("addSearchTerm", field, field_value, action);
 };
 
-const backgroundClass = computed(() =>
-  store.state.theme === "dark" ? "bg-black" : "bg-white",
-);
+const backgroundClass = "bg-surface-base";
 const sendToAiChat = (value: any) => {
   emit("sendToAiChat", value);
 };

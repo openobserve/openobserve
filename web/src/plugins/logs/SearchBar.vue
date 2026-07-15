@@ -746,7 +746,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </template>
                 <div
-                  class="p-2 min-w-[240px]"
+                  class="p-2 min-w-60"
                   data-test="logs-search-bar-region-menu"
                 >
                   <OInput
@@ -1222,7 +1222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="icon-toolbar"
         @click="toggleEditorFullscreen"
-        class="absolute! z-[51] top-[0.1875rem] right-[0.25rem] [border:1px_solid_var(--color-card-glass-border)]! rounded-md w-[30px]! h-[30px]! min-w-[30px]! min-h-[30px]!"
+        class="absolute! z-[51] top-[0.1875rem] right-[0.25rem] [border:1px_solid_var(--color-card-glass-border)]! rounded-md w-7.5! h-7.5! min-w-7.5! min-h-7.5!"
       >
         <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
       </OButton>
@@ -1354,7 +1354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OIcon name="warning" size="md" class="mx-2" />
                       <span
-                        class="text-red-500 p-2 font-semibold"
+                        class="text-status-error-text p-2 font-semibold"
                         >{{ t('search.vrlOnlyForTableWarning') }}</span
                       >
                     </div>
@@ -1432,8 +1432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div>
         <div
-          class="text-sm font-semibold leading-tight pr-2"
-          :class="store.state.theme === 'dark' ? 'text-[#e5e5e5]' : 'text-[#262626]'"
+          class="text-sm font-semibold leading-tight pr-2 text-text-primary"
         >{{ t("search.fileType") }}</div>
         <OButtonGroup
           data-test="custom-download-file-type-button-group"
@@ -1583,7 +1582,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("search.maxEventsScheduleJob") }}
       </div>
       <div class="opacity-80 text-left mapping-warning-msg mt-3">
-        <OIcon name="warning" size="sm" class="mr-2 text-red-500" />
+        <OIcon name="warning" size="sm" class="mr-2 text-status-error-text" />
         <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
       </div>
     </ODialog>
@@ -1673,7 +1672,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="searchObj.loadingSavedView == true"
                     class="w-full p-2"
                   >
-                    <div class="text-sm font-medium text-weight-bold">
+                    <div class="text-sm font-medium font-bold">
                       <OSpinner size="xs" />
                       {{ t("confirmDialog.loading") }}
                     </div>

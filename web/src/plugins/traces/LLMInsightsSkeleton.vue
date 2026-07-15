@@ -29,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!kpiOnly && !hideToolbar"
       class="flex items-center justify-end gap-[0.5rem] py-[0.5rem]"
     >
-      <SkeletonBox width="116px" height="32px" rounded />
-      <SkeletonBox width="14rem" height="36px" rounded />
+      <SkeletonBox width="116px" height="32px" rounded-sm />
+      <SkeletonBox width="14rem" height="36px" rounded-sm />
     </div>
 
     <!-- Row 1: 5 KPI cards -->
@@ -38,21 +38,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="n in 5"
         :key="n"
-        class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-lg py-[0.625rem] px-[0.875rem] flex flex-col gap-2 h-[130px]"
+        class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-lg py-[0.625rem] px-[0.875rem] flex flex-col gap-2 h-32.5"
         :class="
           store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
         "
       >
-        <SkeletonBox width="60%" height="12px" rounded />
-        <SkeletonBox width="55%" height="22px" rounded />
-        <SkeletonBox width="40%" height="10px" rounded />
+        <SkeletonBox width="60%" height="12px" rounded-sm />
+        <SkeletonBox width="55%" height="22px" rounded-sm />
+        <SkeletonBox width="40%" height="10px" rounded-sm />
         <div class="flex items-end gap-[0.15rem] h-8 mt-auto">
           <SkeletonBox
             v-for="bar in 16"
             :key="bar"
             width="100%"
             :height="`${30 + ((bar * 23) % 65)}%`"
-            rounded
+            rounded-sm
           />
         </div>
       </div>
@@ -68,9 +68,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
         "
       >
-        <SkeletonBox width="120px" height="16px" rounded />
-        <SkeletonBox width="160px" height="10px" rounded />
-        <div class="relative h-[220px] mt-2 overflow-hidden">
+        <SkeletonBox width="120px" height="16px" rounded-sm />
+        <SkeletonBox width="160px" height="10px" rounded-sm />
+        <div class="relative h-55 mt-2 overflow-hidden">
           <svg
             class="w-full h-full block"
             viewBox="0 0 200 80"
@@ -101,20 +101,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
       "
     >
-      <SkeletonBox width="120px" height="16px" rounded />
-      <SkeletonBox width="160px" height="10px" rounded />
+      <SkeletonBox width="120px" height="16px" rounded-sm />
+      <SkeletonBox width="160px" height="10px" rounded-sm />
       <div class="flex flex-col gap-2 mt-2">
         <div
           v-for="row in 5"
           :key="row"
           class="panel-tile__row flex items-center gap-3 py-1 border-t border-(--tile-border)"
         >
-          <SkeletonBox width="70px" height="14px" rounded />
-          <SkeletonBox width="90px" height="20px" rounded />
-          <SkeletonBox width="180px" height="14px" rounded />
-          <SkeletonBox width="110px" height="14px" rounded />
-          <SkeletonBox width="60px" height="14px" rounded />
-          <SkeletonBox width="50px" height="14px" rounded />
+          <SkeletonBox width="70px" height="14px" rounded-sm />
+          <SkeletonBox width="90px" height="20px" rounded-sm />
+          <SkeletonBox width="180px" height="14px" rounded-sm />
+          <SkeletonBox width="110px" height="14px" rounded-sm />
+          <SkeletonBox width="60px" height="14px" rounded-sm />
+          <SkeletonBox width="50px" height="14px" rounded-sm />
         </div>
       </div>
     </div>

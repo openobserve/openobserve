@@ -97,8 +97,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :key="p.key"
                       class="flex items-center justify-between py-[0.15rem] pl-[0.5rem]"
                     >
-                      <span class="text-[0.75rem] w-[2rem] shrink-0">{{ p.label }}</span>
-                      <span class="text-[0.75rem] flex-1 text-right pr-[0.25rem]">
+                      <span class="text-xs w-[2rem] shrink-0">{{ p.label }}</span>
+                      <span class="text-xs flex-1 text-right pr-[0.25rem]">
                         {{ formatTimeWithSuffix(durationPercentiles[p.key]) }}
                       </span>
                       <div class="flex w-[3rem]">
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex items-center justify-center w-full pt-[2rem]"
           >
             <div
-              class="text-sm font-medium text-weight-bold w-fit mx-auto my-0 flex-col justify-items-center"
+              class="text-sm font-medium font-bold w-fit mx-auto my-0 flex-col justify-items-center"
             >
               <OSpinner size="sm" />
               {{ t("traces.loadingStream") }}

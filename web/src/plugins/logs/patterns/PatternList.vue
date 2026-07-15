@@ -28,8 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex-1 min-w-0 px-2 relative table-head text-ellipsis text-left"
         >
           <span
-            class="font-bold"
-            :class="store.state.theme === 'dark' ? 'text-white' : 'text-gray-500'"
+            class="font-bold text-text-primary"
           >
             {{ t("search.patternColumnHeader") }}
           </span>
@@ -40,8 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="w-24 flex-shrink-0 px-2 relative table-head text-ellipsis text-right"
         >
           <span
-            class="font-bold"
-            :class="store.state.theme === 'dark' ? 'text-white' : 'text-gray-500'"
+            class="font-bold text-text-primary"
           >
             {{ t("search.occurrenceColumnHeader") }}
           </span>

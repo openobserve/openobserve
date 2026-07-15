@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <transition name="slide">
     <div
       v-if="visible"
-      class="service-graph-edge-side-panel absolute right-0 top-0 w-[420px] h-full z-[100] flex flex-col bg-[#1a1f2e] border-l border-[#2d3548] shadow-[0_10px_15px_-3px_rgba(0,0,0,0.5)] overflow-hidden animate-[slideIn_0.3s_ease-out]"
+      class="service-graph-edge-side-panel absolute right-0 top-0 w-105 h-full z-[100] flex flex-col bg-[#1a1f2e] border-l border-[#2d3548] shadow-[0_10px_15px_-3px_rgba(0,0,0,0.5)] overflow-hidden animate-[slideIn_0.3s_ease-out]"
       data-test="service-graph-edge-side-panel"
     >
       <!-- Header -->
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="panel-title flex-1 min-w-0">
           <h2
-            class="edge-name text-[15px] font-semibold m-0 leading-[1.2] text-[#e4e7eb] tracking-normal flex items-center gap-2 flex-wrap"
+            class="edge-name text-sm font-semibold m-0 leading-[1.2] text-[#e4e7eb] tracking-normal flex items-center gap-2 flex-wrap"
             data-test="service-graph-edge-side-panel-route"
           >
             <span class="from-service text-[#60a5fa] overflow-hidden text-ellipsis whitespace-nowrap">{{ selectedEdge?.from }}</span>

@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             :options="availableTemplates"
             valueKey="id"
             labelKey="name"
-            class="w-[260px]"
+            class="w-65"
             @update:model-value="onTemplateChange"
           >
             <template v-slot:prepend>
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
       <div v-for="(record, idx) in evalData" :key="idx" class="flex flex-col gap-4 w-full">
         <!-- SECTION 1: Hero Metrics (Top Row) -->
-        <div class="flex gap-3 mb-4 h-[100px]">
+        <div class="flex gap-3 mb-4 h-25">
           <!-- 1. Quality Score Card -->
           <div
             class="flex-1 flex flex-col justify-between border border-border-default rounded-lg bg-surface-base p-3"
@@ -65,9 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 {{ $t("traces.evaluations.qualityScore") }}
               </div>
               <div class="w-8 h-8 rounded-lg flex items-center justify-center"
-                   :class="getScoreClass(record.llm_evaluation_quality_score) === 'score-excellent' ? 'bg-green-500/10' : (getScoreClass(record.llm_evaluation_quality_score) === 'score-good' ? 'bg-amber-500/10' : 'bg-red-500/10')">
+                   :class="getScoreClass(record.llm_evaluation_quality_score) === 'score-excellent' ? 'bg-status-success-bg' : (getScoreClass(record.llm_evaluation_quality_score) === 'score-good' ? 'bg-status-warning-bg' : 'bg-status-error-bg')">
                 <OIcon name="insights" size="sm"
-                        :class="getScoreClass(record.llm_evaluation_quality_score) === 'score-excellent' ? 'text-green-500' : (getScoreClass(record.llm_evaluation_quality_score) === 'score-good' ? 'text-amber-500' : 'text-red-500')"
+                        :class="getScoreClass(record.llm_evaluation_quality_score) === 'score-excellent' ? 'text-status-positive' : (getScoreClass(record.llm_evaluation_quality_score) === 'score-good' ? 'text-status-warning-text' : 'text-status-error-text')"
                         class="text-[20px]" />
               </div>
             </div>
@@ -85,14 +85,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 {{ $t("traces.evaluations.verdict") }}
               </div>
               <div class="w-8 h-8 rounded-lg flex items-center justify-center"
-                   :class="getVerdict(record) === 'PASS' ? 'bg-green-500/10' : getVerdict(record) === 'FAIL' ? 'bg-red-500/10' : 'bg-gray-500/10'">
+                   :class="getVerdict(record) === 'PASS' ? 'bg-status-success-bg' : getVerdict(record) === 'FAIL' ? 'bg-status-error-bg' : 'bg-surface-subtle'">
                 <OIcon :name="getVerdict(record) === 'PASS' ? 'check-circle' : getVerdict(record) === 'FAIL' ? 'cancel' : 'help-outline'" size="sm"
-                        :class="getVerdict(record) === 'PASS' ? 'text-green-500' : getVerdict(record) === 'FAIL' ? 'text-red-500' : 'text-gray-400'"
+                        :class="getVerdict(record) === 'PASS' ? 'text-status-positive' : getVerdict(record) === 'FAIL' ? 'text-status-error-text' : 'text-text-secondary'"
                         class="text-[20px]" />
               </div>
             </div>
             <div class="text-2xl font-bold tracking-tight leading-none"
-                 :class="getVerdict(record) === 'PASS' ? 'text-green-500' : getVerdict(record) === 'FAIL' ? 'text-red-500' : 'text-text-secondary'">
+                 :class="getVerdict(record) === 'PASS' ? 'text-status-positive' : getVerdict(record) === 'FAIL' ? 'text-status-error-text' : 'text-text-secondary'">
               {{ getVerdict(record) }}
             </div>
           </div>
@@ -105,8 +105,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               <div class="text-xs font-medium text-text-secondary">
                 {{ $t("traces.evaluations.traceSteps") }}
               </div>
-              <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-500/10">
-                <OIcon name="layers" size="sm" class="text-blue-500 text-[20px]" />
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-status-info-bg">
+                <OIcon name="layers" size="sm" class="text-status-info-text text-[20px]" />
               </div>
             </div>
             <div class="text-3xl font-bold tracking-tight leading-none text-text-secondary">
@@ -122,8 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               <div class="text-xs font-medium text-text-secondary">
                 {{ $t("traces.evaluations.toolCalls") }}
               </div>
-              <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-purple-500/10">
-                <OIcon name="build" size="sm" class="text-purple-500 text-[20px]" />
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-badge-purple-soft-bg">
+                <OIcon name="build" size="sm" class="text-badge-purple-soft-text text-[20px]" />
               </div>
             </div>
             <div class="text-3xl font-bold leading-none text-text-secondary">
@@ -139,8 +139,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               <div class="text-xs font-medium text-text-secondary">
                 {{ $t("traces.evaluations.doneVia") }}
               </div>
-              <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-teal-500/10">
-                <OIcon name="flag" size="sm" class="text-teal-500 text-[20px]" />
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-badge-teal-soft-bg">
+                <OIcon name="flag" size="sm" class="text-badge-teal-soft-text text-[20px]" />
               </div>
             </div>
             <div class="text-lg font-semibold leading-tight text-text-secondary truncate" :title="record.completion_signal">
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                   <!-- Mismatch notice inside the criteria panel -->
                   <div
                     v-if="isTemplateMismatch(record)"
-                    class="mt-2 mb-1 flex items-center gap-1.5 text-[10px] text-amber-700 dark:text-amber-400"
+                    class="mt-2 mb-1 flex items-center gap-1.5 text-[10px] text-status-warning-text"
                   >
                     <OIcon name="warning" size="xs" />
                     <span>{{ $t("traces.evaluations.criteriaTemplateMismatchNote", { template: selectedTemplateData?.name, evaluated: evaluatedTemplateName(record) }) }}</span>
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                   <div
                     v-for="(issue, i) in parseCriticalIssues(record.llm_evaluation_judge_critical_issues)"
                     :key="i"
-                    class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-red-500/10 text-red-600 text-xs font-medium border border-red-500/20"
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-status-error-bg text-status-error-text text-xs font-medium border border-status-error-text"
                   >
                     <OIcon name="report-problem" size="xs" />
                     <span>{{ issue }}</span>
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 <div class="text-[10px] font-bold text-text-secondary uppercase mb-2">{{ $t("traces.evaluations.recommendedFixes") }}</div>
                 <div class="space-y-2">
                   <div v-for="(fix, i) in getFixSuggestions(record)" :key="i"
-                       class="flex items-start gap-2 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg border-dashed">
+                       class="flex items-start gap-2 p-3 bg-status-info-bg border border-status-info-text rounded-lg border-dashed">
                     <OIcon name="lightbulb" size="sm" class="mt-1" />
                     <div class="text-xs text-text-heading flex-1 leading-relaxed">
                       <strong>{{ $t("traces.evaluations.fixSuggestion") }}</strong> {{ fix }}
@@ -344,7 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               <!-- Mismatch warning: selected template ≠ template used for evaluation -->
               <div
                 v-if="isTemplateMismatch(record)"
-                class="flex items-start gap-2 p-2 rounded-md bg-amber-500/10 border border-amber-500/25 text-[10px] text-amber-700 dark:text-amber-400"
+                class="flex items-start gap-2 p-2 rounded-md bg-status-warning-bg border border-status-warning-text text-[10px] text-status-warning-text"
               >
                 <OIcon name="warning" size="xs" class="mt-px shrink-0" />
                 <span>{{ $t("traces.evaluations.templateMismatchWarning", { selected: selectedTemplateData?.name, evaluated: evaluatedTemplateName(record) }) }}</span>

@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Baseline Chip -->
         <div
-          class="time-range-chip baseline-chip flex items-center gap-1 px-2 py-[0.375rem] rounded text-[0.85rem]"
+          class="time-range-chip baseline-chip flex items-center gap-1 px-2 py-[0.375rem] rounded-sm text-[0.85rem]"
           :style="{ '--chip-color': chipColors.baseline }"
         >
           <span class="uppercase tracking-wide opacity-70"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Selected Chip -->
         <div
           v-if="hasSelectedTimeRange"
-          class="time-range-chip selected-chip flex items-center gap-1 px-2 py-[0.375rem] rounded text-[0.85rem]"
+          class="time-range-chip selected-chip flex items-center gap-1 px-2 py-[0.375rem] rounded-sm text-[0.85rem]"
           :style="{ '--chip-color': chipColors.selected }"
         >
           <span class="uppercase tracking-wide opacity-70"
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
 
       <!-- Dashboard Content with Sidebar -->
-      <div class="analysis-content flex-1 pt-2 overflow-hidden flex min-h-0 bg-[#f5f5f5]">
+      <div class="analysis-content flex-1 pt-2 overflow-hidden flex min-h-0 bg-surface-subtle">
         <!-- Collapsed dimension sidebar bar (shown when hidden) -->
         <div
           v-if="!showDimensionSelector"
@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ul>
 
                   <!-- No results message -->
-                  <div v-else class="p-4 text-center text-gray-500">
+                  <div v-else class="p-4 text-center text-text-muted">
                     {{ t("search.noResult") }}
                   </div>
                 </div>
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="text-base">
                     {{ t("latencyInsights.analyzingDimensions") }}
                   </div>
-                  <div class="text-xs text-gray-500 mt-2">
+                  <div class="text-xs text-text-secondary mt-2">
                     {{
                       t("latencyInsights.computingDistributions", {
                         count: selectedDimensions.length,
@@ -271,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="text-base mb-2">
                     {{ t("latencyInsights.failedToLoad") }}
                   </div>
-                  <div class="text-sm text-gray-500">{{ error }}</div>
+                  <div class="text-sm text-text-secondary">{{ error }}</div>
                   <OButton
                     variant="outline"
                     size="sm-action"
@@ -314,6 +314,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { ref, computed, watch, defineAsyncComponent, nextTick } from "vue";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
 import { formatTimeWithSuffix } from "@/utils/zincutils";
@@ -389,10 +390,9 @@ const emit = defineEmits<{
 const { showErrorNotification } = useNotifications();
 const store = useStore();
 const { t } = useI18n();
+const { isDark } = useTheme();
 const chipColors = computed(() =>
-  store.state.theme === "dark"
-    ? COMPARISON_COLORS.dark
-    : COMPARISON_COLORS.light,
+  isDark.value ? COMPARISON_COLORS.dark : COMPARISON_COLORS.light,
 );
 const { loading, error, analyzeAllDimensions } = useLatencyInsightsAnalysis();
 const { generateDashboard } = useLatencyInsightsDashboard();
@@ -1145,7 +1145,7 @@ watch(
 }
 
 .dimension-list-item:hover {
-  background-color: var(--q-hover-color, rgba(0, 0, 0, 0.04));
+  background-color: var(--color-interactive-hover-bg));
 }
 
 /* Splitter separator bar — visible narrow divider */

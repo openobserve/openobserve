@@ -35,31 +35,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="props.showSummary" class="thread-summary flex flex-wrap items-center gap-[0.4rem] py-2 px-4 bg-(--color-surface-base,transparent) border-b border-border-default">
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--steps h-[26px]! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded! text-xs! text-text-body! border-l-[3px]! border-l-[#cc785c]!"
+        class="thread-chip thread-chip--steps h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded! text-xs! text-text-body! border-l-[3px]! border-l-[#cc785c]!"
         :title="`${summary.turnCount} LLM step${summary.turnCount === 1 ? '' : 's'}`"
       >
         <template #icon><OIcon name="auto-awesome" size="xs" /></template>
-        <span class="thread-chip__label text-text-secondary font-medium mr-[5px] tracking-normal text-[11.5px]">Steps</span>
+        <span class="thread-chip__label text-text-secondary font-medium mr-[5px] tracking-normal text-2xs">Steps</span>
         <span class="thread-chip__value text-text-body font-semibold text-xs">{{ summary.turnCount }}</span>
       </OTag>
 
-      <OTag type="metricChip" class="thread-chip thread-chip--tools h-[26px]! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded! text-xs! text-text-body! border-l-[3px]! border-l-[#0ea5e9]!">
+      <OTag type="metricChip" class="thread-chip thread-chip--tools h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded! text-xs! text-text-body! border-l-[3px]! border-l-[#0ea5e9]!">
         <template #icon><OIcon name="build" size="xs" /></template>
-        <span class="thread-chip__label text-text-secondary font-medium mr-[5px] tracking-normal text-[11.5px]">Tools</span>
+        <span class="thread-chip__label text-text-secondary font-medium mr-[5px] tracking-normal text-2xs">Tools</span>
         <span class="thread-chip__value text-text-body font-semibold text-xs">{{ summary.toolCallCount }}</span>
       </OTag>
 
-      <OTag type="metricChip" class="thread-chip thread-chip--duration h-[26px]! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded! text-xs! text-text-body! border-l-[3px]! border-l-[#64748b]!">
+      <OTag type="metricChip" class="thread-chip thread-chip--duration h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded! text-xs! text-text-body! border-l-[3px]! border-l-[#64748b]!">
         <template #icon><OIcon name="schedule" size="xs" /></template>
-        <span class="thread-chip__label text-text-secondary font-medium mr-[5px] tracking-normal text-[11.5px]">Duration</span>
+        <span class="thread-chip__label text-text-secondary font-medium mr-[5px] tracking-normal text-2xs">Duration</span>
         <span class="thread-chip__value text-text-body font-semibold text-xs">
           {{ formatDuration(summary.totalDurationNs) }}
         </span>
       </OTag>
 
-      <OTag type="metricChip" class="thread-chip thread-chip--cost h-[26px]! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded! text-xs! text-text-body! border-l-[3px]! border-l-[#16a34a]!">
+      <OTag type="metricChip" class="thread-chip thread-chip--cost h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded! text-xs! text-text-body! border-l-[3px]! border-l-[#16a34a]!">
         <template #icon><OIcon name="payments" size="xs" /></template>
-        <span class="thread-chip__label text-text-secondary font-medium mr-[5px] tracking-normal text-[11.5px]">Cost</span>
+        <span class="thread-chip__label text-text-secondary font-medium mr-[5px] tracking-normal text-2xs">Cost</span>
         <span class="thread-chip__value text-text-body font-semibold text-xs">
           {{ formatCost(summary.totalCost) }}
         </span>
@@ -68,21 +68,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="summary.dominantModel"
         type="metricChip"
-        class="thread-chip thread-chip--model h-[26px]! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded! text-xs! text-text-body! border-l-[3px]! border-l-[#8b5cf6]!"
+        class="thread-chip thread-chip--model h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded! text-xs! text-text-body! border-l-[3px]! border-l-[#8b5cf6]!"
         :title="summary.dominantModel"
       >
         <template #icon><OIcon name="bolt" size="xs" /></template>
-        <span class="thread-chip__label text-text-secondary font-medium mr-[5px] tracking-normal text-[11.5px]">Model</span>
+        <span class="thread-chip__label text-text-secondary font-medium mr-[5px] tracking-normal text-2xs">Model</span>
         <span class="thread-chip__value text-text-body font-semibold text-xs">{{ summary.dominantModel }}</span>
       </OTag>
 
       <OTag
         v-if="summary.errorCount > 0"
         type="metricChip"
-        class="thread-chip thread-chip--error h-[26px]! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded! text-xs! text-text-body! border-l-[3px]! border-l-error-600!"
+        class="thread-chip thread-chip--error h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded! text-xs! text-text-body! border-l-[3px]! border-l-error-600!"
       >
         <template #icon><OIcon name="error-outline" size="xs" /></template>
-        <span class="thread-chip__label text-text-secondary font-medium mr-[5px] tracking-normal text-[11.5px]">Errors</span>
+        <span class="thread-chip__label text-text-secondary font-medium mr-[5px] tracking-normal text-2xs">Errors</span>
         <span class="thread-chip__value thread-chip__value--error font-semibold text-xs text-error-600">{{ summary.errorCount }}</span>
       </OTag>
 
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="thread-system__head flex items-center gap-[0.625rem] py-2 px-3 cursor-pointer transition-all duration-[120ms]"
           @click="showSystemFull = !showSystemFull"
         >
-          <span class="thread-system__badge inline-flex items-center py-[0.15rem] px-2 bg-[rgba(139,92,246,0.1)] text-[#8b5cf6] rounded text-[0.7rem] font-semibold tracking-[0.02rem] shrink-0">
+          <span class="thread-system__badge inline-flex items-center py-[0.15rem] px-2 bg-[rgba(139,92,246,0.1)] text-[#8b5cf6] rounded-sm text-[0.7rem] font-semibold tracking-[0.02rem] shrink-0">
             <OIcon name="settings" size="xs" class="mr-1" />
             System
           </span>
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-if="showSystemFull"
-          class="thread-system__content py-3 px-[0.875rem] border-t border-border-default bg-(--color-surface-base,var(--color-surface-base)) text-[0.82rem] leading-[1.55] text-text-secondary whitespace-pre-wrap break-words max-h-[360px] overflow-auto"
+          class="thread-system__content py-3 px-[0.875rem] border-t border-border-default bg-(--color-surface-base,var(--color-surface-base)) text-[0.82rem] leading-[1.55] text-text-secondary whitespace-pre-wrap break-words max-h-90 overflow-auto"
         >
           {{ head.systemPrompt }}
         </div>
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              same session — these are answered in earlier traces. -->
         <div
           v-if="group.historicalUserCount > 0"
-          class="thread-prior flex items-center gap-[0.5rem] px-[0.75rem] py-[0.4rem] mb-[0.5rem] rounded border border-dashed border-border-default text-[0.72rem] text-text-muted"
+          class="thread-prior flex items-center gap-[0.5rem] px-[0.75rem] py-[0.4rem] mb-[0.5rem] rounded-sm border border-dashed border-border-default text-[0.72rem] text-text-muted"
         >
           <span>↶</span>
           <span>
@@ -215,35 +215,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Footer. -->
           <div class="thread-turn__footer flex items-center flex-wrap gap-[0.35rem] mt-2 pt-2 border-t border-dashed border-border-default text-[0.72rem] text-text-secondary">
-            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-[0.3rem] bg-(--color-surface-base,rgba(0,0,0,0.03)) border border-border-default text-text-secondary text-[0.7rem] leading-none whitespace-nowrap shrink-0" :title="`Started at ${formatTime(turn.span.start_time)}`">
+            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md bg-(--color-surface-base,rgba(0,0,0,0.03)) border border-border-default text-text-secondary text-[0.7rem] leading-none whitespace-nowrap shrink-0" :title="`Started at ${formatTime(turn.span.start_time)}`">
               <OIcon name="schedule" size="xs" />
               {{ formatTime(turn.span.start_time) }}
             </span>
-            <span class="thread-metric thread-metric--model inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-[0.3rem] text-[#8b5cf6] bg-[rgba(139,92,246,0.06)] border border-[rgba(139,92,246,0.2)] font-medium max-w-[200px] overflow-hidden text-ellipsis text-[0.7rem] leading-none whitespace-nowrap shrink-0" :title="getModel(turn.span)">
+            <span class="thread-metric thread-metric--model inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md text-[#8b5cf6] bg-[rgba(139,92,246,0.06)] border border-[rgba(139,92,246,0.2)] font-medium max-w-50 overflow-hidden text-ellipsis text-[0.7rem] leading-none whitespace-nowrap shrink-0" :title="getModel(turn.span)">
               <OIcon name="bolt" size="xs" />
               {{ getModel(turn.span) || "unknown" }}
             </span>
-            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-[0.3rem] bg-(--color-surface-base,rgba(0,0,0,0.03)) border border-border-default text-text-secondary text-[0.7rem] leading-none whitespace-nowrap shrink-0" title="Duration">
+            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md bg-(--color-surface-base,rgba(0,0,0,0.03)) border border-border-default text-text-secondary text-[0.7rem] leading-none whitespace-nowrap shrink-0" title="Duration">
               <OIcon name="timer" size="xs" />
               {{ formatDuration(turn.span.duration) }}
             </span>
-            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-[0.3rem] bg-(--color-surface-base,rgba(0,0,0,0.03)) border border-border-default text-text-secondary text-[0.7rem] leading-none whitespace-nowrap shrink-0" title="Tokens">
+            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md bg-(--color-surface-base,rgba(0,0,0,0.03)) border border-border-default text-text-secondary text-[0.7rem] leading-none whitespace-nowrap shrink-0" title="Tokens">
               <OIcon name="data-usage" size="xs" />
               {{ formatNumber(getTokens(turn.span)) }} tokens
             </span>
-            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-[0.3rem] bg-(--color-surface-base,rgba(0,0,0,0.03)) border border-border-default text-text-secondary text-[0.7rem] leading-none whitespace-nowrap shrink-0" title="Cost">
+            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md bg-(--color-surface-base,rgba(0,0,0,0.03)) border border-border-default text-text-secondary text-[0.7rem] leading-none whitespace-nowrap shrink-0" title="Cost">
               <OIcon name="payments" size="xs" />
               {{ formatCost(getCost(turn.span)) }}
             </span>
             <span
               v-if="turn.span.span_status === 'ERROR'"
-              class="thread-metric thread-metric--error inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-[0.3rem] text-[#dc2626] bg-[rgba(220,38,38,0.08)] border border-[rgba(220,38,38,0.25)] font-medium text-[0.7rem] leading-none whitespace-nowrap shrink-0"
+              class="thread-metric thread-metric--error inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md text-[#dc2626] bg-[rgba(220,38,38,0.08)] border border-[rgba(220,38,38,0.25)] font-medium text-[0.7rem] leading-none whitespace-nowrap shrink-0"
             >
               <OIcon name="error-outline" size="xs" />
               Error
             </span>
             <button
-              class="thread-turn__view-span ml-auto inline-flex items-center gap-[0.2rem] py-[0.2rem] px-[0.55rem] rounded-[0.3rem] text-(--q-primary) text-[0.72rem] font-medium bg-transparent border border-transparent cursor-pointer transition-all duration-[120ms] shrink-0"
+              class="thread-turn__view-span ml-auto inline-flex items-center gap-[0.2rem] py-[0.2rem] px-[0.55rem] rounded-md text-(--q-primary) text-[0.72rem] font-medium bg-transparent border border-transparent cursor-pointer transition-all duration-[120ms] shrink-0"
               @click="emit('span-selected', turn.span.span_id)"
             >
               View span

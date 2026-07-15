@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="outline"
                 size="xs"
-                class="h-full text-[0.75rem]!"
+                class="h-full text-xs!"
                 :disabled="isViewLogsDisabled"
                 :loading="config.isEnterprise === 'true' && correlationLoading"
                 @click.stop="viewSpanLogs"
@@ -501,7 +501,7 @@ class="h-full overflow-y-auto">
             <OToggleGroup v-model="attributesViewMode" class="rounded!">
               <OToggleGroupItem value="json"
 size="xs"
-class="h-5! text-[0.75rem]!">
+class="h-5! text-xs!">
                 <template #icon-left
                   ><OIcon name="data-object" size="xs" class="shrink-0"
                 /></template>
@@ -509,7 +509,7 @@ class="h-5! text-[0.75rem]!">
               </OToggleGroupItem>
               <OToggleGroupItem value="table"
 size="xs"
-class="h-5! text-[0.75rem]!">
+class="h-5! text-xs!">
                 <template #icon-left
                   ><OIcon name="table-chart" size="xs" class="shrink-0"
                 /></template>
@@ -636,7 +636,7 @@ class="h-5! text-[0.75rem]!">
             </div>
             <!-- TenstackTable for events -->
             <div
-              class="flex-1 traces-events-table-container overflow-hidden tab-content-dynamic-height border-1 border-solid border-card-glass-border rounded"
+              class="flex-1 traces-events-table-container overflow-hidden tab-content-dynamic-height border-1 border-solid border-card-glass-border rounded-sm"
               :class="
                 isLLMSpan && llmMetrics && span.gen_ai_response_model
                   ? '[height:calc(100vh-312px)]'
@@ -800,11 +800,11 @@ class="h-5! text-[0.75rem]!">
               />
               <div
                 v-else-if="correlationError"
-                class="text-[0.875rem] font-bold"
+                class="text-sm font-bold"
               >
                 {{ correlationError }}
               </div>
-              <div v-else class="text-base text-gray-500">
+              <div v-else class="text-base text-text-muted">
                 {{ t("correlation.clickToLoadLogs") }}
               </div>
             </div>
@@ -858,11 +858,11 @@ class="h-5! text-[0.75rem]!">
               />
               <div
                 v-else-if="correlationError"
-                class="text-[0.875rem] font-bold"
+                class="text-sm font-bold"
               >
                 {{ correlationError }}
               </div>
-              <div v-else class="text-base text-gray-500">
+              <div v-else class="text-base text-text-muted">
                 {{ t("correlation.clickToLoadMetrics") }}
               </div>
             </div>
@@ -890,6 +890,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
 import { defineComponent, onBeforeMount, ref, watch, type Ref, inject } from "vue";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import { useI18n } from "vue-i18n";
 import { computed } from "vue";
 import {
@@ -1105,7 +1106,7 @@ export default defineComponent({
         const regex = new RegExp(`(${escapedQuery})`, "gi");
         return escapeHtml(text).replace(
           regex,
-          (match) => `<span class="highlight">${match}</span>`,
+          (match) => `<span class="trace-sidebar-highlight">${match}</span>`,
         );
       } catch (e) {
         return escapeHtml(text);
@@ -1133,7 +1134,7 @@ export default defineComponent({
       };
 
       const lines: string[] = [];
-      lines.push('<span style="color: #9ca3af;">{</span>');
+      lines.push('<span style="color: var(--color-text-label);">{</span>');
 
       const entries = Object.entries(attrs);
       entries.forEach(([key, value], index) => {
@@ -1141,14 +1142,14 @@ export default defineComponent({
         const valueHtml = formatValue(value);
         const comma =
           index < entries.length - 1
-            ? '<span style="color: #9ca3af;">,</span>'
+            ? '<span style="color: var(--color-text-label);">,</span>'
             : "";
         lines.push(
-          `  ${keyHtml}<span style="color: #9ca3af;">:</span> ${valueHtml}${comma}`,
+          `  ${keyHtml}<span style="color: var(--color-text-label);">:</span> ${valueHtml}${comma}`,
         );
       });
 
-      lines.push('<span style="color: #9ca3af;">}</span>');
+      lines.push('<span style="color: var(--color-text-label);">}</span>');
       return lines.join("\n");
     };
 
@@ -1283,8 +1284,8 @@ export default defineComponent({
       spanDetails.value = getFormattedSpanDetails();
     });
 
-    // Get current theme from store
-    const isDarkMode = computed(() => store.state.theme === "dark");
+    // Get current theme via the sanctioned dark-mode seam
+    const { isDark: isDarkMode } = useTheme();
 
     // Check if View Logs button should be disabled
     const isViewLogsDisabled = computed(() => {
@@ -2066,7 +2067,7 @@ export default defineComponent({
     const serviceIconUrl = computed(() =>
       getServiceIconDataUrl(
         props.span?.service_name ?? "",
-        store.state.theme === "dark",
+        isDarkMode.value,
         props.span
           ? getOrSetServiceColor(resolveSpanIdentity(props.span))
           : "#9e9e9e",
@@ -2755,8 +2756,8 @@ body.body--dark .trace-details-toolbar-container .provider-badge {
   font-size: 12px;
 }
 
-.highlight {
-  background-color: yellow; /* Adjust background color as desired */
+.trace-sidebar-highlight {
+  background-color: var(--color-table-highlight-bg);
 }
 </style>
 

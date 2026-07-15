@@ -3,7 +3,7 @@
     <div class="pb-1 flex justify-start px-3 copy-log-btn">
       <app-tabs
         v-if="filteredTabs.length"
-        class="mb-[0.375rem] logs-json-preview-tabs mr-2 border border-solid border-card-glass-border rounded-[0.25rem] text-[]"
+        class="mb-[0.375rem] logs-json-preview-tabs mr-2 border border-solid border-card-glass-border rounded-sm text-[]"
         data-test="logs-json-preview-tabs"
         :tabs="filteredTabs"
         v-model:active-tab="activeTab"
@@ -64,7 +64,7 @@
           ref="queryEditorRef"
           :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"
           class="w-[calc(100%-16px)]!"
-          :class="[mode, mode === 'expanded' ? 'h-[300px]! max-w-[1024px]!' : 'h-[calc(100vh-250px)]!']"
+          :class="[mode, mode === 'expanded' ? 'h-75! max-w-256!' : 'h-[calc(100vh-250px)]!']"
           language="json"
         />
       </div>

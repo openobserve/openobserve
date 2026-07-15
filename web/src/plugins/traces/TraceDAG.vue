@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="w-full h-full min-h-125">
     <div v-if="isLoading" data-test="traces-trace-dag-loading-container" class="flex items-center justify-center flex-col p-6 h-125">
       <OSpinner size="lg" />
-      <div class="mt-3 text-gray-400">Loading trace DAG...</div>
+      <div class="mt-3 text-text-muted">Loading trace DAG...</div>
     </div>
 
     <div v-else-if="error" data-test="traces-trace-dag-error-message" class="p-3">
@@ -27,10 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" data-test="traces-trace-dag-empty-container" class="flex items-center justify-center flex-col p-6 h-125">
       <OIcon name="info" style="width: 48px; height: 48px;" />
-      <div class="mt-3 text-gray-400">No DAG data available</div>
+      <div class="mt-3 text-text-muted">No DAG data available</div>
     </div>
 
-    <div v-else data-test="traces-trace-dag-wrapper" class="w-full h-full min-h-150 border border-border-default rounded relative dark:border-[#444]">
+    <div v-else data-test="traces-trace-dag-wrapper" class="w-full h-full min-h-150 border border-border-default rounded-sm relative">
       <VueFlow
         :nodes="nodes"
         :edges="edges"
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :max-zoom="3"
         fit-view-on-init
         :fit-view-options="{ padding: 0.3, minZoom: 0.3, maxZoom: 0.7 }"
-        class="trace-dag-flow w-full h-full bg-[#fafafa] dark:bg-[#1e1e1e]!"
+        class="trace-dag-flow w-full h-full bg-surface-panel!"
       >
         <Background pattern-color="#aaa" :gap="16" />
         <Controls />
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <Handle v-if="data.hasIncoming" type="target" :position="Position.Top"
             class="w-2 h-2 bg-[#1976d2] border-2 border-white rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.15)]" />
           <div
-            class="p-[6px_12px] rounded-md bg-white border-2 border-[#1976d2] min-w-[80px] max-w-[180px] min-h-[28px] shadow-[0_2px_6px_rgba(0,0,0,0.1)] transition-all duration-200 cursor-pointer text-center flex flex-col items-center justify-center hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:[transform:translateY(-2px)] dark:bg-[#2a2a2a] dark:border-[#64b5f6] dark:text-border-default"
+            class="p-[6px_12px] rounded-md bg-white border-2 border-[#1976d2] min-w-20 max-w-45 min-h-7 shadow-[0_2px_6px_rgba(0,0,0,0.1)] transition-all duration-200 cursor-pointer text-center flex flex-col items-center justify-center hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:[transform:translateY(-2px)] dark:bg-[#2a2a2a] dark:border-[#64b5f6] dark:text-border-default"
             :class="[
               {
                 'border-[#c62828]! bg-[#ffebee]! dark:border-[#ef5350]! dark:bg-[#3a1a1a]!': data.span_status === 'ERROR',
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="handleNodeClick(data.span_id)"
           >
             <div
-              class="text-[13px] text-[#1976d2] font-semibold break-words max-w-[160px] leading-[1.3] whitespace-nowrap overflow-hidden text-ellipsis dark:text-[#90caf9]"
+              class="text-compact text-[#1976d2] font-semibold break-words max-w-40 leading-[1.3] whitespace-nowrap overflow-hidden text-ellipsis dark:text-[#90caf9]"
               :class="getObservationTypeTextClass(data.gen_ai_operation_name)"
             >{{ data.operation_name }}</div>
             <OTag
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="spanStatus"
               :value="data.span_status"
               label="ERR"
-              class="text-[10px] h-[14px] mt-0.5 px-1"
+              class="text-[10px] h-3.5 mt-0.5 px-1"
             />
           </div>
           <Handle v-if="data.hasOutgoing" type="source" :position="Position.Bottom"

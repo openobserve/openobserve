@@ -19,7 +19,7 @@
             <OTooltip :content="t('search.messageWrapContent')" />
           </OButton>
           <div
-            class="text-[#f5a623] border border-[#f5a623] flex items-center px-2 h-[36px] rounded-md"
+            class="text-status-warning-text border border-status-warning-text flex items-center px-2 h-9 rounded-md"
           >
             <OIcon name="info" class="mr-1" size="sm" />
             <div>
@@ -195,10 +195,10 @@
 
             <template #bottom>
               <div
-                class="flex items-center justify-between w-full h-[48px]"
+                class="flex items-center justify-between w-full h-12"
               >
                 <div
-                  class="o2-table-footer-title flex items-center w-[100px] mr-md"
+                  class="o2-table-footer-title flex items-center w-25 mr-md"
                 >
                   {{ resultTotal }} {{ t("search_history.results") }}
                 </div>

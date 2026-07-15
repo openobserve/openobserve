@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="trace-row-latency-bar"
-    class="flex flex-nowrap h-[0.85rem] rounded overflow-hidden w-full bg-card-glass-border"
+    class="flex flex-nowrap h-[0.85rem] rounded-sm overflow-hidden w-full bg-card-glass-border"
   >
     <div
       v-for="[service, svc] in serviceEntries"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTooltip side="left" align="center">
         <template #content>
           <div
-            class="font-semibold mb-[0.35rem] tracking-[0.03rem] opacity-100 text-[0.75rem]"
+            class="font-semibold mb-[0.35rem] tracking-[0.03rem] opacity-100 text-xs"
           >
             {{ item.spans }} spans across {{ serviceEntries.length }} services
           </div>

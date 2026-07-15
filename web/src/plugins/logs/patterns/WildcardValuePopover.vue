@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-show="visible && !!anchorEl"
     ref="popoverRef"
-    class="wcp w-72 bg-card-glass-solid border border-border-default rounded-[0.625rem] overflow-hidden shadow-[0_0.5rem_1.5rem_rgba(0,0,0,0.14),0_0.125rem_0.375rem_rgba(0,0,0,0.06)] [animation:wcpIn_0.15s_ease-out]"
+    class="wcp w-72 bg-card-glass-solid border border-border-default rounded-lg overflow-hidden shadow-[0_0.5rem_1.5rem_rgba(0,0,0,0.14),0_0.125rem_0.375rem_rgba(0,0,0,0.06)] [animation:wcpIn_0.15s_ease-out]"
     :class="{ '[animation-name:wcpInUp]': flipUpward }"
     :style="popoverStyle"
     data-test="wildcard-value-popover"
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="wcp__type-badge shrink-0 font-mono font-bold"
         />
         <span
-          class="wcp__title text-[0.8125rem] font-semibold text-text-heading truncate"
+          class="wcp__title text-compact font-semibold text-text-heading truncate"
         >Variable slot · {{ tokenType }}</span>
       </div>
       <div
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="wcp__unique-count text-sm font-bold text-text-heading [font-variant-numeric:tabular-nums]"
         >{{ displayValues.length }}</span>
         <span
-          class="wcp__unique-label text-[0.6875rem] text-text-caption"
+          class="wcp__unique-label text-2xs text-text-caption"
         >unique</span>
       </div>
     </div>
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="wcp__row-value text-xs font-semibold font-mono text-text-body truncate flex-1 min-w-0"
           >{{ item.value || "(empty)" }}</span>
           <span
-            class="wcp__row-count text-[0.8125rem] font-bold text-text-heading [font-variant-numeric:tabular-nums] shrink-0"
+            class="wcp__row-count text-compact font-bold text-text-heading [font-variant-numeric:tabular-nums] shrink-0"
           >{{ item.count.toLocaleString() }}</span>
         </div>
         <!-- Full-width progress bar -->
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         v-if="displayValues.length === 0"
-        class="wcp__empty py-6 px-3 text-center text-[0.6875rem] text-text-muted"
+        class="wcp__empty py-6 px-3 text-center text-2xs text-text-muted"
       >
         {{ t("search.patternNoValuesAvailable") }}
       </div>
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="wcp__footer flex items-center justify-end py-[0.4375rem] px-3 border-t border-card-glass-border"
     >
       <span
-        class="wcp__occurrences text-[0.6875rem] font-semibold text-text-caption [font-variant-numeric:tabular-nums]"
+        class="wcp__occurrences text-2xs font-semibold text-text-caption [font-variant-numeric:tabular-nums]"
       >{{ totalOccurrences.toLocaleString() }} occurrences</span>
     </div>
   </div>

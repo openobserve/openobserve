@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="p-[0.675rem] mb-6"
           data-test="log-detail-table-content"
         >
-          <div v-if="rowData.length == 0" class="pt-3 max-w-[350px]">
+          <div v-if="rowData.length == 0" class="pt-3 max-w-87.5">
             No data available.
           </div>
           <OTable
@@ -129,12 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-field="{ row, value }">
               <div
                 :data-test="`log-detail-${value}-key`"
-                class="text-left"
-                :class="
-                  store.state.theme == 'dark'
-                    ? 'text-[#f67a7aff]'
-                    : 'text-[#B71C1C]'
-                "
+                class="text-left text-status-error-text"
               >
                 {{ value }}
               </div>
@@ -293,11 +288,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSpinner v-if="correlationLoading" size="lg" class="mb-4" data-test="logs-correlation-loading-indicator" />
             <div
               v-else-if="correlationError"
-              class="text-base text-red-500"
+              class="text-base text-status-error-text"
             >
               {{ correlationError }}
             </div>
-            <div v-else class="text-base text-gray-500">
+            <div v-else class="text-base text-text-muted">
               {{ t("correlation.clickToLoadLogs") }}
             </div>
           </div>
@@ -331,8 +326,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else class="flex items-center justify-center h-full py-20">
           <div class="text-center">
             <OSpinner v-if="correlationLoading" size="lg" class="mb-4" data-test="logs-correlation-loading-indicator" />
-            <div v-else-if="correlationError" class="text-base text-red-500">{{ correlationError }}</div>
-            <div v-else class="text-base text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
+            <div v-else-if="correlationError" class="text-base text-status-error-text">{{ correlationError }}</div>
+            <div v-else class="text-base text-text-muted">{{ t('correlation.clickToLoadMetrics') }}</div>
           </div>
         </div>
       </OTabPanel>
@@ -364,8 +359,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else class="flex items-center justify-center h-full py-20">
           <div class="text-center">
             <OSpinner v-if="correlationLoading" size="lg" class="mb-4" data-test="logs-correlation-loading-indicator" />
-            <div v-else-if="correlationError" class="text-base text-red-500">{{ correlationError }}</div>
-            <div v-else class="text-base text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
+            <div v-else-if="correlationError" class="text-base text-status-error-text">{{ correlationError }}</div>
+            <div v-else class="text-base text-text-muted">{{ t('correlation.clickToLoadTraces') }}</div>
           </div>
         </div>
       </OTabPanel>

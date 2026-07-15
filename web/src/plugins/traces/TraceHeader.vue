@@ -77,10 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-for="(tick, index) in baseTracePosition['tics']"
-        class="trace-tic absolute -top-0.75 w-px bg-[#cacaca] z-1 h-6.5"
+        class="trace-tic absolute -top-0.75 w-px bg-border-default z-1 h-6.5"
         :class="{
           'z-5 hidden': index === 0,
-          'bg-[#3c3c3c]': store.state.theme === 'dark',
         }"
         :key="tick.value + index"
         :style="{

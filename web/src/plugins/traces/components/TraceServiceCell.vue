@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex items-center gap-[0.325rem] min-w-0 flex-nowrap!">
       <span
         data-test="trace-row-service-name"
-        class="text-weight-bold truncate min-w-0 text-text-secondary! text-[0.8rem]! tracking-[0.03rem]! [font-family:var(--font-mono)]"
+        class="font-bold truncate min-w-0 text-text-secondary! text-[0.8rem]! tracking-[0.03rem]! [font-family:var(--font-mono)]"
       >
         {{ item.service_name }}
         <OTooltip side="bottom" align="center">
@@ -42,17 +42,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useStore } from "vuex";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useTraces from "@/composables/useTraces";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
+import useTheme from "@/composables/useTheme";
 
 const props = defineProps<{
   item: Record<string, any>;
   dataTest?: string;
 }>();
 
-const store = useStore();
+const { isDark } = useTheme();
 
 const { getOrSetServiceColor } = useTraces();
 
@@ -63,7 +63,7 @@ const rootColor = computed(
 const serviceIconUrl = computed(() =>
   getServiceIconDataUrl(
     props.item.service_name,
-    store.state.theme === "dark",
+    isDark.value,
     rootColor.value,
   ),
 );

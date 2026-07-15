@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #subtitle>
             <div
-              class="flex items-center space-x-2 text-[0.6875rem] text-text-secondary whitespace-nowrap"
+              class="flex items-center space-x-2 text-2xs text-text-secondary whitespace-nowrap"
             >
               <span>{{
                 formatTimestamp(traceStartTime, store.state.timezone)
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-left
                 ><OIcon name="filter-alt" size="xs"
               /></template>
-              <span class="text-[0.75rem]">{{ t("traces.viewFilters") }}</span>
+              <span class="text-xs">{{ t("traces.viewFilters") }}</span>
               <OTooltip :content="t('traces.reviewAndApplyFilters')" />
             </OButton>
 
@@ -210,11 +210,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Service, Timestamp, and Trace ID -->
               <div
-                class="flex items-center space-x-2 text-[11px] text-text-secondary whitespace-nowrap"
+                class="flex items-center space-x-2 text-2xs text-text-secondary whitespace-nowrap"
               >
                 <span>{{ formatTimestamp(traceStartTime, store.state.timezone) }}</span>
                 <div
-                  class="bg-text-label py-[0rem] w-[1px] h-[16px]"
+                  class="bg-text-label py-[0rem] w-[1px] h-4"
                 />
                 <span class="mr-[0.25rem]">
                   {{ t("traces.traceId") }}:
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Session ID (LLM traces) -->
                 <template v-if="sessionId">
                   <div
-                    class="bg-text-label py-[0rem] w-[1px] h-[16px]"
+                    class="bg-text-label py-[0rem] w-[1px] h-4"
                   />
                   <span class="mr-[0.25rem]">
                     Session ID:
@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div
-                class="bg-text-label py-[0rem] w-[1px] h-[16px]"
+                class="bg-text-label py-[0rem] w-[1px] h-4"
               />
               <!-- Span Count Badge -->
               <span class="inline-flex">
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
 
               <div
-                class="bg-text-label py-[0rem] w-[1px] h-[16px]"
+                class="bg-text-label py-[0rem] w-[1px] h-4"
               />
 
               <!-- Error Count Badge -->
@@ -339,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ><OIcon name="filter-alt"
 size="xs"
               /></template>
-              <span class="text-[0.75rem]">{{ t("traces.viewFilters") }}</span>
+              <span class="text-xs">{{ t("traces.viewFilters") }}</span>
               <OTooltip :content="t('traces.reviewAndApplyFilters')" />
             </OButton>
 
@@ -460,7 +460,7 @@ size="sm">
                   :placeholder="t('traces.searchInSpans')"
                   clearable
                   size="sm"
-                  class="text-[12px]!"
+                  class="text-xs!"
                   @update:model-value="handleSearchQueryChange"
                 />
               </div>
@@ -527,7 +527,7 @@ size="sm">
                     data-test="trace-details-view-logs-btn"
                     variant="outline"
                     size="sm"
-                    class="text-[0.75rem] h-8! font-normal!"
+                    class="text-xs h-8! font-normal!"
                     :disabled="isViewLogsDisabled"
                     @click="redirectToLogs"
                   >
@@ -608,10 +608,7 @@ size="sm">
                         data-test="trace-details-resizer"
                         :style="{
                           left: `${leftWidth}px`,
-                          backgroundColor:
-                            store.state.theme === 'dark'
-                              ? '#3c3c3c'
-                              : '#ececec',
+                          backgroundColor: 'var(--color-border-default)',
                           zIndex: 999,
                         }"
                         class="absolute resize h-full cursor-col-resize top-0 w-[1px]"
@@ -714,7 +711,7 @@ size="sm">
                 class="dag-resizer w-2 cursor-col-resize flex items-center justify-center shrink-0 relative z-10"
                 @mousedown="startDagResize"
               >
-                <div class="dag-resizer-line w-0.75 h-full bg-border-default rounded transition-colors duration-200"></div>
+                <div class="dag-resizer-line w-0.75 h-full bg-border-default rounded-sm transition-colors duration-200"></div>
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
@@ -924,7 +921,7 @@ size="sm">
       @click:secondary="showFilterPopover = false"
       @click:primary="applyAndViewTraces"
     >
-      <div class="flex-1 border border-border-default rounded">
+      <div class="flex-1 border border-border-default rounded-sm">
         <CodeQueryEditor
           v-model:query="localEditorValue"
           language="sql"
@@ -959,6 +956,7 @@ import TraceTree from "./TraceTree.vue";
 import TraceDAG from "./TraceDAG.vue";
 import TraceHeader from "./TraceHeader.vue";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import { createTracesContextProvider } from "@/composables/contextProviders/tracesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
 import {
@@ -1194,7 +1192,7 @@ export default defineComponent({
 
     // Pattern View - new functionality
     const consolidatedPatterns = ref(new Map());
-    const isDarkMode = computed(() => store.state.theme === 'dark');
+    const { isDark: isDarkMode } = useTheme();
 
     // Set up pattern tree composable and visualization engine
     const { generateEChartsOptions } = createTreeVisualizationEngine();
@@ -1668,7 +1666,7 @@ export default defineComponent({
     
     const backgroundStyle = computed(() => {
       return {
-        background: store.state.theme === "dark" ? "#181a1b" : "#ffffff",
+        background: "var(--color-surface-base)",
       };
     });
 
@@ -2923,15 +2921,7 @@ export default defineComponent({
 
 <style>
 .dag-resizer:hover .dag-resizer-line {
-  background-color: var(--color-theme-accent, #1976d2);
-}
-
-body.body--dark .dag-resizer-line {
-  background-color: #3c3c3c;
-}
-
-body.body--dark .dag-resizer:hover .dag-resizer-line {
-  background-color: #90caf9;
+  background-color: var(--color-accent);
 }
 </style>
 

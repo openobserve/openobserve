@@ -119,10 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="(spans as any[])[virtualRow.index].operationName"
             >
               <div
-                class="flex flex-nowrap w-full h-7.5 overflow-visible relative-position operation-name-container cursor-pointer items-center"
-                :class="[
-                  store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
-                ]"
+                class="flex flex-nowrap w-full h-7.5 overflow-visible relative-position operation-name-container cursor-pointer items-center bg-surface-base"
                 :data-test="`trace-tree-span-operation-name-container-${(spans as any[])[virtualRow.index].spanId}`"
                 @click="selectSpan((spans as any[])[virtualRow.index].spanId)"
                 @mouseenter="
@@ -221,15 +218,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span
                         class="text-sm font-medium font-bold mr-2"
                         :class="{
-                          'bg-yellow-300 font-bold': isHighlighted(
+                          'bg-table-highlight-bg text-table-highlight-text font-bold': isHighlighted(
                             (spans as any[])[virtualRow.index].spanId,
                           ),
-                          'text-gray-900':
-                            store.state.theme === 'dark' &&
-                            isHighlighted(
-                              (spans as any[])[virtualRow.index].spanId,
-                            ),
-                          'bg-yellow-300 text-red-600 font-bold':
+                          'bg-table-highlight-bg text-status-error-text font-bold':
                             currentSelectedValue ===
                             (spans as any[])[virtualRow.index].spanId,
                         }"
@@ -261,12 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`trace-tree-span-tech-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
                       <span
-                        class="text-sm"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'text-gray-400'
-                            : 'text-blue-grey-9'
-                        "
+                        class="text-sm text-text-secondary"
                         :data-test="`trace-tree-span-operation-name-${(spans as any[])[virtualRow.index].spanId}`"
                         >{{
                           (spans as any[])[virtualRow.index].operationName
@@ -312,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="
                         getHttpStatusVars((spans as any[])[virtualRow.index])
                       "
-                      class="text-xs font-semibold leading-none py-[0.4rem] px-1 mr-[0.25rem] rounded whitespace-nowrap"
+                      class="text-xs font-semibold leading-none py-[0.4rem] px-1 mr-[0.25rem] rounded-sm whitespace-nowrap"
                       :style="{
                         backgroundColor: getHttpStatusVars(
                           (spans as any[])[virtualRow.index],
@@ -405,6 +392,7 @@ import {
 } from "vue";
 import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import SpanBlock from "./SpanBlock.vue";
 import SpanKindBadge from "./components/SpanKindBadge.vue";
 import { useI18n } from "vue-i18n";
@@ -494,6 +482,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { buildQueryDetails, navigateToLogs } = useTraces();
     const store = useStore();
+    const { isDark } = useTheme();
 
     const { t } = useI18n();
     const router = useRouter();
@@ -756,7 +745,6 @@ export default defineComponent({
 
     // ── Icon maps ────────────────────────────────────────────────────────────
     const spanServiceIconUrlMap = computed(() => {
-      const isDark = store.state.theme === "dark";
       const cache = new Map<string, string>();
       for (const span of props.spans as any[]) {
         const key = `${span.serviceName}/${span.style?.color ?? ""}`;
@@ -765,7 +753,7 @@ export default defineComponent({
             key,
             getServiceIconDataUrl(
               span.serviceName,
-              isDark,
+              isDark.value,
               span.style?.color ?? "#9e9e9e",
             ),
           );
@@ -788,12 +776,11 @@ export default defineComponent({
     };
 
     const spanTechIconUrlMap = computed(() => {
-      const isDark = store.state.theme === "dark";
       const map = new Map<string, string>();
       for (const span of props.spans as any[]) {
         const tech = getSpanTech(span);
         if (tech && !map.has(tech)) {
-          const url = getSpanTechIconDataUrl(tech, isDark);
+          const url = getSpanTechIconDataUrl(tech, isDark.value);
           if (url) map.set(tech, url);
         }
       }
@@ -883,11 +870,7 @@ export default defineComponent({
 
 <style>
 .span-count-box:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-}
-
-.bg-dark .span-count-box:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--color-interactive-hover-bg);
 }
 
 /* Hover highlight via CSS — no JS required */

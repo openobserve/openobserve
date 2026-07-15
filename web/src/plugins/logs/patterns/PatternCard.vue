@@ -30,9 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex-1 min-w-0 px-2 pl-3" :class="wrap ? '' : 'overflow-hidden'">
       <!-- Template rendered as tokenized chips so wildcards are visually distinct -->
       <div
-        class="font-mono text-xs w-full"
+        class="font-mono text-xs w-full text-text-secondary"
         :class="[
-          store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-500',
           wrap
             ? 'break-all'
             : 'flex items-baseline gap-x-[2px] gap-y-[1px] flex-nowrap overflow-hidden',
@@ -73,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Anomaly badge with explanation tooltip -->
       <span
         v-if="pattern.is_anomaly"
-        class="text-badge-error-ol-text text-weight-bold text-[0.7rem] cursor-help"
+        class="text-badge-error-ol-text font-bold text-[0.7rem] cursor-help"
         :data-test="`pattern-card-${index}-anomaly-badge`"
       >
         ⚠️ {{ t("search.anomalyLabel") }}
@@ -90,8 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ pattern.frequency.toLocaleString() }}
       </div>
       <div
-        class="text-[0.6875rem] opacity-80"
-        :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
+        class="text-2xs opacity-80"
+        :class="'text-text-secondary'"
         :data-test="`pattern-card-${index}-percentage`"
       >
         {{ pattern.percentage.toFixed(2) }}%
@@ -100,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Actions Column -->
     <div
-      class="w-20 flex-shrink-0 px-2 flex items-center justify-center gap-[2px]"
+      class="w-20 flex-shrink-0 px-2 flex items-center justify-center gap-0.5"
       :class="wrap ? 'pt-1' : ''"
     >
       <OButton
@@ -140,8 +139,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import useTheme from "@/composables/useTheme";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -170,8 +169,8 @@ defineEmits<{
   (e: "create-alert", pattern: any): void;
 }>();
 
-const store = useStore();
 const { t } = useI18n();
+const { isDark } = useTheme();
 const { onMouseEnter, onMouseLeave } = useWildcardHover();
 
 const templateTokens = computed(() =>
@@ -179,8 +178,6 @@ const templateTokens = computed(() =>
 );
 
 const anomalyExplanationText = computed(() => anomalyExplanation(props.pattern, t));
-
-const isDark = computed(() => store.state.theme === "dark");
 
 const statusColor = computed(() =>
   extractStatusFromTemplate(props.pattern.template ?? "", isDark.value).color,

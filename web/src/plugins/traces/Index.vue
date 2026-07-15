@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.loading
                     "
                     data-test="traces-search-error-text"
-                    class="text-center py-[40px] text-[20px] card-container h-full"
+                    class="text-center py-10 text-[20px] card-container h-full"
                   >
                     <SanitizedHtmlRenderer
                       data-test="traces-search-detail-error-message"
@@ -345,6 +345,7 @@ import {
   getUUID,
   generateTraceContext,
 } from "@/utils/zincutils";
+import { chartColor } from "@/utils/chartTheme";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -1515,7 +1516,7 @@ function generateHistogramData() {
       text: "",
       font: {
         size: 12,
-        color: store.state.theme === "dark" ? "#fff" : "#181a1b",
+        color: chartColor("--color-text-primary"),
       },
     },
     margin: {
@@ -1526,14 +1527,14 @@ function generateHistogramData() {
     },
     font: {
       size: 12,
-      color: store.state.theme === "dark" ? "#fff" : "#181a1b",
+      color: chartColor("--color-text-primary"),
     },
     xaxis: { type: "date" },
     yaxis: { ticksuffix: "ms" },
     scattergap: 0.7,
     height: 150,
-    paper_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
-    plot_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
+    paper_bgcolor: chartColor("--color-surface-base"),
+    plot_bgcolor: chartColor("--color-surface-base"),
     autosize: true,
   };
 

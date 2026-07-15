@@ -158,10 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="(header.column.columnDef.meta as any).closable"
                 :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
                 name="close"
-                class="m-0 mt-[0.125rem]! close-icon cursor-pointer"
-                :class="
-                  store.state.theme === 'dark' ? 'text-white' : 'text-gray-700'
-                "
+                class="m-0 mt-[0.125rem]! close-icon cursor-pointer text-icon-color"
                 :title="t('common.close')"
                 size="sm"
                 @click.stop="closeColumn(header.column.columnDef)"
@@ -177,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="font-bold"
             style="opacity: 0.7"
           >
-            <div class="text-sm font-medium text-weight-bold bg-amber-500">
+            <div class="text-sm font-medium font-bold bg-warning">
               <OIcon size="xs"
 name="warning"
 class="mr-1" />
@@ -195,12 +192,7 @@ class="mr-1" />
             style="opacity: 0.6"
           >
             <div
-              class="text-sm font-medium text-weight-bold pl-2"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'bg-yellow-600'
-                  : 'bg-amber-300'
-              "
+              class="text-sm font-medium font-bold pl-2 bg-status-warning-bg"
             >
               <OButton
                 variant="ghost"
@@ -220,12 +212,7 @@ class="mr-1" />
           <td
             :colspan="columnOrder.length"
             style="opacity: 0.7"
-            class="px-2"
-            :class="
-              store.state.theme === 'dark'
-                ? 'bg-yellow-600'
-                : 'bg-amber-300'
-            "
+            class="px-2 bg-status-warning-bg"
           >
             <pre>{{ functionErrorMsg }}</pre>
           </td>
@@ -1336,7 +1323,7 @@ defineExpose({
 }
 
 /* Dark mode — matches histogram-skeleton dark --hsk-bar (grey-600 #525252) */
-.body--dark .logs-skel-pill {
+.dark .logs-skel-pill {
   background: linear-gradient(
     90deg,
     var(--color-grey-600)       0%,

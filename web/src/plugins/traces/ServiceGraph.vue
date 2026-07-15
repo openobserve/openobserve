@@ -12,7 +12,7 @@
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="w-auto flex-shrink-0 rounded"
+          class="w-auto flex-shrink-0 rounded-sm"
           :disabled="availableStreams.length === 0"
           @update:model-value="onStreamFilterChange"
         />
@@ -34,7 +34,7 @@
       <!-- Legends (horizontal) -->
       <div
         data-test="service-graph-legends"
-        class="flex flex-row items-center gap-3 p-[0.325rem] rounded border border-card-glass-border!"
+        class="flex flex-row items-center gap-3 p-[0.325rem] rounded-sm border border-card-glass-border!"
       >
         <div
           data-test="sg-legend"
@@ -225,13 +225,13 @@
         <OCardSection class="p-0 h-full" style="height: 100%">
           <div
             data-test="service-graph-container"
-            class="graph-container h-full w-full rounded overflow-hidden bg-surface-base"
+            class="graph-container h-full w-full rounded-sm overflow-hidden bg-surface-base"
             style="position: relative"
           >
             <div v-if="loading" class="flex items-center justify-center h-full">
               <div class="text-center flex flex-col items-center">
                 <OSpinner size="xl" />
-                <div class="text-base font-medium mt-3 text-gray-400">
+                <div class="text-base font-medium mt-3 text-text-muted">
                   Loading service graph...
                 </div>
               </div>
@@ -352,7 +352,7 @@
     @click:primary="resetSettings"
   >
     <div class="gap-3">
-      <div class="text-xs text-gray-400">
+      <div class="text-xs text-text-muted">
         Stream-based topology - all data persisted to storage
         <OTooltip content="Service graph uses stream-only architecture with zero in-memory state" />
       </div>
@@ -372,6 +372,7 @@ import {
 } from "vue";
 import * as echarts from "echarts";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import serviceGraphService from "@/services/service_graph";
@@ -443,6 +444,7 @@ export default defineComponent({
   emits: ["view-traces", "request:stream-change", "jump-to-stream-data"],
   setup(props, { emit }) {
     const store = useStore();
+    const { isDark } = useTheme();
     const router = useRouter();
     const { t } = useI18n();
     const { getStreams } = useStreams();
@@ -653,7 +655,7 @@ export default defineComponent({
           ? convertServiceGraphToTree(
               filteredGraphData.value,
               layoutType,
-              store.state.theme === 'dark',
+              isDark.value,
               // Pass the live panel height so the tree can auto-shrink its
               // label font + node size to the fit-to-view compression, keeping
               // labels from overlapping on tall (many-leaf) graphs.
@@ -665,7 +667,7 @@ export default defineComponent({
               // terminal leaves); honor an explicit 'force' choice from the user.
               layoutType === "force" ? "force" : "layered",
               new Map(),
-              store.state.theme === 'dark',
+              isDark.value,
               undefined,
               graphContainerRef.value?.clientWidth || 1200,
               graphContainerRef.value?.clientHeight || 700,
@@ -843,7 +845,7 @@ export default defineComponent({
 
       // Custom tooltip element — node tooltips use innerHTML, edge tooltips use an ECharts mini chart
       const tooltipEl = document.createElement("div");
-      const isDarkInit = store.state.theme === 'dark';
+      const isDarkInit = isDark.value;
       tooltipEl.style.cssText = `
         position: absolute; pointer-events: none; z-index: 9999;
         background: ${isDarkInit ? "rgba(22, 22, 26, 0.90)" : "rgba(255, 255, 255, 0.88)"};
@@ -1061,7 +1063,7 @@ export default defineComponent({
           '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif';
         tooltipEl.style.letterSpacing = "0.01em";
         tooltipEl.style.whiteSpace = "nowrap";
-        tooltipEl.style.color = store.state.theme === 'dark'
+        tooltipEl.style.color = isDark.value
           ? "rgba(255,255,255,0.88)"
           : "rgba(0,0,0,0.82)";
       };
@@ -1867,11 +1869,7 @@ export default defineComponent({
 }
 
 .service-graph-container {
-  background: #0f1419 !important;
-}
-
-.body--light .service-graph-container {
-  background: #ffffff !important;
+  background: var(--color-surface-base) !important;
 }
 
 @keyframes sg-edge-flow {
@@ -1894,8 +1892,8 @@ export default defineComponent({
   animation-fill-mode: both;
 }
 
-.body--dark [data-test="service-graph-stream-selector"] .q-field,
-.body--dark [data-test="service-graph-search-input"] .q-field {
+.dark [data-test="service-graph-stream-selector"] .q-field,
+.dark [data-test="service-graph-search-input"] .q-field {
   background: var(--color-surface-base);
 }
 </style>

@@ -237,14 +237,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
                 <span>
-                  <div class="font-medium text-[12px]">
+                  <div class="font-medium text-xs">
                     {{
                       searchObj.meta.liveMode
                         ? t("search.turnOffLiveMode")
                         : t("search.turnOnLiveMode")
                     }}
                   </div>
-                  <div class="text-[11px] text-muted-foreground">
+                  <div class="text-2xs text-muted-foreground">
                     {{ t("search.liveModeTooltip") }}
                   </div>
                 </span>

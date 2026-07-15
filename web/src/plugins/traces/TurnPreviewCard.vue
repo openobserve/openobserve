@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTooltip :side="side" :delay="delay" max-width="260px" content-class="p-0!">
       <template #content>
         <div
-          class="w-[252px] py-[11px] px-3 text-xs text-text-primary"
+          class="w-63 py-[11px] px-3 text-xs text-text-primary"
           :data-test="`turn-preview-${index + 1}`"
         >
           <!-- Header: Turn N · time · status -->
@@ -65,19 +65,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="grid grid-cols-2 gap-x-3 gap-y-[7px] border-t border-card-glass-border pt-[9px]"
           >
-            <div class="flex items-center justify-between text-[11px]">
+            <div class="flex items-center justify-between text-2xs">
               <span class="text-text-muted">{{ t('traces.sessionDetail.stats.cost') }}</span>
               <span class="font-[650]">{{ costLabel }}</span>
             </div>
-            <div class="flex items-center justify-between text-[11px]">
+            <div class="flex items-center justify-between text-2xs">
               <span class="text-text-muted">{{ t('traces.sessionDetail.kpi.duration') }}</span>
               <span class="font-[650]">{{ latencyLabel }}</span>
             </div>
-            <div class="flex items-center justify-between text-[11px]">
+            <div class="flex items-center justify-between text-2xs">
               <span class="text-text-muted">{{ t('traces.sessionDetail.kpi.tokens') }}</span>
               <span class="font-[650]">{{ tokensLabel }}</span>
             </div>
-            <div class="flex items-center justify-between text-[11px]">
+            <div class="flex items-center justify-between text-2xs">
               <span class="text-text-muted">{{ t('traces.sessionDetail.stats.cache') }}</span>
               <span class="font-[650]">{{ cachePct }}%</span>
             </div>

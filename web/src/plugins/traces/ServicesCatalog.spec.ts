@@ -1577,7 +1577,9 @@ describe("ServicesCatalog", () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      expect(wrapper.vm.errorRateClass(15)).toContain("text-red-500");
+      expect(wrapper.vm.errorRateClass(15)).toContain(
+        "text-service-health-critical",
+      );
     });
 
     it("should return correct class for warning error rate (5-10%)", async () => {
@@ -1592,7 +1594,9 @@ describe("ServicesCatalog", () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      expect(wrapper.vm.errorRateClass(7)).toContain("text-orange-500");
+      expect(wrapper.vm.errorRateClass(7)).toContain(
+        "text-service-health-degraded",
+      );
     });
 
     it("should return correct class for degraded error rate (1-5%)", async () => {
@@ -1607,7 +1611,9 @@ describe("ServicesCatalog", () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      expect(wrapper.vm.errorRateClass(2)).toContain("text-yellow-500");
+      expect(wrapper.vm.errorRateClass(2)).toContain(
+        "text-service-health-warning",
+      );
     });
 
     it("should return empty string for healthy error rate (<=1%)", async () => {

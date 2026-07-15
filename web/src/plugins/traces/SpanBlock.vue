@@ -16,11 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex wrap justify-start items-center"
-    :class="[
-      defocusSpan ? 'opacity-30' : '',
-      store.state.theme === 'dark' ? 'bg-surface-base' : 'bg-white',
-    ]"
+    class="flex wrap justify-start items-center bg-surface-base"
+    :class="defocusSpan ? 'opacity-30' : ''"
     :style="{
       zIndex: 2,
     }"
@@ -28,8 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="span-block-container"
   >
     <div
-      class="flex justify-between items-end cursor-pointer span-block relative-position"
-      :class="[store.state.theme === 'dark' ? 'bg-surface-base' : 'bg-white']"
+      class="flex justify-between items-end cursor-pointer span-block relative-position bg-surface-base"
       :style="{
         height: spanDimensions.height + 'px',
         width: '100%',

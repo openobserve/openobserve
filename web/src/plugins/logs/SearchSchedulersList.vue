@@ -205,8 +205,8 @@
               </div>
             </template>
             <template #bottom>
-              <div class="flex items-center justify-between w-full h-[48px]">
-                <div class="o2-table-footer-title flex items-center w-[100px] mr-md">
+              <div class="flex items-center justify-between w-full h-12">
+                <div class="o2-table-footer-title flex items-center w-25 mr-md">
                   {{ resultTotal }} {{ t('search_scheduler_job.results') }}
                 </div>
                 <div class="ml-auto mr-2">{{ t('search_scheduler_job.max_limit') }} : <b>1000</b></div>
@@ -745,15 +745,15 @@ export default defineComponent({
     const getStatusColorClass = (status) => {
       switch (status) {
         case 0:
-          return "text-orange-500"; // Pending
+          return "text-status-warning-text"; // Pending
         case 1:
-          return "text-blue-500"; // Running
+          return "text-status-info-text"; // Running
         case 2:
-          return "text-green-500"; // Finished
+          return "text-status-positive"; // Finished
         case 3:
-          return "text-red-500"; // Cancelled
+          return "text-status-error-text"; // Cancelled
         default:
-          return "text-gray-500"; // Unknown
+          return "text-text-muted"; // Unknown
       }
     };
     const getStatusColor = (status) => {

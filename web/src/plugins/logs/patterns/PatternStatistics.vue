@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="py-2 px-4 shrink-0 bg-bg-gray text-sm"
     data-test="pattern-statistics"
-    :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
+    :class="'text-text-secondary'"
   >
     {{ summaryText }}
   </div>

@@ -19,7 +19,7 @@
     <template #group-header="{ row, groupName }">
       <div
         :data-test="`logs-page-field-list-group-header-${row.group}`"
-        class="font-semibold text-xs py-0.5 px-[0.325rem] cursor-pointer text-field-list-group-text bg-surface-subtle h-full w-full flex! justify-between items-center rounded-[0.25rem]"
+        class="font-semibold text-xs py-0.5 px-[0.325rem] cursor-pointer text-field-list-group-text bg-surface-subtle h-full w-full flex! justify-between items-center rounded-sm"
         @click="$emit('toggle-group', row.group)"
       >
         <div class="flex-1 min-w-0 flex items-center gap-1">

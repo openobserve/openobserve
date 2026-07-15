@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
         <div
-          class="flex-1 min-w-0 text-left pl-2 bg-amber-500 text-white rounded"
+          class="flex-1 min-w-0 text-left pl-2 bg-warning text-text-inverse rounded-sm"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer

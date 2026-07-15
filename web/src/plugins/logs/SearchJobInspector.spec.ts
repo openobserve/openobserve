@@ -19,6 +19,7 @@ import SearchJobInspector from "@/plugins/logs/SearchJobInspector.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import searchService from "@/services/search";
+import { chartColor } from "@/utils/chartTheme";
 
 
 // ── Stubs for migrated ODialog / ODrawer ────────────────────────────────────
@@ -347,18 +348,19 @@ describe("SearchJobInspector — getResponseTimeLabel", () => {
     expect(wrapper.vm.getResponseTimeLabel(9999).text).toBe("Slow response");
   });
 
-  it("uses green color class in dark theme for ultra-fast/fast", () => {
+  // The dark/light green pair collapsed to a single semantic status token.
+  it("uses the positive status color class in dark theme for ultra-fast/fast", () => {
     store.commit("appTheme", "dark");
     const wrapper = mountComponent();
-    expect(wrapper.vm.getResponseTimeLabel(10).colorClass).toBe("text-green-400");
-    expect(wrapper.vm.getResponseTimeLabel(100).colorClass).toBe("text-green-400");
+    expect(wrapper.vm.getResponseTimeLabel(10).colorClass).toBe("text-status-positive");
+    expect(wrapper.vm.getResponseTimeLabel(100).colorClass).toBe("text-status-positive");
   });
 
-  it("uses green color class in light theme for ultra-fast/fast", () => {
+  it("uses the positive status color class in light theme for ultra-fast/fast", () => {
     store.commit("appTheme", "light");
     const wrapper = mountComponent();
-    expect(wrapper.vm.getResponseTimeLabel(10).colorClass).toBe("text-green-600");
-    expect(wrapper.vm.getResponseTimeLabel(100).colorClass).toBe("text-green-600");
+    expect(wrapper.vm.getResponseTimeLabel(10).colorClass).toBe("text-status-positive");
+    expect(wrapper.vm.getResponseTimeLabel(100).colorClass).toBe("text-status-positive");
     store.commit("appTheme", "dark"); // restore
   });
 });
@@ -373,8 +375,12 @@ describe("SearchJobInspector — getDurationColor", () => {
     setProfileData(wrapper, {
       events: [{ component: "a", duration: 100, timestamp: "0" }],
     });
-    expect(wrapper.vm.getDurationColor(100)).toBe("#f44336"); // 100% → red
-    expect(wrapper.vm.getDurationColor(76)).toBe("#f44336");  // 76% → red
+    expect(wrapper.vm.getDurationColor(100)).toBe(
+      chartColor("--color-service-health-critical"),
+    ); // 100% → critical
+    expect(wrapper.vm.getDurationColor(76)).toBe(
+      chartColor("--color-service-health-critical"),
+    ); // 76% → critical
   });
 
   it("returns orange for > 50% and <= 75% of maxDuration", () => {
@@ -382,8 +388,12 @@ describe("SearchJobInspector — getDurationColor", () => {
     setProfileData(wrapper, {
       events: [{ component: "a", duration: 100, timestamp: "0" }],
     });
-    expect(wrapper.vm.getDurationColor(51)).toBe("#ff9800");
-    expect(wrapper.vm.getDurationColor(75)).toBe("#ff9800");
+    expect(wrapper.vm.getDurationColor(51)).toBe(
+      chartColor("--color-service-health-degraded"),
+    );
+    expect(wrapper.vm.getDurationColor(75)).toBe(
+      chartColor("--color-service-health-degraded"),
+    );
   });
 
   it("returns yellow for > 25% and <= 50% of maxDuration", () => {
@@ -391,8 +401,12 @@ describe("SearchJobInspector — getDurationColor", () => {
     setProfileData(wrapper, {
       events: [{ component: "a", duration: 100, timestamp: "0" }],
     });
-    expect(wrapper.vm.getDurationColor(26)).toBe("#ffc107");
-    expect(wrapper.vm.getDurationColor(50)).toBe("#ffc107");
+    expect(wrapper.vm.getDurationColor(26)).toBe(
+      chartColor("--color-service-health-warning"),
+    );
+    expect(wrapper.vm.getDurationColor(50)).toBe(
+      chartColor("--color-service-health-warning"),
+    );
   });
 
   it("returns green for <= 25% of maxDuration", () => {
@@ -400,8 +414,12 @@ describe("SearchJobInspector — getDurationColor", () => {
     setProfileData(wrapper, {
       events: [{ component: "a", duration: 100, timestamp: "0" }],
     });
-    expect(wrapper.vm.getDurationColor(25)).toBe("#4caf50");
-    expect(wrapper.vm.getDurationColor(1)).toBe("#4caf50");
+    expect(wrapper.vm.getDurationColor(25)).toBe(
+      chartColor("--color-service-health-healthy"),
+    );
+    expect(wrapper.vm.getDurationColor(1)).toBe(
+      chartColor("--color-service-health-healthy"),
+    );
   });
 });
 
