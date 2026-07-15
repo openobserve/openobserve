@@ -418,9 +418,9 @@ type DisplayMonitor = ReturnType<typeof mapMonitor>
 function dotClass(status: string) {
   const lower = status.toLowerCase()
   return {
-    'bg-status-success-text': lower === 'up',
-    'bg-status-warning-text': lower === 'degraded',
-    'bg-status-error-text': lower === 'down',
+    'bg-status-success-text': lower === 'passed',
+    'bg-status-warning-text': lower === 'warning',
+    'bg-status-error-text': lower === 'failed',
     'bg-text-muted': lower === 'unknown',
   }
 }
@@ -784,9 +784,9 @@ const statusTabs = computed(() => {
   const ms = enrichedMonitors.value
   const tabs = [
     { filter: 'all',      label: 'All',      count: ms.length },
-    { filter: 'up',       label: 'Passed',       count: ms.filter(m => m.status === 'up').length },
-    { filter: 'degraded', label: 'Warning', count: ms.filter(m => m.status === 'degraded').length },
-    { filter: 'down',     label: 'Failed',     count: ms.filter(m => m.status === 'down').length },
+    { filter: 'passed',   label: 'Passed',   count: ms.filter(m => m.status === 'passed').length },
+    { filter: 'warning',  label: 'Warning',  count: ms.filter(m => m.status === 'warning').length },
+    { filter: 'failed',   label: 'Failed',   count: ms.filter(m => m.status === 'failed').length },
   ]
   const unknownCount = ms.filter(m => m.status === 'unknown').length
   if (unknownCount > 0) {
