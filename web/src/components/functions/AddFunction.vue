@@ -666,7 +666,12 @@ export default defineComponent({
     // transType and seed the editor with ready-to-edit boilerplate. Only for a
     // fresh function; an existing one keeps its saved language + code.
     if (this.forcedLanguage && !this.beingUpdated) {
-      this.formData.transType = this.forcedLanguage === "javascript" ? "1" : "0";
+      const tt = this.forcedLanguage === "javascript" ? "1" : "0";
+      this.formData.transType = tt;
+      // transType is form-owned (drives the editor language, the "*Function*"
+      // label, and the info tooltip), so it must be written to the FORM — setting
+      // formData alone leaves the display on VRL.
+      (this as any).addFunctionForm?.setFieldValue?.("transType", tt);
       if (this.defaultCode && !this.formData.function) {
         this.formData.function = this.defaultCode;
       }
