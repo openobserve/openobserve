@@ -434,7 +434,7 @@ function openChromeExtensions() {
 </script>
 
 <template>
-  <div class="flex flex-col min-h-0 w-full">
+  <div class="flex flex-col min-h-0 w-full py-4">
 
     <!-- Toolbar — pl-4 mirrors the expand column (w-4) so the select-all checkbox
          aligns with the row checkboxes in the OTable below. -->
