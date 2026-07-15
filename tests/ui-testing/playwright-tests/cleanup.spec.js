@@ -212,11 +212,13 @@ test.describe("Pre-Test Cleanup", () => {
       /^cancel_test_[a-f0-9]{8}$/,                                                           // cancel_test_<uuid> (cancel form test)
       /^toggle_test_[a-f0-9]{8}$/,                                                           // toggle_test_<uuid> (source toggle test)
       /^edit_form_[a-f0-9]{8}$/,                                                             // edit_form_<uuid> (edit form test)
-      /^schema_view_[a-f0-9]{8}$/,                                                           // schema_view_<uuid> (schema view test)
+      /^schema_view_[a-f0-9]{8}$/,                                                           // schema_view_<uuid> (schema view test, legacy prefix)
+      /^view_schema_[a-f0-9]{8}$/,                                                           // view_schema_<uuid> (schema view test — renamed: "schema" prefix hits backend not-an-ingester bug)
       /^duplicate_test_[a-f0-9]{8}$/,                                                        // duplicate_test_<uuid> (duplicate name test)
       /^empty_url_[a-f0-9]{8}$/,                                                             // empty_url_<uuid> (empty URL validation test)
       /^url_404_[a-f0-9]{8}$/,                                                               // url_404_<uuid> (invalid URL 404 test)
-      /^schema_mismatch_[a-f0-9]{8}$/,                                                        // schema_mismatch_<uuid> (schema mismatch test)
+      /^schema_mismatch_[a-f0-9]{8}$/,                                                        // schema_mismatch_<uuid> (schema mismatch test, legacy prefix)
+      /^mismatch_schema_[a-f0-9]{8}$/,                                                        // mismatch_schema_<uuid> (schema mismatch test — renamed off "schema" prefix)
       // Pytest API tests (test_enrichment_table_url.py) - uses api_url_<test>_<uuid8> naming
       /^api_url_create_[a-f0-9]{8}$/,                                                         // api_url_create_<uuid> (create test)
       /^api_url_status_[a-f0-9]{8}$/,                                                         // api_url_status_<uuid> (status test)
@@ -248,8 +250,10 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up URL-based enrichment tables (those showing "NaN MB" in UI)
     // These are tracked separately in /api/{org}/enrichment_tables/status
     await pm.apiCleanup.cleanupUrlEnrichmentTables([
-      /^schema_mismatch_[a-f0-9]{8}$/,    // schema_mismatch_<uuid> (schema mismatch URL tests)
-      /^schema_view_[a-f0-9]{8}$/,        // schema_view_<uuid> (schema view URL tests)
+      /^schema_mismatch_[a-f0-9]{8}$/,    // schema_mismatch_<uuid> (schema mismatch URL tests, legacy prefix)
+      /^mismatch_schema_[a-f0-9]{8}$/,    // mismatch_schema_<uuid> (schema mismatch URL tests, renamed)
+      /^schema_view_[a-f0-9]{8}$/,        // schema_view_<uuid> (schema view URL tests, legacy prefix)
+      /^view_schema_[a-f0-9]{8}$/,        // view_schema_<uuid> (schema view URL tests, renamed)
       /^url_404_[a-f0-9]{8}$/,            // url_404_<uuid> (404 error URL tests)
       /^url_lifecycle_[a-f0-9]{8}$/,      // url_lifecycle_<uuid> (lifecycle URL tests)
       /^invalid_url_[a-f0-9]{8}$/,        // invalid_url_<uuid> (invalid URL tests)
