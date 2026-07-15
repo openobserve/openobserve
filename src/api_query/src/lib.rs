@@ -17,9 +17,7 @@
 
 #![recursion_limit = "256"]
 
-pub use openobserve_api_shared::extractors;
-#[cfg(feature = "enterprise")]
-pub use openobserve_core::cipher;
+pub use openobserve_api_common::extractors;
 pub use openobserve_core::{common, service};
 
 pub mod promql;

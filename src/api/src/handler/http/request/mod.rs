@@ -68,6 +68,6 @@ pub mod status;
 pub mod stream;
 pub mod users;
 
-pub use openobserve_api_shared::request::{BulkDeleteRequest, BulkDeleteResponse};
+pub use openobserve_api_common::request::{BulkDeleteRequest, BulkDeleteResponse};
 
 pub use crate::common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO};

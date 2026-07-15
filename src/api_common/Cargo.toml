@@ -1,5 +1,5 @@
 [package]
-name = "openobserve-api-shared"
+name = "openobserve-api-common"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

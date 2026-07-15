@@ -6600,8 +6600,8 @@ dependencies = [
  "o2_enterprise",
  "o2_openfga",
  "o2_ratelimit",
+ "openobserve-api-common",
  "openobserve-api-query",
- "openobserve-api-shared",
  "openobserve-core",
  "opentelemetry",
  "opentelemetry-proto",
@@ -6638,6 +6638,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "openobserve-api-common"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "http 1.4.0",
+ "log",
+ "serde",
+ "serde_json",
+ "utoipa",
+]
+
+[[package]]
 name = "openobserve-api-query"
 version = "0.1.0"
 dependencies = [
@@ -6654,7 +6666,7 @@ dependencies = [
  "log",
  "o2_enterprise",
  "o2_openfga",
- "openobserve-api-shared",
+ "openobserve-api-common",
  "openobserve-core",
  "promql-parser",
  "proto",
@@ -6664,18 +6676,6 @@ dependencies = [
  "tokio-stream",
  "tower",
  "tracing",
- "utoipa",
-]
-
-[[package]]
-name = "openobserve-api-shared"
-version = "0.1.0"
-dependencies = [
- "axum",
- "http 1.4.0",
- "log",
- "serde",
- "serde_json",
  "utoipa",
 ]
 

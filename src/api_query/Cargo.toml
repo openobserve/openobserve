@@ -20,7 +20,7 @@ vectorscan = ["openobserve-core/vectorscan"]
 vortex = ["openobserve-core/vortex"]
 
 [dependencies]
-openobserve-api-shared.workspace = true
+openobserve-api-common.workspace = true
 openobserve-core.workspace = true
 arrow-schema.workspace = true
 axum.workspace = true
