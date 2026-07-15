@@ -450,20 +450,34 @@ describe("ReportList", () => {
 
   // ── Date formatting ──────────────────────────────────────────────────────
 
-  describe("convertUnixToQuasarFormat", () => {
-    it.skip("should format a valid unix microsecond timestamp", () => {
-      const formatted = wrapper.vm.convertUnixToQuasarFormat(1234567890000000);
-      expect(formatted).toMatch(
-        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{4}$/,
+  describe("last_triggered_at formatting", () => {
+    // These used to call `wrapper.vm.convertUnixToDateFormat(null)` — asserting
+    // the shared util's null handling, which `date.spec.ts` already owns, and
+    // forcing the component to `defineExpose` a function purely so a test could
+    // reach it. What is actually ReportList's to get right is the ROW mapping:
+    // format a real timestamp, and show "-" when there is none.
+    it("formats a triggered report's timestamp for the table", () => {
+      const row = wrapper.vm.reportsTableRows.find(
+        (r: any) => r.name === REPORT_SCHEDULED.name,
       );
+
+      // 1234567890000000µs = 2009-02-13T23:31:30Z. The suite pins TZ=UTC
+      // (vitest.config.ts), so the zero offset renders as `Z`.
+      expect(row.last_triggered_at).toBe("2009-02-13T23:31:30Z");
+      // ...and the raw value is kept alongside it, for sorting.
+      expect(row.last_triggered_at_raw).toBe(REPORT_SCHEDULED.last_triggered_at);
     });
 
-    it("should return empty string for null", () => {
-      expect(wrapper.vm.convertUnixToQuasarFormat(null)).toBe("");
-    });
+    it("shows a dash for a report that has never triggered", async () => {
+      wrapper.vm.activeTab = "cached";
+      await flushPromises();
 
-    it("should return empty string for undefined", () => {
-      expect(wrapper.vm.convertUnixToQuasarFormat(undefined)).toBe("");
+      const row = wrapper.vm.reportsTableRows.find(
+        (r: any) => r.name === REPORT_CACHED.name,
+      );
+
+      expect(row.last_triggered_at).toBe("-");
+      expect(row.last_triggered_at_raw).toBeNull();
     });
   });
 

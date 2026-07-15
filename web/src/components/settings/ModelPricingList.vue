@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md flex flex-col h-full p-0">
+  <div class="flex flex-col h-full p-0">
     <!-- Full-page Import View -->
     <ImportModelPricing
       v-if="showImportModelPricingPage"
@@ -128,6 +128,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('modelPricing.searchPlaceholder')"
             />
           </div>
+        </template>
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="model-pricing-list-refresh-btn"
+            @click="fetchModels"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="modelPricingRefresh" />
+          </OButton>
         </template>
         <template #tree-warning="{ row }">
           <div class="flex items-center gap-2 py-1 text-sm leading-none">
@@ -377,8 +389,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- end v-if="!showImportModelPricingPage" -->
 
     <!-- Pricing detail side panel -->
-    <ODrawer data-test="model-pricing-list-pricing-drawer" v-model:open="showPricingDialog" :width="30" title="Hello">
-      <template #header-left>
+    <ODrawer
+      data-test="model-pricing-list-pricing-drawer"
+      v-model:open="showPricingDialog"
+      :width="30"
+      :title="pricingDialogRow?.match_pattern"
+      :title-data-test="'model-pricing-drawer-title'"
+      :sub-title="t('modelPricing.modelDetails')"
+    >
+      <!-- Source (built-in / inherited / custom) indicator trails on the right. -->
+      <template #header-right>
         <span
             v-if="getSource(pricingDialogRow) === 'built_in'"
             class="shrink-0 cursor-default inline-flex"
@@ -503,6 +523,8 @@ import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const { t } = useI18n();
 const store = useStore();
@@ -928,23 +950,22 @@ onActivated(() => {
     showImportModelPricingPage.value = true;
   }
 });
+
+useShortcuts([
+  { id: "modelPricingRefresh", handler: () => { if (!isInputFocused()) fetchModels(); } },
+]);
 </script>
 
 <style>
-/* Dark mode for pricing panel table header (th element selector — cannot inline) */
-.body--dark .pricing-panel-table th {
-  background: rgba(255, 255, 255, 0.04);
-}
-
 /* ── Pricing panel table (side panel) child selectors ──────────────── */
 .pricing-panel-table th {
   font-size: 11px;
   font-weight: 600;
-  opacity: 0.5;
+  color: var(--color-table-header-text);
   text-align: left;
   padding: 6px 14px;
-  background: rgba(0, 0, 0, 0.025);
-  border-bottom: 1px solid var(--o2-border-color);
+  background: var(--color-table-header-bg);
+  border-bottom: 1px solid var(--color-table-header-border);
 }
 
 .pricing-panel-table th:last-child {
@@ -954,7 +975,7 @@ onActivated(() => {
 .pricing-panel-table td {
   font-size: 13px;
   padding: 8px 14px;
-  border-bottom: 1px solid var(--o2-border-color);
+  border-bottom: 1px solid var(--color-table-row-divider);
 }
 
 .pricing-panel-table td:last-child {
@@ -970,10 +991,11 @@ onActivated(() => {
 .pricing-breakdown-table th {
   font-size: 11px;
   font-weight: 600;
-  opacity: 0.65;
+  color: var(--color-table-header-text);
+  background: var(--color-table-header-bg);
   text-align: left;
   padding: 0 16px 4px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 1px solid var(--color-table-header-border);
 }
 
 .pricing-breakdown-table th:last-child {

@@ -19,19 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div data-test="add-report-section" class="w-full flex flex-col flex-1 min-h-0 create-report-page">
       <AppPageHeader
         :title="isEditingReport ? t('reports.update') : t('reports.add')"
+        title-data-test="add-report-title"
         :back="{
           label: t('reports.header'),
           onClick: () => router.back(),
           dataTest: 'add-report-back-btn',
         }"
         class="px-4 border-b border-border-default"
-      >
-        <template #title>
-          <span data-test="add-report-title">{{
-            isEditingReport ? t("reports.update") : t("reports.add")
-          }}</span>
-        </template>
-      </AppPageHeader>
+      />
       <div
         class="flex card-container flex-1 min-h-0 overflow-auto"
       >

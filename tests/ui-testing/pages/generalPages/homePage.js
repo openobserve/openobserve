@@ -1,6 +1,6 @@
 // homePage.js - Landing Page Object for OpenObserve
 import { expect } from '@playwright/test';
-import { openNavFlyoutChild } from '../commonActions.js';
+import { openNavFlyoutChild, gotoMetricsEditor } from '../commonActions.js';
 
 export class HomePage {
     constructor(page) {
@@ -87,10 +87,20 @@ export class HomePage {
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
+    /**
+     * Clicks the sidebar's Metrics item — which is what this page object's
+     * callers are testing — and then continues into the panel EDITOR, whose
+     * controls `validateMetricsPageElements` asserts on.
+     *
+     * The sidebar now lands on the Metrics Explorer browse grid (`/metrics`);
+     * the editor moved to `/metrics/editor`. Both hops are kept so the sidebar
+     * link itself stays covered rather than being bypassed by a direct goto.
+     */
     async navigateToMetrics() {
         await this.metricsMenu.waitFor({ state: 'visible', timeout: 10000 });
         await this.metricsMenu.click();
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        await gotoMetricsEditor(this.page);
     }
 
     async navigateToTraces() {
@@ -351,7 +361,7 @@ export class HomePage {
      * After Header.vue migration the user profile menu is an ODropdown
      * ([role="menuitem"]) but the language sub-menu was kept in-place (not
      * supported by ODropdown nesting). The data-test attribute is preserved
-     * either on a q-item-section (Quasar) or directly on a menuitem (ODropdown),
+     * either on a q-item-section or directly on a menuitem (ODropdown),
      * so target the element with data-test and walk up to its clickable ancestor.
      * @param {string} langCode - Language code (e.g., 'en-gb', 'de', 'es', 'fr', etc.)
      * @returns {Locator} - Playwright locator for the language option
@@ -377,7 +387,7 @@ export class HomePage {
     /**
      * Opens the language selection submenu
      * Steps: Click profile icon -> Click on language item to open submenu
-     * Note: Quasar menus require click, not hover, to open nested menus
+     * Note: menus require click, not hover, to open nested menus
      */
     async openLanguageMenu() {
         await this.openProfileMenu();

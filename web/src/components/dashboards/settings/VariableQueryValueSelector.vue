@@ -64,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span>All</span>
           </div>
+          <OSeparator data-test="dashboard-variable-all-separator" />
         </template>
       </template>
       <!-- Custom suggestion rendered AFTER the matching options so real results
@@ -156,7 +157,7 @@ export default defineComponent({
       });
     });
 
-    // Handler for OSelect @search event (replaces Quasar @filter)
+    // Handler for OSelect @search event
     const onSearch = (val: string) => {
       currentSearchTerm.value = val;
       updateSearch(val);
@@ -269,7 +270,9 @@ export default defineComponent({
 
       selectedValue.value = newValue;
       emit("update:modelValue", newValue);
-      await closePopUpWhenValueIsSet();
+      if (!props.variableItem.multiSelect) {
+        await closePopUpWhenValueIsSet();
+      }
     };
 
     const onUpdateValue = async (val: any) => {

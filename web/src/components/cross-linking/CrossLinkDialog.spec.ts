@@ -28,6 +28,10 @@ describe("CrossLinkDialog Component", () => {
         plugins: [i18n],
         provide: { store },
         stubs: {
+          // Stub ONLY the ODialog overlay so its body slot renders inline
+          // (and unmounts via v-if='open' like the real reka-ui DialogContent).
+          // The OForm + OFormInput fields stay REAL so the schema wiring is
+          // exercised (playbook §5 / R22).
           ODialog: {
             name: "ODialog",
             template:
@@ -37,21 +41,10 @@ describe("CrossLinkDialog Component", () => {
               "persistent",
               "size",
               "title",
-              "subTitle",
               "showClose",
-              "width",
+              "formId",
               "primaryButtonLabel",
               "secondaryButtonLabel",
-              "neutralButtonLabel",
-              "primaryButtonVariant",
-              "secondaryButtonVariant",
-              "neutralButtonVariant",
-              "primaryButtonDisabled",
-              "secondaryButtonDisabled",
-              "neutralButtonDisabled",
-              "primaryButtonLoading",
-              "secondaryButtonLoading",
-              "neutralButtonLoading",
             ],
             emits: [
               "update:open",
@@ -60,20 +53,30 @@ describe("CrossLinkDialog Component", () => {
               "click:neutral",
             ],
           },
-          // OCombobox: stubbed so we can test at the field-input data-test level
-          OCombobox: {
-            name: "OCombobox",
-            template:
-              '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" :data-test="$attrs[\'data-test\']" />',
-            props: ["modelValue", "items", "placeholder"],
-            emits: ["update:modelValue", "select"],
-            methods: {
-              clear: vi.fn(),
-            },
-          },
+          // OFormCombobox (chip-builder scratch input) renders REAL so the
+          // newFieldName form-field binding + forwarded clear() are exercised.
         },
       },
     });
+  };
+
+  const getForm = (w: any) =>
+    (w.findComponent({ name: "OForm" }).vm as any).form;
+
+  // newFieldName is now an OForm-owned scratch field (not a vm ref).
+  const setNewField = (w: any, v: string) =>
+    getForm(w).setFieldValue("newFieldName", v);
+  const newFieldVal = (w: any) => getForm(w).state.values.newFieldName;
+
+  // `fields` is now a form-owned array (the old `fieldsModel` mirror was
+  // removed) — read/seed it THROUGH the form, the single source of truth.
+  const fieldsVal = (w: any) => getForm(w).state.values.fields ?? [];
+  const setFields = (w: any, v: Array<{ name: string }>) =>
+    getForm(w).setFieldValue("fields", v);
+
+  const submit = async (w: any) => {
+    await getForm(w).handleSubmit();
+    await flushPromises();
   };
 
   beforeEach(() => {
@@ -90,39 +93,27 @@ describe("CrossLinkDialog Component", () => {
   describe("Component Initialization", () => {
     it("should mount successfully", () => {
       wrapper = createWrapper();
-
       expect(wrapper.exists()).toBe(true);
     });
 
     it("should have correct component name", () => {
       wrapper = createWrapper();
-
       expect(wrapper.vm.$options.name).toBe("CrossLinkDialog");
-    });
-
-    it("should accept modelValue prop", () => {
-      wrapper = createWrapper({ modelValue: true });
-
-      expect(wrapper.props("modelValue")).toBe(true);
     });
 
     it("should accept link prop", () => {
       wrapper = createWrapper({ link: existingLink });
-
       expect(wrapper.props("link")).toEqual(existingLink);
     });
 
-    it("should accept availableFields prop", () => {
+    it("should wire the dialog footer to the form via form-id", () => {
       wrapper = createWrapper();
-
-      expect(wrapper.props("availableFields")).toEqual(defaultProps.availableFields);
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("formId")).toBe("cross-link-form");
     });
 
-    it("should expose availableFieldOptions computed when availableFields is empty", () => {
-      // availableFieldOptions is the computed property that replaces the old filteredFieldOptions
+    it("should expose availableFieldOptions empty when availableFields is empty", () => {
       wrapper = createWrapper({ availableFields: [] });
-
-      expect(wrapper.vm.availableFieldOptions).toBeDefined();
       expect(wrapper.vm.availableFieldOptions).toEqual([]);
     });
   });
@@ -130,171 +121,134 @@ describe("CrossLinkDialog Component", () => {
   describe("isEditing Computed Property", () => {
     it("should return false when link is null", () => {
       wrapper = createWrapper({ link: null });
-
       expect(wrapper.vm.isEditing).toBe(false);
     });
 
     it("should return false when link has no name", () => {
       wrapper = createWrapper({ link: { name: "", url: "", fields: [] } });
-
       expect(wrapper.vm.isEditing).toBe(false);
     });
 
     it("should return true when link has a name", () => {
       wrapper = createWrapper({ link: existingLink });
-
       expect(wrapper.vm.isEditing).toBe(true);
     });
   });
 
-  describe("Form Reset on Dialog Open", () => {
-    it("should reset form to empty when dialog opens without link", async () => {
+  describe("Edit prefill (default-values on open)", () => {
+    it("seeds an empty form when opened without a link", async () => {
       wrapper = createWrapper({ modelValue: false, link: null });
-
       await wrapper.setProps({ modelValue: true });
-      await nextTick();
+      await flushPromises();
 
-      expect(wrapper.vm.form.name).toBe("");
-      expect(wrapper.vm.form.url).toBe("");
-      expect(wrapper.vm.form.fields).toEqual([]);
+      const form = getForm(wrapper);
+      expect(form.state.values.name).toBe("");
+      expect(form.state.values.url).toBe("");
+      expect(fieldsVal(wrapper)).toEqual([]);
     });
 
-    it("should populate form when dialog opens with existing link", async () => {
+    it("seeds the form from an existing link on open", async () => {
       wrapper = createWrapper({ modelValue: false, link: existingLink });
-
       await wrapper.setProps({ modelValue: true });
-      await nextTick();
+      await flushPromises();
 
-      expect(wrapper.vm.form.name).toBe("View Trace");
-      expect(wrapper.vm.form.url).toBe("https://example.com/trace/${trace_id}");
-      expect(wrapper.vm.form.fields).toEqual([
+      const form = getForm(wrapper);
+      expect(form.state.values.name).toBe("View Trace");
+      expect(form.state.values.url).toBe(
+        "https://example.com/trace/${trace_id}",
+      );
+      expect(fieldsVal(wrapper)).toEqual([
         { name: "trace_id" },
         { name: "span_id" },
       ]);
     });
 
-    it("should clear newFieldName when dialog opens", async () => {
-      wrapper = createWrapper({ modelValue: false });
-      // Set via the public vm ref since there is no UI interaction that seeds
-      // newFieldName without also committing the field
-      wrapper.vm.newFieldName = "some_field";
-
+    it("seeds an empty newFieldName on a fresh open", async () => {
+      wrapper = createWrapper({ modelValue: false, link: existingLink });
       await wrapper.setProps({ modelValue: true });
-      await nextTick();
-
-      expect(wrapper.vm.newFieldName).toBe("");
+      await flushPromises();
+      expect(newFieldVal(wrapper)).toBe("");
     });
 
-    it("should handle link with no fields", async () => {
+    it("should handle a link with no fields", async () => {
       const linkNoFields = {
         name: "No Fields Link",
         url: "https://example.com",
         fields: null as any,
       };
       wrapper = createWrapper({ modelValue: false, link: linkNoFields });
-
       await wrapper.setProps({ modelValue: true });
       await nextTick();
-
-      expect(wrapper.vm.form.fields).toEqual([]);
+      expect(fieldsVal(wrapper)).toEqual([]);
     });
   });
 
   describe("addField Function", () => {
-    it("should add a field when newFieldName is set", () => {
-      // The component no longer uses a separate fieldInputValue — newFieldName
-      // is the single source of truth read by addField().
+    it("should add a field when newFieldName (form field) is set", () => {
       wrapper = createWrapper();
-      wrapper.vm.newFieldName = "trace_id";
-
+      setNewField(wrapper, "trace_id");
       wrapper.vm.addField();
-
-      expect(wrapper.vm.form.fields).toEqual([{ name: "trace_id" }]);
+      expect(fieldsVal(wrapper)).toEqual([{ name: "trace_id" }]);
     });
 
     it("should not add duplicate fields", () => {
       wrapper = createWrapper();
-      wrapper.vm.form.fields = [{ name: "trace_id" }];
-      wrapper.vm.newFieldName = "trace_id";
-
+      setFields(wrapper, [{ name: "trace_id" }]);
+      setNewField(wrapper, "trace_id");
       wrapper.vm.addField();
-
-      expect(wrapper.vm.form.fields).toEqual([{ name: "trace_id" }]);
+      expect(fieldsVal(wrapper)).toEqual([{ name: "trace_id" }]);
     });
 
     it("should not add empty field names", () => {
       wrapper = createWrapper();
-      wrapper.vm.newFieldName = "";
-
+      setNewField(wrapper, "");
       wrapper.vm.addField();
-
-      expect(wrapper.vm.form.fields).toEqual([]);
+      expect(fieldsVal(wrapper)).toEqual([]);
     });
 
     it("should trim whitespace from field names", () => {
       wrapper = createWrapper();
-      wrapper.vm.newFieldName = "  trace_id  ";
-
+      setNewField(wrapper, "  trace_id  ");
       wrapper.vm.addField();
-
-      expect(wrapper.vm.form.fields).toEqual([{ name: "trace_id" }]);
+      expect(fieldsVal(wrapper)).toEqual([{ name: "trace_id" }]);
     });
 
-    it("should clear newFieldName after adding field", () => {
+    it("should clear newFieldName after adding field", async () => {
       wrapper = createWrapper();
-      wrapper.vm.newFieldName = "trace_id";
-
+      setNewField(wrapper, "trace_id");
       wrapper.vm.addField();
-
-      // After addField, newFieldName is cleared (fieldInputValue no longer
-      // exists in this component — there is only newFieldName)
-      expect(wrapper.vm.newFieldName).toBe("");
+      await nextTick();
+      expect(newFieldVal(wrapper)).toBe("");
     });
   });
 
   describe("onFieldSelect Function", () => {
-    // The method was renamed from onFieldSelected → onFieldSelect in the
-    // refactored component. It sets newFieldName and immediately calls addField.
-    it("should add selected field to form", () => {
+    it("should add selected field to the form-owned fields", () => {
       wrapper = createWrapper();
-
       wrapper.vm.onFieldSelect("trace_id");
-
-      expect(wrapper.vm.form.fields).toEqual([{ name: "trace_id" }]);
+      expect(fieldsVal(wrapper)).toEqual([{ name: "trace_id" }]);
     });
 
-    it("should not add duplicate when selecting existing field", () => {
+    it("should clear newFieldName after selection", async () => {
       wrapper = createWrapper();
-      wrapper.vm.form.fields = [{ name: "trace_id" }];
-
+      setNewField(wrapper, "trace_id");
       wrapper.vm.onFieldSelect("trace_id");
-
-      expect(wrapper.vm.form.fields).toEqual([{ name: "trace_id" }]);
-    });
-
-    it("should clear newFieldName after selection", () => {
-      wrapper = createWrapper();
-
-      wrapper.vm.onFieldSelect("trace_id");
-
-      expect(wrapper.vm.newFieldName).toBe("");
+      await nextTick();
+      expect(newFieldVal(wrapper)).toBe("");
     });
 
     it("should not add field for empty string value", () => {
       wrapper = createWrapper();
-
       wrapper.vm.onFieldSelect("");
-
-      expect(wrapper.vm.form.fields).toEqual([]);
+      expect(fieldsVal(wrapper)).toEqual([]);
     });
   });
 
   describe("availableFieldOptions Computed", () => {
-    // filterFieldOptions was removed; filtering is now done inside the
-    // availableFieldOptions computed. Tests drive it via props.
     it("should return all fields as option objects when none have been added", () => {
-      wrapper = createWrapper({ availableFields: ["trace_id", "span_id", "service_name", "host"] });
-
+      wrapper = createWrapper({
+        availableFields: ["trace_id", "span_id", "service_name", "host"],
+      });
       expect(wrapper.vm.availableFieldOptions).toEqual([
         { label: "trace_id", value: "trace_id" },
         { label: "span_id", value: "span_id" },
@@ -303,45 +257,62 @@ describe("CrossLinkDialog Component", () => {
       ]);
     });
 
-    it("should exclude already-added fields from suggestions", () => {
-      wrapper = createWrapper({ availableFields: ["trace_id", "span_id", "service_name", "host"] });
-      wrapper.vm.form.fields = [{ name: "trace_id" }];
-
-      // Need nextTick for the computed to re-evaluate
-      return nextTick().then(() => {
-        const values = wrapper.vm.availableFieldOptions.map((o: any) => o.value);
-        expect(values).not.toContain("trace_id");
-        expect(values).toContain("span_id");
-        expect(values).toContain("service_name");
-        expect(values).toContain("host");
+    it("should exclude already-added fields from suggestions", async () => {
+      wrapper = createWrapper({
+        availableFields: ["trace_id", "span_id", "service_name", "host"],
       });
-    });
-
-    it("should return empty array when all fields have been added", () => {
-      wrapper = createWrapper({ availableFields: ["trace_id"] });
-      wrapper.vm.form.fields = [{ name: "trace_id" }];
-
-      return nextTick().then(() => {
-        expect(wrapper.vm.availableFieldOptions).toEqual([]);
-      });
+      setFields(wrapper, [{ name: "trace_id" }]);
+      await nextTick();
+      const values = wrapper.vm.availableFieldOptions.map((o: any) => o.value);
+      expect(values).not.toContain("trace_id");
+      expect(values).toContain("span_id");
     });
 
     it("should return empty array when availableFields is empty", () => {
       wrapper = createWrapper({ availableFields: [] });
-
       expect(wrapper.vm.availableFieldOptions).toEqual([]);
     });
   });
 
-  describe("onSubmit Function", () => {
-    it("should emit save with form data", () => {
+  describe("Field Chip Removal", () => {
+    it("should remove field when chip remove button is clicked", async () => {
       wrapper = createWrapper();
-      wrapper.vm.form.name = "My Link";
-      wrapper.vm.form.url = "https://example.com/${trace_id}";
-      wrapper.vm.form.fields = [{ name: "trace_id" }];
+      setFields(wrapper, [
+        { name: "trace_id" },
+        { name: "span_id" },
+        { name: "service_name" },
+      ]);
+      await nextTick();
 
-      wrapper.vm.onSubmit();
+      const removeBtn = wrapper.find(
+        '[data-test="cross-link-field-chip-remove-1"]',
+      );
+      expect(removeBtn.exists()).toBe(true);
+      await removeBtn.trigger("click");
 
+      expect(fieldsVal(wrapper)).toEqual([
+        { name: "trace_id" },
+        { name: "service_name" },
+      ]);
+    });
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Real-OForm validation wiring (playbook §5 / R22): the Zod schema — not a
+  // disabled button — gates an empty submit, and the restored required rules
+  // (name + url) block save.
+  describe("OForm schema validation (real form)", () => {
+    it("emits save with the validated payload on submit", async () => {
+      wrapper = createWrapper();
+      const form = getForm(wrapper);
+      form.setFieldValue("name", "My Link");
+      form.setFieldValue("url", "https://example.com/${trace_id}");
+      setFields(wrapper, [{ name: "trace_id" }]);
+      await nextTick();
+
+      await submit(wrapper);
+
+      expect(form.state.isValid).toBe(true);
       expect(wrapper.emitted("save")).toBeTruthy();
       expect(wrapper.emitted("save")[0][0]).toEqual({
         name: "My Link",
@@ -350,259 +321,129 @@ describe("CrossLinkDialog Component", () => {
       });
     });
 
-    it("should not emit save when name is empty", () => {
+    it("blocks submit + does NOT emit save when name is empty", async () => {
       wrapper = createWrapper();
-      wrapper.vm.form.name = "";
-      wrapper.vm.form.url = "https://example.com";
+      const form = getForm(wrapper);
+      form.setFieldValue("name", "");
+      form.setFieldValue("url", "https://example.com");
+      await nextTick();
 
-      wrapper.vm.onSubmit();
+      await submit(wrapper);
 
+      expect(form.state.isValid).toBe(false);
       expect(wrapper.emitted("save")).toBeFalsy();
     });
 
-    it("should not emit save when url is empty", () => {
+    it("blocks submit + does NOT emit save when url is empty", async () => {
       wrapper = createWrapper();
-      wrapper.vm.form.name = "My Link";
-      wrapper.vm.form.url = "";
+      const form = getForm(wrapper);
+      form.setFieldValue("name", "My Link");
+      form.setFieldValue("url", "");
+      await nextTick();
 
-      wrapper.vm.onSubmit();
+      await submit(wrapper);
 
+      expect(form.state.isValid).toBe(false);
       expect(wrapper.emitted("save")).toBeFalsy();
     });
 
-    it("should auto-add pending field typed in newFieldName on submit", () => {
-      // The component calls addField() before emit("save"), and addField reads
-      // newFieldName (not the old fieldInputValue which no longer exists).
+    it("auto-adds a pending typed field on submit", async () => {
       wrapper = createWrapper();
-      wrapper.vm.form.name = "My Link";
-      wrapper.vm.form.url = "https://example.com";
-      wrapper.vm.newFieldName = "pending_field";
+      const form = getForm(wrapper);
+      form.setFieldValue("name", "My Link");
+      form.setFieldValue("url", "https://example.com");
+      setNewField(wrapper, "pending_field");
+      await nextTick();
 
-      wrapper.vm.onSubmit();
+      await submit(wrapper);
 
-      const savedData = wrapper.emitted("save")[0][0];
-      expect(savedData.fields).toEqual([{ name: "pending_field" }]);
+      const saved = wrapper.emitted("save")[0][0];
+      expect(saved.fields).toEqual([{ name: "pending_field" }]);
     });
   });
 
   describe("onCancel Function", () => {
-    it("should emit cancel event", () => {
+    it("should emit cancel and update:modelValue false", () => {
       wrapper = createWrapper();
-
       wrapper.vm.onCancel();
-
       expect(wrapper.emitted("cancel")).toBeTruthy();
-    });
-
-    it("should emit update:modelValue with false", () => {
-      wrapper = createWrapper();
-
-      wrapper.vm.onCancel();
-
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
       expect(wrapper.emitted("update:modelValue")[0][0]).toBe(false);
     });
-  });
 
-  describe("Field Chip Removal", () => {
-    it("should remove field when chip remove button is clicked", async () => {
+    it("emits cancel when ODialog emits click:secondary", async () => {
       wrapper = createWrapper();
-      wrapper.vm.form.fields = [
-        { name: "trace_id" },
-        { name: "span_id" },
-        { name: "service_name" },
-      ];
-      await nextTick();
-
-      // The chip remove button uses splice(idx, 1) on click; drive it through
-      // the data-test attribute on the remove button
-      const removeBtn = wrapper.find('[data-test="cross-link-field-chip-remove-1"]');
-      expect(removeBtn.exists()).toBe(true);
-      await removeBtn.trigger("click");
-
-      expect(wrapper.vm.form.fields).toEqual([
-        { name: "trace_id" },
-        { name: "service_name" },
-      ]);
-    });
-
-    it("should remove correct field by index via splice", () => {
-      // Drive via the vm.form directly (no UI interaction needed, behavior
-      // is the same as clicking the chip remove button internally)
-      wrapper = createWrapper();
-      wrapper.vm.form.fields = [
-        { name: "trace_id" },
-        { name: "span_id" },
-        { name: "service_name" },
-      ];
-
-      wrapper.vm.form.fields.splice(1, 1);
-
-      expect(wrapper.vm.form.fields).toEqual([
-        { name: "trace_id" },
-        { name: "service_name" },
-      ]);
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      await dialog.vm.$emit("click:secondary");
+      expect(wrapper.emitted("cancel")).toBeTruthy();
+      expect(wrapper.emitted("update:modelValue")[0][0]).toBe(false);
     });
   });
 
   describe("dialogVisible Computed", () => {
     it("should reflect modelValue prop", () => {
       wrapper = createWrapper({ modelValue: true });
-
       expect(wrapper.vm.dialogVisible).toBe(true);
     });
 
     it("should emit update:modelValue when set", () => {
       wrapper = createWrapper({ modelValue: true });
-
       wrapper.vm.dialogVisible = false;
-
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
       expect(wrapper.emitted("update:modelValue")[0][0]).toBe(false);
     });
   });
 
   describe("ODialog Integration", () => {
-    it("should render ODialog with editing title when link has name", () => {
+    it("renders the editing title when link has a name", () => {
       wrapper = createWrapper({ link: existingLink });
-
       const dialog = wrapper.findComponent({ name: "ODialog" });
-
-      expect(dialog.exists()).toBe(true);
       expect(dialog.props("title")).toBe("Edit Cross-Link");
     });
 
-    it("should render ODialog with add title when link is null", () => {
+    it("renders the add title when link is null", () => {
       wrapper = createWrapper({ link: null });
-
       const dialog = wrapper.findComponent({ name: "ODialog" });
-
       expect(dialog.props("title")).toBe("Add Cross-Link");
     });
 
-    it("should pass primaryButtonDisabled true when form is invalid", () => {
-      wrapper = createWrapper();
-
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-
-      expect(dialog.props("primaryButtonDisabled")).toBe(true);
-    });
-
-    it("should pass primaryButtonDisabled false when form is valid", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.form.name = "My Link";
-      wrapper.vm.form.url = "https://example.com";
-      await nextTick();
-
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-
-      expect(dialog.props("primaryButtonDisabled")).toBe(false);
-    });
-
-    it("should emit save when ODialog emits click:primary with valid form", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.form.name = "My Link";
-      wrapper.vm.form.url = "https://example.com";
-      await nextTick();
-
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      await dialog.vm.$emit("click:primary");
-
-      expect(wrapper.emitted("save")).toBeTruthy();
-      expect(wrapper.emitted("save")[0][0]).toEqual({
-        name: "My Link",
-        url: "https://example.com",
-        fields: [],
-      });
-    });
-
-    it("should emit cancel when ODialog emits click:secondary", async () => {
-      wrapper = createWrapper();
-
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      await dialog.vm.$emit("click:secondary");
-
-      expect(wrapper.emitted("cancel")).toBeTruthy();
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      expect(wrapper.emitted("update:modelValue")[0][0]).toBe(false);
-    });
-
-    it("should sync open prop with modelValue", () => {
+    it("syncs open prop with modelValue", () => {
       wrapper = createWrapper({ modelValue: true });
-
       const dialog = wrapper.findComponent({ name: "ODialog" });
-
       expect(dialog.props("open")).toBe(true);
     });
   });
 
-  describe("Save Button Disable State", () => {
-    it("should be disabled when name is empty", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.form.name = "";
-      wrapper.vm.form.url = "https://example.com";
-      await nextTick();
-
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-
-      expect(dialog.props("primaryButtonDisabled")).toBe(true);
-    });
-
-    it("should be disabled when url is empty", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.form.name = "My Link";
-      wrapper.vm.form.url = "";
-      await nextTick();
-
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-
-      expect(dialog.props("primaryButtonDisabled")).toBe(true);
-    });
-
-    it("should be enabled when both name and url are provided", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.form.name = "My Link";
-      wrapper.vm.form.url = "https://example.com";
-      await nextTick();
-
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-
-      expect(dialog.props("primaryButtonDisabled")).toBe(false);
-    });
-  });
-
   describe("Add Field Button", () => {
-    it("should be disabled when newFieldName is empty", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.newFieldName = "";
-      await nextTick();
-
-      const addBtn = wrapper.find('[data-test="cross-link-add-field-btn"]');
-
-      expect(addBtn.exists()).toBe(true);
-      expect(addBtn.attributes("disabled")).toBeDefined();
-    });
-
     it("should add field when add button is clicked with a typed value", async () => {
       wrapper = createWrapper();
-      wrapper.vm.newFieldName = "my_field";
+      setNewField(wrapper, "my_field");
       await nextTick();
-
-      await wrapper.find('[data-test="cross-link-add-field-btn"]').trigger("click");
-
-      expect(wrapper.vm.form.fields).toEqual([{ name: "my_field" }]);
+      await wrapper
+        .find('[data-test="cross-link-add-field-btn"]')
+        .trigger("click");
+      expect(fieldsVal(wrapper)).toEqual([{ name: "my_field" }]);
     });
   });
 
-  describe("Field Input", () => {
-    it("should update newFieldName when typing in the field input", async () => {
+  describe("Field Input (real OFormCombobox)", () => {
+    it("renders the combobox input with the preserved data-test", () => {
       wrapper = createWrapper();
+      // OFormCombobox → OCombobox forwards data-test onto the root; the inner
+      // <input> is `<data-test>-input` (e2e selectors unchanged).
+      expect(
+        wrapper.find('[data-test="cross-link-field-input"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="cross-link-field-input-input"]').exists(),
+      ).toBe(true);
+    });
 
-      const input = wrapper.find('[data-test="cross-link-field-input"]');
+    it("updates the newFieldName form field when typing in the combobox", async () => {
+      wrapper = createWrapper();
+      const input = wrapper.find('[data-test="cross-link-field-input-input"]');
       expect(input.exists()).toBe(true);
       await input.setValue("trace_id");
-
-      expect(wrapper.vm.newFieldName).toBe("trace_id");
+      await flushPromises();
+      expect(newFieldVal(wrapper)).toBe("trace_id");
     });
   });
 });

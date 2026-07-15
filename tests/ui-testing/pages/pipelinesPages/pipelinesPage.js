@@ -180,10 +180,12 @@ export class PipelinesPage {
         // OSelect renders its `:error-message` inside a `<span>` with
         // `data-test="${parent}-error"` (auto-derived from the wrapper data-test).
         this.fieldRequiredError = page.locator('[data-test="associate-function-select-function-input-error"]');
-        // Condition node's "Please add at least one condition" toast — OToast
-        // exposes the message via `data-test-message`.
+        // Condition node's "Please add at least one condition" validation error.
+        // The OForm migration replaced the old imperative toast with inline schema
+        // validation (Condition.schema.ts superRefine), rendered as a form-level
+        // error div `data-test="add-condition-error"` in Condition.vue.
         this.conditionRequiredToast = page.locator(
-          '[data-test-message="Please add at least one condition"]'
+          '[data-test="add-condition-error"]'
         );
         this.tableRowsLocator = page.locator("tbody tr");
         this.confirmButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
@@ -360,9 +362,14 @@ export class PipelinesPage {
     // Methods from PipelinePage
     async openPipelineMenu() {
         await openNavFlyoutChild(this.page, 'pipeline');
-        await this.page.waitForTimeout(1000);
+        // pipelineTab.click() auto-waits for actionability, so the pre-click sleep
+        // was redundant. After the click, wait for the pipeline list page to render
+        // instead of a blind 2s — resolves in ~0.5-1s on the common path. Best-effort
+        // (.catch) so callers that immediately page.goto elsewhere aren't blocked.
         await this.pipelineTab.click();
-        await this.page.waitForTimeout(2000);
+        await this.page.locator('[data-test="pipeline-list-page"]')
+            .waitFor({ state: 'visible', timeout: 15000 })
+            .catch(() => {});
     }
 
     async addPipeline() {
@@ -432,9 +439,21 @@ export class PipelinesPage {
             },
             { sx: sourceX, sy: sourceY, tx: targetX, ty: targetY }
         );
-        // Wait for the input-node stream form dialog to render — `onDrop` sets
-        // pipelineObj.dialog.show=true which mounts add-stream-input-stream-routing-section.
-        await this.page.locator('[data-test="add-stream-input-stream-routing-section"]')
+        // Wait for whichever node form the drop opened to render:
+        //   Stream    -> add-stream-input-stream-routing-section (Stream.vue)
+        //   Query     -> add-stream-query-routing-section        (Query.vue)
+        //   Condition -> add-condition-section                   (Condition.vue)
+        //   Function  -> associate-function-drawer               (AssociateFunction.vue)
+        // Previously this waited only on the stream selector, so EVERY query/condition/
+        // function drag burned the full 10s timeout before the .catch(). Racing all four
+        // (`:visible` so .first() only considers the one open dialog) lets each drag
+        // resolve on its own form in ~1s.
+        await this.page.locator(
+            '[data-test="add-stream-input-stream-routing-section"]:visible, ' +
+            '[data-test="add-stream-query-routing-section"]:visible, ' +
+            '[data-test="add-condition-section"]:visible, ' +
+            '[data-test="associate-function-drawer"]:visible'
+        )
             .first()
             .waitFor({ state: 'visible', timeout: 10000 })
             .catch(() => {});
@@ -938,9 +957,10 @@ export class PipelinesPage {
     }
 
     async verifyConditionRequiredError() {
-        // Condition.saveCondition emits a toast "Please add at least one
-        // condition" when no condition row exists. OToast exposes the
-        // message as `data-test-message="<text>"` on its root.
+        // Saving a condition node with no valid condition fails the OForm schema
+        // (conditionSchema superRefine), which surfaces the "Please add at least
+        // one condition" message inline as `data-test="add-condition-error"`
+        // (no toast is emitted anymore).
         await this.conditionRequiredToast.first().waitFor({ state: 'visible', timeout: 10000 });
     }
 
@@ -1659,11 +1679,11 @@ export class PipelinesPage {
     }
 
     async verifyNotificationVisible() {
-        const notification = this.qNotificationMessage;
-        if (await notification.count() > 0) {
-            await expect(notification.first()).toBeVisible();
-        }
-        await this.page.waitForTimeout(2000);
+        // Saving without a valid condition surfaces the OForm schema error inline
+        // (`data-test="add-condition-error"`), not a `[role="alert"]` notification.
+        // The old `[role="alert"]` locator now matches Monaco's hidden a11y alert
+        // (`class="monaco-alert" data-aria-hidden="true"`), so assert the real error.
+        await this.conditionRequiredToast.first().waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async fillPartialCondition(columnName) {

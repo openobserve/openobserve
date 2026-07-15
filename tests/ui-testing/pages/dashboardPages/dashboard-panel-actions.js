@@ -17,6 +17,10 @@ export default class DashboardactionPage {
     this.discardPanelBtn = page.locator('[data-test="dashboard-panel-discard"]');
     // Error toast surfaced on validation/apply/save errors
     this.errorToast = page.locator('[data-test-variant="error"]');
+    // Inline OForm field error under the panel name input (shown when the
+    // panel name is empty on save — the form schema blocks submit before any
+    // toast is produced).
+    this.panelNameError = page.locator('[data-test="dashboard-panel-name-error"]');
     // TanStack table data rows / cells (source data-tests in TenstackTable.vue)
     this.tableDataRow = page.locator('[data-test="dashboard-panel-table"] [data-test="dashboard-data-row"]');
   }
@@ -24,6 +28,11 @@ export default class DashboardactionPage {
   // Returns the error toast locator for assertions
   getErrorToast() {
     return this.errorToast;
+  }
+
+  // Returns the inline panel-name validation error locator for assertions
+  getPanelNameError() {
+    return this.panelNameError;
   }
 
   // Returns all dashboard panel table data rows
@@ -82,16 +91,19 @@ export default class DashboardactionPage {
   async savePanel() {
     await this.panelSaveBtn.waitFor({ state: "visible" });
     await this.panelSaveBtn.click();
-    // Wait for either: successful navigation away from add_panel, or a
-    // validation error toast. On success the URL changes; on failure the toast
-    // appears and navigation never happens — without this race the error toast
-    // disappears (5 s) before the URL wait (20 s) gives up.
+    // Wait for one of: successful navigation away from add_panel, a validation
+    // error toast (deeper chart/query validation), or the inline panel-name
+    // field error (empty name is blocked by the OForm schema before any toast
+    // is produced). On success the URL changes; on failure one of the errors
+    // surfaces and navigation never happens — without this race the whole call
+    // would sit on the URL wait until it times out.
     await Promise.race([
       this.page.waitForURL(
         (url) => !url.pathname.includes("/add_panel"),
         { timeout: 20000 }
       ),
       this.errorToast.waitFor({ state: "visible", timeout: 20000 }),
+      this.panelNameError.waitFor({ state: "visible", timeout: 20000 }),
     ]).catch(() => {});
   }
 

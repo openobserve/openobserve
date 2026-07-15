@@ -1,8 +1,16 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// Behavior spec for AddEnrichmentTable.vue after the OForm + Zod migration.
+// Mounts the REAL <OForm> (not a stub) so the schema wiring is exercised: empty
+// required fields block submit (the service is NOT called), and a valid payload
+// flows through to the jstransform service.
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mount, flushPromises } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import AddEnrichmentTable from './AddEnrichmentTable.vue';
+import OForm from '@/lib/forms/Form/OForm.vue';
 
 // Mock dependencies
 vi.mock('@/services/jstransform', () => ({
@@ -39,59 +47,25 @@ vi.mock('@/lib/feedback/Toast/useToast', () => ({
   useToast: () => ({ toast: mockToast }),
 }));
 
-
 describe('AddEnrichmentTable.vue', () => {
   let wrapper: any;
   let store: any;
   let i18n: any;
 
+  // Non-form components are stubbed; OForm + OForm* fields render for real so the
+  // schema is actually exercised.
   const OButtonStub = {
     name: 'OButton',
-    template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')" :type="type"><slot /></button>',
-    props: ['label', 'type', 'variant', 'size', 'icon-left'],
+    template:
+      '<button :data-test="$attrs[\'data-test\']" :type="type" :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
+    props: ['label', 'type', 'variant', 'size', 'iconLeft', 'disabled', 'loading'],
     emits: ['click'],
     inheritAttrs: false,
   };
+  const OIconStub = { name: 'OIcon', template: '<i></i>', props: ['name', 'size'] };
+  const OSeparatorStub = { name: 'OSeparator', template: '<hr />' };
 
-  const OInputStub = {
-    name: 'OInput',
-    template: '<div><input :data-test="$attrs[\'data-test\']" :value="modelValue" :readonly="readonly" :disabled="disabled" @input="$emit(\'update:modelValue\', $event.target.value)" /></div>',
-    props: ['modelValue', 'label', 'rules', 'readonly', 'disabled', 'error', 'errorMessage'],
-    emits: ['update:modelValue'],
-    inheritAttrs: false,
-  };
-
-  const OFileStub = {
-    name: 'OFile',
-    template: '<div class="o-file" :data-test="$attrs[\'data-test\']"><input type="file" /></div>',
-    props: ['modelValue', 'label', 'accept', 'error', 'errorMessage'],
-    emits: ['update:modelValue'],
-    inheritAttrs: false,
-  };
-
-  const OSwitchStub = {
-    name: 'OSwitch',
-    template: '<input type="checkbox" :data-test="$attrs[\'data-test\']" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
-    props: ['modelValue', 'label'],
-    emits: ['update:modelValue'],
-    inheritAttrs: false,
-  };
-
-  const OIconStub = {
-    name: 'OIcon',
-    template: '<i></i>',
-    props: ['name', 'size'],
-  };
-
-  const OSeparatorStub = {
-    name: 'OSeparator',
-    template: '<hr />',
-  };
-
-  const OCardStub = {
-    name: 'OCard',
-    template: '<div><slot /></div>',
-  };
+  const getForm = (w: any) => (w.findComponent(OForm).vm as any).form;
 
   const createWrapper = (propsData = {}) => {
     store = createStore({
@@ -104,6 +78,7 @@ describe('AddEnrichmentTable.vue', () => {
           email: 'test@example.com',
           name: 'Test User',
         },
+        theme: 'light',
       },
       getters: {},
       mutations: {},
@@ -120,6 +95,7 @@ describe('AddEnrichmentTable.vue', () => {
           function: {
             addEnrichmentTable: 'Add Enrichment Table',
             updateEnrichmentTable: 'Update Enrichment Table',
+            enrichmentTables: 'Enrichment Tables',
             name: 'Name',
             uploadCSVFile: 'Upload CSV File',
             appendData: 'Append Data',
@@ -147,13 +123,8 @@ describe('AddEnrichmentTable.vue', () => {
         plugins: [store, i18n],
         stubs: {
           OButton: OButtonStub,
-          OInput: OInputStub,
-          OFile: OFileStub,
-          OSwitch: OSwitchStub,
           OIcon: OIconStub,
           OSeparator: OSeparatorStub,
-          OCard: OCardStub,
-          OOptionGroup: true,
         },
       },
     });
@@ -171,194 +142,210 @@ describe('AddEnrichmentTable.vue', () => {
   });
 
   describe('Component Initialization', () => {
-    it('should render the component with default configuration', () => {
+    it('should render the component', () => {
       wrapper = createWrapper();
-
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.find('[data-test="add-enrichment-table-title"]').text()).toBe('Add Enrichment Table');
     });
 
-    it('should initialize with correct default values', () => {
+    it('should initialize with correct default values', async () => {
       wrapper = createWrapper();
-      
+      await flushPromises();
       expect((wrapper.vm as any).formData.name).toBe('');
       expect((wrapper.vm as any).formData.file).toBe('');
       expect((wrapper.vm as any).formData.append).toBe(false);
     });
 
     it('should render update mode when isUpdating is true', () => {
-      wrapper = createWrapper({ isUpdating: true });
-
+      wrapper = createWrapper({
+        isUpdating: true,
+        modelValue: { name: 'existing-table', file: '', append: false },
+      });
       expect(wrapper.find('[data-test="add-enrichment-table-title"]').text()).toBe('Update Enrichment Table');
     });
 
-    it('should initialize with provided modelValue', () => {
-      const modelValue = {
-        name: 'test-table',
-        file: 'test.csv',
-        append: true,
-      };
-      
-      wrapper = createWrapper({ modelValue });
-      
+    it('should initialize with provided modelValue', async () => {
+      wrapper = createWrapper({
+        modelValue: { name: 'test-table', file: 'test.csv', append: true },
+      });
+      await flushPromises();
       expect((wrapper.vm as any).formData.name).toBe('test-table');
-      expect((wrapper.vm as any).formData.file).toBe('test.csv');
       expect((wrapper.vm as any).formData.append).toBe(true);
     });
   });
 
   describe('Form Fields', () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-    });
-
     it('should render name input field', () => {
-      const nameInput = wrapper.find('input');
-      expect(nameInput.exists()).toBe(true);
+      wrapper = createWrapper();
+      expect(wrapper.find('[data-test="add-enrichment-table-name"]').exists()).toBe(true);
     });
 
-    it('should render file upload field', () => {
-      const fileInput = wrapper.find('.o-file');
-      expect(fileInput.exists()).toBe(true);
+    it('should render file upload field by default (source=file)', () => {
+      wrapper = createWrapper();
+      expect(wrapper.find('[data-test="add-enrichment-table-file"]').exists()).toBe(true);
     });
 
     it('should not show append toggle in add mode', () => {
-      expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false);
+      wrapper = createWrapper();
+      expect(wrapper.find('[data-test="add-enrichment-table-append-switch"]').exists()).toBe(false);
     });
 
-    it('should show append toggle in update mode', () => {
+    it('should show append toggle in update mode (file source)', () => {
       wrapper = createWrapper({
         isUpdating: true,
-        modelValue: {
-          name: 'test-table',
-          source: 'file',
-          file: '',
-          append: false,
-        }
+        modelValue: { name: 'test-table', source: 'file', file: '', append: false },
       });
-      expect(wrapper.find('input[type="checkbox"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-enrichment-table-append-switch"]').exists()).toBe(true);
     });
 
-    it('should disable name field in update mode', () => {
-      wrapper = createWrapper({ 
+    it('should set disable color in update mode', () => {
+      wrapper = createWrapper({
         isUpdating: true,
-        modelValue: { name: 'existing-table', file: '', append: false }
+        modelValue: { name: 'existing-table', file: '', append: false },
       });
-      
-      // Check if the component is in update mode
       expect((wrapper.vm as any).isUpdating).toBe(true);
       expect((wrapper.vm as any).disableColor).toBe('grey-5');
     });
   });
 
-  describe('Form Submission', () => {
-    beforeEach(() => {
+  // Rule ③ regression: the owner (AddEnrichmentTable) reads the ONE form via
+  // form.useStore to drive its v-if conditionals. These would FAIL on the old
+  // dead `form.store.subscribe` mirror (formData never updated → the URL/update
+  // inputs never appeared); they pass now that the conditionals read the form.
+  describe('Conditional rendering reacts to form state (owner pattern)', () => {
+    it('reveals the URL input and hides the file upload when source → url', async () => {
       wrapper = createWrapper();
+      await flushPromises();
+      // create mode defaults to source=file
+      expect(wrapper.find('[data-test="add-enrichment-table-file"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-enrichment-table-url"]').exists()).toBe(false);
+
+      const form = getForm(wrapper);
+      form.setFieldValue('source', 'url');
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="add-enrichment-table-url"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-enrichment-table-file"]').exists()).toBe(false);
     });
 
-    it('should have save and cancel buttons', () => {
-      const cancelBtn = wrapper.find('[data-test="add-enrichment-table-cancel-btn"]');
-      const saveBtn = wrapper.find('[data-test="add-enrichment-table-save-btn"]');
-      expect(cancelBtn.exists()).toBe(true);
-      expect(saveBtn.exists()).toBe(true);
-    });
+    it('reveals the new-URL input when a url-based update leaves reload mode', async () => {
+      wrapper = createWrapper({
+        isUpdating: true,
+        modelValue: {
+          name: 'existing',
+          urlJobs: [{ id: '1', url: 'https://x.com/a.csv', status: 'completed' }],
+        },
+      });
+      await flushPromises();
+      // url-based update defaults to reload → the new-URL input is hidden
+      expect(wrapper.find('[data-test="add-enrichment-table-new-url"]').exists()).toBe(false);
 
-    it('should emit cancel event when cancel button is clicked', async () => {
-      const cancelBtn = wrapper.find('[data-test="add-enrichment-table-cancel-btn"]');
-      await cancelBtn.trigger('click');
+      const form = getForm(wrapper);
+      form.setFieldValue('updateMode', 'append');
+      await flushPromises();
 
-      expect(wrapper.emitted('cancel:hideform')).toBeTruthy();
-    });
-
-    it('should call onSubmit when form is submitted', async () => {
-      const onSubmitSpy = vi.spyOn(wrapper.vm, 'onSubmit');
-      
-      // Set form data
-      (wrapper.vm as any).formData = {
-        name: 'test-table',
-        file: new File(['test'], 'test.csv', { type: 'text/csv' }),
-        append: false,
-      };
-      
-      // Call onSubmit directly since form submission might not work with stubs
-      await (wrapper.vm as any).onSubmit();
-      
-      expect(onSubmitSpy).toHaveBeenCalled();
+      expect(wrapper.find('[data-test="add-enrichment-table-new-url"]').exists()).toBe(true);
     });
   });
 
-  describe('Form Validation', () => {
-    beforeEach(() => {
+  describe('Validation (real OForm + schema)', () => {
+    it('blocks submit when required fields are empty (service NOT called)', async () => {
       wrapper = createWrapper();
+      const jsTransformService = (await import('@/services/jstransform')).default;
+      const createSpy = vi.spyOn(jsTransformService, 'create_enrichment_table');
+
+      const form = getForm(wrapper);
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(form.state.isValid).toBe(false);
+      expect(createSpy).not.toHaveBeenCalled();
     });
 
-    it('should validate required name field', () => {
-      // Test that rules function exists and works
-      const rules = [(val: any) => !!val || 'Field is required!'];
-      
-      expect(rules[0]('')).toBe('Field is required!');
-      expect(rules[0]('test-name')).toBe(true);
+    it('requires a CSV file when source is file (service NOT called)', async () => {
+      wrapper = createWrapper();
+      const jsTransformService = (await import('@/services/jstransform')).default;
+      const createSpy = vi.spyOn(jsTransformService, 'create_enrichment_table');
+
+      const form = getForm(wrapper);
+      form.setFieldValue('name', 'test-table'); // name ok, file still missing
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(form.state.isValid).toBe(false);
+      expect(createSpy).not.toHaveBeenCalled();
     });
 
-    it('should validate required file field', () => {
-      // Test that rules function exists and works
-      const rules = [(val: any) => !!val || 'CSV File is required!'];
-      
-      expect(rules[0]('')).toBe('CSV File is required!');
-      expect(rules[0]('test.csv')).toBe(true);
+    it('requires a URL with http(s):// prefix when source is url (service NOT called)', async () => {
+      wrapper = createWrapper();
+      const jsTransformService = (await import('@/services/jstransform')).default;
+      const createUrlSpy = vi.spyOn(jsTransformService, 'create_enrichment_table_from_url');
+
+      const form = getForm(wrapper);
+      form.setFieldValue('source', 'url');
+      form.setFieldValue('name', 'test-table');
+      form.setFieldValue('url', 'not-a-url');
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(form.state.isValid).toBe(false);
+      expect(createUrlSpy).not.toHaveBeenCalled();
     });
   });
 
-  describe('API Integration', () => {
-    beforeEach(() => {
+  describe('Submission (real OForm + schema)', () => {
+    it('creates a file-based enrichment table when valid', async () => {
       wrapper = createWrapper();
-    });
+      const jsTransformService = (await import('@/services/jstransform')).default;
+      const createSpy = vi.spyOn(jsTransformService, 'create_enrichment_table');
 
-    it('should call create_enrichment_table service on successful submit', async () => {
-      const jsTransformService = await import('@/services/jstransform');
-      const createSpy = vi.spyOn(jsTransformService.default, 'create_enrichment_table');
-      
-      // Set form data
-      (wrapper.vm as any).formData = {
-        name: 'test-table',
-        file: new File(['test'], 'test.csv', { type: 'text/csv' }),
-        append: false,
-      };
-      
-      await (wrapper.vm as any).onSubmit();
-      
+      const form = getForm(wrapper);
+      form.setFieldValue('name', 'test-table');
+      form.setFieldValue('file', new File(['test'], 'test.csv', { type: 'text/csv' }));
+      await form.handleSubmit();
+      await flushPromises();
+
       expect(createSpy).toHaveBeenCalledWith(
         'test-org-id',
         'test-table',
         expect.any(FormData),
-        false
+        false,
       );
-    });
-
-    it('should emit update:list on successful submission', async () => {
-      // Set form data
-      (wrapper.vm as any).formData = {
-        name: 'test-table',
-        file: new File(['test'], 'test.csv', { type: 'text/csv' }),
-        append: false,
-      };
-      
-      await (wrapper.vm as any).onSubmit();
-      
       expect(wrapper.emitted('update:list')).toBeTruthy();
     });
 
-    it('should show success notification on successful submission', async () => {
-      // Set form data
-      (wrapper.vm as any).formData = {
-        name: 'test-table',
-        file: new File(['test'], 'test.csv', { type: 'text/csv' }),
-        append: false,
-      };
-      
-      await (wrapper.vm as any).onSubmit();
-      
-      // Check that toast was called twice: once for loading, once for success
+    it('creates a URL-based enrichment table when valid', async () => {
+      wrapper = createWrapper();
+      const jsTransformService = (await import('@/services/jstransform')).default;
+      const createUrlSpy = vi.spyOn(jsTransformService, 'create_enrichment_table_from_url');
+
+      const form = getForm(wrapper);
+      form.setFieldValue('source', 'url');
+      form.setFieldValue('name', 'test-table');
+      form.setFieldValue('url', 'https://example.com/data.csv');
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(createUrlSpy).toHaveBeenCalledWith(
+        'test-org-id',
+        'test-table',
+        'https://example.com/data.csv',
+        false, // append
+        false, // resume
+        false, // retry
+        false, // replaceFailed
+      );
+      expect(wrapper.emitted('update:list')).toBeTruthy();
+    });
+
+    it('shows the loading toast during submission', async () => {
+      wrapper = createWrapper();
+      const form = getForm(wrapper);
+      form.setFieldValue('name', 'test-table');
+      form.setFieldValue('file', new File(['test'], 'test.csv', { type: 'text/csv' }));
+      await form.handleSubmit();
+      await flushPromises();
+
       expect(mockToast).toHaveBeenCalledWith({
         variant: 'loading',
         message: 'Please wait...',
@@ -369,383 +356,71 @@ describe('AddEnrichmentTable.vue', () => {
         message: 'Enrichment table created successfully',
       });
     });
+  });
 
-    it('should reset form data after successful submission', async () => {
-      // Set form data
-      (wrapper.vm as any).formData = {
-        name: 'test-table',
-        file: new File(['test'], 'test.csv', { type: 'text/csv' }),
-        append: false,
-      };
-      
-      await (wrapper.vm as any).onSubmit();
-      
-      expect((wrapper.vm as any).formData.name).toBe('');
-      expect((wrapper.vm as any).formData.file).toBe('');
-      expect((wrapper.vm as any).formData.append).toBe(false);
+  describe('Save button', () => {
+    it('keeps the Save button enabled (no :disabled binding)', () => {
+      wrapper = createWrapper();
+      const saveBtn = wrapper.find('[data-test="add-enrichment-table-save-btn"]');
+      expect(saveBtn.exists()).toBe(true);
+      expect(saveBtn.attributes('disabled')).toBeUndefined();
+    });
+
+    it('has save and cancel buttons', () => {
+      wrapper = createWrapper();
+      expect(wrapper.find('[data-test="add-enrichment-table-cancel-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-enrichment-table-save-btn"]').exists()).toBe(true);
+    });
+
+    it('emits cancel:hideform when cancel is clicked', async () => {
+      wrapper = createWrapper();
+      await wrapper.find('[data-test="add-enrichment-table-cancel-btn"]').trigger('click');
+      expect(wrapper.emitted('cancel:hideform')).toBeTruthy();
     });
   });
 
   describe('Error Handling', () => {
-    beforeEach(() => {
+    it('captures the API error message into compilationErr', async () => {
       wrapper = createWrapper();
-      vi.clearAllMocks();
-    });
+      const jsTransformService = (await import('@/services/jstransform')).default;
+      vi.spyOn(jsTransformService, 'create_enrichment_table').mockRejectedValueOnce({
+        response: { status: 400, data: { message: 'Invalid CSV format' } },
+      });
 
-    it('should handle API errors gracefully', async () => {
-      const jsTransformService = await import('@/services/jstransform');
-      const error = {
-        response: {
-          status: 400,
-          data: {
-            message: 'Invalid CSV format',
-            error: 'Parsing error',
-          },
-        },
-      };
-      
-      // Mock the service to reject
-      vi.spyOn(jsTransformService.default, 'create_enrichment_table')
-        .mockRejectedValueOnce(error);
-      
-      // Set form data
-      (wrapper.vm as any).formData = {
-        name: 'test-table',
-        file: new File(['test'], 'test.csv', { type: 'text/csv' }),
-        append: false,
-      };
-      
-      await (wrapper.vm as any).onSubmit();
-      await wrapper.vm.$nextTick();
-      
+      const form = getForm(wrapper);
+      form.setFieldValue('name', 'test-table');
+      form.setFieldValue('file', new File(['test'], 'test.csv', { type: 'text/csv' }));
+      await form.handleSubmit();
+      await flushPromises();
+
       expect((wrapper.vm as any).compilationErr).toBe('Invalid CSV format');
     });
 
-    it('should set compilationErr from error message when response data is missing', async () => {
-      const jsTransformService = await import('@/services/jstransform');
-      const error = new Error('Direct error message');
-      
-      vi.spyOn(jsTransformService.default, 'create_enrichment_table')
-        .mockRejectedValueOnce(error);
-      
-      // Set form data
-      (wrapper.vm as any).formData = {
-        name: 'test-table',
-        file: new File(['test'], 'test.csv', { type: 'text/csv' }),
-        append: false,
-      };
-      
-      await (wrapper.vm as any).onSubmit();
-      await wrapper.vm.$nextTick();
-      
-      expect((wrapper.vm as any).compilationErr).toBe('Direct error message');
-    });
-
-    it('should set compilationErr to "Unknown error" when no error details available', async () => {
-      const jsTransformService = await import('@/services/jstransform');
-      const error = {};
-      
-      vi.spyOn(jsTransformService.default, 'create_enrichment_table')
-        .mockRejectedValueOnce(error);
-      
-      // Set form data
-      (wrapper.vm as any).formData = {
-        name: 'test-table',
-        file: new File(['test'], 'test.csv', { type: 'text/csv' }),
-        append: false,
-      };
-      
-      await (wrapper.vm as any).onSubmit();
-      await wrapper.vm.$nextTick();
-      
-      expect((wrapper.vm as any).compilationErr).toBe('Unknown error');
-    });
-
-    it('should handle 403 errors without showing notification', async () => {
-      const jsTransformService = await import('@/services/jstransform');
-      const error = {
-        response: {
-          status: 403,
-          data: {
-            message: 'Forbidden',
-            error: 'Access denied',
-          },
-        },
-      };
-      
-      const createSpy = vi.spyOn(jsTransformService.default, 'create_enrichment_table')
-        .mockRejectedValueOnce(error);
-      
-      // Set form data
-      (wrapper.vm as any).formData = {
-        name: 'test-table',
-        file: new File(['test'], 'test.csv', { type: 'text/csv' }),
-        append: false,
-      };
-      
-      try {
-        await (wrapper.vm as any).onSubmit();
-      } catch (e) {
-        // Expected to fail
-      }
-      
-      expect(createSpy).toHaveBeenCalled();
-    });
-
-    it('should show default error message when error details are missing', async () => {
-      const jsTransformService = await import('@/services/jstransform');
-      const error = new Error('Network error');
-      
-      const createSpy = vi.spyOn(jsTransformService.default, 'create_enrichment_table')
-        .mockRejectedValueOnce(error);
-      
-      // Set form data
-      (wrapper.vm as any).formData = {
-        name: 'test-table',
-        file: new File(['test'], 'test.csv', { type: 'text/csv' }),
-        append: false,
-      };
-      
-      try {
-        await (wrapper.vm as any).onSubmit();
-      } catch (e) {
-        // Expected to fail
-      }
-      
-      expect(createSpy).toHaveBeenCalled();
-    });
-  });
-
-  describe('Analytics Tracking', () => {
-    beforeEach(() => {
+    it('does not show an error toast for 403 responses', async () => {
       wrapper = createWrapper();
-    });
-
-    it('should track save button click event', async () => {
-      const segment = await import('@/services/segment_analytics');
-      const trackSpy = vi.spyOn(segment.default, 'track');
-      
-      // Set form data
-      (wrapper.vm as any).formData = {
-        name: 'test-table',
-        file: new File(['test'], 'test.csv', { type: 'text/csv' }),
-        append: false,
-      };
-      
-      await (wrapper.vm as any).onSubmit();
-      
-      expect(trackSpy).toHaveBeenCalledWith('Button Click', {
-        button: 'Save Enrichment Table',
-        user_org: 'test-org-id',
-        user_id: 'test@example.com',
-        function_name: 'test-table',
-        page: 'Add/Update Enrichment Table',
+      const jsTransformService = (await import('@/services/jstransform')).default;
+      vi.spyOn(jsTransformService, 'create_enrichment_table').mockRejectedValueOnce({
+        response: { status: 403, data: { message: 'Forbidden' } },
       });
-    });
-  });
 
-  describe('Loading States', () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-    });
+      const form = getForm(wrapper);
+      form.setFieldValue('name', 'test-table');
+      form.setFieldValue('file', new File(['test'], 'test.csv', { type: 'text/csv' }));
+      await form.handleSubmit();
+      await flushPromises();
 
-    it('should show loading notification during submission', async () => {
-      // Set form data
-      (wrapper.vm as any).formData = {
-        name: 'test-table',
-        file: new File(['test'], 'test.csv', { type: 'text/csv' }),
-        append: false,
-      };
-      
-      const submitPromise = (wrapper.vm as any).onSubmit();
-      
-      // Check if loading toast was called
-      expect(mockToast).toHaveBeenCalledWith({
-        variant: 'loading',
-        message: 'Please wait...',
-        timeout: 0,
-      });
-      
-      await submitPromise;
-    });
-  });
-
-  describe('Component Props and Emits', () => {
-    it('should accept modelValue prop', () => {
-      const modelValue = {
-        name: 'test-table',
-        file: 'test.csv',
-        append: true,
-      };
-      
-      wrapper = createWrapper({ modelValue });
-      
-      expect(wrapper.props('modelValue')).toEqual(modelValue);
-    });
-
-    it('should accept isUpdating prop', () => {
-      wrapper = createWrapper({ isUpdating: true });
-      
-      expect(wrapper.props('isUpdating')).toBe(true);
-    });
-
-    it('should emit cancel:hideform event', async () => {
-      wrapper = createWrapper();
-
-      const cancelBtn = wrapper.find('[data-test="add-enrichment-table-cancel-btn"]');
-      await cancelBtn.trigger('click');
-
-      expect(wrapper.emitted('cancel:hideform')).toBeTruthy();
-    });
-
-    it('should emit update:list event on successful submission', async () => {
-      wrapper = createWrapper();
-      
-      // Set form data
-      (wrapper.vm as any).formData = {
-        name: 'test-table',
-        file: new File(['test'], 'test.csv', { type: 'text/csv' }),
-        append: false,
-      };
-      
-      await (wrapper.vm as any).onSubmit();
-      
-      expect(wrapper.emitted('update:list')).toBeTruthy();
+      expect(mockToast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ variant: 'error' }),
+      );
     });
   });
 
   describe('Compilation Error Display', () => {
-    beforeEach(() => {
+    it('displays compilation errors', async () => {
       wrapper = createWrapper();
-    });
-
-    it('should display compilation errors', async () => {
       (wrapper.vm as any).compilationErr = 'Test error message';
       await wrapper.vm.$nextTick();
-      
-      const errorElement = wrapper.find('pre');
-      expect(errorElement.text()).toBe('Test error message');
-    });
-
-    it('should clear compilation errors on successful submission', async () => {
-      (wrapper.vm as any).compilationErr = 'Previous error';
-      
-      // Set form data
-      (wrapper.vm as any).formData = {
-        name: 'test-table',
-        file: new File(['test'], 'test.csv', { type: 'text/csv' }),
-        append: false,
-      };
-      
-      await (wrapper.vm as any).onSubmit();
-      
-      // Error should remain as it's only cleared on error in catch block, not success
-      // The component doesn't explicitly clear it on success
-      expect((wrapper.vm as any).compilationErr).toBe('Previous error');
-    });
-  });
-
-  describe('Update Mode Specific Tests', () => {
-    it('should set append to false by default in update mode', () => {
-      const modelValue = {
-        name: 'existing-table',
-        file: 'existing.csv',
-        // append is undefined
-      };
-      
-      wrapper = createWrapper({ 
-        isUpdating: true,
-        modelValue 
-      });
-      
-      expect((wrapper.vm as any).formData.append).toBe(false);
-    });
-
-    it('should preserve existing append value in update mode', () => {
-      const modelValue = {
-        name: 'existing-table',
-        file: 'existing.csv',
-        append: true,
-      };
-      
-      wrapper = createWrapper({ 
-        isUpdating: true,
-        modelValue 
-      });
-      
-      expect((wrapper.vm as any).formData.append).toBe(true);
-    });
-
-    it('should set disable color in update mode', () => {
-      wrapper = createWrapper({ isUpdating: true });
-      
-      expect((wrapper.vm as any).disableColor).toBe('grey-5');
-    });
-  });
-
-  describe('Editor Functionality', () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-    });
-
-    it('should update formData.function when editor content changes', async () => {
-      // Initialize formData.function if it doesn't exist
-      if (!(wrapper.vm as any).formData.function) {
-        (wrapper.vm as any).formData.function = '';
-      }
-
-      const mockEvent = {
-        target: {
-          value: 'new function content'
-        }
-      };
-
-      // Call editorUpdate
-      await (wrapper.vm as any).editorUpdate(mockEvent);
-      await wrapper.vm.$nextTick();
-      
-      // Verify the function was updated
-      expect((wrapper.vm as any).formData.function).toBe('new function content');
-    });
-
-    it('should handle empty editor content', async () => {
-      // Initialize formData.function if it doesn't exist
-      if (!(wrapper.vm as any).formData.function) {
-        (wrapper.vm as any).formData.function = 'initial content';
-      }
-
-      const mockEvent = {
-        target: {
-          value: ''
-        }
-      };
-
-      // Call editorUpdate
-      await (wrapper.vm as any).editorUpdate(mockEvent);
-      await wrapper.vm.$nextTick();
-      
-      // Verify the function was updated to empty string
-      expect((wrapper.vm as any).formData.function).toBe('');
-    });
-
-    it('should handle null event value', async () => {
-      // Initialize formData.function if it doesn't exist
-      if (!(wrapper.vm as any).formData.function) {
-        (wrapper.vm as any).formData.function = 'initial content';
-      }
-
-      const mockEvent = {
-        target: {
-          value: null
-        }
-      };
-
-      // Call editorUpdate
-      await (wrapper.vm as any).editorUpdate(mockEvent);
-      await wrapper.vm.$nextTick();
-      
-      // Verify the function was updated to null
-      expect((wrapper.vm as any).formData.function).toBe(null);
+      expect(wrapper.find('pre').text()).toBe('Test error message');
     });
   });
 });

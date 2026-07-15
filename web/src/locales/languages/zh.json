@@ -12,13 +12,20 @@
       "action": "扩大时间范围",
       "actionDesc": "在更长的时间内搜索"
     },
+    "noPatterns": {
+      "title": "未找到图案",
+      "description": "尝试增加时间范围或选择包含更多日志数据的其他流。对于至少 1,000 个日志，模式提取效果最佳。",
+      "logsAnalyzed": "只分析了 {count} 个日志。"
+    },
     "noStreamSelected": {
       "title": "选择数据流开始",
       "description": "选择一个直播，然后运行查询来浏览其数据。使用筛选条件和自定义时间范围优化结果。"
     },
     "noQueryApplied": {
       "title": "运行查询以查看日志",
-      "description": "调整您的过滤器并单击 “运行查询” 以加载此数据流的事件。"
+      "description": "调整您的过滤器并单击 “运行查询” 以加载此数据流的事件。",
+      "action": "运行查询",
+      "actionDesc": "加载所选过滤器的事件"
     },
     "noDashboards": {
       "title": "创建您的第一个仪表板",
@@ -80,7 +87,9 @@
       "title": "还没有目的地",
       "description": "目的地定义警报通知的发送地点——Slack、电子邮件、网络挂钩等。",
       "action": "新目的地",
-      "actionDesc": "连接通知频道"
+      "actionDesc": "连接通知频道",
+      "import": "导入目的地",
+      "importDesc": "从 JSON 文件导入"
     },
     "noPipelineDestinations": {
       "title": "还没有目的地",
@@ -92,7 +101,9 @@
       "title": "还没有模板",
       "description": "模板定义警报通知消息的格式。",
       "action": "新模板",
-      "actionDesc": "创建通知模板"
+      "actionDesc": "创建通知模板",
+      "import": "导入模板",
+      "importDesc": "从 JSON 文件导入"
     },
     "noEvalTemplates": {
       "title": "尚无评估模板",
@@ -142,6 +153,20 @@
       "title": "没有回填作业",
       "description": "回填任务通过管道重新处理历史数据。运行一个即可开始。"
     },
+    "noRegexPatterns": {
+      "title": "还没有正则表达式模式",
+      "description": "创建可重复使用的模式来编辑敏感数据，或从库中导入一个模式。",
+      "action": "新图案",
+      "actionDesc": "定义新的正则表达式模式",
+      "import": "导入模式",
+      "importDesc": "重复使用库中的图案"
+    },
+    "noStorageConfig": {
+      "title": "未配置存储桶",
+      "description": "将该组织的数据路由到专用的存储桶，独立于其他组织和全局默认值。",
+      "action": "配置存储",
+      "actionDesc": "连接 S3、GCS 或 Azure 存储桶"
+    },
     "noPipelineHistory": {
       "title": "尚无管道历史记录",
       "description": "管道运行后，管道执行历史记录将显示在此处。"
@@ -161,10 +186,12 @@
       "actionDesc": "写一个新的 VRL 函数"
     },
     "noStreams": {
-      "title": "等待你的第一批数据",
-      "description": "尚未收到任何数据。连接来源，您的数据流将自动显示在此处。",
+      "title": "连接源来创建你的第一个直播",
+      "description": "数据到达的那一刻就会自动创建流。开始使用您的应用程序、代理或收集器进行提取。",
       "action": "设置摄取",
-      "actionDesc": "连接数据源"
+      "actionDesc": "连接数据源",
+      "createAction": "新直播",
+      "createActionDesc": "手动定义直播架构"
     },
     "noAlerts": {
       "title": "创建您的第一个提醒",
@@ -174,7 +201,7 @@
     },
     "noIncidents": {
       "title": "没有活跃事件",
-      "description": "你们都被困住了——现在没有什么需要你注意的。触发的事件将出现在此处。"
+      "description": "事件是在警报触发时产生的，尚未触发任何警报。警报到位后，任何触发的事件都将显示在此处。"
     },
     "noLLMInsights": {
       "title": "还没有 LLM 活动",
@@ -191,20 +218,24 @@
     "noScorers": {
       "title": "还没有评分器",
       "description": "评分器根据你的分数配置对 LLM 回复进行评分——从 LLM 评分器开始，或者从库中导入一个。",
-      "action": "创建评分器",
-      "actionDesc": "定义 LLM 评分器或远程评分器"
+      "action": "新得分手",
+      "actionDesc": "定义 LLM 评分器或远程评分器",
+      "import": "导入记分器",
+      "importDesc": "从 JSON 文件导入"
     },
     "noEvalJobs": {
       "title": "尚无评测任务",
       "description": "在 LLM 数据流中安排评分器。创建一个，开始按节奏对对话进行评分。",
-      "action": "创建评测任务",
+      "action": "新工作",
       "actionDesc": "选择数据流 + 得分手 + 节奏"
     },
     "noScoreConfigs": {
       "title": "还没有分数配置",
       "description": "分数配置定义评分器生成的架构——数字、布尔值或分类。添加一个即可开始得分。",
-      "action": "创建分数配置",
-      "actionDesc": "定义分数形状 + 健康范围"
+      "action": "新的分数配置",
+      "actionDesc": "定义分数形状 + 健康范围",
+      "import": "导入分数配置",
+      "importDesc": "从 JSON 文件导入"
     },
     "loadError": {
       "title": "出了点问题",
@@ -271,6 +302,7 @@
     },
     "nouns": {
       "logs": "Logs",
+      "patterns": "模式",
       "dashboards": "仪表板",
       "pipelines": "管道",
       "functions": "功能",
@@ -305,7 +337,8 @@
       "scorers": "评分器",
       "evalJobs": "评估作业",
       "scoreConfigs": "评分配置",
-      "pipelineHistory": "管道历史记录"
+      "pipelineHistory": "管道历史记录",
+      "regexPatterns": "正则表达式模式"
     }
   },
   "common": {
@@ -451,6 +484,10 @@
   },
   "validation": {
     "required": "此字段为必填字段",
+    "fieldRequired": "字段为必填项！",
+    "alphanumeric": "输入必须为字母数字",
+    "organizationNameRequired": "组织名称为必填项",
+    "selectOrganization": "请选择一个组织",
     "invalidFormat": "格式无效",
     "mustBeGreaterThan": "必须大于 {值}",
     "mustBeLessThan": "必须小于 {值}"
@@ -849,6 +886,12 @@
     "webVitals": "关键指标",
     "errors": "错误",
     "api": "API",
+    "uploadSourceMapsForm": {
+      "serviceRequired": "服务是必填项",
+      "versionRequired": "版本是必填项",
+      "fileRequired": "请选择要上传的 ZIP 文件",
+      "fileTypeZip": "仅允许 ZIP 文件"
+    },
     "emptyState": {
       "title": "使用真实用户监控监控您的用户",
       "description": "RUM 跟踪真实的用户交互——页面加载、错误、API 调用和会话重播——因此您可以确切地了解用户对应用程序的体验。",
@@ -1612,6 +1655,11 @@
     "subtitle": "索引管理和流配置",
     "streamNameHelpText": "仅使用字母数字字符、下划线和冒号。",
     "search": "搜索数据流",
+    "emptyOr": "或者：",
+    "emptyKubernetes": "Kubernetes",
+    "emptyAws": "AWS/CloudWatch",
+    "emptyLinux": "Linux的",
+    "emptyWindows": "Windows",
     "name": "名称",
     "docNum": "数据量",
     "storageSize": "采集数据",
@@ -1653,6 +1701,9 @@
     "labelIndex": "索引",
     "add": "添加数据流",
     "dataRetention": "数据保留（以天为单位）",
+    "streamNameRequired": "流名称为必填项",
+    "streamTypeRequired": "请选择流类型",
+    "dataRetentionMin": "数据保留时间必须至少为 1 天",
     "indexing": "索引",
     "createStream": "创建数据流",
     "indexType": "索引类型",
@@ -1792,6 +1843,27 @@
     "dragDropNodesHere": "将节点拖放到此处",
     "promqlOnlyForMetrics": "PromQL 仅适用于指标流类型",
     "invalidCronExpression": "无效的 cron 表达式",
+    "cronRequired": "Cron 表达式为必填项",
+    "destResourceNameInvalid": "不允许使用 :、?、/、# 等字符和空格。",
+    "urlTrailingSlash": "URL 结尾不应包含斜杠",
+    "orgRequiredOpenobserve": "OpenObserve 需要填写组织",
+    "streamRequiredOpenobserve": "OpenObserve 需要填写流名称",
+    "endpointMustStartSlash": "端点路径必须以 / 开头",
+    "indexRequiredEsbulk": "ESBulk 格式需要填写索引名称",
+    "separatorRequiredStringseparated": "StringSeparated 格式需要填写分隔符",
+    "ddSourceRequiredDatadog": "Datadog 需要填写 DD Source",
+    "ddTagsRequiredDatadog": "Datadog 需要填写 DD Tags",
+    "periodGreaterThanZero": "周期必须大于 0",
+    "frequencyGreaterThanSeconds": "频率必须大于 {seconds} 秒。",
+    "minimumFrequencyMinutes": "最小频率应为 {minutes} 分钟",
+    "streamSelectionNameInvalid": "仅使用字母数字和 '+=,.@-_' 字符，不含空格。",
+    "functionAlreadyAssociated": "该函数已关联",
+    "atLeastOneCondition": "请至少添加一个条件",
+    "fillAllConditionFields": "请填写所有条件字段（列、运算符和值均为必填项）",
+    "selectExternalDestination": "请从列表中选择外部目标",
+    "backfillNumericRange": "必须介于 {min} 和 {max} 之间",
+    "selectValidTimeRange": "请选择有效的时间范围",
+    "startBeforeEndTime": "开始时间必须早于结束时间",
     "thresholdShouldNotBeEmpty": "阈值不应为空",
     "errorGettingResults": "获取结果时出错",
     "save": "保存",
@@ -1843,6 +1915,11 @@
     "tooltipPromptTemplate": "提示已发送到 LLM。在评估时使用 {输入}、{输出} 和 {context} 作为动态值的占位符。"
   },
   "function": {
+    "csvFileRequired": "CSV 文件为必填项！",
+    "urlRequired": "URL 为必填项！",
+    "urlMustStartWithHttp": "URL 必须以 http:// 或 https:// 开头",
+    "nameRequired": "此字段为必填项！",
+    "invalidMethodName": "方法名称无效。必须以字母或下划线开头，且只能包含字母、数字和下划线。",
     "header": "函数",
     "subtitle": "应用于管道的可重复使用的 VRL 函数",
     "clickTestFunctionHint": "请单击 “测试功能” 查看事件",
@@ -2103,6 +2180,17 @@
     "header": "仪表盘",
     "subtitle": "跨文件夹创建、组织和共享仪表板",
     "add": "添加仪表盘",
+    "setAsHome": "固定到主页",
+    "removeFromHome": "从主页取消固定",
+    "isHomeDashboard": "主页仪表板",
+    "openHomeDashboard": "查看固定的仪表板",
+    "pinnedOnHome": "将仪表板固定在主页上",
+    "deletedSuccessfully": "仪表板已成功删除。",
+    "pinnedDeletedPinRemoved": "固定的仪表板已删除，因此其主页图钉已删除。",
+    "homePinNotFound": "此仪表板已不存在并已从主页中移除。",
+    "homePinUnavailable": "此仪表板不再可用，已从主页中移除。",
+    "setAsHomeDesc": "在主页上为组织中的所有人显示此仪表板",
+    "moreActions": "更多动作",
     "save": "保存",
     "cancel": "取消",
     "delete": "删除",
@@ -2172,6 +2260,7 @@
     "selectVariableScope": "选择变量范围",
     "variableScopeHelp": "如果选择了全局变量，则变量将应用于所有选项卡和面板。",
     "newTab": "添加选项卡",
+    "editTab": "编辑选项卡",
     "generalSettingsTitle": "通用设置",
     "tabSettingsTitle": "选项卡设置",
     "addGeneralSettings": "基本设置",
@@ -2546,14 +2635,34 @@
     "editDrilldown": "编辑 Drilldown",
     "goTo": "前往：",
     "selectLogsMode": "选择日志模式：",
-    "enterCustomQuery": "输入自定义查询：",
-    "enterUrl": "输入网址：",
+    "enterCustomQuery": "自定义 SQL 查询 *:",
+    "sqlQueryRequired": "SQL 查询是必填项",
+    "variableNameRequired": "变量名称是必填项",
+    "variableNameInvalid": "只允许使用字母、数字、连字符和下划线",
+    "atLeastOneTabRequired": "至少需要一个选项卡",
+    "atLeastOnePanelRequired": "至少需要一个面板",
+    "streamTypeRequired": "流类型是必填项",
+    "streamIndexRequired": "流 / 索引是必填项",
+    "fieldRequired": "字段为必填字段",
+    "constantValueRequired": "常量值是必填项",
+    "operatorRequired": "运算符是必填项",
+    "filterValueRequired": "必填",
+    "labelRequired": "标签是必填项",
+    "optionValueRequired": "字段为必填字段！",
+    "seriesValueRequired": "系列值是必填项",
+    "colorRequired": "颜色是必填项",
+    "onlyHttpsUrlsAllowed": "仅允许使用 HTTP(S) URL",
+    "urlRequired": "网址为必填项",
+    "folderRequired": "文件夹为必填项",
+    "dashboardRequired": "仪表盘为必填项",
+    "tabRequired": "选项卡为必填项",
+    "enterUrl": "输入网址",
     "invalidUrl": "网址无效",
-    "selectFolderDrilldown": "选择文件夹 *:",
+    "selectFolderDrilldown": "选择文件夹",
     "noFoldersAvailable": "没有可用的文件夹",
-    "selectDashboardDrilldown": "选择控制面板 *:",
+    "selectDashboardDrilldown": "选择控制面板",
     "noDashboardsAvailable": "没有可用的仪表板",
-    "selectTabDrilldown": "选择选项卡 *:",
+    "selectTabDrilldown": "选择选项卡",
     "noTabAvailable": "没有可用的选项卡",
     "variables": "变量：",
     "passAllCurrentVariables": "传递所有当前变量：",
@@ -2676,6 +2785,11 @@
     "operations": "操作",
     "promQLBuilder": "PromQL 生成器",
     "joins": "连接",
+    "xAxisShort": "X轴",
+    "yAxisShort": "Y轴",
+    "rowFields": "行字段",
+    "valueFields": "值字段",
+    "noData": "无数据",
     "addJoin": "添加连接",
     "removeJoin": "移除连接",
     "leftJoin": "左连接",
@@ -2751,6 +2865,7 @@
     "tabAiAssistant": "O2 AI 助手",
     "tabOverview": "概述",
     "tabUsage": "用法",
+    "removeHomeDashboard": "移除主控制面板",
     "subtitle": "您的可观测性工作空间一览"
   },
   "overview": {
@@ -2903,6 +3018,9 @@
     "enterpriseNote": "高容量需求？让我们来谈谈规模！联系我们获取量身定制的解决方案。",
     "contactSupport": "联系支持部门",
     "totalUsage": "总使用量",
+    "usageTrends": {
+      "dailyUsage": "每日使用量"
+    },
     "aiCredits": "AI 积分",
     "aiModeFree": "免费",
     "aiModePayAsYouGo": "即用即付",
@@ -2934,6 +3052,7 @@
       "inviteTitle": "邀请组织",
       "inviteOrgIdLabel": "组织标识符",
       "inviteOrgIdPlaceholder": "输入组织标识符",
+      "inviteOrgIdRequired": "组织标识符是必填项",
       "sendInvite": "发送邀请",
       "inviteSent": "邀请已成功发送",
       "inviteSameOrg": "组织无法邀请自己",
@@ -3017,9 +3136,9 @@
     "searchAllFolders": "所有文件夹",
     "streamConfig": "直播配置",
     "alertRules": "警报规则",
-    "noTemplatesMsg": "看来你还没有创建任何模板。要创建提醒，你需要至少有一个目的地和一个模板",
+    "noTemplatesMsg": "要创建警报，您至少需要一个模板和一个目的地。模板定义通知消息的格式——首先创建一个。",
     "createTemplateBtn": "创建模板",
-    "noDestinationsMsg": "看来你还没有创建任何目的地。要创建提醒，你需要至少有一个目的地和一个模板",
+    "noDestinationsMsg": "要创建警报，你需要至少一个目的地和一个模板。目的地定义通知的发送位置——首先创建通知。",
     "createDestinationBtn": "创建目的地",
     "add": "添加告警",
     "edit": "编辑",
@@ -3881,12 +4000,24 @@
     "domainConfiguredCount": "{count} 个域已配置",
     "allowAllUsersFromDomain": "允许来自 {domain} 的所有用户",
     "allowOnlySpecificUsers": "仅允许来自 {domain} 的特定用户",
+    "blockSpecificUsers": "仅屏蔽来自 {domain} 的特定用户",
+    "blockAllUsersFromDomain": "屏蔽来自 {domain} 的所有用户",
+    "allUsersBlockedMessage": "所有电子邮件地址以 {domain} 结尾的外部 SSO 用户都将被禁止访问系统（用户界面、API 和提取）。",
+    "blockedUsersHint": "被封锁的条目仅适用于外部 SSO 身份（SSO 用户和 SSO/代币服务账户）。它们会覆盖任何允许规则，涵盖用户界面、API 和摄取。原生账户和 API 创建的账户不受影响，改为删除这些账户。",
+    "addBlockedEmail": "屏蔽电子邮件",
+    "blockedEmailPlaceholder": "例如用户 {域}",
+    "domainNeedsBlockedEmails": "在屏蔽特定用户时，域 “{domain}” 必须至少有一个电子邮件地址",
+    "confirmRemoveBlockedEmail": "您确定要解除对电子邮件 “{email}” 的封锁吗？",
+    "blockedEmailAdded": "电子邮件地址已成功封锁",
+    "blockedEmailRemoved": "电子邮件地址成功解除封锁",
     "allUsersAllowedMessage": "所有电子邮件地址以 {domain} 结尾的用户都将被允许登录。",
     "emailPlaceholder": "例如用户 {域}",
     "addEmail": "添加电子邮件",
     "saveChanges": "保存",
     "invalidDomain": "请输入有效的域名",
     "invalidEmail": "请输入该域的有效电子邮件地址",
+    "domainRequired": "需要域名",
+    "emailRequired": "需要电子邮件地址",
     "domainAlreadyExists": "此域已被添加",
     "domainAdded": "域名已成功添加",
     "confirmRemoveDomain": "您确定要移除域名 '{domain}' 吗？",
@@ -3903,6 +4034,7 @@
     "pageSubtitle": "调整应用程序的设置",
     "platformSettings": "平台设置",
     "scrapeIntervalRequired": "需要抓取间隔",
+    "scrapeIntervalPositive": "抓取间隔必须为正数",
     "scrapeIntervalDescription": "抓取间隔是监控系统收集指标的频率，以秒为单位。",
     "maxSeriesPerQueryLabel": "每个查询的最大序列数",
     "maxSeriesPerQueryDescription": "单个 PromQL 查询可以返回的最大序列数。使用大型结果集有助于防止界面冻结。留空以使用系统默认值 (40,000)。",
@@ -4213,6 +4345,51 @@
     "querySource": "查询来源"
   },
   "traces": {
+    "serviceGraph": {
+      "searchPlaceholder": "搜索服务",
+      "noStreamsDetected": "未检测到任何直播。确保服务图表指标包含 stream_name 标签。",
+      "streamOnlyInfo": "服务图使用纯流架构，内存状态为零",
+      "borderColor": "边框颜色",
+      "borderColorMetric": "错误",
+      "nodeSize": "节点大小",
+      "nodeSizeMetric": "请求",
+      "sizeLow": "低",
+      "sizeHigh": "高",
+      "status": {
+        "healthy": "健康",
+        "degraded": "已降级",
+        "warning": "警告",
+        "critical": "关键"
+      },
+      "range": {
+        "healthy": "< 1%",
+        "degraded": "1 — 5%",
+        "warning": "5 — 10%",
+        "critical": "> 10%"
+      },
+      "entities": "实体",
+      "distribution": "分发",
+      "total": "总计",
+      "showTypes": "显示类型",
+      "typesFiltered": "有些类型是隐藏的。打开以更改显示的内容。",
+      "zoomIn": "放大",
+      "zoomOut": "缩小",
+      "fitToScreen": "适合屏幕",
+      "layout": "布局",
+      "types": "类型",
+      "mode": {
+        "auto": "汽车",
+        "expanded": "已扩展",
+        "collapsed": "崩溃了"
+      },
+      "kind": {
+        "service": "服务",
+        "database": "数据存储",
+        "queue": "队列",
+        "external": "外部",
+        "rpc": "RPC"
+      }
+    },
     "openInFullView": "以全视图打开",
     "viewLogs": "查看日志",
     "viewRelated": "查看相关",
@@ -4491,6 +4668,7 @@
     "servicesCatalog": {
       "tabLabel": "服务目录",
       "title": "服务目录",
+      "footerTitle": "服务",
       "filterPlaceholder": "按服务名称筛选...",
       "noServicesFound": "在所选时间范围内未找到任何服务。",
       "loading": "正在加载服务...",
@@ -4517,6 +4695,15 @@
       "servicesLabel": "服务",
       "viewTraces": "查看踪迹",
       "exportCsv": "导出 CSV",
+      "types": {
+        "all": "全部",
+        "service": "服务",
+        "datastore": "数据存储",
+        "queue": "队列",
+        "external": "外部",
+        "rpc": "RPC"
+      },
+      "unhealthyTooltip": "{count} {状态}",
       "legend": {
         "title": "错误率"
       }
@@ -4551,6 +4738,9 @@
     "search": "搜索操作",
     "timezone": "时区",
     "zipFileRequired": "ZIP 文件是必填的！",
+    "fieldRequired": "字段为必填项！",
+    "nameInvalidChars": "不允许使用 :、?、/、# 等字符和空格。",
+    "invalidMethodName": "方法名称无效。必须以字母或下划线开头。只能使用字母、数字和下划线。",
     "zipFile": "ZIP 文件",
     "frequency": "频率"
   },
@@ -5131,7 +5321,7 @@
     "nameTooLong": "型号名称必须少于 256 个字符",
     "patternRequired": "匹配模式为必填项",
     "patternTooLong": "匹配模式必须少于 512 个字符",
-    "invalidRegex": "无效的正则表达式：{错误}",
+    "invalidRegex": "无效的正则表达式：{error}",
     "usageKeyPureInteger": "用法键不能是纯整数",
     "usageKeyContainsSpaces": "使用密钥不得包含空格",
     "tierPriceMissingKey": "等级 “{name}” 的价格没有使用密钥。添加使用密钥（例如 “输入”）或使用快速设置模板。",
@@ -5217,17 +5407,17 @@
     "description": "配置 LLM 提供商、分数定义、评分器和实时评测任务。",
     "loading": "正在加载在线评估配置...",
     "loadError": "加载在线评估失败",
-    "deletePrompt": "删除 {姓名}？",
-    "deleteTitle": "删除 {标签}",
+    "deletePrompt": "删除 {name}？",
+    "deleteTitle": "删除 {label}",
     "deleteConfirmMessage": "您确定要删除 “{name}” 吗？此操作无法撤消。",
     "deleted": "{label} 已删除",
     "deleteError": "删除 {label} 失败",
     "saved": "{label} 已保存",
-    "newButton": "新的 {标签}",
-    "search": "搜索 {标签}",
+    "newButton": "新的 {label}",
+    "search": "搜索 {label}",
     "refresh": "刷新",
     "allStatuses": "所有状态",
-    "noRowsFound": "未找到 {标签}",
+    "noRowsFound": "未找到 {label}",
     "getStartedHint": "创建一个，开始接线在线评估。",
     "columns": {
       "name": "姓名",
@@ -5254,6 +5444,7 @@
     },
     "quality": {
       "scopeLabel": "此工作空间中的所有质量维度",
+      "agentPlaceholder": "所有代理",
       "timeRange": {
         "label": "时间范围",
         "last1h": "过去 1 小时",
@@ -6118,6 +6309,10 @@
       "functions": "函数",
       "reports": "报告",
       "iam": "IAM",
+      "settings": "设置",
+      "onlineEvals": "在线评估",
+      "actions": "行动",
+      "rum": "朗姆酒",
       "runningQueries": "运行查询"
     },
     "pages": {
@@ -6143,7 +6338,30 @@
       "panelEditor": "面板编辑器",
       "traceDetail": "追踪详情",
       "runningQueries": "运行查询",
-      "ingestionTokens": "IAM — 摄取代币"
+      "ingestionTokens": "IAM — 摄取代币",
+      "alertIncidents": "警报-事件",
+      "pipelineDestinations": "管道—目的地",
+      "enrichmentTables": "充实表",
+      "iamInvitations": "IAM — 邀请",
+      "iamOrganizations": "IAM — 组织",
+      "regexPatterns": "正则表达式模式",
+      "cipherKeys": "密码密钥",
+      "nodes": "节点",
+      "modelPricing": "型号定价",
+      "searchSchedulers": "搜索调度器",
+      "searchHistory": "搜索历史",
+      "sessions": "会话",
+      "evalTemplates": "在线评估—模板",
+      "scorers": "在线评估——记分员",
+      "evalJobs": "在线评估—职位",
+      "scoreConfigs": "在线评估—分数配置",
+      "actions": "行动",
+      "llmProviders": "LLM 提供商",
+      "aiToolsets": "AI 工具集",
+      "orgManagement": "组织管理",
+      "rumErrors": "RUM — 错误跟踪",
+      "rumSessions": "RUM — 会话",
+      "sourceMaps": "RUM — 源地图"
     },
     "actions": {
       "openCheatsheet": "打开键盘快捷键备忘单",
@@ -6223,7 +6441,30 @@
       "logsExport": "将结果导出为 CSV",
       "tableRowOpen": "打开/展开悬停行",
       "tableRowInspect": "检查悬停的行",
-      "tracesCopyUrl": "复制跟踪共享网址"
+      "tracesCopyUrl": "复制跟踪共享网址",
+      "alertIncidentsRefresh": "刷新清单",
+      "pipelineDestinationsRefresh": "刷新清单",
+      "enrichmentTablesRefresh": "刷新清单",
+      "iamInvitationsRefresh": "刷新清单",
+      "iamOrganizationsRefresh": "刷新清单",
+      "regexPatternsRefresh": "刷新清单",
+      "cipherKeysRefresh": "刷新清单",
+      "nodesRefresh": "刷新清单",
+      "modelPricingRefresh": "刷新清单",
+      "searchSchedulersRefresh": "刷新清单",
+      "searchHistoryRefresh": "刷新清单",
+      "sessionsRefresh": "刷新清单",
+      "evalTemplatesRefresh": "刷新清单",
+      "scorersRefresh": "刷新清单",
+      "evalJobsRefresh": "刷新清单",
+      "scoreConfigsRefresh": "刷新清单",
+      "actionsRefresh": "刷新清单",
+      "llmProvidersRefresh": "刷新清单",
+      "aiToolsetsRefresh": "刷新清单",
+      "orgManagementRefresh": "刷新清单",
+      "rumErrorsRefresh": "刷新清单",
+      "rumSessionsRefresh": "刷新清单",
+      "sourceMapsRefresh": "刷新清单"
     }
   }
 }

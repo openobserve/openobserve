@@ -16,21 +16,36 @@ test.describe("Unflattened testcases", () => {
     return text.replace(/[^\x00-\x7F]/g, " ");
   }
   async function applyQueryButton(page) {
-    // After stream selection, an auto-search may be in progress (button shows
-    // "Cancel").  Clicking refresh while a search is running just cancels it
-    // without starting a new one.  We click twice: first to cancel any
-    // in-flight search, then again to start a fresh one.
-    await page.waitForTimeout(3000);
-
-    // First click — cancels any in-progress auto-search.
-    await pageManager.logsPage.runQueryAndWaitForResults();
-
-    // Second click — reliably starts a new search now that no search is running.
-    await page.waitForTimeout(1000);
+    // runQueryAndWaitForResults already handles an in-flight auto-search internally:
+    // it waits for the button to exit the "Cancel" state before clicking, and if the
+    // state never clears it cancels and re-clicks Run itself. The old double-click
+    // wrapper (3s sleep + run + 1s sleep + run) duplicated that logic and added ~5s
+    // of fixed sleep to every call.
     await pageManager.logsPage.runQueryAndWaitForResults();
 
     // 2-minute timeout: cloud re-indexing after Store Original Data changes takes longer than the default 30s
     await pageManager.logsPage.waitForSearchResults(120000);
+  }
+
+  // Re-run the log search from a FRESH page load so the row scan below sees a
+  // complete, freshly-ordered result set. Re-clicking Run in place does not
+  // recover a stale/partial streaming result set (ZO_STREAMING_ENABLED delivers
+  // hits over a WebSocket that can lag the HTTP _search readiness gate) — the
+  // only reliable recovery is a new navigation + query, which is exactly what the
+  // whole-test Playwright retry does when it succeeds. This reproduces that here
+  // without re-ingesting, so it stays cheap. Pass sqlSelectAll for the quick-mode
+  // test, whose intent is specifically a `SELECT *` query (a plain reload would
+  // otherwise fall back to the quick-mode interesting-fields-only query).
+  async function runFreshLogSearch(page, { sqlSelectAll = false } = {}) {
+    await page.goto(
+      `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${getOrgIdentifier()}&stream_type=logs&stream=e2e_automate`
+    );
+    await page.waitForLoadState('domcontentloaded');
+    if (sqlSelectAll) {
+      await pageManager.logsPage.typeQuery('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC');
+      await pageManager.logsPage.waitForQueryEditorValue('ORDER BY _timestamp DESC');
+    }
+    await applyQueryButton(page);
   }
 
   test.beforeEach(async ({ page }) => {
@@ -42,11 +57,12 @@ test.describe("Unflattened testcases", () => {
       await pageManager.loginPage.loginAsInternalUser();
       await pageManager.loginPage.login();
     }
-    await page.waitForTimeout(2000);
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('domcontentloaded');
     await ingestion(page);
-    // Wait for data to be indexed before navigating to logs
-    await page.waitForTimeout(2000);
+    // Wait for the stream to actually be queryable instead of a blind 2s sleep —
+    // deterministic (usually instant once the stream exists) and more tolerant on
+    // slow CI runners than a fixed pause.
+    await pageManager.logsPage.waitForStreamAvailable('e2e_automate', 30000, 1000);
 
     // Check and disable Store Original Data if it's enabled.
     // Navigate directly to the streams URL with the correct org — clicking the
@@ -162,11 +178,12 @@ test.describe("Unflattened testcases", () => {
     await applyQueryButton(page);
     testLogger.info('Search query applied, logs should now contain _o2_id field');
 
-    testLogger.info('Searching log rows for _o2_id field (iterates first 10 rows per attempt)');
+    testLogger.info('Searching log rows for _o2_id field (iterates first 15 rows per attempt)');
     let o2idFound = false;
     // The backend readiness gate above already guarantees _o2_id is queryable, so
-    // a miss here is only UI/render lag — re-run the query (cheap) rather than
-    // re-ingesting (the old loop's re-ingest + 5s sleep is what ballooned wall-time).
+    // a miss here is UI/streaming lag — recover with a FRESH log search (reload +
+    // re-run) rather than re-ingesting. Re-clicking Run in place does not recover a
+    // stale/partial streaming result set; a fresh navigation does (see runFreshLogSearch).
     for (let attempt = 1; attempt <= 3; attempt++) {
       const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(15);
       if (matchedRow !== -1) {
@@ -175,10 +192,10 @@ test.describe("Unflattened testcases", () => {
         o2idFound = true;
         break;
       }
-      testLogger.warn(`_o2_id not found in first 10 rows on attempt ${attempt}, re-running query`);
+      testLogger.warn(`_o2_id not found in first 15 rows on attempt ${attempt}, re-running query from a fresh page`);
       await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
       if (attempt < 3) {
-        await applyQueryButton(page);
+        await runFreshLogSearch(page);
       }
     }
     if (!o2idFound) {
@@ -322,14 +339,22 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Replacing query with SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC');
     await pageManager.logsPage.typeQuery('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC');
 
+    // Wait for Monaco to commit the typed query to the Vue store before clicking Run.
+    // Without this the click can race the editor debounce and re-run the PREVIOUS
+    // (quick-mode fields-only) query, whose hits never contain _o2_id — dooming the
+    // row scan below and burning the whole 5-minute test budget (CI flake).
+    await pageManager.logsPage.waitForQueryEditorValue('ORDER BY _timestamp DESC');
+
     testLogger.info('Executing SELECT * query to fetch fresh data with _o2_id');
     await applyQueryButton(page);
 
-    testLogger.info('Searching log rows for _o2_id field (iterates first 10 rows per attempt)');
-    // With ORDER BY _timestamp DESC the newest rows come first. The backend
-    // readiness gate above already guarantees _o2_id is queryable, so a miss here
-    // is only UI/render lag — re-run the query (cheap) rather than re-ingesting
-    // (the old loop's re-ingest + 5s sleep is what ballooned wall-time on CI).
+    testLogger.info('Searching log rows for _o2_id field (iterates first 15 rows per attempt)');
+    // With ORDER BY _timestamp DESC the newest rows come first (the fixture carries
+    // no _timestamp, so the Store-Original-Data re-ingest is genuinely newest). The
+    // backend readiness gate above guarantees _o2_id is queryable, so a miss here is
+    // UI/streaming lag — recover with a FRESH SELECT * search (reload + re-type +
+    // re-run) rather than re-ingesting. Re-clicking Run in place does not recover a
+    // stale/partial streaming result set; a fresh navigation does.
     let o2idFound = false;
     for (let attempt = 1; attempt <= 3; attempt++) {
       const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(15);
@@ -339,7 +364,7 @@ test.describe("Unflattened testcases", () => {
         o2idFound = true;
         break;
       }
-      testLogger.warn(`_o2_id not found in first 10 rows on attempt ${attempt}, re-running query`);
+      testLogger.warn(`_o2_id not found in first 15 rows on attempt ${attempt}, re-running query from a fresh page`);
       if (attempt === 3) {
         try {
           const allKeys = await pageManager.unflattenedPage.allLogDetailKeys.allTextContents();
@@ -350,7 +375,7 @@ test.describe("Unflattened testcases", () => {
         break;
       }
       await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
-      await applyQueryButton(page);
+      await runFreshLogSearch(page, { sqlSelectAll: true });
     }
     if (!o2idFound) {
       throw new Error('Failed to find _o2_id field in log details after 3 attempts');

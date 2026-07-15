@@ -6,10 +6,6 @@ vi.mock("vuex", () => ({
   useStore: vi.fn(),
 }));
 
-vi.mock("quasar", () => ({
-  useQuasar: vi.fn(() => ({})),
-}));
-
 vi.mock("@/services/rate_limit", () => ({
   default: {
     getApiLimits: vi.fn(),

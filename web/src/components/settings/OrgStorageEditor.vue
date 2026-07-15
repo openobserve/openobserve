@@ -34,7 +34,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Stepper -->
     <div class="card-container h-[calc(100vh-7rem)] py-2 px-3 overflow-auto">
     <div style="max-width: 720px;">
-      <OForm ref="storageForm" :default-values="{}" @submit="submitStorage">
+      <OForm
+        ref="storageForm"
+        :schema="orgStorageEditorSchema"
+        :default-values="orgStorageEditorDefaults"
+        @submit="submitStorage"
+      >
         <OStepper
           v-model="step"
           ref="stepper"
@@ -135,51 +140,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- AwsCredentials Fields -->
               <template v-if="selectedProvider === 'AwsCredentials'">
                 <div class="flex flex-col gap-y-3">
-                  <OInput
+                  <OFormInput
                     v-if="!isCloud"
                     data-test="storage-settings-server-url-input"
-                    v-model="formData.server_url"
+                    name="server_url"
                     label="Server URL"
                     class="no-border showLabelOnTop"
                     flat
                     :disabled="isEditMode"
                   />
-                  <OInput
+                  <OFormInput
                     data-test="storage-settings-region-input"
-                    v-model="formData.region"
+                    name="region"
                     label="Region"
                     class="no-border showLabelOnTop"
                     flat
                     :disabled="isEditMode || !!cloudRegion"
                   />
-                  <OInput
+                  <OFormInput
                     data-test="storage-settings-bucket-name-input"
-                    v-model="formData.bucket_name"
-                    label="Bucket Name *"
+                    name="bucket_name"
+                    label="Bucket Name"
+                    required
                     class="no-border showLabelOnTop"
                     flat
                     :disabled="isEditMode"
-                    :error="!!fieldErrors.bucket_name"
-                    :error-message="fieldErrors.bucket_name"
                   />
-                  <OInput
+                  <OFormInput
                     data-test="storage-settings-access-key-input"
-                    v-model="formData.access_key"
-                    label="Access Key *"
+                    name="access_key"
+                    label="Access Key"
+                    required
                     class="no-border showLabelOnTop"
                     flat
-                    :error="!!fieldErrors.access_key"
-                    :error-message="fieldErrors.access_key"
                   />
-                  <OInput
+                  <OFormInput
                     data-test="storage-settings-secret-key-input"
-                    v-model="formData.secret_key"
-                    label="Secret Key *"
+                    name="secret_key"
+                    label="Secret Key"
+                    required
                     class="no-border showLabelOnTop"
                     flat
                     type="password"
-                    :error="!!fieldErrors.secret_key"
-                    :error-message="fieldErrors.secret_key"
                   />
                 </div>
               </template>
@@ -187,40 +189,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- AzureCredentials Fields -->
               <template v-if="selectedProvider === 'AzureCredentials'">
                 <div class="flex flex-col gap-y-3">
-                  <OInput
+                  <OFormInput
                     data-test="storage-settings-access-key-input"
-                    v-model="formData.storage_account"
-                    label="Storage Account Name *"
+                    name="storage_account"
+                    label="Storage Account Name"
+                    required
                     class="no-border showLabelOnTop"
                     flat
                     :disabled="isEditMode"
-                    :error="!!fieldErrors.storage_account"
-                    :error-message="fieldErrors.storage_account"
                   />
-                  <OInput
+                  <OFormInput
                     data-test="storage-settings-bucket-name-input"
-                    v-model="formData.bucket_name"
-                    label="Bucket Name *"
+                    name="bucket_name"
+                    label="Bucket Name"
+                    required
                     class="no-border showLabelOnTop"
                     flat
                     :disabled="isEditMode"
-                    :error="!!fieldErrors.bucket_name"
-                    :error-message="fieldErrors.bucket_name"
                   />
-                  <OInput
+                  <OFormInput
                     data-test="storage-settings-secret-key-input"
-                    v-model="formData.secret_key"
-                    label="Secret Key *"
+                    name="secret_key"
+                    label="Secret Key"
+                    required
                     class="no-border showLabelOnTop"
                     flat
                     type="password"
-                    :error="!!fieldErrors.secret_key"
-                    :error-message="fieldErrors.secret_key"
                   />
-                  <OInput
+                  <OFormInput
                     v-if="!isCloud"
                     data-test="storage-settings-server-url-input"
-                    v-model="formData.server_url"
+                    name="server_url"
                     label="Server URL"
                     class="no-border showLabelOnTop"
                     flat
@@ -232,29 +231,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- GcpCredentials Fields -->
               <template v-if="selectedProvider === 'GcpCredentials'">
                  <div class="flex flex-col gap-y-3">
-                  <OInput
+                  <OFormInput
                     data-test="storage-settings-bucket-name-input"
-                    v-model="formData.bucket_name"
-                    label="Bucket Name *"
+                    name="bucket_name"
+                    label="Bucket Name"
+                    required
                     class="no-border showLabelOnTop"
                     flat
                     :disabled="isEditMode"
-                    :error="!!fieldErrors.bucket_name"
-                    :error-message="fieldErrors.bucket_name"
                   />
-                  <OInput
+                  <OFormInput
                     data-test="storage-settings-access-key-input"
-                    v-model="formData.access_key"
-                    label="Access Key *"
+                    name="access_key"
+                    label="Access Key"
+                    required
                     class="no-border showLabelOnTop"
                     flat
-                    :error="!!fieldErrors.access_key"
-                    :error-message="fieldErrors.access_key"
                   />
-                  <OInput
+                  <OFormInput
                     v-if="!isCloud"
                     data-test="storage-settings-server-url-input"
-                    v-model="formData.server_url"
+                    name="server_url"
                     label="Server URL"
                     class="no-border showLabelOnTop"
                     flat
@@ -282,43 +279,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                  <div class="flex flex-col gap-y-3">
-                  <OInput
+                  <OFormInput
                     data-test="storage-settings-bucket-name-input"
-                    v-model="formData.bucket_name"
-                    label="Bucket Name *"
+                    name="bucket_name"
+                    label="Bucket Name"
+                    required
                     class="no-border showLabelOnTop"
                     flat
                     :disabled="isEditMode"
-                    :error="!!fieldErrors.bucket_name"
-                    :error-message="fieldErrors.bucket_name"
                   />
-                  <OInput
+                  <OFormInput
                     data-test="storage-settings-region-input"
-                    v-model="formData.region"
-                    label="Region *"
+                    name="region"
+                    label="Region"
+                    required
                     class="no-border showLabelOnTop"
                     flat
                     :disabled="isEditMode || !!cloudRegion"
-                    :error="!!fieldErrors.region"
-                    :error-message="fieldErrors.region"
                   />
-                  <OInput
+                  <OFormInput
                     data-test="storage-settings-role-arn-input"
-                    v-model="formData.role_arn"
-                    label="Role ARN *"
+                    name="role_arn"
+                    label="Role ARN"
+                    required
                     class="no-border showLabelOnTop"
                     flat
-                    :error="!!fieldErrors.role_arn"
-                    :error-message="fieldErrors.role_arn"
                   />
-                  <OInput
+                  <OFormInput
                     data-test="storage-settings-role-external-id-input"
-                    v-model="formData.external_id"
-                    label="External Id *"
+                    name="external_id"
+                    label="External Id"
+                    required
                     class="no-border showLabelOnTop"
                     flat
-                    :error="!!fieldErrors.external_id"
-                    :error-message="fieldErrors.external_id"
                   />
                 </div>
               </template>
@@ -407,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted, reactive, watch } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 
 defineOptions({ name: "OrgStorageEditor" });
 import { useI18n } from "vue-i18n";
@@ -419,10 +412,14 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  makeOrgStorageEditorSchema,
+  type OrgStorageEditorForm,
+} from "./OrgStorageEditor.schema";
 
 const props = defineProps<{
   action: "add" | "edit";
@@ -439,15 +436,15 @@ const { t } = useI18n();
 const step = ref(1);
 const selectedProvider = ref("");
 
-const fieldErrors = reactive<Record<string, string>>({
-  bucket_name: "",
-  access_key: "",
-  secret_key: "",
-  storage_account: "",
-  region: "",
-  role_arn: "",
-  external_id: "",
-});
+// OForm instance ref — used for the selectedProvider bridge (setFieldValue),
+// provider-change reset, and async edit-prefill (form.reset).
+const storageForm = ref<any>(null);
+
+// Schema-driven validation replaces the manual fieldErrors map +
+// validateStorageForm(). Provider-discriminated via superRefine on the bridged
+// `selectedProvider` field.
+const orgStorageEditorSchema = makeOrgStorageEditorSchema(t);
+
 const existingConfig = ref<any>(null);
 
 const isEditMode = computed(() => props.action === "edit");
@@ -458,16 +455,26 @@ const headerTitle = computed(() =>
 );
 const isCloud = computed(() => config.isCloud === "true");
 
-const formData = reactive({
-  bucket_name: "",
-  server_url: "",
-  region: (store.state as any).zoConfig?.org_storage_region || "",
-  access_key: "",
-  storage_account: "",
-  secret_key: "",
-  role_arn: "",
-  external_id: "",
-});
+// Blank form values for a given provider (region seeded from cloud/store).
+function blankFormValues(provider: string): OrgStorageEditorForm {
+  return {
+    selectedProvider: provider,
+    bucket_name: "",
+    server_url: "",
+    region: cloudRegion.value || (store.state as any).zoConfig?.org_storage_region || "",
+    access_key: "",
+    storage_account: "",
+    secret_key: "",
+    role_arn: "",
+    external_id: "",
+  };
+}
+
+// Dynamic defaults (region from cloud/store, provider projected from the card
+// grid) → a typed computed.
+const orgStorageEditorDefaults = computed((): OrgStorageEditorForm =>
+  blankFormValues(selectedProvider.value),
+);
 
 const cloudProviders = computed(() => {
   const raw = (store.state as any).zoConfig?.org_storage_providers;
@@ -525,74 +532,42 @@ function prevStep() {
   if (step.value > 1) step.value--;
 }
 
-function resetFormData() {
-  formData.bucket_name = "";
-  formData.server_url = "";
-  formData.region = cloudRegion.value;
-  formData.access_key = "";
-  formData.storage_account = "";
-  formData.secret_key = "";
-  formData.role_arn = "";
-  formData.external_id = "";
-}
-
-function buildDataPayload() {
+function buildDataPayload(value: OrgStorageEditorForm) {
   const data: Record<string, string> = {};
   switch (selectedProvider.value) {
     case "AwsCredentials":
-      data.bucket_name = formData.bucket_name;
-      data.server_url = isCloud.value ? "" : formData.server_url;
-      data.region = formData.region;
-      data.access_key = formData.access_key;
-      data.secret_key = formData.secret_key;
+      data.bucket_name = value.bucket_name;
+      data.server_url = isCloud.value ? "" : value.server_url;
+      data.region = value.region;
+      data.access_key = value.access_key;
+      data.secret_key = value.secret_key;
       break;
     case "AzureCredentials":
-      data.bucket_name = formData.bucket_name;
-      data.server_url = isCloud.value ? "" : formData.server_url;
-      data.storage_account = formData.storage_account;
-      data.secret_key = formData.secret_key;
+      data.bucket_name = value.bucket_name;
+      data.server_url = isCloud.value ? "" : value.server_url;
+      data.storage_account = value.storage_account;
+      data.secret_key = value.secret_key;
       break;
     case "GcpCredentials":
-      data.bucket_name = formData.bucket_name;
-      data.server_url = isCloud.value ? "" : formData.server_url;
-      data.access_key = formData.access_key;
+      data.bucket_name = value.bucket_name;
+      data.server_url = isCloud.value ? "" : value.server_url;
+      data.access_key = value.access_key;
       break;
     case "AwsRoleArn":
-      data.bucket_name = formData.bucket_name;
-      data.region = formData.region;
-      data.role_arn = formData.role_arn;
-      data.external_id = formData.external_id;
+      data.bucket_name = value.bucket_name;
+      data.region = value.region;
+      data.role_arn = value.role_arn;
+      data.external_id = value.external_id;
       break;
   }
   return data;
 }
 
-function validateStorageForm(): boolean {
-  Object.keys(fieldErrors).forEach((k) => (fieldErrors[k] = ""));
-  const p = selectedProvider.value;
-  if (p === "AwsCredentials") {
-    if (!formData.bucket_name?.trim()) fieldErrors.bucket_name = t("storage_settings.bucketNameRequired");
-    if (!formData.access_key?.trim()) fieldErrors.access_key = t("storage_settings.accessKeyRequired");
-    if (!formData.secret_key?.trim()) fieldErrors.secret_key = t("storage_settings.secretKeyRequired");
-  } else if (p === "AzureCredentials") {
-    if (!formData.storage_account?.trim()) fieldErrors.storage_account = t("storage_settings.storageAccountRequired");
-    if (!formData.bucket_name?.trim()) fieldErrors.bucket_name = t("storage_settings.bucketNameRequired");
-    if (!formData.secret_key?.trim()) fieldErrors.secret_key = t("storage_settings.secretKeyRequired");
-  } else if (p === "GcpCredentials") {
-    if (!formData.bucket_name?.trim()) fieldErrors.bucket_name = t("storage_settings.bucketNameRequired");
-    if (!formData.access_key?.trim()) fieldErrors.access_key = t("storage_settings.accessKeyRequired");
-  } else if (p === "AwsRoleArn") {
-    if (!formData.bucket_name?.trim()) fieldErrors.bucket_name = t("storage_settings.bucketNameRequired");
-    if (!formData.region?.trim()) fieldErrors.region = t("storage_settings.regionRequired");
-    if (!formData.role_arn?.trim()) fieldErrors.role_arn = t("storage_settings.roleARNRequired");
-    if (!formData.external_id?.trim()) fieldErrors.external_id = t("storage_settings.externalIdRequired");
-  }
-  return Object.values(fieldErrors).every((e) => !e);
-}
-
-async function submitStorage() {
-  if (!validateStorageForm()) return;
-
+// @submit handler — fires only once the provider-discriminated schema passes,
+// so the manual validateStorageForm()/fieldErrors are gone. The Save button is
+// inline (type=submit inside <OForm>) so Enter works natively; OForm awaits this
+// so the spinner spans the POST.
+async function submitStorage(value: OrgStorageEditorForm) {
   const dismiss = toast({
     variant: "loading",
     message: "Please wait...",
@@ -602,7 +577,7 @@ async function submitStorage() {
   const orgId = store.state.selectedOrganization.identifier;
   const payload = {
     provider: selectedProvider.value,
-    data: buildDataPayload(),
+    data: buildDataPayload(value),
   };
 
   try {
@@ -648,17 +623,22 @@ onMounted(async () => {
         step.value = 2;
         // data is already a parsed object from the API
         const parsed = res.data.data || {};
-        // prefill non-credential fields (they will be disabled in the form)
-        formData.bucket_name = parsed.bucket_name || "";
-        formData.server_url = parsed.server_url || "";
-        formData.region = parsed.region || "";
-        // credentials must be entered fresh — never prefill with masked values
-        formData.access_key = "";
-        formData.secret_key = "";
-        formData.role_arn = "";
-        // external id is something that is technically a credential, but not masked
-        formData.external_id = parsed.external_id || "";
-        formData.storage_account = parsed.storage_account || "";
+        // Prefill the form once the (async) config arrives — form.reset, not a
+        // per-field loop (the documented "data arrives after mount" pattern).
+        // Non-credential fields are disabled in the form; credentials must be
+        // entered fresh — never prefill with masked values. external_id is a
+        // credential but not masked, so it IS prefilled.
+        storageForm.value?.form?.reset({
+          selectedProvider: res.data.provider,
+          bucket_name: parsed.bucket_name || "",
+          server_url: parsed.server_url || "",
+          region: parsed.region || "",
+          access_key: "",
+          secret_key: "",
+          role_arn: "",
+          external_id: parsed.external_id || "",
+          storage_account: parsed.storage_account || "",
+        });
       }
     } catch {
       toast({
@@ -669,10 +649,13 @@ onMounted(async () => {
   }
 });
 
-// Watch for provider change to reset form data (skip in edit mode since provider is locked)
+// Bridge the provider card grid into the form (the documented sanctioned
+// discriminator bridge) so superRefine can branch on it. On a create-mode
+// provider change, reset the credential fields fresh for the new provider.
 watch(selectedProvider, (newProvider) => {
+  storageForm.value?.form?.setFieldValue("selectedProvider", newProvider);
   if (newProvider && !isEditMode.value) {
-    resetFormData();
+    storageForm.value?.form?.reset(blankFormValues(newProvider));
   }
 });
 </script>

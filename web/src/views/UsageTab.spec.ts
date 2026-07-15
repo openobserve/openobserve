@@ -90,11 +90,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
   };
 });
 
-vi.mock("@quasar/extras/material-icons-outlined", () => ({
-  "window": "outlined_window",
-}));
-
-// Mock Toast — replaces quasar notify
+// Mock Toast
 const mockNotifyDismiss = vi.fn();
 const mockNotify = vi.fn().mockReturnValue(mockNotifyDismiss);
 

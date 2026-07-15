@@ -114,19 +114,21 @@
               valueKey="value"
               data-test="dashboard-promql-builder-query-type"
               style="width: 120px"
+            />
+            <OIcon
+              name="info"
+              size="sm"
+              data-test="promql-builder-options-field-info-icon"
+              class="cursor-pointer"
             >
-              <template v-slot:append>
-                <OIcon name="info" size="sm" class="cursor-pointer">
-                  <OTooltip side="top" max-width="250px">
-                    <template #content>
-                      <b>Query Type - </b><br />
-                      Range: Returns time series data over a time range.<br />
-                      Instant: Returns single value at a specific point in time.
-                    </template>
-                  </OTooltip>
-                </OIcon>
-              </template>
-            </OSelect>
+              <OTooltip side="top" max-width="250px">
+                <template #content>
+                  <b>Query Type - </b><br />
+                  Range: Returns time series data over a time range.<br />
+                  Instant: Returns single value at a specific point in time.
+                </template>
+              </OTooltip>
+            </OIcon>
           </div>
         </div>
       </div>

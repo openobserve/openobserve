@@ -54,6 +54,15 @@ async function mountComp(props: Record<string, any> = {}) {
   });
 }
 
+// Form helpers — name/description/stream_type/stream_name are form-owned now.
+const setField = (w: any, name: string, val: unknown) =>
+  w.vm.form.setFieldValue(name, val);
+const formVals = (w: any) => w.vm.form.state.values;
+const submitForm = async (w: any) => {
+  await w.vm.form.handleSubmit();
+  await flushPromises();
+};
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -164,7 +173,7 @@ describe("StreamSelection - stream type options", () => {
   });
 });
 
-describe("StreamSelection - formData initial state", () => {
+describe("StreamSelection - form initial state", () => {
   let wrapper: any = null;
 
   beforeEach(async () => {
@@ -176,20 +185,20 @@ describe("StreamSelection - formData initial state", () => {
     vi.clearAllMocks();
   });
 
-  it("formData.name initializes as empty string", () => {
-    expect((wrapper.vm as any).formData.name).toBe("");
+  it("form name initializes as empty string", () => {
+    expect(formVals(wrapper).name).toBe("");
   });
 
-  it("formData.description initializes as empty string", () => {
-    expect((wrapper.vm as any).formData.description).toBe("");
+  it("form description initializes as empty string", () => {
+    expect(formVals(wrapper).description).toBe("");
   });
 
-  it("formData.stream_type initializes as empty string", () => {
-    expect((wrapper.vm as any).formData.stream_type).toBe("");
+  it("form stream_type initializes as empty string", () => {
+    expect(formVals(wrapper).stream_type).toBe("");
   });
 
-  it("formData.stream_name initializes as empty string", () => {
-    expect((wrapper.vm as any).formData.stream_name).toBe("");
+  it("form stream_name initializes as empty string", () => {
+    expect(formVals(wrapper).stream_name).toBe("");
   });
 });
 
@@ -201,86 +210,125 @@ describe("StreamSelection - isUpdating prop", () => {
     vi.clearAllMocks();
   });
 
-  it("name input is disabled when isUpdating=true", async () => {
+  it("isUpdating prop is passed through when true", async () => {
     wrapper = await mountComp({ isUpdating: true });
-    const nameInput = wrapper.find('[data-test="add-pipeline-name-input"] .q-field');
-    // q-input with disable renders the input as disabled
     expect(wrapper.find('[data-test="add-pipeline-name-input"]').exists()).toBe(true);
-    // Check the internal q-input has disable prop via vm
     const vm = wrapper.vm as any;
     expect(vm.$props.isUpdating).toBe(true);
   });
 
-  it("name input is enabled when isUpdating=false", async () => {
+  it("isUpdating prop is false by default", async () => {
     wrapper = await mountComp({ isUpdating: false });
     const vm = wrapper.vm as any;
     expect(vm.$props.isUpdating).toBe(false);
   });
 });
 
-describe("StreamSelection - isValidName computed", () => {
+describe("StreamSelection - schema validation (real OForm)", () => {
   let wrapper: any = null;
 
   beforeEach(async () => {
+    vi.clearAllMocks();
     wrapper = await mountComp();
   });
 
   afterEach(() => {
     wrapper?.unmount();
-    vi.clearAllMocks();
   });
 
-  it("isValidName is true for a valid alphanumeric name", () => {
-    (wrapper.vm as any).formData.name = "my-pipeline";
-    expect((wrapper.vm as any).isValidName).toBe(true);
+  it("blocks submit and does NOT emit save when name is empty", async () => {
+    setField(wrapper, "stream_type", "logs");
+    setField(wrapper, "stream_name", "my-stream");
+    setField(wrapper, "name", "");
+    await submitForm(wrapper);
+    expect(wrapper.vm.form.state.isValid).toBe(false);
+    expect(wrapper.emitted("save")).toBeFalsy();
   });
 
-  it("isValidName is true for name with allowed special characters", () => {
-    (wrapper.vm as any).formData.name = "pipeline_v1.0@test+ok";
-    expect((wrapper.vm as any).isValidName).toBe(true);
+  it("blocks submit when name has spaces (regex)", async () => {
+    setField(wrapper, "stream_type", "logs");
+    setField(wrapper, "stream_name", "my-stream");
+    setField(wrapper, "name", "my pipeline");
+    await submitForm(wrapper);
+    expect(wrapper.vm.form.state.isValid).toBe(false);
+    expect(wrapper.emitted("save")).toBeFalsy();
   });
 
-  it("isValidName is false for a name with spaces", () => {
-    (wrapper.vm as any).formData.name = "my pipeline";
-    expect((wrapper.vm as any).isValidName).toBe(false);
+  it("blocks submit when name has a disallowed slash (regex)", async () => {
+    setField(wrapper, "stream_type", "logs");
+    setField(wrapper, "stream_name", "my-stream");
+    setField(wrapper, "name", "my/pipeline");
+    await submitForm(wrapper);
+    expect(wrapper.vm.form.state.isValid).toBe(false);
+    expect(wrapper.emitted("save")).toBeFalsy();
   });
 
-  it("isValidName is false for an empty string", () => {
-    (wrapper.vm as any).formData.name = "";
-    expect((wrapper.vm as any).isValidName).toBe(false);
+  it("blocks submit when name has trailing whitespace (validates raw, not trimmed)", async () => {
+    // Regression: with a schema `.trim()`, "mypipe " passed validation (trim ran
+    // before the regex) but OForm SAVES the raw value → the space was persisted.
+    // The raw value must be rejected by the regex (no .trim() in the schema).
+    setField(wrapper, "stream_type", "logs");
+    setField(wrapper, "stream_name", "my-stream");
+    setField(wrapper, "name", "mypipe ");
+    await submitForm(wrapper);
+    expect(wrapper.vm.form.state.isValid).toBe(false);
+    expect(wrapper.emitted("save")).toBeFalsy();
   });
 
-  it("isValidName is false for a name with disallowed characters (slash)", () => {
-    (wrapper.vm as any).formData.name = "my/pipeline";
-    expect((wrapper.vm as any).isValidName).toBe(false);
+  it("blocks submit when stream_type is empty", async () => {
+    setField(wrapper, "name", "valid-name");
+    setField(wrapper, "stream_name", "my-stream");
+    setField(wrapper, "stream_type", "");
+    await submitForm(wrapper);
+    expect(wrapper.vm.form.state.isValid).toBe(false);
+    expect(wrapper.emitted("save")).toBeFalsy();
+  });
+
+  it("blocks submit when stream_name is empty", async () => {
+    setField(wrapper, "name", "valid-name");
+    setField(wrapper, "stream_type", "logs");
+    setField(wrapper, "stream_name", "");
+    await submitForm(wrapper);
+    expect(wrapper.vm.form.state.isValid).toBe(false);
+    expect(wrapper.emitted("save")).toBeFalsy();
+  });
+
+  it("allows a valid name with permitted special characters", async () => {
+    setField(wrapper, "stream_type", "logs");
+    setField(wrapper, "stream_name", "my-stream");
+    setField(wrapper, "name", "pipeline_v1.0@test+ok");
+    await submitForm(wrapper);
+    expect(wrapper.vm.form.state.isValid).toBe(true);
+    expect(wrapper.emitted("save")).toBeTruthy();
   });
 });
 
-describe("StreamSelection - savePipeline emits save with formData", () => {
+describe("StreamSelection - submit emits save with form values", () => {
   let wrapper: any = null;
 
   beforeEach(async () => {
+    vi.clearAllMocks();
     wrapper = await mountComp();
   });
 
   afterEach(() => {
     wrapper?.unmount();
-    vi.clearAllMocks();
   });
 
-  it("calling savePipeline emits 'save'", async () => {
-    (wrapper.vm as any).formData.name = "test-pipe";
-    (wrapper.vm as any).formData.stream_type = "logs";
-    await (wrapper.vm as any).savePipeline();
+  it("submitting a valid form emits 'save'", async () => {
+    setField(wrapper, "name", "test-pipe");
+    setField(wrapper, "stream_type", "logs");
+    setField(wrapper, "stream_name", "my-stream");
+    await submitForm(wrapper);
     expect(wrapper.emitted("save")).toBeTruthy();
   });
 
-  it("emitted 'save' payload matches formData", async () => {
-    (wrapper.vm as any).formData.name = "test-pipe";
-    (wrapper.vm as any).formData.description = "desc";
-    (wrapper.vm as any).formData.stream_type = "logs";
-    (wrapper.vm as any).formData.stream_name = "my-stream";
-    await (wrapper.vm as any).savePipeline();
+  it("emitted 'save' payload matches the form values", async () => {
+    setField(wrapper, "name", "test-pipe");
+    setField(wrapper, "description", "desc");
+    setField(wrapper, "stream_type", "logs");
+    setField(wrapper, "stream_name", "my-stream");
+    await submitForm(wrapper);
     const emittedPayload = wrapper.emitted("save")![0][0];
     expect(emittedPayload).toMatchObject({
       name: "test-pipe",
@@ -304,42 +352,48 @@ describe("StreamSelection - updateStreams", () => {
   });
 
   it("updateStreams resets stream_name when resetStream=true (default)", async () => {
-    (wrapper.vm as any).formData.stream_name = "existing-stream";
-    (wrapper.vm as any).formData.stream_type = "logs";
+    setField(wrapper, "stream_type", "logs");
+    setField(wrapper, "stream_name", "existing-stream");
     await (wrapper.vm as any).updateStreams(true);
     await flushPromises();
-    expect((wrapper.vm as any).formData.stream_name).toBe("");
+    expect(formVals(wrapper).stream_name).toBe("");
   });
 
   it("updateStreams does NOT reset stream_name when resetStream=false", async () => {
-    (wrapper.vm as any).formData.stream_name = "existing-stream";
-    (wrapper.vm as any).formData.stream_type = "logs";
+    setField(wrapper, "stream_type", "logs");
+    setField(wrapper, "stream_name", "existing-stream");
     await (wrapper.vm as any).updateStreams(false);
     await flushPromises();
-    expect((wrapper.vm as any).formData.stream_name).toBe("existing-stream");
+    expect(formVals(wrapper).stream_name).toBe("existing-stream");
   });
 
   it("updateStreams calls getStreams with current stream_type", async () => {
-    (wrapper.vm as any).formData.stream_type = "metrics";
+    setField(wrapper, "stream_type", "metrics");
     await (wrapper.vm as any).updateStreams();
     await flushPromises();
     expect(mockGetStreams).toHaveBeenCalledWith("metrics", false);
   });
 
   it("updateStreams does nothing when stream_type is empty", async () => {
-    (wrapper.vm as any).formData.stream_type = "";
+    setField(wrapper, "stream_type", "");
     await (wrapper.vm as any).updateStreams();
     await flushPromises();
     expect(mockGetStreams).not.toHaveBeenCalled();
   });
 
   it("updateStreams populates indexOptions from getStreams result", async () => {
-    (wrapper.vm as any).formData.stream_type = "logs";
+    setField(wrapper, "stream_type", "logs");
     await (wrapper.vm as any).updateStreams();
     await flushPromises();
     const indexOptions = (wrapper.vm as any).indexOptions;
     expect(indexOptions).toContain("stream1");
     expect(indexOptions).toContain("stream2");
+  });
+
+  it("changing stream_type triggers updateStreams (option refetch)", async () => {
+    setField(wrapper, "stream_type", "traces");
+    await flushPromises();
+    expect(mockGetStreams).toHaveBeenCalledWith("traces", false);
   });
 });
 

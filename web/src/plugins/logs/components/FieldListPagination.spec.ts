@@ -21,7 +21,7 @@ vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),
 }));
 
-const quasarStubs = {
+const componentStubs = {
   OToggleGroup: {
     name: "OToggleGroup",
     template:
@@ -87,7 +87,7 @@ function createWrapper(props = {}) {
   return mount(FieldListPagination, {
     props: { ...defaultProps, ...props },
     global: {
-      stubs: quasarStubs,
+      stubs: componentStubs,
     },
   });
 }

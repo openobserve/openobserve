@@ -1638,7 +1638,7 @@ export default defineComponent({
     const toggleFieldGroup = (group: string) => {
       searchObj.data.stream.expandGroupRows[group] =
         !searchObj.data.stream.expandGroupRows[group];
-      // Reset to page 1 so Quasar recalculates page count from the new row total
+      // Reset to page 1 so the table recalculates page count from the new row total
       pagination.value = { ...pagination.value, page: 1 };
     };
 
@@ -2001,8 +2001,8 @@ export default defineComponent({
       page: number;
       rowsPerPage: number;
     }) => {
-      // When extractFields() temporarily clears the field list, Quasar's
-      // q-table recalculates pages and emits page=1.  Ignore that automatic
+      // When extractFields() temporarily clears the field list, the table
+      // recalculates pages and emits page=1.  Ignore that automatic
       // reset while the stream fields are still loading so the user stays on
       // their current page after the query completes.
       if (

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="w-full"
+    class="w-full h-full flex flex-col overflow-hidden min-h-0"
     :class="[containerClass]"
     :style="containerStyle"
   >
@@ -54,20 +54,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </AppPageHeader>
 
-    <div class="flex" :class="contentWrapperClass">
-      <div class="flex" :style="contentStyle">
+    <div class="flex flex-1 min-h-0" :class="contentWrapperClass">
+      <div class="flex w-full min-h-0" :style="contentStyle">
         <OSplitter
           v-if="showSplitter"
-          class="logs-search-splitter"
+          class="logs-search-splitter w-full h-full min-h-0"
           v-model="splitterModel"
           :style="splitterStyle"
           :limits="[30, 60]"
           :horizontal="false"
         >
           <template #before>
-            <div class="w-full h-full border-r border-border-default">
+            <div class="w-full h-full flex flex-col border-r border-border-default">
               <!-- Tabs Section -->
-              <div class="card-container py-2 px-2 mb-[0.625rem]">
+              <div class="card-container py-2 px-2 mb-1 shrink-0">
                 <div class="app-tabs-container h-[36px] w-fit">
                   <app-tabs
                     :data-test="`${testPrefix}-import-tabs`"
@@ -82,12 +82,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- URL Import Tab -->
               <div
                 v-if="activeTab === 'import_json_url'"
-                class="editor-container-url card-container py-1"
+                class="editor-container-url card-container py-1 flex-1 min-h-0 flex flex-col"
               >
-                <div class="mx-2 pb-2">
+                <div class="mx-2 mt-1 pb-2 flex flex-col flex-1 min-h-0">
                   <!-- Slot for custom URL input section -->
                   <slot name="url-input-section" :url="url" :updateUrl="updateUrl">
-                    <div class="flex mt-3 mb-3">
+                    <div class="flex mb-3 shrink-0">
                         <OInput
                           :data-test="`${testPrefix}-import-url-input`"
                           v-model="url"
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="import-editor-shell import-url-editor mx-2"
+                    class="import-editor-shell import-url-editor mx-2 flex-1 min-h-0"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -111,12 +111,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="activeTab === 'import_json_file'"
-                class="editor-container-json card-container py-1"
+                class="editor-container-json card-container py-1 flex-1 min-h-0 flex flex-col"
               >
-                <div class="mx-2 mt-3 pb-2">
+                <div class="mx-2 mt-1 pb-2 flex flex-col flex-1 min-h-0">
                   <!-- Slot for custom file input section -->
                   <slot name="file-input-section" :jsonFiles="jsonFiles" :updateFiles="updateFiles">
-                    <div style="width: calc(100% - 10px)" class="mb-1 flex">
+                    <div style="width: calc(100% - 10px)" class="mb-1 flex shrink-0">
                       <div style="width: 100%" class="pr-2">
                         <OFile
                           :data-test="`${testPrefix}-import-json-file-input`"
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="import-editor-shell import-file-editor mx-2"
+                    class="import-editor-shell import-file-editor mx-2 flex-1 min-h-0"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -162,16 +162,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               :data-test="`${testPrefix}-import-output-editor`"
-              class="card-container w-full"
-              :style="outputContainerStyle"
+              class="card-container w-full h-full flex flex-col min-h-0"
             >
               <!-- Slot for complete output section customization -->
               <slot name="output-section">
                 <!-- Default output section - only shown if slot not used -->
                 <slot name="output-content">
-                  <div class="text-center text-xl font-semibold py-2">Output Messages</div>
-                  <OSeparator class="mr-4 mt-4" />
-                  <div class="error-report-container">
+                  <div class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0">Output Messages</div>
+                  <OSeparator class="mt-1 shrink-0" />
+                  <div class="error-report-container flex-1 min-h-0 overflow-auto">
                     <div class="text-center p-3 text-gray-400">
                       No messages to display
                     </div>
@@ -365,12 +364,6 @@ export default defineComponent({
       };
     });
 
-    const outputContainerStyle = computed(() => {
-      return {
-        height: props.editorHeights.outputContainer,
-      };
-    });
-
     // Methods
     const handleBack = () => {
       emit("back");
@@ -542,7 +535,6 @@ export default defineComponent({
       updateJsonArray,
       contentStyle,
       splitterStyle,
-      outputContainerStyle,
     };
   },
 });
@@ -561,23 +553,15 @@ export default defineComponent({
   box-sizing: border-box;
   /* w-full (100%) + mx-2 (1rem total) would overflow by 1rem and add a
      horizontal scrollbar; subtract the margins so the box stays inside and
-     keeps a right-side gap. */
+     keeps a right-side gap. The height comes from flex (flex-1 min-h-0) so the
+     editor grows to fill the pane instead of a brittle calc(100vh - Npx). */
   width: calc(100% - 1rem);
   border: 1px solid var(--o2-border-color);
   border-radius: 0.375rem;
   overflow: hidden;
 }
 
-.import-url-editor {
-  height: v-bind('editorHeights.urlEditor');
-}
-
-.import-file-editor {
-  height: v-bind('editorHeights.fileEditor');
-}
-
 .error-report-container {
-  height: v-bind('editorHeights.errorReport') !important;
   overflow: auto;
   resize: none;
 }

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <!-- Page gutter is owned by the Settings shell's ConstrainedPage. -->
   <div>
     <LicensePeriod @updateLicense="showUpdateFormAndFocus"></LicensePeriod>
@@ -41,36 +41,43 @@
               <div class="text-base font-medium mb-3">
                 {{ t("about.enter_license_key") }}
               </div>
-              <OTextarea
-                data-test="no-license-key-input"
-                v-model="licenseKey"
-                :rows="8"
-                :placeholder="t('about.paste_license_placeholder')"
-                style="min-height: 200px"
-              />
-              <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
-                <div class="flex items-center py-3 px-4 bg-[rgba(34,197,94,0.08)] border border-solid border-[rgba(34,197,94,0.2)] rounded-lg [backdrop-filter:blur(10px)] transition-all duration-200 dark:bg-[rgba(34,197,94,0.15)] dark:border-[rgba(34,197,94,0.3)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
-                  <OIcon
-                    name="check-circle"
-                    class="text-green-600 mr-2"
-                    size="md"
-                  />
-                  <span class="text-sm">{{
-                    t("about.license_auto_filled")
-                  }}</span>
-                </div>
-              </div>
-              <OButton
-                data-test="no-license-update-btn"
-                variant="primary"
-                size="sm-action"
-                class="mt-2"
-                :loading="updating"
-                :disabled="!licenseKey.trim()"
-                @click="updateLicense"
+              <OForm
+                ref="noLicenseForm"
+                :schema="licenseSchema"
+                :default-values="licenseDefaults"
+                @submit="updateLicense"
+                v-slot="{ isSubmitting }"
               >
-                {{ t("about.update_license") }}
-              </OButton>
+                <OFormTextarea
+                  data-test="no-license-key-input"
+                  name="licenseKey"
+                  :rows="8"
+                  :placeholder="t('about.paste_license_placeholder')"
+                  style="min-height: 200px"
+                />
+                <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
+                  <div class="flex items-center py-3 px-4 bg-[rgba(34,197,94,0.08)] border border-solid border-[rgba(34,197,94,0.2)] rounded-lg [backdrop-filter:blur(10px)] transition-all duration-200 dark:bg-[rgba(34,197,94,0.15)] dark:border-[rgba(34,197,94,0.3)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
+                    <OIcon
+                      name="check-circle"
+                      class="text-green-600 mr-2"
+                      size="md"
+                    />
+                    <span class="text-sm">{{
+                      t("about.license_auto_filled")
+                    }}</span>
+                  </div>
+                </div>
+                <OButton
+                  data-test="no-license-update-btn"
+                  variant="primary"
+                  size="sm-action"
+                  class="mt-2"
+                  type="submit"
+                  :loading="isSubmitting"
+                >
+                  {{ t("about.update_license") }}
+                </OButton>
+              </OForm>
             </OCardSection>
           </OCard>
         </div>
@@ -79,49 +86,52 @@
           <OCard class="border border-solid border-[var(--o2-border-color)]">
             <OCardSection role="body">
               <div class="text-xl font-semibold mb-3">{{ t("about.license_info") }}</div>
-              <table class="w-full border-collapse border border-solid border-[var(--o2-border-color)]">
+              <table class="w-full border-collapse border border-solid border-[var(--color-table-header-border)]">
                 <tbody>
-                  <tr class="border-b border-solid border-[var(--o2-border-color)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
+                  <tr class="border-b border-solid border-[var(--color-table-row-divider)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
                       {{ t("about.installation_id") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.installation_id }}</td>
                   </tr>
-                  <tr class="border-b border-solid border-[var(--o2-border-color)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
+                  <tr class="border-b border-solid border-[var(--color-table-row-divider)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
                       {{ t("about.license_id") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.license_id }}</td>
                   </tr>
-                  <tr class="border-b border-solid border-[var(--o2-border-color)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
+                  <tr class="border-b border-solid border-[var(--color-table-row-divider)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
                       {{ t("about.status_lbl") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">
-                      <OTag
-                        type="licenseStatus"
-                        :value="licenseData?.expired ? 'expired' : 'active'"
-                      />
+                      <OBadge :variant="licenseData?.expired ? 'error' : 'success'">
+                        {{
+                          licenseData?.expired
+                            ? t("about.expired_lbl")
+                            : t("about.active_lbl")
+                        }}
+                      </OBadge>
                     </td>
                   </tr>
-                  <tr class="border-b border-solid border-[var(--o2-border-color)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
+                  <tr class="border-b border-solid border-[var(--color-table-row-divider)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
                       {{ t("about.create_at_lbl") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ formatDate(licenseData.license.created_at) }}</td>
                   </tr>
-                  <tr class="border-b border-solid border-[var(--o2-border-color)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
+                  <tr class="border-b border-solid border-[var(--color-table-row-divider)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
                       {{ t("about.expires_at_lbl") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ formatDate(licenseData.license.expires_at) }}</td>
                   </tr>
-                  <tr class="border-b border-solid border-[var(--o2-border-color)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">{{ t("about.company") }}</td>
+                  <tr class="border-b border-solid border-[var(--color-table-row-divider)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">{{ t("about.company") }}</td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.company }}</td>
                   </tr>
-                  <tr v-if="licenseData.key" class="border-b border-solid border-[var(--o2-border-color)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
+                  <tr v-if="licenseData.key" class="border-b border-solid border-[var(--color-table-row-divider)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
                       {{ t("about.license_key") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">
@@ -139,20 +149,20 @@
                       </div>
                     </td>
                   </tr>
-                  <tr v-if="licenseData.license.contact_name" class="border-b border-solid border-[var(--o2-border-color)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
+                  <tr v-if="licenseData.license.contact_name" class="border-b border-solid border-[var(--color-table-row-divider)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
                       {{ t("about.contact_name") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.contact_name }}</td>
                   </tr>
-                  <tr v-if="licenseData.license.contact_email" class="border-b border-solid border-[var(--o2-border-color)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
+                  <tr v-if="licenseData.license.contact_email" class="border-b border-solid border-[var(--color-table-row-divider)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
                       {{ t("about.contact_email") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.contact_email }}</td>
                   </tr>
                   <tr v-if="licenseData.license.environment_type">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
                       {{ t("about.environment_type") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.environment_type }}</td>
@@ -194,48 +204,57 @@
               <div class="text-base font-medium mb-2">
                 {{ t("about.update_license_key") }}
               </div>
-              <OTextarea
-                data-test="update-license-key-input"
-                v-model="licenseKey"
-                :rows="6"
-                :placeholder="t('about.paste_new_license_placeholder')"
-                style="min-height: 150px"
-              />
-              <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
-                <div class="flex items-center py-3 px-4 bg-[rgba(34,197,94,0.08)] border border-solid border-[rgba(34,197,94,0.2)] rounded-lg [backdrop-filter:blur(10px)] transition-all duration-200 dark:bg-[rgba(34,197,94,0.15)] dark:border-[rgba(34,197,94,0.3)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
-                  <OIcon
-                    name="check-circle"
-                    class="text-green-600 mr-2"
-                    size="md"
-                  />
-                  <span class="text-sm">{{
-                    t("about.license_auto_filled")
-                  }}</span>
+              <OForm
+                ref="updateLicenseForm"
+                :schema="licenseSchema"
+                :default-values="licenseDefaults"
+                @submit="updateLicense"
+                v-slot="{ isSubmitting }"
+              >
+                <OFormTextarea
+                  data-test="update-license-key-input"
+                  name="licenseKey"
+                  :rows="6"
+                  :placeholder="t('about.paste_new_license_placeholder')"
+                  style="min-height: 150px"
+                />
+                <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
+                  <div class="flex items-center py-3 px-4 bg-[rgba(34,197,94,0.08)] border border-solid border-[rgba(34,197,94,0.2)] rounded-lg [backdrop-filter:blur(10px)] transition-all duration-200 dark:bg-[rgba(34,197,94,0.15)] dark:border-[rgba(34,197,94,0.3)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
+                    <OIcon
+                      name="check-circle"
+                      class="text-green-600 mr-2"
+                      size="md"
+                    />
+                    <span class="text-sm">{{
+                      t("about.license_auto_filled")
+                    }}</span>
+                  </div>
                 </div>
-              </div>
-              <div class="flex gap-2">
-                <OButton
-                  data-test="cancel-update-license-btn"
-                  variant="outline"
-                  size="sm-action"
-                  @click="
-                    showUpdateForm = false;
-                    licenseKey = '';
-                  "
-                >
-                  {{ t("common.cancel") }}
-                </OButton>
-                <OButton
-                  data-test="confirm-update-license-btn"
-                  variant="primary"
-                  size="sm-action"
-                  :loading="updating"
-                  :disabled="!licenseKey.trim()"
-                  @click="updateLicense"
-                >
-                  {{ t("about.update_license") }}
-                </OButton>
-              </div>
+                <div class="flex gap-2">
+                  <OButton
+                    data-test="cancel-update-license-btn"
+                    variant="outline"
+                    size="sm-action"
+                    type="button"
+                    :disabled="isSubmitting"
+                    @click="
+                      showUpdateForm = false;
+                      licenseKey = '';
+                    "
+                  >
+                    {{ t("common.cancel") }}
+                  </OButton>
+                  <OButton
+                    data-test="confirm-update-license-btn"
+                    variant="primary"
+                    size="sm-action"
+                    type="submit"
+                    :loading="isSubmitting"
+                  >
+                    {{ t("about.update_license") }}
+                  </OButton>
+                </div>
+              </OForm>
             </OCardSection>
           </OCard>
         </div>
@@ -441,6 +460,7 @@ import {
   ref,
   onMounted,
   computed,
+  watch,
   defineAsyncComponent,
 } from "vue";
 import { useI18n } from "vue-i18n";
@@ -452,13 +472,16 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { copyToClipboard } from "@/utils/clipboard";
+import { makeLicenseSchema, type LicenseForm } from "./License.schema";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -473,8 +496,10 @@ export default defineComponent({
     ODialog,
     OSpinner,
     OIcon,
-    OTag,
+    OBadge,
     OTextarea,
+    OForm,
+    OFormTextarea,
     OCard,
     OCardSection,
 },
@@ -482,7 +507,6 @@ export default defineComponent({
     const { t } = useI18n();
     const { confirm } = useConfirmDialog();
     const loading = ref(false);
-    const updating = ref(false);
     const licenseData = ref<any>({});
     const licenseKey = ref("");
     const showUpdateForm = ref(false);
@@ -491,6 +515,29 @@ export default defineComponent({
     const store = useStore();
     const usageDashboardData = ref<any>(null);
     const dashboardRenderKey = ref(0);
+
+    // Schema-driven validation replaces the `:disabled="!licenseKey.trim()"`
+    // gate. The same licenseKey is entered in two mutually-exclusive cards, each
+    // wrapped in its own <OForm> that OWNS the field (by name). `licenseKey` is
+    // only the shared INCOMING working value (auto-filled from URL, cleared on
+    // save/cancel) — bridged one-way into whichever form is mounted via the
+    // watch below; the typed value is read back from the submit payload, never
+    // from this ref. Options-API: schema/defaults MUST be returned from setup().
+    const licenseSchema = makeLicenseSchema(t);
+    const noLicenseForm = ref<any>(null);
+    const updateLicenseForm = ref<any>(null);
+    const licenseDefaults = computed(
+      (): LicenseForm => ({ licenseKey: licenseKey.value }),
+    );
+
+    // Bridge programmatic licenseKey changes (URL auto-fill, cancel/clear) into
+    // whichever card's form is mounted. Use form.reset (NOT setFieldValue) so the
+    // field re-seeds AND submit state resets (submissionAttempts → 0) — no
+    // post-save "required" flash on the v-show'd update card when clearing to "".
+    watch(licenseKey, (v) => {
+      noLicenseForm.value?.form?.reset({ licenseKey: v ?? "" });
+      updateLicenseForm.value?.form?.reset({ licenseKey: v ?? "" });
+    });
 
     const loadLicenseData = async () => {
       try {
@@ -509,10 +556,14 @@ export default defineComponent({
       }
     };
 
-    const updateLicense = async () => {
+    // @submit handler — fires only once the schema passes (licenseKey required +
+    // trim), so the `:disabled` gate is gone (R3). Still callable directly with
+    // no args (reads the shared working ref); OForm awaits it so the inline Save
+    // button's spinner spans the request.
+    const updateLicense = async (value?: LicenseForm) => {
+      const key = (value?.licenseKey ?? licenseKey.value ?? "").trim();
       try {
-        updating.value = true;
-        await licenseServer.update_license(licenseKey.value.trim());
+        await licenseServer.update_license(key);
         toast({
           variant: "success",
           message: t("about.license_updated_success"),
@@ -537,8 +588,6 @@ export default defineComponent({
             " : " +
             (error?.response?.data?.message || "unexpected error"),
         });
-      } finally {
-        updating.value = false;
       }
     };
 
@@ -945,13 +994,19 @@ export default defineComponent({
 
     return {
       t,
+      store,
       loading,
-      updating,
       licenseData,
       licenseKey,
       showUpdateForm,
       showLicenseKeyModal,
       updateLicense,
+      // Form wiring (Options-API: schema/defaults MUST be returned so :schema
+      // resolves and validation runs).
+      licenseSchema,
+      licenseDefaults,
+      noLicenseForm,
+      updateLicenseForm,
       formatDate,
       isIngestionUnlimited,
       ingestionUsagePercent,
@@ -973,7 +1028,6 @@ export default defineComponent({
       generateUsageDashboard,
       limitBreachAllowedCount,
       DOMPurify,
-      store,
     };
   },
 });

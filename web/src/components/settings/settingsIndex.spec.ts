@@ -46,19 +46,8 @@ vi.mock("vue-router", () => ({
   useRoute: () => mockRouter.currentRoute.value,
 }));
 
-// Global mock notify for Quasar
+// Global mock notify
 const globalMockNotify = vi.fn(() => vi.fn());
-
-// Mock Quasar composables
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: globalMockNotify,
-    }),
-  };
-});
 
 const mockStore = createStore({
   state: {

@@ -893,6 +893,9 @@ defineExpose({
           props.horizontalScroll ? 'min-w-max' : ((useComputedWidth && frozen) ? '' : 'w-full'),
           props.horizontalScroll || props.defaultColumns ? 'table-auto' : 'table-fixed',
           (props.bordered && !props.columns.some((c) => c.pinned || c.isAction)) ? '' : 'border-separate border-spacing-0',
+          // Without a leading selection/expansion gutter the first column would
+          // hug the table's left edge; inset it so it aligns like gutter tables.
+          (!selection.isEnabled.value && !expansion.isEnabled.value) ? 'o2-table--inset-first' : '',
         ]"
         :style="{
           ...columnSizeVars,
@@ -1163,3 +1166,16 @@ defineExpose({
     </div> <!-- /bordered wrapper -->
   </div>
 </template>
+
+<style scoped>
+/* When the table has no leading selection/expansion gutter, the first data
+   column would otherwise sit flush against the left edge with only the default
+   cell padding (0.5rem). Inset the first header + body cell so these tables read
+   with the same comfortable left margin as tables that do have a checkbox
+   gutter. Targeted by data-test prefix so full-width colspan rows (expanded /
+   tree-warning) are left untouched. */
+.o2-table--inset-first :deep(th[data-test^="o2-table-th-"]:first-child),
+.o2-table--inset-first :deep(td[data-test^="o2-table-cell-"]:first-child) {
+  padding-left: 1rem;
+}
+</style>

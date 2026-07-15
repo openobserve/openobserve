@@ -19,6 +19,13 @@ const props = withDefaults(defineProps<TooltipProps>(), {
   delay: 700,
   maxWidth: "320px",
   disabled: false,
+  // MUST stay explicitly undefined. Vue casts an absent Boolean prop to `false`,
+  // so without this `open` is false rather than undefined — the `open !== undefined`
+  // guard below then passes, TooltipRoot receives `open: false`, and reka switches
+  // into CONTROLLED mode locked shut. Wrapper mode never emits update:open, so the
+  // tooltip could never open: hovering left the trigger at data-state="closed"
+  // forever. Child mode was unaffected because it drives `open` itself.
+  open: undefined,
 });
 
 defineSlots<TooltipSlots>();
@@ -145,7 +152,7 @@ const contentClasses = computed(() => [
           :style="contentStyle"
           :class="contentClasses"
         >
-          <span class="inline-flex items-center gap-1.5">
+          <span :class="(shortcut || shortcutId) ? 'inline-flex items-center gap-1.5' : ''">
             <slot name="content">{{ content }}</slot>
             <OShortcut
               v-if="shortcut || shortcutId"
@@ -188,7 +195,7 @@ const contentClasses = computed(() => [
             :style="contentStyle"
             :class="contentClasses"
           >
-            <span class="inline-flex items-center gap-1.5">
+            <span :class="(shortcut || shortcutId) ? 'inline-flex items-center gap-1.5' : ''">
               <slot name="content">{{ content }}</slot>
               <OShortcut
               v-if="shortcut || shortcutId"

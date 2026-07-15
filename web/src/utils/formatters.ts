@@ -1,6 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { formatDate } from "@/utils/date";
 
 export const b64EncodeUnicode = (str: string) => {
   try {
@@ -247,10 +246,10 @@ export const convertToCamelCase = (str: string) => {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 };
 
-export function convertUnixToQuasarFormat(unixMicroseconds: any) {
-  if (!unixMicroseconds) return "";
-  const unixSeconds = unixMicroseconds / 1e6;
-  const dateToFormat = new Date(unixSeconds * 1000);
-  const formattedDate = dateToFormat.toISOString();
-  return formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
-}
+/**
+ * Re-exported, not reimplemented: `@/utils/zincutils` barrels this module, so
+ * this is how the many `import { convertUnixToDateFormat } from "@/utils/zincutils"`
+ * call sites resolve. The implementation lives in `@/utils/date` — there is
+ * exactly one.
+ */
+export { convertUnixToDateFormat } from "@/utils/date";

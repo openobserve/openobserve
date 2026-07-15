@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Selected Count Footer -->
                 <div
-                  class="p-3 border-t border-solid border-[var(--o2-border-color)] o2-table-footer-title text-[var(--o2-text-4)]!"
+                  class="p-3 border-t border-solid border-[var(--o2-border-color)] o2-table-footer-title"
                 >
                   {{ selectedDimensions.length }}
                   {{ t("latencyInsights.dimensionsSelected") }}

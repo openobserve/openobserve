@@ -171,8 +171,10 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
     // Ensure we start without a metrics_data blob in URL
     const hasBlobBefore = await pm.metricsPage.hasMetricsDataParam();
     if (hasBlobBefore) {
-      // Re-navigate cleanly
-      const baseUrl = `${process.env.ZO_BASE_URL}/web/metrics`;
+      // Re-navigate cleanly. Must target the editor explicitly: a bare
+      // `/metrics` carries no editor params, so it lands on the Metrics
+      // Explorer — which has no query bar for the Apply below to use.
+      const baseUrl = `${process.env.ZO_BASE_URL}/web/metrics/editor`;
       const orgId = process.env.ORGNAME || 'default';
       await pm.metricsPage.navigateToMetricsUrl(`${baseUrl}?org_identifier=${orgId}`);
     }

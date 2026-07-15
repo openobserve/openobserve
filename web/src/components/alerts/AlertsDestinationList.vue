@@ -15,20 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md flex flex-col h-full p-0">
+  <div class="flex flex-col h-full p-0">
 
-    <div v-if="!showDestinationEditor && !showImportDestination" class="flex flex-col h-full">
+    <PageLayout
+      v-if="!showDestinationEditor && !showImportDestination"
+      :main-panel="false"
+      :header-class="'shrink-0 px-4 border-b border-border-default'"
+    >
+      <template #header>
       <AppPageHeader
         :title="t('alert_destinations.header')"
+        title-data-test="alert-destinations-list-title"
         icon="location-on"
         subtitle="Where triggered alerts are delivered"
-        class="shrink-0 px-4 border-b border-border-default"
       >
-        <template #title>
-          <span data-test="alert-destinations-list-title">{{
-            t("alert_destinations.header")
-          }}</span>
-        </template>
         <template #actions>
           <OToggleGroup
             :model-value="activeTab"
@@ -63,6 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t(`alert_destinations.add`) }}</OButton>
         </template>
       </AppPageHeader>
+      </template>
       <div class="card-container flex-1 min-h-0">
         <OTable
           data-test="alert-destinations-list-table"
@@ -92,9 +93,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('alert_destinations.search')"
             />
           </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="alert-destinations-list-refresh-btn"
+              @click="getDestinations"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="alertDestinationsRefresh" />
+            </OButton>
+          </template>
 
           <template #bottom="{ totalRows }">
-            <span class="o2-table-footer-title text-primary">
+            <span class="o2-table-footer-title">
               {{ totalRows.toLocaleString() }} {{ t('alert_destinations.header') }}
             </span>
             <OButton
@@ -210,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTable>
       </div>
-    </div>
+    </PageLayout>
     <div v-else-if="showDestinationEditor && !showImportDestination">
       <AddDestination
         :is-alerts="true"
@@ -220,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @get:destinations="getDestinations"
       />
     </div>
-    <div v-else>
+    <div v-else class="flex-1 min-h-0">
       <ImportDestination
         :destinations="destinations"
         :templates="templates"
@@ -275,6 +288,7 @@ import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 import OTag from '@/lib/core/Badge/OTag.vue';
@@ -282,6 +296,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -301,6 +316,7 @@ export default defineComponent({
     ConfirmDialog,
     ImportDestination,
     OButton,
+    OTooltip,
     OSearchInput,
     OCheckbox,
     OTag,
@@ -308,6 +324,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     AppPageHeader,
+    PageLayout,
   },
   setup() {
     const store = useStore();

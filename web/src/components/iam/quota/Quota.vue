@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <!-- TODO: we need to completely remove the store.state.theme based styling on this page as we have moved it to central place app.scss -->
 <template>
-  <div class="rounded-md quota-page text-left h-full flex flex-col"
+  <div class="quota-page text-left h-full flex flex-col"
     :class="
       store.state.theme === 'dark' ? 'dark-theme-page' : 'light-theme-page'
     "
@@ -24,14 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Standard page header: title + icon + subtitle, matching the other IAM pages. -->
     <AppPageHeader
       :title="t('quota.header')"
+      title-data-test="user-title-text"
       :subtitle="'Usage limits applied per role'"
       icon="speed"
       class="shrink-0 px-4 border-b border-border-default"
-    >
-      <template #title>
-        <span data-test="user-title-text">{{ t("quota.header") }}</span>
-      </template>
-    </AppPageHeader>
+    />
     <div :style="{ marginTop: 0 }" class="app-table-container flex flex-col flex-1 min-h-0">
       <div class="card-container mb-[0.625rem] mt-2.5">
         <div class="px-3 py-2">

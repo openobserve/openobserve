@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="sessions-list h-full! flex flex-col bg-[var(--o2-card-bg-solid)] card-container"
+    class="sessions-list h-full! flex flex-col bg-[var(--color-surface-base)] card-container"
   >
     <!-- No LLM streams exist in the org at all — nothing to select, so show
          the rich first-run empty state on its own (no table chrome). -->
@@ -126,6 +126,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
 
+      <template #toolbar-trailing>
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          icon-left="refresh"
+          :loading="loading"
+          data-test="sessions-list-refresh-btn"
+          @click="() => refresh()"
+        >
+          <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="sessionsRefresh" />
+        </OButton>
+      </template>
+
       <!-- Empty / error body — rendered inside the frame so the toolbar (and
            thus the stream selector) stays visible. -->
       <template #empty>
@@ -186,12 +199,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-firstUserMessage="{ row }">
           <div
             v-if="row.firstUserMessage"
-            class="text-[0.75rem] text-[var(--o2-text-secondary)] truncate w-full"
+            class="text-[0.75rem] text-[var(--color-text-secondary)] truncate w-full"
           >
             {{ row.firstUserMessage }}
             <OTooltip :content="row.firstUserMessage" />
           </div>
-          <span v-else class="text-[0.75rem] text-[var(--o2-text-muted)]">—</span>
+          <span v-else class="text-[0.75rem] text-[var(--color-text-muted)]">—</span>
         </template>
 
         <!-- Turns -->
@@ -246,6 +259,9 @@ import { useSessions, type SessionRow } from "./composables/useSessions";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -481,7 +497,7 @@ const tableColumns = computed(() => [
 
 function formatTimestamp(nanos: number): string {
   if (!nanos) return "—";
-  // Backend ships timestamps as nanoseconds — quasar's date wants ms.
+  // Backend ships timestamps as nanoseconds — formatDate wants ms.
   return formatDate(Math.floor(nanos / 1_000_000), "YYYY-MM-DD HH:mm:ss");
 }
 
@@ -710,4 +726,8 @@ onMounted(() => {
 onUnmounted(() => {
   cancelAll();
 });
+
+useShortcuts([
+  { id: "sessionsRefresh", handler: () => { if (!isInputFocused()) refresh(); } },
+]);
 </script>

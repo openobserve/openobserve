@@ -120,7 +120,7 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { ScheduledDashboardReport } from "@/ts/interfaces/report";
 import NoData from "@/components/shared/grid/NoData.vue";
-import { convertUnixToQuasarFormat } from "@/utils/date";
+import { convertUnixToDateFormat } from "@/utils/date";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -232,10 +232,10 @@ const formatReports = () => {
         frequency: getFrequencyValue(report.frequency),
         last_triggered_at_raw: report.last_triggered_at || null,
         last_triggered_at: report.last_triggered_at
-          ? convertUnixToQuasarFormat(report.last_triggered_at)
+          ? convertUnixToDateFormat(report.last_triggered_at)
           : "-",
         created_at_raw: report.created_at || null,
-        created_at: convertUnixToQuasarFormat(report.created_at),
+        created_at: convertUnixToDateFormat(report.created_at),
         orgId: report.org_id,
         isCached: !report?.destinations?.length,
       });
@@ -393,8 +393,8 @@ const getTimeRangeValue = (dateTime: any) => {
   if (dateTime.type === "relative") {
     return `Past ${dateTime.period}`;
   } else {
-    const startDateTime = convertUnixToQuasarFormat(dateTime.from);
-    const endDateTime = convertUnixToQuasarFormat(dateTime.to);
+    const startDateTime = convertUnixToDateFormat(dateTime.from);
+    const endDateTime = convertUnixToDateFormat(dateTime.to);
     return `${startDateTime} - ${endDateTime}`;
   }
 };
@@ -415,7 +415,7 @@ const getTimeRangeValue = (dateTime: any) => {
 }
 
 .scheduled-dashboards thead tr {
-  background-color: var(--o2-table-header-bg) !important;
+  background-color: var(--color-table-header-bg);
 }
 
 .scheduled-dashboards .rum-tabs {

@@ -24,17 +24,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Row 1: standard header — title + actions only. The stream-type filter
            and search moved into the table's own toolbar below. -->
       <template #header>
-        <AppPageHeader :subtitle="t('logStream.subtitle')" icon="window">
-          <template #title><span data-test="log-stream-title-text">{{ t('logStream.header') }}</span></template>
+        <AppPageHeader
+          :title="t('logStream.header')"
+          title-data-test="log-stream-title-text"
+          :subtitle="t('logStream.subtitle')"
+          icon="window"
+        >
           <template #actions>
-            <OButton
-              data-test="log-stream-refresh-stats-btn"
-              variant="outline"
-              size="sm-action"
-              @click="getLogStream(true)"
-            >
-              {{ t(`logStream.refreshStats`) }}
-            </OButton>
             <OButton
               v-if="isSchemaUDSEnabled"
               data-test="log-stream-add-stream-btn"
@@ -116,6 +112,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :debounce="300"
               />
             </div>
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loadingState"
+              data-test="log-stream-refresh-stats-btn"
+              @click="() => getLogStream(true)"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="streamsRefresh" />
+            </OButton>
           </template>
           <!--
             Render the stream-name cell with a deterministic per-name data-test.
@@ -211,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center justify-between w-full py-2"
             >
               <div
-                class="flex items-center w-full font-bold text-[14px]"
+                class="flex items-center w-full o2-table-footer-title"
               >
                 {{ scope.totalRows }} Stream(s)
                 <OButton
@@ -328,6 +336,7 @@ import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
 import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -349,6 +358,7 @@ export default defineComponent({
     EmptyStateIngestionChip,
     AddStream,
     OButton,
+    OTooltip,
     ODialog,
     OIcon,
     OToggleGroup,

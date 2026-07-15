@@ -39,12 +39,15 @@
 
           <div>
             <OButton
-              variant="primary"
-              size="sm"
+              variant="outline"
+              size="icon-sm"
+              class="h-9! w-9!"
+              icon-left="refresh"
+              :loading="isLoading"
+              data-test="search-history-get-history-btn"
               @click="fetchSearchHistory"
-              :disabled="isLoading"
             >
-              {{ t("search_history.get_history") }}
+              <OTooltip side="bottom" :content="t('search_history.get_history')" shortcut-id="searchHistoryRefresh" />
             </OButton>
           </div>
       </template>
@@ -236,6 +239,8 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 
@@ -587,6 +592,9 @@ export default defineComponent({
     watch(
       () => props.isClicked,
       (value) => {
+        // This is a v-show sub-view of the Logs page: only own the keyboard
+        // scope while actually visible, otherwise hand it back to the logs page.
+        getManager()?.setScope(value ? "search-history" : "logs");
         if (value == true && !isLoading.value) {
           fetchSearchHistory();
         }
@@ -611,6 +619,14 @@ export default defineComponent({
         return filtered;
       }, {});
     }
+    useShortcuts([
+      { id: "searchHistoryRefresh", handler: () => { if (!isInputFocused()) fetchSearchHistory(); } },
+    ]);
+    // useShortcuts activates this sub-view's scope on mount, but it mounts while
+    // hidden inside the Logs page — restore the logs scope until it's shown.
+    onMounted(() => {
+      if (!props.isClicked) getManager()?.setScope("logs");
+    });
     return {
       searchObj,
       store,

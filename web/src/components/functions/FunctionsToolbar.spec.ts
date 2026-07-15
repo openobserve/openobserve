@@ -16,14 +16,57 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import FunctionsToolbar from "./FunctionsToolbar.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { makeAddFunctionSchema } from "./AddFunction.schema";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
 
+// The schema is a factory taking vue-i18n's `t`; use the real i18n so messages
+// resolve exactly as they do in the app.
+const addFunctionSchema = makeAddFunctionSchema((k: string) =>
+  i18n.global.t(k as never),
+);
 
 describe("FunctionsToolbar", () => {
   let store: any;
   let router: any;
+
+  // The toolbar's name + transType fields are form-owned (OForm*), so they only
+  // render inside an <OForm>. The harness provides that context (mirroring how
+  // AddFunction.vue hosts the toolbar) and exposes the form + the submit spy.
+  const mountToolbar = (
+    toolbarProps: Record<string, any> = {},
+    defaults: Record<string, any> = { name: "", transType: "0" },
+    onSubmit: (v: any) => void = vi.fn(),
+  ) => {
+    const Harness = {
+      components: { OForm, FunctionsToolbar },
+      props: ["toolbarProps", "defaults"],
+      setup(props: any) {
+        return { schema: addFunctionSchema, onSubmit, props };
+      },
+      template: `
+        <OForm
+          id="add-function-form"
+          :schema="schema"
+          :default-values="props.defaults"
+          @submit="onSubmit"
+          v-slot="{ isSubmitting }"
+        >
+          <FunctionsToolbar v-bind="props.toolbarProps" :is-submitting="isSubmitting" />
+        </OForm>
+      `,
+    };
+
+    return mount(Harness, {
+      props: { toolbarProps, defaults },
+      global: { plugins: [i18n, store, router] },
+    });
+  };
+
+  const getForm = (w: any) => (w.findComponent(OForm).vm as any).form;
+  const getToolbar = (w: any) => w.findComponent(FunctionsToolbar);
 
   beforeEach(() => {
     store = createStore({
@@ -47,269 +90,139 @@ describe("FunctionsToolbar", () => {
   });
 
   it("should render the component", () => {
-    const wrapper = mount(FunctionsToolbar, {
-      props: {
-        name: "testFunction",
-        transformTypeOptions: [
-          { label: "VRL", value: "0" },
-          { label: "JavaScript", value: "1" },
-        ],
-      },
-      global: {
-        plugins: [i18n, store, router],
-      },
+    const wrapper = mountToolbar({
+      transformTypeOptions: [
+        { label: "VRL", value: "0" },
+        { label: "JavaScript", value: "1" },
+      ],
     });
-
-    expect(wrapper.exists()).toBe(true);
+    expect(getToolbar(wrapper).exists()).toBe(true);
   });
 
-  it("should display function name input", () => {
-    const wrapper = mount(FunctionsToolbar, {
-      props: {
-        name: "myFunction",
-        transformTypeOptions: [{ label: "VRL", value: "0" }],
-      },
-      global: {
-        plugins: [i18n, store, router],
-      },
+  it("should display function name input (form-owned)", () => {
+    const wrapper = mountToolbar({
+      transformTypeOptions: [{ label: "VRL", value: "0" }],
     });
-
-    const input = wrapper.find('[data-test="add-function-name-input"]');
-    expect(input.exists()).toBe(true);
+    expect(wrapper.find('[data-test="add-function-name-input"]').exists()).toBe(true);
   });
 
-  it("should emit update:name when function name changes", async () => {
-    const wrapper = mount(FunctionsToolbar, {
-      props: {
-        name: "oldName",
-        transformTypeOptions: [{ label: "VRL", value: "0" }],
-      },
-      global: {
-        plugins: [i18n, store, router],
-      },
+  it("should update the form's name when the input changes", async () => {
+    const wrapper = mountToolbar({
+      transformTypeOptions: [{ label: "VRL", value: "0" }],
     });
-
-    const inputWrapper = wrapper.find('[data-test="add-function-name-input"]');
-    const input = inputWrapper.find('input');
+    const input = wrapper.find('[data-test="add-function-name-input-field"]');
     await input.setValue("newName");
 
-    expect(wrapper.emitted("update:name")).toBeTruthy();
-    expect(wrapper.emitted("update:name")?.[0]).toEqual(["newName"]);
+    expect(getForm(wrapper).state.values.name).toBe("newName");
   });
 
   it("should disable name input when disableName is true", () => {
-    const wrapper = mount(FunctionsToolbar, {
-      props: {
-        name: "testFunction",
-        disableName: true,
-        transformTypeOptions: [{ label: "VRL", value: "0" }],
-      },
-      global: {
-        plugins: [i18n, store, router],
-      },
+    const wrapper = mountToolbar({
+      disableName: true,
+      transformTypeOptions: [{ label: "VRL", value: "0" }],
     });
-
-    const inputWrapper = wrapper.find('[data-test="add-function-name-input"]');
-    const input = inputWrapper.find('input');
+    const input = wrapper.find('[data-test="add-function-name-input-field"]');
     expect(input.attributes("disabled")).toBeDefined();
   });
 
-  it("should validate function name format", async () => {
-    const wrapper = mount(FunctionsToolbar, {
-      props: {
-        name: "123invalid",
-        transformTypeOptions: [{ label: "VRL", value: "0" }],
-      },
-      global: {
-        plugins: [i18n, store, router],
-      },
-    });
-
-    // Trigger validation
-    wrapper.vm.showInputError = true;
-    await flushPromises();
-
-    const validationResult = wrapper.vm.isValidMethodName();
-    expect(validationResult).not.toBe(true);
-    expect(typeof validationResult).toBe("string");
-  });
-
-  it("should accept valid function names", () => {
-    const wrapper = mount(FunctionsToolbar, {
-      props: {
-        name: "validFunctionName",
-        transformTypeOptions: [{ label: "VRL", value: "0" }],
-      },
-      global: {
-        plugins: [i18n, store, router],
-      },
-    });
-
-    const validationResult = wrapper.vm.isValidMethodName();
-    expect(validationResult).toBe(true);
-  });
-
   it("should render VRL radio button", () => {
-    const wrapper = mount(FunctionsToolbar, {
-      props: {
-        name: "testFunction",
-        transformTypeOptions: [
-          { label: "VRL", value: "0" },
-        ],
-      },
-      global: {
-        plugins: [i18n, store, router],
-      },
+    const wrapper = mountToolbar({
+      transformTypeOptions: [{ label: "VRL", value: "0" }],
     });
-
-    const vrlRadio = wrapper.find('[data-test="function-transform-type-vrl-radio"]');
-    expect(vrlRadio.exists()).toBe(true);
+    expect(wrapper.find('[data-test="function-transform-type-vrl-radio"]').exists()).toBe(true);
   });
 
   it("should render JavaScript radio button when option is provided", () => {
-    const wrapper = mount(FunctionsToolbar, {
-      props: {
-        name: "testFunction",
-        transformTypeOptions: [
-          { label: "VRL", value: "0" },
-          { label: "JavaScript", value: "1" },
-        ],
-      },
-      global: {
-        plugins: [i18n, store, router],
-      },
+    const wrapper = mountToolbar({
+      transformTypeOptions: [
+        { label: "VRL", value: "0" },
+        { label: "JavaScript", value: "1" },
+      ],
     });
+    expect(wrapper.find('[data-test="function-transform-type-js-radio"]').exists()).toBe(true);
+  });
 
-    const jsRadio = wrapper.find('[data-test="function-transform-type-js-radio"]');
-    expect(jsRadio.exists()).toBe(true);
+  it("should NOT render the JavaScript radio when only one option is provided", () => {
+    const wrapper = mountToolbar({
+      transformTypeOptions: [{ label: "VRL", value: "0" }],
+    });
+    expect(wrapper.find('[data-test="function-transform-type-js-radio"]').exists()).toBe(false);
   });
 
   it("should emit test event when test button is clicked", async () => {
-    const wrapper = mount(FunctionsToolbar, {
-      props: {
-        name: "testFunction",
-        transformTypeOptions: [{ label: "VRL", value: "0" }],
-      },
-      global: {
-        plugins: [i18n, store, router],
-      },
+    const wrapper = mountToolbar({
+      transformTypeOptions: [{ label: "VRL", value: "0" }],
     });
-
-    const testButton = wrapper.find('[data-test="add-function-test-btn"]');
-    await testButton.trigger("click");
-
-    expect(wrapper.emitted("test")).toBeTruthy();
+    await wrapper.find('[data-test="add-function-test-btn"]').trigger("click");
+    expect(getToolbar(wrapper).emitted("test")).toBeTruthy();
   });
 
   it("should emit cancel event when cancel button is clicked", async () => {
-    const wrapper = mount(FunctionsToolbar, {
-      props: {
-        name: "testFunction",
-        transformTypeOptions: [{ label: "VRL", value: "0" }],
-      },
-      global: {
-        plugins: [i18n, store, router],
-      },
+    const wrapper = mountToolbar({
+      transformTypeOptions: [{ label: "VRL", value: "0" }],
     });
-
-    const cancelButton = wrapper.find('[data-test="add-function-cancel-btn"]');
-    await cancelButton.trigger("click");
-
-    expect(wrapper.emitted("cancel")).toBeTruthy();
-  });
-
-  it("should emit save event when save button is clicked", async () => {
-    const wrapper = mount(FunctionsToolbar, {
-      props: {
-        name: "validFunction",
-        transformTypeOptions: [{ label: "VRL", value: "0" }],
-      },
-      global: {
-        plugins: [i18n, store, router],
-      },
-    });
-
-    const saveButton = wrapper.find('[data-test="add-function-save-btn"]');
-    await saveButton.trigger("click");
-
-    expect(wrapper.emitted("save")).toBeTruthy();
+    await wrapper.find('[data-test="add-function-cancel-btn"]').trigger("click");
+    expect(getToolbar(wrapper).emitted("cancel")).toBeTruthy();
   });
 
   it("should emit back event when back button is clicked", async () => {
-    const wrapper = mount(FunctionsToolbar, {
-      props: {
-        name: "testFunction",
-        transformTypeOptions: [{ label: "VRL", value: "0" }],
-      },
-      global: {
-        plugins: [i18n, store, router],
-      },
+    const wrapper = mountToolbar({
+      transformTypeOptions: [{ label: "VRL", value: "0" }],
     });
-
-    const backButton = wrapper.find('[data-test="add-function-back-btn"]');
-    await backButton.trigger("click");
-
-    expect(wrapper.emitted("back")).toBeTruthy();
+    await wrapper.find('[data-test="add-function-back-btn"]').trigger("click");
+    expect(getToolbar(wrapper).emitted("back")).toBeTruthy();
   });
 
-  it("should toggle fullscreen when fullscreen button is clicked", async () => {
-    const wrapper = mount(FunctionsToolbar, {
-      props: {
-        name: "testFunction",
-        transformTypeOptions: [{ label: "VRL", value: "0" }],
-      },
-      global: {
-        plugins: [i18n, store, router],
-      },
+  it("should keep the Save button enabled (no :disabled binding)", () => {
+    const wrapper = mountToolbar({
+      transformTypeOptions: [{ label: "VRL", value: "0" }],
     });
-
-    const fullscreenButton = wrapper.find('[data-test="add-function-fullscreen-btn"]');
-    await fullscreenButton.trigger("click");
-
-    // Just verify that clicking the button doesn't throw an error
-    // The actual fullscreen behavior is handled by Quasar and the browser
-    expect(fullscreenButton.exists()).toBe(true);
+    const saveBtn = wrapper.find('[data-test="add-function-save-btn"]');
+    expect(saveBtn.exists()).toBe(true);
+    expect(saveBtn.attributes("disabled")).toBeUndefined();
+    // The Save button submits the form natively.
+    expect(saveBtn.attributes("type")).toBe("submit");
   });
 
-  it("should emit update:transType when transform type changes", async () => {
-    const wrapper = mount(FunctionsToolbar, {
-      props: {
-        name: "testFunction",
-        transType: "0",
-        transformTypeOptions: [
-          { label: "VRL", value: "0" },
-          { label: "JavaScript", value: "1" },
-        ],
-      },
-      global: {
-        plugins: [i18n, store, router],
-      },
-    });
-
-    const radioGroup = wrapper.findComponent({ name: "ORadioGroup" });
-    await radioGroup.vm.$emit("update:model-value", "1");
-
+  it("blocks submit for an invalid (empty) name — save NOT called", async () => {
+    const onSubmit = vi.fn();
+    const wrapper = mountToolbar(
+      { transformTypeOptions: [{ label: "VRL", value: "0" }] },
+      { name: "", transType: "0" },
+      onSubmit,
+    );
+    await getForm(wrapper).handleSubmit();
     await flushPromises();
 
-    expect(wrapper.emitted("update:transType")).toBeTruthy();
-    expect(wrapper.emitted("update:transType")?.[0]).toEqual(["1"]);
+    expect(getForm(wrapper).state.isValid).toBe(false);
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it("should show error icon when function name is invalid", async () => {
-    const wrapper = mount(FunctionsToolbar, {
-      props: {
-        name: "123invalid",
-        transformTypeOptions: [{ label: "VRL", value: "0" }],
-      },
-      global: {
-        plugins: [i18n, store, router],
-      },
-    });
+  it("blocks submit for an invalid method name — save NOT called", async () => {
+    const onSubmit = vi.fn();
+    const wrapper = mountToolbar(
+      { transformTypeOptions: [{ label: "VRL", value: "0" }] },
+      { name: "123-invalid", transType: "0" },
+      onSubmit,
+    );
+    await getForm(wrapper).handleSubmit();
+    await flushPromises();
 
-    wrapper.vm.showInputError = true;
-    await wrapper.vm.$nextTick();
+    expect(getForm(wrapper).state.isValid).toBe(false);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
 
-    const errorIcon = wrapper.find('.cursor-pointer[size="20px"]');
-    expect(wrapper.vm.isValidMethodName()).not.toBe(true);
+  it("submits a valid function name", async () => {
+    const onSubmit = vi.fn();
+    const wrapper = mountToolbar(
+      { transformTypeOptions: [{ label: "VRL", value: "0" }] },
+      { name: "validFunctionName", transType: "0" },
+      onSubmit,
+    );
+    await getForm(wrapper).handleSubmit();
+    await flushPromises();
+
+    expect(onSubmit).toHaveBeenCalled();
+    expect(onSubmit.mock.calls[0][0].name).toBe("validFunctionName");
   });
 });
