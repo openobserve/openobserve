@@ -163,16 +163,7 @@ const useEnterpriseRoutes = () => {
         beforeEnter(to: any, from: any, next: any) {
           syntheticsRouteGuard(to, from, next);
         },
-      },
-      {
-        path: "synthetic/:id",
-        name: "synthetic-detail",
-        component: () => import("@/views/synthetics/BrowserCheckDetail.vue"),
-        meta: { title: "Browser Check" },
-        beforeEnter(to: any, from: any, next: any) {
-          syntheticsRouteGuard(to, from, next);
-        },
-      },
+      }
     );
 
     routes.push(

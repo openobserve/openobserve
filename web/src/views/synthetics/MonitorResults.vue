@@ -83,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @edit="editMonitor"
         @open-run="openRunDetail"
         @refresh="refresh"
+        @jump-to-window="onJumpToWindow"
       />
     </div>
   </div>
@@ -323,6 +324,20 @@ async function refresh() {
   }
 }
 
+function onJumpToWindow(startTime: number, endTime: number) {
+  timeState.value = {
+    valueType: "absolute",
+    startTime,
+    endTime,
+    relativeTimePeriod: null,
+  };
+  timeRange.value = { startTime, endTime };
+  writeToUrl();
+  nextTick(() => {
+    runsRef.value?.refresh?.(startTime, endTime);
+  });
+}
+
 function editMonitor() {
   router.push({ name: "synthetic-new", query: { edit: monitorId.value } });
 }
@@ -342,7 +357,29 @@ function openRunDetail(runId: string, executionId: string) {
 }
 
 onMounted(() => {
-  if (!readFromUrl()) {
+  // Anchor the initial time window around last_triggered_at (±15 min)
+  // when arriving from the synthetics list page (fresh navigation with no
+  // explicit time range in the URL). Falls back to readFromUrl / default
+  // relative period for direct page loads, refreshes, or never-run monitors.
+  const lastTriggeredAtRaw = route.query.last_triggered_at
+  const lastTriggeredAt = typeof lastTriggeredAtRaw === 'string' ? Number(lastTriggeredAtRaw) : 0
+  const hasExplicitRange = route.query.from || route.query.to || route.query.period
+
+  if (lastTriggeredAt > 0 && !hasExplicitRange) {
+    // Convert microseconds → milliseconds
+    const tsMs = Math.floor(lastTriggeredAt / 1000)
+    const anchor = new Date(tsMs)
+    const PAD_US = 15 * 60 * 1000 * 1000
+    const startTime = Math.max(0, (anchor.getTime() - 15 * 60 * 1000) * 1000)
+    const endTime = Math.min(Date.now() * 1000, anchor.getTime() * 1000 + PAD_US)
+    timeState.value = {
+      valueType: 'absolute',
+      startTime,
+      endTime,
+      relativeTimePeriod: null,
+    }
+    timeRange.value = { startTime, endTime }
+  } else if (!readFromUrl()) {
     applyRelative(DEFAULT_RELATIVE);
   }
   writeToUrl();

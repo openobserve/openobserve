@@ -443,6 +443,7 @@ function mapMonitor(m: ApiMonitor) {
     uptime:       null as number | null,
     history:      [] as unknown[],
     folderId:     m.folder_id,
+    lastTriggeredAt: m.last_triggered_at,
   }
 }
 
@@ -795,10 +796,12 @@ const hideMapTip = () => { mapTipTimer = setTimeout(() => { mapTip.value.show = 
 
 // ── Row click → Monitor Results page ───────────────────────────────────
 const openDetail = (monitor: any) => {
+  const query: Record<string, string> = { name: monitor.name, folder: monitor.folder_name }
+  if (monitor.lastTriggeredAt > 0) query.last_triggered_at = String(monitor.lastTriggeredAt)
   router.push({
     name: 'synthetic-monitor-results',
     params: { id: String(monitor.id) },
-    query: { name: monitor.name, folder: monitor.folder_name },
+    query,
   });
 };
 

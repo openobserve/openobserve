@@ -618,7 +618,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :show-global-filter="false"
                 :enable-column-resize="true"
                 :enable-column-reorder="true"
-                :empty-message="'No runs match'"
                 data-test="monitor-runs-runs-table"
                 @row-click="openRun"
               >
@@ -707,18 +706,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ (row as VisibleRun).triggerType }}
                   </span>
                 </template>
+
+                <!-- Empty state: smart — differentiates "never run" vs "no runs in window" -->
+                <template #empty>
+                  <div v-if="kpiHasLoadedOnce" class="px-2">
+                    <!-- Monitor has runs elsewhere — guide to last run + optionally clear filters -->
+                    <OEmptyState
+                      v-if="synthetics.kpi.value.totalRuns > 0"
+                      size="block"
+                      illustration="no-results"
+                      :title="t('synthetics.results.noRunsInWindow')"
+                      :description="t('synthetics.results.noRunsInWindowDesc')"
+                      data-test="monitor-runs-empty"
+                    >
+                      <template #actions>
+                        <EmptyStateActionCard
+                          icon="schedule"
+                          :label="t('synthetics.results.jumpToLastRun')"
+                          :sublabel="lastRunLabel"
+                          data-test="monitor-runs-empty-jump-last-run"
+                          @click="handleEmptyStateAction('jump-to-last-run')"
+                        />
+                        <EmptyStateActionCard
+                          v-if="hasActiveFilters"
+                          icon="filter-list"
+                          :label="t('synthetics.results.clearFilters')"
+                          :sublabel="t('synthetics.results.clearFiltersDesc')"
+                          data-test="monitor-runs-empty-clear-filters"
+                          @click="handleEmptyStateAction('clear-filters')"
+                        />
+                      </template>
+                    </OEmptyState>
+
+                    <!-- Monitor has never been run — prompt to trigger -->
+                    <OEmptyState
+                      v-else
+                      size="block"
+                      illustration="browser-check"
+                      :title="t('synthetics.results.noRunsYet')"
+                      :description="t('synthetics.results.noRunsYetDesc')"
+                      data-test="monitor-runs-empty"
+                    >
+                      <template #actions>
+                        <EmptyStateActionCard
+                          icon="play-arrow"
+                          :label="t('synthetics.results.triggerRunNow')"
+                          :sublabel="t('synthetics.results.triggerRunNowDesc')"
+                          data-test="monitor-runs-empty-trigger-run"
+                          @click="handleEmptyStateAction('trigger-run')"
+                        />
+                      </template>
+                    </OEmptyState>
+                  </div>
+                </template>
               </OTable>
             </OCard>
 
-            <!-- Empty state below the table -->
-            <div v-if="visibleRuns.length === 0 && !runsLoading" class="px-2">
-              <OEmptyState
-                preset="no-results"
-                size="block"
-                data-test="monitor-runs-empty"
-                @action="resetFilters"
-              />
-            </div>
           </div>
         </OTabPanel>
 
@@ -1150,6 +1193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -1162,6 +1206,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -1182,6 +1227,8 @@ import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
 import firefoxSvgUrl from "@/assets/images/synthetics/firefox.svg";
 import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
+import syntheticsService from "@/services/synthetics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 defineOptions({ name: "SyntheticMonitorRuns" });
 
@@ -1191,7 +1238,11 @@ const emit = defineEmits<{
   (e: "edit"): void;
   (e: "open-run", runId: string, executionId: string): void;
   (e: "refresh"): void;
+  (e: "jump-to-window", startTime: number, endTime: number): void;
 }>();
+
+const store = useStore();
+const orgIdentifier = computed(() => (store.state as any).selectedOrganization?.identifier ?? "");
 
 // ── Props ────────────────────────────────────────────────────────────────
 interface Props {
@@ -1290,6 +1341,66 @@ const locatorFilter = ref("");
 const actionFilter = ref("all");
 const errorFilter = ref<string | null>(null);
 const expandedRows = ref<Record<string, boolean>>({});
+
+// ── Smart empty state helpers ──────────────────────────────────────────
+const hasActiveFilters = computed(
+  () =>
+    statusFilter.value !== "all" ||
+    browserFilter.value !== "all" ||
+    deviceFilter.value !== "all" ||
+    locationFilter.value !== "all" ||
+    errorFilter.value !== null,
+);
+
+const lastRunLabel = computed(() => {
+  const ts = synthetics.kpi.value.lastRunAt;
+  if (!ts) return "";
+  return new Date(ts).toLocaleString();
+});
+
+const runTriggerLoading = ref(false);
+
+async function handleEmptyStateAction(id: string) {
+  if (id === "jump-to-last-run") {
+    const lastRunAt = synthetics.kpi.value.lastRunAt;
+    if (!lastRunAt) return;
+    const HALF_HOUR_US = 30 * 60 * 1000 * 1000;
+    const startTime = lastRunAt * 1000 - HALF_HOUR_US;
+    const endTime = lastRunAt * 1000 + HALF_HOUR_US;
+    emit("jump-to-window", startTime, endTime);
+    return;
+  }
+
+  if (id === "clear-filters") {
+    resetFilters();
+    return;
+  }
+
+  if (id === "trigger-run") {
+    if (runTriggerLoading.value) return;
+    runTriggerLoading.value = true;
+    const dismiss = toast({
+      variant: "loading",
+      message: `Triggering a run for "${props.monitorName}"…`,
+      timeout: 0,
+    });
+    try {
+      await syntheticsService.run(orgIdentifier.value, props.monitorId, {});
+      dismiss();
+      toast({ variant: "success", message: `Run triggered for "${props.monitorName}".` });
+      // Emit refresh so parent reloads data
+      emit("refresh");
+    } catch (err: any) {
+      dismiss();
+      toast({
+        variant: "error",
+        message: err?.response?.data?.message || `Failed to trigger "${props.monitorName}".`,
+      });
+    } finally {
+      runTriggerLoading.value = false;
+    }
+  }
+}
 
 // Composite key that changes when any filter changes — ensures the runs
 // table fully re-renders with the filtered data.
