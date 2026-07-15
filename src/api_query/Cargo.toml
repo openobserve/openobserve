@@ -1,0 +1,46 @@
+[package]
+name = "openobserve-api-query"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+enterprise = [
+    "dep:o2_enterprise",
+    "dep:o2_openfga",
+    "openobserve-core/enterprise",
+]
+cloud = ["enterprise", "openobserve-core/cloud"]
+vectorscan = ["openobserve-core/vectorscan"]
+vortex = ["openobserve-core/vortex"]
+
+[dependencies]
+openobserve-api-common.workspace = true
+openobserve-core.workspace = true
+arrow-schema.workspace = true
+axum.workspace = true
+bytes.workspace = true
+chrono.workspace = true
+config.workspace = true
+futures.workspace = true
+hashbrown.workspace = true
+http.workspace = true
+infra.workspace = true
+log.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+o2_openfga = { workspace = true, optional = true }
+promql-parser.workspace = true
+proto.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+tower.workspace = true
+tracing.workspace = true
+utoipa.workspace = true
+vector-enrichment.workspace = true

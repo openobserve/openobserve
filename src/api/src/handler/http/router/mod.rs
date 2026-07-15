@@ -32,7 +32,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "enterprise")]
 use {
-    crate::{common::meta::ingestion::INGESTION_EP, service::self_reporting::audit},
+    crate::service::self_reporting::audit,
     axum::body::{Body, to_bytes},
     base64::{Engine as _, engine::general_purpose},
     config::utils::time::now_micros,
@@ -293,7 +293,8 @@ pub async fn proxy_auth_middleware(request: Request, next: Next) -> Response {
 
 #[cfg(feature = "enterprise")]
 pub async fn audit_middleware(request: Request, next: Next) -> Response {
-    let method = request.method().to_string();
+    let http_method = request.method().clone();
+    let method = http_method.to_string();
     let path = request
         .uri()
         .path()
@@ -301,7 +302,12 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         .unwrap_or("")
         .to_string();
     let path_columns = path.split('/').collect::<Vec<&str>>();
-    let path_len = path_columns.len();
+
+    // Org-relative view of the path so the ingestion-route classifier sees
+    // segment 0 as `{org_id}`. `audit_middleware` runs before prefix stripping,
+    // so `path` here is e.g. `[base_uri/]api/{org}/_bulk`; take everything after
+    // the `api/` segment.
+    let ingestion_path = path.split_once("api/").map(|(_, rest)| rest).unwrap_or("");
 
     if get_o2_config().common.audit_enabled
         && !(path_columns
@@ -310,7 +316,10 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             .to_string()
             .ends_with("_stream")
             || path.ends_with("ai/chat_stream")
-            || (method.eq("POST") && INGESTION_EP.contains(&path_columns[path_len - 1])))
+            || crate::common::meta::ingestion_routes::is_ingestion_write(
+                &http_method,
+                ingestion_path,
+            ))
     {
         let query_params = request.uri().query().unwrap_or("").to_string();
         let org_id = {

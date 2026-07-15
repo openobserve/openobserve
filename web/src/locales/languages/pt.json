@@ -1915,6 +1915,11 @@
     "tooltipPromptTemplate": "O prompt enviado ao LLM. Use {input}, {output} e {context} como espaços reservados para valores dinâmicos no momento da avaliação."
   },
   "function": {
+    "csvFileRequired": "O arquivo CSV é obrigatório!",
+    "urlRequired": "A URL é obrigatória!",
+    "urlMustStartWithHttp": "A URL deve começar com http:// ou https://",
+    "nameRequired": "Este campo é obrigatório!",
+    "invalidMethodName": "Nome de método inválido. Deve começar com uma letra ou sublinhado. Use apenas letras, números e sublinhados.",
     "header": "Funções",
     "subtitle": "Funções VRL reutilizáveis aplicadas em pipelines",
     "clickTestFunctionHint": "Clique em Função de teste para ver os eventos",

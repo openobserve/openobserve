@@ -12,594 +12,451 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
+// StreamFieldInputs is FORM-ONLY now: it injects the parent's TanStack form and
+// renders indexed OForm* rows. So every test mounts it inside a REAL <OForm>
+// (via a small harness) whose schema carries a `fields` array. This also lets us
+// prove the schema gates empty rows AND the :key-must-be-index delete behavior.
 
-import { mount } from '@vue/test-utils';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { qLayoutInjections } from '@/test/unit/helpers/layout-injections';
-import StreamFieldInputs from './StreamFieldInputs.vue';
-import { createI18n } from 'vue-i18n';
-import { createStore } from 'vuex';
+import { mount, flushPromises } from "@vue/test-utils";
+import { describe, it, expect } from "vitest";
+import { defineComponent } from "vue";
+import { z } from "zod";
+import StreamFieldInputs from "./StreamFieldInputs.vue";
+import { makeStreamFieldRowSchema } from "./StreamFieldInputs.schema";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import { qLayoutInjections } from "@/test/unit/helpers/layout-injections";
+import { createStore } from "vuex";
+import i18n from "@/locales";
 
-const i18n = createI18n({
-  locale: 'en',
-  legacy: false,
-  messages: {
-    en: {
-      logStream: {
-        fields: 'Fields',
-        addField: 'Add Field',
-        deleteField: 'Delete',
-        fieldName: 'Field Name',
-        fieldRequired: 'Field is required!',
-        indexType: 'Index Type',
-        dataType: 'Data Type',
-        dataTypeRequired: 'Data Type is required!'
-      }
-    }
-  }
+const harnessSchema = z.object({
+  fields: z.array(makeStreamFieldRowSchema(i18n.global.t)).default([]),
 });
 
-const store = createStore({
-  state: {
-    theme: 'dark'
-  }
-});
+const store = createStore({ state: { theme: "dark" } });
 
 const mockFields = [
-  {
-    uuid: '1',
-    name: 'field1',
-    type: 'Utf8',
-    index_type: ['fullTextSearchKey']
-  },
-  {
-    uuid: '2',
-    name: 'field2',
-    type: 'Int64',
-    index_type: ['secondaryIndexKey']
-  }
+  { uuid: "1", name: "field1", type: "Utf8", index_type: ["fullTextSearchKey"] },
+  { uuid: "2", name: "field2", type: "Int64", index_type: ["secondaryIndexKey"] },
 ];
 
-const defaultProps = {
-  fields: [],
-  showHeader: true,
-  isInSchema: false,
-  visibleInputs: {
-    name: true,
-    data_type: true,
-    index_type: true
-  }
+// Renders the child inside a real <OForm> (form-only contract) and seeds the
+// `fields` array from `initialFields`. Extra props (showHeader/visibleInputs)
+// are forwarded to the child.
+const makeHarness = (
+  initialFields: any[] = [],
+  childProps: Record<string, any> = {},
+) => {
+  const Harness = defineComponent({
+    components: { OForm, StreamFieldInputs },
+    setup() {
+      const form = useOForm<{ fields: any[] }>({
+        defaultValues: { fields: initialFields },
+        schema: harnessSchema,
+      });
+      return { form, childProps };
+    },
+    template: `
+      <OForm :form="form">
+        <StreamFieldInputs form-field-name="fields" v-bind="childProps" />
+      </OForm>
+    `,
+  });
+  return mount(Harness, {
+    global: { plugins: [i18n, store], provide: qLayoutInjections() },
+  });
 };
 
-describe('StreamFieldInputs', () => {
-  let wrapper: any;
+const getForm = (w: any) => (w.findComponent(OForm).vm as any).form;
+const childVm = (w: any) => w.findComponent(StreamFieldInputs).vm as any;
 
-  beforeEach(() => {
-    wrapper = mount(StreamFieldInputs, {
-      props: defaultProps,
-      global: {
-        plugins: [i18n, store],
-        provide: qLayoutInjections(),
-      }
-    });
-  });
+// The RENDERED row-name inputs (model-value on each OInput), in render order.
+const renderedRowNames = (w: any) =>
+  w
+    .findAllComponents(OFormInput)
+    .filter((c: any) => /^fields\[\d+\]\.name$/.test(c.props("name")))
+    .map((c: any) => c.findComponent(OInput).props("modelValue"));
 
-  describe('Component Initialization', () => {
-    it('should render correctly with default props', () => {
-      expect(wrapper.find('[data-test="add-stream-fields-section"]').exists()).toBe(true);
-    });
-
-    it('should display header when showHeader is true', () => {
-      expect(wrapper.find('[data-test="alert-conditions-text"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="alert-conditions-text"]').text()).toBe('Fields');
+describe("StreamFieldInputs (form-mode)", () => {
+  describe("Component Initialization", () => {
+    it("renders the fields section", async () => {
+      const wrapper = makeHarness([]);
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test="add-stream-fields-section"]').exists(),
+      ).toBe(true);
     });
 
-    it('should hide header when showHeader is false', async () => {
-      await wrapper.setProps({ showHeader: false });
-      expect(wrapper.find('[data-test="alert-conditions-text"]').exists()).toBe(false);
+    it("shows the header when showHeader is true (default)", async () => {
+      const wrapper = makeHarness([]);
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test="alert-conditions-text"]').exists(),
+      ).toBe(true);
     });
 
-    it('should show add field button when fields array is empty', () => {
-      expect(wrapper.find('[data-test="add-stream-add-field-btn"]').exists()).toBe(true);
+    it("hides the header when showHeader is false", async () => {
+      const wrapper = makeHarness([], { showHeader: false });
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test="alert-conditions-text"]').exists(),
+      ).toBe(false);
     });
 
-    it('should have correct button styling for add field', () => {
+    it("shows the add-field button when the array is empty", async () => {
+      const wrapper = makeHarness([]);
+      await flushPromises();
       const addBtn = wrapper.find('[data-test="add-stream-add-field-btn"]');
-      // OButton replaces q-btn; verify the button exists and is a button element
       expect(addBtn.exists()).toBe(true);
-      expect(addBtn.element.tagName).toBe('BUTTON');
+      expect(addBtn.element.tagName).toBe("BUTTON");
     });
   });
 
-  describe('Fields Rendering', () => {
-    beforeEach(async () => {
-      await wrapper.setProps({ fields: mockFields });
+  describe("Fields Rendering", () => {
+    it("renders a row per field", async () => {
+      const wrapper = makeHarness(mockFields);
+      await flushPromises();
+      expect(
+        wrapper.findAll('[data-test^="add-stream-field-row-"]'),
+      ).toHaveLength(2);
     });
 
-    it('should render field inputs when fields array has data', () => {
-      const conditions = wrapper.findAll('[data-test^="add-stream-field-row-"]');
-      expect(conditions.length).toBeGreaterThanOrEqual(2);
+    it("renders a name input, index-type and data-type select per row", async () => {
+      const wrapper = makeHarness(mockFields);
+      await flushPromises();
+      expect(
+        wrapper.findAll('[data-test="add-stream-field-name-input"]'),
+      ).toHaveLength(2);
+      expect(
+        wrapper.findAll('[data-test="add-stream-field-index-type-select"]'),
+      ).toHaveLength(2);
+      expect(
+        wrapper.findAll('[data-test="add-stream-field-data-type-select"]'),
+      ).toHaveLength(2);
     });
 
-    it('should render field name input for each field', () => {
-      expect(wrapper.findAll('[data-test="add-stream-field-name-input"]')).toHaveLength(2);
+    it("binds each row's name to the rendered input", async () => {
+      const wrapper = makeHarness(mockFields);
+      await flushPromises();
+      expect(renderedRowNames(wrapper)).toEqual(["field1", "field2"]);
     });
 
-    it('should render index type and data type selects for each field', () => {
-      expect(wrapper.findAll('[data-test="add-stream-field-index-type-select"]')).toHaveLength(2);
-      expect(wrapper.findAll('[data-test="add-stream-field-data-type-select"]')).toHaveLength(2);
-    });
-
-    it('should have correct field name values', () => {
-      const nameInputs = wrapper.findAll('[data-test="add-stream-field-name-input"] input');
-      expect(nameInputs[0].element.value).toBe('field1');
-      expect(nameInputs[1].element.value).toBe('field2');
-    });
-
-    it('should display add button only for last field', () => {
-      const addButtons = wrapper.findAll('[data-test="add-stream-add-field-btn"]');
-      expect(addButtons).toHaveLength(1);
-    });
-
-    it('should display delete button for each field', () => {
-      const deleteButtons = wrapper.findAll('[data-test="add-stream-delete-field-btn"]');
-      expect(deleteButtons).toHaveLength(2);
+    it("shows the add button only on the last row + a delete button per row", async () => {
+      const wrapper = makeHarness(mockFields);
+      await flushPromises();
+      expect(
+        wrapper.findAll('[data-test="add-stream-add-field-btn"]'),
+      ).toHaveLength(1);
+      expect(
+        wrapper.findAll('[data-test="add-stream-delete-field-btn"]'),
+      ).toHaveLength(2);
     });
   });
 
-  describe('Field Row Layout', () => {
-    it('should render field rows with flex layout', async () => {
-      await wrapper.setProps({ fields: mockFields });
-      const rows = wrapper.findAll('[data-test^="add-stream-field-row-"]');
-      expect(rows.length).toBe(2);
-      rows.forEach((row, i) => {
-        expect(row.classes()).toContain('flex');
-        expect(row.classes()).toContain('flex-wrap');
+  describe("Visible Inputs Configuration", () => {
+    it("hides the index_type select when visibleInputs.index_type is false", async () => {
+      const wrapper = makeHarness(mockFields, {
+        visibleInputs: { name: true, data_type: true, index_type: false },
+      });
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test="add-stream-field-index-type-select"]').exists(),
+      ).toBe(false);
+    });
+
+    it("hides the data_type select when visibleInputs.data_type is false", async () => {
+      const wrapper = makeHarness(mockFields, {
+        visibleInputs: { name: true, data_type: false, index_type: true },
+      });
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test="add-stream-field-data-type-select"]').exists(),
+      ).toBe(false);
+    });
+  });
+
+  describe("Row add / remove (form-owned)", () => {
+    it("adds a blank row to the form when the add button is clicked", async () => {
+      const wrapper = makeHarness(mockFields);
+      await flushPromises();
+      await wrapper
+        .find('[data-test="add-stream-add-field-btn"]')
+        .trigger("click");
+      await flushPromises();
+      expect(getForm(wrapper).state.values.fields).toHaveLength(3);
+    });
+
+    it("adds the first row from the empty state", async () => {
+      const wrapper = makeHarness([]);
+      await flushPromises();
+      await wrapper
+        .find('[data-test="add-stream-add-field-btn"]')
+        .trigger("click");
+      await flushPromises();
+      expect(getForm(wrapper).state.values.fields).toHaveLength(1);
+    });
+
+    it("removes a row from the form when the delete button is clicked", async () => {
+      const wrapper = makeHarness(mockFields);
+      await flushPromises();
+      await wrapper
+        .findAll('[data-test="add-stream-delete-field-btn"]')[0]
+        .trigger("click");
+      await flushPromises();
+      const rows = getForm(wrapper).state.values.fields;
+      expect(rows).toHaveLength(1);
+      expect(rows[0].name).toBe("field2");
+    });
+
+    // 🔑 The :key-must-be-index gate — delete a NON-last row and assert the
+    // RENDERED inputs stay aligned (a stable-id :key would shift/blank them).
+    it("keeps rendered inputs aligned after deleting a NON-last row", async () => {
+      // Only the name inputs are read here, so hide the (heavy) selects to keep
+      // the render light — the :key behavior is identical regardless.
+      const wrapper = makeHarness(
+        [
+          { uuid: "a", name: "row_one", type: "Utf8", index_type: [] },
+          { uuid: "b", name: "row_two", type: "Utf8", index_type: [] },
+          { uuid: "c", name: "row_three", type: "Utf8", index_type: [] },
+        ],
+        { visibleInputs: { name: true, data_type: false, index_type: false } },
+      );
+      await flushPromises();
+      expect(renderedRowNames(wrapper)).toEqual([
+        "row_one",
+        "row_two",
+        "row_three",
+      ]);
+
+      childVm(wrapper).removeRow(1);
+      await flushPromises();
+
+      expect(renderedRowNames(wrapper)).toEqual(["row_one", "row_three"]);
+      expect(
+        getForm(wrapper).state.values.fields.map((r: any) => r.name),
+      ).toEqual(["row_one", "row_three"]);
+    }, 20000);
+  });
+
+  describe("Button States", () => {
+    it("disables the add button when the last row name is empty", async () => {
+      const wrapper = makeHarness([
+        { uuid: "1", name: "", type: "", index_type: [] },
+      ]);
+      await flushPromises();
+      const addBtn = wrapper.find('[data-test="add-stream-add-field-btn"]');
+      expect(addBtn.element.hasAttribute("disabled")).toBe(true);
+    });
+
+    it("enables the add button when the last row name is filled", async () => {
+      const wrapper = makeHarness([
+        { uuid: "1", name: "test", type: "", index_type: [] },
+      ]);
+      await flushPromises();
+      const addBtn = wrapper.find('[data-test="add-stream-add-field-btn"]');
+      expect(addBtn.element.hasAttribute("disabled")).toBe(false);
+    });
+  });
+
+  describe("Schema validation (through the real OForm)", () => {
+    it("blocks submit and shows per-row errors for an empty row", async () => {
+      const wrapper = makeHarness([
+        { uuid: "1", name: "", type: "", index_type: [] },
+      ]);
+      await flushPromises();
+
+      // Nothing validates before the first submit.
+      expect(wrapper.text()).not.toContain("Field is required!");
+
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      expect(getForm(wrapper).state.isValid).toBe(false);
+      expect(wrapper.text()).toContain("Field is required!");
+      expect(wrapper.text()).toContain("Data Type is required!");
+    });
+
+    it("rejects a row name with disallowed characters", async () => {
+      const wrapper = makeHarness([
+        { uuid: "1", name: "bad name!", type: "Utf8", index_type: [] },
+      ]);
+      await flushPromises();
+
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      expect(getForm(wrapper).state.isValid).toBe(false);
+    });
+
+    // Regression: a schema `.trim()` would let a surrounding space PASS (the
+    // regex judges the trimmed copy) while OForm saves the RAW row value. The
+    // schema validates the RAW value (no `.trim()`), so " my_field " is rejected
+    // by the character rule — mirroring `main` and the scalar `name` fix.
+    it("rejects a row name with surrounding whitespace", async () => {
+      const wrapper = makeHarness([
+        { uuid: "1", name: " my_field ", type: "Utf8", index_type: [] },
+      ]);
+      await flushPromises();
+
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      expect(getForm(wrapper).state.isValid).toBe(false);
+      expect(wrapper.text()).toContain(
+        "Use alphanumeric characters, underscore and colon only.",
+      );
+    });
+
+    it("passes when every row has a valid name + type", async () => {
+      const wrapper = makeHarness(mockFields);
+      await flushPromises();
+
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      expect(getForm(wrapper).state.isValid).toBe(true);
+    });
+  });
+
+  describe("Exposed helpers", () => {
+    it("exposes addRow / removeRow / getIndexTypeOptions / disableOptions", async () => {
+      const wrapper = makeHarness([]);
+      await flushPromises();
+      const vm = childVm(wrapper);
+      expect(typeof vm.addRow).toBe("function");
+      expect(typeof vm.removeRow).toBe("function");
+      expect(typeof vm.getIndexTypeOptions).toBe("function");
+      expect(typeof vm.disableOptions).toBe("function");
+    });
+  });
+
+  describe("Constants", () => {
+    it("exposes the streamIndexType array (10 options)", async () => {
+      const wrapper = makeHarness([]);
+      await flushPromises();
+      const streamIndexType = childVm(wrapper).streamIndexType;
+      expect(streamIndexType).toHaveLength(10);
+      expect(streamIndexType[0]).toEqual({
+        label: "Full text search",
+        value: "fullTextSearchKey",
+      });
+      expect(streamIndexType[1]).toEqual({
+        label: "Secondary index",
+        value: "secondaryIndexKey",
+      });
+      expect(streamIndexType[2]).toEqual({
+        label: "Bloom filter",
+        value: "bloomFilterKey",
       });
     });
 
-    it('should render field name input in each row', async () => {
-      await wrapper.setProps({ fields: mockFields });
-      const nameInputs = wrapper.findAll('[data-test="add-stream-field-name-input"]');
-      expect(nameInputs).toHaveLength(2);
+    it("exposes the dataTypes array (5 options)", async () => {
+      const wrapper = makeHarness([]);
+      await flushPromises();
+      const dataTypes = childVm(wrapper).dataTypes;
+      expect(dataTypes).toHaveLength(5);
+      expect(dataTypes.map((d: any) => d.value)).toEqual([
+        "Utf8",
+        "Int64",
+        "Uint64",
+        "Float64",
+        "Boolean",
+      ]);
     });
   });
 
-  describe('Visible Inputs Configuration', () => {
-    it('should hide index_type select when visibleInputs.index_type is false', async () => {
-      await wrapper.setProps({
-        fields: mockFields,
-        visibleInputs: { name: true, data_type: true, index_type: false }
-      });
-      expect(wrapper.find('[data-test="add-stream-field-index-type-select"]').exists()).toBe(false);
+  describe("disableOptions logic", () => {
+    let disable: (schema: any, option: any) => boolean;
+
+    const setup = async () => {
+      const wrapper = makeHarness([]);
+      await flushPromises();
+      disable = childVm(wrapper).disableOptions;
+      return wrapper;
+    };
+
+    it("returns false when no conflicting options selected", async () => {
+      await setup();
+      expect(
+        disable({ index_type: ["fullTextSearchKey"] }, { value: "secondaryIndexKey" }),
+      ).toBe(false);
     });
 
-    it('should hide data_type select when visibleInputs.data_type is false', async () => {
-      await wrapper.setProps({
-        fields: mockFields,
-        visibleInputs: { name: true, data_type: false, index_type: true }
-      });
-      expect(wrapper.find('[data-test="add-stream-field-data-type-select"]').exists()).toBe(false);
-    });
-  });
-
-  describe('Event Emissions', () => {
-    beforeEach(async () => {
-      await wrapper.setProps({ fields: mockFields });
+    it("disables keyPartition when prefixPartition is selected", async () => {
+      await setup();
+      expect(
+        disable({ index_type: ["prefixPartition"] }, { value: "keyPartition" }),
+      ).toBe(true);
     });
 
-    it('should emit add event when add button is clicked', async () => {
-      const addBtn = wrapper.find('[data-test="add-stream-add-field-btn"]');
-      await addBtn.trigger('click');
-      expect(wrapper.emitted('add')).toHaveLength(1);
+    it("disables prefixPartition when keyPartition is selected", async () => {
+      await setup();
+      expect(
+        disable({ index_type: ["keyPartition"] }, { value: "prefixPartition" }),
+      ).toBe(true);
     });
 
-    it('should emit add event when add field button is clicked on empty fields', async () => {
-      await wrapper.setProps({ fields: [] });
-      const addBtn = wrapper.find('[data-test="add-stream-add-field-btn"]');
-      await addBtn.trigger('click');
-      expect(wrapper.emitted('add')).toHaveLength(1);
+    it("disables a different hash partition when one is already selected", async () => {
+      await setup();
+      expect(
+        disable({ index_type: ["hashPartition_8"] }, { value: "hashPartition_16" }),
+      ).toBe(true);
     });
 
-    it('should emit remove event when delete button is clicked', async () => {
-      const deleteBtn = wrapper.find('[data-test="add-stream-delete-field-btn"]');
-      await deleteBtn.trigger('click');
-      expect(wrapper.emitted('remove')).toHaveLength(1);
-      expect(wrapper.emitted('remove')[0]).toEqual([mockFields[0], 0]);
+    it("allows the same hash partition that is already selected", async () => {
+      await setup();
+      expect(
+        disable({ index_type: ["hashPartition_8"] }, { value: "hashPartition_8" }),
+      ).toBe(false);
     });
 
-    it('should emit input:update event when delete button is clicked', async () => {
-      const deleteBtn = wrapper.find('[data-test="add-stream-delete-field-btn"]');
-      await deleteBtn.trigger('click');
-      expect(wrapper.emitted('input:update')).toHaveLength(1);
-      expect(wrapper.emitted('input:update')[0]).toEqual(['conditions', mockFields[0]]);
-    });
-  });
-
-  describe('Button States', () => {
-    it('should disable add button when field name is empty', async () => {
-      const emptyField = [{ uuid: '1', name: '', type: '', index_type: [] }];
-      await wrapper.setProps({ fields: emptyField });
-      const addBtn = wrapper.find('[data-test="add-stream-add-field-btn"]');
-      expect(addBtn.element.hasAttribute('disabled')).toBe(true);
+    it("disables hash partition when keyPartition is selected", async () => {
+      await setup();
+      expect(
+        disable({ index_type: ["keyPartition"] }, { value: "hashPartition_8" }),
+      ).toBe(true);
     });
 
-    it('should enable add button when field name is not empty', async () => {
-      const filledField = [{ uuid: '1', name: 'test', type: '', index_type: [] }];
-      await wrapper.setProps({ fields: filledField });
-      const addBtn = wrapper.find('[data-test="add-stream-add-field-btn"]');
-      expect(addBtn.element.hasAttribute('disabled')).toBe(false);
-    });
-  });
-
-  describe('Exposed Methods', () => {
-    it('should expose deleteApiHeader method', () => {
-      expect(wrapper.vm.deleteApiHeader).toBeDefined();
-      expect(typeof wrapper.vm.deleteApiHeader).toBe('function');
+    it("disables hash partition when prefixPartition is selected", async () => {
+      await setup();
+      expect(
+        disable({ index_type: ["prefixPartition"] }, { value: "hashPartition_8" }),
+      ).toBe(true);
     });
 
-    it('should expose addApiHeader method', () => {
-      expect(wrapper.vm.addApiHeader).toBeDefined();
-      expect(typeof wrapper.vm.addApiHeader).toBe('function');
+    it("handles an empty index_type array", async () => {
+      await setup();
+      expect(disable({ index_type: [] }, { value: "fullTextSearchKey" })).toBe(
+        false,
+      );
     });
 
-    it('should expose disableOptions method', () => {
-      expect(wrapper.vm.disableOptions).toBeDefined();
-      expect(typeof wrapper.vm.disableOptions).toBe('function');
+    it("handles an undefined index_type", async () => {
+      await setup();
+      expect(disable({}, { value: "fullTextSearchKey" })).toBe(false);
     });
 
-    it('should expose handleFocus method', () => {
-      expect(wrapper.vm.handleFocus).toBeDefined();
-      expect(typeof wrapper.vm.handleFocus).toBe('function');
+    it("does not disable non-partition types when hashPartition is selected", async () => {
+      await setup();
+      const schema = { index_type: ["hashPartition_8"] };
+      expect(disable(schema, { value: "fullTextSearchKey" })).toBe(false);
+      expect(disable(schema, { value: "secondaryIndexKey" })).toBe(false);
+      expect(disable(schema, { value: "bloomFilterKey" })).toBe(false);
     });
 
-    it('should expose handleBlur method', () => {
-      expect(wrapper.vm.handleBlur).toBeDefined();
-      expect(typeof wrapper.vm.handleBlur).toBe('function');
-    });
-
-    it('should expose handleDataTypeFocus method', () => {
-      expect(wrapper.vm.handleDataTypeFocus).toBeDefined();
-      expect(typeof wrapper.vm.handleDataTypeFocus).toBe('function');
-    });
-
-    it('should expose handleDataTypeBlur method', () => {
-      expect(wrapper.vm.handleDataTypeBlur).toBeDefined();
-      expect(typeof wrapper.vm.handleDataTypeBlur).toBe('function');
-    });
-  });
-
-  describe('Focus Handling', () => {
-    it('should set isFocused to true on handleFocus call', () => {
-      expect(wrapper.vm.isFocused).toBe(false);
-      wrapper.vm.handleFocus();
-      expect(wrapper.vm.isFocused).toBe(true);
-    });
-
-    it('should set isFocused to false on handleBlur call', () => {
-      wrapper.vm.handleFocus();
-      expect(wrapper.vm.isFocused).toBe(true);
-      wrapper.vm.handleBlur();
-      expect(wrapper.vm.isFocused).toBe(false);
-    });
-
-    it('should set isDataTypeFocused to true on handleDataTypeFocus call', () => {
-      expect(wrapper.vm.isDataTypeFocused).toBe(false);
-      wrapper.vm.handleDataTypeFocus();
-      expect(wrapper.vm.isDataTypeFocused).toBe(true);
-    });
-
-    it('should set isDataTypeFocused to false on handleDataTypeBlur call', () => {
-      wrapper.vm.handleDataTypeFocus();
-      expect(wrapper.vm.isDataTypeFocused).toBe(true);
-      wrapper.vm.handleDataTypeBlur();
-      expect(wrapper.vm.isDataTypeFocused).toBe(false);
-    });
-  });
-
-  describe('Constants', () => {
-    it('should expose streamIndexType array', () => {
-      expect(wrapper.vm.streamIndexType).toBeDefined();
-      expect(Array.isArray(wrapper.vm.streamIndexType)).toBe(true);
-      expect(wrapper.vm.streamIndexType).toHaveLength(10);
-    });
-
-    it('should have correct streamIndexType values', () => {
-      const streamIndexType = wrapper.vm.streamIndexType;
-      expect(streamIndexType[0]).toEqual({ label: "Full text search", value: "fullTextSearchKey" });
-      expect(streamIndexType[1]).toEqual({ label: "Secondary index", value: "secondaryIndexKey" });
-      expect(streamIndexType[2]).toEqual({ label: "Bloom filter", value: "bloomFilterKey" });
-    });
-
-    it('should expose dataTypes array', () => {
-      expect(wrapper.vm.dataTypes).toBeDefined();
-      expect(Array.isArray(wrapper.vm.dataTypes)).toBe(true);
-      expect(wrapper.vm.dataTypes).toHaveLength(5);
-    });
-
-    it('should have correct dataTypes values', () => {
-      const dataTypes = wrapper.vm.dataTypes;
-      expect(dataTypes[0]).toEqual({ label: "Utf8", value: "Utf8" });
-      expect(dataTypes[1]).toEqual({ label: "Int64", value: "Int64" });
-      expect(dataTypes[2]).toEqual({ label: "Uint64", value: "Uint64" });
-      expect(dataTypes[3]).toEqual({ label: "Float64", value: "Float64" });
-      expect(dataTypes[4]).toEqual({ label: "Boolean", value: "Boolean" });
-    });
-  });
-
-  describe('disableOptions Method Logic', () => {
-    const mockSchema = { index_type: ['fullTextSearchKey'] };
-
-    it('should return false when no conflicting options selected', () => {
-      const option = { value: 'secondaryIndexKey' };
-      const result = wrapper.vm.disableOptions(mockSchema, option);
-      expect(result).toBe(false);
-    });
-
-    it('should disable keyPartition when prefixPartition is selected', () => {
-      const schemaWithPrefix = { index_type: ['prefixPartition'] };
-      const keyPartitionOption = { value: 'keyPartition' };
-      const result = wrapper.vm.disableOptions(schemaWithPrefix, keyPartitionOption);
-      expect(result).toBe(true);
-    });
-
-    it('should disable prefixPartition when keyPartition is selected', () => {
-      const schemaWithKey = { index_type: ['keyPartition'] };
-      const prefixPartitionOption = { value: 'prefixPartition' };
-      const result = wrapper.vm.disableOptions(schemaWithKey, prefixPartitionOption);
-      expect(result).toBe(true);
-    });
-
-    it('should disable different hash partitions when one is already selected', () => {
-      const schemaWithHash = { index_type: ['hashPartition_8'] };
-      const differentHashOption = { value: 'hashPartition_16' };
-      const result = wrapper.vm.disableOptions(schemaWithHash, differentHashOption);
-      expect(result).toBe(true);
-    });
-
-    it('should allow same hash partition that is already selected', () => {
-      const schemaWithHash = { index_type: ['hashPartition_8'] };
-      const sameHashOption = { value: 'hashPartition_8' };
-      const result = wrapper.vm.disableOptions(schemaWithHash, sameHashOption);
-      expect(result).toBe(false);
-    });
-
-    it('should disable hash partition when keyPartition is selected', () => {
-      const schemaWithKey = { index_type: ['keyPartition'] };
-      const hashOption = { value: 'hashPartition_8' };
-      const result = wrapper.vm.disableOptions(schemaWithKey, hashOption);
-      expect(result).toBe(true);
-    });
-
-    it('should disable hash partition when prefixPartition is selected', () => {
-      const schemaWithPrefix = { index_type: ['prefixPartition'] };
-      const hashOption = { value: 'hashPartition_8' };
-      const result = wrapper.vm.disableOptions(schemaWithPrefix, hashOption);
-      expect(result).toBe(true);
-    });
-
-    it('should handle empty index_type array', () => {
-      const emptySchema = { index_type: [] };
-      const option = { value: 'fullTextSearchKey' };
-      const result = wrapper.vm.disableOptions(emptySchema, option);
-      expect(result).toBe(false);
-    });
-
-    it('should handle undefined index_type', () => {
-      const undefinedSchema = {};
-      const option = { value: 'fullTextSearchKey' };
-      const result = wrapper.vm.disableOptions(undefinedSchema, option);
-      expect(result).toBe(false);
-    });
-
-    it('should disable keyPartition when hashPartition is selected', () => {
-      const schemaWithHash = { index_type: ['hashPartition_8'] };
-      const keyOption = { value: 'keyPartition' };
-      const result = wrapper.vm.disableOptions(schemaWithHash, keyOption);
-      expect(result).toBe(true);
-    });
-
-    it('should disable prefixPartition when hashPartition is selected', () => {
-      const schemaWithHash = { index_type: ['hashPartition_8'] };
-      const prefixOption = { value: 'prefixPartition' };
-      const result = wrapper.vm.disableOptions(schemaWithHash, prefixOption);
-      expect(result).toBe(true);
-    });
-
-    it('should not disable fullTextSearchKey when hashPartition is selected', () => {
-      const schemaWithHash = { index_type: ['hashPartition_8'] };
-      const ftsOption = { value: 'fullTextSearchKey' };
-      const result = wrapper.vm.disableOptions(schemaWithHash, ftsOption);
-      expect(result).toBe(false);
-    });
-
-    it('should not disable secondaryIndexKey when hashPartition is selected', () => {
-      const schemaWithHash = { index_type: ['hashPartition_8'] };
-      const secondaryOption = { value: 'secondaryIndexKey' };
-      const result = wrapper.vm.disableOptions(schemaWithHash, secondaryOption);
-      expect(result).toBe(false);
-    });
-
-    it('should not disable bloomFilterKey when hashPartition is selected', () => {
-      const schemaWithHash = { index_type: ['hashPartition_8'] };
-      const bloomOption = { value: 'bloomFilterKey' };
-      const result = wrapper.vm.disableOptions(schemaWithHash, bloomOption);
-      expect(result).toBe(false);
-    });
-
-    it('should not disable fullTextSearchKey when prefixPartition is selected', () => {
-      const schemaWithPrefix = { index_type: ['prefixPartition'] };
-      const ftsOption = { value: 'fullTextSearchKey' };
-      const result = wrapper.vm.disableOptions(schemaWithPrefix, ftsOption);
-      expect(result).toBe(false);
-    });
-
-    it('should not disable fullTextSearchKey when keyPartition is selected', () => {
-      const schemaWithKey = { index_type: ['keyPartition'] };
-      const ftsOption = { value: 'fullTextSearchKey' };
-      const result = wrapper.vm.disableOptions(schemaWithKey, ftsOption);
-      expect(result).toBe(false);
-    });
-
-    it('should not disable secondaryIndexKey when prefixPartition is selected', () => {
-      const schemaWithPrefix = { index_type: ['prefixPartition'] };
-      const option = { value: 'secondaryIndexKey' };
-      const result = wrapper.vm.disableOptions(schemaWithPrefix, option);
-      expect(result).toBe(false);
-    });
-
-    it('should not disable bloomFilterKey when keyPartition is selected', () => {
-      const schemaWithKey = { index_type: ['keyPartition'] };
-      const option = { value: 'bloomFilterKey' };
-      const result = wrapper.vm.disableOptions(schemaWithKey, option);
-      expect(result).toBe(false);
-    });
-
-    it('should disable other hash variants and partition types when hashPartition is selected with multiple index types', () => {
-      const complexSchema = { index_type: ['hashPartition_8', 'fullTextSearchKey', 'bloomFilterKey'] };
-
-      // Different hash variant should be disabled
-      expect(wrapper.vm.disableOptions(complexSchema, { value: 'hashPartition_16' })).toBe(true);
-      expect(wrapper.vm.disableOptions(complexSchema, { value: 'hashPartition_64' })).toBe(true);
-      // Same hash should be allowed
-      expect(wrapper.vm.disableOptions(complexSchema, { value: 'hashPartition_8' })).toBe(false);
-      // keyPartition and prefixPartition should be disabled
-      expect(wrapper.vm.disableOptions(complexSchema, { value: 'keyPartition' })).toBe(true);
-      expect(wrapper.vm.disableOptions(complexSchema, { value: 'prefixPartition' })).toBe(true);
-      // Non-partition types should be allowed
-      expect(wrapper.vm.disableOptions(complexSchema, { value: 'fullTextSearchKey' })).toBe(false);
-      expect(wrapper.vm.disableOptions(complexSchema, { value: 'bloomFilterKey' })).toBe(false);
-      expect(wrapper.vm.disableOptions(complexSchema, { value: 'secondaryIndexKey' })).toBe(false);
-    });
-
-    it('should disable hashPartition options when prefixPartition or keyPartition is selected', () => {
-      // When prefix is selected alongside other non-hash types
-      const schemaWithPrefix = { index_type: ['prefixPartition', 'fullTextSearchKey'] };
-      expect(wrapper.vm.disableOptions(schemaWithPrefix, { value: 'hashPartition_8' })).toBe(true);
-      expect(wrapper.vm.disableOptions(schemaWithPrefix, { value: 'hashPartition_32' })).toBe(true);
-      expect(wrapper.vm.disableOptions(schemaWithPrefix, { value: 'keyPartition' })).toBe(true);
-
-      // When key is selected alongside other non-hash types
-      const schemaWithKey = { index_type: ['keyPartition', 'bloomFilterKey'] };
-      expect(wrapper.vm.disableOptions(schemaWithKey, { value: 'hashPartition_8' })).toBe(true);
-      expect(wrapper.vm.disableOptions(schemaWithKey, { value: 'hashPartition_64' })).toBe(true);
-      expect(wrapper.vm.disableOptions(schemaWithKey, { value: 'prefixPartition' })).toBe(true);
-    });
-  });
-
-  describe('Form Validation', () => {
-    it('should show field name error when validate finds empty name', async () => {
-      const emptyField = [{ uuid: '1', name: '', type: 'Utf8', index_type: [] }];
-      await wrapper.setProps({ fields: emptyField });
-      wrapper.vm.validate();
-      await wrapper.vm.$nextTick();
-      expect(wrapper.html()).toContain('Field is required');
-    });
-
-    it('should render data type selects with validation', async () => {
-      await wrapper.setProps({ fields: mockFields });
-      const dataTypeSelects = wrapper.findAll('[data-test="add-stream-field-data-type-select"]');
-      expect(dataTypeSelects.length).toBeGreaterThan(0);
-    });
-
-    it('should show data type error when field has name but no type', async () => {
-      const fieldWithoutType = [{ uuid: '1', name: 'myField', type: '', index_type: [] }];
-      await wrapper.setProps({ fields: fieldWithoutType });
-
-      wrapper.vm.validate();
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.html()).toContain('Data Type is required');
-    });
-
-    it('should not require data type when visibleInputs.data_type is false', async () => {
-      const fieldWithoutType = [{ uuid: '1', name: 'myField', type: '', index_type: [] }];
-      await wrapper.setProps({
-        fields: fieldWithoutType,
-        visibleInputs: { name: true, data_type: false, index_type: false },
-      });
-
-      const result = wrapper.vm.validate();
-
-      expect(result).toBe(true);
-      expect(wrapper.html()).not.toContain('Data Type is required');
-    });
-
-    it('should return true when all fields have name and type', async () => {
-      await wrapper.setProps({ fields: mockFields });
-
-      const result = wrapper.vm.validate();
-
-      expect(result).toBe(true);
-    });
-
-    it('should return false when field has empty name and empty type', async () => {
-      const emptyField = [{ uuid: '1', name: '', type: '', index_type: [] }];
-      await wrapper.setProps({ fields: emptyField });
-
-      const result = wrapper.vm.validate();
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.html()).toContain('Field is required');
-      expect(wrapper.html()).toContain('Data Type is required');
-      expect(result).toBe(false);
-    });
-
-    it('should clear data type error on update:model-value', async () => {
-      const fieldWithoutType = [{ uuid: '1', name: 'myField', type: '', index_type: [] }];
-      await wrapper.setProps({ fields: fieldWithoutType });
-
-      wrapper.vm.validate();
-      await wrapper.vm.$nextTick();
-      expect(wrapper.html()).toContain('Data Type is required');
-
-      // Changing the type via the OSelect should clear the error
-      // The OSelect component emits update:model-value which triggers
-      // fieldDataTypeErrors[index] = ''
-      const dataTypeSelect = wrapper.find('[data-test="add-stream-field-data-type-select"]');
-      expect(dataTypeSelect.exists()).toBe(true);
-    });
-  });
-
-  describe('Store and i18n Integration', () => {
-    it('should expose store reference', () => {
-      expect(wrapper.vm.store).toBeDefined();
-      expect(wrapper.vm.store.state).toBeDefined();
-    });
-
-    it('should expose translation function', () => {
-      expect(wrapper.vm.t).toBeDefined();
-      expect(typeof wrapper.vm.t).toBe('function');
-    });
-
-    it('should render with dark theme from store', async () => {
-      await wrapper.setProps({ fields: mockFields });
-      const buttons = wrapper.findAll('button');
-      expect(buttons.length).toBeGreaterThan(0);
-      expect(wrapper.vm.store.state.theme).toBe('dark');
-    });
-  });
-
-  describe('Edge Cases', () => {
-    it('should handle single field with empty name correctly', async () => {
-      const singleEmptyField = [{ uuid: '1', name: '', type: '', index_type: [] }];
-      await wrapper.setProps({ fields: singleEmptyField });
-      const addBtn = wrapper.find('[data-test="add-stream-add-field-btn"]');
-      expect(addBtn.element.hasAttribute('disabled')).toBe(true);
-    });
-
-    it('should handle multiple hash partitions in disableOptions', () => {
-      const schemaWithMultipleHash = { index_type: ['hashPartition_8', 'fullTextSearchKey'] };
-      const differentHashOption = { value: 'hashPartition_16' };
-      const result = wrapper.vm.disableOptions(schemaWithMultipleHash, differentHashOption);
-      expect(result).toBe(true);
-    });
-
-    it('should handle complex partition combinations in disableOptions', () => {
-      const complexSchema = { index_type: ['keyPartition', 'fullTextSearchKey'] };
-      const hashOption = { value: 'hashPartition_32' };
-      const result = wrapper.vm.disableOptions(complexSchema, hashOption);
-      expect(result).toBe(true);
+    it("disables other hash variants + partition types with a complex selection", async () => {
+      await setup();
+      const complexSchema = {
+        index_type: ["hashPartition_8", "fullTextSearchKey", "bloomFilterKey"],
+      };
+      expect(disable(complexSchema, { value: "hashPartition_16" })).toBe(true);
+      expect(disable(complexSchema, { value: "hashPartition_8" })).toBe(false);
+      expect(disable(complexSchema, { value: "keyPartition" })).toBe(true);
+      expect(disable(complexSchema, { value: "prefixPartition" })).toBe(true);
+      expect(disable(complexSchema, { value: "fullTextSearchKey" })).toBe(false);
     });
   });
 });

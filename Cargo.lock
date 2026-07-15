@@ -6423,7 +6423,7 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
 name = "openobserve"
-version = "0.92.0"
+version = "0.93.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -6487,6 +6487,7 @@ dependencies = [
  "object_store",
  "openobserve-api",
  "openobserve-core",
+ "openobserve-jobs",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-proto",
@@ -6590,7 +6591,6 @@ dependencies = [
  "ingester",
  "itertools 0.14.0",
  "jemalloc_pprof",
- "jsonwebtoken",
  "log",
  "mime",
  "mime_guess",
@@ -6599,6 +6599,9 @@ dependencies = [
  "o2_enterprise",
  "o2_openfga",
  "o2_ratelimit",
+ "openobserve-api-common",
+ "openobserve-api-management",
+ "openobserve-api-query",
  "openobserve-core",
  "opentelemetry",
  "opentelemetry-proto",
@@ -6612,7 +6615,6 @@ dependencies = [
  "regex",
  "reqwest 0.13.2",
  "rust-embed-for-web",
- "sea-orm",
  "serde",
  "serde_json",
  "snap",
@@ -6632,6 +6634,84 @@ dependencies = [
  "utoipa-swagger-ui",
  "vrl",
  "zip 8.2.0",
+]
+
+[[package]]
+name = "openobserve-api-common"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "http 1.4.0",
+ "log",
+ "serde",
+ "serde_json",
+ "utoipa",
+]
+
+[[package]]
+name = "openobserve-api-management"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "axum-extra",
+ "base64 0.22.1",
+ "chrono",
+ "config",
+ "cron",
+ "hashbrown 0.16.1",
+ "http 1.4.0",
+ "infra",
+ "jsonwebtoken",
+ "log",
+ "o2_dex",
+ "o2_enterprise",
+ "o2_openfga",
+ "openobserve-api-common",
+ "openobserve-core",
+ "regex",
+ "reqwest 0.13.2",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "svix-ksuid",
+ "time",
+ "tokio",
+ "tower",
+ "tracing",
+ "url",
+ "utoipa",
+ "vrl",
+]
+
+[[package]]
+name = "openobserve-api-query"
+version = "0.1.0"
+dependencies = [
+ "arrow-schema",
+ "axum",
+ "bytes",
+ "chrono",
+ "config",
+ "enrichment",
+ "futures",
+ "hashbrown 0.16.1",
+ "http 1.4.0",
+ "infra",
+ "log",
+ "o2_enterprise",
+ "o2_openfga",
+ "openobserve-api-common",
+ "openobserve-core",
+ "promql-parser",
+ "proto",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "tower",
+ "tracing",
+ "utoipa",
 ]
 
 [[package]]
@@ -6739,6 +6819,36 @@ dependencies = [
  "webpki-roots 1.0.6",
  "x509-parser",
  "zip 8.2.0",
+]
+
+[[package]]
+name = "openobserve-jobs"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow",
+ "arrow-schema",
+ "bytes",
+ "chrono",
+ "config",
+ "futures",
+ "hashbrown 0.16.1",
+ "infra",
+ "ingester",
+ "log",
+ "o2_dex",
+ "o2_enterprise",
+ "o2_openfga",
+ "openobserve-core",
+ "prometheus",
+ "proto",
+ "regex",
+ "report_server",
+ "reqwest 0.13.2",
+ "serde_json",
+ "tokio",
+ "tonic",
+ "wal",
 ]
 
 [[package]]

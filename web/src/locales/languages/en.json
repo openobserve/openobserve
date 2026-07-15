@@ -1920,6 +1920,11 @@
     "tooltipPromptTemplate": "The prompt sent to the LLM. Use {input}, {output}, and {context} as placeholders for dynamic values at evaluation time."
   },
   "function": {
+    "csvFileRequired": "CSV File is required!",
+    "urlRequired": "URL is required!",
+    "urlMustStartWithHttp": "URL must start with http:// or https://",
+    "nameRequired": "Field is required!",
+    "invalidMethodName": "Invalid method name. Must start with a letter or underscore. Use only letters, numbers, and underscores.",
     "header": "Functions",
     "subtitle": "Reusable VRL functions applied in pipelines",
     "clickTestFunctionHint": "Please click Test Function to see the events",
