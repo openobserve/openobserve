@@ -307,9 +307,9 @@ test.describe("Pre-Test Cleanup", () => {
         /^alert_validation_stream$/,                   // Alert validation stream
         // NOTE: auto_playwright_stream is intentionally NOT deleted here. It is a shared,
         // fixed-name fixture stream (ingested by global-setup-alpha1.js and reused by the
-        // @serialAlpha1 alerts-ui-operations tests). OpenObserve deletes streams
-        // asynchronously, so deleting it at shard start left it stuck in a "being deleted"
-        // state; the serial tests' later re-ingest was then rejected with
+        // alerts-ui-operations tests). OpenObserve deletes streams asynchronously, so
+        // deleting it at shard start left it stuck in a "being deleted" state; a test's
+        // later re-ingest was then rejected with
         // 400 "stream [auto_playwright_stream] is being deleted", the stream never
         // reappeared in the alert wizard's stream dropdown, and the tests timed out.
         // It is treated as a persistent fixture (see the protected list below), like

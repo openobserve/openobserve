@@ -50,7 +50,7 @@ test.describe("Alerts Import/Export", () => {
   // Re-enabled from test.skip — API-first fixes (alertTemplatesPage/alertDestinationsPage) resolved
   // the cascading "page context closed" errors that caused this test to fail previously
   test('Import/Export Alert Functionality', {
-    tag: ['@all', '@alerts', '@alertsImportExport', '@serialAlpha1'],
+    tag: ['@all', '@alerts', '@alertsImportExport'],
     timeout: FIVE_MINUTES_MS
   }, async ({ page }) => {
     // This test covers import/export and includes trigger validation
@@ -204,7 +204,7 @@ test.describe("Alerts Import/Export", () => {
    * Covers: webhook/email destinations from URL and FILE
    */
   test('Destination Import from URL and File', {
-    tag: ['@destinationImport', '@all', '@alerts', '@serialAlpha1']
+    tag: ['@destinationImport', '@all', '@alerts']
   }, async ({ page }) => {
     // Create templates needed for destinations
     const webhookTemplateName = 'auto_webhook_template_' + sharedRandomValue;

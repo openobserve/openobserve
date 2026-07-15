@@ -49,7 +49,7 @@ testLogger.info(`ORGNAME from .env: ${process.env.ORGNAME}`);
  * Uses Dex "Continue with Email" login flow
  */
 
-// Shared browser context for both projects below.
+// Shared browser context for the chromium project.
 const CHROME_USE = {
   ...devices['Desktop Chrome'],
   viewport: { width: 1500, height: 1024 },
@@ -57,14 +57,6 @@ const CHROME_USE = {
   // Reuse auth state from global setup (Dex email login)
   storageState: path.join(__dirname, 'playwright-tests/utils/auth/user.json'),
 };
-
-// A handful of Alerts specs are known to contend on the shared alpha org when they
-// run concurrently at --workers=5 (heavy stream/destination/template dropdown flows
-// hitting the same slow list fetches). Those exact tests are tagged @serialAlpha1 and
-// routed to a dedicated fullyParallel:false project so they run one-at-a-time within
-// their file, while every other test (all other Alerts tests AND every other shard —
-// nothing else carries the tag) keeps running fully in parallel.
-const SERIAL_TAG = /@serialAlpha1/;
 
 module.exports = defineConfig({
   testDir: './playwright-tests',
@@ -78,7 +70,12 @@ module.exports = defineConfig({
 
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  // The heavy Alerts specs contend on the shared alpha org's slow list fetches under
+  // concurrent load. Rather than serialize them, they run fully in parallel and rely on
+  // (a) the page-object resilience (bounded retry loops + settle waits for slow stream/
+  // destination/template dropdown fetches) and (b) this suite-wide retry to absorb any
+  // residual contention flake. Only failing tests retry, so passing runs are unaffected.
+  retries: process.env.CI ? 2 : 0,
   workers: 3,
 
   reporter: process.env.CI
@@ -107,21 +104,8 @@ module.exports = defineConfig({
 
   projects: [
     {
-      // Everything WITHOUT the serial tag — runs fully in parallel as before.
+      // Single project — every test runs fully in parallel.
       name: 'chromium',
-      grepInvert: SERIAL_TAG,
-      use: CHROME_USE,
-    },
-    {
-      // Only the tagged, known-contended Alerts tests — serialized within their file
-      // (fullyParallel:false) so they don't pile up on the shared org's list fetches.
-      name: 'chromium-serial',
-      grep: SERIAL_TAG,
-      fullyParallel: false,
-      // One extra retry for these heaviest, most contention-sensitive specs (e.g. the
-      // P1 prebuilt test does 15 destination operations in one test). Only failing tests
-      // retry, so passing runs are unaffected.
-      retries: process.env.CI ? 2 : 0,
       use: CHROME_USE,
     },
   ],

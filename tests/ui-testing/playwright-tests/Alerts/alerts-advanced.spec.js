@@ -41,7 +41,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
     // ==================== ADVANCED CONDITIONS TESTS ====================
 
     test("Create alert with multiple AND conditions", {
-        tag: ['@alertsAdvanced', '@all', '@alerts', '@multiCondition', '@serialAlpha1']
+        tag: ['@alertsAdvanced', '@all', '@alerts', '@multiCondition']
     }, async ({ page }) => {
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);
         testLogger.info('Testing multi-condition alert creation', { uniqueSuffix });
@@ -77,7 +77,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
     });
 
     test("Verify condition operator toggle (AND to OR)", {
-        tag: ['@alertsAdvanced', '@all', '@alerts', '@conditionOperator', '@serialAlpha1']
+        tag: ['@alertsAdvanced', '@all', '@alerts', '@conditionOperator']
     }, async ({ page }) => {
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);
         testLogger.info('Testing condition operator toggle', { uniqueSuffix });
@@ -113,7 +113,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
     // ==================== BULK OPERATIONS TESTS ====================
 
     test("Bulk pause and unpause multiple alerts", {
-        tag: ['@alertsAdvanced', '@all', '@alerts', '@bulkOperations', '@serialAlpha1']
+        tag: ['@alertsAdvanced', '@all', '@alerts', '@bulkOperations']
     }, async ({ page }) => {
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);
         const templateName = 'auto_template_bulk_' + uniqueSuffix;
@@ -167,7 +167,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
     // ==================== DEDUPLICATION TESTS ====================
 
     test("Create scheduled alert with deduplication configuration", {
-        tag: ['@alertsAdvanced', '@all', '@alerts', '@deduplication', '@serialAlpha1']
+        tag: ['@alertsAdvanced', '@all', '@alerts', '@deduplication']
     }, async ({ page }) => {
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);
         testLogger.info('Testing scheduled alert with deduplication configuration', { uniqueSuffix });
