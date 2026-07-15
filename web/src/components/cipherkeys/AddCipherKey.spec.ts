@@ -129,10 +129,28 @@ describe("AddCipherKey.vue", () => {
       expect(wrapper.vm.step).toBe(1);
     });
 
-    it("keeps the Save button enabled (R3 — never disabled)", async () => {
+    // Pre-migration this button was step-gated (`step === 1 && !isUpdating`), so
+    // create-mode Save was dead on step 1. R3 drops that: Save always submits and
+    // the schema decides. The two assertions below are the whole contract — it is
+    // only safe to leave Save enabled BECAUSE an invalid submit reports why.
+    it("keeps the Save button enabled and submitting (R3 — never disabled)", async () => {
       wrapper = await createWrapper();
       const saveBtn = wrapper.find('[data-test="add-cipher-key-save-btn"]');
       expect(saveBtn.attributes("disabled")).toBeUndefined();
+      expect(saveBtn.attributes("type")).toBe("submit");
+    });
+
+    it("surfaces the name error when Save submits an empty form on step 1", async () => {
+      wrapper = await createWrapper();
+      expect(wrapper.vm.step).toBe(1);
+
+      await wrapper.find("form").trigger("submit");
+      await flush();
+
+      expect(CipherKeysService.create).not.toHaveBeenCalled();
+      expect(
+        wrapper.find('[data-test="add-cipher-key-name-input-error"]').text(),
+      ).toBe("Name is required");
     });
   });
 
