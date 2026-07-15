@@ -21,8 +21,8 @@ import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import useIngestion from "@/composables/useIngestion";
 const name = "openvpn";
-const store = useStore();
-const { endpoint, securityContent, securityDocURLs } = useIngestion();
+useStore();
+const { securityContent, securityDocURLs } = useIngestion();
 const content = securityContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
 const docURL = securityDocURLs[name];
 </script>

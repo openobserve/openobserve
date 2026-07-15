@@ -436,7 +436,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { formatToTimeCompact, formatTimestamp } from "@/utils/date";
+import { formatTimestamp } from "@/utils/date";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -788,26 +788,6 @@ const getRowClass = (row: any) => {
     return store.state.theme === "dark" ? "!bg-[#2d1b1b]" : "!bg-[#fff5f5]";
   }
   return "";
-};
-
-const formatTimestampRelative = (timestamp: number) => {
-  if (!timestamp) return "N/A";
-  const now = Date.now() * 1000; // microseconds
-  const diff = now - timestamp;
-
-  if (diff < 3600000000) {
-    const minutes = Math.floor(diff / 60000000);
-    return `${minutes} min ago`;
-  }
-  if (diff < 86400000000) {
-    const hours = Math.floor(diff / 3600000000);
-    return `${hours}h ago`;
-  }
-  if (diff < 604800000000) {
-    const days = Math.floor(diff / 86400000000);
-    return `${days}d ago`;
-  }
-  return formatToTimeCompact(timestamp);
 };
 
 const formatTimestampFull = (timestamp: number) => {

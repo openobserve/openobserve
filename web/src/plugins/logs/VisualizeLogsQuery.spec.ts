@@ -3,7 +3,6 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import VisualizeLogsQuery from "@/plugins/logs/VisualizeLogsQuery.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { ref } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
 
@@ -533,7 +532,7 @@ describe("VisualizeLogsQuery Component", () => {
 
   describe("addToDashboard Function", () => {
     it("should show dialog when no errors", () => {
-      mockValidatePanel.mockImplementation((errors) => {
+      mockValidatePanel.mockImplementation(() => {
         // No errors added to array
       });
 
@@ -587,7 +586,7 @@ describe("VisualizeLogsQuery Component", () => {
         { converted_histogram_query: "SELECT histogram(...)" },
       ]);
 
-      mockValidatePanel.mockImplementation((errors) => {
+      mockValidatePanel.mockImplementation(() => {
         // No errors
       });
 
@@ -607,7 +606,7 @@ describe("VisualizeLogsQuery Component", () => {
 
       const originalQuery = wrapper.vm.dashboardPanelData.data.queries[0].query;
 
-      mockValidatePanel.mockImplementation((errors) => {
+      mockValidatePanel.mockImplementation(() => {
         // No errors
       });
 
@@ -925,7 +924,7 @@ describe("VisualizeLogsQuery Component", () => {
     it("should handle missing resultMetaData gracefully in addToDashboard", () => {
       wrapper.vm.resultMetaData = null;
 
-      mockValidatePanel.mockImplementation((errors) => {
+      mockValidatePanel.mockImplementation(() => {
         // No errors
       });
 

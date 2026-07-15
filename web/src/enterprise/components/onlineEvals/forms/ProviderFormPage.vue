@@ -160,7 +160,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
 import {
   availableModelsOf,
-  booleanOf,
   defaultModelOf,
   providerTypeOf,
 } from "../utils/evalEntity";

@@ -19,9 +19,8 @@ import {
   it,
   beforeEach,
   afterEach,
-  vi,
 } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import SpanRenderer from "@/plugins/traces/SpanRenderer.vue";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";

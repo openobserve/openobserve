@@ -246,7 +246,7 @@ import {
   getDashboard,
   getFoldersList,
 } from "../../../utils/commons";
-import { onMounted, onUnmounted } from "vue";
+import { onMounted } from "vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
 import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";

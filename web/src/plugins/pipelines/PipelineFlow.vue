@@ -108,25 +108,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script>
-import { ref, onMounted, onActivated, watch, computed, nextTick } from "vue";
+import { ref, onMounted, watch, computed } from "vue";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
-import { ControlButton, Controls } from '@vue-flow/controls'
+import { Controls } from '@vue-flow/controls'
 // import vueFlowConfig from "./vueFlowConfig";
 import CustomNode from "./CustomNode.vue";
 import CustomEdge from "./CustomEdge.vue";
 import DropzoneBackground from "./DropzoneBackground.vue";
 import useDragAndDrop from "./useDnD";
-import EdgeWithButton from "./EdgeWithButton.vue";
 import { useI18n } from "vue-i18n";
 
 /* import the required styles */
 
 import { useStore } from "vuex";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-const { onInit } = useVueFlow();
 
 export default {
-  components: { VueFlow, CustomNode, DropzoneBackground, Controls,ControlButton,EdgeWithButton,CustomEdge
+  components: { VueFlow, CustomNode, DropzoneBackground, Controls,CustomEdge
    },
   setup() {
     const { t } = useI18n();
@@ -149,10 +146,10 @@ export default {
     const showEdgeHelpNotification = ref(false);
     let notificationTimeout = null;
 
-    const { setViewport, getSelectedEdges, addSelectedEdges, removeSelectedEdges, removeEdges } = useVueFlow()
+    const { setViewport } = useVueFlow()
 
     // Handle edge click events
-    const onEdgeClick = (event) => {
+    const onEdgeClick = () => {
 
       // Clear any existing timeout
       if (notificationTimeout) {
@@ -173,7 +170,7 @@ export default {
 
 
 
-    watch(() => pipelineObj.currentSelectedPipeline, (newVal, oldVal) => {
+    watch(() => pipelineObj.currentSelectedPipeline, () => {
           if(pipelineObj.dirtyFlag){
             pipelineObj.dirtyFlag = false;
           }

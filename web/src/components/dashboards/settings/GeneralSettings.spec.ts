@@ -56,12 +56,6 @@ describe("GeneralSettings", () => {
   let wrapper: any;
   let router: any;
 
-  const mockRoute = {
-    query: {
-      dashboard: "dashboard-1",
-      folder: "default",
-    },
-  };
 
   beforeEach(async () => {
     vi.clearAllMocks();

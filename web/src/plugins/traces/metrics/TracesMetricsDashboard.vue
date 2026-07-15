@@ -71,7 +71,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import {
   ref,
-  watch,
   onMounted,
   onBeforeUnmount,
   computed,
@@ -118,9 +117,9 @@ const emit = defineEmits<{
 }>();
 
 const { showErrorNotification } = useNotifications();
-const store = useStore();
+useStore();
 const { searchObj } = useTraces();
-const { t } = useI18n();
+useI18n();
 
 
 // Read filter and timeRange directly from the shared composable rather than via props.
@@ -134,7 +133,6 @@ const effectiveTimeRange = computed<TimeRange>(() => ({
   endTime: searchObj.data.datetime.endTime,
 }));
 
-const autoRefreshEnabled = ref(false);
 const autoRefreshIntervalId = ref<number | null>(null);
 const error = ref<string | null>(null);
 const dashboardChartsRef = ref<any>(null);
@@ -155,8 +153,6 @@ interface AnalysisFilter {
   timeEnd?: number;
 }
 const showAnalysisDashboard = ref(false);
-const showVolumeAnalysisDashboard = ref(false);
-const showErrorAnalysisDashboard = ref(false);
 const analysisDurationFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 });
 const analysisRateFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 });
 const analysisErrorFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 });
@@ -486,23 +482,6 @@ const onDataZoom = async ({
   }
 };
 
-const removeRangeFilter = (panelId: string) => {
-  searchObj.meta.metricsRangeFilters.delete(panelId);
-  // Increment version to trigger reactivity
-  rangeFiltersVersion.value++;
-
-  // Emit updated filters to parent to update Query Editor
-  emitFiltersToQueryEditor();
-};
-
-const formatTimestamp = (timestamp: number) => {
-  const date = new Date(timestamp);
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
-  return `${hours}:${minutes}:${seconds}`;
-};
-
 const handleChartContextMenu = (event: any) => {
   // Extract field name from series name
   // For traces metrics, the panel titles are "Rate", "Errors", "Duration"
@@ -522,81 +501,6 @@ const handleChartContextMenu = (event: any) => {
 
 const hideContextMenu = () => {
   contextMenuVisible.value = false;
-};
-
-const openAnalysisDashboard = () => {
-  // Get the current duration range from existing filters
-  let durationStart = null;
-  let durationEnd = null;
-
-  rangeFilters.value.forEach((filter) => {
-    if (filter.panelTitle === "Duration") {
-      durationStart = filter.start;
-      durationEnd = filter.end;
-    }
-  });
-
-  // Set the duration filter for analysis
-  analysisDurationFilter.value = {
-    start: durationStart || 0,
-    end: durationEnd || Number.MAX_SAFE_INTEGER,
-  };
-
-  showAnalysisDashboard.value = true;
-};
-
-const openVolumeAnalysisDashboard = () => {
-  // Get the current rate range from existing filters
-  let rateStart = null;
-  let rateEnd = null;
-  let timeStart = null;
-  let timeEnd = null;
-
-  rangeFilters.value.forEach((filter) => {
-    if (filter.panelTitle === "Rate") {
-      rateStart = filter.start;
-      rateEnd = filter.end;
-      timeStart = filter.timeStart;
-      timeEnd = filter.timeEnd;
-    }
-  });
-
-  // Set the rate filter for analysis
-  analysisRateFilter.value = {
-    start: rateStart || 0,
-    end: rateEnd || Number.MAX_SAFE_INTEGER,
-    timeStart: timeStart || undefined,
-    timeEnd: timeEnd || undefined,
-  };
-
-  showVolumeAnalysisDashboard.value = true;
-};
-
-const openErrorAnalysisDashboard = () => {
-  // Get the current error range from existing filters
-  let errorStart = null;
-  let errorEnd = null;
-  let timeStart = null;
-  let timeEnd = null;
-
-  rangeFilters.value.forEach((filter) => {
-    if (filter.panelTitle === "Errors") {
-      errorStart = filter.start;
-      errorEnd = filter.end;
-      timeStart = filter.timeStart;
-      timeEnd = filter.timeEnd;
-    }
-  });
-
-  // Set the error filter for analysis
-  analysisErrorFilter.value = {
-    start: errorStart || 0,
-    end: errorEnd || Number.MAX_SAFE_INTEGER,
-    timeStart: timeStart || undefined,
-    timeEnd: timeEnd || undefined,
-  };
-
-  showErrorAnalysisDashboard.value = true;
 };
 
 // Unified function to open analysis dashboard with all filters populated
@@ -696,26 +600,6 @@ const handleContextMenuSelect = (selection: {
   );
 
   hideContextMenu();
-};
-
-const toggleAutoRefresh = () => {
-  autoRefreshEnabled.value = !autoRefreshEnabled.value;
-
-  if (autoRefreshEnabled.value) {
-    startAutoRefresh();
-  } else {
-    stopAutoRefresh();
-  }
-};
-
-const startAutoRefresh = () => {
-  if (autoRefreshIntervalId.value !== null) {
-    stopAutoRefresh();
-  }
-
-  autoRefreshIntervalId.value = window.setInterval(() => {
-    refreshDashboard();
-  }, 30000); // 30 seconds
 };
 
 const stopAutoRefresh = () => {

@@ -3,7 +3,6 @@ import { mount, VueWrapper } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import { createRouter, createWebHistory } from 'vue-router';
-import { nextTick } from 'vue';
 import SAPHana from './SAPHana.vue';
 import CopyContent from '@/components/CopyContent.vue';
 

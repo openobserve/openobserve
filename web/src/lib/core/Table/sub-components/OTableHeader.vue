@@ -3,7 +3,7 @@
 <script setup lang="ts">
 import type { HeaderGroup, Table } from "@tanstack/vue-table";
 import { FlexRender } from "@tanstack/vue-table";
-import { computed, inject, ref } from "vue";
+import { inject } from "vue";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -51,8 +51,6 @@ function startResize(header: any, event: MouseEvent | TouchEvent) {
   emit("resize-start");
   header.getResizeHandler()?.(event);
 }
-
-const drag = ref(false);
 
 const horizontalScroll = inject<{ value: boolean } | null>(
   "o2TableHorizontalScroll",
@@ -145,8 +143,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
     >
       <!-- Row-field column headers: first row only, rowspan all levels -->
       <th
-        v-if="levelIdx === 0"
-        v-for="col in pivotRowColumns"
+        v-for="col in levelIdx === 0 ? pivotRowColumns : []"
         :key="'pivot-rh-' + col.id"
         :rowspan="pivotHeaderLevels.length"
         :data-test="`o2-table-pivot-th-${col.id}`"

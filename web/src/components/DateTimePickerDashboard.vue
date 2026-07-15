@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { ref, defineComponent, reactive, watch, computed, onUnmounted, type PropType } from "vue";
+import { ref, defineComponent, onUnmounted, type PropType } from "vue";
 import DateTime from "@/components/DateTime.vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 

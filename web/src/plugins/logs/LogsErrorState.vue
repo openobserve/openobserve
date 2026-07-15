@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import QueryErrorState from "@/components/common/QueryErrorState.vue";
 
-const props = defineProps<{
+defineProps<{
   errorCode: number;
   errorMsg: string;
   errorDetail?: string;

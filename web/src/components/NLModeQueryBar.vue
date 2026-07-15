@@ -386,7 +386,7 @@ const handleGenerationEnd = () => {
   isGenerating.value = false;
 };
 
-const handleGenerationSuccess = ({ type, message }: any) => {
+const handleGenerationSuccess = ({ type }: any) => {
 
   // Show success message in AI status
   aiStatusText.value = '✓ ' + t('search.queryGeneratedSuccess');

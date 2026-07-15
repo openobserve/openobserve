@@ -186,7 +186,7 @@ export default createStore({
     setOrganizationPasscodeUser(state, payload) {
       state.organizationData.organizationPasscodeUser = payload;
     },
-    resetOrganizationData(state, payload) {
+    resetOrganizationData(state) {
       state.organizationData = JSON.parse(JSON.stringify(organizationObj));
     },
     setRUMToken(state, payload) {

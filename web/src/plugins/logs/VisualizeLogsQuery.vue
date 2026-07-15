@@ -136,7 +136,6 @@ export default defineComponent({
     const {
       visualizeChartData,
       is_ui_histogram,
-      shouldRefreshWithoutCache,
     }: any = toRefs(props);
     const chartData = ref(visualizeChartData.value);
 
@@ -309,8 +308,6 @@ export default defineComponent({
       showAddToDashboardDialog,
       addPanelToDashboard,
       addToDashboard,
-      is_ui_histogram,
-      shouldRefreshWithoutCache,
       hoveredSeriesState,
       resultMetaData,
       isSimpleSelectAllQuery,

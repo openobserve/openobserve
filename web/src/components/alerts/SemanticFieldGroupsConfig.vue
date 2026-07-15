@@ -269,14 +269,6 @@ const filteredGroups = computed(() => {
   );
 });
 
-// Group ID options for fingerprint selection
-const groupIdOptions = computed(() => {
-  return localGroups.value.map((group) => ({
-    label: group.display,
-    value: group.id,
-  }));
-});
-
 // Generate a short unique ID for new groups using first 8 chars of UUID
 const generateShortId = (): string => {
   return uuidv4().substring(0, 8);

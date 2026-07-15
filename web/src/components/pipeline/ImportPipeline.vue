@@ -384,8 +384,6 @@ import BaseImport from "../common/BaseImport.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import {
   detectConditionsVersion,
   convertV0ToV2,
@@ -542,7 +540,7 @@ export default defineComponent({
           }
         });
         baseImportRef.value.jsonArrayOfObj[index].edges.forEach((edge: any) => {
-          if (edge.hasOwnProperty("sourceNode")) {
+          if (Object.prototype.hasOwnProperty.call(edge, "sourceNode")) {
             edge.sourceNode.data.stream_name = stream_name;
           }
         });
@@ -663,7 +661,7 @@ export default defineComponent({
       });
     };
 
-    const importJson = async ({ jsonStr: jsonString, jsonArray }: any) => {
+    const importJson = async ({ jsonStr: jsonString }: any) => {
       pipelineErrorsToDisplay.value = [];
       pipelineCreators.value = [];
 
@@ -1041,14 +1039,7 @@ export default defineComponent({
         input.source.source_type == "scheduled" ||
         input.source.source_type == "realtime"
       ) {
-        const validationPromises = input.nodes.map(async (node: any) => {
-          const validDestinationStreamTypes = [
-            "logs",
-            "metrics",
-            "traces",
-            "enrichment_tables",
-          ];
-        });
+        const validationPromises = input.nodes.map(async () => {});
         // Wait for all validation to complete
         await Promise.all(validationPromises);
       }
@@ -1272,7 +1263,6 @@ export default defineComponent({
     const getSourceStreamsList = async (
       streamType: string,
       index: number,
-      isInput: boolean = false,
     ) => {
       //update the stream type if user selects a different stream type
       if (index != -1 && baseImportRef.value?.jsonArrayOfObj[index]) {
@@ -1318,7 +1308,6 @@ export default defineComponent({
     const getDestinationStreamsList = async (
       streamType: string,
       index: number,
-      isInput: boolean = false,
     ) => {
       //update the stream type if user selects a different stream type
       if (index != -1 && baseImportRef.value?.jsonArrayOfObj[index]) {
@@ -1348,7 +1337,6 @@ export default defineComponent({
     const getOutputStreamsList = async (
       streamType: string,
       index: number,
-      isInput: boolean = false,
     ) => {
       //update the stream type if user selects a different stream type
       if (index != -1 && baseImportRef.value?.jsonArrayOfObj[index]) {

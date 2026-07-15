@@ -57,12 +57,6 @@ const dotSize: Record<"xs" | "sm" | "md", string> = {
   md: "size-2",
 };
 
-const labelSize: Record<"xs" | "sm" | "md", string> = {
-  xs: "text-xs",
-  sm: "text-xs",
-  md: "text-sm",
-};
-
 const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
 </script>
 

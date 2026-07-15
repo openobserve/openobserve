@@ -520,7 +520,6 @@ import config from "@/aws-exports";
 import configService from "@/services/config";
 import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
-import store from "@/test/unit/helpers/store";
 import { applyThemeColors } from "@/utils/theme";
 import { useLocalOrganization } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1151,11 +1150,6 @@ export default defineComponent({
           loadingState.value = false;
         });
     };
-
-    interface CounterLabelParams {
-      totalSize: string;
-      filesNumber: number;
-    }
 
     /**
      * When navigating away from General Settings without saving, clear temp preview

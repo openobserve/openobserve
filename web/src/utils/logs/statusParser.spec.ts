@@ -19,7 +19,6 @@ import {
   STATUS_COLORS_DARK,
   extractStatusFromLog,
   extractStatusFromTemplate,
-  type StatusInfo,
 } from "./statusParser";
 
 describe("statusParser.ts", () => {

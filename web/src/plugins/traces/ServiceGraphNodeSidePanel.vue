@@ -1211,45 +1211,6 @@ export default defineComponent({
       },
     );
 
-    // Extract semantic dimensions from a span for richer metric correlation
-    const extractSpanDimensions = (
-      span: Record<string, any>,
-    ): Record<string, string> => {
-      const dimensions: Record<string, string> = {};
-      if (span.service_name) dimensions["service"] = span.service_name;
-
-      const attributeMappings: Record<string, string> = {
-        k8s_namespace_name: "k8s-namespace",
-        "k8s.namespace.name": "k8s-namespace",
-        k8s_deployment_name: "k8s-deployment",
-        "k8s.deployment.name": "k8s-deployment",
-        k8s_pod_name: "k8s-pod",
-        "k8s.pod.name": "k8s-pod",
-        k8s_container_name: "k8s-container",
-        "k8s.container.name": "k8s-container",
-        k8s_node_name: "k8s-node",
-        "k8s.node.name": "k8s-node",
-        k8s_cluster_name: "k8s-cluster",
-        "k8s.cluster.name": "k8s-cluster",
-        host_name: "host-name",
-        "host.name": "host-name",
-        cloud_region: "cloud-region",
-        "cloud.region": "cloud-region",
-        cloud_availability_zone: "cloud-availability-zone",
-        "cloud.availability_zone": "cloud-availability-zone",
-        container_name: "container-name",
-        "container.name": "container-name",
-      };
-
-      for (const [attr, dim] of Object.entries(attributeMappings)) {
-        let service_attr = "service_" + attr;
-        if (span[service_attr] && !dimensions[dim]) {
-          dimensions[dim] = String(span[service_attr]);
-        }
-      }
-      return dimensions;
-    };
-
     // Fetch the most recent span for this service to extract rich semantic dimensions
     const fetchLatestSpan = async (): Promise<Record<string, any> | null> => {
       const serviceName = buildServiceName();

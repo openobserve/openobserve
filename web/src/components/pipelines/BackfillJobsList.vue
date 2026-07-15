@@ -314,7 +314,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { formatDate } from "@/utils/date";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -382,7 +381,6 @@ const columns: OTableColumnDef[] = [
 ];
 
 const allStatusOptions = ["running", "completed", "paused", "failed"];
-const statusOptions = ref<string[]>([...allStatusOptions]);
 const pipelineOptions = ref<any[]>([]);
 const allPipelineOptions = ref<any[]>([]);
 
@@ -425,24 +423,6 @@ const loadPipelineOptions = () => {
 
   allPipelineOptions.value = uniquePipelines;
   pipelineOptions.value = uniquePipelines;
-};
-
-const filterPipelines = (val: string, update: any) => {
-  update(() => {
-    const needle = val.toLowerCase();
-    pipelineOptions.value = allPipelineOptions.value.filter(
-      (v) => v.label.toLowerCase().indexOf(needle) > -1,
-    );
-  });
-};
-
-const filterStatuses = (val: string, update: any) => {
-  update(() => {
-    const needle = val.toLowerCase();
-    statusOptions.value = allStatusOptions.filter(
-      (v) => v.toLowerCase().indexOf(needle) > -1,
-    );
-  });
 };
 
 const filteredJobs = computed(() => {
@@ -643,13 +623,6 @@ const closeErrorDialog = () => {
 };
 
 // Helper functions
-const getProgressColor = (deletionStatus?: any) => {
-  if (deletionStatus && ["pending", "in_progress"].includes(deletionStatus)) {
-    return "blue";
-  }
-  return "positive";
-};
-
 const formatTimeRange = (startTime: number, endTime: number) => {
   const userTimezone =
     store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -667,12 +640,5 @@ const formatTimeRange = (startTime: number, endTime: number) => {
   return `${start} - ${end}`;
 };
 
-const formatTimestamp = (timestamp?: number) => {
-  if (!timestamp) return "N/A";
-  const unixSeconds = timestamp / 1e6; // Convert from microseconds to seconds
-  const dateToFormat = new Date(unixSeconds * 1000);
-  const formattedDate = dateToFormat.toISOString();
-  return formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
-};
 </script>
 

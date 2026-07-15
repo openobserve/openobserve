@@ -186,7 +186,6 @@ describe("SkeletonBox", () => {
       },
     });
 
-    const element = wrapper.element as HTMLElement;
     // Since width/height are not explicitly provided, it should use computed defaults
     expect(wrapper.props("variant")).toBe("text");
   });

@@ -140,7 +140,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                     <div v-if="filesImportResults.length" class="py-2" data-test="dashboard-import-file-results">
-                      <div v-for="importResult in filesImportResults">
+                      <div
+                        v-for="(importResult, importIndex) in filesImportResults"
+                        :key="importIndex"
+                      >
                         <span
                           v-if="importResult.status == 'rejected'"
                           class="text-red"
@@ -268,11 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   defineComponent,
   ref,
-  computed,
   onMounted,
-  onActivated,
-  onDeactivated,
-  onUnmounted,
   reactive,
   watch,
 } from "vue";
@@ -290,7 +289,6 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -307,7 +305,6 @@ import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
 );
-import stream from "@/services/stream.js";
 export default defineComponent({
   name: "Import Dashboard",
   props: ["dashboardId"],
@@ -525,67 +522,64 @@ export default defineComponent({
         return;
       }
 
-      const data = jsonStr.value.map((parsedContent, fileIndex) => {
-        return new Promise(async (resolve, reject) => {
-          const fileName =
-            jsonFiles.value[fileIndex]?.name || `File ${fileIndex + 1}`;
+      const data = jsonStr.value.map(async (parsedContent, fileIndex) => {
+        const fileName =
+          jsonFiles.value[fileIndex]?.name || `File ${fileIndex + 1}`;
 
-          try {
-            //this is done because if the user uploads a single dashboard, it will be an object and if the user uploads multiple dashboards, it will be an array of objects
-            //to support both the cases, we are using this condition\
-            //Example: if user uploads a single object file it will be converted to an array and if user uploads a array of objects it is already an array so we dont do anything
-            const dashboards = Array.isArray(parsedContent)
-              ? parsedContent
-              : [parsedContent];
+        let results;
+        try {
+          //this is done because if the user uploads a single dashboard, it will be an object and if the user uploads multiple dashboards, it will be an array of objects
+          //to support both the cases, we are using this condition\
+          //Example: if user uploads a single object file it will be converted to an array and if user uploads a array of objects it is already an array so we dont do anything
+          const dashboards = Array.isArray(parsedContent)
+            ? parsedContent
+            : [parsedContent];
 
-            const results = [];
+          results = [];
 
-            for (let i = 0; i < dashboards.length; i++) {
-              const dashboard = dashboards[i];
-              //this is the core logic to convert the dashboard schema version
-              //it will convert the dashboard schema version to the latest version
+          for (let i = 0; i < dashboards.length; i++) {
+            const dashboard = dashboards[i];
+            //this is the core logic to convert the dashboard schema version
+            //it will convert the dashboard schema version to the latest version
 
-              try {
-                const convertedSchema =
-                  convertDashboardSchemaVersion(dashboard);
+            try {
+              const convertedSchema = convertDashboardSchemaVersion(dashboard);
 
-                // Validate the converted schema before importing
-                const validationErrors = validateDashboardJson(convertedSchema);
-                if (validationErrors.length > 0) {
-                  const errorMessage = validationErrors.join("; ");
-                  results.push({
-                    index: i + 1,
-                    error: new Error(errorMessage),
-                  });
-                  continue;
-                }
-
-                const res = await importDashboardFromJSON(
-                  convertedSchema,
-                  selectedFolder.value,
-                );
-                results.push({ index: i + 1, result: res });
-              } catch (e) {
-                results.push({ index: i + 1, error: e });
+              // Validate the converted schema before importing
+              const validationErrors = validateDashboardJson(convertedSchema);
+              if (validationErrors.length > 0) {
+                const errorMessage = validationErrors.join("; ");
+                results.push({
+                  index: i + 1,
+                  error: new Error(errorMessage),
+                });
+                continue;
               }
-            }
 
-            const failedMessages = results
-              .filter((r) => r.error)
-              .map((r) => `${r.error?.message || r.error}`);
-
-            if (failedMessages.length) {
-              reject({
-                file: `JSON ${fileIndex + 1}`,
-                error: failedMessages.join("; "),
-              });
-            } else {
-              resolve({ file: fileName, results });
+              const res = await importDashboardFromJSON(
+                convertedSchema,
+                selectedFolder.value,
+              );
+              results.push({ index: i + 1, result: res });
+            } catch (e) {
+              results.push({ index: i + 1, error: e });
             }
-          } catch (e) {
-            reject({ file: fileName, error: "Error processing file" });
           }
-        });
+        } catch (e) {
+          throw { file: fileName, error: "Error processing file" };
+        }
+
+        const failedMessages = results
+          .filter((r) => r.error)
+          .map((r) => `${r.error?.message || r.error}`);
+
+        if (failedMessages.length) {
+          throw {
+            file: `JSON ${fileIndex + 1}`,
+            error: failedMessages.join("; "),
+          };
+        }
+        return { file: fileName, results };
       });
 
       Promise.allSettled(data).then(async (results) => {
@@ -727,7 +721,7 @@ export default defineComponent({
         await importDashboardFromJSON(
           convertedSchema,
           selectedFolder.value,
-        ).then((res) => {
+        ).then(() => {
           resetAndRefresh(ImportType.JSON_STRING, selectedFolder.value);
           filesImportResults.value = [];
           jsonStr.value = "";
@@ -884,7 +878,7 @@ export default defineComponent({
   },
   components: { OSeparator, SelectFolderDropdown, AppTabs, AppPageHeader, QueryEditor, OButton, OInput, OSelect,
     OForm, OFormInput, OFormFile,
-    OIcon, OSplitter,
+    OSplitter,
 },
 });
 </script>

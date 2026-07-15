@@ -36,13 +36,7 @@ function normalizeValue(value: any, minValue: any, maxValue: any) {
 export class GeoConverter implements PromQLChartConverter {
   supportedTypes = ["geomap"];
 
-  convert(
-    processedData: ProcessedPromQLData[],
-    panelSchema: any,
-    store: any,
-    extras: any,
-    chartPanelRef?: any,
-  ) {
+  convert(processedData: ProcessedPromQLData[], panelSchema: any) {
     const config: GeoMapConfig & Record<string, any> = panelSchema.config || {};
     const aggregation = config.aggregation || "last";
 
@@ -53,8 +47,8 @@ export class GeoConverter implements PromQLChartConverter {
 
     const geoData: any[] = [];
     const errors: string[] = [];
-    processedData.forEach((queryData, qIndex) => {
-      queryData.series.forEach((seriesData, sIndex) => {
+    processedData.forEach((queryData) => {
+      queryData.series.forEach((seriesData) => {
         const lat = seriesData.metric[latLabel];
         const lon = seriesData.metric[lonLabel];
 

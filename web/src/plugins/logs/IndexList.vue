@@ -270,8 +270,6 @@ import {
   type Ref,
   watch,
   computed,
-  onBeforeMount,
-  onBeforeUnmount,
   nextTick,
   defineAsyncComponent,
 } from "vue";
@@ -286,12 +284,8 @@ import {
   formatLargeNumber,
   useLocalInterestingFields,
   generateTraceContext,
-  isStreamingEnabled,
   addSpacesToOperators,
 } from "../../utils/zincutils";
-import streamService from "../../services/stream";
-import EqualIcon from "@/components/icons/EqualIcon.vue";
-import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
@@ -302,7 +296,6 @@ import {
   removeFieldFromWhereAST,
 } from "@/composables/useLogs/logsUtils";
 import { useSearchBar } from "@/composables/useLogs/useSearchBar";
-import { applyCollapseFilter } from "@/utils/fieldCategories";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
@@ -310,7 +303,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { captureFromValuesApi } from "@/composables/useFieldValueStore";
@@ -318,11 +310,6 @@ import { saveLogsStreamType, saveLogsStream } from "@/utils/streamPersist";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-interface Filter {
-  fieldName: string;
-  selectedValues: string[];
-  selectedOperator: string;
-}
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
   props: {
@@ -332,8 +319,6 @@ export default defineComponent({
     },
   },
   components: {
-    EqualIcon,
-    NotEqualIcon,
     GroupedFieldList: defineAsyncComponent(
       () => import("@/components/common/GroupedFieldList.vue"),
     ),
@@ -343,9 +328,6 @@ export default defineComponent({
     FieldExpansion: defineAsyncComponent(
       () => import("@/components/common/FieldExpansion.vue"),
     ),
-    FieldListPagination: defineAsyncComponent(
-      () => import("@/components/common/FieldListPagination.vue"),
-    ),
     GroupedFieldListPagination: defineAsyncComponent(
       () => import("@/components/common/FieldListPagination.vue"),
     ),
@@ -353,7 +335,7 @@ export default defineComponent({
     OSelect,
     OIcon,
     OTooltip,
-    OSpinner,
+    OSkeleton,
     OEmptyState,
   },
   emits: ["setInterestingFieldInSQLQuery"],
@@ -402,8 +384,7 @@ export default defineComponent({
     const { fnParsedSQL, fnUnparsedSQL, updatedLocalLogFilterField } =
       logsUtils();
 
-    const { fetchQueryDataWithWebSocket, sendSearchMessageBasedOnRequestId } =
-      useSearchWebSocket();
+    const { sendSearchMessageBasedOnRequestId } = useSearchWebSocket();
 
     const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
       useHttpStreaming();
@@ -785,7 +766,7 @@ export default defineComponent({
         showUserDefinedSchemaToggle.value,
         searchObj.meta.useUserDefinedSchemas,
       ],
-      (isActive) => {
+      () => {
         showOnlyInterestingFields.value =
           searchObj.meta.useUserDefinedSchemas === "interesting_fields";
       },
@@ -983,7 +964,7 @@ export default defineComponent({
 
     const openFilterCreator = async (
       event: any,
-      { name, ftsKey, isSchemaField, streams }: any,
+      { name, ftsKey, streams }: any,
     ) => {
       if (ftsKey && !showFtsFieldValues.value) {
         event.stopPropagation();
@@ -1118,14 +1099,6 @@ export default defineComponent({
           query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
         }
 
-        let action_id = "";
-        if (
-          searchObj.data.transformType === "action" &&
-          searchObj.data.selectedTransform?.id
-        ) {
-          action_id = searchObj.data.selectedTransform.id;
-        }
-
         resetFieldValues(name, true);
 
         if (whereClause.trim() != "") {
@@ -1147,7 +1120,6 @@ export default defineComponent({
           }
         }
 
-        let countTotal = streams.length;
         for (const selectedStream of streams) {
           if (streams.length > 1) {
             query_context = "select * from [INDEX_NAME]";
@@ -1564,11 +1536,6 @@ export default defineComponent({
     };
 
     const addInterestingFieldToSelectedStreamFields = (field: any) => {
-      const defaultFields = [
-        store.state.zoConfig?.timestamp_column,
-        store.state.zoConfig?.all_fields_name,
-      ];
-
       let expandKeys = Object.keys(searchObj.data.stream.expandGroupRows);
 
       let index = 0;
@@ -1646,7 +1613,10 @@ export default defineComponent({
       return searchObj.data.stream.selectedStream.some((stream: any) => {
         store.state.zoConfig.user_defined_schemas_enabled &&
           searchObj.meta.useUserDefinedSchemas == "user_defined_schema" &&
-          stream.settings.hasOwnProperty("defined_schema_fields") &&
+          Object.prototype.hasOwnProperty.call(
+            stream.settings,
+            "defined_schema_fields",
+          ) &&
           (stream.settings?.defined_schema_fields?.slice() || []) > 0;
       });
     };
@@ -1755,7 +1725,7 @@ export default defineComponent({
       removeTraceId(payload.queryReq.fields[0], payload.traceId);
     };
 
-    const handleSearchError = (request: any, err: any) => {
+    const handleSearchError = (request: any, _extra?: unknown) => {
       if (fieldValues.value[request.queryReq?.fields[0]]) {
         fieldValues.value[request.queryReq.fields[0]].isLoading = false;
         fieldValues.value[request.queryReq.fields[0]].errMsg =

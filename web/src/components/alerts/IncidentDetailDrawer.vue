@@ -1121,7 +1121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import { defineComponent, ref, watch, computed, PropType, nextTick, onMounted, onBeforeUnmount, onUnmounted } from "vue";
+import { defineComponent, ref, watch, computed, nextTick, onMounted, onBeforeUnmount, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -1137,7 +1137,6 @@ import serviceStreamsApi, {
   buildChipDimensionsFromFilters,
   type CorrelationResponse,
 } from "@/services/service_streams";
-import { getImageURL } from "@/utils/zincutils";
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
@@ -2616,7 +2615,7 @@ export default defineComponent({
       // Configure marked with custom renderer using marked.use() extension API
       marked.use({
         renderer: {
-          heading({ tokens, depth, text }: any) {
+          heading({ tokens, depth }: any) {
             // Parse inline tokens to get the heading text
             const parsedText = this.parser.parseInline(tokens);
 

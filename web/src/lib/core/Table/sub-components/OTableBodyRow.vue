@@ -14,7 +14,6 @@ import {
   ref,
   onMounted,
   onBeforeUnmount,
-  watch,
   useSlots,
 } from "vue";
 import OTableBodyCell from "./OTableBodyCell.vue";

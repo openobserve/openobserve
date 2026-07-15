@@ -34,7 +34,6 @@ export class GaugeConverter implements PromQLChartConverter {
     panelSchema: any,
     store: any,
     extras: any,
-    chartPanelRef?: any,
   ) {
     const config = panelSchema.config || {};
     const series: any[] = [];

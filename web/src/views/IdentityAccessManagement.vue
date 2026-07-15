@@ -55,9 +55,6 @@ const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization?.identifier,
 }));
 
-const isHub = computed(() => route.name === "iam");
-const hubRoute = computed(() => ({ name: "iam", query: orgQuery.value }));
-
 // Route name → section key (drill-down editors map back to their section).
 const routeToIamTab: Record<string, string> = {
   users: "users",

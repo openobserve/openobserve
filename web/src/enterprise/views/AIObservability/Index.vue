@@ -160,5 +160,5 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
 
 // Reserved for future per-section header chrome wiring (mirrors Settings'
 // activeSectionItem use). Keeping the reference live for clarity.
-void activeSectionItem;
+void activeSectionItem.value;
 </script>

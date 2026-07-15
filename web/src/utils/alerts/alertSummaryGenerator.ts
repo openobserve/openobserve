@@ -19,7 +19,7 @@ export interface SummarySegment {
  * @param previewQuery - The formatted preview query string
  * @param generatedSqlQuery - The generated SQL query for custom conditions (computed property)
  */
-export function generateAlertSummary(formData: any, destinations: any[], t?: (key: string) => string, wizardStep: number = 6, previewQuery: string = '', generatedSqlQuery: string = ''): string {
+export function generateAlertSummary(formData: any, destinations: any[], t?: (key: string) => string, _wizardStep: number = 6, previewQuery: string = '', generatedSqlQuery: string = ''): string {
   // Generate summary based on available data
   if (!formData) {
     return '';
@@ -164,7 +164,7 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
   const bulletPoints = parts.join('\n');
 
   // Add plain English summary first (show from step 1 onwards for better UX)
-  const plainEnglish = generatePlainEnglishSummary(formData, destinations, isRealTime, translate, wizardStep);
+  const plainEnglish = generatePlainEnglishSummary(formData, destinations, isRealTime, translate);
   if (plainEnglish) {
     // Return plain English first, then bullet points (with single line break for tighter spacing)
     return `<div class="plain-english-section">"${esc(plainEnglish)}"</div>\n${bulletPoints}`;
@@ -293,7 +293,7 @@ function getSilenceText(silence: number, t: (key: string) => string): string {
 /**
  * Generate a plain English summary of the alert
  */
-function generatePlainEnglishSummary(formData: any, destinations: any[], isRealTime: boolean, t: (key: string) => string, wizardStep: number = 6): string {
+function generatePlainEnglishSummary(formData: any, destinations: any[], isRealTime: boolean, t: (key: string) => string): string {
   if (!formData || !formData.stream_name) return '';
 
   const parts: string[] = [];

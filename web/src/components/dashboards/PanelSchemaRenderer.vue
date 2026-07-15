@@ -367,7 +367,6 @@ const AlertContextMenu = defineAsyncComponent(() => {
 });
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
@@ -390,7 +389,6 @@ export default defineComponent({
     LoadingProgress,
     OButton,
     OIcon,
-    OTooltip,
     OEmptyState,
   },
   props: {
@@ -705,7 +703,6 @@ export default defineComponent({
       searchResponse,
       is_ui_histogram,
       shouldRefreshWithoutCache,
-      showLegendsButton,
       regionClusterParams,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
@@ -950,7 +947,6 @@ export default defineComponent({
     onMounted(async () => {
       // fetch all panels
       await fetchAllPanels();
-      panelsList.value = panelsList.value;
     });
 
     // When switching of tab was done, reset the loading state of the panels in variablesAndPanelsDataLoadingState
@@ -1716,10 +1712,6 @@ export default defineComponent({
         };
       },
       logDataAsJSON: (title: string) => {
-        const chartData =
-          panelSchema.value?.queryType === "promql"
-            ? filteredData.value
-            : data.value;
         console.group(`[oo] ${title ?? panelSchema.value?.title ?? "panel"}`);
         console.groupEnd();
       },

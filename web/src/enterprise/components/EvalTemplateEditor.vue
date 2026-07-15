@@ -199,21 +199,6 @@ const defaultDimensionOptions = [
   "toxicity",
 ];
 
-const filteredDimensionOptions = ref<string[]>(defaultDimensionOptions);
-
-const filterDimensions = (val: string, update: (fn: () => void) => void) => {
-  update(() => {
-    if (!val) {
-      filteredDimensionOptions.value = defaultDimensionOptions;
-    } else {
-      const needle = val.toLowerCase();
-      filteredDimensionOptions.value = defaultDimensionOptions.filter((d) =>
-        d.includes(needle),
-      );
-    }
-  });
-};
-
 const responseTypes = [
   { label: t("evalTemplate.typeScore"), value: "score" },
   { label: t("evalTemplate.typeBoolean"), value: "boolean" },

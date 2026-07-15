@@ -168,7 +168,7 @@ describe('OtelConfig.vue', () => {
       
       // Access the computed property to trigger the function call
       const vm = wrapper.vm
-      const accessKey = vm.accessKey
+      vm.accessKey
       
       // Verify that b64EncodeStandard is called with correct parameters
       expect(mockB64EncodeStandard).toHaveBeenCalledWith(
@@ -251,7 +251,7 @@ describe('OtelConfig.vue', () => {
       
       // Access the computed property to trigger the function call
       const vm = wrapper.vm
-      const accessKey = vm.accessKey
+      vm.accessKey
       
       expect(mockB64EncodeStandard).toHaveBeenCalledWith(
         'new-user@example.com:'
@@ -270,7 +270,7 @@ describe('OtelConfig.vue', () => {
       
       // Access the computed property to trigger recalculation
       const vm = wrapper.vm
-      const accessKey = vm.accessKey
+      vm.accessKey
       
       // Verify that b64EncodeStandard is called with the updated passcode
       expect(mockB64EncodeStandard).toHaveBeenCalledWith(
@@ -284,7 +284,7 @@ describe('OtelConfig.vue', () => {
       
       // Access the computed property to trigger the function call
       const vm = wrapper.vm
-      const accessKey = vm.accessKey
+      vm.accessKey
       
       expect(mockB64EncodeStandard).toHaveBeenCalledWith('test@example.com:')
     })
@@ -467,7 +467,7 @@ service:
       
       // Access the computed property to trigger the function call
       const vm = wrapper.vm
-      const accessKey = vm.accessKey
+      vm.accessKey
       
       expect(mockB64EncodeStandard).toHaveBeenCalledWith('updated@example.com:')
     })
@@ -489,7 +489,7 @@ service:
       
       // Access the computed property to trigger the function call
       const vm = wrapper.vm
-      const accessKey = vm.accessKey
+      vm.accessKey
       
       expect(mockB64EncodeStandard).toHaveBeenCalledWith('null:')
     })
@@ -509,7 +509,7 @@ service:
       
       // Access the computed property to trigger the function call
       const vm = wrapper.vm
-      const accessKey = vm.accessKey
+      vm.accessKey
       
       expect(mockB64EncodeStandard).toHaveBeenCalledWith('user+test@example-domain.com:')
     })

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mount, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
@@ -204,7 +204,7 @@ describe("Condition Component", () => {
     });
 
     it("clears userSelectedNode on mount", async () => {
-      const wrapper = createWrapper();
+      createWrapper();
       await flushPromises();
       expect(mockPipelineObj.userSelectedNode).toEqual({});
     });
@@ -678,8 +678,7 @@ describe("Condition Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       const opts = ["timestamp", "message", "level"];
-      let captured = [];
-      const update = (cb) => { captured = []; cb(); };
+      const update = (cb) => { cb(); };
       wrapper.vm.filterColumns(opts, "", update);
       // called without error – update was called
       expect(update).toBeDefined();
@@ -689,7 +688,6 @@ describe("Condition Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       const opts = ["timestamp", "message", "level"];
-      let result = [];
       const update = (cb) => { cb(); };
       // call manually to test logic
       wrapper.vm.filterColumns(opts, "MESS", update);

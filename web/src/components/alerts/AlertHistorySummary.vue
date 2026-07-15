@@ -80,7 +80,6 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import alertsService from "@/services/alerts";
-import { formatToReadable } from "@/utils/date";
 
 const { t } = useI18n();
 const store = useStore();
@@ -152,32 +151,6 @@ const columns: OTableColumnDef[] = [
   },
 ];
 
-const getStateIcon = (state: string) => {
-  switch (state.toLowerCase()) {
-    case "firing":
-    case "error":
-      return "error";
-    case "ok":
-    case "completed":
-      return "check-circle";
-    default:
-      return "info";
-  }
-};
-
-const getStateColorClass = (state: string) => {
-  switch (state.toLowerCase()) {
-    case "firing":
-    case "error":
-      return "text-[var(--o2-negative)]";
-    case "ok":
-    case "completed":
-      return "text-[var(--o2-positive)]";
-    default:
-      return "text-gray-500";
-  }
-};
-
 const formatFrequency = (seconds: number | null) => {
   if (!seconds) return "N/A";
   if (seconds < 60) return `${seconds}s`;
@@ -185,11 +158,6 @@ const formatFrequency = (seconds: number | null) => {
   if (minutes < 60) return `${minutes}m`;
   const hours = Math.floor(minutes / 60);
   return `${hours}h`;
-};
-
-const formatTimestamp = (timestamp: number) => {
-  if (!timestamp) return "N/A";
-  return formatToReadable(timestamp);
 };
 
 const fetchHistorySummary = async () => {

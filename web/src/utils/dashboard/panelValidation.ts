@@ -906,7 +906,7 @@ export const validatePanel = (
   panelData: any,
   errors: string[] = [],
   isFieldsValidationRequired: boolean = true,
-  allStreamFields: any[] = [],
+  _allStreamFields: any[] = [],
   pageKey: string = "dashboard",
   store: any,
   checkTimestampAlias: any,
@@ -925,7 +925,7 @@ export const validatePanel = (
     const timestampColumn =
       store.state.zoConfig.timestamp_column || "_timestamp";
 
-    panelData?.data?.queries?.forEach((queryObj: any, index: number) => {
+    panelData?.data?.queries?.forEach((queryObj: any) => {
       if (queryObj?.query && queryObj?.customQuery) {
         if (!checkTimestampAlias(queryObj.query)) {
           errors.push(
@@ -1084,7 +1084,7 @@ export const validateDashboardJson = (dashboardJson: any): string[] => {
 
   // Check for unique tab IDs
   const tabIds = new Set<string>();
-  for (const tab of dashboardJson?.tabs) {
+  for (const tab of dashboardJson?.tabs ?? []) {
     if (!tab?.tabId) {
       errors.push("Each tab must have a tabId");
     } else if (tabIds.has(tab?.tabId)) {

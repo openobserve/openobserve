@@ -153,7 +153,6 @@
     import OIcon from '@/lib/core/Icon/OIcon.vue';
     import { useI18n } from 'vue-i18n';
     import { getUUID } from '@/utils/zincutils';
-    import ConfirmDialog from '@/components/ConfirmDialog.vue';
     import { buildConditionsString } from '@/utils/alerts/conditionsFormatter';
     const props = defineProps({
     group: {
@@ -221,7 +220,6 @@
   
   const isOpen = ref(true);
   const groups = ref(props.group);
-  const showPreview = ref(true);
 
   const store = useStore();
   const { t } = useI18n();
@@ -267,7 +265,7 @@
     return false;
   }
   
-  const addCondition = (groupId: string) => {
+  const addCondition = (_groupId?: string) => {
     // V2: Create condition with filterType and logicalOperator
     const newCondition = {
       filterType: 'condition',
@@ -282,7 +280,7 @@
     emit('add-condition', groups.value);
   };
   
-  const addGroup = (groupId: string) => {
+  const addGroup = (_groupId?: string) => {
     // V2: Create group with filterType, logicalOperator, and conditions array
     const newGroup = {
       filterType: 'group',

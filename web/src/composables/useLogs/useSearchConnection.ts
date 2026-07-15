@@ -40,10 +40,9 @@ export const useSearchConnection = () => {
   } = logsUtils();
   const store = useStore();
   const { searchObj, notificationMsg, searchPartitionMap } = searchState();
-  const { resetHistogramWithError } = useHistogram();
+  useHistogram();
 
   const {
-    fetchQueryDataWithWebSocket,
     sendSearchMessageBasedOnRequestId,
     closeSocketBasedOnRequestId,
   } = useSearchWebSocket();

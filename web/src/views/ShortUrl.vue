@@ -10,7 +10,7 @@
 
 <script lang="ts">
 import { defineComponent, onMounted } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 import shortURL from "@/services/short_url";
 import { useStore } from "vuex";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -24,8 +24,7 @@ export default defineComponent({
       required: true,
     },
   },
-  setup(props, { emit }) {
-    const route = useRoute();
+  setup(props) {
     const router = useRouter();
     const store = useStore();
 

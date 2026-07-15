@@ -127,7 +127,6 @@ import {
   type PropType,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import config from "../../aws-exports";
 import { getImageURL } from "@/utils/zincutils";
@@ -140,10 +139,6 @@ import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { toggleFullscreen } from "@/utils/dom";
 const { t } = useI18n();
-
-
-
-const router = useRouter();
 
 const store = useStore();
 
@@ -171,8 +166,6 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["test", "save", "update:name", "back", "cancel", "open:chat", "update:transType"]);
-
-const addFunctionForm = ref(null);
 
 const showInputError = ref(false);
 
@@ -210,7 +203,6 @@ const selectedTransType = computed({
   set: (value) => emit("update:transType", value),
 });
 
-const isAddFunctionComponent = computed(() => router.currentRoute.value.path.includes('functions'))
 const handleFullScreen = () => {
   toggleFullscreen();
 };

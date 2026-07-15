@@ -100,7 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
 import type { PropType } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -114,7 +113,7 @@ interface AlertVariable {
   value: string;
 }
 
-const props = defineProps({
+defineProps({
   variables: {
     type: Array as PropType<AlertVariable[]>,
     required: true,
@@ -122,8 +121,6 @@ const props = defineProps({
 });
 
 const emits = defineEmits(["add:variable", "remove:variable"]);
-
-const store = useStore();
 
 const { t } = useI18n();
 

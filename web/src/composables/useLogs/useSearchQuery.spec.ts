@@ -90,7 +90,7 @@ const {
   return {
     mockSemanticGroups: { value: [] as any[] },
     fnParsedSQLMock: vi.fn(() => ({})),
-    fnUnparsedSQLMock: vi.fn((_p: any) => 'select * from "t"'),
+    fnUnparsedSQLMock: vi.fn(() => 'select * from "t"'),
     RESERVED_KEYWORD,
     quoteSqlIdentifierIfNeededMock: vi.fn((identifier: string) =>
       identifier === RESERVED_KEYWORD ? `"${identifier}"` : identifier,

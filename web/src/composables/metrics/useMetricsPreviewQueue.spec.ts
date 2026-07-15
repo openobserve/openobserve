@@ -20,7 +20,7 @@ import {
   PREVIEW_CACHE_SIZE,
   PRIORITY,
 } from "./useMetricsPreviewQueue";
-import { hasSamples, isAllNaN } from "./useMetricsExplorerGrid";
+import { isAllNaN } from "./useMetricsExplorerGrid";
 
 /** Asserts a promise rejects with a cancellation, whatever its concrete shape. */
 async function expectCancelled(promise: Promise<any>) {

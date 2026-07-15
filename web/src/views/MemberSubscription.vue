@@ -88,12 +88,12 @@ export default defineComponent({
         .process_subscription(s, action, invited_org_id)
         .then((res) => {
           this.status = "completed";
-          const dismiss = toast({
+          toast({
             variant: "success",
             message: res.data.message,
           });
 
-          if (res.data.hasOwnProperty("data")) {
+          if (Object.prototype.hasOwnProperty.call(res.data, "data")) {
             res.data.data.label = res.data.data.name;
             useLocalOrganization(res.data.data);
 

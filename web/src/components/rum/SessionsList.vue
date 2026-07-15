@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="rum-sessions-list-table"
           @row-click="handleRowClick"
         >
-          <template #cell-action_play="{ row }">
+          <template #cell-action_play>
             <OIcon
               name="play-circle-filled"
               size="md"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed } from "vue";
+import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -62,15 +62,6 @@ import { formatDuration } from "@/utils/zincutils";
 import SearchBar from "./SearchBar.vue";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
 import { useRouter } from "vue-router";
-
-interface SessionColumn {
-  name: string;
-  field: (row: any) => any;
-  prop: (row: any) => any;
-  label: string;
-  align: string;
-  sortable: boolean;
-}
 
 interface Session {
   timestamp: string;

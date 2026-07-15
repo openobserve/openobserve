@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="o2-table o2-row-md o2-schema-table log-detail-source-table w-full border border-solid border-[var(--o2-border-color)]"
             :class="store.state.theme === 'dark' && 'dark'"
           >
-            <template #cell-field="{ row, value }">
+            <template #cell-field="{ value }">
               <div
                 :data-test="`log-detail-${value}-key`"
                 class="text-left"
@@ -456,7 +456,6 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 const defaultValue: any = () => {
   return {

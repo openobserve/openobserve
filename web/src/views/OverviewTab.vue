@@ -337,7 +337,7 @@ const _anomalyCache = new Map<
   { ts: number; startTime: number; endTime: number; data: any[] }
 >();
 import { useI18n } from "vue-i18n";
-import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import alertsService from "@/services/alerts";
@@ -379,7 +379,9 @@ function loadSavedTime() {
   try {
     const raw = localStorage.getItem(LS_TIME_KEY);
     if (raw) return JSON.parse(raw);
-  } catch {}
+  } catch {
+    /* ignore: corrupt/absent saved time falls back to null */
+  }
   return null;
 }
 
@@ -774,14 +776,6 @@ const incidentIconClass = (severity: string) => {
   return "text-(--color-info-700)";
 };
 
-const severityBadgeClass = (sev: string): string => {
-  const s = (sev || "p4").toLowerCase();
-  if (s === "p1") return "bg-(--color-error-50) text-(--color-error-600) border border-[0.0625em] border-(--color-error-600)";
-  if (s === "p2") return "bg-(--color-warning-50) text-(--color-warning-700) border border-[0.0625em] border-(--color-warning-600)";
-  if (s === "p3") return "bg-(--color-warning-50) text-(--color-warning-700) border border-[0.0625em] border-(--color-warning-600)";
-  return "bg-(--color-info-50) text-(--color-info-700) border border-[0.0625em] border-(--color-info-700)";
-};
-
 const serviceCardClass = (svc: any) => {
   if (svc.errorFlag && svc.error_rate >= 5) return "border-l-[0.1875em] border-l-(--color-error-600)";
   if (svc.errorFlag || svc.latencyFlag) return "border-l-[0.1875em] border-l-(--color-warning-600)";
@@ -819,7 +813,7 @@ const goToService = (svc: any, e?: MouseEvent) => {
   router.push({ name: "traces", query });
 };
 
-const openServicePanel = (svc: any, _e?: MouseEvent) => {
+const openServicePanel = (svc: any) => {
   // The card's own click handler (behaviour swapped with the info icon):
   // clicking the card body opens the latency/info side panel.
   selectedService.value = svc;
@@ -879,10 +873,6 @@ const goToServiceGraph = () => {
     query.to = timeRange.value.endTime.toString();
   }
   router.push({ name: "traces", query });
-};
-
-const goToAlertHistory = () => {
-  router.push({ name: "alertHistory", query: { org_identifier: orgId.value } });
 };
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────

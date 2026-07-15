@@ -267,7 +267,7 @@ export const mockCipherKeysService = {
 export const mockZincUtils = {
   isValidResourceName: vi.fn((val: string) => {
     if (!val) return "Name is required";
-    return !/[:\?\/\#\s]/.test(val) || "Characters like :, ?, /, #, and spaces are not allowed.";
+    return !/[:?/#\s]/.test(val) || "Characters like :, ?, /, #, and spaces are not allowed.";
   }),
   maxLengthCharValidation: vi.fn((val: string, maxLength: number) => {
     if (!val) return true;

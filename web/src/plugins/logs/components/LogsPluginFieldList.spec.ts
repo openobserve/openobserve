@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { mount } from "@vue/test-utils";
 import FieldList from "./LogsPluginFieldList.vue";
 
 vi.mock("vue-i18n", () => ({
@@ -120,7 +120,7 @@ const defaultProps = {
   ],
   selectedStream: "stream1",
   filterField: "",
-  filterFieldFn: (rows: any[], terms: any) => rows,
+  filterFieldFn: (rows: any[]) => rows,
   pagination: { page: 1, rowsPerPage: 25 },
   wrapCells: false,
   loadingStream: false,

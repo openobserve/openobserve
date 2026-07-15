@@ -239,18 +239,4 @@ const getLabelValueOptions = (labelKey: string) => {
   return options;
 };
 
-const getOperatorHint = (op: string): string => {
-  switch (op) {
-    case "=":
-      return "Exact match";
-    case "!=":
-      return "Not equal to";
-    case "=~":
-      return "Regex pattern (e.g., prod.*)";
-    case "!~":
-      return "Regex not matching (e.g., test.*)";
-    default:
-      return "";
-  }
-};
 </script>

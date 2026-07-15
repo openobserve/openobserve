@@ -253,12 +253,6 @@ export interface StreamReference {
   streamAlias?: string;
 }
 
-const JOIN_TYPES = {
-  INNER: "inner",
-  LEFT: "left",
-  RIGHT: "right",
-} as const;
-
 const JOIN_OPERATIONS = ["=", "!=", ">", "<", ">=", "<="] as const;
 
 const JOIN_LOGICAL_OPERATORS = {

@@ -783,7 +783,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { getFoldersListByType } from "@/utils/commons";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-const props = defineProps({
+defineProps({
   report: {
     type: Object,
     default: null,
@@ -842,8 +842,6 @@ const { t } = useI18n();
 const router = useRouter();
 
 const isCachedReport = ref(false);
-
-const showInfoTooltip = ref(false);
 
 const originalReportData: Ref<string> = ref("");
 
@@ -906,8 +904,6 @@ const frequencyTabs = [
 const selectedTimeTab = ref("scheduleNow");
 
 const store = useStore();
-
-const filteredTimezone: any = ref([]);
 
 const folderOptions: Ref<{ label: string; value: string }[]> = ref([]);
 
@@ -1003,11 +999,6 @@ const scheduling = ref({
   timezone: "",
 });
 
-const isValidName = computed(() => {
-  const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
-  // Check if the role name is valid
-  return roleNameRegex.test(formData.value.name);
-});
 
 const setInitialReportData = async () => {
   const queryParams = router.currentRoute.value.query;
@@ -1093,7 +1084,7 @@ const setDashboardOptions = (id: string) => {
 
         resolve(true);
       })
-      .catch((err) => reject(true))
+      .catch(() => reject(true))
       .finally(() => (isFetchingDashboard.value = false));
   });
 };
@@ -1187,27 +1178,6 @@ const currentTimezone =
   useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
 const timezone = ref(currentTimezone);
 
-const timezoneFilterFn = (val: string, update: Function) => {
-  filteredTimezone.value = filterColumns(timezoneOptions, val, update);
-};
-
-const filterColumns = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-    return filteredOptions;
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1,
-    );
-  });
-  return filteredOptions;
-};
-
 // @ts-ignore
 let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
   return tz;
@@ -1250,7 +1220,7 @@ const getDashboaordFolders = () => {
         });
         resolve(true);
       })
-      .catch((err) => reject(true))
+      .catch(() => reject(true))
       .finally(() => {
         isFetchingFolders.value = false;
       });
@@ -1575,45 +1545,6 @@ const goToReports = () => {
       folder: selectedReportFolderId.value || "default",
     },
   });
-};
-
-const onFilterOptions = (type: string, val: String, update: Function) => {
-  if (type === "folders") {
-    folderOptions.value = filterOptions(options.value[type] || [], val, update);
-  }
-
-  if (type === "dashboards") {
-    dashboardOptions.value = filterOptions(
-      options.value[type] || [],
-      val,
-      update,
-    );
-  }
-
-  if (type === "tabs") {
-    dashboardTabOptions.value = filterOptions(
-      dashboardTabOptions.value,
-      val,
-      update,
-    );
-  }
-};
-
-const filterOptions = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter((option: any) => {
-      return option.label.toLowerCase().indexOf(value) > -1;
-    });
-  });
-
-  return filteredOptions;
 };
 
 const setupEditingReport = async (report: any) => {

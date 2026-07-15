@@ -9,7 +9,7 @@ import { makeDestinationSchema } from "./CreateDestinationForm.schema";
 
 // Mirror the production isValidResourceName behaviour (reject :, /, ?, #, space).
 vi.mock("@/utils/zincutils", () => ({
-  isValidResourceName: (val: string) => !/[:\/?#\s]/.test(val),
+  isValidResourceName: (val: string) => !/[:/?#\s]/.test(val),
 }));
 
 // i18n passthrough (the only key the schema uses is common.nameRequired).

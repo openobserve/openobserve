@@ -679,8 +679,6 @@ import { getImageURL } from "../../../utils/zincutils";
 import DashboardGeoMapsQueryBuilder from "./DashboardGeoMapsQueryBuilder.vue";
 import DashboardMapsQueryBuilder from "./DashboardMapsQueryBuilder.vue";
 import DashboardSankeyChartBuilder from "./DashboardSankeyChartBuilder.vue";
-import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
-import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
@@ -729,7 +727,6 @@ export default defineComponent({
     DashboardGeoMapsQueryBuilder,
     DashboardMapsQueryBuilder,
     DashboardSankeyChartBuilder,
-    SanitizedHtmlRenderer,
     DashboardFiltersOption,
     DashboardJoinsOption,
     DynamicFunctionPopUp,
@@ -742,7 +739,7 @@ export default defineComponent({
   },
   props: ["dashboardData"],
   emits: ["customChartTemplateSelected"],
-  setup(props) {
+  setup() {
     const showXAxis = ref(true);
     const panelName = ref("");
     const panelDesc = ref("");
@@ -779,8 +776,6 @@ export default defineComponent({
       isAddZAxisNotAllowed,
       isAddBreakdownNotAllowed,
       cleanupDraggingFields,
-      selectedStreamFieldsBasedOnUserDefinedSchema,
-      fetchPromQLLabels,
       isPivotMode,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
 
@@ -1007,7 +1002,7 @@ export default defineComponent({
             streamAlias: firstFieldTypeArg.streamAlias,
           };
 
-          const axisArray = getAxisArray(targetAxis);
+          getAxisArray(targetAxis);
 
           if (targetAxis !== "f") {
             if (
@@ -1148,11 +1143,11 @@ export default defineComponent({
       e.preventDefault();
     };
 
-    const onDragStart = (e: any, item: any) => {
+    const onDragStart = (e: any) => {
       e.preventDefault();
     };
 
-    const onDragOver = (e: any, area: string) => {
+    const onDragOver = (e: any, _columnData?: string) => {
       e.preventDefault();
     };
 
@@ -1172,7 +1167,7 @@ export default defineComponent({
       cleanupDraggingFields();
     };
 
-    const xAxisHint = computed((e: any) => {
+    const xAxisHint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "pie":
         case "donut":
@@ -1199,7 +1194,7 @@ export default defineComponent({
       }
     });
 
-    const bAxisHint = computed((e: any) => {
+    const bAxisHint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "stacked":
         case "area-stacked":
@@ -1210,7 +1205,7 @@ export default defineComponent({
       }
     });
 
-    const yAxisHint = computed((e: any) => {
+    const yAxisHint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "pie":
         case "donut":
@@ -1225,7 +1220,7 @@ export default defineComponent({
       }
     });
 
-    const zAxisHint = computed((e: any) => {
+    const zAxisHint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "heatmap":
           return "Add 1 field here";
@@ -1287,8 +1282,6 @@ export default defineComponent({
         ].fields?.z;
       return zFields.map(commonBtnLabel);
     });
-
-    const operators = ["=", "<>", ">=", "<=", ">", "<"];
 
     // PromQL Builder Mode (queryType = "promql" with customQuery = false)
     const promqlBuilderMode = computed(
@@ -1529,7 +1522,9 @@ export default defineComponent({
         try {
           const query = promqlRenderer.renderQuery(promqlBuilderQuery);
           currentQuery.query = query;
-        } catch (error) {}
+        } catch {
+          /* ignore: keep last valid query on render failure */
+        }
       },
       { deep: true },
     );

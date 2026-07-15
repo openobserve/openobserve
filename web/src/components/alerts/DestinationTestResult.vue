@@ -149,7 +149,6 @@ limitations under the License. -->
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import OButton from '@/lib/core/Button/OButton.vue';
 import { formatDate } from "@/utils/date";
@@ -168,7 +167,7 @@ interface Props {
   isLoading?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   result: null,
   isLoading: false
 });
@@ -178,7 +177,7 @@ interface Emits {
   (e: 'retry'): void;
 }
 
-const emit = defineEmits<Emits>();
+defineEmits<Emits>();
 
 // Composables
 const { t } = useI18n();

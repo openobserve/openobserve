@@ -22,13 +22,16 @@ import { watch } from "vue";
  * The watcher returns immediately (no-op) ΓÇö remove the `return;` statement
  * to enable the detailed change logging when debugging is needed.
  */
+// Set to true to enable the detailed change logging when debugging is needed.
+const DEBUG_VARIABLES_WATCHER = false;
+
 export const useVariablesWatcher = (variablesData: any) => {
   // watch for changes in variablesData.values
   let previousValues: any[] = [];
   watch(
     () => variablesData.values,
     (newValues) => {
-      return;
+      if (!DEBUG_VARIABLES_WATCHER) return;
       // Track all changes to log them together
       const changes: any[] = [];
 
@@ -119,8 +122,9 @@ export const useVariablesWatcher = (variablesData: any) => {
   );
 };
 
-export const variableLog = (_name: string, _message: string) => {
-  // console.log(`[Variable: ${_name}] ${_message}`);
+export const variableLog = (name: string, message: string) => {
+  void name;
+  void message;
 };
 
 // ================== [END] FOR DEBUGGING PURPOSES ONLY ==================

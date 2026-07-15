@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
-import { h } from "vue";
 import OSpinner from "./OSpinner.vue";
 
 describe("OSpinner", () => {

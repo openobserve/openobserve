@@ -462,9 +462,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import searchService from "@/services/search";
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
-import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
-import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
 import config from "@/aws-exports";
@@ -613,7 +611,6 @@ const localTab = ref<'sql' | 'promql'>(props.tab || 'sql');
 const localSqlQuery = ref(props.sqlQuery);
 const localPromqlQuery = ref(props.promqlQuery);
 const vrlFunctionContent = ref(props.vrlFunction);
-const isFullScreen = ref(false);
 const sqlEditorMaximized = ref(false);
 // Controls whether the VRL Monaco editor is mounted. Kept false briefly when
 // restoring from maximized so Monaco mounts AFTER the flex container has
@@ -771,10 +768,7 @@ const handleAlertFunctionEditorGenerationEnd = () => {
 /**
  * Handle successful generation from alert function editor
  */
-const handleAlertFunctionEditorGenerationSuccess = (payload: {
-  type: string;
-  message: string;
-}) => {
+const handleAlertFunctionEditorGenerationSuccess = () => {
   // Function code is already updated via @update:query handler
 };
 
@@ -1146,7 +1140,7 @@ const handleRunQuery = (language: 'sql' | 'promql') => {
   }
 };
 
-const handleAskAI = async (_naturalLanguage: string, _language: string) => {
+const handleAskAI = async () => {
   // The unified component handles AI generation internally
   // This event is just for parent components that may need to react
 };
@@ -1156,10 +1150,6 @@ const toggleAIChat = () => {
   const isEnabled = !store.state.isAiChatEnabled;
   store.dispatch("setIsAiChatEnabled", isEnabled);
 };
-
-const getBtnO2Logo = computed(() => {
-  return getImageURL('images/common/ai_icon_blue.svg');
-});
 
 const getBtnLogo = computed(() => {
   if (isHovered.value || store.state.isAiChatEnabled) {

@@ -20,7 +20,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { http, HttpResponse } from "msw";
-import actionScriptsMockData from "@/test/unit/mockData/actionScripts";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");

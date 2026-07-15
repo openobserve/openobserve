@@ -24,11 +24,8 @@ vi.mock("@/stores", async () => {
   const { default: store } = await import("@/test/unit/helpers/store");
   return { default: store };
 });
-// @ts-ignore
-import { rest } from "msw";
-import searchService from "@/services/search";
 import router from "@/test/unit/helpers/router";
-import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
+import { getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 
 // Mock CSS.supports for test environment
@@ -148,7 +145,7 @@ vi.mock("@/composables/useDashboardPanelData", () => ({
         },
         htmlContent: "",
         markdownContent: "",
-        customChartContent: `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};
+        customChartContent: ` // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};
       `,
         customChartResult: {},
         queryType: "sql",

@@ -20,11 +20,6 @@ export interface Condition {
   value: string;
 }
 
-interface TimingFunction {
-  unit: "Minutes";
-  value: number;
-}
-
 // Alert payload which is sent to backend
 export interface Alert {
   id?: string;

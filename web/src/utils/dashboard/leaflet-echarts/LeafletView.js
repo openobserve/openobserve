@@ -20,7 +20,7 @@ const LeafletView = {
     const resizeEnable = lmapModel.get('resizeEnable');
     const largeMode = lmapModel.get('largeMode');
 
-    let moveHandler = function(e) {
+    let moveHandler = function() {
       if (rendering) {
         return;
       }
@@ -119,7 +119,7 @@ const LeafletView = {
     }
 
     if(!renderOnMoving && !this._moveEndHandler) {
-      const moveEndHandler = function(e) {
+      const moveEndHandler = function() {
         setTimeout(function() {
           lmapModel.setEChartsLayerVisibility(true);
         }, !largeMode ? 0 : 20);

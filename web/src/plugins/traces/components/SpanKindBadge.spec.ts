@@ -22,10 +22,6 @@ import SpanKindBadge from "./SpanKindBadge.vue";
 // Helpers
 // ---------------------------------------------------------------------------
 
-const tooltipStub = {
-  template: '<span data-test="tooltip-stub"><slot /></span>',
-};
-
 function mountBadge(kind: string): VueWrapper {
   return mount(SpanKindBadge, {
     props: { kind },

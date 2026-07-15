@@ -12,7 +12,7 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 // Forward tabindex to the switch control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
 const wrapperAttrs = computed(() => {
-  const { tabindex, ...rest } = $attrs;
+  const { tabindex: _tabindex, ...rest } = $attrs;
   return rest;
 });
 
@@ -85,13 +85,6 @@ const trackSizes: Record<NonNullable<SwitchProps["size"]>, TrackSize> = {
     thumb: "size-4.5",
     thumbTranslate: "translate-x-5",
   },
-};
-
-const labelSize: Record<NonNullable<SwitchProps["size"]>, string> = {
-  sm: "text-xs",
-  md: "text-sm",
-  lg: "text-sm",
-  xl: "text-lg",
 };
 
 const currentSizes = computed(() => trackSizes[props.size ?? "md"]);

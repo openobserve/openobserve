@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >= {{ formatFilterValue(filter.start) }}
               </span>
               <span v-else-if="filter.end !== null">
-                <= {{ formatFilterValue(filter.end) }}
+                &lt;= {{ formatFilterValue(filter.end) }}
               </span>
             </span>
             <OIcon
@@ -468,7 +468,7 @@ const updateDateTime = (value: any) => {
   refreshDashboard();
 };
 
-const updateTimezone = (value: any) => {
+const updateTimezone = () => {
   // Handle timezone changes if needed
   // Currently the date-time component manages timezone internally
   // This is here for compatibility with the logs date picker
@@ -700,7 +700,6 @@ const editAlert = () => {
   //   params: { alertName: selectedAlertForAction.value }
   // });
 };
-const org = 'default'
 const viewHistory = () => {
   // Navigate to alert history with filter
   router.push({

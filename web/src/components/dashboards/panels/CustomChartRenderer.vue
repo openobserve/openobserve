@@ -106,7 +106,7 @@ export default defineComponent({
       if (typeof obj === "object" && obj !== null) {
         const result = {};
         for (const key in obj) {
-          if (obj.hasOwnProperty(key)) {
+          if (Object.prototype.hasOwnProperty.call(obj, key)) {
             result[key] = convertStringToFunction(obj[key]); // Recursively handle object properties
           }
         }
@@ -131,7 +131,7 @@ export default defineComponent({
     const initChart = async () => {
       if (!chartRef.value) return;
 
-      const echartsGL = await import("echarts-gl");
+      await import("echarts-gl");
 
       // Initialize chart if it doesn't exist, otherwise reuse existing instance
       if (!chart) {

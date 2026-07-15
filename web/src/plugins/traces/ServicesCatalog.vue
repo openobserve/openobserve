@@ -319,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             table-id="services-catalog"
             data-test="services-catalog-table"
             @row-click="(row) => handleRowClick(row)"
-            @sort-change="(p) => handleSortChange(p.column, p.order)"
+            @sort-change="(p) => handleSortChange(p.column)"
           >
             <!-- Status badge -->
             <template #cell-status="{ row }">
@@ -438,7 +438,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
@@ -450,7 +449,6 @@ import useTraces from "@/composables/useTraces";
 import useStreams from "@/composables/useStreams";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import streamService from "@/services/stream";
-import { formatLatency } from "@/utils/traces/treeTooltipHelpers";
 import { classifyEntity } from "@/utils/traces/serviceClassification";
 import {
   b64EncodeUnicode,
@@ -459,11 +457,9 @@ import {
   formatTimeWithSuffix,
 } from "@/utils/zincutils";
 import { getEffectiveTimeRange } from "@/utils/date";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -471,7 +467,6 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
 
 const { t } = useI18n();
-const store = useStore();
 const { columnVisibility, setColumnVisibility } =
   useExternalColumnToggle("services-catalog");
 const catalogContainerRef = ref<HTMLElement | null>(null);
@@ -579,7 +574,7 @@ const hasInferColumns = ref<boolean | null>(null);
 // includes the "cleared" step), computing the direction ourselves. When OTable
 // emits its clear step (empty column), that means the currently-sorted column
 // was clicked again → flip it.
-function handleSortChange(field: string, _order: "asc" | "desc") {
+function handleSortChange(field: string) {
   const clickedField = field || sortBy.value;
   if (clickedField === sortBy.value && sortBy.value) {
     // Same column re-clicked → flip direction (2-state toggle).
@@ -908,20 +903,6 @@ function deriveStatus(
   return "healthy";
 }
 
-function statusBadgeClass(status: string): string {
-  if (status === "critical") return "text-(--o2-service-health-critical)";
-  if (status === "warning") return "text-(--o2-service-health-warning)";
-  if (status === "degraded") return "text-(--o2-service-health-degraded)";
-  return "text-(--o2-service-health-healthy)";
-}
-
-function errorRateClass(rate: number): string {
-  if (rate > 10) return "text-red-500 font-medium";
-  if (rate > 5) return "text-orange-500";
-  if (rate > 1) return "text-yellow-500";
-  return "";
-}
-
 function formatPercent(value: number): string {
   return value.toFixed(2) + "%";
 }
@@ -1102,13 +1083,13 @@ ORDER BY total_requests DESC`;
           services.value = Array.from(serviceMap.values());
         }
       },
-      error: (_payload: any, _response: any) => {
+      error: () => {
         isLoading.value = false;
       },
-      complete: (_payload: any, _response: any) => {
+      complete: () => {
         isLoading.value = false;
       },
-      reset: (_payload: any, _response: any) => {
+      reset: () => {
         services.value = [];
         isLoading.value = false;
       },

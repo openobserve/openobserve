@@ -233,7 +233,6 @@ import useStreams from "@/composables/useStreams";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
-import OSelect from '@/lib/forms/Select/OSelect.vue';
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -292,15 +291,6 @@ export default defineComponent({
     onMounted(() => {
       if (!streamOptions.value.length) streamOptions.value = props.metricsList;
     });
-    const filterMetrics = (val: string, update: any) => {
-      update(() => {
-        streamOptions.value = props.metricsList;
-        const needle = val.toLowerCase();
-        streamOptions.value = streamOptions.value.filter(
-          (v: any) => v.label.toLowerCase().indexOf(needle) > -1,
-        );
-      });
-    };
     const updateMetricLabels = async () => {
       const streamData = await getStream(
         selectedMetric.value?.value || "",

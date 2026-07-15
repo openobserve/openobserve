@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
+import { defineComponent, ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
@@ -51,7 +51,7 @@ export default defineComponent({
     },
   },
   components: { CopyContent, IngestionContent, IngestionDocLink },
-  setup(props) {
+  setup() {
     const store = useStore();
     const endpoint: any = ref({
       url: "",

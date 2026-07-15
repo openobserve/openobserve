@@ -106,7 +106,7 @@ const emit = defineEmits(["test", "save", "update:name", "back", "cancel"]);
 // @submit fires ONLY once the Zod schema passes (name required + method-name
 // regex), so emitting `save` here preserves the old contract — "emit save only
 // after the form validates" — without a hand-rolled validate().
-const onSubmit = (_value: ScriptToolbarForm) => {
+const onSubmit = () => {
   emit("save");
 };
 

@@ -163,7 +163,6 @@ class PromqlRendererImpl implements PromqlRenderer {
     }
 
     // Handle functions with parameters
-    const paramStr = params.map((p) => (typeof p === "string" ? p : p)).join(", ");
 
     // Functions like clamp that have params before the expression
     if (

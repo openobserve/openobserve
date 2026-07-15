@@ -7,16 +7,14 @@ import {
   vi,
   MockedFunction,
 } from "vitest";
-import { reactive, nextTick, ref } from "vue";
+import { nextTick } from "vue";
 import useDashboardPanelData from "./dashboard/useDashboardPanel";
 import { useStore } from "vuex";
 import useNotifications from "./useNotifications";
 import useValuesWebSocket from "./dashboard/useValuesWebSocket";
-import StreamService from "@/services/stream";
 import queryService from "@/services/search";
 import * as zincutils from "@/utils/zincutils";
 import * as sqlUtils from "@/utils/query/sqlUtils";
-import * as convertDataIntoUnitValue from "@/utils/dashboard/convertDataIntoUnitValue";
 import * as panelValidation from "@/utils/dashboard/panelValidation";
 
 // Mock Vue lifecycle hooks to avoid warnings
@@ -673,7 +671,7 @@ describe("useDashboardPanel", () => {
         const firstField = yFields[0];
 
         // Verify that colors are assigned (if the field has a color property)
-        if (firstField.hasOwnProperty("color")) {
+        if (Object.prototype.hasOwnProperty.call(firstField, "color")) {
           expect(firstField.color).toBeDefined();
         }
 
@@ -1148,8 +1146,6 @@ describe("useDashboardPanel", () => {
     });
 
     it("should maintain data consistency", () => {
-      const originalData = JSON.stringify(panel.dashboardPanelData);
-
       // Perform operations
       panel.addXAxisItem({ name: "timestamp" });
       panel.cleanupDraggingFields();
@@ -1667,12 +1663,6 @@ describe("useDashboardPanel", () => {
     it("should handle drag and drop field operations and state management", () => {
       const panel = useDashboardPanelData();
 
-      // Test drag and drop state - get initial state
-      const initialDragState =
-        panel.dashboardPanelData.meta.dragAndDrop.dragging;
-      const initialTargetIndex =
-        panel.dashboardPanelData.meta.dragAndDrop.targetDragIndex;
-
       // Test setting drag state
       panel.dashboardPanelData.meta.dragAndDrop.dragging = true;
       panel.dashboardPanelData.meta.dragAndDrop.currentDragField = "test_field";
@@ -1849,8 +1839,6 @@ describe("useDashboardPanel", () => {
 
       // Test field removal by different criteria
       if (panel.dashboardPanelData.data.queries[0].fields.y.length > 0) {
-        const fieldCount =
-          panel.dashboardPanelData.data.queries[0].fields.y.length;
         panel.removeYAxisItemByIndex(0);
         // Field count should remain valid
         expect(
@@ -1883,7 +1871,7 @@ describe("useDashboardPanel", () => {
         "SELECT AVG(response_time) FROM metrics WHERE service = 'api'",
       ];
 
-      sqlQueries.forEach((query, index) => {
+      sqlQueries.forEach((query) => {
         panel.dashboardPanelData.data.queries[0].query = query;
         expect(panel.dashboardPanelData.data.queries[0].query).toBe(query);
       });
@@ -2316,7 +2304,7 @@ describe("useDashboardPanel", () => {
       };
 
       // Test both formats
-      [stringFields, objectFields].forEach((fields, index) => {
+      [stringFields, objectFields].forEach((fields) => {
         if (typeof panel.setFieldsBasedOnChartTypeValidation === "function") {
           panel.setFieldsBasedOnChartTypeValidation(fields, "line");
         }
@@ -2567,7 +2555,7 @@ describe("useDashboardPanel", () => {
         },
       ];
 
-      testCases.forEach((testCase, index) => {
+      testCases.forEach((testCase) => {
         if (typeof panel.determineChartType === "function") {
           try {
             const chartType = panel.determineChartType(
@@ -3339,9 +3327,6 @@ describe("useDashboardPanel", () => {
 
           // Test removeXAxisItem (remove by name)
           if (panel.dashboardPanelData.data.queries[0].fields.x.length > 0) {
-            const fieldToRemove =
-              panel.dashboardPanelData.data.queries[0].fields.x[0].name ||
-              "timestamp";
             const initialXCount =
               panel.dashboardPanelData.data.queries[0].fields.x.length;
             panel.removeXAxisItemByIndex(0);
@@ -3352,9 +3337,6 @@ describe("useDashboardPanel", () => {
 
           // Test removeYAxisItem (remove by name)
           if (panel.dashboardPanelData.data.queries[0].fields.y.length > 0) {
-            const fieldToRemove =
-              panel.dashboardPanelData.data.queries[0].fields.y[0].name ||
-              "count";
             const initialYCount =
               panel.dashboardPanelData.data.queries[0].fields.y.length;
             panel.removeYAxisItemByIndex(0);
@@ -3367,9 +3349,6 @@ describe("useDashboardPanel", () => {
           if (
             panel.dashboardPanelData.data.queries[0].fields.breakdown.length > 0
           ) {
-            const fieldToRemove =
-              panel.dashboardPanelData.data.queries[0].fields.breakdown[0]
-                .name || "category";
             const initialBreakdownCount =
               panel.dashboardPanelData.data.queries[0].fields.breakdown.length;
             panel.removeBreakdownItemByIndex(0);
@@ -4572,8 +4551,6 @@ describe("useDashboardPanel", () => {
     });
 
     it("should maintain state consistency", () => {
-      const initialState = JSON.stringify(panel.dashboardPanelData);
-
       // Perform operations
       panel.addXAxisItem({ name: "test" });
       panel.removeXAxisItemByIndex(0);

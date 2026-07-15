@@ -390,7 +390,6 @@ import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ONumberCell from "@/lib/core/Table/cells/ONumberCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -412,7 +411,6 @@ export default defineComponent({
     ODrawer,
     OSearchInput,
     OTooltip,
-    OCheckbox,
     OIcon,
     OTag,
     ONumberCell,
@@ -423,7 +421,7 @@ export default defineComponent({
     "update:changeRecordPerPage",
     "update:maxRecordToReturn",
   ],
-  setup(props, { emit }) {
+  setup() {
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();

@@ -12,7 +12,7 @@ function install(registers) {
 
   // add coordinate system support for pie series for ECharts < 5.4.0
   if ((ecVer[0] == 5 && ecVer[1] < 4)) {
-    registers.registerLayout(function(ecModel, api) {
+    registers.registerLayout(function(ecModel) {
       ecModel.eachSeriesByType('pie', function (seriesModel) {
         const coordSys = seriesModel.coordinateSystem;
         const data = seriesModel.getData();

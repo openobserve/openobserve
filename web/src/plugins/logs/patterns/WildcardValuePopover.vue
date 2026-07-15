@@ -128,7 +128,7 @@ const props = defineProps<{
   anchorEl: HTMLElement | null;
 }>();
 
-const emit = defineEmits<{
+defineEmits<{
   (e: "popoverEnter"): void;
   (e: "popoverLeave"): void;
   (e: "filter-value", value: string, action: "include" | "exclude"): void;

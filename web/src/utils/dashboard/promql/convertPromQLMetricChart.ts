@@ -27,9 +27,9 @@ export class MetricConverter implements PromQLChartConverter {
   convert(
     processedData: ProcessedPromQLData[],
     panelSchema: any,
-    store: any,
-    extras: any,
-    chartPanelRef?: any,
+    _store: any,
+    _extras: any,
+    _chartPanelRef?: any,
   ) {
     const config = panelSchema.config || {};
     const aggregation = config.aggregation || "last";

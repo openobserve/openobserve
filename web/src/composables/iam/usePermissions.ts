@@ -34,7 +34,7 @@ const permissions = {
 
 const users = {
   users: [] as any[],
-  getOrgUsers: (org_identifier: string, queryParams?: { list_all?: boolean } ) => {
+  getOrgUsers: (org_identifier: string, _queryParams?: { list_all?: boolean } ) => {
     return new Promise((resolve, reject) => {
       usersService
         .orgUsers(org_identifier)

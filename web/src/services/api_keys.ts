@@ -31,7 +31,7 @@ const apiKeys = {
   createRUMToken: (org_id: string) => {
     return http().post(`/api/${org_id}/rumtoken`);
   },
-  updateRUMToken: (org_id: string, id: string) => {
+  updateRUMToken: (org_id: string, _id: string) => {
     return http().put(`/api/${org_id}/rumtoken`);
   },
   deleteUserAPIKey: (id: string) => {

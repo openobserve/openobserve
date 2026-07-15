@@ -145,7 +145,9 @@ const useValuesWebSocket = () => {
           });
         }
       }
-    } catch (error) {}
+    } catch (error) {
+      // ignore: best-effort filter merge
+    }
   };
 
   const initializeStreamingConnection = (

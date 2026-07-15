@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useSearchPagination } from "./useSearchPagination";
-import { searchState } from "./searchState";
 
 // Create a shared mock state
 const createMockState = () => ({

@@ -74,8 +74,6 @@ import useErrorIssuesData from "./useErrorIssuesData";
 import {
   WINDOW_START_US,
   WINDOW_END_US,
-  MID_WINDOW_US,
-  EARLY_WINDOW_US,
   FULL_SCHEMA,
   MOCK_ISSUE_HITS,
   MOCK_HISTOGRAM_HITS,

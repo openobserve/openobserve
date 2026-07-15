@@ -219,7 +219,7 @@ function buildI18n() {
   });
 }
 
-function buildRouter(query: Record<string, string> = {}) {
+function buildRouter() {
   const router = createRouter({
     history: createWebHistory(),
     routes: [

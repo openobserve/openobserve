@@ -301,7 +301,6 @@ import Lan from "~icons/material-symbols/lan-outline";
 import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
 import CheckCircleOutline from "~icons/material-symbols/check-circle-outline";
 import TrendingUpFilled from "~icons/material-symbols/trending-up";
-import ErrorOutlineFilled from "~icons/material-symbols/error-outline";
 import ViewInAr from "~icons/material-symbols/view-in-ar-outline";
 import Input from "~icons/material-symbols/input";
 import Transform from "~icons/material-symbols/transform";

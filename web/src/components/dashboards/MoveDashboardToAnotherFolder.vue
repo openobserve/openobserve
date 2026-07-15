@@ -73,7 +73,7 @@ export default defineComponent({
     },
     dashboardIds: {
       type: Array,
-      default: [],
+      default: () => [],
     },
     open: {
       type: Boolean,

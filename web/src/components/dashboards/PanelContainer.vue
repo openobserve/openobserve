@@ -401,9 +401,7 @@ import { addPanel } from "@/utils/commons";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
-import RelativeTime from "@/components/common/RelativeTime.vue";
 import {
-  getFunctionErrorMessage,
   getUUID,
   processQueryMetadataErrors,
 } from "@/utils/zincutils";
@@ -449,7 +447,6 @@ export default defineComponent({
     "height",
     "variablesData",
     "dashboardId",
-    "metaData",
     "forceLoad",
     "searchType",
     "folderId",
@@ -471,7 +468,6 @@ export default defineComponent({
     QueryInspector,
     ConfirmDialog,
     SinglePanelMove,
-    RelativeTime,
     PanelErrorButtons,
     OButton,
     OIcon,
@@ -750,7 +746,7 @@ export default defineComponent({
       dismiss();
     };
 
-    const deletePanelDialog = async (data: any) => {
+    const deletePanelDialog = async () => {
       emit("onDeletePanel", props.data.id);
     };
 
@@ -1010,7 +1006,6 @@ export default defineComponent({
         this.createAlertFromPanel();
       } else if (evt == "Refresh") {
         this.onRefreshPanel(true);
-      } else {
       }
     },
     createAlertFromPanel() {

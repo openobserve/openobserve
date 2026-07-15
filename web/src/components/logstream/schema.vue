@@ -918,9 +918,7 @@ import {
   computed,
   defineComponent,
   onBeforeMount,
-  reactive,
   ref,
-  onMounted,
   watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
@@ -940,7 +938,6 @@ import {
 import config from "@/aws-exports";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useStreams from "@/composables/useStreams";
-import { useRouter } from "vue-router";
 import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -960,7 +957,6 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -1015,7 +1011,6 @@ export default defineComponent({
     OSelect,
     OSwitch,
     OTooltip,
-    OCheckbox,
     OCard,
     OCardSection,
   },
@@ -1046,7 +1041,6 @@ export default defineComponent({
     const loadingState = ref(true);
     const rowsPerPage = ref(20);
     const filterField = ref("");
-    const router = useRouter();
     const qTable = ref(null);
     const minDate = ref(null);
     const selectedDateFields = ref([]);
@@ -1284,8 +1278,7 @@ export default defineComponent({
       return store.state.zoConfig.user_defined_schemas_enabled;
     });
 
-    // Args are accepted (one caller passes row context) but unused.
-    const markFormDirty = (..._args: any[]) => {
+    const markFormDirty = (..._args: unknown[]) => {
       formDirtyFlag.value = true;
     };
     const deleteFields = async () => {
@@ -1536,7 +1529,7 @@ export default defineComponent({
           loadingState.value = false;
           dismiss();
         })
-        .catch((err) => {
+        .catch(() => {
           loadingState.value = false;
         });
     };
@@ -1738,7 +1731,7 @@ export default defineComponent({
           indexData.value.stream_type,
           modifiedSettings,
         )
-        .then(async (res) => {
+        .then(async () => {
           if (
             store.state.logs?.logs?.data?.stream?.selectedStream?.includes(
               indexData.value.name,
@@ -2235,7 +2228,7 @@ export default defineComponent({
     };
 
     const updateStreamResponse = (streamResponse) => {
-      if (streamResponse.settings.hasOwnProperty("defined_schema_fields")) {
+      if (Object.prototype.hasOwnProperty.call(streamResponse.settings, "defined_schema_fields")) {
         const userDefinedSchema = streamResponse.settings.defined_schema_fields;
 
         // Map through the schema and add `isUserDefined` field
@@ -2300,10 +2293,10 @@ export default defineComponent({
 
     const dateChangeValue = (value) => {
       const selectedFromDate =
-        value.hasOwnProperty("selectedDate") &&
+        Object.prototype.hasOwnProperty.call(value, "selectedDate") &&
         formatDate(value.selectedDate.from);
       const selectedToDate =
-        value.hasOwnProperty("selectedDate") &&
+        Object.prototype.hasOwnProperty.call(value, "selectedDate") &&
         formatDate(value.selectedDate.to);
       if (value.relativeTimePeriod == null) {
         try {
@@ -2335,11 +2328,6 @@ export default defineComponent({
       const currentDate = new Date(today);
       currentDate.setDate(today.getDate() - (dataRetentionDays.value - 1)); // Adjust to the desired number of days (dataRetentionDays of  days in this case)
 
-      const formattedDate = timestampToTimezoneDate(
-        new Date().getTime(), // Current timestamp
-        store.state.timezone, // Get the timezone from the store
-        "yyyy/MM/dd", // Desired format
-      );
       // Format minDate using timestampToTimezoneDate for a custom format
       minDate.value = timestampToTimezoneDate(
         currentDate.getTime(),

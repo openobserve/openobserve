@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { getUUID } from "@/utils/zincutils";
-import { defineComponent, ref, watch, computed, onBeforeMount } from "vue";
+import { defineComponent, ref, watch, onBeforeMount } from "vue";
 
 export default defineComponent({
   name: "HighLight",

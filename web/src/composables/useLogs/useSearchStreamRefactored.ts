@@ -90,7 +90,7 @@ export const useSearchStreamRefactored = () => {
    * Handle search completion
    * Orchestrates histogram processing if needed
    */
-  const handleSearchComplete = (payload: any, response: any) => {
+  const handleSearchComplete = (payload: any) => {
     // Process histogram if needed
     if (
       payload.type === "search" &&
@@ -119,7 +119,7 @@ export const useSearchStreamRefactored = () => {
   /**
    * Handle search reset/retry
    */
-  const handleSearchReset = (data: any, traceId?: string) => {
+  const handleSearchReset = (data: any) => {
     try {
       if (data.type === "search") {
         if (!data.isPagination) {

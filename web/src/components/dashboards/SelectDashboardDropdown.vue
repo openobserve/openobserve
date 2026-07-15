@@ -96,7 +96,7 @@ export default defineComponent({
     const { t } = useI18n();
 
     // on add dashboard, select added dashboard
-    const updateDashboardList = async (dashboardId: any, folderId: any) => {
+    const updateDashboardList = async (dashboardId: any) => {
       showAddDashboardDialog.value = false;
       await getDashboardList.execute();
       selectedDashboard.value = dashboardId ?? null;

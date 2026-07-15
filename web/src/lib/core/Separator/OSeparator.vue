@@ -2,7 +2,7 @@
 import type { OSeparatorProps } from "./OSeparator.types";
 import { Separator } from "reka-ui";
 
-const props = withDefaults(defineProps<OSeparatorProps>(), {
+withDefaults(defineProps<OSeparatorProps>(), {
   vertical: false,
 });
 </script>

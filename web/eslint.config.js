@@ -81,10 +81,12 @@ export default [
       "vue/no-deprecated-v-bind-sync": "error",
       "vue/no-v-text-v-html-on-component": "error",
       //
-      // Ratchet targets — surfaced as "warn" so they don't fail the `lint:errors`
-      // (--quiet) CI gate while we drive each bucket to zero and flip it to "error".
+      // Enforced ("error") — the rollout drove each of these to 0 violations.
+      // Three rules below stay "warn" (ratchet backlog); see their notes.
       //
-      // Unused code (single source of truth; `_`-prefix opts out).
+      // Unused code (single source of truth; `_`-prefix opts out). Still "warn":
+      // ~4 stragglers are imports used only in template `as` casts, which
+      // eslint-plugin-vue cannot see (false positives) — TS keeps them honest.
       "@typescript-eslint/no-unused-vars": [
         "warn",
         {
@@ -94,36 +96,39 @@ export default [
         },
       ],
       // Bucket 1 — real bugs.
-      "no-unreachable": "warn",
-      "no-self-assign": "warn",
-      "no-redeclare": "warn",
-      "no-case-declarations": "warn",
-      "no-unsafe-optional-chaining": "warn",
-      "no-import-assign": "warn",
+      "no-unreachable": "error",
+      "no-self-assign": "error",
+      "no-redeclare": "error",
+      "no-case-declarations": "error",
+      "no-unsafe-optional-chaining": "error",
+      "no-import-assign": "error",
+      // Still "warn": 3 left are a prop + a same-named setup-return/computed;
+      // deduping would break the component's public prop API.
       "vue/no-dupe-keys": "warn",
-      "vue/no-ref-as-operand": "warn",
-      "vue/no-side-effects-in-computed-properties": "warn",
-      "vue/return-in-computed-property": "warn",
-      "vue/require-valid-default-prop": "warn",
-      "vue/require-v-for-key": "warn",
-      "vue/valid-v-for": "warn",
-      "vue/valid-attribute-name": "warn",
-      "vue/valid-next-tick": "warn",
-      "vue/no-parsing-error": "warn",
-      "vue/no-use-v-if-with-v-for": "warn",
-      "vue/no-reserved-component-names": "warn",
-      "vue/require-toggle-inside-transition": "warn",
-      "vue/prefer-import-from-vue": "warn",
+      "vue/no-ref-as-operand": "error",
+      "vue/no-side-effects-in-computed-properties": "error",
+      "vue/return-in-computed-property": "error",
+      "vue/require-valid-default-prop": "error",
+      "vue/require-v-for-key": "error",
+      "vue/valid-v-for": "error",
+      "vue/valid-attribute-name": "error",
+      "vue/valid-next-tick": "error",
+      "vue/no-parsing-error": "error",
+      "vue/no-use-v-if-with-v-for": "error",
+      "vue/no-reserved-component-names": "error",
+      "vue/require-toggle-inside-transition": "error",
+      "vue/prefer-import-from-vue": "error",
       // Bucket 2 — low-risk / mechanical.
-      "no-prototype-builtins": "warn",
-      "no-useless-escape": "warn",
-      "no-empty": "warn",
-      "no-useless-catch": "warn",
-      "no-async-promise-executor": "warn",
-      // Bucket 4 — Vue correctness.
+      "no-prototype-builtins": "error",
+      "no-useless-escape": "error",
+      "no-empty": "error",
+      "no-useless-catch": "error",
+      "no-async-promise-executor": "error",
+      // Bucket 4 — Vue correctness. Still "warn": 228 left need genuine
+      // emit-refactors (behavior-sensitive), deferred to a focused pass.
       "vue/no-mutating-props": "warn",
-      "vue/no-unused-components": "warn",
-      "vue/no-unused-vars": "warn",
+      "vue/no-unused-components": "error",
+      "vue/no-unused-vars": "error",
 
       // Enforced rules
       "vue/no-restricted-html-elements": [

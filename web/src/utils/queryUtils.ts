@@ -271,11 +271,11 @@ export const getWebSocketUrl = (
   return `${protocol}//${apiEndPoint.split("//")[1]}/api/${org_identifier}/ws/v2/${request_id}`;
 };
 
-export const isWebSocketEnabled = (data: any) => {
+export const isWebSocketEnabled = () => {
   return false;
 };
 
-export const isStreamingEnabled = (data: any) => {
+export const isStreamingEnabled = (_data?: unknown) => {
   return true;
 };
 

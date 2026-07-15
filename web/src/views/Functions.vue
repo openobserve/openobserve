@@ -148,8 +148,6 @@ import {
   onBeforeMount,
   onMounted,
   onUnmounted,
-  onActivated,
-  onDeactivated,
   watch,
 } from "vue";
 import { useStore } from "vuex";

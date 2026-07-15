@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { defineComponent } from 'vue';
 import { mount, flushPromises } from '@vue/test-utils';
 import i18n from '@/locales';
@@ -48,7 +48,7 @@ vi.mock('@/composables/useStreams', () => ({
 
 // Mock all external services used inside EditRole.vue
 vi.mock('@/services/iam', () => ({
-  getResources: vi.fn(async (_org) => ({
+  getResources: vi.fn(async () => ({
     data: [
       { key: 'stream', display_name: 'Streams', has_entities: true, top_level: true, visible: true, order: 1 },
       { key: 'logs', display_name: 'Logs', has_entities: true, parent: 'stream', top_level: false, visible: true, order: 2 },
@@ -164,21 +164,6 @@ async function mountEditRole(customStubs = {}) {
   await flushPromises();
   await flushPromises();
   return wrapper;
-}
-
-// Helpers to stub editor ref methods when switching to JSON view
-function stubEditorRefs(wrapper) {
-  if (!wrapper.vm.permissionJsonEditorRef) {
-    // initialize ref container if missing
-    // @ts-ignore
-    wrapper.vm.permissionJsonEditorRef = { value: null };
-  }
-  // Assign methods on the ref's value so component closures use them
-  wrapper.vm.permissionJsonEditorRef.value = {
-    setValue: vi.fn(),
-    formatDocument: vi.fn(),
-    resetEditorLayout: vi.fn(),
-  };
 }
 
 // Reset mocks

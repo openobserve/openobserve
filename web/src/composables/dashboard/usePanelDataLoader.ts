@@ -464,7 +464,7 @@ export const usePanelDataLoader = (
   watch(
     // Watching for changes in panelSchema, selectedTimeObj and forceLoad
     () => [selectedTimeObj?.value, forceLoad?.value],
-    async (newVal, oldVal) => {
+    async () => {
       log("PanelSchema/Time Wather: called");
 
       // CRITICAL FIX: Check if this specific panel should refresh

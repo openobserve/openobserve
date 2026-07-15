@@ -49,7 +49,7 @@ const dashboardPanelDataObj: any = {};
 const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const store = useStore();
   const { showErrorNotification } = useNotifications();
-  const { getStreams, getStream } = useStreams();
+  const { getStream } = useStreams();
   const valuesWebSocket = useValuesWebSocket();
 
   // Initialize the state for this page key if it doesn't already exist
@@ -433,7 +433,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         no_count: true,
       };
 
-      const res = await valuesWebSocket.fetchFieldValues(
+      await valuesWebSocket.fetchFieldValues(
         queryReq,
         dashboardPanelData,
         row,
@@ -478,7 +478,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         no_count: true,
       };
 
-      const response = await valuesWebSocket.fetchFieldValues(
+      await valuesWebSocket.fetchFieldValues(
         queryReq,
         dashboardPanelData,
         row,
@@ -1080,8 +1080,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     );
   };
 
-  const VARIABLE_PLACEHOLDER = "substituteValue";
-
   const validateQuery = (query: any, variables: any) => {
     // Helper to test one replacement (string or number)
     const testReplacement = (q: any, varName: any, replacement: any) => {
@@ -1372,8 +1370,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const getResultSchema = async (
     query: string,
     abortSignal?: AbortSignal,
-    startISOTimestamp?: number,
-    endISOTimestamp?: number,
+    _startISOTimestamp?: number,
+    _endISOTimestamp?: number,
   ): Promise<{
     group_by: string[];
     projections: string[];

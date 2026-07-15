@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref, onBeforeMount } from "vue";
+import { defineComponent, ref, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
@@ -201,11 +201,10 @@ export default defineComponent({
     const password = ref("");
     const confirmpassword = ref("");
     const email = ref("");
-    const loginform = ref();
     const selectedOrg = ref({});
     const autoRedirectDexLogin = ref(false);
     let orgOptions = ref([{ label: Number, value: String }]);
-    const { identify } = useReo();
+    useReo();
 
     const submitting = ref(false);
 
@@ -266,7 +265,7 @@ export default defineComponent({
               //if user is authorized, get user info
               if (res.data.status == true) {
                 //get user info from backend and extract auth token and set it into localstorage
-                const authToken = getBasicAuth(name.value, password.value);
+                getBasicAuth(name.value, password.value);
                 const userInfo = {
                   given_name: name.value,
                   auth_time: Math.floor(Date.now() / 1000),
@@ -346,13 +345,18 @@ export default defineComponent({
                             user_email: store.state.userInfo.email,
                             ingest_threshold: data.ingest_threshold,
                             search_threshold: data.search_threshold,
-                            subscription_type: data.hasOwnProperty(
+                            subscription_type:
+                              Object.prototype.hasOwnProperty.call(
+                                data,
+                                "CustomerBillingObj",
+                              )
+                                ? data.CustomerBillingObj.subscription_type
+                                : "",
+                            status: data.status,
+                            note: Object.prototype.hasOwnProperty.call(
+                              data,
                               "CustomerBillingObj",
                             )
-                              ? data.CustomerBillingObj.subscription_type
-                              : "",
-                            status: data.status,
-                            note: data.hasOwnProperty("CustomerBillingObj")
                               ? data.CustomerBillingObj.note
                               : "",
                           };
@@ -403,7 +407,7 @@ export default defineComponent({
                 });
               }
             })
-            .catch((e: Error) => {
+            .catch(() => {
               //if any error occurs, show error message and reset form.
               submitting.value = false;
               toast({

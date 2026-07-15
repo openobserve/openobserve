@@ -15,7 +15,6 @@
 
  
 import http from "./http";
-import config from "../aws-exports";
 
 const service_accounts = {
   list: (

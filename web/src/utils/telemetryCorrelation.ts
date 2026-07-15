@@ -171,31 +171,6 @@ export function filterDimensionsForCorrelation(
 }
 
 /**
- * Translate dimensions to field names for a specific telemetry type
- *
- * Uses semantic groups to map dimension IDs to actual field names
- */
-function translateDimensionsToFields(
-  dimensions: Record<string, string>,
-  semanticGroups: FieldAlias[]
-): Array<{ dimensionId: string; possibleFields: string[]; value: string }> {
-  const translations: Array<{ dimensionId: string; possibleFields: string[]; value: string }> = [];
-
-  for (const [dimensionId, value] of Object.entries(dimensions)) {
-    const group = semanticGroups.find((g) => g.id === dimensionId);
-    if (group) {
-      translations.push({
-        dimensionId,
-        possibleFields: group.fields,
-        value,
-      });
-    }
-  }
-
-  return translations;
-}
-
-/**
  * Build WHERE clause conditions using exact field names from StreamInfo.filters
  *
  * Uses the exact field names returned by the _correlate API instead of semantic variations.

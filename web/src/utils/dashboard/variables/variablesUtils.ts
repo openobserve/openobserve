@@ -284,7 +284,8 @@ export const processVariableContent = (
 
     // Get effective value based on context or use direct value
     let effectiveValue =
-      context && resolvedVariables.hasOwnProperty(variable.name)
+      context &&
+      Object.prototype.hasOwnProperty.call(resolvedVariables, variable.name)
         ? resolvedVariables[variable.name]
         : variable.value;
 

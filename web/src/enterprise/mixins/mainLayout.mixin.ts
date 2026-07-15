@@ -1,11 +1,10 @@
-import { ref, Ref, h } from "vue";
+import { ref, Ref } from "vue";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { useStore } from "vuex";
 
 import { getUserInfo, getImageURL, useLocalOrganization, invalidateLoginData, useLocalCurrentUser, useLocalUserInfo } from "@/utils/zincutils";
 import organizationService from "@/services/organizations";
-import billingService from "@/services/billings";
 import userService from "@/services/users";
 
 const MainLayoutCloudMixin = {

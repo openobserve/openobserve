@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { mount, VueWrapper } from "@vue/test-utils";
 import CustomChartRenderer from "./CustomChartRenderer.vue";
 
 // Create mock chart instance
@@ -114,7 +114,7 @@ describe("CustomChartRenderer", () => {
     });
   };
   
-  const waitForChartInit = async (_wrapper: any) => {
+  const waitForChartInit = async () => {
     // Capture the current call count so we can wait for exactly one NEW call,
     // handling the async import("echarts-gl") inside initChart which doesn't
     // settle in a single flushPromises pass within Vitest's module resolution.

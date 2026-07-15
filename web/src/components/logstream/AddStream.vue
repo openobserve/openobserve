@@ -180,7 +180,7 @@ const streamTypes = [
 ];
 
 const emits = defineEmits(["streamAdded", "close", "added:stream-added", "update:open"]);
-const props = defineProps<{
+defineProps<{
   isInPipeline: boolean;
   open?: boolean;
 }>();
@@ -189,7 +189,6 @@ const props = defineProps<{
 const { addStream, getStream } = useStreams();
 
 const fields: Ref<any[]> = ref([]);
-const addStreamFormRef = ref<any>(null);
 const fieldInputsRef = ref<any>(null);
 const nameError = ref('');
 const streamTypeError = ref('');

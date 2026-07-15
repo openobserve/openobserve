@@ -203,7 +203,6 @@ import {
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
-import { getImageURL } from "../../../utils/zincutils";
 import {
   getDashboard,
   deleteVariable,

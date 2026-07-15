@@ -380,8 +380,8 @@ describe("convertCustomChartData", () => {
         customChartContent: "var option = {};"
       };
 
-      const promise = runJavaScriptCode(panelSchema, []);
-      
+      runJavaScriptCode(panelSchema, []);
+
       // Change the panel ID to be refreshed before message handling
       panelIdToBeRefreshed.value = "panel2";
       
@@ -410,14 +410,6 @@ describe("convertCustomChartData", () => {
       // Reset panel ID and send valid message to complete
       panelIdToBeRefreshed.value = null;
       
-      const validEvent = {
-        source: mockIframe.contentWindow,
-        data: {
-          type: "success",
-          result: JSON.stringify({ valid: "data" })
-        }
-      };
-
       // Need to simulate a new message handler since the old one was removed
       // This simulates the behavior but the original promise will remain hanging
       // which is expected behavior in this edge case

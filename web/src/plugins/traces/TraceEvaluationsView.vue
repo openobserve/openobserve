@@ -441,7 +441,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
 <script lang="ts">
 import { defineComponent, PropType, ref, watch, onMounted } from "vue";
-import { getQualityScoreColor } from "@/utils/llmUtils";
 import LLMContentRenderer from "./LLMContentRenderer.vue";
 import { useStore } from "vuex";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -817,16 +816,6 @@ export default defineComponent({
       } catch {
         return [];
       }
-    };
-
-    const getRoleColor = (role: string): string => {
-      const colors: Record<string, string> = {
-        user: "rgba(25, 118, 210, 0.1)",
-        assistant: "rgba(76, 175, 80, 0.1)",
-        system: "rgba(255, 152, 0, 0.1)",
-        tool: "rgba(156, 39, 176, 0.1)",
-      };
-      return colors[role] || "rgba(158, 158, 158, 0.1)";
     };
 
     const parseMessages = (

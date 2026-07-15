@@ -127,6 +127,7 @@ export default defineComponent({
     OSpinner,
     OIcon,
     OTag,
+    OBanner,
 },
   props: {
     traceId: {
@@ -185,7 +186,7 @@ export default defineComponent({
       });
 
       // Sort children by start_time for proper preorder traversal ordering
-      children.forEach((childIds, parentId) => {
+      children.forEach((childIds) => {
         childIds.sort((a, b) => {
           const nodeA = nodeMap.get(a);
           const nodeB = nodeMap.get(b);

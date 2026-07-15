@@ -48,8 +48,8 @@
               :preset="p.preset"
               size="hero"
               :filtered="filteredPreview"
-              @action="onAction(p.preset)"
-              @secondary-action="onAction(p.preset + ':secondary')"
+              @action="onAction()"
+              @secondary-action="onAction()"
             />
           </div>
         </section>
@@ -73,7 +73,7 @@
             description="Nothing matches yet — try a different stream, widen the time range, or create something new."
             action-label="Clear filters"
             action-icon="filter-list"
-            @action="onAction('explorer')"
+            @action="onAction()"
           />
         </div>
       </div>
@@ -88,7 +88,7 @@
               size="block" (inside a card / dashboard panel)
             </span>
             <div class="rounded-xl border border-border-default overflow-hidden">
-              <OEmptyState preset="no-search-results" size="block" @action="onAction('block')" />
+              <OEmptyState preset="no-search-results" size="block" @action="onAction()" />
             </div>
           </section>
           <section class="flex flex-col gap-2">
@@ -96,7 +96,7 @@
               size="inline" (table body / dropdown)
             </span>
             <div class="rounded-xl border border-border-default overflow-hidden">
-              <OEmptyState preset="no-search-results" size="inline" @action="onAction('inline')" />
+              <OEmptyState preset="no-search-results" size="inline" @action="onAction()" />
             </div>
           </section>
         </div>
@@ -137,7 +137,5 @@ const presets: { preset: EmptyStatePresetName; label: string }[] = [
   { preset: "no-invitations", label: "No invitations" },
 ];
 
-const onAction = (which: string) => {
-
-};
+const onAction = () => {};
 </script>

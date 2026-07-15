@@ -446,7 +446,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -628,11 +628,6 @@ const columns = ref<OTableColumnDef[]>([
 ]);
 
 // Computed
-const filteredRows = computed(() => {
-  // Removed client-side filtering as we're using server-side pagination
-  return rows.value;
-});
-
 // Methods
 const fetchAlertsList = async () => {
   try {
@@ -664,15 +659,6 @@ const fetchAlertsList = async () => {
     console.error("Error fetching alerts list:", error);
     // Silently fail - user can still type alert names manually
   }
-};
-
-const filterAlertOptions = (val: string, update: any) => {
-  update(() => {
-    const needle = val.toLowerCase();
-    filteredAlertOptions.value = allAlerts.value.filter((v) =>
-      v.label.toLowerCase().includes(needle),
-    );
-  });
 };
 
 const onAlertSelected = (val: any) => {

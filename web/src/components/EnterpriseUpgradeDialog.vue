@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, PropType, watch, defineAsyncComponent } from "vue";
+import { defineComponent, ref, computed, watch, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -991,7 +991,7 @@ export default defineComponent({
             },
             series: [{
               type: 'bar',
-              data: values.map((value, index) => {
+              data: values.map((value) => {
                 // Color bars red if they exceed threshold, otherwise green
                 const exceeds = thresholdInDataUnit > 0 && value > thresholdInDataUnit;
                 return {

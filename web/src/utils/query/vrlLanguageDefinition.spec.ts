@@ -111,7 +111,7 @@ describe("vrlLanguageDefinition.ts", () => {
     });
 
     it("should have correct regEx pattern", () => {
-      const expectedPattern = /\/(?!\/\/)(?:[^\/\\]|\\.)*\/[igm]*/;
+      const expectedPattern = /\/(?!\/\/)(?:[^/\\]|\\.)*\/[igm]*/;
       expect(vrlLanguageDefinition.regEx.toString()).toBe(expectedPattern.toString());
     });
 
@@ -176,7 +176,7 @@ describe("vrlLanguageDefinition.ts", () => {
     });
 
     it("should have correct symbols pattern", () => {
-      const expectedSymbols = /[=><!~?&%|+\-*\/\^\.,\:]+/;
+      const expectedSymbols = /[=><!~?&%|+\-*/^.,:]+/;
       expect(vrlLanguageDefinition.symbols.toString()).toBe(expectedSymbols.toString());
     });
 

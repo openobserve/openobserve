@@ -35,7 +35,7 @@
               >
                 <div class="text-sm font-semibold min-w-18.75">{{ period.label }}</div>
                 <div
-                  v-for="(item, itemIndex) in relativeDates[period.value]"
+                  v-for="item in relativeDates[period.value]"
                   :key="item"
                 >
                   <OButton

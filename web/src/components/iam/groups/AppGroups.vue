@@ -243,8 +243,6 @@ const columns: OTableColumnDef[] = [
   },
 ];
 
-const groups = ref([]);
-
 onBeforeMount(() => {
   setupGroups();
 });
@@ -252,7 +250,7 @@ onBeforeMount(() => {
 const updateTable = () => {
   let counter = 1;
   rows.value = cloneDeep(
-    groupsState.groups.map((group: { group_name: string }, index: number) => ({
+    groupsState.groups.map((group: { group_name: string }) => ({
       ...group,
       "#": counter <= 9 ? `0${counter++}` : counter++,
     }))
@@ -317,11 +315,6 @@ const setupGroups = async () => {
       loading.value = false;
     });
 };
-
-const hideAddGroup = () => {
-  showAddGroup.value = false;
-};
-
 
 const deleteUserGroup = (group: any) => {
   deleteGroup(group.group_name, store.state.selectedOrganization.identifier)

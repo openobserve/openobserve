@@ -1,7 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import useDnD from '@/plugins/pipelines/useDnD';
-import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import Condition from "./Condition.vue";
 

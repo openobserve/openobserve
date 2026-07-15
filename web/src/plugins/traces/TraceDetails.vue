@@ -964,8 +964,6 @@ import { contextRegistry } from "@/composables/contextProviders";
 import {
   formatTimeWithSuffix,
   getImageURL,
-  convertTimeFromNsToMs,
-  convertTimeFromNsToUs,
 } from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
@@ -982,11 +980,8 @@ import {
   createTreeVisualizationEngine,
   type TreeVisualizationData,
 } from "@/utils/traces/treeVisualizationEngine";
-import { generateTracePatternTooltipContent } from "@/utils/traces/treeTooltipHelpers";
 import {
   SPAN_KIND_MAP,
-  SPAN_KIND_UNSPECIFIED,
-  SPAN_KIND_CLIENT,
 } from "@/utils/traces/constants";
 import useResizer from "@/composables/useResizer";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -1157,8 +1152,6 @@ export default defineComponent({
     const {
       searchObj,
       getUrlQueryParams,
-      buildQueryDetails,
-      navigateToLogs,
       navigateToCorrelatedLogs,
     } = useTraces();
 
@@ -1171,7 +1164,7 @@ export default defineComponent({
     const splitterModel = ref(25);
     const timeRange: any = ref({ start: 0, end: 0 });
     const store = useStore();
-    const { getStreams, getStream } = useStreams();
+    const { getStreams } = useStreams();
 
     // Chart renderer ref for tooltip integration
     const chartRendererRef = ref<any>(null);
@@ -1542,24 +1535,6 @@ export default defineComponent({
       return Math.min(...spans.map((span: any) => span.start_time));
     });
 
-    // Tabs configuration matching TraceDetailsV2 — inlined into template
-    const traceTabs = computed(() => {
-      const tabs = [
-        { label: "Waterfall", value: "waterfall" },
-        { label: "Flame Graph", value: "flame-graph" },
-        { label: "Trace Graph", value: "map" },
-      ];
-      // Conditionally add DAG tab for LLM traces
-      if (hasLLMSpans.value) {
-        tabs.push({ label: "DAG", value: "dag" });
-      }
-      // Thread view — chat-style projection of LLM turns and tool calls.
-      if (hasLLMSpans.value) {
-        tabs.push({ label: "Thread", value: "thread" });
-      }
-      return tabs;
-    });
-
     const showTraceDetails = ref(false);
     const currentIndex = ref(0);
     const searchResults = ref(0);
@@ -1670,12 +1645,6 @@ export default defineComponent({
       }, 300);
     }
     
-    const backgroundStyle = computed(() => {
-      return {
-        background: store.state.theme === "dark" ? "#181a1b" : "#ffffff",
-      };
-    });
-
     const resetTraceDetails = () => {
       searchObj.data.traceDetails.showSpanDetails = false;
       searchObj.data.traceDetails.selectedSpanId = "";

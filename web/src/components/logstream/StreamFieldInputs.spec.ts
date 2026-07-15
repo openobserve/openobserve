@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mount } from '@vue/test-utils';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { qLayoutInjections } from '@/test/unit/helpers/layout-injections';
 import StreamFieldInputs from './StreamFieldInputs.vue';
 import { createI18n } from 'vue-i18n';
@@ -152,7 +152,7 @@ describe('StreamFieldInputs', () => {
       await wrapper.setProps({ fields: mockFields });
       const rows = wrapper.findAll('[data-test^="add-stream-field-row-"]');
       expect(rows.length).toBe(2);
-      rows.forEach((row, i) => {
+      rows.forEach((row) => {
         expect(row.classes()).toContain('flex');
         expect(row.classes()).toContain('flex-wrap');
       });

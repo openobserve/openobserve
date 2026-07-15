@@ -370,9 +370,7 @@ import {
   watch,
   nextTick,
 } from "vue";
-import * as echarts from "echarts";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import serviceGraphService from "@/services/service_graph";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
@@ -386,13 +384,10 @@ import {
   GROUP_PREFIX,
 } from "@/utils/traces/applyGraphCollapse";
 import {
-  formatNumber,
-  formatLatency,
   pointToBezierDistance,
   generateNodeTooltipContent,
   generateEdgeTooltipContent,
   findIncomingEdgeForNode,
-  calculateRootNodeMetrics,
 } from "@/utils/traces/treeTooltipHelpers";
 import useStreams from "@/composables/useStreams";
 import useTraces from "@/composables/useTraces";
@@ -443,7 +438,6 @@ export default defineComponent({
   emits: ["view-traces", "request:stream-change", "jump-to-stream-data"],
   setup(props, { emit }) {
     const store = useStore();
-    const router = useRouter();
     const { t } = useI18n();
     const { getStreams } = useStreams();
     const { searchObj } = useTraces();
@@ -499,12 +493,12 @@ export default defineComponent({
       const s = new Set(expandedGroups.value);
       s.has(groupId) ? s.delete(groupId) : s.add(groupId);
       expandedGroups.value = s;
-      lastChartOptions.value = null;
+      lastChartOptions = null;
       applyFilters();
     };
     const setCollapseMode = (m: "auto" | "expanded" | "collapsed") => {
       collapseMode.value = m;
-      lastChartOptions.value = null;
+      lastChartOptions = null;
       applyFilters();
     };
 
@@ -543,14 +537,14 @@ export default defineComponent({
     // reliable reset for both tree (layout:none) and graph series (also clears
     // any wheel pan/zoom the user applied).
     const fitToScreen = () => {
-      lastChartOptions.value = null;
+      lastChartOptions = null;
       chartKey.value++;
     };
     const toggleKindVisibility = (kind: string) => {
       const s = new Set(hiddenKinds.value);
       s.has(kind) ? s.delete(kind) : s.add(kind);
       hiddenKinds.value = s;
-      lastChartOptions.value = null;
+      lastChartOptions = null;
       applyFilters();
     };
 
@@ -614,8 +608,9 @@ export default defineComponent({
     // Key to control chart recreation - only change when layout/visualization type changes
     const chartKey = ref(0);
 
-    // Track last chart options to prevent unnecessary recreation for graph view
-    const lastChartOptions = ref<any>(null);
+    // Non-reactive memo to prevent unnecessary recreation for graph view.
+    // Kept as a plain variable so writes are not reactive side effects.
+    let lastChartOptions: { key: number; data: any } | null = null;
 
     const chartData = computed(() => {
       if (!filteredGraphData.value.nodes.length) {
@@ -632,12 +627,12 @@ export default defineComponent({
       // BUT only if no filters are active and no new baselines have arrived
       if (
         vizType === "graph" &&
-        lastChartOptions.value &&
-        chartKey.value === lastChartOptions.value.key &&
+        lastChartOptions &&
+        chartKey.value === lastChartOptions.key &&
         !hasActiveFilters
       ) {
         return {
-          options: lastChartOptions.value.data.options,
+          options: lastChartOptions.data.options,
           // Full-replace even on a cache hit: graph uses fixed node positions,
           // so replacing re-renders at the same coordinates (no jump) while
           // never leaving a stale wrong-type series behind. Consistent with the
@@ -674,13 +669,13 @@ export default defineComponent({
       // Cache the options for graph view
       // BUT only if no filters are active (to avoid caching filtered states)
       if (vizType === "graph" && !hasActiveFilters) {
-        lastChartOptions.value = {
+        lastChartOptions = {
           key: chartKey.value,
           data: newOptions,
         };
       } else if (hasActiveFilters) {
         // Clear cache when filtering to ensure fresh render on filter removal
-        lastChartOptions.value = null;
+        lastChartOptions = null;
       }
 
       return {
@@ -1397,7 +1392,7 @@ export default defineComponent({
       error.value = null;
 
       // Clear cache to force chart regeneration with fresh data
-      lastChartOptions.value = null;
+      lastChartOptions = null;
       chartKey.value++;
       try {
         const orgId = store.state.selectedOrganization.identifier;
@@ -1517,91 +1512,6 @@ export default defineComponent({
       }
     };
 
-    const parsePrometheusMetrics = (metricsText: string) => {
-      const nodes = new Map<string, any>();
-      const edges: any[] = [];
-
-      const lines = metricsText.split("\n");
-
-      for (const line of lines) {
-        if (line.startsWith("#") || !line.trim()) continue;
-
-        // Parse metric line: metric_name{labels} value
-        const match = line.match(/^(\w+)\{([^}]+)\}\s+([\d.eE+-]+)/);
-        if (!match) continue;
-
-        const [, metricName, labelsStr, value] = match;
-        const labels: any = {};
-
-        // Parse labels
-        const labelMatches = Array.from(labelsStr.matchAll(/(\w+)="([^"]+)"/g));
-        for (const [, key, val] of labelMatches) {
-          labels[key] = val;
-        }
-
-        if (!labels.client || !labels.server) continue;
-
-        // Add nodes
-        if (!nodes.has(labels.client)) {
-          nodes.set(labels.client, {
-            id: labels.client,
-            label: labels.client,
-            is_virtual: labels.client === "unknown",
-          });
-        }
-        if (!nodes.has(labels.server)) {
-          nodes.set(labels.server, {
-            id: labels.server,
-            label: labels.server,
-            is_virtual: labels.server.includes("unknown"),
-          });
-        }
-
-        // Add edge data
-        if (metricName === "traces_service_graph_request_total") {
-          const edgeId = `${labels.client}->${labels.server}`;
-          let edge = edges.find((e) => e.id === edgeId);
-
-          if (!edge) {
-            edge = {
-              id: edgeId,
-              from: labels.client,
-              to: labels.server,
-              total_requests: 0,
-              failed_requests: 0,
-            };
-            edges.push(edge);
-          }
-
-          edge.total_requests = parseFloat(value);
-        }
-
-        if (metricName === "traces_service_graph_request_failed_total") {
-          const edgeId = `${labels.client}->${labels.server}`;
-          let edge = edges.find((e) => e.id === edgeId);
-
-          // Create edge if it doesn't exist yet (failed_total may come before request_total)
-          if (!edge) {
-            edge = {
-              id: edgeId,
-              from: labels.client,
-              to: labels.server,
-              total_requests: 0,
-              failed_requests: 0,
-            };
-            edges.push(edge);
-          }
-
-          edge.failed_requests = parseFloat(value);
-        }
-      }
-
-      return {
-        nodes: Array.from(nodes.values()),
-        edges,
-      };
-    };
-
     const onStreamFilterChange = (stream: string) => {
       emit("request:stream-change", stream);
     };
@@ -1654,7 +1564,7 @@ export default defineComponent({
         // swap comes from chartData rendering with notMerge:true (full replace),
         // which lets a `type:"tree"` series be replaced by a `type:"graph"` one
         // (and vice-versa) — a merge cannot swap series types.
-        lastChartOptions.value = null;
+        lastChartOptions = null;
       },
     );
 

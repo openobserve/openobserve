@@ -852,8 +852,6 @@ describe("Login.vue", () => {
         }),
       );
 
-      const verifySpy = vi.fn();
-
       wrapper = mount(LoginPage, {
         global: {
           plugins: [store, router, i18n],

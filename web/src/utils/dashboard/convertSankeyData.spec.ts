@@ -19,7 +19,7 @@ import { convertSankeyData } from "./convertSankeyData";
 // Mock the convertDataIntoUnitValue module
 vi.mock("./convertDataIntoUnitValue", () => ({
   formatUnitValue: vi.fn((value) => `formatted_${value}`),
-  getUnitValue: vi.fn((value, unit, unitCustom, decimals) => `unit_${value}`)
+  getUnitValue: vi.fn((value) => `unit_${value}`)
 }));
 
 describe("convertSankeyData", () => {

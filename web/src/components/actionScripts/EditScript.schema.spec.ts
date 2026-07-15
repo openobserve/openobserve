@@ -11,7 +11,7 @@ import { makeEditScriptSchema } from "./EditScript.schema";
 
 // Mirror the production isValidResourceName behaviour (reject :, /, ?, #, space).
 vi.mock("@/utils/zincutils", () => ({
-  isValidResourceName: (val: string) => !/[:\/?#\s]/.test(val),
+  isValidResourceName: (val: string) => !/[:/?#\s]/.test(val),
 }));
 
 // i18n passthrough. The schema translates every message (common.nameRequired,
@@ -102,7 +102,7 @@ describe("EditScript.schema", () => {
     });
 
     it("defaults timezone to UTC when omitted", () => {
-      const { timezone, ...rest } = base();
+      const { timezone: _timezone, ...rest } = base();
       const res = makeSchema().safeParse(rest);
       expect(res.success).toBe(true);
       if (res.success) expect(res.data.timezone).toBe("UTC");

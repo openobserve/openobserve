@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { useStore } from "vuex";
-import { reactive } from "vue";
 import { ref } from "vue";
 import rateLimiterService from "@/services/rate_limit";
  const  useRateLimiter = () => {
@@ -132,6 +131,7 @@ import rateLimiterService from "@/services/rate_limit";
       });
       return modulesToDisplay;
       } catch (error) {
+        /* ignore: best-effort module list */
       }
 
 

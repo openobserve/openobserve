@@ -971,7 +971,7 @@ describe("SearchBar.vue Integration", () => {
       },
       
       // Mock integration methods
-      executeSearch: vi.fn(async (query: string) => {
+      executeSearch: vi.fn(async () => {
         integrationInstance.searchObj.loading = true;
         await new Promise(resolve => setTimeout(resolve, 100));
         integrationInstance.searchObj.data.results = [
@@ -1362,7 +1362,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
         }
       }),
       
-      changeFunctionName: vi.fn((value) => {
+      changeFunctionName: vi.fn(() => {
         // Mock function name change logic
       }),
       
@@ -1506,7 +1506,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
         componentInstance.$emit("onChangeTimezone");
       }),
       
-      downloadLogs: vi.fn(async (data, format) => {
+      downloadLogs: vi.fn(async (data) => {
         if (data.length === 0) {
           componentInstance.notify({
             type: "negative",
@@ -1635,7 +1635,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
       handleSavedView: vi.fn(() => {
         if (componentInstance.isSavedViewAction === "create") {
           if (componentInstance.savedViewName === "" || 
-              !/^[A-Za-z0-9 \-\_]+$/.test(componentInstance.savedViewName)) {
+              !/^[A-Za-z0-9 \-_]+$/.test(componentInstance.savedViewName)) {
             componentInstance.notify({
               message: "Please provide valid view name.",
               color: "negative",
@@ -1684,7 +1684,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
         });
       }),
       
-      updateSavedViews: vi.fn((viewID, viewName) => {
+      updateSavedViews: vi.fn(() => {
         componentInstance.notify({
           message: "View updated successfully.",
           color: "positive",
@@ -1705,7 +1705,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
         componentInstance.$emit("showSearchHistory");
       }),
       
-      getFieldList: vi.fn((stream, streamFields, interestingFields, isQuickMode) => {
+      getFieldList: vi.fn((stream, streamFields, interestingFields) => {
         return streamFields
           .filter((item) => interestingFields.includes(item.name))
           .map((item) => item.name);
@@ -3127,8 +3127,6 @@ describe("SearchBar.vue Actual Component Methods", () => {
 
   // Test 186: Complex search object manipulation
   it("should handle complex search object updates", () => {
-    const originalQuery = componentInstance.searchObj.data.query;
-    const originalMode = componentInstance.searchObj.meta.sqlMode;
     
     componentInstance.searchObj.data.query = "SELECT * FROM new_stream";
     componentInstance.searchObj.meta.sqlMode = true;
@@ -3533,7 +3531,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
 
   // Test 218: shareLink error handling
   it("should handle shareLink method execution", async () => {
-    const result = await componentInstance.shareLink();
+    await componentInstance.shareLink();
     
     expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "positive",
@@ -3673,8 +3671,6 @@ describe("SearchBar.vue VRL Visualization Support", () => {
 
     it("should NOT display 'VRL Function Editor is not supported in visualize mode' message", () => {
       // This message was inside the removed banner
-      const warningMessage = "VRL Function Editor is not supported in visualize mode.";
-
       // The message is no longer rendered since the banner was removed
       // Simulating that the banner render condition no longer exists
       const bannerRendered = false;

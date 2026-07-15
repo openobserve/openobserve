@@ -402,18 +402,18 @@ describe('GCPConfig.vue Component Logic', () => {
   // Test 30: Component handles getIngestionURL returning empty string
   it('should handle getIngestionURL returning empty string', () => {
     vi.mocked(getIngestionURL).mockReturnValue('');
-    
-    const setup = createComponentSetup();
-    
+
+    createComponentSetup();
+
     expect(getEndPoint).toHaveBeenCalledWith('');
   });
 
   // Test 31: Component handles getIngestionURL returning null
   it('should handle getIngestionURL returning null', () => {
     vi.mocked(getIngestionURL).mockReturnValue(null as any);
-    
-    const setup = createComponentSetup();
-    
+
+    createComponentSetup();
+
     expect(getEndPoint).toHaveBeenCalledWith(null);
   });
 

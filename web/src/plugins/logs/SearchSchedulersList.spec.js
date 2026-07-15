@@ -1,13 +1,10 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import SearchSchedulersList from "./SearchSchedulersList.vue";
 import searchService from "@/services/search";
-import useLogs from "@/composables/useLogs";
-import { useRouter, useRoute } from "vue-router";
-import config from "@/aws-exports";
-import { nextTick, ref } from "vue";
+import { useRouter } from "vue-router";
+import { nextTick } from "vue";
 
 // Mock config
 vi.mock("@/aws-exports", () => ({
@@ -148,7 +145,7 @@ describe("SearchSchedulersList Component", () => {
 
     // Mock component methods
     wrapper.vm.formatTime = vi.fn(took => `${took.toFixed(2)} sec`);
-    wrapper.vm.calculateDuration = vi.fn((startTime, endTime) => ({
+    wrapper.vm.calculateDuration = vi.fn(() => ({
       formatted: "1 second",
       raw: 1.0
     }));
@@ -272,11 +269,6 @@ describe("SearchSchedulersList Component", () => {
 
   describe("UI Elements", () => {
     it("shows expanded row details correctly", async () => {
-      const testRow = {
-        trace_id: "test-uuid",
-        sql: "SELECT * FROM logs"
-      };
-
       wrapper.vm.onExpandedIdsChange(["test-uuid"]);
       expect(wrapper.vm.expandedIds).toEqual(["test-uuid"]);
     });

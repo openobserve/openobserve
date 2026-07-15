@@ -465,25 +465,18 @@ import { ref, nextTick, onMounted, watch } from "vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import DateTime from "@/components/DateTime.vue";
 import {
   getUUID,
-  useLocalTimezone,
-  isValidResourceName,
   getCronIntervalDifferenceInSeconds,
   isAboveMinRefreshInterval,
 } from "@/utils/zincutils";
-import VariablesInput from "@/components/alerts/VariablesInput.vue";
 import { useStore } from "vuex";
-import dashboardService from "@/services/dashboards";
 import { onBeforeMount } from "vue";
 import type { Ref } from "vue";
-import { DateTime as _DateTime } from "luxon";
 import actions from "@/services/action_scripts";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import CronExpressionParser from "cron-parser";
-import { convertDateToTimestamp } from "@/utils/date";
 import service_accounts from "@/services/service_accounts";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -565,17 +558,6 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-const timeTabs = [
-  {
-    label: "Schedule now",
-    value: "scheduleNow",
-  },
-  {
-    label: "Schedule later",
-    value: "scheduleLater",
-  },
-];
-
 const frequencyTabs = [
   {
     label: "Cron Job",
@@ -587,23 +569,7 @@ const frequencyTabs = [
   },
 ];
 
-const selectedTimeTab = ref("scheduleNow");
-
 const store = useStore();
-
-const filteredTimezone: any = ref([]);
-
-const folderOptions: Ref<{ label: string; value: string }[]> = ref([]);
-
-const dashboardOptions: Ref<
-  { label: string; value: string; tabs: any[]; version: number }[]
-> = ref([]);
-
-const dashboardTabOptions: Ref<{ label: string; value: string }[]> = ref([]);
-
-const options: Ref<{ [key: string]: any[] }> = ref({});
-
-const emails = ref("");
 
 const isEditingActionScript = ref(false);
 
@@ -768,7 +734,7 @@ watch(
 
 watch(
   () => router.currentRoute.value.query?.id,
-  async (action_id) => {
+  async () => {
     await handleActionScript();
   },
 );
@@ -776,37 +742,6 @@ watch(
 onBeforeMount(async () => {
   await handleActionScript();
 });
-
-const scheduling = ref({
-  date: "",
-  time: "",
-  timezone: "",
-});
-
-const currentTimezone =
-  useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
-const timezone = ref(currentTimezone);
-
-const timezoneFilterFn = (val: string, update: Function) => {
-  filteredTimezone.value = filterColumns(timezoneOptions, val, update);
-};
-
-const filterColumns = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-    return filteredOptions;
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1,
-    );
-  });
-  return filteredOptions;
-};
 
 // @ts-ignore
 let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
@@ -1031,14 +966,6 @@ const deleteApiHeader = (header: any) => {
 
   if (!environmentalVariables.value.length) addApiHeader();
 };
-const isRequiredKey = (value: any) => {
-  return value && value.trim() !== "" ? true : "Key is required";
-};
-
-const isRequiredValue = (value: any) => {
-  return value && value.trim() !== "" ? true : "Value is required";
-};
-
 const handleActionScript = async () => {
   isEditingActionScript.value = !!router.currentRoute.value.query?.id;
   // Fresh load starts with an unedited cron field (edit-load re-seeds via
@@ -1084,14 +1011,6 @@ const filteredServiceAccounts: Ref<{ label: string; value: string }[]> = ref(
   [],
 );
 const isFetchingServiceAccounts = ref(false);
-
-const filterServiceAccounts = (val: string, update: Function) => {
-  filteredServiceAccounts.value = filterColumns(
-    serviceAccountsOptions,
-    val,
-    update,
-  );
-};
 
 const serviceAccountsOptions: any[] = [];
 

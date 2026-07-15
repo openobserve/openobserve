@@ -465,7 +465,6 @@ describe("useTextHighlighter", () => {
     });
 
     it("should correctly detect status codes in context (address example)", () => {
-      const colors = { status_code: "#f57c00", stringValue: "#047857" };
       const mockColors = {
         stringValue: "#047857",
         status_code: "#f57c00",

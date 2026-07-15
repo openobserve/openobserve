@@ -91,7 +91,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed } from "vue";
 import { PromqlBuilderQuery } from "@/components/promql/types";
 import { promqlRenderer } from "@/components/promql/operations/queryModeller";
 import MetricSelector from "@/components/promql/components/MetricSelector.vue";
@@ -115,7 +115,6 @@ const visualQuery = ref<PromqlBuilderQuery>({
 });
 
 const queryResult = ref<string | null>(null);
-const showDocumentation = ref(true);
 
 // Datasource options (you can connect this to actual datasource later)
 const datasourceOptions = ref({

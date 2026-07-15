@@ -147,7 +147,6 @@ const emit = defineEmits<{
 }>();
 
 const internalWidth = ref(props.sidebarWidth);
-const lastWidth = ref(props.sidebarWidth);
 
 const sidebarVisible = computed(() => internalWidth.value > 0);
 
@@ -166,13 +165,5 @@ watch(internalWidth, (val) => {
   emit("update:sidebarWidth", val);
 });
 
-const toggleSidebar = () => {
-  if (sidebarVisible.value) {
-    lastWidth.value = internalWidth.value;
-    internalWidth.value = 0;
-  } else {
-    internalWidth.value = lastWidth.value || props.sidebarWidth;
-  }
-};
 </script>
 

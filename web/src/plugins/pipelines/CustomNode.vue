@@ -22,19 +22,12 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import { getImageURL } from "@/utils/zincutils";
 import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
 
-import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-
-const functionImage = getImageURL("images/pipeline/function.svg");
-const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
-const conditionImage = getImageURL("images/pipeline/condition.svg");
-const externalOutputImage = getImageURL("images/pipeline/externalOutput.svg");
 
 const props = defineProps({
   id: {
@@ -48,15 +41,12 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["delete:node"]);
+defineEmits(["delete:node"]);
 const {
   pipelineObj,
   deletePipelineNode,
-  onDragStart,
-  onDrop,
   checkIfDefaultDestinationNode,
 } = useDragAndDrop();
-const menu = ref(false);
 const showButtons = ref(false);
 const showDeleteTooltip = ref(false);
 let hideButtonsTimeout = null;
@@ -205,83 +195,6 @@ const navigateToFunction = (functionName) => {
   });
 };
 
-const onFunctionClick = (data, event, id) => {
-  pipelineObj.userSelectedNode = data;
-  const dataToOpen = {
-    label: "Function",
-    subtype: "function",
-    io_type: "default",
-    icon: "img:" + functionImage,
-    tooltip: "Function Node",
-    isSectionHeader: false,
-  };
-  pipelineObj.userClickedNode = id;
-  onDragStart(event, dataToOpen);
-  onDrop(event, { x: 100, y: 100 });
-  menu.value = false;
-};
-
-const onConditionClick = (data, event, id) => {
-  data.label = id;
-  pipelineObj.userSelectedNode = data;
-
-  const dataToOpen = {
-    label: "Condition",
-    subtype: "condition",
-    io_type: "default",
-    icon: "img:" + conditionImage,
-    tooltip: "Condition Node",
-    isSectionHeader: false,
-  };
-  pipelineObj.userClickedNode = id;
-  onDragStart(event, dataToOpen);
-  onDrop(event, { x: 100, y: 100 });
-  menu.value = false;
-};
-
-const onStreamOutputClick = (data, event, id) => {
-  pipelineObj.userSelectedNode = data;
-
-  if (!id) {
-    pipelineObj.userClickedNode = data.label;
-  } else {
-    pipelineObj.userClickedNode = id;
-  }
-  const dataToOpen = {
-    label: "Stream",
-    subtype: "stream",
-    io_type: "output",
-    icon: "img:" + streamOutputImage,
-    tooltip: "Destination: Stream Node",
-    isSectionHeader: false,
-  };
-  // pipelineObj.userClickedNode = id
-  onDragStart(event, dataToOpen);
-  onDrop(event, { x: 100, y: 100 });
-  menu.value = false;
-};
-const onExternalDestinationClick = (data, event, id) => {
-  pipelineObj.userSelectedNode = data;
-
-  if (!id) {
-    pipelineObj.userClickedNode = data.label;
-  } else {
-    pipelineObj.userClickedNode = id;
-  }
-  const dataToOpen = {
-    label: "Remote",
-    subtype: "remote_stream",
-    io_type: "output",
-    icon: "img:" + externalOutputImage,
-    tooltip: "Destination: Remote Node",
-    isSectionHeader: false,
-  };
-  // pipelineObj.userClickedNode = id
-  onDragStart(event, dataToOpen);
-  onDrop(event, { x: 100, y: 100 });
-  menu.value = false;
-};
-
 const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
@@ -300,9 +213,6 @@ const editNode = (id) => {
 
 const deleteNode = (id) => {
   openCancelDialog(id);
-};
-const functionInfo = (data) => {
-  return pipelineObj.functions[data.name] || null;
 };
 
 const getTruncatedConditions = (conditionData) => {
@@ -443,7 +353,7 @@ const openCancelDialog = (id) => {
   confirmDialogMeta.value.message = "Are you sure you want to delete node?";
   //here we will check if the destination node is added by default if yes then we will show a warning message to the user
   if (
-    props.data?.hasOwnProperty("node_type") &&
+    Object.prototype.hasOwnProperty.call(props.data ?? {}, "node_type") &&
     props.data.node_type === "stream" &&
     checkIfDefaultDestinationNode(id)
   ) {
@@ -623,7 +533,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          v-if="data.stream_name && data.stream_name.hasOwnProperty('label')"
+          v-if="data.stream_name && Object.prototype.hasOwnProperty.call(data.stream_name, 'label')"
           class="flex text-[15px]! font-bold! leading-[1.4]!"
           style="
             text-align: left;

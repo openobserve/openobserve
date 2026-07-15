@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import PerformanceSummary from "./PerformanceSummary.vue";
 import { createI18n } from "vue-i18n";
 import { createStore } from "vuex";
@@ -138,15 +138,13 @@ function mountComponent(routeQuery: Record<string, any> = {}, props: Record<stri
 
 describe("PerformanceSummary", () => {
   let wrapper: ReturnType<typeof mountComponent>;
-  let mockGetDashboard: ReturnType<typeof vi.fn>;
   let mockDeletePanel: ReturnType<typeof vi.fn>;
   let mockConvertDashboardSchemaVersion: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     vi.clearAllMocks();
 
-    const { getDashboard, deletePanel } = await import("@/utils/commons.ts");
-    mockGetDashboard = vi.mocked(getDashboard);
+    const { deletePanel } = await import("@/utils/commons.ts");
     mockDeletePanel = vi.mocked(deletePanel);
 
     const { convertDashboardSchemaVersion } = await import(

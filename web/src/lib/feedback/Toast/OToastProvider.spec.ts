@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest"
 import { mount } from "@vue/test-utils"
-import { h, nextTick } from "vue"
+import { nextTick } from "vue"
 import OToastProvider from "./OToastProvider.vue"
 import { toastRecords, toast } from "./useToast"
 
@@ -35,7 +35,6 @@ describe("OToastProvider", () => {
     expect(toastRecords).toHaveLength(1)
 
     // Simulate Reka firing openChange(false) by directly calling the handler
-    const id = toastRecords[0].id
     // Manually trigger handleOpenChange by emitting on the OToast child
     const oToast = wrapper.findComponent({ name: "OToast" })
     oToast.vm.$emit("openChange", false)

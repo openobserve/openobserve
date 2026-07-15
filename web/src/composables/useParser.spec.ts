@@ -21,10 +21,6 @@ class MockParserInstance {
   }
 }
 
-class MockParser {
-  static Parser = MockParserInstance;
-}
-
 vi.mock("@openobserve/node-sql-parser/build/datafusionsql", () => ({
   default: {
     Parser: MockParserInstance,

@@ -314,11 +314,9 @@ import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { debounce } from "lodash-es";
 import useQuery from "@/composables/useQuery";
-import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
 import { getConsumableRelativeTime } from "@/utils/date";
-import AppTabs from "@/components/common/AppTabs.vue";
 import jstransform from "@/services/jstransform";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -348,27 +346,6 @@ const QueryEditor = defineAsyncComponent(
 const inputQuery = ref<string>("");
 const inputEvents = ref<string>("");
 const outputEvents = ref<string>("");
-
-const dummyEvents = {
-  data: {
-    results: [
-      {
-        event: {
-          _timestamp: 1735128523652186,
-          job: "test",
-          level: "info",
-          log: "test message for openobserve",
-        },
-      },
-      {
-        event: {
-          log: "test message for openobserve",
-        },
-        message: "Error in event",
-      },
-    ],
-  },
-};
 
 const originalOutputEvents = ref<any>("");
 
@@ -494,19 +471,6 @@ const outputMessage = computed(() => {
 
   return "";
 });
-
-const areInputValid = () => {
-  if (!inputQuery.value) {
-    toast({
-      variant: "error",
-      message: t("function.pleaseEnterQuery"),
-    });
-    sqlQueryErrorMsg.value = t("function.pleaseEnterQuery");
-    return false;
-  }
-
-  return true;
-};
 
 const importSqlParser = async () => {
   const useSqlParser: any = await import("@/composables/useParser");

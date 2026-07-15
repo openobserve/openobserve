@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import FunctionsToolbar from "./FunctionsToolbar.vue";
 import i18n from "@/locales";
@@ -309,7 +309,6 @@ describe("FunctionsToolbar", () => {
     wrapper.vm.showInputError = true;
     await wrapper.vm.$nextTick();
 
-    const errorIcon = wrapper.find('.cursor-pointer[size="20px"]');
     expect(wrapper.vm.isValidMethodName()).not.toBe(true);
   });
 });

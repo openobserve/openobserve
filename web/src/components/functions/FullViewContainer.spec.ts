@@ -382,7 +382,7 @@ describe('FullViewContainer.vue', () => {
       const icon = wrapper.find('.OIcon-stub');
       
       const clickEvent = new Event('click');
-      const stopPropagationSpy = vi.spyOn(clickEvent, 'stopPropagation');
+      vi.spyOn(clickEvent, 'stopPropagation');
       
       // The @click.stop directive should handle this
       await icon.trigger('click');
@@ -486,7 +486,6 @@ describe('FullViewContainer.vue', () => {
     it('provides clickable elements for keyboard navigation', () => {
       wrapper = createWrapper();
       const icon = wrapper.find('.OIcon-stub');
-      const label = wrapper.find('.text-\\[14px\\]');
 
       expect(icon.classes()).toContain('cursor-pointer');
       // Label should be clickable when showExpandIcon is true

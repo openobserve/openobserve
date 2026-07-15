@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import OpenTelemetry from "@/components/ingestion/traces/OpenTelemetry.vue";
 import { nextTick } from "vue";
@@ -34,7 +34,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
     ...actual,
     getImageURL: vi.fn((path: string) => `/mocked/path/${path}`),
     getIngestionURL: vi.fn(() => "http://localhost:5080"),
-    getEndPoint: vi.fn((url: string) => ({
+    getEndPoint: vi.fn(() => ({
       url: "http://localhost:5080",
       host: "localhost:5080", 
       port: "5080",
@@ -185,7 +185,7 @@ describe("OpenTelemetry Component", () => {
       });
       
       // The URL should contain the organization identifier from the store
-      expect(testWrapper.vm.copyHTTPTracesContentURL).toMatch(/\/api\/[^\/]+$/);
+      expect(testWrapper.vm.copyHTTPTracesContentURL).toMatch(/\/api\/[^/]+$/);
       testWrapper.unmount();
     });
 
@@ -472,14 +472,7 @@ tls:
 
     it("should handle null endpoint values gracefully", () => {
       // Test that the component doesn't crash with null values
-      const nullEndpoint = {
-        url: null,
-        host: null,
-        port: null,
-        protocol: null,
-        tls: null
-      };
-      
+
       // Component should still render without crashing
       expect(wrapper.vm.endpoint).toBeTruthy();
     });
@@ -514,8 +507,8 @@ tls:
     });
 
     it("should handle reactive data updates", async () => {
-      const initialURL = wrapper.vm.copyHTTPTracesContentURL;
-      
+      wrapper.vm.copyHTTPTracesContentURL;
+
       // Simulate endpoint change
       wrapper.vm.endpoint.url = "https://new-host:443";
       await nextTick();

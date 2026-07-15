@@ -92,7 +92,7 @@ export default defineComponent({
       default: false,
     },
   },
-  setup(props) {
+  setup() {
     const { t } = useI18n();
     const isUpdate = ref(false);
     const secretTouched = ref(false);

@@ -19,7 +19,7 @@ import ErrorDetail from "@/components/rum/ErrorDetail.vue";
 import i18n from "@/locales";
 
 vi.mock("@/utils/date", () => ({
-  formatDate: vi.fn((_timestamp: number, _format: string) => {
+  formatDate: vi.fn(() => {
     return "Jan 01, 2024 10:00:00.000 +0000";
   }),
 }));
@@ -86,7 +86,7 @@ describe("ErrorDetail", () => {
 
     it("displays Error fallback text when column has no error_type property", async () => {
       // Arrange
-      const { error_type, ...columnWithoutErrorType } = mockColumn;
+      const { error_type: _error_type, ...columnWithoutErrorType } = mockColumn;
 
       // Act
       await wrapper.setProps({ column: columnWithoutErrorType });
@@ -276,7 +276,7 @@ describe("ErrorDetail", () => {
 
     it("renders without throwing when timestamp is missing from column", async () => {
       // Arrange
-      const { zo_sql_timestamp, ...columnWithoutTimestamp } = mockColumn;
+      const { zo_sql_timestamp: _zo_sql_timestamp, ...columnWithoutTimestamp } = mockColumn;
 
       // Act + Assert — component should not throw even with undefined timestamp
       await expect(

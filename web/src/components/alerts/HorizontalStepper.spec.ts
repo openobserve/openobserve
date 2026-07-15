@@ -202,11 +202,7 @@ describe("HorizontalStepper", () => {
     it("clicking the first step item triggers 'update:currentStep' for step id 1", async () => {
       wrapper = buildWrapper({ currentStep: 1, completedSteps: [] });
 
-      // The stepper renders a list of items; get the first one via the label
-      const stepTitles = wrapper.findAll("[class*='step-title'], [class*='step-label']");
-      // Fallback: trigger via the first child of the stepper container
-      const container = wrapper.find("[class*='stepper-container']");
-      const firstChild = container.element.children[0] as HTMLElement;
+      // Trigger via the first child of the stepper container
       await wrapper.find("[class*='stepper-container']").element.children[0].dispatchEvent(
         new MouseEvent("click", { bubbles: true }),
       );

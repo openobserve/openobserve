@@ -48,7 +48,6 @@
   import { getImageURL } from "@/utils/zincutils";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
   import { defineComponent, computed, watch } from 'vue';
-  import { ControlButton, Controls } from '@vue-flow/controls'
   import { VueFlow } from "@vue-flow/core";
   import { ref, onMounted, nextTick } from "vue";
 import CustomNode from '@/plugins/pipelines/CustomNode.vue';
@@ -69,7 +68,7 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
     props: {
       pipeline: Object
     },
-    components: { VueFlow, CustomNode, DropzoneBackground, CustomEdge, ControlButton, Controls },
+    components: { VueFlow, CustomNode, DropzoneBackground, CustomEdge },
     setup(props) {
       const {
       pipelineObj,

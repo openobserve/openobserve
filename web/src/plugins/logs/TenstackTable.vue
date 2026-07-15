@@ -644,7 +644,7 @@ const emits = defineEmits([
 const sorting = ref<SortingState>([]);
 
 const store = useStore();
-const { isFTSColumn } = useTextHighlighter();
+useTextHighlighter();
 const { processedResults, processHitsInChunks } = useLogsHighlighter();
 
 const getSortingHandler = (e: Event, fn: any) => {

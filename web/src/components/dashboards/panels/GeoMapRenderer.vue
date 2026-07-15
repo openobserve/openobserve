@@ -31,9 +31,7 @@ import {
   watch,
   onUnmounted,
   nextTick,
-  onBeforeMount,
 } from "vue";
-import { useStore } from "vuex";
 
 import L from "leaflet";
 import "@/utils/dashboard/leaflet-echarts/index";
@@ -66,50 +64,6 @@ import {
 } from "echarts/components";
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
-import type {
-  BarSeriesOption,
-  LineSeriesOption,
-  CustomSeriesOption,
-  GaugeSeriesOption,
-  PieSeriesOption,
-  ScatterSeriesOption,
-  HeatmapSeriesOption,
-  SankeySeriesOption,
-  TreeSeriesOption,
-} from "echarts/charts";
-import type { ComposeOption } from "echarts/core";
-import type {
-  TitleComponentOption,
-  TooltipComponentOption,
-  GridComponentOption,
-  ToolboxComponentOption,
-  DatasetComponentOption,
-  LegendComponentOption,
-  PolarComponentOption,
-  VisualMapComponentOption,
-  DataZoomComponentOption,
-} from "echarts/components";
-
-type ECOption = ComposeOption<
-  | BarSeriesOption
-  | LineSeriesOption
-  | CustomSeriesOption
-  | GaugeSeriesOption
-  | PieSeriesOption
-  | ScatterSeriesOption
-  | HeatmapSeriesOption
-  | SankeySeriesOption
-  | TreeSeriesOption
-  | TitleComponentOption
-  | TooltipComponentOption
-  | GridComponentOption
-  | ToolboxComponentOption
-  | DatasetComponentOption
-  | LegendComponentOption
-  | PolarComponentOption
-  | VisualMapComponentOption
-  | DataZoomComponentOption
->;
 
 echarts.use([
   TitleComponent,
@@ -155,7 +109,6 @@ export default defineComponent({
       ? { ...props.data.options.lmap }
       : {};
 
-    const store = useStore();
     const windowResizeEventCallback = async () => {
       await nextTick();
       await nextTick();
@@ -221,7 +174,7 @@ export default defineComponent({
 
     watch(
       () => props.data.options,
-      async (newOptions) => {
+      async () => {
         await nextTick();
         chart?.resize();
         const options = {

@@ -543,10 +543,6 @@ const filterText = computed<string>(() => {
   return body ? `if ${body}` : "";
 });
 
-const statusLabel = computed(() =>
-  t(`onlineEvals.jobStatus.${props.row.status}`, props.row.status),
-);
-
 const samplingMode = computed(
   () => valueOf<string>(props.row, "samplingMode", "sampling_mode") ?? "all",
 );

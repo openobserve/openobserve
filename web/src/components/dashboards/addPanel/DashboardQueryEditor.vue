@@ -318,13 +318,11 @@ import {
   watch,
   computed,
   onMounted,
-  defineAsyncComponent,
   nextTick,
   onUnmounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import ConfirmDialog from "../../../components/ConfirmDialog.vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
@@ -353,7 +351,6 @@ export default defineComponent({
   components: {
     OTabs,
     OTab,
-    ConfirmDialog,
     QueryTypeSelector,
     UnifiedQueryEditor,
     OButton,
@@ -398,14 +395,6 @@ export default defineComponent({
           for (let i = 0; i < parseInt(data.num_args); i++) {
             args.push("'${1:value}'");
           }
-
-          const itemObj: {
-            name: any;
-            args: string;
-          } = {
-            name: data.name,
-            args: "(" + args.join(",") + ")",
-          };
 
           functionList.value.push({
             name: data.name,
@@ -552,7 +541,7 @@ export default defineComponent({
         dashboardPanelData.data.queries.length - 1;
     };
 
-    const updatePromQLQuery = async (value, event) => {
+    const updatePromQLQuery = async (value, _event?: unknown) => {
       promqlAutoCompleteData.value.query = value;
       // promqlAutoCompleteData.value.text = event.changes[0].text;
 
@@ -773,7 +762,7 @@ export default defineComponent({
       },
     );
 
-    const onUpdateToggle = (value) => {
+    const onUpdateToggle = () => {
       dashboardPanelData.meta.errors.queryErrors = [];
     };
 
@@ -858,10 +847,7 @@ export default defineComponent({
     };
 
     // Unified Query Editor: Handle Ask AI
-    const handleAskAI = async (
-      naturalLanguage: string,
-      language: "sql" | "promql",
-    ) => {
+    const handleAskAI = async () => {
       // The unified component handles AI generation internally
       // This event is just for parent components that may need to react
     };
@@ -900,10 +886,7 @@ export default defineComponent({
       // Can remove loading indicators here if needed
     };
 
-    const handleVrlGenerationSuccess = (payload: {
-      type: string;
-      message: string;
-    }) => {
+    const handleVrlGenerationSuccess = () => {
       // VRL function code is already updated via @update:query handler
     };
 

@@ -182,7 +182,6 @@ export const convertPromQLData = async (
     if (!queryData || !queryData.result) {
       return queryData;
     }
-    const originalCount = queryData.result.length;
     const remainingSeries = queryData.result.slice(0, limitPerQuery);
     return {
       ...queryData,
@@ -1067,7 +1066,6 @@ export const convertPromQLData = async (
 
           case "vector": {
             const traces = it?.result?.map((metric: any) => {
-              const values = [metric.value];
               return {
                 name: JSON.stringify(metric.metric),
                 value: metric?.value?.length > 1 ? metric.value[1] : "",

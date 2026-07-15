@@ -98,7 +98,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import {
-  getCurrentInstance,
   onMounted,
   onUnmounted,
   ref,
@@ -629,13 +628,6 @@ export default defineComponent({
                   ? JSON.stringify(originalValue) !==
                     JSON.stringify(variableObject.value)
                   : originalValue !== variableObject.value;
-
-              // Check if variable now has a valid value (not null/undefined/empty)
-              const hasValidValue =
-                variableObject.value !== null &&
-                variableObject.value !== undefined &&
-                (!Array.isArray(variableObject.value) ||
-                  variableObject.value.length > 0);
 
               // Mark as partially loaded
               variableObject.isVariablePartialLoaded = true;
@@ -1427,10 +1419,6 @@ export default defineComponent({
         return;
       }
 
-      // Pre-calculate the options values array
-      const optionsValues =
-        currentVariable.options.map((option: any) => option.value) ?? [];
-
       // For single select, handle old value selection
       if (!currentVariable.multiSelect) {
         // Check if custom value should be preserved (even if not in options)
@@ -1609,7 +1597,9 @@ export default defineComponent({
       isInitialLoad: boolean = false,
       searchText?: string,
     ) => {
-      return new Promise(async (resolve, reject) => {
+      return new Promise((resolve, reject) => {
+        // Async body hoisted into an IIFE so the executor stays synchronous
+        void (async () => {
         const { name } = variableObject;
 
         if (!name || !variableObject) {
@@ -1787,6 +1777,7 @@ export default defineComponent({
           await finalizeVariableLoading(variableObject, false);
           resolve(false);
         }
+        })();
       });
     };
 

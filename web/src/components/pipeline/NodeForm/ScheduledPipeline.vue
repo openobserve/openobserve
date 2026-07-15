@@ -1024,27 +1024,21 @@ import {
   onMounted,
   onBeforeMount,
 } from "vue";
-import FieldsInput from "@/components/alerts/FieldsInput.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import {
   getImageURL,
-  useLocalTimezone,
   timestampToTimezoneDate,
   formatTimeWithSuffix,
   b64EncodeUnicode,
   queryIndexSplit,
 } from "@/utils/zincutils";
-import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { toggleFullscreen } from "@/utils/dom";
 import { copyToClipboard } from "@/utils/clipboard";
 import CronExpressionParser from "cron-parser";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
-import IndexList from "@/plugins/logs/IndexList.vue";
-import { split } from "postcss/lib/list";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
-import SearchResult from "@/plugins/logs/SearchResult.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1057,17 +1051,13 @@ import { inject } from "vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 
-import DateTime from "@/components/DateTime.vue";
-
 import useLogs from "@/composables/useLogs";
 
 import GroupedFieldList from "@/components/common/GroupedFieldList.vue";
 import FieldRow from "@/components/common/FieldRow.vue";
-import FieldListPagination from "@/components/common/FieldListPagination.vue";
 import useStreams from "@/composables/useStreams";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useDurationPercentiles from "@/composables/useDurationPercentiles";
-import AppTabs from "@/components/common/AppTabs.vue";
 import {
   applyFieldGrouping,
   buildSemanticIndex,
@@ -1093,7 +1083,6 @@ import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { createPipelinesContextProvider } from "@/composables/contextProviders/pipelinesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   getFieldFromExpression,
   hasFieldCondition,
@@ -1292,18 +1281,11 @@ const query = ref(
     : (initialQc.sql ?? props.sql),
 );
 
-const promqlQuery = ref(initialQc.promql ?? props.promql);
-
-const stream_type = ref(
-  form.state.values?.stream_type ?? props.streamType ?? "logs",
-);
 const collapseFields = ref(false);
 
 
 
 const store = useStore();
-
-const functionEditorPlaceholderFlag = ref(true);
 
 const queryEditorPlaceholderFlag = ref(true);
 const pipelineEditorRef: any = ref(null);
@@ -1781,10 +1763,6 @@ const formIsSubmitting = form.useStore((s: any) => s.isSubmitting);
 
 const filteredNumericColumns = ref(getNumericColumns.value);
 
-const currentTimezone =
-  useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-const browserTimezone = ref(currentTimezone);
 const streamTypes = ["logs", "metrics", "traces"];
 
 const rows = ref([]);
@@ -1803,14 +1781,6 @@ timezoneOptions.unshift(browserTime);
 
 filteredTimezone.value = [...timezoneOptions];
 
-const timezoneFilterFn = (val: string, update: Function) => {
-  filteredTimezone.value = filterColumns(timezoneOptions, val, update);
-};
-
-const addField = () => {
-  emits("field:add");
-};
-
 var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<"]);
 
 const isCronMode = computed({
@@ -1821,10 +1791,6 @@ const isCronMode = computed({
 });
 
 const selectedFunction = ref("");
-
-const removeField = (field: any) => {
-  emits("field:remove", field);
-};
 
 const updateQueryValue = (value: string) => {
   _sqlOnQueryChange();
@@ -1878,13 +1844,6 @@ const debouncedSyncStreamFromQuery = debounce(async (sql: string) => {
     // ignore parse errors while user is mid-typing
   }
 }, 600);
-
-const updateStreamType = () => {
-  if (stream_type.value != "metrics") {
-    tab.value = "sql";
-  }
-  emits("update:stream_type", stream_type.value);
-};
 
 const updateFrequency = async () => {
   // Mirror frequency into period for the minutes mode (form-owned, single SoT).
@@ -1973,15 +1932,6 @@ const vrlFunctionContent = computed({
   },
 });
 
-const isVrlFunctionEnabled = computed({
-  get() {
-    return props.showVrlFunction;
-  },
-  set(value) {
-    emits("update:showVrlFunction", value);
-  },
-});
-
 const updateQuery = () => {
   if (tab.value === "promql") {
     query.value = `${selectedStreamName.value}{}`;
@@ -2030,61 +1980,10 @@ const updateAggregation = () => {
   }
 };
 
-const filterFields = (val: string, update: Function) => {
-  filteredFields.value = filterColumns(props.columns, val, update);
-};
-
-const filterColumns = (options: string[], val: string, update: Function) => {
-  let filteredOptions: any[] = [];
-
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-  }
-
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter((column: any) => {
-      // Check if type of column is object or string and then filter
-      if (typeof column === "object") {
-        return column.value.toLowerCase().indexOf(value) > -1;
-      }
-
-      if (typeof column === "string") {
-        return column.toLowerCase().indexOf(value) > -1;
-      }
-    });
-  });
-
-  return filteredOptions;
-};
-
-const filterNumericColumns = (val: string, update: Function) => {
-  if (val === "") {
-    update(() => {
-      filteredNumericColumns.value = [...getNumericColumns.value];
-    });
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredNumericColumns.value = getNumericColumns.value.filter(
-      (column: any) => column.value.toLowerCase().indexOf(value) > -1,
-    );
-  });
-};
 
 const updateAggregationToggle = () => {
   _isAggregationEnabled.value =
     tab.value === "custom" && !!aggregationData.value;
-};
-
-const filterFunctionOptions = (val: string, update: any) => {
-  update(() => {
-    functionOptions.value = functionsList.value.filter((fn: any) => {
-      return fn.name.toLowerCase().indexOf(val.toLowerCase()) > -1;
-    });
-  });
 };
 
 const onBlurQueryEditor = debounce(async () => {
@@ -2254,16 +2153,6 @@ function closeField(fieldName: string) {
   }
   expandedRows.value[fieldName] = false;
   expandedIds.value = expandedIds.value.filter((id) => id !== fieldName);
-}
-
-function onFieldRowClick(row: any) {
-  if (!isFieldExpandable(row)) return;
-  const currentlyExpanded = expandedRows.value[row.name];
-  if (currentlyExpanded) {
-    closeField(row.name);
-  } else {
-    openFilterCreator(row);
-  }
 }
 
 const handleSearchFieldValues = (fieldName: string, term: string) => {
@@ -2711,13 +2600,11 @@ const registerAiContextHandler = () => {
 };
 
 const getContext = async () => {
-  return new Promise(async (resolve, reject) => {
     try {
       const payload: any = {};
 
       if (!selectedStreamType.value || !selectedStreamName.value) {
-        resolve("");
-        return;
+        return "";
       }
 
       const schema = streamFields.value.map((field: any) => {
@@ -2753,12 +2640,11 @@ const getContext = async () => {
       payload["schema_"] =
         userDefinedFields.value.length > 0 ? userDefinedFields.value : schema;
 
-      resolve(payload);
+      return payload;
     } catch (error) {
       console.error("Error in getContext for logs page", error);
-      resolve("");
+      return "";
     }
-  });
 };
 
 const removeAiContextHandler = () => {

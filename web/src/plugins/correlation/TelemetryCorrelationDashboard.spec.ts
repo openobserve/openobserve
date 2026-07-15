@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import TelemetryCorrelationDashboard from "./TelemetryCorrelationDashboard.vue";
 import store from "@/test/unit/helpers/store";
@@ -513,7 +513,6 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       wrapper = createWrapper({ metricStreams: [] });
       const stream = { stream_name: "new_metric", stream_type: "metrics", filters: {} };
 
-      const initialCount = wrapper.vm.selectedMetricStreams.length;
       wrapper.vm.selectedMetricStreams = [];
       wrapper.vm.toggleMetricStream(stream);
       await nextTick();

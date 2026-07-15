@@ -12,15 +12,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type Ref } from "vue";
-import type { Endpoint } from "@/ts/interfaces";
+import { computed, ref } from "vue";
 import ContentCopy from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
-import { useStore } from "vuex";
-import { b64EncodeStandard, getEndPoint, getIngestionURL } from "../../../utils/zincutils";
+import { getEndPoint, getIngestionURL } from "../../../utils/zincutils";
 import config from "@/aws-exports";
-
-const store = useStore();
 
 const props = defineProps({
   currOrgIdentifier: {
@@ -41,12 +37,6 @@ const endpoint: any = ref({
 
 const ingestionURL = getIngestionURL();
 endpoint.value = getEndPoint(ingestionURL);
-
-const accessKey = computed(() => {
-  return b64EncodeStandard(
-    `${props.currUserEmail}:${store.state.organizationData.organizationPasscode}`
-  );
-});
 
 const getOtelGrpcConfig = computed(() => {
   return `exporters:

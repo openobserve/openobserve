@@ -26,7 +26,7 @@ vi.mock("@vueuse/core", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@vueuse/core")>();
   return {
     ...actual,
-    watchDebounced: vi.fn((source: any, callback: any) => {
+    watchDebounced: vi.fn(() => {
       // Execute synchronously in tests so we can assert on emit calls
     }),
   };

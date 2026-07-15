@@ -247,7 +247,6 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import OCard from "@/lib/core/Card/OCard.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 const defaultValue: any = () => {
   return {
@@ -263,7 +262,7 @@ const defaultValue: any = () => {
 export default defineComponent({
   name: "AddEnrichmentTable",
   components: { OSeparator, OButton, OInput, OFile, OOptionGroup, OSwitch,
-    OIcon, OCard, AppPageHeader,
+    OIcon, AppPageHeader,
 },
   props: {
     modelValue: {

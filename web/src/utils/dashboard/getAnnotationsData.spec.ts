@@ -18,7 +18,7 @@ import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 
 // Mock date-fns-tz
 vi.mock("date-fns-tz", () => ({
-  toZonedTime: vi.fn((date, timezone) => {
+  toZonedTime: vi.fn((date) => {
     // Simple mock that returns a predictable date object for testing
     if (date instanceof Date) {
       return new Date(date.getTime()); // Return the same date for simplicity

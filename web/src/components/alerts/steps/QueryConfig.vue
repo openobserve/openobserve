@@ -882,7 +882,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, type PropType, defineAsyncComponent, nextTick, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { b64EncodeUnicode, getUUID, convertMinutesToCron, getCronIntervalDifferenceInSeconds, isAboveMinRefreshInterval, describeCron, getImageURL } from "@/utils/zincutils";
+import { convertMinutesToCron, getCronIntervalDifferenceInSeconds, isAboveMinRefreshInterval, describeCron, getImageURL } from "@/utils/zincutils";
 import hljs from "highlight.js/lib/core";
 import sql from "highlight.js/lib/languages/sql";
 
@@ -905,9 +905,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue")
-);
 const UnifiedQueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue")
 );
@@ -916,7 +913,6 @@ export default defineComponent({
   name: "Step2QueryConfig",
   components: {
     FilterGroup,
-    QueryEditor,
     QueryEditorDialog,
     CustomConfirmDialog,
     UnifiedQueryEditor,
@@ -1031,9 +1027,6 @@ export default defineComponent({
     const localIsAggregationEnabled = ref(props.isAggregationEnabled);
 
     // Expandable section toggles — auto-expand filters if editing an alert with existing conditions
-    const hasExistingFilters = props.inputData.conditions?.conditions?.some(
-      (c: any) => c.filterType === 'condition' && c.column && c.column.trim() !== ''
-    );
     const showFilters = ref(true);
     const showVrl = ref(!!(props.vrlFunction?.trim()));
     const filtersSectionRef = ref<HTMLElement | null>(null);
@@ -2159,23 +2152,6 @@ export default defineComponent({
       }
 
       return isValid;
-    };
-
-    // Validate SQL mode
-    const validateSqlMode = () => {
-      const sqlQuery = props.sqlQuery;
-
-      // Check if SQL query is empty
-      if (!sqlQuery || sqlQuery.trim() === '') {
-        return false;
-      }
-
-      // Check if there's a backend validation error
-      if (props.sqlQueryErrorMsg && props.sqlQueryErrorMsg.trim() !== '') {
-        return false;
-      }
-
-      return true;
     };
 
     const highlightedSqlQuery = computed(() => {

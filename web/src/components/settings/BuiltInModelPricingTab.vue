@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <!-- Pattern -->
-        <template #cell-pattern="{ row, value }">
+        <template #cell-pattern="{ value }">
           <code
             class="text-xs"
             style="word-break: break-all; white-space: normal"
@@ -172,7 +172,6 @@ import modelPricingService from "@/services/model_pricing";
 import { ModelPricingCache } from "@/utils/modelPricingCache";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -196,7 +195,7 @@ interface BuiltInModel {
 
 export default defineComponent({
   name: "BuiltInModelPricingTab",
-  components: { OButton, OSpinner, OSearchInput, OTable,
+  components: { OButton, OSearchInput, OTable,
     OIcon,
 },
   emits: ["import-models"],

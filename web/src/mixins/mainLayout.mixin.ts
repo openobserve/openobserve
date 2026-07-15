@@ -1,7 +1,7 @@
-import { onActivated, onMounted, ref, Ref, h } from "vue";
+import { onActivated, onMounted, ref, Ref } from "vue";
 import { useStore } from "vuex";
 import organizationService from "@/services/organizations";
-import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
+import { useLocalOrganization } from "@/utils/zincutils";
 
 const MainLayoutOpenSourceMixin = {
   setup() {

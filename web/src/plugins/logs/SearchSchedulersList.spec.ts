@@ -3,7 +3,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { nextTick, ref } from "vue";
+import { nextTick } from "vue";
 
 
 // Mock services
@@ -66,7 +66,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 // Mock date utils
 vi.mock("@/utils/date", () => ({
-  formatDate: vi.fn((date: any, format: string) => "2024-01-01T10:00:00Z"),
+  formatDate: vi.fn(() => "2024-01-01T10:00:00Z"),
   // The component imports this now instead of re-declaring it; the shared
   // implementation is tested in date.spec.ts, so here we only assert the wiring.
   convertUnixToDateFormat: vi.fn((us: any) =>

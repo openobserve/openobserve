@@ -306,7 +306,7 @@ describe("Variables Utils", () => {
         SELECT * FROM logs 
         WHERE region = '\${region}' 
         AND service IN (\${service:singlequote})
-        AND env = '\$env'
+        AND env = '$env'
         AND query REGEXP '\${service:pipe}'
       `;
       

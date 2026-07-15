@@ -49,7 +49,6 @@ vi.mock("@/aws-exports", () => ({
 import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccountsList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import router from "@/test/unit/helpers/router";
 import service_accounts from "@/services/service_accounts";
 
 const node = document.createElement("div");
@@ -72,7 +71,6 @@ describe("ServiceAccountsList Component", () => {
   let mockRouter;
   let dismissMock;
   let notifyMock;
-  let dialogMock;
 
   beforeEach(async () => {
     // Reset mock implementations
@@ -133,7 +131,6 @@ describe("ServiceAccountsList Component", () => {
     // Setup notify and dialog mocks
     dismissMock = vi.fn();
     notifyMock = vi.fn().mockReturnValue(dismissMock);
-    dialogMock = vi.fn().mockResolvedValue(true);
 
     // Mock navigator.clipboard
     Object.assign(navigator, {

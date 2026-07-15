@@ -154,17 +154,13 @@ const router = useRouter();
 const store = useStore();
 const { t } = useI18n();
 const isLoading = ref<boolean[]>([]);
-const { buildQueryPayload, getTimeInterval, parseQuery } = useQuery();
+const { buildQueryPayload } = useQuery();
 const segments = ref<any[]>([]);
 const segmentEvents = ref<any[]>([]);
 const { sessionState } = useSessionsReplay();
 const videoPlayerRef = ref<any>(null);
 const splitterSize = ref(600);
-const errorCount = ref(10);
 const { performanceState } = usePerformance();
-
-const session_start_time = 1692884313968;
-const session_end_time = 1692884769270;
 
 const getSessionId = computed(() => router.currentRoute.value.params.id);
 
@@ -498,7 +494,7 @@ const getSessionErrorLogs = () => {
         return hit.date >= Number(sessionState.data.selectedSession.start_time);
       });
 
-      events.forEach((hit: any, index: number) => {
+      events.forEach((hit: any) => {
         hit.type = "error";
         hit.error_id = getUUID();
         hit.error_message = hit.message;

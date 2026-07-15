@@ -15,7 +15,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ref } from 'vue';
-import { mount } from '@vue/test-utils';
 import LogstashDatasource from './LogstashDatasource.vue';
 import store from '../../../test/unit/helpers/store';
 import config from '../../../aws-exports';
@@ -453,18 +452,18 @@ describe('LogstashDatasource.vue Component Logic', () => {
   // Test 34: Component handles getIngestionURL returning empty string
   it('should handle getIngestionURL returning empty string', () => {
     vi.mocked(getIngestionURL).mockReturnValue('');
-    
-    const setup = createComponentSetup();
-    
+
+    createComponentSetup();
+
     expect(getEndPoint).toHaveBeenCalledWith('');
   });
 
   // Test 35: Component handles getIngestionURL returning null
   it('should handle getIngestionURL returning null', () => {
     vi.mocked(getIngestionURL).mockReturnValue(null as any);
-    
-    const setup = createComponentSetup();
-    
+
+    createComponentSetup();
+
     expect(getEndPoint).toHaveBeenCalledWith(null);
   });
 
@@ -629,7 +628,7 @@ describe('LogstashDatasource.vue Component Logic', () => {
       { url: 'http://localhost:3000', protocol: 'http' }
     ];
     
-    differentEndpoints.forEach((endpoint, index) => {
+    differentEndpoints.forEach((endpoint) => {
       vi.mocked(getEndPoint).mockReturnValue({
         ...mockEndpointData,
         ...endpoint

@@ -9,7 +9,6 @@ import {
   type AggregationFn,
   type ColumnDef,
   type Row,
-  type Table,
 } from "@tanstack/vue-table";
 import { computed, ref, watch, type Ref } from "vue";
 import { TABLE_INDEX_COL_SIZE, type OTableColumnDef } from "../OTable.types";
@@ -56,7 +55,7 @@ export function useTableCore<TData>(
     /** When true, do not auto-reset page index when data changes */
     keepPageOnDataChange?: boolean;
   },
-  emit: any,
+  _emit?: unknown,
 ) {
   // ── Effective columns ───────────────────────────────────────────
   // When `showIndex` is set (and the caller hasn't already declared a `#`
@@ -215,7 +214,7 @@ export function useTableCore<TData>(
         accessorKey: col.accessorKey ?? col.id,
         accessorFn: col.accessorFn as any,
         cell: col.cell
-          ? ((info: any) => {
+          ? (() => {
               if (typeof col.cell === "string") return col.cell;
               return col.cell;
             })

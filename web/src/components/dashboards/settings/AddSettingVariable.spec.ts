@@ -599,8 +599,8 @@ describe("AddSettingVariable", () => {
     });
 
     it("should render escape single quotes toggle", () => {
-      const escapeToggle = wrapper.find('[data-test*="dashboard-config-limit-info"]').exists() || 
-                          wrapper.vm.variableData.hasOwnProperty('escapeSingleQuotes');
+      const escapeToggle = wrapper.find('[data-test*="dashboard-config-limit-info"]').exists() ||
+                          Object.prototype.hasOwnProperty.call(wrapper.vm.variableData, 'escapeSingleQuotes');
       expect(escapeToggle).toBe(true);
     });
   });

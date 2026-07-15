@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
-import { mount, VueWrapper, flushPromises } from '@vue/test-utils'
+import { mount, VueWrapper } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
 // Mock useResizer composable - must be hoisted before import

@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @add-condition="(updatedGroup) => updateGroup(updatedGroup)"
               @add-group="(updatedGroup) => updateGroup(updatedGroup)"
               @remove-group="(groupId) => removeConditionGroup(groupId)"
-              @input:update="(name, field) => onInputUpdate(name, field)"
+              @input:update="onInputUpdate"
             />
             <div v-else class="p-3 text-gray-400">Loading conditions...</div>
           </div>
@@ -157,7 +157,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import {
   computed,
-  defineAsyncComponent,
   onMounted,
   ref,
   type Ref,
@@ -172,17 +171,12 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { makeConditionSchema, type ConditionForm } from "./Condition.schema";
 import {
-  getTimezoneOffset,
   getUUID,
-  getTimezonesByOffset,
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../../ConfirmDialog.vue";
-import { convertDateToTimestamp } from "@/utils/date";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
@@ -193,12 +187,7 @@ import {
   updateGroup as updateGroupUtil,
   removeConditionGroup as removeConditionGroupUtil,
   ensureIds,
-  type V2Group,
 } from "@/utils/alerts/alertDataTransforms";
-
-const VariablesInput = defineAsyncComponent(
-  () => import("@/components/alerts/VariablesInput.vue"),
-);
 
 // V1 interfaces (legacy support)
 interface FilterCondition {
@@ -220,19 +209,12 @@ interface ConditionGroup {
   items?: (FilterCondition | ConditionGroup)[];
 }
 
-interface StreamRoute {
-  name: string;
-  query_condition: any | null;
-}
-
 const { t } = useI18n();
 
 
-const router = useRouter();
-
 const store = useStore();
 
-const { getStream, getStreams } = useStreams();
+const { getStream } = useStreams();
 
 const emit = defineEmits(["update:node", "cancel:hideform", "delete:node"]);
 
@@ -249,21 +231,9 @@ function handleDrawerClose(v: boolean) {
   internalOpen.value = v;
 }
 
-const isUpdating = ref(false);
-
 const filteredColumns: any = ref([]);
 
-const scheduledAlertRef = ref<any>(null);
-
-const filteredStreams: Ref<any[]> = ref([]);
-
-const indexOptions = ref([]);
-
 const originalStreamFields: Ref<any[]> = ref([]);
-
-const isAggregationEnabled = ref(false);
-
-const showTimezoneWarning = ref(false);
 
 const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
 
@@ -273,53 +243,12 @@ watch(selected, (newValue: any) => {
 });
 let parser: any;
 
-const nodeLink = ref({
-  from: "",
-  to: "",
-});
-
 const dialog = ref({
   show: false,
   title: "",
   message: "",
   okCallback: () => {},
 });
-
-const getDefaultStreamRoute: any = () => {
-  if (pipelineObj.isEditNode) {
-    return pipelineObj.currentSelectedNodeData.data;
-  }
-  return {
-    name: "",
-    destination: {
-      org_id: "",
-      stream_name: "",
-      stream_type: "logs",
-    },
-    is_real_time: true,
-    query_condition: {
-      sql: "",
-      type: "sql",
-      aggregation: null,
-    },
-    trigger_condition: {
-      period: 15,
-      frequency_type: "minutes",
-      cron: "",
-      frequency: 15,
-      timezone: "UTC",
-    },
-    context_attributes: [
-      {
-        key: "",
-        value: "",
-        id: getUUID(),
-      },
-    ],
-    description: "",
-    enabled: true,
-  };
-};
 
 // Backend returns operators in lowercase (e.g. "contains", "not_contains").
 // Normalize them to the canonical casing expected by FilterCondition's triggerOperators.
@@ -430,12 +359,6 @@ const importSqlParser = async () => {
   parser = await sqlParser();
 };
 
-const streamTypes = ["logs", "enrichment_tables"];
-
-const streamRoute: Ref<StreamRoute> = ref(getDefaultStreamRoute());
-
-const originalStreamRouting: Ref<StreamRoute> = ref(getDefaultStreamRoute());
-
 const conditionGroup: Ref<ConditionGroup> = ref(getDefaultConditionGroup());
 
 // Create a deep copy to preserve the original state for comparison
@@ -492,27 +415,6 @@ const conditionsError = computed(() =>
     ? String(firstFieldError(conditionsErrors.value))
     : "",
 );
-
-const filterColumns = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-    return filteredOptions;
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1,
-    );
-  });
-  return filteredOptions;
-};
-
-const filterStreams = (val: string, update: any) => {
-  filteredStreams.value = filterColumns(indexOptions.value, val, update);
-};
 
 const updateStreamFields = async (streamName: any, streamType: any) => {
   let streamCols: any = [];
@@ -669,7 +571,7 @@ const removeConditionGroup = (targetGroupId: string) => {
   syncConditionsToForm();
 };
 
-const onInputUpdate = (_name?: string, _field?: any) => {
+const onInputUpdate = () => {
   // FilterGroup mutates the passed `conditionGroup` in place and emits this on
   // every field edit — bridge the live model into the form so the schema's
   // superRefine sees column/operator changes (Rule ③ direct-handler bridge).

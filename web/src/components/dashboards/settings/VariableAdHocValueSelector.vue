@@ -53,7 +53,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, toRef, watch, type Ref, toRefs } from "vue";
+import { defineComponent, toRef, watch, toRefs } from "vue";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import { useStore } from "vuex";
 import DynamicFilterIcon from "../../icons/DynamicFilterIcon.vue";

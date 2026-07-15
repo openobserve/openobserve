@@ -219,8 +219,7 @@ describe('RouteTabs.vue', () => {
   describe('Direction Handling', () => {
     it('applies vertical direction by default', () => {
       wrapper = createWrapper();
-      const tabs = wrapper.find('.o-tabs-stub');
-      
+
       // Check if vertical class or attribute is applied
       expect(wrapper.props('direction')).toBe('vertical');
     });

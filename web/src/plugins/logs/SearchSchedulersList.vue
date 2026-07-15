@@ -245,28 +245,20 @@ import {
   ref,
   watch,
   onMounted,
-  nextTick,
   computed,
-  onBeforeMount,
-  onActivated,
 } from "vue";
 import {
-  timestampToTimezoneDate,
   b64EncodeUnicode,
   b64DecodeUnicode,
-  convertDateToTimestamp,
 } from "@/utils/zincutils";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { defineAsyncComponent, defineComponent, reactive } from "vue";
 import { searchState } from "@/composables/useLogs/searchState";
-import TenstackTable from "../../plugins/logs/TenstackTable.vue";
 import searchService from "@/services/search";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import DateTime from "@/components/DateTime.vue";
 import { useI18n } from "vue-i18n";
 import { convertUnixToDateFormat } from "@/utils/date";
-import type { Ref } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
@@ -278,13 +270,11 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 
-import JsonPreview from "./JsonPreview.vue";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
@@ -293,20 +283,16 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "SearchSchedulersList",
   components: {
-    DateTime,
     OEmptyState,
     OTable,
     OTableColumnToggle,
     OTimeCell,
     OUserCell,
     OTag,
-    TenstackTable,
     ConfirmDialog,
     AppTabs,
-    JsonPreview,
     OButton,
     OTooltip,
-    OSpinner,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
@@ -325,7 +311,7 @@ export default defineComponent({
       this.$emit("closeSearchHistory");
     },
   },
-  setup(props, { emit }) {
+  setup(props) {
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
@@ -412,7 +398,6 @@ export default defineComponent({
       }
 
       try {
-        const { org_identifier } = router.currentRoute.value.query;
         // columnsToBeRendered.value = [];
         // dataToBeLoaded.value = [];
         expandedIds.value = [];
@@ -495,7 +480,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           jobId: toBeCancelled.value.id,
         })
-        .then((res) => {
+        .then(() => {
           toast({
             variant: "success",
             message: t('search_scheduler_job.job_cancelled_success'),
@@ -520,7 +505,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           jobId: row.id,
         })
-        .then((res) => {
+        .then(() => {
           toast({
             variant: "success",
             message: t('search_scheduler_job.job_restarted_success'),
@@ -553,7 +538,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           jobId: toBeDeletedJob.value.id,
         })
-        .then((res) => {
+        .then(() => {
           fetchSearchHistory();
           toast({
             variant: "success",
@@ -584,7 +569,6 @@ export default defineComponent({
     });
 
     const updateDateTime = async (value: any) => {
-      const { startTime, endTime } = value;
       dateTimeToBeSent.value = value;
       searchDateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
     };
@@ -655,7 +639,6 @@ export default defineComponent({
       }
     };
     const goToLogs = (row) => {
-      const duration_suffix = row.duration.split(" ")[1];
       const from = row.toBeStoredStartTime;
       const to = row.toBeStoredEndTime;
       const refresh = 0;
@@ -682,7 +665,7 @@ export default defineComponent({
       };
       //here if we have function then we are adding fn_editor flag as true because it will open the function editor by default
       //else we are adding fn_editor flag as false because it will close the function editor by default
-      if (row.hasOwnProperty("function") && row.function) {
+      if (Object.prototype.hasOwnProperty.call(row, "function") && row.function) {
         const functionContent = b64EncodeUnicode(row.function);
         queryObject["functionContent"] = functionContent;
         queryObject["fn_editor"] = "true";

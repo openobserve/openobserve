@@ -449,16 +449,6 @@ watch(
 );
 
 /**
- * Returns the colour token for a value's checkbox.
- * Excluded values (!=) render red ("negative") to visually distinguish them
- * from included values (=) which render the default blue ("primary").
- */
-const checkboxColor = (key: string): string => {
-  if (props.activeExcludeValues?.includes(key)) return "negative";
-  return "primary";
-};
-
-/**
  * Resets the panel to match the current active filter state.
  * Called by the parent (via defineExpose) when the expansion panel closes, so
  * stale user selections don't persist the next time the panel is opened.

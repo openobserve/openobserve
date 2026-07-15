@@ -76,7 +76,7 @@ export default defineComponent({
   },
   props: ["errors"],
 
-  setup(props, { emit }) {
+  setup(props) {
     const showErrors = ref(false);
     const { t } = useI18n();
     const store = useStore();

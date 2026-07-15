@@ -262,37 +262,48 @@ export default defineComponent({
       data.selectedDate.relative.value = 1;
     };
 
+    // Normalize the absolute date into a { from, to } object.
+    const normalizeAbsoluteDate = () => {
+      if (data.selectedDate.tab === "relative") return;
+      if (data.selectedDate.absolute.date != null) {
+        if (typeof data.selectedDate.absolute.date != "object") {
+          if (data.selectedDate.absolute.date != "") {
+            data.selectedDate.absolute.date = {
+              from: data.selectedDate.absolute.date,
+              to: data.selectedDate.absolute.date,
+            };
+          } else {
+            const todayDate = new Date().toLocaleDateString("en-ZA");
+            data.selectedDate.absolute.date = {
+              from: todayDate,
+              to: todayDate,
+            };
+          }
+        }
+      } else {
+        const todayDate = new Date().toLocaleDateString("en-ZA");
+        data.selectedDate.absolute.date = {
+          from: todayDate,
+          to: todayDate,
+        };
+      }
+    };
+
+    watch(
+      () => [data.selectedDate.tab, data.selectedDate.absolute.date],
+      () => normalizeAbsoluteDate(),
+      { immediate: true, deep: true },
+    );
+
     // change the actual date object based on selected tab.
     const displayValue = computed(() => {
       if (data.selectedDate.tab === "relative") {
         return `${data.selectedDate.relative.value} ${data.selectedDate.relative.period.label}`;
-      } else {
-        if (data.selectedDate.absolute.date != null) {
-          if (typeof data.selectedDate.absolute.date != "object") {
-            if (data.selectedDate.absolute.date != "") {
-              data.selectedDate.absolute.date = {
-                from: data.selectedDate.absolute.date,
-                to: data.selectedDate.absolute.date,
-              };
-            } else {
-              const todayDate = new Date().toLocaleDateString("en-ZA");
-              data.selectedDate.absolute.date = {
-                from: todayDate,
-                to: todayDate,
-              };
-            }
-          }
-
-          return `${data.selectedDate.absolute.date.from} ${data.selectedDate.absolute.startTime} - ${data.selectedDate.absolute.date.to} ${data.selectedDate.absolute.endTime}`;
-        } else {
-          const todayDate = new Date().toLocaleDateString("en-ZA");
-          data.selectedDate.absolute.date = {
-            from: todayDate,
-            to: todayDate,
-          };
-          return `${todayDate} ${data.selectedDate.absolute.startTime} - ${todayDate} ${data.selectedDate.absolute.endTime}`;
-        }
       }
+      const date = data.selectedDate.absolute.date;
+      const from = typeof date === "object" && date != null ? date.from : date;
+      const to = typeof date === "object" && date != null ? date.to : date;
+      return `${from} ${data.selectedDate.absolute.startTime} - ${to} ${data.selectedDate.absolute.endTime}`;
     });
 
     const calculateMaxValue = () => {

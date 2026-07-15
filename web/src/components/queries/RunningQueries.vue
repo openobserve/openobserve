@@ -155,7 +155,6 @@ import SearchService from "@/services/search";
 import {
   onBeforeMount,
   ref,
-  type Ref,
   defineComponent,
   computed,
   toRaw,

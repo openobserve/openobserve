@@ -323,7 +323,7 @@ describe("calculateGridForSubPlot", () => {
       expect(result.panelHeight).toBeGreaterThanOrEqual(600); // Should include spacing
       
       // Verify all grid elements have proper structure
-      result.gridArray.forEach((grid, index) => {
+      result.gridArray.forEach((grid) => {
         expect(grid.left).toMatch(/^[\d.]+%$/);
         expect(grid.top).toMatch(/^[\d.]+%$/);
         expect(grid.width).toMatch(/^[\d.]+%$/);

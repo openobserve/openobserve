@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { ref, computed } from "vue";
+import { computed } from "vue";
 
 /**
  * These test the EXPLORER'S WIRING, not the grid's logic.

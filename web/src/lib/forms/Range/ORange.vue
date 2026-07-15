@@ -16,7 +16,7 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 
 // Strip tabindex from the wrapper so it isn't an extra tab-stop before the thumbs.
 const wrapperAttrs = computed(() => {
-  const { tabindex, ...rest } = $attrs;
+  const { tabindex: _tabindex, ...rest } = $attrs;
   return rest;
 });
 

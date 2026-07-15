@@ -98,7 +98,6 @@ export default defineComponent({
       if (!isCollapsible.value) return props.fieldsText;
 
       const prefix = props.fieldsText.substring(0, props.fieldsText.indexOf('[') + 1);
-      const suffix = props.fieldsText.substring(props.fieldsText.lastIndexOf(']'));
       const visible = fields.value.slice(0, 3).join(', ');
 
       return `${prefix}${visible}`;

@@ -485,7 +485,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 // @ts-nocheck
@@ -493,9 +492,7 @@ import {
   computed,
   defineAsyncComponent,
   defineComponent,
-  onActivated,
   onBeforeUnmount,
-  onDeactivated,
   onMounted,
   onUnmounted,
   ref,
@@ -527,12 +524,11 @@ import {
   getAllDashboardsByFolderId,
   getDashboard,
   getFoldersList,
-  moveModuleToAnotherFolder,
 } from "../../utils/commons";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import useNotifications from "@/composables/useNotifications";
-import { debounce, filter, forIn } from "lodash-es";
+import { debounce } from "lodash-es";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import { useLoading } from "@/composables/useLoading";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -581,7 +577,6 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     OInput,
-    OCheckbox,
     ODialog,
     AddDashboard,
     OTooltip,
@@ -1094,8 +1089,7 @@ export default defineComponent({
     });
 
     const dashboards = computed(function () {
-      selectedIds.value = [];
-      if (!searchAcrossFolders.value || searchQuery.value == "") {
+      if (!searchAcrossFolders.value || searchQuery.value === "") {
         const dashboardList = toRaw(
           store.state.organizationData?.allDashboardList[
             activeFolderId.value
@@ -1112,6 +1106,11 @@ export default defineComponent({
           }),
         );
       }
+    });
+
+    // Clear selection whenever the visible dashboard list changes
+    watch(dashboards, () => {
+      selectedIds.value = [];
     });
 
     const resultTotal = computed(function () {
@@ -1163,7 +1162,7 @@ export default defineComponent({
     };
 
     //after adding Folder need to update the Folder list
-    const updateFolderList = async (it: any) => {
+    const updateFolderList = async () => {
       showAddFolderDialog.value = false;
       isFolderEditMode.value = false;
     };
@@ -1556,7 +1555,7 @@ export default defineComponent({
         },
       });
     },
-    onRowClick(row, _evt) {
+    onRowClick(row) {
       this.routeToViewD(row);
     },
     ownerInitials(name: string) {

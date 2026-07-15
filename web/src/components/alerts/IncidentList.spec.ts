@@ -137,7 +137,7 @@ describe("IncidentList.vue", () => {
 
     // Silence unknown Vuex action dispatches from the component
     // (incidents/setCachedData is dispatched but not registered in the test store)
-    vi.spyOn(store, "dispatch").mockImplementation(async (type: string, ...args: any[]) => {
+    vi.spyOn(store, "dispatch").mockImplementation(async (type: string) => {
       // pass through known actions, swallow unknown ones silently
       const knownPrefixes = ["incidents/setIncidents", "incidents/setShouldRefresh"];
       if (knownPrefixes.some((k) => type.startsWith(k) || type === k)) {

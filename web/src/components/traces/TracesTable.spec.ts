@@ -29,7 +29,7 @@
  */
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { mount, VueWrapper } from "@vue/test-utils";
 import { h } from "vue";
 
 // ---------------------------------------------------------------------------

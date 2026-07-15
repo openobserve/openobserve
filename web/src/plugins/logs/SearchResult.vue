@@ -693,8 +693,6 @@ import { usePagination } from "@/composables/useLogs/usePagination";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { searchState } from "@/composables/useLogs/searchState";
-import EqualIcon from "@/components/icons/EqualIcon.vue";
-import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
@@ -735,9 +733,6 @@ export default defineComponent({
     ),
     SanitizedHtmlRenderer,
     TenstackTable: defineAsyncComponent(() => import("./TenstackTable.vue")),
-    JsonPreview: defineAsyncComponent(() => import("./JsonPreview.vue")),
-    EqualIcon,
-    NotEqualIcon,
     TelemetryCorrelationDashboard,
     PatternList: defineAsyncComponent(
       () => import("./patterns/PatternList.vue"),
@@ -794,7 +789,7 @@ export default defineComponent({
         },
       ];
     },
-    handleColumnOrderUpdate(newColOrder: string[], columns: any[]) {
+    handleColumnOrderUpdate(newColOrder: string[]) {
       // Here we are checking if the columns are default columns ( _timestamp and source)
       // If selected fields are empty, then we are setting colOrder to empty array as we
       // don't change the order of default columns
@@ -1350,7 +1345,10 @@ export default defineComponent({
     const reDrawChart = () => {
       if (
          
-        searchObj.data.histogram.hasOwnProperty("xData") &&
+        Object.prototype.hasOwnProperty.call(
+          searchObj.data.histogram,
+          "xData",
+        ) &&
         searchObj.data.histogram.xData.length > 0
       ) {
         const { xData, yData, breakdownSeries, chartParams, breakdownField } =
@@ -1376,7 +1374,7 @@ export default defineComponent({
       });
     };
 
-    const changeMaxRecordToReturn = (val: any) => {
+    const changeMaxRecordToReturn = () => {
       // searchObj.meta.resultGrid.pagination.rowsPerPage = val;
     };
 
@@ -1847,19 +1845,6 @@ export default defineComponent({
         originalTimeRangeBeforeSelection.value = null;
       }
     });
-
-    // Debug watcher for patterns state
-    watch(
-      () => patternsState.value.patterns,
-      (newPatterns) => {
-        // console.log("[SearchResult] Patterns state changed:", {
-        //   hasPatterns: !!newPatterns,
-        //   patternCount: newPatterns?.patterns?.length || 0,
-        //   statistics: newPatterns?.statistics,
-        // });
-      },
-      { deep: true },
-    );
 
     // Watch for sidebar close to clear correlation data
     // This ensures fresh correlation data when reopening with a different "row"

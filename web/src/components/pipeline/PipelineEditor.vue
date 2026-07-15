@@ -210,7 +210,6 @@ import {
   pipelineMetaDefaults,
   type PipelineMetaForm,
 } from "./pipelineMeta.schema";
-import jstransform from "@/services/jstransform";
 import NodeSidebar from "@/components/pipeline/NodeSidebar.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
@@ -220,14 +219,13 @@ import { MarkerType, useVueFlow } from "@vue-flow/core";
 import ExternalDestination from "./NodeForm/ExternalDestination.vue";
 import { contextRegistry, createPipelinesContextProvider } from "@/composables/contextProviders";
 import JsonEditor from "../common/JsonEditor.vue";
-import { validatePipeline as validatePipelineUtil, type ValidationResult } from '../../utils/validatePipeline';
+import { validatePipeline as validatePipelineUtil } from '../../utils/validatePipeline';
 import { useReo } from "@/services/reodotdev_analytics";
 
 const functionImage = getImageURL("images/pipeline/transform_function.png");
 const streamImage = getImageURL("images/pipeline/input_stream.png");
 const streamOutputImage = getImageURL("images/pipeline/output_stream.png");
 const externalOutputImage = getImageURL("images/pipeline/output_remote.png");
-const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/transform_condition.png");
 const queryImage = getImageURL("images/pipeline/input_query.png");
 import useStreams from "@/composables/useStreams";
@@ -269,51 +267,6 @@ interface Pipeline {
   functions: Function[];
   derived_streams: any[];
 }
-
-interface Node {
-  name: string;
-  x: number;
-  y: number;
-  type: string;
-  fixed: boolean;
-  order?: number;
-  stream?: string;
-}
-
-interface NodeLink {
-  from: string[];
-  to: string[];
-}
-
-const plotChart: any = ref({
-  options: {
-    tooltip: {},
-    series: [
-      {
-        type: "graph",
-        layout: "none",
-        symbolSize: "60",
-        roam: false,
-        label: {
-          show: true,
-        },
-        draggable: true,
-        edgeSymbol: ["arrow"],
-        edgeSymbolSize: [10, 10],
-        edgeLabel: {
-          fontSize: 20,
-        },
-        data: [],
-        links: [],
-        lineStyle: {
-          opacity: 0.9,
-          width: 2,
-          curveness: 0,
-        },
-      },
-    ],
-  },
-});
 
 const pipeline = ref<Pipeline>({
   pipeline_id: "",
@@ -400,19 +353,6 @@ const { pipelineObj, resetPipelineData } = useDragAndDrop();
 pipelineObj.nodeTypes = nodeTypes;
 pipelineObj.functions = functions;
 
-const nodes: Ref<Node[]> = ref([]);
-
-const hasInputType = computed(() => {
-  return pipelineObj.currentSelectedPipeline.nodes.some(
-    (node: any) => node.io_type === "input",
-  );
-});
-const isNodeConfigDrawerOpen = computed(
-  () => pipelineObj.dialog.show,
-);
-
-const nodeLinks = ref<{ [key: string]: NodeLink }>({});
-
 const refreshFunctionList = () => {
   getFunctions();
 };
@@ -436,9 +376,6 @@ const isPipelineSaving = ref(false);
 
 const { getStreams } = useStreams();
 
-const nodeRows = ref<(string | null)[]>([]);
-
-
 const confirmDialogBasicPipeline = ref(false);
 const showJsonEditorDialog = ref(false);
 const associatedFunctions: Ref<string[]> = ref([]);
@@ -457,14 +394,6 @@ const toggleJsonEditorAIChat = () => {
 };
 
 const { t } = useI18n();
-
-const dialog = ref({
-  name: "streamRouting",
-  show: false,
-  title: "Stream Routing",
-  message: "",
-  okCallback: () => {},
-});
 
 const validationErrors = ref<string[]>([]);
 
@@ -818,7 +747,7 @@ const savePipeline = async () => {
       if (
         node.data.node_type === "stream" &&
         node.data.stream_name &&
-        node.data.stream_name.hasOwnProperty("value")
+        Object.prototype.hasOwnProperty.call(node.data.stream_name, "value")
       ) {
         node.data.stream_name = node.data.stream_name.value;
       }
@@ -1101,30 +1030,6 @@ const isValidNodes = (nodes: any) => {
 };
 
 // Drag n Drop methods
-
-const onNodeDragStart = (event: any, data: any) => {
-  event.dataTransfer.setData("text", data);
-};
-
-const onNodeDrop = (event: any) => {
-  event.preventDefault();
-  const nodeType = event.dataTransfer.getData("text");
-};
-
-const onNodeDragOver = (event: any) => {
-  event.preventDefault();
-};
-
-const updateNewFunction = (_function: Function) => {
-  if (!functions.value[_function.name]) {
-    // Only add VRL functions (trans_type !== 1) to pipeline options
-    // JavaScript functions cannot be used in pipelines
-    if (_function.trans_type !== 1) {
-      functions.value[_function.name] = _function;
-      functionOptions.value.push(_function.name);
-    }
-  }
-};
 
 const beforeUnloadHandler = (e: any) => {
   //check is data updated or not

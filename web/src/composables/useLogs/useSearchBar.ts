@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
 
 import { searchState } from "@/composables/useLogs/searchState";
 import useStreams from "@/composables/useStreams";
@@ -42,7 +41,6 @@ export const useSearchBar = () => {
   let { searchObj, searchObjDebug, notificationMsg } = searchState();
 
   const store = useStore();
-  const router = useRouter();
 
   const { fnParsedSQL, extractTimestamps } = logsUtils();
 
@@ -114,7 +112,6 @@ export const useSearchBar = () => {
   const getSavedViews = async () => {
     try {
       searchObj.loadingSavedView = true;
-      const favoriteViews: any = [];
       savedviewsService
         .get(store.state.selectedOrganization.identifier)
         .then((res) => {
@@ -874,7 +871,7 @@ export const useSearchBar = () => {
   };
 
   const cancelQuery = async (): Promise<boolean> => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       try {
         // only call cancel query api if it is enterprise
         // otherwise resolve and return immediately

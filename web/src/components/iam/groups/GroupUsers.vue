@@ -196,7 +196,6 @@ const usersDisplay = ref("selected");
 const store = useStore();
 const orgOptions = ref([{ label: "All", value: "all" }]);
 const selectedOrg = ref(orgOptions.value[0]);
-const orgList = ref([...orgOptions.value]);
 const usersDisplayOptions = [
   {
     label: "All",
@@ -207,15 +206,6 @@ const usersDisplayOptions = [
     value: "selected",
   },
 ];
-const filterOrganizations = (val: string, update: (fn: () => void) => void) => {
-  // Filter logic
-  update(() => {
-    const needle = val.toLowerCase();
-    orgList.value = orgOptions.value.filter((org) =>
-      org.label.toLowerCase().includes(needle)
-    );
-  });
-};
 const { t } = useI18n();
 
 const userSearchKey = ref("");
@@ -347,38 +337,36 @@ const updateOrganization = () => {
 const getchOrgUsers = async () => {
   // fetch group users
   hasFetchedOrgUsers.value = true;
-  return new Promise(async (resolve) => {
-    const data: any = await usersState.getOrgUsers(
-      store.state.selectedOrganization.identifier , { list_all: true }
-    );
+  const data: any = await usersState.getOrgUsers(
+    store.state.selectedOrganization.identifier , { list_all: true }
+  );
 
-    usersState.users = cloneDeep(
-      data.map((user: any, index: number) => {
-        return {
-          email: user.email,
-          "#": index + 1,
-          isInGroup: groupUsersMap.value.has(user.email),
-          org: user.orgs?.length > 0 ? user.orgs.map((org:{ org_name: string }) => org.org_name).join(", ") : "", // Set default "N/A" for users with no orgs
-          role: user.role,
-          is_external: user.is_external || false
-        };
-      })
-    );
+  usersState.users = cloneDeep(
+    data.map((user: any, index: number) => {
+      return {
+        email: user.email,
+        "#": index + 1,
+        isInGroup: groupUsersMap.value.has(user.email),
+        org: user.orgs?.length > 0 ? user.orgs.map((org:{ org_name: string }) => org.org_name).join(", ") : "", // Set default "N/A" for users with no orgs
+        role: user.role,
+        is_external: user.is_external || false
+      };
+    })
+  );
 
-    users.value = cloneDeep(usersState.users).map(
-      (user: any, index: number) => {
-        return {
-          "#": index + 1,
-          email: user.email,
-          isInGroup: groupUsersMap.value.has(user.email),
-          org: user.org,
-          role: user.role,
-          is_external: user.is_external || false
-        };
-      }
-    );
-    resolve(true);
-  });
+  users.value = cloneDeep(usersState.users).map(
+    (user: any, index: number) => {
+      return {
+        "#": index + 1,
+        email: user.email,
+        isInGroup: groupUsersMap.value.has(user.email),
+        org: user.org,
+        role: user.role,
+        is_external: user.is_external || false
+      };
+    }
+  );
+  return true;
 };
 
 const toggleUserSelection = (user: any) => {

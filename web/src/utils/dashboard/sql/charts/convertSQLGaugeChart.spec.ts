@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { applyGaugeChart } from "@/utils/dashboard/sql/charts/convertSQLGaugeChart";
 
 vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({

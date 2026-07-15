@@ -27,8 +27,6 @@ import {
   deletePanel,
   updateVariable,
   updatePanel,
-  updateDashboard,
-  getDashboard,
   deleteDashboardById,
   getPanel,
   getPanelId,
@@ -79,7 +77,7 @@ vi.mock("./dashboard/convertDashboardSchemaVersion", () => ({
 }));
 
 // Mock moment globally
-global.moment = vi.fn((date) => ({
+global.moment = vi.fn(() => ({
   format: vi.fn((format) => {
     if (format === "YYYY-MM-DDThh:mm:ssZ") {
       return "2023-01-01T12:00:00Z";

@@ -20,7 +20,7 @@
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import { nextTick } from "vue";
-import { ref, watch } from "vue";
+import { ref } from "vue";
 
 const props = defineProps({
   tabs: {

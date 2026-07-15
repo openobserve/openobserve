@@ -66,7 +66,7 @@ export default defineComponent({
     },
   },
   components: { CopyContent },
-  setup(props) {
+  setup() {
     const { t } = useI18n();
     const store = useStore();
     const endpoint: any = ref({

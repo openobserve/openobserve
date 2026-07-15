@@ -151,7 +151,6 @@ import type {
 } from "@/utils/awsIntegrations";
 import {
   generateCloudFormationURL,
-  generateDashboardURL,
 } from "@/utils/awsIntegrations";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
@@ -386,7 +385,7 @@ export default defineComponent({
       // If replacing existing dashboard, delete it first
       if (existingDashboardId) {
         try {
-          const deleteResponse = await dashboardsService.delete(
+          await dashboardsService.delete(
             orgId,
             existingDashboardId,
             folderId,

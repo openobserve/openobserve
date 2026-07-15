@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { defineComponent, ref, provide, computed, nextTick } from 'vue'
+import { defineComponent, provide, computed, nextTick } from 'vue'
 import OStep from './OStep.vue'
 import { STEPPER_CONTEXT_KEY, STEPPER_REGISTER_KEY } from './OStepper.types'
 import type { StepperContext, StepperRegisterAPI, StepRegistration } from './OStepper.types'

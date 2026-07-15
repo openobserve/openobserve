@@ -22,7 +22,6 @@ import templatesService from '@/services/alert_templates';
 // Types and configurations
 import {
   PREBUILT_DESTINATION_TYPES,
-  PREBUILT_CONFIGS,
   getPrebuiltConfig,
   isPrebuiltType,
   detectPrebuiltTypeFromUrl,
@@ -43,12 +42,9 @@ import {
 const systemTemplatesCache = ref<Map<string, any>>(new Map());
 
 import type {
-  PrebuiltType,
-  PrebuiltFormData,
   ValidationResult,
   TestResult,
-  PrebuiltTypeId,
-  DestinationWithPrebuilt
+  PrebuiltTypeId
 } from '@/utils/prebuilt-templates/types';
 import type { Destination } from '@/ts/interfaces/alert';
 

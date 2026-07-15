@@ -276,9 +276,6 @@ import {
   onMounted,
   watch,
   nextTick,
-  onActivated,
-  onBeforeUnmount,
-  onBeforeMount,
   type PropType,
 } from "vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
@@ -291,7 +288,6 @@ import {
 import { subtractRelativeTime } from "@/utils/date";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
 import { toZonedTime } from "date-fns-tz";
 
 export default defineComponent({
@@ -395,7 +391,6 @@ export default defineComponent({
     });
     const browserTime =
       "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
-    const router = useRouter();
 
     // Add the UTC option
     timezoneOptions.unshift("UTC");
@@ -914,12 +909,15 @@ export default defineComponent({
         selectedType.value = "relative";
       } else {
         if (
-          dateobj.hasOwnProperty("selectedDate") &&
-          dateobj.hasOwnProperty("selectedTime") &&
-          dateobj.selectedDate.hasOwnProperty("from") &&
-          dateobj.selectedDate.hasOwnProperty("to") &&
-          dateobj.selectedTime.hasOwnProperty("startTime") &&
-          dateobj.selectedTime.hasOwnProperty("endTime")
+          Object.prototype.hasOwnProperty.call(dateobj, "selectedDate") &&
+          Object.prototype.hasOwnProperty.call(dateobj, "selectedTime") &&
+          Object.prototype.hasOwnProperty.call(dateobj.selectedDate, "from") &&
+          Object.prototype.hasOwnProperty.call(dateobj.selectedDate, "to") &&
+          Object.prototype.hasOwnProperty.call(
+            dateobj.selectedTime,
+            "startTime",
+          ) &&
+          Object.prototype.hasOwnProperty.call(dateobj.selectedTime, "endTime")
         ) {
           selectedDate.value = dateobj.selectedDate;
           selectedTime.value = dateobj.selectedTime;
@@ -948,10 +946,7 @@ export default defineComponent({
     );
 
     const getDisplayValue = computed(() => {
-      if (props.disableRelative) {
-        selectedType.value = "absolute";
-      }
-      if (selectedType.value === "relative") {
+      if (!props.disableRelative && selectedType.value === "relative") {
         return `Past ${relativeValue.value} ${getPeriodLabel.value}`;
       } else {
         if (selectedDate.value != null) {

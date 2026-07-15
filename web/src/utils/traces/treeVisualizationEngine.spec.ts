@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
-import { createTreeVisualizationEngine, type TreeNode } from './treeVisualizationEngine'
+import { createTreeVisualizationEngine } from './treeVisualizationEngine'
 
 // Mock useStore
 const mockStore = {

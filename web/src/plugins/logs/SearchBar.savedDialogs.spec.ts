@@ -23,7 +23,7 @@
 //   2. mounts the schema in a REAL <OForm> with the dialog's exact OForm*
 //      fields to prove the schema gates an empty/invalid submit (R22).
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { defineComponent, h, watch } from "vue";
 import OForm from "@/lib/forms/Form/OForm.vue";

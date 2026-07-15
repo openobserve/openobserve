@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mount } from "@vue/test-utils";
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import HighLight from "@/components/HighLight.vue";
 
 
@@ -40,9 +40,6 @@ describe("HighLight", async () => {
     expect(wrapper).toBeTruthy();
   });
   it("watcher - content", async () => {
-    const localThis = {
-      init: vi.fn(),
-    };
     // await HighLight.watch.content.handler.call(localThis)
 
     // const init = vi.spyOn(HighLight.methods, 'init')
@@ -50,10 +47,6 @@ describe("HighLight", async () => {
   });
   it("watcher - queryString", () => {
     // const getKeywords = vi.fn()
-    const localThis = {
-      getKeywords: vi.fn(),
-      init: vi.fn(),
-    };
     // HighLight.watch.queryString.handler.call(localThis)
   });
 });

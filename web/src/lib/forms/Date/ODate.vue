@@ -33,7 +33,7 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 // Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
 const wrapperAttrs = computed(() => {
-  const { tabindex, ...rest } = $attrs;
+  const { tabindex: _tabindex, ...rest } = $attrs;
   return rest;
 });
 
@@ -76,11 +76,6 @@ const rekaValue = computed(() => tryParse(props.modelValue));
 const stagedDate = ref<DateValue | undefined>(rekaValue.value) as Ref<
   DateValue | undefined
 >;
-
-// What the calendar shows — staged when manual apply, live otherwise
-const calendarValue = computed(() =>
-  props.autoApply === false ? stagedDate.value : rekaValue.value,
-);
 
 const rekaMin = computed(() => tryParse(props.min));
 const rekaMax = computed(() => tryParse(props.max));

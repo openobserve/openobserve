@@ -1,7 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { computed, ref } from "vue";
-import type { Row } from "@tanstack/vue-table";
+import { ref } from "vue";
 
 /**
  * Manages recursive row grouping / tree expansion state.

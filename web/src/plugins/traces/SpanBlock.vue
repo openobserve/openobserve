@@ -96,15 +96,12 @@ import {
   ref,
   onMounted,
   onBeforeUnmount,
-  nextTick,
   watch,
-  onActivated,
 } from "vue";
 import useTraces from "@/composables/useTraces";
 import { getImageURL, formatTimeWithSuffix } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { b64EncodeStandard } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "SpanBlock",
@@ -236,7 +233,7 @@ export default defineComponent({
 
     watch(
       () => spanBlockWidth.value + leftPosition.value + spanWidth.value,
-      (val) => {
+      () => {
         durationStyle.value = getDurationStyle();
       },
     );

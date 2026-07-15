@@ -232,7 +232,6 @@ const formData: Ref<Template> = ref({
   title: "",
 });
 const store = useStore();
-const editorRef: any = ref(null);
 const isUpdatingTemplate = ref(false);
 const nameError = ref('');
 const titleError = ref('');

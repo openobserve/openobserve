@@ -6,7 +6,6 @@ import OSelect from "./OSelect.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
 import { firstFieldError } from "../Form/fieldError";
 import type { FormSelectProps } from "./OFormSelect.types";
-import type { SelectModelValue } from "./OSelect.types";
 
 defineOptions({ inheritAttrs: false });
 

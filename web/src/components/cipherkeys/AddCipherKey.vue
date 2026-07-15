@@ -178,10 +178,7 @@ import { ref, onBeforeMount, onActivated, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import {
-  isValidResourceName,
-  maxLengthCharValidation,
-} from "@/utils/zincutils";
+import { isValidResourceName } from "@/utils/zincutils";
 import AddOpenobserveType from "@/components/cipherkeys/AddOpenobserveType.vue";
 import AddAkeylessType from "@/components/cipherkeys/AddAkeylessType.vue";
 import AddEncryptionMechanism from "@/components/cipherkeys/AddEncryptionMechanism.vue";
@@ -199,7 +196,6 @@ const emit = defineEmits(["cancel:hideform"]);
 const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
-const addCipherKeyFormRef: any = ref();
 const nameError = ref('');
 const storeTypeError = ref('');
 // Flipped to true the first time the user clicks Continue. Passed down to
@@ -376,7 +372,7 @@ const createCipherKey = () => {
     store.state.selectedOrganization.identifier,
     formData.value,
   )
-    .then((response) => {
+    .then(() => {
       dismiss();
       toast({
         variant: "success",
@@ -395,34 +391,6 @@ const createCipherKey = () => {
     });
 };
 
-function filterEditedAttributes(formdata: any, originalData: any) {
-  const result: any = {};
-
-  for (const key in formdata) {
-    const formValue = formdata[key];
-    const originalValue = originalData[key];
-
-    if (originalValue === undefined) {
-      // New attribute in formdata, keep it
-      result[key] = formValue;
-    } else if (
-      typeof formValue === "object" &&
-      formValue !== null &&
-      !Array.isArray(formValue)
-    ) {
-      // Recursively process nested objects
-      const nestedResult = filterEditedAttributes(formValue, originalValue);
-      if (Object.keys(nestedResult).length > 0) {
-        result[key] = nestedResult;
-      }
-    } else if (formValue !== originalValue) {
-      // Edited attribute, keep it
-      result[key] = formValue;
-    }
-  }
-
-  return result;
-}
 
 const updateCipherKey = () => {
   isSubmitting.value = true;
@@ -442,17 +410,12 @@ const updateCipherKey = () => {
     return;
   }
 
-  const editedData = filterEditedAttributes(
-    formData.value,
-    JSON.parse(originalData.value),
-  );
-
   CipherKeysService.update(
     store.state.selectedOrganization.identifier,
     formData.value,
     formData.value.name,
   )
-    .then((response) => {
+    .then(() => {
       isSubmitting.value = false;
       dismiss();
       toast({

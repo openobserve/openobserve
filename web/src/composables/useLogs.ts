@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { useI18n } from "vue-i18n";
 import { reactive, onBeforeMount, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -41,20 +40,17 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 
 const useLogs = () => {
   const store = useStore();
-  const { t } = useI18n();
 
   let {
     searchObj,
-    searchObjDebug,
     initialQueryPayload,
     resetFunctions,
     notificationMsg,
-    fieldValues,
   } = searchState();
 
   const { getHistogramTitle } = useHistogram();
 
-  const { refreshPartitionPagination, getPaginatedData } = usePagination();
+  const { getPaginatedData } = usePagination();
 
   const { buildSearch } = useSearchStream();
 
@@ -63,11 +59,8 @@ const useLogs = () => {
   const {
     fnParsedSQL,
     fnUnparsedSQL,
-    extractTimestamps,
     addTransformToQuery,
     isActionsEnabled,
-    showCancelSearchNotification,
-    isTimestampASC,
   } = logsUtils();
 
   const {
@@ -132,7 +125,10 @@ const useLogs = () => {
             if (
               searchObj.meta.refreshInterval == 0 &&
               router.currentRoute.value.name == "logs" &&
-              searchObj.data.queryResults.hasOwnProperty("hits")
+              Object.prototype.hasOwnProperty.call(
+                searchObj.data.queryResults,
+                "hits",
+              )
             ) {
               const start_time: number =
                 initialQueryPayload.value?.query?.start_time || 0;
@@ -156,7 +152,7 @@ const useLogs = () => {
             },
             "ui",
           )
-          .then((res: any) => {
+          .then(() => {
             toast({
               variant: "success",
               message: "Job added successfully",
@@ -359,7 +355,7 @@ const useLogs = () => {
     }
   };
 
-  const restoreUrlQueryParams = async (dashboardPanelData: any = null) => {
+  const restoreUrlQueryParams = async (_dashboardPanelData: any = null) => {
     searchObj.shouldIgnoreWatcher = true;
     const queryParams: any = router.currentRoute.value.query;
     // Allow SQL mode queries without stream param (will be auto-detected from SQL)
@@ -397,7 +393,7 @@ const useLogs = () => {
     }
 
     if (
-      queryParams.hasOwnProperty("defined_schemas") &&
+      Object.prototype.hasOwnProperty.call(queryParams, "defined_schemas") &&
       queryParams.defined_schemas != ""
     ) {
       searchObj.meta.useUserDefinedSchemas = queryParams.defined_schemas;
@@ -463,7 +459,10 @@ const useLogs = () => {
     }
 
     if (
-      queryParams.hasOwnProperty("logs_visualize_toggle") &&
+      Object.prototype.hasOwnProperty.call(
+        queryParams,
+        "logs_visualize_toggle",
+      ) &&
       queryParams.logs_visualize_toggle != ""
     ) {
       searchObj.meta.logsVisualizeToggle = queryParams.logs_visualize_toggle;

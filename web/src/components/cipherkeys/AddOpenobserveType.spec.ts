@@ -238,7 +238,6 @@ describe("AddOpenobserveType", () => {
 
     it("should show update button in update mode", () => {
       expect(updateWrapper.vm.formData.isUpdate).toBe(true);
-      const updateButton = updateWrapper.find('[data-test="add-cipher-key-openobserve-secret-input-update"]');
       // Update button should exist in update mode when not editing
     });
 
@@ -264,7 +263,6 @@ describe("AddOpenobserveType", () => {
       updateWrapper.vm.isUpdate = true;
       await nextTick();
       
-      const cancelButton = updateWrapper.find('[data-test="add-cipher-key-openobserve-secret-input-cancel"]');
       // Cancel button should be visible when isUpdate is true and formData.isUpdate is true
     });
 
@@ -282,12 +280,10 @@ describe("AddOpenobserveType", () => {
 
     it("should display pre-formatted secret text correctly", () => {
       expect(updateWrapper.vm.formData.key.store.local).toBe("existing-secret");
-      const preText = updateWrapper.find('pre.pre-text');
       // Pre-formatted text should display the secret
     });
 
     it("should have correct label for secret field", () => {
-      const label = updateWrapper.find('label b');
       // Label should contain translated secret text
     });
 
@@ -497,7 +493,6 @@ describe("AddOpenobserveType", () => {
 
   describe("Conditional Rendering Logic", () => {
     it("should render input when not in update mode", () => {
-      const secretInput = wrapper.find('[data-test="add-cipher-key-openobserve-secret-input"]');
       // In non-update mode, input should be rendered
       expect(wrapper.vm.formData.isUpdate).toBeFalsy();
     });

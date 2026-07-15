@@ -778,7 +778,7 @@ describe("Ingestion", () => {
       wrapper.vm.store.state.organizationData.isDataIngested = false;
       await wrapper.vm.$nextTick();
 
-      const shouldShowWarning = wrapper.vm.store.state.zoConfig.hasOwnProperty('restricted_routes_on_empty_data') &&
+      const shouldShowWarning = Object.prototype.hasOwnProperty.call(wrapper.vm.store.state.zoConfig, 'restricted_routes_on_empty_data') &&
         wrapper.vm.store.state.zoConfig.restricted_routes_on_empty_data === true &&
         wrapper.vm.store.state.organizationData.isDataIngested === false;
       
@@ -795,7 +795,7 @@ describe("Ingestion", () => {
       wrapper.vm.store.state.organizationData.isDataIngested = true;
       await wrapper.vm.$nextTick();
 
-      const shouldShowWarning = wrapper.vm.store.state.zoConfig.hasOwnProperty('restricted_routes_on_empty_data') &&
+      const shouldShowWarning = Object.prototype.hasOwnProperty.call(wrapper.vm.store.state.zoConfig, 'restricted_routes_on_empty_data') &&
         wrapper.vm.store.state.zoConfig.restricted_routes_on_empty_data === true &&
         wrapper.vm.store.state.organizationData.isDataIngested === false;
       

@@ -198,10 +198,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import {
-  validateTemplateBody,
-  getTemplateValidationErrorMessage,
-} from "@/utils/templates/validation";
+import { validateTemplateBody } from "@/utils/templates/validation";
 
 export default defineComponent({
   name: "ImportTemplate",
@@ -310,7 +307,7 @@ export default defineComponent({
       }
     };
 
-    const importJson = async ({ jsonStr: jsonString, jsonArray }: any) => {
+    const importJson = async ({ jsonStr: jsonString }: any) => {
       templateErrorsToDisplay.value = [];
       tempalteCreators.value = [];
 

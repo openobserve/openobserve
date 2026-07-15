@@ -30,30 +30,6 @@ export interface ToastDetail {
   url: string
 }
 
-/** A single entry in the collapsible "affected sections" detail list */
-export interface ToastDetail {
-  /** Human-readable resource label, e.g. "Dashboards" */
-  label: string
-  /** API path shown alongside the label, e.g. "/api/default/dashboards" */
-  url: string
-}
-
-/** A single entry in the collapsible "affected sections" detail list */
-export interface ToastDetail {
-  /** Human-readable resource label, e.g. "Dashboards" */
-  label: string
-  /** API path shown alongside the label, e.g. "/api/default/dashboards" */
-  url: string
-}
-
-/** A single entry in the collapsible "affected sections" detail list */
-export interface ToastDetail {
-  /** Human-readable resource label, e.g. "Dashboards" */
-  label: string
-  /** API path shown alongside the label, e.g. "/api/default/dashboards" */
-  url: string
-}
-
 export interface ToastOptions {
   /** Visual style + icon set */
   variant?: ToastVariant

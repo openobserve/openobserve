@@ -153,17 +153,19 @@ export const useHistogram = () => {
       const xData: number[] = [];
       const yData: number[] = [];
 
-      // hasAggregationFlag is set here but consumed by commented-out code below;
-      // kept in place so it's ready if that code is re-enabled.
-       
-      let hasAggregationFlag = false;
       const parsedSQL: any = fnParsedSQL();
-      if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
-        hasAggregationFlag = hasAggregation(parsedSQL.columns);
+      if (
+        searchObj.meta.sqlMode &&
+        Object.prototype.hasOwnProperty.call(parsedSQL, "columns")
+      ) {
+        hasAggregation(parsedSQL.columns);
       }
 
       if (
-        searchObj.data.queryResults.hasOwnProperty("aggs") &&
+        Object.prototype.hasOwnProperty.call(
+          searchObj.data.queryResults,
+          "aggs",
+        ) &&
         searchObj.data.queryResults.aggs
       ) {
         // NEW: read the breakdown field returned by the backend.
@@ -370,7 +372,10 @@ export const useHistogram = () => {
 
   const generateHistogramSkeleton = () => {
     if (
-      searchObj.data.queryResults.hasOwnProperty("aggs") &&
+      Object.prototype.hasOwnProperty.call(
+        searchObj.data.queryResults,
+        "aggs",
+      ) &&
       searchObj.data.queryResults.aggs
     ) {
       histogramResults.value = [];
@@ -384,7 +389,6 @@ export const useHistogram = () => {
         .histogram_interval
         ? searchObj.data.queryResults.histogram_interval * 1000000
         : intervalMs;
-      const date = new Date();
       const startTimeDate = new Date(
         searchObj.data.customDownloadQueryObj.query.start_time / 1000,
       ); // Convert microseconds to milliseconds
@@ -410,11 +414,10 @@ export const useHistogram = () => {
         startTimeDate.setDate(startTimeDate.getDate() + 1);
       }
 
-      const startTime = startTimeDate.getTime() * 1000;
     }
   };
 
-  const setMultiStreamHistogramQuery = (queryReq: any) => {
+  const setMultiStreamHistogramQuery = (_queryReq?: unknown) => {
     let histogramQuery = `select histogram(${store.state.zoConfig.timestamp_column}, '${searchObj.meta.resultGrid.chartInterval}') AS zo_sql_key, count(*) AS zo_sql_num from "[INDEX_NAME]" [WHERE_CLAUSE] GROUP BY zo_sql_key`;
     let multiSql = [];
 

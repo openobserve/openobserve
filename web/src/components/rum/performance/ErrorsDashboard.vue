@@ -52,7 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   defineComponent,
   ref,
-  watch,
   onActivated,
   onMounted,
   nextTick,
@@ -63,7 +62,6 @@ import { useI18n } from "vue-i18n";
 import { reactive } from "vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import errorDashboard from "@/utils/rum/errors.json";
-import searchService from "@/services/search";
 import { convertDashboardSchemaVersion } from "../../../utils/dashboard/convertDashboardSchemaVersion";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 

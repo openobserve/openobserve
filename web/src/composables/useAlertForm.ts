@@ -42,7 +42,6 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import {
   getUUID,
   getTimezoneOffset,
-  b64DecodeUnicode,
   smartDecodeVrlFunction,
   isValidResourceName,
   getTimezonesByOffset,
@@ -891,7 +890,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const debouncedPreviewAlert = debounce(previewAlert, 500);
 
-  const onInputUpdate = async (name: string, value: any) => {
+  const onInputUpdate = async (_field?: string, _value?: unknown) => {
     if (formData.value.query_condition.type === "custom") {
       debouncedGenerateSql();
     } else if (showPreview.value) {
@@ -2032,7 +2031,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         activeFolderId.value,
       );
       callAlert
-        .then((res: { data: any }) => {
+        .then(() => {
           formData.value = { ...defaultAlertValue() };
           emit("update:list", activeFolderId.value as string);
           addAlertForm.value?.resetValidation();
@@ -2068,7 +2067,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       );
 
       callAlert
-        .then((res: { data: any }) => {
+        .then(() => {
           formData.value = { ...defaultAlertValue() };
           emit("update:list", activeFolderId.value as string);
           addAlertForm.value?.resetValidation();

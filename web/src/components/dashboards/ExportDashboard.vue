@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref } from "vue";
+import { defineComponent } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18n } from "vue-i18n";
@@ -38,7 +38,7 @@ export default defineComponent({
   name: "ExportDashboard",
   components: { OButton, OTooltip },
   props: ["dashboardId"],
-  setup(props, { emit }) {
+  setup(props) {
     const { t } = useI18n();
     const store = useStore();
     const route = useRoute();

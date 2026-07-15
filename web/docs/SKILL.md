@@ -135,27 +135,40 @@ service/composable return), not at each call site.
 ## 2. Unused code — `@typescript-eslint/no-unused-vars` (the big bucket)
 
 Single source of truth for unused code (core `no-unused-vars` and TS
-`noUnusedLocals` stay off). `_`-prefix opts out.
+`noUnusedLocals` stay off).
+
+**DELETE is the default fix. `_`-prefix is a narrow last resort for FUNCTION
+PARAMETERS ONLY** — never `_`-prefix an import, a local, or a function/const, because
+that just *hides* dead code instead of removing it.
 
 ```ts
-// ❌ unused import
+// ❌ unused import → remove it (or just the one specifier)
 import { computed, ref, watch } from "vue"; // watch never used
-// ✅ remove it
-import { computed, ref } from "vue";
+import { computed, ref } from "vue";        // ✅
 
 // ❌ unused local
-const result = compute(); // never read
-// ✅ if the call has side effects, keep the call, drop the binding:
-compute();
-// ✅ if not, delete the line.
+const result = compute();                   // never read
+compute();                                  // ✅ side-effect call → keep call, drop binding
+                                            // ✅ no side effects → delete the line entirely
 
-// ❌ unused param
-arr.map((item, index) => item.id); // index unused
-// ✅ prefix with _ (signature preserved):
-arr.map((item, _index) => item.id);
+// ❌ unused standalone function/const — DELETE it (dead code)
+const _getInitials = () => …;               // ❌ `_`-prefix does NOT make it "used"
+// ✅ verify no caller (grep the name), then remove the whole declaration.
+
+// PARAMETERS:
+// ❌ unused TRAILING param → REMOVE it, don't `_`-prefix
+arr.map((item, index) => item.id);          // index unused
+arr.map((item) => item.id);                 // ✅ drop it
+watch(src, (_newVal, _oldVal) => { … });    // ❌ both unused & trailing
+watch(src, () => { … });                    // ✅ drop them
+// ❌ unused DESTRUCTURED element (e.g. setup's ctx) → remove the key, don't rename
+setup(props, { emit: _emit, expose }) {}    // ❌ emit unused
+setup(props, { expose }) {}                 // ✅ drop `emit`
+// ✅ `_`-prefix ONLY when a LATER param is used (can't drop) or a contract fixes arity:
+arr.map((_item, index) => index);           // _item kept because index is used
 ```
 In `.vue`, vue-tsc/eslint-vue already account for `<template>` usage, so a flagged
-script var is genuinely dead — safe to remove.
+script var/function is genuinely dead — safe to remove.
 
 ## 3. Real-bug rules (Bucket 1 — fix each by hand)
 
@@ -259,9 +272,14 @@ if (Object.prototype.hasOwnProperty.call(obj, k)) {}      // ✅
 // no-useless-escape — drop the needless backslash (prettier/--fix often handles it)
 /\-/  →  /-/
 
-// no-empty — an empty block needs a reason or a no-op
+// no-empty — FIRST ask: does the block do anything? If it does NOTHING,
+// DELETE it — do not comment an empty block into existence.
+if (a) { doX(); } else { }            // ❌ empty else that does nothing
+if (a) { doX(); }                     // ✅ drop the dead branch entirely
+// Only keep an empty block when it MUST exist (a catch that deliberately
+// swallows, a required override) — then add a reason comment:
 catch (e) {}                          // ❌
-catch (e) { /* ignore: best-effort */ } // ✅
+catch (e) { /* ignore: best-effort */ } // ✅ intentional no-op
 
 // no-useless-catch — a catch that only rethrows adds nothing → remove the try/catch
 // no-async-promise-executor — never pass an async fn to new Promise; hoist the body

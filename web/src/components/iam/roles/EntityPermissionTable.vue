@@ -76,7 +76,7 @@ const { t } = useI18n();
 
 const rows: any = ref([]);
 
-const { permissionsState } = usePermissions();
+usePermissions();
 
 const permissionColumnIds = computed(() =>
   columns.value

@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, reactive } from "vue";
+import { ref, reactive } from "vue";
 import type { PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -159,7 +159,7 @@ var triggerOperators: any = ref([
 ]);
 const emits = defineEmits(["add", "remove", "input:update"]);
 
-const store = useStore();
+useStore();
 
 const { t } = useI18n();
 

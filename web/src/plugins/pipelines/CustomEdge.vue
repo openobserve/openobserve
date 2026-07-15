@@ -12,8 +12,8 @@
 </template>
 
 <script setup>
-import { BaseEdge, getBezierPath,EdgeLabelRenderer,getSmoothStepPath,useVueFlow } from '@vue-flow/core'
-import { computed, onMounted } from 'vue'
+import { BaseEdge, getBezierPath,EdgeLabelRenderer,useVueFlow } from '@vue-flow/core'
+import { computed } from 'vue'
 
 
 const props = defineProps({
@@ -63,13 +63,9 @@ const props = defineProps({
     default: false,
   },
 })
-const midX = computed(() => (props.sourceX + props.targetX) / 2)
-const midY = computed(() => (props.sourceY + props.targetY) / 2)
-const { removeEdges, getSelectedEdges, addSelectedEdges, removeSelectedEdges } = useVueFlow()
+useVueFlow()
 
 const path = computed(() => getBezierPath(props))
-
-let clickTimeout = null
 
 // Edge click handling moved to PipelineFlow.vue using VueFlow events
 // These handlers are no longer used but kept for backwards compatibility

@@ -21,8 +21,8 @@ import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import useIngestion from "@/composables/useIngestion";
 const name = "rabbitmq";
-const store = useStore();
-const { endpoint, messageQueuesContent, messageQueuesDocURLs } = useIngestion();
+useStore();
+const { messageQueuesContent, messageQueuesDocURLs } = useIngestion();
 const content = messageQueuesContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
 const docURL = messageQueuesDocURLs[name];
 </script>

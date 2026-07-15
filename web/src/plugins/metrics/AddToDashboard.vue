@@ -51,7 +51,6 @@ import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.v
 import SelectDashboardDropdown from "@/components/dashboards/SelectDashboardDropdown.vue";
 import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
-import OInput from '@/lib/forms/Input/OInput.vue';
 import OForm from '@/lib/forms/Form/OForm.vue';
 import OFormInput from '@/lib/forms/Input/OFormInput.vue';
 import { useRouter } from "vue-router";
@@ -66,7 +65,6 @@ export default defineComponent({
     SelectDashboardDropdown,
     SelectTabDropdown,
     ODialog,
-    OInput,
     OForm,
     OFormInput,
   },

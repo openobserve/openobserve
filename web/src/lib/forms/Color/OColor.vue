@@ -28,6 +28,7 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
 const wrapperAttrs = computed(() => {
   const { tabindex, ...rest } = $attrs;
+  void tabindex;
   return rest;
 });
 

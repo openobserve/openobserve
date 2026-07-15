@@ -152,7 +152,7 @@ export function useMetricsCorrelationDashboard() {
     const effectiveFilters = { ...(stream.filters ?? {}), ...subjectOverrides };
 
     const whereConditions = Object.entries(effectiveFilters)
-      .filter(([field, value]) => {
+      .filter(([, value]) => {
         const skip = value === SELECT_ALL_VALUE;
         // if (skip) {
         //   console.log(`[useMetricsCorrelationDashboard] Skipping filter ${field}=${value} (SELECT_ALL_VALUE)`);

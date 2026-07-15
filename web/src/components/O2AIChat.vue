@@ -1388,7 +1388,6 @@ import { getImageURL, getUUIDv7 } from "@/utils/zincutils";
 import {
   ChatMessage,
   ChatHistoryEntry,
-  ToolCall,
   ContentBlock,
   NavigationAction,
   ImageAttachment,
@@ -1514,7 +1513,6 @@ export default defineComponent({
     const isLoading = ref(false);
     const messagesContainer = ref<HTMLElement | null>(null);
     const chatInput = ref<any>(null); // RichTextInput component instance
-    const scrollTimeoutId = ref<ReturnType<typeof setTimeout> | null>(null);
     const currentStreamingMessage = ref("");
     const currentTextSegment = ref(""); // Track current text segment (resets after each tool call)
     const showHistory = ref(false);
@@ -1734,28 +1732,6 @@ export default defineComponent({
       }
     };
 
-    // Flush any in-progress streaming text into the last assistant text block
-    // and reset streaming state. Called before inserting non-text blocks
-    // (confirmation_required, navigation_action) so the text preceding them is
-    // not lost.
-    const finalizeTextBlock = () => {
-      if (currentTextSegment.value) {
-        const lm = chatMessages.value[chatMessages.value.length - 1];
-        if (lm && lm.role === "assistant" && lm.contentBlocks) {
-          const lb = lm.contentBlocks[lm.contentBlocks.length - 1];
-          if (lb && lb.type === "text") {
-            lb.text = currentTextSegment.value;
-          }
-        }
-      }
-      if (typewriterAnimationId.value) {
-        cancelAnimationFrame(typewriterAnimationId.value);
-        typewriterAnimationId.value = null;
-      }
-      currentTextSegment.value = "";
-      displayedStreamingContent.value = "";
-    };
-
     // Interval ID for title animation
     let titleIntervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -1881,16 +1857,6 @@ export default defineComponent({
     const historyIndex = ref(-1);
     const HISTORY_KEY = "ai-chat-query-history";
     const MAX_HISTORY_SIZE = 10;
-
-    const modelConfig: any = {
-      openai: ["gpt-4.1"],
-      groq: [
-        "llama-3.3-70b-versatile",
-        "meta-llama/llama-4-scout-17b-16e-instruct",
-        "meta-llama/llama-4-maverick-17b-128e-instruct",
-      ],
-      xai: ["xai/grok-3-mini-beta", "xai/grok-3-latest"],
-    };
 
     const capabilities = [
       "1. Create a SQL query for me",
@@ -3466,22 +3432,6 @@ export default defineComponent({
       }
     };
 
-    /**
-     * Throttled save for streaming - saves at most every STREAMING_SAVE_INTERVAL ms
-     * This prevents data loss if the user reloads the page during streaming
-     * @param force - If true, saves immediately regardless of throttle (used for first assistant message)
-     */
-    const throttledStreamingSave = async (force: boolean = false) => {
-      const now = Date.now();
-      if (
-        force ||
-        now - lastStreamingSaveTime.value >= STREAMING_SAVE_INTERVAL
-      ) {
-        lastStreamingSaveTime.value = now;
-        await saveToHistory();
-      }
-    };
-
     const loadHistory = async () => {
       try {
         // Load history using the composable (automatically prunes to 100 items)
@@ -4198,9 +4148,8 @@ export default defineComponent({
           }
 
           // Scroll to bottom after loading chat
-          await nextTick(() => {
-            scrollToBottom();
-          });
+          await nextTick();
+          scrollToBottom();
         }
       } catch (error) {
         console.error("Error loading chat:", error);
@@ -4878,36 +4827,6 @@ export default defineComponent({
       previewImage.value = null;
     };
 
-    // Scroll input textarea to bottom to show latest appended content
-    const scrollInputToBottom = () => {
-      // Clear any pending scroll timeout
-      if (scrollTimeoutId.value !== null) {
-        clearTimeout(scrollTimeoutId.value);
-      }
-
-      // Set new timeout for scroll
-      scrollTimeoutId.value = setTimeout(() => {
-        const textarea = chatInput.value?.$el?.querySelector("textarea");
-        if (!textarea) return;
-
-        textarea.focus();
-        textarea.setSelectionRange(
-          textarea.value.length,
-          textarea.value.length,
-        );
-
-        // Scroll all scrollable parent elements
-        let element = textarea;
-        while (element && element !== document.body) {
-          if (element.scrollHeight > element.clientHeight) {
-            element.scrollTop = element.scrollHeight;
-          }
-          element = element.parentElement;
-        }
-
-        scrollTimeoutId.value = null;
-      }, 50);
-    };
 
     // Load query history from localStorage
     const loadQueryHistory = () => {
@@ -5248,7 +5167,7 @@ export default defineComponent({
         const formatted = JSON.stringify(parsed, null, 2);
         // Apply syntax highlighting
         const highlighted = formatted.replace(
-          /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+          /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
           (match) => {
             let cls = "json-number";
             if (/^"/.test(match)) {
@@ -5362,12 +5281,6 @@ export default defineComponent({
           contentBlocks: message.contentBlocks || [],
         };
       });
-    });
-
-    // Check if there's an assistant message in progress (for loading indicator positioning)
-    const hasAssistantMessage = computed(() => {
-      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-      return lastMessage?.role === "assistant";
     });
 
     const retryGeneration = async (message: any) => {

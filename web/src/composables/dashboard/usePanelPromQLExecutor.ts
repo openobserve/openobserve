@@ -294,7 +294,7 @@ export const usePanelPromQLExecutor = (ctx: {
             }
           };
 
-          const handlePromQLComplete = (data: any, _: any) => {
+          const handlePromQLComplete = () => {
             // Mark this query as completed
             completedQueries.add(queryIndex);
 
@@ -326,7 +326,7 @@ export const usePanelPromQLExecutor = (ctx: {
             }
           };
 
-          const handlePromQLReset = (data: any, res: any) => {
+          const handlePromQLReset = () => {
             // Reset handling if needed
           };
 

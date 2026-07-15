@@ -173,8 +173,6 @@ describe("JsonPreview Component", () => {
     }
   };
 
-  const mockTracesStreams = ["trace-stream1", "trace-stream2"];
-
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
@@ -734,8 +732,7 @@ describe("JsonPreview Component", () => {
 
     it("should not add event listeners when enterprise disabled", () => {
       vi.clearAllMocks();
-      const config = { isEnterprise: "false" };
-      
+
       mount(JsonPreview, {
         props: { value: mockValue },
         global: {

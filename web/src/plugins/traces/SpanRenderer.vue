@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent } from "vue";
-import SpanBlock from "./SpanBlock.vue";
 
 export default defineComponent({
   name: "SpanRenderer",
@@ -68,6 +67,5 @@ export default defineComponent({
       toggleSpanCollapse,
     };
   },
-  components: { SpanBlock },
 });
 </script>

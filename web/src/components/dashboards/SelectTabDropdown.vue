@@ -58,7 +58,6 @@ import { useStore } from "vuex";
 import AddTab from "../../components/dashboards/tabs/AddTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import { useRoute } from "vue-router";
 import { getDashboard } from "@/utils/commons";
 import { onMounted } from "vue";
 import { useLoading } from "@/composables/useLoading";
@@ -83,7 +82,6 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const store: any = useStore();
-    const route = useRoute();
     const showAddTabDialog: any = ref(false);
     const tabList: any = ref([]);
 

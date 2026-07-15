@@ -122,11 +122,9 @@ import { ScheduledDashboardReport } from "@/ts/interfaces/report";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { convertUnixToDateFormat } from "@/utils/date";
 import { useStore } from "vuex";
-import { getImageURL } from "@/utils/zincutils";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -340,8 +338,6 @@ const selectedPerPage = ref(20);
 
 const perPageOptionsList = [5, 10, 20, 50, 100];
 
-const resultTotal = ref(0);
-
 const displayReports = computed(() => {
   let reports = formattedReports.value;
   if (scheduledFilterQuery.value) {
@@ -352,7 +348,6 @@ const displayReports = computed(() => {
       ),
     );
   }
-  resultTotal.value = reports.length;
   return reports;
 });
 

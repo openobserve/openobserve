@@ -132,10 +132,7 @@ import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
   // @ts-nocheck
   import {
     computed,
-    defineAsyncComponent,
     defineComponent,
-    onBeforeMount,
-    onBeforeUnmount,
     onMounted,
     ref,
     watch,
@@ -143,51 +140,23 @@ import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
   import { useStore } from "vuex";
   import { useI18n } from "vue-i18n";
 
-  import dashboardService from "@/services/dashboards";
-  import QTablePagination from "@/components/shared/grid/Pagination.vue";
-  import NoData from "@/components/shared/grid/NoData.vue";
-  import { useRoute, useRouter } from "vue-router";
-  import { toRaw } from "vue";
-  import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+  import { useRouter } from "vue-router";
   import ConfirmDialog from "@/components/ConfirmDialog.vue";
   import {
-    deleteDashboardById,
-    deleteFolderById,
     deleteFolderByIdByType,
-    getAllDashboards,
-    getAllDashboardsByFolderId,
-    getDashboard,
-    getFoldersList,
     getFoldersListByType
   } from "@/utils/commons";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
   import AddFolder from "./AddFolder.vue";
   import useNotifications from "@/composables/useNotifications";
-  import { filter, forIn } from "lodash-es";
-  import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
-  import { useLoading } from "@/composables/useLoading";
   import { useReo } from "@/services/reodotdev_analytics";
-
-  const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
-    return import("@/components/common/sidebar/MoveAcrossFolders.vue");
-  });
-
-  const AddDashboard = defineAsyncComponent(() => {
-    return import("@/components/dashboards/AddDashboard.vue");
-  });
 
 export default defineComponent({
     name: "FolderList",
     components: {
-      OSeparator,
       OIcon,
-      AddDashboard,
-      QTablePagination,
-      NoData,
       ConfirmDialog,
       AddFolder,
-      MoveDashboardToAnotherFolder,
       OTabs,
       OTab,
       OButton,

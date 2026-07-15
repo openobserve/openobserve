@@ -196,19 +196,6 @@ defineExpose({
   },
 });
 
-const deleteApiHeader = (field: any) => {
-  emits("remove", field);
-  emits("input:update", "conditions", field);
-};
-
-const addApiHeader = (groupId: string) => {
-  emits("add", groupId);
-};
-
-const addGroupApiHeader = (groupId: string) => {
-  emits("add-group", groupId);
-};
-
 const computedLabel = computed(() => {
   // V2: First condition in any group should not show AND/OR operator
   // Only subsequent conditions show the operator

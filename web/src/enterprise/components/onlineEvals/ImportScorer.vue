@@ -339,7 +339,6 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
     for (const e of item.errors) {
       const raw: any = rawItems[e.itemIndex] ?? {};
       const scorer = raw.scorer ?? raw;
-      const params = scorer?.params ?? {};
 
       if ((e.field === "name" || e.field === "nameConflict") && nameFixers[e.itemIndex] === undefined) {
         nameFixers[e.itemIndex] = typeof raw.name === "string" ? raw.name : "";

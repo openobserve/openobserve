@@ -175,8 +175,7 @@ describe('AddCipherKey.vue', () => {
     it('updates form data when name input changes', async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      const nameInput = wrapper.find('[data-test="add-cipher-key-name-input"]');
-      
+
       vm.formData.name = 'test-cipher-key';
       await wrapper.vm.$nextTick();
       
@@ -432,7 +431,6 @@ describe('AddCipherKey.vue', () => {
 
     it('directly cancels when no changes detected', async () => {
       wrapper = createWrapper();
-      const vm = wrapper.vm as any;
       const cancelBtn = wrapper.find('[data-test="add-cipher-key-cancel-btn"]');
       
       await cancelBtn.trigger('click');
@@ -527,8 +525,7 @@ describe('AddCipherKey.vue', () => {
 
     it('handles edit mode setup correctly', () => {
       wrapper = createWrapper({ action: 'edit', name: 'test-key' });
-      const vm = wrapper.vm as any;
-      
+
       // setupTemplateData will be called which sets isUpdatingCipherKey
       expect(wrapper.exists()).toBe(true);
     });

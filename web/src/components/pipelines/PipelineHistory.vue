@@ -711,15 +711,6 @@ const fetchPipelinesList = async () => {
   }
 };
 
-const filterPipelineOptions = (val: string, update: any) => {
-  update(() => {
-    const needle = val.toLowerCase();
-    filteredPipelineOptions.value = allPipelines.value.filter((v) =>
-      v.label.toLowerCase().includes(needle),
-    );
-  });
-};
-
 const onPipelineSelected = (val: any) => {
   // OSelect with valueKey="value" emits the primitive value (pipeline id) or null on clear
   searchQuery.value = val ?? "";
@@ -867,16 +858,6 @@ const formatDuration = (microseconds: number) => {
     return `${minutes}m ${seconds % 60}s`;
   }
   return `${seconds}s`;
-};
-
-const showDetailsDialog = (row: any) => {
-  selectedRow.value = row;
-  detailsDialog.value = true;
-};
-
-const showErrorDialog = (error: any) => {
-  errorMessage.value = error;
-  errorDialog.value = true;
 };
 
 const closeErrorDialog = () => {

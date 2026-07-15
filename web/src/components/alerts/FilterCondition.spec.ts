@@ -3,7 +3,6 @@ import { mount } from '@vue/test-utils';
 import FilterCondition from './FilterCondition.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
-import { nextTick } from 'vue';
 
 const mockStore = createStore({
   state: {

@@ -643,7 +643,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   computed,
   defineComponent,
-  nextTick,
   ref,
   watch,
   type PropType,
@@ -813,29 +812,6 @@ export default defineComponent({
       } finally {
         loadingFields.value = false;
       }
-    };
-
-    const filterFieldOptions = (val: string, update: any) => {
-      update(() => {
-        const needle = val.toLowerCase();
-        filteredStreamFields.value = needle
-          ? allStreamFields.value.filter((f) =>
-              f.toLowerCase().includes(needle),
-            )
-          : allStreamFields.value;
-      });
-    };
-
-    const filterDetectionFieldOptions = (val: string, update: any) => {
-      update(() => {
-        const needle = val.toLowerCase();
-        const base = requiresNumericField(props.config.detection_function)
-          ? numericStreamFields.value
-          : allStreamFields.value;
-        filteredDetectionFields.value = needle
-          ? base.filter((f) => f.toLowerCase().includes(needle))
-          : base;
-      });
     };
 
     const onDetectionFunctionChange = (fn: string) => {

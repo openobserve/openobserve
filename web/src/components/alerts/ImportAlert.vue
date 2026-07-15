@@ -490,7 +490,7 @@ export default defineComponent({
       getActiveFolderAlerts(activeFolderId.value as string);
     });
 
-    const importJson = async ({ jsonStr: jsonString, jsonArray }: any) => {
+    const importJson = async ({ jsonStr: jsonString }: any) => {
       alertErrorsToDisplay.value = [];
       templateErrorsToDisplay.value = [];
       destinationErrorsToDisplay.value = [];
@@ -639,8 +639,6 @@ export default defineComponent({
           field: "alert_name",
         });
       }
-      const organizationData = store.state.organizations;
-      const orgList = organizationData.map((org: any) => org.identifier);
 
       // 2. Validate 'org_id' field
       if (
@@ -954,7 +952,7 @@ export default defineComponent({
 
       if (
         (input.trigger_condition.frequency_type == "cron" &&
-          !input.trigger_condition.hasOwnProperty("timezone")) ||
+          !Object.prototype.hasOwnProperty.call(input.trigger_condition, "timezone")) ||
         input.trigger_condition.timezone === ""
       ) {
         alertErrors.push({
@@ -997,19 +995,19 @@ export default defineComponent({
     };
 
     const createAlert = async (input: any, index: any, folderId: any) => {
-      if (!input.hasOwnProperty("context_attributes")) {
+      if (!Object.prototype.hasOwnProperty.call(input, "context_attributes")) {
         input.context_attributes = {};
       }
-      if (!input.trigger_condition.hasOwnProperty("timezone")) {
+      if (!Object.prototype.hasOwnProperty.call(input.trigger_condition, "timezone")) {
         input.trigger_condition.timezone = store.state.timezone;
       }
-      if (!input.trigger_condition.hasOwnProperty("tolerance_in_secs")) {
+      if (!Object.prototype.hasOwnProperty.call(input.trigger_condition, "tolerance_in_secs")) {
         input.trigger_condition.tolerance_in_secs = null;
       }
       input.folder_id = folderId;
       input.owner = store.state.userInfo.email;
       input.last_edited_by = store.state.userInfo.email;
-      if (input.hasOwnProperty("id")) delete input.id;
+      if (Object.prototype.hasOwnProperty.call(input, "id")) delete input.id;
 
       // VERSION DETECTION AND CONVERSION
       // Convert V0 and V1 conditions to V2 format before creating alert

@@ -367,10 +367,7 @@ describe("useLatencyInsightsAnalysis", () => {
   // -------------------------------------------------------------------------
   describe("analyzeAllDimensions", () => {
     it("sets loading to true then false around execution", async () => {
-      let capturedLoadingDuringExecution = false;
-
       mockSearch.mockImplementation(async () => {
-        capturedLoadingDuringExecution = instance.loading.value;
         return makeSearchResponse([]);
       });
 

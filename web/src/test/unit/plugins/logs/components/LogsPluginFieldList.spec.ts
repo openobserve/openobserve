@@ -83,7 +83,7 @@ describe("FieldList.vue", () => {
     ],
     selectedStream: "logs",
     filterField: "",
-    filterFieldFn: (rows: any[], terms: any) => rows,
+    filterFieldFn: (rows: any[]) => rows,
     pagination: { page: 1, rowsPerPage: 100 },
     wrapCells: false,
     loadingStream: false,

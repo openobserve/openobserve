@@ -115,7 +115,7 @@ import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionCh
 import { useAiIcon } from "@/composables/useAiIcon";
 import { getImageURL } from "@/utils/zincutils";
 
-const props = defineProps<{
+defineProps<{
   aiEnabled: boolean;
 }>();
 

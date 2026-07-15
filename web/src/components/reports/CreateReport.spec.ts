@@ -460,10 +460,8 @@ describe("CreateReport", () => {
       ({ wrapper } = mountComponent());
       await flushPromises();
       const options = ["UTC", "America/New_York", "Asia/Tokyo"];
-      let result: string[] = [];
       wrapper.vm.filterColumns(options, "", (fn: Function) => {
         fn();
-        result = wrapper.vm.filteredTimezone;
       });
       // filterColumns returns the filtered list; just verify it doesn't throw
       expect(wrapper.exists()).toBe(true);
@@ -473,7 +471,6 @@ describe("CreateReport", () => {
       ({ wrapper } = mountComponent());
       await flushPromises();
       const options = ["UTC", "America/New_York", "Asia/Tokyo"];
-      let result: string[] = [];
       const returned = wrapper.vm.filterColumns(options, "America", (fn: Function) => {
         fn();
       });

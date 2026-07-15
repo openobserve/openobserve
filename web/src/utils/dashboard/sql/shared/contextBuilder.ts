@@ -666,7 +666,6 @@ export function buildSQLContext(
         hasTimestampField || isHorizontalChart
           ? 120
           : panelSchema.config?.axis_label_truncate_width || 120;
-      const labelFontSize = 12;
       const labelMargin = 10;
 
       return {
@@ -793,9 +792,14 @@ export function buildSQLContext(
       bottom: "100%",
       feature: {
         dataZoom: {
-          yAxisIndex: panelSchema.config?.dataZoom?.hasOwnProperty("yAxisIndex")
-            ? panelSchema.config?.dataZoom.yAxisIndex
-            : "none",
+          yAxisIndex:
+            panelSchema.config?.dataZoom &&
+            Object.prototype.hasOwnProperty.call(
+              panelSchema.config.dataZoom,
+              "yAxisIndex",
+            )
+              ? panelSchema.config?.dataZoom.yAxisIndex
+              : "none",
         },
       },
     },

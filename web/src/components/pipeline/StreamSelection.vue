@@ -144,7 +144,7 @@ import {
   type AddPipelineForm,
 } from "./StreamSelection.schema";
 
-const props = defineProps({
+defineProps({
   isUpdating: {
     type: Boolean,
     required: false,

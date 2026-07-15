@@ -68,10 +68,4 @@ const serviceIconUrl = computed(() =>
   ),
 );
 
-const extraServices = computed(() => {
-  const svcs = props.item.services ?? {};
-  return Object.keys(svcs)
-    .filter((s) => s !== props.item.service_name)
-    .map((s) => ({ name: s, color: getOrSetServiceColor(s) ?? "#9e9e9e" }));
-});
 </script>

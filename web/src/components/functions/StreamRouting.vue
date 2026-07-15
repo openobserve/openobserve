@@ -183,7 +183,7 @@ const streamRoute: Ref<StreamRoute> = ref(getDefaultStreamRoute());
 
 const originalStreamRouting: Ref<StreamRoute> = ref(getDefaultStreamRoute());
 
-const updateStreams = (resetStream = true) => {
+const updateStreams = () => {
   // if (resetStream) formData.value.stream_name = "";
   // if (streams.value[formData.value.stream_type]) {
   //   schemaList.value = streams.value[formData.value.stream_type];
@@ -211,28 +211,11 @@ const updateStreams = (resetStream = true) => {
   //   .finally(() => (isFetchingStreams.value = false));
 };
 
-const filterColumns = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-    return filteredOptions;
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1
-    );
-  });
-  return filteredOptions;
-};
-
-const filterStreams = (val: string) => {
+const filterStreams = () => {
   // filteredStreams.value = filterColumns(indexOptions.value, val, update);
 };
 
-const updateStreamFields = async (stream_name: any) => {
+const updateStreamFields = async (_val?: unknown) => {
   // let streamCols: any = [];
   // const streams: any = await getStream(
   //   stream_name,

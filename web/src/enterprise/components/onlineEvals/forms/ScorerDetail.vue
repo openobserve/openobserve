@@ -440,12 +440,6 @@ const scorerType = computed<"llm_judge" | "remote">(() => {
   return raw === "remote" ? "remote" : "llm_judge";
 });
 
-const scorerTypeLabel = computed(() =>
-  scorerType.value === "remote"
-    ? t("onlineEvals.scorer.detail.typeRemote")
-    : t("onlineEvals.scorer.detail.typeLlmJudge"),
-);
-
 const params = computed<Record<string, any>>(() => props.row.params ?? {});
 
 const provider = computed<Provider | null>(() => {

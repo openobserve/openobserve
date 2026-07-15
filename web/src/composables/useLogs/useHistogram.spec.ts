@@ -530,9 +530,6 @@ describe("useHistogram Composable", () => {
       mockState.searchObj.data.queryResults.histogram_breakdown_field =
         "severity";
 
-      const before = JSON.stringify(
-        mockState.searchObj.data.histogram.breakdownField,
-      );
       wrapper.vm.generateHistogramData();
       // aggs is truthy (empty array) but .some() returns false → flat path,
       // flat path loops over empty data and still writes a histogram.

@@ -198,8 +198,6 @@ import {
   nextTick,
   watch,
   reactive,
-  onActivated,
-  onDeactivated,
   onUnmounted,
   onMounted,
   defineAsyncComponent,
@@ -212,14 +210,12 @@ import {
   getPanel,
   updatePanel,
   updateDashboard,
-  deleteVariable,
 } from "../../../utils/commons";
 import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import DateTimePickerDashboard from "../../../components/DateTimePickerDashboard.vue";
 import AddSettingVariable from "../../../components/dashboards/settings/AddSettingVariable.vue";
-import { useLoading } from "@/composables/useLoading";
 import { debounce, isEqual } from "lodash-es";
 import { provide, inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
@@ -234,7 +230,6 @@ import {
   createDashboardsContextProvider,
   contextRegistry,
 } from "@/composables/contextProviders";
-import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
@@ -258,7 +253,6 @@ const QueryInspector = defineAsyncComponent(() => {
 
 export default defineComponent({
   name: "AddPanel",
-  props: ["metaData"],
 
   components: {
     OIcon,
@@ -275,7 +269,7 @@ export default defineComponent({
     QueryInspector,
     PanelEditor,
   },
-  setup(props) {
+  setup() {
     provide("dashboardPanelDataPageKey", "dashboard");
 
     // PanelEditor ref for accessing exposed methods/properties
@@ -299,7 +293,6 @@ export default defineComponent({
     }
     const {
       showErrorNotification,
-      showPositiveNotification,
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
     const {
@@ -621,14 +614,14 @@ export default defineComponent({
         await nextTick();
         // Initialize PanelEditor's chartData after loading panel data
         panelEditorRef.value?.initChartData(dashboardPanelData.data);
-        updateDateTime(selectedDate.value);
+        updateDateTime();
       } else {
         editMode.value = false;
         resetDashboardPanelDataAndAddTimeField();
         // Initialize PanelEditor's chartData as empty for new panel
         panelEditorRef.value?.initChartData({});
         // set the value of the date time after the reset
-        updateDateTime(selectedDate.value);
+        updateDateTime();
       }
       // let it call the watchers and then mark the panel config watcher as activated
       await nextTick();
@@ -966,7 +959,7 @@ export default defineComponent({
       };
     };
     watch(selectedDate, () => {
-      updateDateTime(selectedDate.value);
+      updateDateTime();
     });
     // Watch for panel-level time configuration changes and update URL
     watch(
@@ -1061,7 +1054,7 @@ export default defineComponent({
         panelEditorRef.value?.initChartData(dashboardPanelData.data);
         // refresh the date time based on current time if relative date is selected
         dateTimePickerRef.value && dateTimePickerRef.value.refresh();
-        updateDateTime(selectedDate.value);
+        updateDateTime();
 
         // Call PanelEditor's runQuery if available
         if (panelEditorRef.value) {
@@ -1091,7 +1084,7 @@ export default defineComponent({
       }
     };
 
-    const updateDateTime = (value: object) => {
+    const updateDateTime = () => {
       if (selectedDate.value && dateTimePickerRef?.value) {
         // CRITICAL: Clear panelIdToBeRefreshed to ensure panel refreshes
         // In add/edit panel mode, when time changes, this panel should always refresh
@@ -1541,7 +1534,7 @@ export default defineComponent({
       return { width: `${contentWidth}px`, transition: "width 0.2s ease" };
     });
 
-    const debouncedUpdateChartConfig = debounce((newVal, oldVal) => {
+    const debouncedUpdateChartConfig = debounce((newVal) => {
       if (!isEqual(chartData.value, newVal)) {
         const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
           chartData.value,
@@ -1569,48 +1562,44 @@ export default defineComponent({
     };
 
     const getContext = async () => {
-      return new Promise(async (resolve, reject) => {
-        try {
-          const isAddPanelPage = router.currentRoute.value.name === "addPanel";
+      try {
+        const isAddPanelPage = router.currentRoute.value.name === "addPanel";
 
-          const isStreamSelectedInDashboardPage =
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream;
+        const isStreamSelectedInDashboardPage =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream;
 
-          if (!isAddPanelPage || !isStreamSelectedInDashboardPage) {
-            resolve("");
-            return;
-          }
-
-          const payload = {};
-
-          const stream =
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream;
-
-          const streamType =
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream_type;
-
-          if (!streamType || !stream?.length) {
-            resolve("");
-            return;
-          }
-
-          const schema = await getStream(stream, streamType, true);
-
-          payload["stream_name"] = stream;
-          payload["schema"] = schema.uds_schema || schema.schema || [];
-
-          resolve(payload);
-        } catch (error) {
-          console.error("Error in getContext for add panel page", error);
-          resolve("");
+        if (!isAddPanelPage || !isStreamSelectedInDashboardPage) {
+          return "";
         }
-      });
+
+        const payload = {};
+
+        const stream =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream;
+
+        const streamType =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream_type;
+
+        if (!streamType || !stream?.length) {
+          return "";
+        }
+
+        const schema = await getStream(stream, streamType, true);
+
+        payload["stream_name"] = stream;
+        payload["schema"] = schema.uds_schema || schema.schema || [];
+
+        return payload;
+      } catch (error) {
+        console.error("Error in getContext for add panel page", error);
+        return "";
+      }
     };
 
     const removeAiContextHandler = () => {
@@ -1762,24 +1751,6 @@ export default defineComponent({
       // the new variables from the manager through their computed properties
     };
 
-    const isPartialData = ref(false);
-    const isPanelLoading = ref(false);
-    const isCachedDataDifferWithCurrentTimeRange = ref(false);
-
-    const handleIsPartialDataUpdate = (data: boolean) => {
-      isPartialData.value = data;
-    };
-
-    const handleLoadingStateChange = (data: boolean) => {
-      isPanelLoading.value = data;
-    };
-
-    const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (
-      data: boolean,
-    ) => {
-      isCachedDataDifferWithCurrentTimeRange.value = data;
-    };
-
     // ── Keyboard shortcuts ────────────────────────
     useShortcuts([
       {
@@ -1908,7 +1879,7 @@ export default defineComponent({
     };
   },
   methods: {
-    goBackToDashboardList(evt?: any, row?: any) {
+    goBackToDashboardList() {
       this.goBack();
     },
   },

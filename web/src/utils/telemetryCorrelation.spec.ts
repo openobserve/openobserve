@@ -21,10 +21,8 @@ import {
 import type { ServiceIdentityConfig, FieldAlias } from '@/services/service_streams';
 
 describe('telemetryCorrelation', () => {
-  let consoleLogSpy: any;
-
   beforeEach(() => {
-    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
   });
 
   describe('buildFieldToGroupIdMap', () => {

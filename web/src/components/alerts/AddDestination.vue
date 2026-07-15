@@ -535,7 +535,6 @@ import {
   onBeforeMount,
   onActivated,
   watch,
-  nextTick,
 } from "vue";
 import type { Ref, PropType } from "vue";
 import { useI18n } from "vue-i18n";
@@ -573,7 +572,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 const props = defineProps({
   templates: {
     type: Array as PropType<Template[]>,
-    default: [],
+    default: () => [],
   },
   destination: {
     // Backend also returns `metadata` (JSON string or object) for prebuilt
@@ -635,8 +634,6 @@ const { getAllActions } = useActions();
 // Prebuilt destinations composable
 const {
   availableTypes,
-  popularTypes,
-  validateCredentials,
   testDestination,
   createDestination,
   updateDestination,
@@ -698,36 +695,6 @@ const tabs = computed(() => {
   }
 
   return tabs;
-});
-
-// Destination types for alerts (prebuilt + custom)
-const destinationTypes = computed(() => {
-  if (!props.isAlerts) return [];
-
-  const prebuiltTypes: {
-    value: PrebuiltTypeId | "custom";
-    label: string;
-    image: string | null;
-    icon: string;
-    description: string;
-  }[] = availableTypes.value.map((type) => ({
-    value: type.id,
-    label: type.name,
-    image: `/src/assets/images/destinations/${type.icon}.png`,
-    icon: type.icon,
-    description: type.description,
-  }));
-
-  // Add custom option
-  prebuiltTypes.push({
-    value: "custom",
-    label: "Custom",
-    image: null,
-    icon: "webhook",
-    description: "Create custom webhook destination",
-  });
-
-  return prebuiltTypes;
 });
 
 // Check if current destination type is prebuilt
@@ -1362,28 +1329,4 @@ const createEmailTemplate = () => {
   });
 };
 
-const filterColumns = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-    return filteredOptions;
-  }
-  update(() => {
-    const value = val?.toLowerCase();
-    filteredOptions = options.filter((column: any) => {
-      if (typeof column === "string")
-        return column?.toLowerCase().indexOf(value) > -1;
-      else {
-        return column?.label?.toLowerCase().indexOf(value) > -1;
-      }
-    });
-  });
-  return filteredOptions;
-};
-
-const filterActions = (val: string, update: any) => {
-  filterColumns(actionOptions.value, val, update);
-};
 </script>

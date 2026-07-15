@@ -83,7 +83,6 @@ import {
   defineComponent,
   ref,
   watch,
-  onActivated,
   onMounted,
   nextTick,
   inject,
@@ -202,8 +201,6 @@ export default defineComponent({
         initializeSelectedButtonType();
       },
     );
-
-    const isSQLMode = computed(() => selectedButtonQueryType.value === "sql");
 
     const isPromQLMode = computed(
       () => selectedButtonQueryType.value === "promql",

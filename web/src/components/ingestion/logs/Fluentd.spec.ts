@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import Fluentd from "@/components/ingestion/logs/Fluentd.vue";
 import { createI18n } from 'vue-i18n';

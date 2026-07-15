@@ -148,7 +148,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import BillingService from "@/services/billings";
 import { useStore } from "vuex";
-import { useLocalOrganization, convertToTitleCase, getImageURL } from "@/utils/zincutils";
+import { useLocalOrganization, getImageURL } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import { siteURL } from "@/constants/config";
@@ -261,8 +261,8 @@ export default defineComponent({
         BillingService.resume_subscription(
           this.store.state.selectedOrganization.identifier,
         )
-          .then(async (res) => {
-            await this.loadSubscription(true);
+          .then(async () => {
+            await this.loadSubscription();
           })
           .catch((e) => {
             this.proLoading = false;
@@ -312,7 +312,7 @@ export default defineComponent({
           });
         });
     },
-    async loadSubscription(fromPro = false) {
+    async loadSubscription() {
       try {
         const res = await BillingService.list_subscription(
           this.store.state.selectedOrganization.identifier,

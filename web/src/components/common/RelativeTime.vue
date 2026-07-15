@@ -36,7 +36,7 @@ export default {
       default: "",
     },
   },
-  setup(props, { root }) {
+  setup(props) {
     const store = useStore();
 
     const relativeTime = ref("");

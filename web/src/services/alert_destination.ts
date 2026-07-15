@@ -16,7 +16,7 @@
 import http from "./http";
 
 const destination = {
-  create: ({ org_identifier, destination_name, data, module }: any) => {
+  create: ({ org_identifier, data, module }: any) => {
     let url = `/api/${org_identifier}/alerts/destinations`;
     if (module) {
       url += `?module=${module}`;

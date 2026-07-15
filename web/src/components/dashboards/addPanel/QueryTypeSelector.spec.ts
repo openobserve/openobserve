@@ -637,7 +637,6 @@ describe("QueryTypeSelector", () => {
       wrapper = createWrapper();
 
       wrapper.vm.ignoreSelectedButtonTypeUpdate = true;
-      const initialType = mockDashboardPanelData.data.queryType;
 
       wrapper.vm.selectedButtonQueryType = "promql";
       await nextTick();
@@ -795,7 +794,6 @@ describe("QueryTypeSelector", () => {
 
     it("should maintain reactivity", async () => {
       wrapper = createWrapper();
-      const initialType = wrapper.vm.selectedButtonType;
 
       mockDashboardPanelData.data.queries[0].customQuery = true;
       await nextTick();

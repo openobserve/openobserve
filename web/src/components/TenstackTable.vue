@@ -71,8 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="max-height: 28px; height: 28px"
           >
             <!-- Row-field headers: first <tr> only, rowspan all levels -->
+            <template v-if="levelIdx === 0">
             <th
-              v-if="levelIdx === 0"
               v-for="col in pivotRowColumns"
               :key="'rh_' + col.name"
               :rowspan="pivotHeaderLevels.length"
@@ -92,6 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
               />
             </th>
+            </template>
             <!-- Pivot group / value headers -->
             <th
               v-for="(cell, cellIdx) in level.cells"
@@ -532,7 +533,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="header.id"
                 class="px-2 overflow-hidden"
                 :class="c === 0 ? 'pl-4' : ''"
-                :style="skelTdStyle(header, Number(c))"
+                :style="skelTdStyle(header)"
               >
                 <span
                   class="o2-skel-pill inline-block h-3 rounded-md"
@@ -588,7 +589,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @keydown="handleDataRowKeydown($event, row.original, idx as number)"
             >
               <td
-                v-for="(cell, cellIndex) in row.getVisibleCells()"
+                v-for="cell in row.getVisibleCells()"
                 :key="cell.id"
                 data-test="dashboard-data-row-cell"
                 class="py-1 px-2 overflow-hidden relative table-cell group/copy"
@@ -761,8 +762,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <!-- ── Virtual scroll rows (logs / traces only — no `data` prop) ────── -->
+          <template v-if="!showPagination && useVirtualScroll">
           <template
-            v-if="!showPagination && useVirtualScroll"
             v-for="virtualRow in virtualRows"
             :key="virtualRow.index"
           >
@@ -1094,6 +1095,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </td>
               </template>
             </tr>
+          </template>
           </template>
           <!-- Empty slot: shown when rows is empty and not loading -->
           <tr v-if="!loading && tableRows.length === 0" class="w-full">
@@ -1501,7 +1503,7 @@ const clearColFilter = (colId: string) => {
 const sanitizeCssId = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, "_");
 
 const store = useStore();
-const { isFTSColumn } = useTextHighlighter();
+useTextHighlighter();
 const { processedResults, processHitsInChunks } = useLogsHighlighter();
 
 // ── Dashboard: sticky columns composable ─────────────────────────────────────
@@ -1842,10 +1844,6 @@ const isFunctionErrorOpen = ref(false);
 
 const activeCellActionId = ref("");
 
-const highlightQuery = computed(() => {
-  return props.highlightQuery;
-});
-
 const getRowStatusColor = (rowData: any) => {
   const statusInfo = extractStatusFromLog(rowData);
   return statusInfo.color;
@@ -2123,7 +2121,7 @@ const skelCellWidth = (r: number, c: number): number => {
 // Mirror the exact width/flex logic of the real cells so skeleton columns align.
 // Source column (width:'auto' in real rows) → flex:1 to fill remaining space.
 // All other columns: fixed width from the CSS variable (same as real rows).
-const skelTdStyle = (header: any, c: number): Record<string, string> => {
+const skelTdStyle = (header: any): Record<string, string> => {
   const colId = header.column.id;
   const isStretchSource = colId === "source" && !header.column.getCanResize();
   if (isStretchSource) return { flex: "1 1 0", minWidth: "0" };

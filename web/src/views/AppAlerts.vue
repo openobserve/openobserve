@@ -26,9 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount, watch } from "vue";
+import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import templateService from "@/services/alert_templates";
 import destinationService from "@/services/alert_destination";
@@ -38,7 +37,6 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { t } = useI18n();
-    const router = useRouter();
     const activeTab: any = ref("destinations");
     const templates = ref([]);
     const destinations = ref([]);

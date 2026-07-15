@@ -12,8 +12,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type Ref } from "vue";
-import type { Endpoint } from "@/ts/interfaces";
+import { computed, ref } from "vue";
 import ContentCopy from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import { useStore } from "vuex";

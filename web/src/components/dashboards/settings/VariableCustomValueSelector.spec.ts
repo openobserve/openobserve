@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import VariableCustomValueSelector from "./VariableCustomValueSelector.vue";
 

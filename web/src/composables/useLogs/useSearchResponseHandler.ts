@@ -15,7 +15,6 @@
 
 import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
-import useNotifications from "@/composables/useNotifications";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useSearchPagination from "@/composables/useLogs/useSearchPagination";
@@ -34,7 +33,6 @@ import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import { rangesFromSqlParserDetail, rangesFromServerMessage } from "@/utils/query/sqlDiagnostics";
 
 export const useSearchResponseHandler = () => {
-  const { showErrorNotification } = useNotifications();
   // showCancelSearchNotification is defined in logsUtils, not useNotifications
   const {
     fnParsedSQL,
@@ -44,8 +42,7 @@ export const useSearchResponseHandler = () => {
     showCancelSearchNotification,
   } = logsUtils();
 
-  const { getHistogramTitle, generateHistogramData, resetHistogramWithError } =
-    useHistogram();
+  const { getHistogramTitle, generateHistogramData } = useHistogram();
 
   const { refreshPagination, sortResponse } = useSearchPagination();
 
@@ -58,10 +55,8 @@ export const useSearchResponseHandler = () => {
     searchObj,
     searchObjDebug,
     searchAggData,
-    resetQueryData,
     notificationMsg,
     searchPartitionMap,
-    resetHistogramError,
     histogramResults,
   } = searchState();
 
@@ -157,7 +152,7 @@ export const useSearchResponseHandler = () => {
       payload.type === "histogram" &&
       response?.type === "search_response_hits"
     ) {
-      handleHistogramStreamingHits(payload, response, payload.isPagination);
+      handleHistogramStreamingHits(payload, response);
       return;
     }
 
@@ -165,7 +160,7 @@ export const useSearchResponseHandler = () => {
       payload.type === "histogram" &&
       response?.type === "search_response_metadata"
     ) {
-      handleHistogramStreamingMetadata(payload, response, payload.isPagination);
+      handleHistogramStreamingMetadata(payload, response);
       return;
     }
 
@@ -173,7 +168,7 @@ export const useSearchResponseHandler = () => {
       payload.type === "pageCount" &&
       response?.type === "search_response_hits"
     ) {
-      handlePageCountStreamingHits(payload, response, payload.isPagination);
+      handlePageCountStreamingHits(payload, response);
       return;
     }
 
@@ -181,7 +176,7 @@ export const useSearchResponseHandler = () => {
       payload.type === "pageCount" &&
       response?.type === "search_response_metadata"
     ) {
-      handlePageCountStreamingMetadata(payload, response, payload.isPagination);
+      handlePageCountStreamingMetadata(payload, response);
       return;
     }
 
@@ -231,7 +226,10 @@ export const useSearchResponseHandler = () => {
     if (
       searchObj.data.queryResults.hits.length > 0 &&
       store.state.zoConfig.timestamp_column != "" &&
-      searchObj.data.queryResults.hasOwnProperty("order_by_metadata") &&
+      Object.prototype.hasOwnProperty.call(
+        searchObj.data.queryResults,
+        "order_by_metadata",
+      ) &&
       searchObj.data.queryResults.order_by_metadata.length > 0
     ) {
       sortResponse(
@@ -263,7 +261,12 @@ export const useSearchResponseHandler = () => {
     handleAggregation(payload.queryReq, response);
     resetFieldValues();
 
-    if (!payload.queryReq.query.hasOwnProperty("track_total_hits")) {
+    if (
+      !Object.prototype.hasOwnProperty.call(
+        payload.queryReq.query,
+        "track_total_hits",
+      )
+    ) {
       delete response.content.total;
     }
 
@@ -299,7 +302,12 @@ export const useSearchResponseHandler = () => {
       }
     }
 
-    if (response.content.results.hasOwnProperty("is_histogram_eligible")) {
+    if (
+      Object.prototype.hasOwnProperty.call(
+        response.content.results,
+        "is_histogram_eligible",
+      )
+    ) {
       searchObj.data.queryResults.is_histogram_eligible =
         response.content.results.is_histogram_eligible;
     }
@@ -387,8 +395,6 @@ export const useSearchResponseHandler = () => {
   const handleHistogramStreamingHits = (
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse,
-    isPagination: boolean,
-    appendResult: boolean = false,
   ) => {
     searchObj.loading = false;
 
@@ -483,8 +489,6 @@ export const useSearchResponseHandler = () => {
   const handleHistogramStreamingMetadata = (
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse,
-    isPagination: boolean,
-    appendResult: boolean = false,
   ) => {
     searchObjDebug["histogramProcessingStartTime"] = performance.now();
 
@@ -520,8 +524,6 @@ export const useSearchResponseHandler = () => {
   const handlePageCountStreamingHits = (
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse,
-    isPagination: boolean,
-    appendResult: boolean = false,
   ) => {
     let regeratePaginationFlag = false;
     if (
@@ -547,8 +549,6 @@ export const useSearchResponseHandler = () => {
   const handlePageCountStreamingMetadata = (
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse,
-    isPagination: boolean,
-    appendResult: boolean = false,
   ) => {
     removeTraceId(response.content.trace_id ?? "");
 
@@ -568,17 +568,29 @@ export const useSearchResponseHandler = () => {
     response: any,
   ) => {
     if (
-      response.content.results.hasOwnProperty("function_error") &&
+      Object.prototype.hasOwnProperty.call(
+        response.content.results,
+        "function_error",
+      ) &&
       response.content.results.function_error != ""
     ) {
       searchObj.data.functionError = response.content.results.function_error;
     }
 
     if (
-      response.content.results.hasOwnProperty("function_error") &&
+      Object.prototype.hasOwnProperty.call(
+        response.content.results,
+        "function_error",
+      ) &&
       response.content.results.function_error != "" &&
-      response.content.results.hasOwnProperty("new_start_time") &&
-      response.content.results.hasOwnProperty("new_end_time")
+      Object.prototype.hasOwnProperty.call(
+        response.content.results,
+        "new_start_time",
+      ) &&
+      Object.prototype.hasOwnProperty.call(
+        response.content.results,
+        "new_end_time",
+      )
     ) {
       response.content.results.function_error = getFunctionErrorMessage(
         response.content.results.function_error,
@@ -717,7 +729,12 @@ export const useSearchResponseHandler = () => {
   };
 
   const setCancelSearchError = () => {
-    if (!searchObj.data?.queryResults.hasOwnProperty("hits")) {
+    if (
+      !Object.prototype.hasOwnProperty.call(
+        searchObj.data?.queryResults,
+        "hits",
+      )
+    ) {
       searchObj.data.queryResults.hits = [];
     }
 
@@ -727,7 +744,10 @@ export const useSearchResponseHandler = () => {
     }
 
     if (
-      searchObj.data?.queryResults?.hasOwnProperty("hits") &&
+      Object.prototype.hasOwnProperty.call(
+        searchObj.data?.queryResults ?? {},
+        "hits",
+      ) &&
       searchObj.data.queryResults?.hits?.length &&
       !searchObj.data.queryResults?.aggs?.length
     ) {
@@ -736,7 +756,7 @@ export const useSearchResponseHandler = () => {
     }
   };
 
-  const shouldGetPageCount = (queryReq: any, parsedSQL: any): boolean => {
+  const shouldGetPageCount = (queryReq: any, _parsedSQL: any): boolean => {
     // Simplified version - implement full logic as needed
     return (
       !queryReq.query.sql?.includes("LIMIT") &&

@@ -114,15 +114,6 @@ const { searchObj } = searchState();
 
 const store = useStore();
 
-const functionToggleIcon = computed(() => {
-  return (
-    "img:" +
-    (store.state.theme == "dark"
-      ? getImageURL("images/common/function_dark.svg")
-      : getImageURL("images/common/function.svg"))
-  );
-});
-
 const iconRight = computed(() => {
   return (
     "img:" +

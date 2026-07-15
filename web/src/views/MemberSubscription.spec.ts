@@ -4,7 +4,6 @@ import { createStore } from 'vuex';
 import { createRouter, createWebHistory } from 'vue-router';
 import MemberSubscription from './MemberSubscription.vue';
 import organizationsService from '@/services/organizations';
-import * as zincutils from '@/utils/zincutils';
 
 // Mock the services and utilities
 vi.mock('@/services/organizations', () => ({

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import CommonAutoComplete from "./CommonAutoComplete.vue";
 // Mock store
 const mockStore = {

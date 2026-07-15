@@ -2,7 +2,7 @@
 
 import { computed } from "vue";
 import type { Table } from "@tanstack/vue-table";
-import type { OTableSortingMode, OTableSortParams } from "../OTable.types";
+import type { OTableSortingMode } from "../OTable.types";
 
 export function useTableSorting<TData>(
   table: Table<TData>,

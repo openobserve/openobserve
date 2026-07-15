@@ -145,7 +145,7 @@ onBeforeMount(() => {
 
 const updateTable = () => {
    let counter = 1;
-  rows.value = rolesState.roles.map((role: { role_name: string }, index: number) => ({
+  rows.value = rolesState.roles.map((role: { role_name: string }) => ({
       ...role,
       "#": counter <= 9 ? `0${counter++}` : counter++,
     }));
@@ -210,10 +210,6 @@ const setupRoles = async () => {
     .finally(() => {
       loading.value = false;
     });
-};
-
-const hideForm = () => {
-  showAddGroup.value = false;
 };
 
 const deleteUserRole = (role: any) => {

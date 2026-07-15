@@ -400,7 +400,7 @@ describe('useSelectAutocomplete.ts Comprehensive Coverage', () => {
       ]);
       const searchKey = 'name';
       
-      const { filteredOptions, filterFn } = useSelectAutoComplete(options, searchKey);
+      const { filterFn } = useSelectAutoComplete(options, searchKey);
 
       // The current implementation will throw an error when accessing undefined property
       expect(() => {
@@ -541,8 +541,8 @@ describe('useSelectAutocomplete.ts Comprehensive Coverage', () => {
     it('should handle null options array during filtering', () => {
       const options = ref(null);
       const searchKey = 'name';
-      
-      const { filteredOptions, filterFn } = useSelectAutoComplete(options, searchKey);
+
+      const { filterFn } = useSelectAutoComplete(options, searchKey);
 
       expect(() => {
         filterFn('test', mockUpdate);
@@ -554,8 +554,8 @@ describe('useSelectAutocomplete.ts Comprehensive Coverage', () => {
     it('should handle undefined options array during filtering', () => {
       const options = ref(undefined);
       const searchKey = 'name';
-      
-      const { filteredOptions, filterFn } = useSelectAutoComplete(options, searchKey);
+
+      const { filterFn } = useSelectAutoComplete(options, searchKey);
 
       expect(() => {
         filterFn('test', mockUpdate);

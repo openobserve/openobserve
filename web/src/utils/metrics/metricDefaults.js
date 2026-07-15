@@ -816,7 +816,6 @@ function buildVariants(cardKind, ctx) {
     metricName,
     base,
     sel,
-    baseSel,
     countSel,
     w,
     labels,

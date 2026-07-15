@@ -1155,7 +1155,7 @@ describe("ConfigPanel", () => {
       ];
 
       chartConfigs.forEach(
-        ({ type, shouldHaveGridlines, shouldHaveConnectNulls }) => {
+        ({ type, shouldHaveGridlines }) => {
           const panelData = {
             ...mockDashboardPanelData,
             data: { ...mockDashboardPanelData.data, type },

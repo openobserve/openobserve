@@ -534,7 +534,8 @@ const filterData = (rows: any, terms: any) => {
 const exportTemplate = (row: any) => {
   const findTemplate: any = getTemplateByName(row.name);
   const templateByName = { ...findTemplate };
-  if (templateByName.hasOwnProperty("#")) delete templateByName["#"];
+  if (Object.prototype.hasOwnProperty.call(templateByName, "#"))
+    delete templateByName["#"];
   const templateJson = JSON.stringify(templateByName, null, 2);
   const blob = new Blob([templateJson], { type: "application/json" });
   const url = URL.createObjectURL(blob);

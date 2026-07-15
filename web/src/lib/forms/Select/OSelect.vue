@@ -124,6 +124,7 @@ const parentDataTest = computed(
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
 const wrapperAttrs = computed(() => {
   const { tabindex, ...rest } = $attrs;
+  void tabindex;
   return rest;
 });
 

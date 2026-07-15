@@ -930,7 +930,6 @@ describe("DashboardQueryBuilder", () => {
     it("should not show having conditions for heatmap charts", () => {
       wrapper = createWrapper({ "data.type": "heatmap" });
 
-      const field = wrapper.vm.dashboardPanelData.data.queries[0].fields.y[0];
       expect(wrapper.text()).not.toContain("Having");
     });
   });

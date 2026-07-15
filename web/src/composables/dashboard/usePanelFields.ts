@@ -45,7 +45,7 @@ export const usePanelFields = ({
 
   const generateLabelFromName = (name: string) => {
     return name
-      .replace(/[\_\-\s\.]/g, " ")
+      .replace(/[_\-\s.]/g, " ")
       .split(" ")
       .map((string) => string.charAt(0).toUpperCase() + string.slice(1))
       .filter((it) => it)
@@ -65,7 +65,7 @@ export const usePanelFields = ({
     );
   });
 
-  const isAddXAxisNotAllowed = computed((e: any) => {
+  const isAddXAxisNotAllowed = computed(() => {
     switch (dashboardPanelData.data.type) {
       case "pie":
       case "donut":
@@ -101,7 +101,7 @@ export const usePanelFields = ({
     }
   });
 
-  const isAddBreakdownNotAllowed = computed((e: any) => {
+  const isAddBreakdownNotAllowed = computed(() => {
     switch (dashboardPanelData.data.type) {
       case "area":
       case "bar":
@@ -123,10 +123,12 @@ export const usePanelFields = ({
             dashboardPanelData.layout.currentQueryIndex
           ].fields.breakdown?.length >= 3
         );
+      default:
+        return false;
     }
   });
 
-  const isAddYAxisNotAllowed = computed((e: any) => {
+  const isAddYAxisNotAllowed = computed(() => {
     switch (dashboardPanelData.data.type) {
       case "pie":
       case "donut":
@@ -154,7 +156,7 @@ export const usePanelFields = ({
     }
   });
 
-  const isAddZAxisNotAllowed = computed((e: any) => {
+  const isAddZAxisNotAllowed = computed(() => {
     switch (dashboardPanelData.data.type) {
       case "heatmap":
         return (
@@ -964,7 +966,7 @@ export const usePanelFields = ({
 
   const setFieldsBasedOnChartTypeValidation = (
     fields: any,
-    chartType: string,
+    _chartType: string,
   ) => {
     // First reset all existing fields in dashboardPanelData
     resetFields();

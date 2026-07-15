@@ -94,7 +94,7 @@ function buildTitle(): string {
   return "Access Required"
 }
 
-function buildMessage(_count: number): string {
+function buildMessage(): string {
   return "Some sections couldn't load because you don't have the required permissions. Contact your administrator if you believe you should have access."
 }
 
@@ -121,7 +121,7 @@ function copyDetails(): void {
 function flushGroupedToast(): void {
   const details = [...accumulatedErrors]
   const title = buildTitle()
-  const message = buildMessage(details.length)
+  const message = buildMessage()
 
   // If a toast is still visible, update it in-place instead of stacking
   if (activeToastId !== null) {

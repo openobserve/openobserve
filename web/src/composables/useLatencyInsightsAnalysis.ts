@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
-import { useStore } from "vuex";
 import searchService from "@/services/search";
 
 export interface ValueDistribution {
@@ -70,7 +69,6 @@ export interface LatencyInsightsConfig {
 }
 
 export function useLatencyInsightsAnalysis() {
-  const store = useStore();
   const loading = ref(false);
   const error = ref<string | null>(null);
 

@@ -345,7 +345,6 @@ import {
   defineComponent,
   ref,
   onActivated,
-  onDeactivated,
   computed,
   nextTick,
   onBeforeMount,
@@ -355,7 +354,6 @@ import {
   onMounted,
   onBeforeUnmount,
   onUnmounted,
-  toRaw,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -365,9 +363,7 @@ import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import {
   verifyOrganizationStatus,
-  useLocalInterestingFields,
   deepCopy,
-  b64EncodeUnicode,
   addSpacesToOperators,
 } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
@@ -378,8 +374,6 @@ import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep, debounce } from "lodash-es";
 import {
-  buildSqlQuery,
-  getFieldsFromQuery,
   isSimpleSelectAllQuery,
   getStreamFromQuery,
   extractWhereClause,
@@ -391,20 +385,16 @@ import {
 import useNotifications from "@/composables/useNotifications";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
-import SearchHistory from "@/plugins/logs/SearchHistory.vue";
-import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
 import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import useAiChat from "@/composables/useAiChat";
-import queryService from "@/services/search";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
 import {
   getVisualizationConfig,
-  encodeVisualizationConfig,
   decodeVisualizationConfig,
 } from "@/composables/useLogs/logsVisualization";
 import useSearchBar from "@/composables/useLogs/useSearchBar";
@@ -601,7 +591,6 @@ export default defineComponent({
       getQueryData,
       cancelQuery,
       getRegionInfo,
-      sendCancelSearchMessage,
       setCommunicationMethod,
     } = useSearchBar();
     let {
@@ -635,7 +624,6 @@ export default defineComponent({
       isLimitQuery,
       updateUrlQueryParams,
       addTraceId,
-      checkTimestampAlias,
     } = logsUtils();
     const {
       getHistogramData,
@@ -669,13 +657,9 @@ export default defineComponent({
     const {
       dashboardPanelData,
       validatePanel,
-      generateLabelFromName,
       resetDashboardPanelData,
       setCustomQueryFields,
       getResultSchema,
-      determineChartType,
-      convertSchemaToFields,
-      setFieldsBasedOnChartTypeValidation,
     } = useDashboardPanelData("logs");
 
     // Get build page's dashboardPanelData for watching chart type/config changes
@@ -704,7 +688,6 @@ export default defineComponent({
     const {
       registerAiChatHandler,
       removeAiChatHandler,
-      initializeDefaultContext,
     } = useAiChat();
 
     onUnmounted(() => {
@@ -720,13 +703,13 @@ export default defineComponent({
 
     onMounted(() => {
       if (
-        router.currentRoute.value.query.hasOwnProperty("action") &&
+        Object.prototype.hasOwnProperty.call(router.currentRoute.value.query, "action") &&
         router.currentRoute.value.query.action == "history"
       ) {
         showSearchHistory.value = true;
       }
       if (
-        router.currentRoute.value.query.hasOwnProperty("action") &&
+        Object.prototype.hasOwnProperty.call(router.currentRoute.value.query, "action") &&
         router.currentRoute.value.query.action == "search_scheduler"
       ) {
         if (config.isEnterprise == "true") {
@@ -828,18 +811,18 @@ export default defineComponent({
     watch(
       () => router.currentRoute.value.query,
       () => {
-        if (!router.currentRoute.value.query.hasOwnProperty("action")) {
+        if (!Object.prototype.hasOwnProperty.call(router.currentRoute.value.query, "action")) {
           showSearchHistory.value = false;
           showSearchScheduler.value = false;
         }
         if (
-          router.currentRoute.value.query.hasOwnProperty("action") &&
+          Object.prototype.hasOwnProperty.call(router.currentRoute.value.query, "action") &&
           router.currentRoute.value.query.action == "history"
         ) {
           showSearchHistory.value = true;
         }
         if (
-          router.currentRoute.value.query.hasOwnProperty("action") &&
+          Object.prototype.hasOwnProperty.call(router.currentRoute.value.query, "action") &&
           router.currentRoute.value.query.action == "search_scheduler"
         ) {
           if (config.isEnterprise == "true") {
@@ -1178,10 +1161,6 @@ export default defineComponent({
       );
     }
 
-    // Helper function to check if the environment is cloud
-    function isCloudEnvironment() {
-      return config.isCloud === "true";
-    }
 
     // Helper function to check if quick mode is enabled
     function isQuickModeEnabled() {
@@ -1770,7 +1749,7 @@ export default defineComponent({
         if (searchObj.meta.sqlMode == true) {
           searchObj.data.query = searchObj.data.query.replace(
             /SELECT\s+(.*?)\s+FROM/gi,
-            (match, fields) => {
+            () => {
               return `SELECT ${field_list} FROM`;
             },
           );
@@ -2275,7 +2254,6 @@ export default defineComponent({
 
     // Create debounced function for visualization updates
     const updateVisualization = async (autoSelectChartType: boolean = true) => {
-      try {
         if (searchObj?.meta?.logsVisualizeToggle == "visualize") {
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
@@ -2323,9 +2301,6 @@ export default defineComponent({
 
           return true;
         }
-      } catch (error) {
-        throw error;
-      }
     };
 
     watch(
@@ -2464,14 +2439,7 @@ export default defineComponent({
         searchObj.data.datetime,
         searchObj.data.datetime.relativeTimePeriod,
       ],
-      async () => {
-        const dateTime =
-          searchObj.data.datetime.type === "relative"
-            ? getConsumableRelativeTime(
-                searchObj.data.datetime.relativeTimePeriod,
-              )
-            : cloneDeep(searchObj.data.datetime);
-      },
+      async () => {},
       { deep: true },
     );
 
@@ -3101,10 +3069,6 @@ export default defineComponent({
 
     // [END] cancel running queries
 
-    const cancelOnGoingSearchQueries = () => {
-      sendCancelSearchMessage(searchObj.data.searchWebSocketTraceIds);
-    };
-
     // [START] O2 AI Context Handler
 
     const registerAiContextHandler = () => {
@@ -3112,8 +3076,7 @@ export default defineComponent({
     };
 
     const getContext = async () => {
-      return new Promise(async (resolve, reject) => {
-        try {
+      try {
           const isLogsPage = router.currentRoute.value.name === "logs";
 
           const isStreamSelectedInLogsPage =
@@ -3130,8 +3093,7 @@ export default defineComponent({
             !isLogsPage ||
             !(isStreamSelectedInLogsPage || isStreamSelectedInDashboardPage)
           ) {
-            resolve("");
-            return;
+            return "";
           }
 
           const payload = {};
@@ -3153,8 +3115,7 @@ export default defineComponent({
                 ].fields.stream_type;
 
           if (!streamType || !streams?.length) {
-            resolve("");
-            return;
+            return "";
           }
 
           for (let i = 0; i < streams.length; i++) {
@@ -3180,12 +3141,11 @@ export default defineComponent({
             payload["schema_" + (i + 1)] = schemaData;
           }
 
-          resolve(payload);
+          return payload;
         } catch (error) {
           console.error("Error in getContext for logs page", error);
-          resolve("");
+          return "";
         }
-      });
     };
 
     const removeAiContextHandler = () => {
@@ -3443,7 +3403,7 @@ export default defineComponent({
     },
     redrawHistogram() {
       return (
-        this.searchObj.data.histogram.hasOwnProperty("xData") &&
+        Object.prototype.hasOwnProperty.call(this.searchObj.data.histogram, "xData") &&
         this.searchObj.data.histogram.xData.length
       );
     },

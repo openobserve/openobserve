@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mount, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
@@ -180,7 +180,7 @@ describe("AssociateFunction Component", () => {
     });
 
     it("clears userSelectedNode on mount", async () => {
-      const wrapper = createWrapper();
+      createWrapper();
       await flushPromises();
       expect(mockPipelineObj.userSelectedNode).toEqual({});
     });

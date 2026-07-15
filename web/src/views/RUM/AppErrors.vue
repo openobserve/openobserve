@@ -267,7 +267,6 @@ import useErrorIssuesData from "@/composables/rum/useErrorIssuesData";
 import { issueKey, formatRelativeTime } from "@/utils/rum/errorIssueUtils";
 import { addCommasToNumber } from "@/utils/formatters";
 import { useStore } from "vuex";
-import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
@@ -640,14 +639,6 @@ const handleErrorTypeClick = async (payload: any) => {
 
 const handleRowClick = (row: any) => {
   handleErrorTypeClick({ row });
-};
-
-// Severity spine flush against the row's left edge — same mechanism and
-// colors as the sessions table, for cross-page consistency.
-const getIssueStatusColor = (row: any) => {
-  if (row.error_handling === "handled")
-    return "var(--o2-severity-warning-color)";
-  return "var(--o2-severity-error-color)";
 };
 
 function restoreUrlQueryParams() {

@@ -307,8 +307,6 @@ import {
   defineComponent,
   ref,
   onActivated,
-  onDeactivated,
-  onUnmounted,
   onBeforeMount,
   type Ref,
 } from "vue";
@@ -331,7 +329,6 @@ import {
   formatSizeFromMB,
 } from "../utils/zincutils";
 import config from "@/aws-exports";
-import { cloneDeep } from "lodash-es";
 import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
 import { watch } from "vue";
@@ -341,7 +338,6 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -363,13 +359,12 @@ export default defineComponent({
     OIcon,
     OToggleGroup,
     OToggleGroupItem,
-    OSpinner,
     OSearchInput,
     OCheckbox,
     OTable,
   },
   emits: [],
-  setup(props, { emit }) {
+  setup() {
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();
@@ -405,8 +400,6 @@ export default defineComponent({
 
     const streamTabs: never[] = [];
     const {
-      getStreams,
-      resetStreams,
       removeStream,
       getStream,
       getPaginatedStreams,
@@ -524,7 +517,7 @@ export default defineComponent({
     //   },
     // );
 
-    const getLogStream = (refresh: boolean = false) => {
+    const getLogStream = (_refresh?: boolean) => {
       if (store.state.selectedOrganization != null) {
         loadingState.value = true;
         previousOrgIdentifier.value =
@@ -802,7 +795,7 @@ export default defineComponent({
               dateTime["period"] = "15m";
             }
           })
-          .catch((err) => {
+          .catch(() => {
             dateTime["period"] = "15m";
           })
           .finally(() => {

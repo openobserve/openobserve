@@ -896,7 +896,6 @@ import {
   formatTimeWithSuffix,
   convertTimeFromNsToUs,
   getImageURL,
-  b64EncodeUnicode,
 } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
@@ -909,7 +908,6 @@ import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
-import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import config from "@/aws-exports";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import {
@@ -927,7 +925,6 @@ import {
   getObservationTypeColor,
   formatModelParameters,
 } from "@/utils/llmUtils";
-import DOMPurify from "dompurify";
 import { escapeHtml } from "@/utils/html";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -935,7 +932,6 @@ import AttributeValueCell from "@/components/AttributeValueCell.vue";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import DbSpanDetails from "./DbSpanDetails.vue";
 import TraceErrorTab from "./components/TraceErrorTab.vue";
-import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -1075,8 +1071,6 @@ export default defineComponent({
     const sysInstrOpen = ref(false);
     const modelParamsOpen = ref(false);
 
-    const showPendingFilter = false;
-
     const closeSidebar = () => {
       emit("close");
     };
@@ -1153,10 +1147,6 @@ export default defineComponent({
     };
 
     const store = useStore();
-
-    const RAW_VALUE_FILTER_FIELDS = new Set([
-      store.state?.zoConfig?.timestamp_column || "_timestamp",
-    ]);
 
     const hasDbSpan = computed(() =>
       Object.keys(props.span ?? {}).some((key) => key.startsWith("db_")),

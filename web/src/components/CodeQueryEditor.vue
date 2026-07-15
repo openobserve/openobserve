@@ -337,16 +337,16 @@ export default defineComponent({
           `match_all_raw_ignore_case('${_keyword}')`,
       },
       {
-        label: (_keyword: string) =>
+        label: () =>
           `re_match(fieldname: string, regular_expression: string)`,
         kind: "Text",
-        insertText: (_keyword: string) => `re_match(fieldname, '')`,
+        insertText: () => `re_match(fieldname, '')`,
       },
       {
-        label: (_keyword: string) =>
+        label: () =>
           `re_not_match(fieldname: string, regular_expression: string)`,
         kind: "Text",
-        insertText: (_keyword: string) => `re_not_match(fieldname, '')`,
+        insertText: () => `re_not_match(fieldname, '')`,
       },
       {
         label: (_keyword: string) => `str_match(fieldname, '${_keyword}')`,
@@ -402,13 +402,13 @@ export default defineComponent({
 
       // ONLY emit events if NOT already in NLP mode (auto-detection feature)
       // If already in NLP mode (user toggled it), don't change anything
+      // Only emit when not already in NLP mode; if already set, do nothing.
       if (!props.nlpMode) {
         if (isNL) {
           emit("nlpModeDetected", true);
         } else {
           emit("nlpModeDetected", false);
         }
-      } else {
       }
     }, 500);
 
@@ -890,7 +890,7 @@ export default defineComponent({
     // update readonly when prop value changes
     watch(
       () => props.query,
-      (newQuery, oldQuery) => {
+      () => {
         if (!editorObj) return;
 
         const currentValue = editorObj?.getValue();
@@ -1043,7 +1043,7 @@ export default defineComponent({
         };
       });
 
-      const decorationIds = editorObj.deltaDecorations([], decorations);
+      editorObj.deltaDecorations([], decorations);
     };
 
     function addErrorDiagnostics(ranges: any) {

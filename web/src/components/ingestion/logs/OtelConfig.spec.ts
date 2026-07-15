@@ -27,7 +27,7 @@ vi.mock("@/aws-exports", () => ({
 // Mock utility functions
 vi.mock("@/utils/zincutils", () => ({
   b64EncodeStandard: vi.fn((str: string) => btoa(str)),
-  getEndPoint: vi.fn((url: string) => ({
+  getEndPoint: vi.fn(() => ({
     url: "http://localhost:5080",
     host: "localhost",
     port: "5080",

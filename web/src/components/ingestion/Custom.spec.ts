@@ -428,8 +428,8 @@ describe("Custom Component", () => {
 
     it("should handle ingestTraces route", () => {
       mockRouter.currentRoute.value.name = "ingestTraces";
-      
-      const testWrapper = mount(Custom, {
+
+      mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
@@ -455,8 +455,8 @@ describe("Custom Component", () => {
 
     it("should handle ingestMetrics route", () => {
       mockRouter.currentRoute.value.name = "ingestMetrics";
-      
-      const testWrapper = mount(Custom, {
+
+      mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
@@ -482,8 +482,8 @@ describe("Custom Component", () => {
 
     it("should handle rumMonitoring route", () => {
       mockRouter.currentRoute.value.name = "rumMonitoring";
-      
-      const testWrapper = mount(Custom, {
+
+      mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],

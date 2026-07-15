@@ -20,10 +20,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
 import { SearchRequestPayload } from "@/ts/interfaces/query";
-import {
-  convertDateToTimestamp,
-  getConsumableRelativeTime,
-} from "@/utils/date";
+import { getConsumableRelativeTime } from "@/utils/date";
 import config from "@/aws-exports";
 import { b64EncodeUnicode, addSpacesToOperators } from "@/utils/zincutils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
@@ -75,7 +72,6 @@ export const useSearchQuery = () => {
     isDistinctQuery,
     isWithQuery,
     isLimitQuery,
-    extractTimestamps,
     addTransformToQuery,
     updateUrlQueryParams,
     fnUnparsedSQL,
@@ -161,7 +157,10 @@ export const useSearchQuery = () => {
         if (
           searchObj.meta.refreshInterval == 0 &&
           router.currentRoute.value.name == "logs" &&
-          searchObj.data.queryResults.hasOwnProperty("hits")
+          Object.prototype.hasOwnProperty.call(
+            searchObj.data.queryResults,
+            "hits",
+          )
         ) {
           const start_time: number =
             initialQueryPayload.value?.query?.start_time || 0;

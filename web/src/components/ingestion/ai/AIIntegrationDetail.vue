@@ -45,10 +45,6 @@ const integration = computed<AIIntegration | undefined>(() =>
 );
 
 const docURL = computed(() => integration.value?.docURL ?? "");
-const displayName = computed(
-  () => integration.value?.name ?? props.integrationSlug,
-);
-
 // Rich card markdown sourced from o2-datasource (if this integration has it),
 // otherwise fall back to the legacy 3-line snippet + doc link.
 const cardContent = computed(() =>

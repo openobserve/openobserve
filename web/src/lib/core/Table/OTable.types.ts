@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { Component } from "vue";
-import type { ColumnDef, Row, Table } from "@tanstack/vue-table";
+import type { Row, Table } from "@tanstack/vue-table";
 
 // ─── Shared column size constants ────────────────────────────────
 /**

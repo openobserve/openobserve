@@ -78,7 +78,9 @@ export const convertTableData = (
         fieldNameCache[key.toLowerCase()] = key;
       });
     }
-  } catch (e) {}
+  } catch (e) {
+    // ignore: best-effort field-name cache
+  }
 
   // use all response keys if tableDynamicColumns is true
   if (panelSchema?.config?.table_dynamic_columns == true) {
@@ -216,7 +218,7 @@ export const convertTableData = (
     let uniqueTransposeColumns: any = [];
     const columnDuplicationMap: any = {};
 
-    transposeColumns.forEach((col: any, index: any) => {
+    transposeColumns.forEach((col: any) => {
       if (!columnDuplicationMap[col]) {
         uniqueTransposeColumns.push(col);
         columnDuplicationMap[col] = 1;
@@ -342,7 +344,6 @@ export const convertTableData = (
     // Transpose rows, adding 'label' as the first column
 
     tableRows = columnData.map((it: any) => {
-      const isHistogramField = histogramFields.includes(it.alias);
       let obj = uniqueTransposeColumns.reduce(
         (acc: any, curr: any, reduceIndex: any) => {
           const value =

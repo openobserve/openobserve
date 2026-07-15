@@ -439,7 +439,7 @@ size="xs" class="warning" />{{
 
 <script lang="ts">
 
-import { defineComponent, PropType, computed, ref, watch, nextTick } from "vue";
+import { defineComponent, PropType, computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import ThemeSwitcher from "./ThemeSwitcher.vue";

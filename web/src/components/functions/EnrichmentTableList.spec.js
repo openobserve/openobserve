@@ -3,9 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import EnrichmentTableList from './EnrichmentTableList.vue';
 import streamService from '@/services/stream';
 import segment from '@/services/segment_analytics';
-import useStreams from '@/composables/useStreams';
 import i18n from "@/locales";
-import { formatSizeFromMB } from "@/utils/zincutils";
 
 // Mock zincutils
 vi.mock("@/utils/zincutils", () => ({

@@ -73,10 +73,6 @@ const onClose = (socketId: string, event: CloseEvent) => {
   closeHandlers[socketId]?.forEach((handler) => handler(event, socketId));
 };
 
-const onError = (socketId: string, event: Event) => {
-  errorHandlers[socketId]?.forEach((handler) => handler(event, socketId));
-};
-
 // Message and handler functions
 const sendMessage = (socketId: string, message: string) => {
   const socket = sockets[socketId];

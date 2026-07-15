@@ -1,8 +1,8 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { computed, ref, watch, type Ref } from "vue";
+import { computed, watch } from "vue";
 import type { Table } from "@tanstack/vue-table";
-import type { OTablePaginationMode, OTablePaginationParams } from "../OTable.types";
+import type { OTablePaginationMode } from "../OTable.types";
 
 export function useTablePagination<TData>(
   table: Table<TData>,

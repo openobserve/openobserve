@@ -133,7 +133,7 @@ import {
   watch,
   onUpdated,
 } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useSession from "@/composables/useSessionReplay";
 import useErrorTracking from "@/composables/useErrorTracking";
@@ -141,18 +141,15 @@ import usePerformance from "@/composables/rum/usePerformance";
 
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
-import useRum from "@/composables/rum/useRum";
 import useStreams from "@/composables/useStreams";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 
-const route = useRoute();
 const router = useRouter();
 const store = useStore();
 const showTabs = computed(() => {
@@ -174,8 +171,7 @@ const isLoading = ref<boolean[]>([]);
 const { sessionState } = useSession();
 const { errorTrackingState } = useErrorTracking();
 const { performanceState } = usePerformance();
-const { rumState } = useRum();
-const { getStream, getStreams } = useStreams();
+const { getStream } = useStreams();
 
 const activeTab = ref<string>("performance");
 const tabs = [
@@ -302,7 +298,7 @@ const updateTabOnRouteChange = () => {
 
 const checkIfRumEnabled = async () => {
   await nextTick();
-  return new Promise(async (resolve) => {
+  return new Promise((resolve) => {
     getStream("_rumdata", "logs", false)
       .then((response: any) => {
         if (response?.name === "_rumdata") isRumEnabled.value = true;

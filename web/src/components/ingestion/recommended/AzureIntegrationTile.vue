@@ -182,7 +182,7 @@ export default defineComponent({
         const baseURL = `${window.location.protocol}//${window.location.host}`;
 
         // Generate dashboard URL
-        const dashboardURL = generateAzureDashboardURL(
+        generateAzureDashboardURL(
           props.integration,
           organizationId,
           baseURL,

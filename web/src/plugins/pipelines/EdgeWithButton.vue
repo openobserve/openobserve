@@ -41,11 +41,9 @@ const props = defineProps({
   },
 })
 
-const { removeEdges, getSelectedEdges, addSelectedEdges, removeSelectedEdges } = useVueFlow()
+useVueFlow()
 
 const path = computed(() => getBezierPath(props))
-
-let clickTimeout = null
 
 // Edge click handling moved to PipelineFlow.vue using VueFlow events
 // These handlers are no longer used but kept for backwards compatibility

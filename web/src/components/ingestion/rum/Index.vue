@@ -55,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OSplitter from '@/lib/core/Splitter/OSplitter.vue'
 // @ts-ignore
@@ -72,7 +71,7 @@ import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 export default defineComponent({
   name: "IngestRum",
   components: {
-    OTabs, OTab, ORouteTab, OSplitter,},
+    OTabs, ORouteTab, OSplitter,},
   data() {
     return {};
   },

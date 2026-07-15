@@ -57,7 +57,7 @@ import ContentCopy from "@/components/CopyContent.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { useStore } from "vuex";
-import { b64EncodeStandard, getEndPoint, getIngestionURL } from "../../../utils/zincutils";
+import { getEndPoint, getIngestionURL } from "../../../utils/zincutils";
 
 const store = useStore();
 
@@ -86,10 +86,6 @@ const options = [
 const endpoint: any = ref({ url: "", host: "", port: "", protocol: "", tls: "" });
 const ingestionURL = getIngestionURL();
 endpoint.value = getEndPoint(ingestionURL);
-
-const accessKey = computed(() =>
-  b64EncodeStandard(`${props.currUserEmail}:${store.state.organizationData.organizationPasscode}`)
-);
 
 const activeCommand = computed(() => {
   const base = selected.value === "ec2"

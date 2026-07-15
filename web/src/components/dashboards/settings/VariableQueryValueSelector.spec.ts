@@ -20,7 +20,7 @@ import VariableQueryValueSelector from "./VariableQueryValueSelector.vue";
 
 // Mock lodash debounce - improved version
 vi.mock("lodash-es", () => ({
-  debounce: vi.fn((fn, delay) => {
+  debounce: vi.fn((fn) => {
     // Return a mock function that can be called immediately for testing
     const mockFn = vi.fn((...args) => {
       // For tests, execute immediately instead of with delay
@@ -412,8 +412,7 @@ describe("VariableQueryValueSelector", () => {
       await nextTick();
       
       const debounce = await getMockedDebounce();
-      const debouncedFunction = vi.mocked(debounce).mock.results[0]?.value;
-      
+
       wrapper.unmount();
       
       // Verify debounce was called (indicating cleanup was attempted)
@@ -953,7 +952,6 @@ describe("VariableQueryValueSelector", () => {
 
     it("should handle Enter key for custom values", async () => {
       wrapper.vm.onSearch("enter-test");
-      const originalValue = wrapper.vm.selectedValue;
 
       const enterEvent = new KeyboardEvent("keydown", { key: "Enter" });
       wrapper.vm.handleKeydown(enterEvent);
@@ -998,7 +996,6 @@ describe("VariableQueryValueSelector", () => {
 
     it("should handle Enter with whitespace-only filter text", async () => {
       wrapper.vm.onSearch("   ");
-      const originalValue = wrapper.vm.selectedValue;
 
       const enterEvent = new KeyboardEvent("keydown", { key: "Enter" });
       wrapper.vm.handleKeydown(enterEvent);

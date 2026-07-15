@@ -17,7 +17,6 @@ import { ref, computed, reactive } from "vue";
 import {
   buildScopedDependencyGraph,
   detectCyclesInScopedGraph,
-  extractVariableNames,
   type ScopedDependencyGraph,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
@@ -469,14 +468,10 @@ export const useVariablesManager = () => {
     });
 
     // Step 3: Build dependency graph
-    try {
-      dependencyGraph.value = buildScopedDependencyGraph(
-        expandedVars,
-        panelTabMapping.value,
-      );
-    } catch (error: any) {
-      throw error;
-    }
+    dependencyGraph.value = buildScopedDependencyGraph(
+      expandedVars,
+      panelTabMapping.value,
+    );
 
     // Step 4: Detect cycles
     const cycle = detectCyclesInScopedGraph(dependencyGraph.value);

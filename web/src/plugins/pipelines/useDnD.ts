@@ -15,16 +15,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { b64EncodeUnicode, getUUID } from "@/utils/zincutils";
+import { getUUID } from "@/utils/zincutils";
 import { useVueFlow,MarkerType  } from "@vue-flow/core";
-import { watch, reactive ,computed , ref} from "vue";
-const functionImage = getImageURL("images/pipeline/function.svg");
-const streamImage = getImageURL("images/pipeline/stream.svg");
-const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
-const streamRouteImage = getImageURL("images/pipeline/route.svg");
-const conditionImage = getImageURL("images/pipeline/condition.svg");
-const queryImage = getImageURL("images/pipeline/query.svg");
-import { getImageURL } from "@/utils/zincutils";
+import { watch, reactive } from "vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 
@@ -90,7 +83,7 @@ const pipelineObj = reactive(Object.assign({}, defaultObject));
 export { pipelineObj };
 export default function useDragAndDrop() {
 
-  const { screenToFlowCoordinate, onNodesInitialized, updateNode, addEdges  } =
+  const { screenToFlowCoordinate, onNodesInitialized, updateNode } =
     useVueFlow();
 
     watch(
@@ -202,12 +195,12 @@ export default function useDragAndDrop() {
 
   }
 
-  function onNodeChange(changes:any) {
+  function onNodeChange() {
 
     // console.log("Node change", changes);
   }
 
-  function onNodesChange(changes:any) {
+  function onNodesChange() {
     hasInputNodeFn();
 
   }
@@ -320,7 +313,7 @@ export default function useDragAndDrop() {
     return false; // No cycle detected
 };
 
-  function validateConnection({ source, target, sourceHandle, targetHandle }:any) {
+  function validateConnection({ source, target }:any) {
     // Example validation rules
     const sourceNode = pipelineObj.currentSelectedPipeline.nodes.find(
       (node:any) => node.id === source,
@@ -499,7 +492,7 @@ export default function useDragAndDrop() {
         newEdge,
       ];
     }
-        if(newNode.hasOwnProperty('meta') && newNode.meta.hasOwnProperty('append_data')){
+        if(Object.prototype.hasOwnProperty.call(newNode, 'meta') && Object.prototype.hasOwnProperty.call(newNode.meta, 'append_data')){
           pipelineObj.currentSelectedNodeData.meta = newNode.meta;
           delete newNode.meta;
           delete pipelineObj.currentSelectedNodeData.data.meta;
@@ -576,7 +569,7 @@ export default function useDragAndDrop() {
   const getInputNodeStream = () => {
     const nodes = pipelineObj.currentSelectedPipeline?.nodes ?? [];
     const inputNode = nodes.find((node: any) => node.io_type === "input");
-    if(inputNode?.data.hasOwnProperty('node_type') &&  inputNode.data.node_type === 'stream'){
+    if(Object.prototype.hasOwnProperty.call(inputNode?.data, 'node_type') &&  inputNode.data.node_type === 'stream'){
       return inputNode?.data?.stream_name?.value || inputNode.data.stream_name || "";
     }
     else {

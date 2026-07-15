@@ -213,9 +213,6 @@ export default defineComponent({
   },
   components: {
     OSplitter,
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
     UnifiedQueryEditor: defineAsyncComponent(
       () => import("@/components/QueryEditor.vue"),
     ),
@@ -232,7 +229,7 @@ export default defineComponent({
     const { track } = useReo();
 
     // let beingUpdated: boolean = false;
-    const addJSTransformForm: any = ref(null);    const disableColor: any = ref("");
+    const disableColor: any = ref("");
     const formData: any = ref({
       name: "",
       function: "",
@@ -246,7 +243,6 @@ export default defineComponent({
     const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
     const { placeholder: jsPlaceholder } = useJsPlaceholder();
     let editorobj: any = null;
-    const streams: any = ref({});
     const isFetchingStreams = ref(false);
     const testFunctionRef = ref<typeof TestFunction>();
     const functionsToolbarRef = ref<typeof FunctionsToolbar>();
@@ -375,10 +371,6 @@ export default defineComponent({
     ${suffixCode.value}`;
     };
 
-    const isValidFnName = () => {
-      return formData.value.name.trim().length > 0;
-    };
-
     const onSubmit = () => {
       if (!functionsToolbarRef.value) return;
 
@@ -420,7 +412,6 @@ export default defineComponent({
 
             callTransform
               .then((res: { data: any }) => {
-                const data = res.data;
                 const _formData: any = { ...formData.value };
                 formData.value = { ...defaultValue() };
 
@@ -564,20 +555,8 @@ export default defineComponent({
     /**
      * Handle successful generation from UnifiedQueryEditor
      */
-    const handleGenerationSuccess = (payload: {type: string, message: string}) => {
+    const handleGenerationSuccess = () => {
       // Function code is already updated via @update:query handler
-    };
-
-    // Unified Query Editor: Handle Ask AI
-    const handleAskAI = async (naturalLanguage: string, language: 'vrl' | 'javascript') => {
-
-      // Enable AI chat if not already enabled
-      if (!store.state.isAiChatEnabled) {
-        openChat(true);
-      }
-
-      // The unified component handles AI generation internally
-      // This event is just for parent components that may need to react
     };
 
     return {

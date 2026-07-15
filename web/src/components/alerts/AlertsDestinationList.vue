@@ -290,7 +290,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 import OTag from '@/lib/core/Badge/OTag.vue';
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -318,7 +317,6 @@ export default defineComponent({
     OButton,
     OTooltip,
     OSearchInput,
-    OCheckbox,
     OTag,
     OTable,
     OToggleGroup,
@@ -640,7 +638,8 @@ export default defineComponent({
     const exportDestination = (row: any) => {
       const findDestination: any = getDestinationByName(row.name);
       const destinationByName = { ...findDestination };
-      if (destinationByName.hasOwnProperty("#")) delete destinationByName["#"];
+      if (Object.prototype.hasOwnProperty.call(destinationByName, "#"))
+        delete destinationByName["#"];
       const destinationJson = JSON.stringify(destinationByName, null, 2);
       const blob = new Blob([destinationJson], { type: "application/json" });
       const url = URL.createObjectURL(blob);

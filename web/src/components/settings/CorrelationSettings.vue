@@ -108,7 +108,6 @@ import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
 import OrganizationDeduplicationSettings from "@/components/alerts/OrganizationDeduplicationSettings.vue";
 import DiscoveredServices from "@/components/settings/DiscoveredServices.vue";
 import ServiceIdentitySetup from "@/components/settings/ServiceIdentitySetup.vue";
-import AppTabs from "@/components/common/AppTabs.vue";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
@@ -122,7 +121,6 @@ export default defineComponent({
     OrganizationDeduplicationSettings,
     DiscoveredServices,
     ServiceIdentitySetup,
-    AppTabs,
     SemanticFieldGroupsConfig,
     OTabs,
     OTab,

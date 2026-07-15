@@ -25,7 +25,7 @@ const makeEntity = (name: string, withPerm = false) => ({
   permission: makePermission(withPerm),
 });
 
-function makeResource(expand = true, showSelected = false) {
+function makeResource(expand = true) {
   return {
     expand,
     entities: [

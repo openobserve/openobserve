@@ -202,7 +202,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, watch } from "vue";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useRouter } from "vue-router";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -236,8 +235,6 @@ const props = defineProps({
   },
 });
 
-const router = useRouter();
-
 const HALF_HOUR_US = 1800000000;
 
 const correlationRange = computed(() =>
@@ -250,7 +247,6 @@ const correlationRange = computed(() =>
 );
 
 const {
-  correlationData,
   isLoading,
   hasBackendTrace,
   fetchCorrelation,

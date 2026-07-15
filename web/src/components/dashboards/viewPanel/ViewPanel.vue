@@ -195,14 +195,13 @@ import {
   getPanel,
   checkIfVariablesAreLoaded,
 } from "../../../utils/commons";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import DateTimePickerDashboard from "../../../components/DateTimePickerDashboard.vue";
 import DashboardErrorsComponent from "../../../components/dashboards/addPanel/DashboardErrors.vue";
 import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
-import RelativeTime from "@/components/common/RelativeTime.vue";
 // import _ from "lodash-es";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { onActivated } from "vue";
@@ -218,7 +217,6 @@ import { useVariablesManager } from "@/composables/dashboard/useVariablesManager
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { defineAsyncComponent } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
@@ -239,11 +237,9 @@ export default defineComponent({
     PanelSchemaRenderer,
     AutoRefreshInterval,
     HistogramIntervalDropDown,
-    RelativeTime,
     ShowLegendsPopup,
     PanelErrorButtons,
     OButton,
-    OIcon,
     OTooltip,
 },
   props: {
@@ -278,7 +274,6 @@ export default defineComponent({
     const showLegendsDialog = ref(false);
     const panelSchemaRendererRef: any = ref(null);
     const { t } = useI18n();
-    const router = useRouter();
     const route = useRoute();
     const store = useStore();
 
@@ -306,7 +301,6 @@ export default defineComponent({
       errors: [],
     });
     let variablesData: any = reactive({});
-    const initialVariableValues = ref<any>({}); // Store the initial variable values
     const isVariablesChanged = ref(true); // Flag to track if variables have changed
     let needsVariablesAutoUpdate = true;
 
@@ -325,7 +319,9 @@ export default defineComponent({
         }
 
         return;
-      } catch (error) {}
+      } catch (error) {
+        /* ignore: best-effort */
+      }
 
       // resize the chart when variables data is updated
       // because if variable requires some more space then need to resize chart
@@ -546,7 +542,7 @@ export default defineComponent({
     });
     watch(
       () => variablesData,
-      (newVal) => {
+      () => {
         const isValueChanged =
           currentVariablesDataRef?.values?.length > 0 &&
           variablesData.values.every((variable: any, index: number) => {
@@ -662,7 +658,9 @@ export default defineComponent({
 
         // Commit the values immediately so they're used by the chart
         variablesManager.commitAll();
-      } catch (error) {}
+      } catch (error) {
+        /* ignore: best-effort */
+      }
 
       // if variables data is null, set it to empty list
       if (
@@ -677,7 +675,7 @@ export default defineComponent({
     };
 
     watch(selectedDate, () => {
-      updateDateTime(selectedDate.value);
+      updateDateTime();
 
       // CRITICAL FIX: When date time changes (user clicked Apply), also commit any pending variable changes
       // This ensures that if user changed both variables and date time,
@@ -707,7 +705,7 @@ export default defineComponent({
       };
     };
 
-    const updateDateTime = (value: object) => {
+    const updateDateTime = () => {
       // CRITICAL: Clear panelIdToBeRefreshed to ensure panel refreshes
       // In view panel mode, when time changes, this panel should always refresh
       panelIdToBeRefreshed.value = null;

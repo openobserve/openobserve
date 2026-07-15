@@ -126,25 +126,14 @@
     } from "vue";
     import { useI18n } from "vue-i18n";
     import { useStore } from "vuex";
-    import streamService from "../../services/stream";
-    import segment from "../../services/segment_analytics";
     import {
     formatSizeFromMB,
-    getImageURL,
-    timestampToTimezoneDate,
-    convertDateToTimestamp,
     } from "@/utils/zincutils";
     import config from "@/aws-exports";
-    import ConfirmDialog from "@/components/ConfirmDialog.vue";
     import useStreams from "@/composables/useStreams";
-    import { useRouter } from "vue-router";
-    import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
-    import AppTabs from "@/components/common/AppTabs.vue";
 
     import OTable from "@/lib/core/Table/OTable.vue";
     import { COL } from "@/lib/core/Table/OTable.types";
-        import DateTime from "@/components/DateTime.vue";
-    import OButton from "@/lib/core/Button/OButton.vue";
     import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
     import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
         import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -173,12 +162,8 @@
         },
     },
     components: {
-        ConfirmDialog,
-        StreamFieldsInputs,
-        AppTabs,
         OTable,
         ODrawer,
-        OButton,
         OSearchInput,
         OSpinner,
 },
@@ -239,7 +224,6 @@
         columns,
         loadingState,
         schemaData,
-        selectedEnrichmentTable: props.selectedEnrichmentTable,
         getStream,
         formatSizeFromMB,
         isCloud,

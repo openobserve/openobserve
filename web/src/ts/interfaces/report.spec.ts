@@ -245,8 +245,6 @@ describe("Report Interfaces", () => {
       // Type assertions to verify field types
       const reportNumber: number = report["#"];
       const reportName: string = report.name;
-      const reportTab: string | null | undefined = report.tab;
-      const reportTimeRange: string | null | undefined = report.time_range;
       const reportFrequency: string = report.frequency;
       const reportLastTriggered: string = report.last_triggered_at;
       const reportCreated: string = report.created_at;

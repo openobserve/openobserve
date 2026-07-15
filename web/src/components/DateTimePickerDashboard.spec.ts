@@ -15,7 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { ref } from "vue";
-import { shallowMount, flushPromises, mount } from "@vue/test-utils";
+import { shallowMount, flushPromises } from "@vue/test-utils";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import DateTime from "@/components/DateTime.vue";
 
@@ -488,8 +488,7 @@ describe("DateTimePickerDashboard", () => {
 
     it("should have correct ref attribute", () => {
       wrapper = createWrapper();
-      
-      const dateTimeComponent = wrapper.findComponent(DateTime);
+
       expect(wrapper.vm.dateTimePicker).toBeDefined();
     });
   });

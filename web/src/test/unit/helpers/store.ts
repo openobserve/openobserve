@@ -204,7 +204,7 @@ const store = createStore({
     setOrganizationPasscode(state, payload) {
       state.organizationData.organizationPasscode = payload;
     },
-    resetOrganizationData(state, payload) {
+    resetOrganizationData(state) {
       state.organizationData = JSON.parse(JSON.stringify(organizationObj));
     },
     setRUMToken(state, payload) {
@@ -318,7 +318,7 @@ const store = createStore({
     setChatUpdated(state, payload) {
       state.chatUpdated = payload;
     },
-    clearPendingShortURL(state) {
+    clearPendingShortURL() {
       // Mock mutation for tests - clears pending short URL state
     },
     setAlertListFilters(state, payload) {
@@ -347,7 +347,7 @@ const store = createStore({
         },
       },
       actions: {
-        setStreams(context: any, payload: any) {
+        setStreams() {
           // Mock action for setting streams
         },
       },

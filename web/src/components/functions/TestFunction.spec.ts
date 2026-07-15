@@ -541,7 +541,7 @@ describe('TestFunction.vue Branch Coverage', () => {
     });
 
     it('should cover edge case branches', async () => {
-      const wrapper = mount(TestFunction, {
+      mount(TestFunction, {
         props: defaultProps,
         global: {
           plugins: [mockI18n],
@@ -557,8 +557,6 @@ describe('TestFunction.vue Branch Coverage', () => {
         },
       });
 
-      const vm = wrapper.vm as any;
-      
       // Branch: editorLine === "},") modification (line 694-696)
       const testEditorLine = "},";
       const modifiedLine = testEditorLine === "}," ? "}" : testEditorLine;

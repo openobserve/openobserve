@@ -198,11 +198,11 @@ const createWrapper = (props = {}, options = {}) => {
               <slot name='footer' />
               <button
                 data-test-stub='o-dialog-primary'
-                @click='$emit(\"click:primary\")'
+                @click='$emit("click:primary")'
               >{{ primaryButtonLabel }}</button>
               <button
                 data-test-stub='o-dialog-secondary'
-                @click='$emit(\"click:secondary\")'
+                @click='$emit("click:secondary")'
               >{{ secondaryButtonLabel }}</button>
             </div>`,
           props: [

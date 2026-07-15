@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { validatePipeline, ValidationResult } from "./validatePipeline";
+import { validatePipeline } from "./validatePipeline";
 
 describe("Pipeline Validation", () => {
   const validPipeline = {

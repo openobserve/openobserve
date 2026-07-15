@@ -191,9 +191,7 @@ import {
   defineComponent,
   ref,
   onMounted,
-  reactive,
   computed,
-  watch,
   defineAsyncComponent,
 } from "vue";
 import { useI18n } from "vue-i18n";
@@ -207,7 +205,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import BaseImport from "../common/BaseImport.vue";
-import axios from "axios";
 
 import regexPatternsService from "@/services/regex_pattern";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -325,7 +322,7 @@ export default defineComponent({
       activeTab.value = newTab;
     };
 
-    const importJson = async ({ jsonStr: jsonString, jsonArray }: any) => {
+    const importJson = async ({ jsonStr: jsonString }: any) => {
       regexPatternErrorsToDisplay.value = [];
       regexPatternCreators.value = [];
 
@@ -481,10 +478,6 @@ export default defineComponent({
         },
       });
       emit("cancel:hideform");
-    };
-
-    const onSubmit = (e: any) => {
-      e.preventDefault();
     };
 
     const updateActiveTab = () => {

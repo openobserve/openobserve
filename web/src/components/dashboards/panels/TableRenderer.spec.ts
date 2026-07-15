@@ -518,7 +518,7 @@ describe("TableRenderer", () => {
     beforeEach(() => {
       capturedCsv = "";
       vi.stubGlobal("Blob", class MockBlob {
-        constructor(parts: any[], _options?: any) {
+        constructor(parts: any[]) {
           capturedCsv = String(parts?.[0] ?? "");
         }
       });

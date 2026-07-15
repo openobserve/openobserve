@@ -12,7 +12,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount, shallowMount } from "@vue/test-utils";
+import { flushPromises, shallowMount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 import AddAlert from "@/components/alerts/AddAlert.vue";
@@ -22,12 +22,8 @@ import router from "@/test/unit/helpers/router";
 import { generateWhereClause } from "@/utils/alerts/alertQueryBuilder";
 import { detectConditionsVersion } from "@/utils/alerts/alertDataTransforms";
 
-import PreviewAlert from "@/components/alerts/PreviewAlert.vue";
-
 import i18n from "@/locales";
 import CronExpressionParser from "cron-parser";
-
-import { useLocalOrganization } from "@/utils/zincutils";
 
 import searchService from "@/services/search";
 
@@ -583,8 +579,6 @@ describe("AddAlert Component", () => {
           }
       });
       it('generates correct payload for a new alert in custom tab', () => {
-        const { formData, getSelectedTab, isAggregationEnabled, store, beingUpdated } = wrapper.vm;
-      
         const result = wrapper.vm.getAlertPayload();
       
         expect(result.uuid).toBeUndefined();
@@ -679,7 +673,6 @@ describe("AddAlert Component", () => {
       
     });
     describe('onSubmit', () => {
-      let notifyMock: any;
       beforeEach(() => {
         window.HTMLElement.prototype.scrollIntoView = vi.fn();
         wrapper.vm.q = {
@@ -690,7 +683,7 @@ describe("AddAlert Component", () => {
           wrapper.vm.validateSqlQueryPromise = vi.fn().mockResolvedValue(true);
       });
       it.skip('should submit alert successfully for creating new alert', async () => {
-        const createAlertSpy = vi.spyOn(alertsService, 'create_by_alert_id');
+        vi.spyOn(alertsService, 'create_by_alert_id');
         wrapper.vm.q = {
           notify: vi.fn(() => vi.fn())
         };

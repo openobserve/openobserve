@@ -15,12 +15,8 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useSearchResponseHandler } from "./useSearchResponseHandler";
-import { searchState } from "./searchState";
 import { logsUtils } from "./logsUtils";
-import { useHistogram } from "./useHistogram";
 import useNotifications from "@/composables/useNotifications";
-import useSearchPagination from "@/composables/useLogs/useSearchPagination";
-import useStreamFields from "@/composables/useLogs/useStreamFields";
 
 // Create a shared mock state
 const createMockState = () => ({
@@ -293,7 +289,7 @@ describe("useSearchResponseHandler", () => {
   describe("handleSearchError", () => {
     it("should handle generic search error", () => {
       // Use mockState directly
-      const notifications = useNotifications();
+      useNotifications();
 
       const request = { type: "search" };
       const error = {
@@ -330,7 +326,7 @@ describe("useSearchResponseHandler", () => {
 
     it("should handle cancelled search error", () => {
       // Use mockState directly
-      const notifications = useNotifications();
+      useNotifications();
 
       const request = { type: "search" };
       const error = {
@@ -554,7 +550,7 @@ describe("useSearchResponseHandler", () => {
 
     it("should handle cancel_response", () => {
       // Use mockState directly
-      const notifications = useNotifications();
+      useNotifications();
       mockState.searchObj.loading = true;
       mockState.searchObj.loadingHistogram = true;
 

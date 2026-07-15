@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import CustomDateTimePicker from '@/components/CustomDateTimePicker.vue';
@@ -6,18 +6,6 @@ import CustomDateTimePicker from '@/components/CustomDateTimePicker.vue';
 
 describe('CustomDateTimePicker.vue', () => {
   let wrapper: VueWrapper;
-  let store: any;
-
-  beforeEach(() => {
-    // Create mock store
-    store = createStore({
-      state: {
-        theme: 'light'
-      },
-      mutations: {},
-      actions: {}
-    });
-  });
 
   afterEach(() => {
     if (wrapper) {

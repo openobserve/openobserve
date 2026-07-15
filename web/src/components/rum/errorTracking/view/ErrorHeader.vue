@@ -71,7 +71,7 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 const { t } = useI18n();
 const router = useRouter();
-const props = defineProps({
+defineProps({
   error: {
     type: Object,
     required: true,

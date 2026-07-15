@@ -56,7 +56,7 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 const { t } = useI18n();
 
 // Props
-const props = defineProps<{
+defineProps<{
   destination?: any;
 }>();
 

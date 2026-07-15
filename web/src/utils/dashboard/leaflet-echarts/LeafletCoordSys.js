@@ -1,12 +1,10 @@
 import { util as zrUtil, graphic, matrix } from 'echarts/core';
-import { logWarn } from './helper';
 import {
   DomUtil,
   LatLng,
   Layer,
   Map as LMap,
   Projection,
-  tileLayer,
   } from 'leaflet';
 
 
@@ -58,7 +56,7 @@ const CustomOverlay = Layer.extend({
     // map.on('zoomend viewreset', this._update, this);
   },
 
-  onRemove: function(map) {
+  onRemove: function() {
     DomUtil.remove(this._container);
   },
 

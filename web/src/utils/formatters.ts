@@ -22,7 +22,7 @@ export const b64DecodeUnicode = (str: string) => {
     return decodeURIComponent(
       Array.prototype.map
         .call(
-          atob(str.replace(/\-/g, "+").replace(/\_/g, "/").replace(/\./g, "=")),
+          atob(str.replace(/-/g, "+").replace(/_/g, "/").replace(/\./g, "=")),
           function (c) {
             return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
           },
@@ -42,7 +42,7 @@ export const b64DecodeUnicodeSafe = (str: string, fallback = ""): string => {
 const isBase64Encoded = (str: string): boolean => {
   if (!str || typeof str !== "string") return false;
 
-  const base64Pattern = /^[A-Za-z0-9\-_\.]+$/;
+  const base64Pattern = /^[A-Za-z0-9\-_.]+$/;
 
   if (!base64Pattern.test(str)) return false;
 

@@ -7,7 +7,6 @@ import PendingSubscriptionWarning from '@/components/PendingSubscriptionWarning.
 
 describe('PendingSubscriptionWarning.vue', () => {
   let wrapper: VueWrapper;
-  let store: any;
   let router: any;
   let mockPush: any;
 
@@ -22,17 +21,6 @@ describe('PendingSubscriptionWarning.vue', () => {
       ]
     });
     router.push = mockPush;
-
-    // Create mock store
-    store = createStore({
-      state: {
-        selectedOrganization: {
-          identifier: 'test-org-123'
-        }
-      },
-      mutations: {},
-      actions: {}
-    });
   });
 
   afterEach(() => {

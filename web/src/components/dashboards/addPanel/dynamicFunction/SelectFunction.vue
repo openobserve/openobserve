@@ -165,7 +165,7 @@
 </template>
 
 <script lang="ts">
-import { ref, watch, toRef, computed, inject } from "vue";
+import { ref, watch, inject } from "vue";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import HistogramIntervalDropDown from "../HistogramIntervalDropDown.vue";
@@ -434,7 +434,7 @@ export default {
     // watcher on functionName
     watch(
       () => fields.value.functionName,
-      (newVal) => {
+      () => {
         // Save the old args
         const oldArgs = [...fields.value.args];
 

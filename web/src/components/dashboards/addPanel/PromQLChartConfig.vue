@@ -361,12 +361,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, ref, inject, watch } from "vue";
+import { defineComponent, computed, ref, inject } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ColumnOrderPopUp from "./ColumnOrderPopUp.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -381,8 +380,7 @@ export default defineComponent({
     OInput,
     OSwitch,
     OTooltip,
-    OIcon,
-},
+  },
   props: {
     chartType: {
       type: String,
@@ -549,7 +547,7 @@ export default defineComponent({
       }
 
       // Iterate through ALL queries and collect unique field names
-      queries.forEach((query: any, index: number) => {
+      queries.forEach((query: any) => {
         const streamName = query?.fields?.stream;
 
         if (!streamName) {

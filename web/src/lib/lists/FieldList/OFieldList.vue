@@ -258,7 +258,7 @@ const isLastPage = computed(
   () => internalCurrentPage.value >= totalPages.value,
 );
 
-function setPageSize(size: number) {
+function setPageSize() {
   internalCurrentPage.value = 1;
   emit("update:currentPage", 1);
 }

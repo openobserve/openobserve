@@ -1838,7 +1838,6 @@ import BackGroundColorConfig from "./BackGroundColorConfig.vue";
 import OverrideConfig from "./OverrideConfig.vue";
 import ConfigPanelSearch from "./ConfigPanelSearch.vue";
 import { useConfigPanel } from "../../../composables/dashboard/useConfigPanel";
-import { SectionId } from "../../../utils/dashboard/searchLabelsConfig";
 import LinearIcon from "@/components/icons/dashboards/LinearIcon.vue";
 import NoSymbol from "@/components/icons/dashboards/NoSymbol.vue";
 import Smooth from "@/components/icons/dashboards/Smooth.vue";
@@ -1897,12 +1896,6 @@ export default defineComponent({
     ColorPaletteDropDown,
     BackGroundColorConfig,
     OverrideConfig,
-    LinearIcon,
-    NoSymbol,
-    Smooth,
-    StepBefore,
-    StepAfter,
-    StepMiddle,
     PromQLChartConfig,
     OButton,
     OTooltip,
@@ -2609,8 +2602,6 @@ export default defineComponent({
       isConfigOptionVisible,
       isSectionVisible,
       isExpanded,
-      toggleSection,
-      resetSearch,
       allSectionsExpanded,
       toggleAllSections,
       anySectionVisible,

@@ -1,7 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { computed, ref, watch } from "vue";
-import type { Row } from "@tanstack/vue-table";
 import type { OTableExpansionMode } from "../OTable.types";
 
 export function useTableExpansion<TData>(

@@ -272,7 +272,7 @@ export default defineComponent({
       }),
     },
   },
-  setup(props: any, { emit, expose }) {
+  setup(props: any, { expose }) {
     const { t } = useI18n();
     const isUpdateLDAPPass = ref(false);
     const isUpdateLDAPUsername = ref(false);

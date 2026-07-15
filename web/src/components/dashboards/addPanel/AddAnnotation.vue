@@ -68,7 +68,6 @@ import { useLoading } from "@/composables/useLoading";
 import { annotationService } from "@/services/dashboard_annotations";
 import useNotifications from "@/composables/useNotifications";
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
@@ -178,7 +177,7 @@ const handleSave = async () => {
           panels: annotationData.value.panels,
           tags: annotationData.value.tags,
         };
-        const response = await annotationService.update_timed_annotations(
+        await annotationService.update_timed_annotations(
           organization,
           props.dashboardId,
           annotationData.value.annotation_id,
@@ -193,7 +192,7 @@ const handleSave = async () => {
     } else {
       try {
         // create annotation
-        const response = await annotationService.create_timed_annotations(
+        await annotationService.create_timed_annotations(
           organization,
           props.dashboardId,
           [annotationData.value],

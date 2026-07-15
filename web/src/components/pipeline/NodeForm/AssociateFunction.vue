@@ -196,7 +196,6 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
@@ -204,21 +203,6 @@ import {
   makeAssociateFunctionSchema,
   type AssociateFunctionForm,
 } from "./AssociateFunction.schema";
-
-interface RouteCondition {
-  column: string;
-  operator: string;
-  value: any;
-  id: string;
-}
-
-interface StreamRoute {
-  sourceStreamName: string;
-  destinationStreamName: string;
-  sourceStreamType: string;
-  destinationStreamType: string;
-  conditions: RouteCondition[];
-}
 
 const AddFunction = defineAsyncComponent(
   () => import("@/components/functions/AddFunction.vue"),
@@ -316,17 +300,6 @@ const form = useOForm<AssociateFunctionForm>({
 
 const selectedFunction = form.useStore((s: any) => s.values.selectedFunction);
 
-const nodeLink = ref({
-  from: "",
-  to: "",
-});
-
-const computedStyleForFunction = computed(() => {
-  return createNewFunction.value
-    ? { width: "100%" }
-    : { width: "100%", height: "100%" };
-});
-
 const dialog = ref({
   show: false,
   title: "",
@@ -353,7 +326,7 @@ onMounted(() => {
 });
 
 const openCancelDialog = () => {
-  if (!isUpdating) {
+  if (!isUpdating.value) {
     if (
       createNewFunction.value == true &&
       addFunctionRef.value.formData.name == "" &&
@@ -409,23 +382,10 @@ const cancelFunctionCreation = () => {
   emit("cancel:hideform");
 };
 
-const saveUpdatedLink = (link: { from: string; to: string }) => {
-  nodeLink.value = link;
-};
-
 const deleteFunction = () => {
   deletePipelineNode(pipelineObj.currentSelectedNodeID);
 
   emit("cancel:hideform");
-};
-const filterFunctions = (val: any, update: any) => {
-  const filtered = props.functions
-    .filter((func: any) => func.toLowerCase().includes(val.toLowerCase()))
-    .sort((a: any, b: any) => a.localeCompare(b));
-
-  update(() => {
-    filteredFunctions.value = filtered;
-  });
 };
 </script>
 

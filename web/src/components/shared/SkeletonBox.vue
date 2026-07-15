@@ -44,7 +44,7 @@ const props = withDefaults(defineProps<Props>(), {
   lines: 1
 })
 
-const store = useStore()
+useStore()
 
 const variantClass = computed(() => {
   switch (props.variant) {
@@ -57,40 +57,6 @@ const variantClass = computed(() => {
   }
 })
 
-// Computed styles based on variant
-const computedWidth = computed(() => {
-  switch (props.variant) {
-    case 'text':
-      return props.width
-    case 'title':
-      return props.width || '200px'
-    case 'button':
-      return props.width || '80px'
-    case 'avatar':
-      return props.width || '40px'
-    case 'image':
-      return props.width || '100px'
-    default:
-      return props.width
-  }
-})
-
-const computedHeight = computed(() => {
-  switch (props.variant) {
-    case 'text':
-      return props.height || '14px'
-    case 'title':
-      return props.height || '24px'
-    case 'button':
-      return props.height || '32px'
-    case 'avatar':
-      return props.height || '40px'
-    case 'image':
-      return props.height || '100px'
-    default:
-      return props.height
-  }
-})
 </script>
 
 <style>

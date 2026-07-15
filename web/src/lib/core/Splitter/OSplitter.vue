@@ -88,7 +88,7 @@ const minValue = computed(() => props.limits?.[0] ||  (props.unit ==='%' ? 0 : 0
 const maxValue = computed(() => props.limits?.[1] || (props.unit ==='%' ? 100 : 1000))
 
 // Setup resizer composable with faster throttling for smoother movement
-const { value: currentValue, isResizing, onMouseDown } = useResizer({
+const { value: currentValue, onMouseDown } = useResizer({
   direction: !props.horizontal ? 'horizontal' : 'vertical',
   initialValue: props.modelValue,
   minValue: minValue.value,
@@ -108,24 +108,6 @@ const beforeStyle = computed(() => {
   return props.horizontal
     ? { height: size }
     : { width: size }
-})
-
-const afterStyle = computed(() => {
-  const remainingSize = props.unit === '%'
-    ? `${100 - currentValue.value}%`
-    : `calc(100% - ${currentValue.value}px)`
-
-  return props.horizontal
-    ? { height: remainingSize }
-    : { width: remainingSize }
-})
-
-// Separator absolute positioning
-const separatorPosition = computed(() => {
-  const position = `${currentValue.value}${props.unit}`
-  return props.horizontal
-    ? { top: position, left: '0' }
-    : { left: position, top: '0' }
 })
 
 // Keyboard navigation support

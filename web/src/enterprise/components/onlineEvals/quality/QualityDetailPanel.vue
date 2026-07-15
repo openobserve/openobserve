@@ -172,7 +172,7 @@ const props = defineProps<{
   categoricalRows: CategoricalAggRow[];
 }>();
 
-const emit = defineEmits<{
+defineEmits<{
   (e: "back"): void;
 }>();
 

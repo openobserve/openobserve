@@ -372,15 +372,13 @@ import onlineEvalsService, {
   type ScorerType,
 } from "@/services/online-evals.service";
 import { useOnlineEvalsData } from "./onlineEvals/composables/useOnlineEvalsData";
-import { entityId, statusOf } from "./onlineEvals/utils/evalEntity";
+import { entityId } from "./onlineEvals/utils/evalEntity";
 import { showError } from "./onlineEvals/utils/evalFormat";
 import {
   buildCrossNavigationQuery,
   computeViewState,
-  findRowById as findRowByIdPure,
   parseTabFromRoute,
   rowIdOf as rowIdOfPure,
-  VALID_TABS,
   type ActiveTab,
   type AnyRow,
   type FullPageEntity,
@@ -416,7 +414,6 @@ import {
   useAiDateRange,
   resolveAiDateWindow,
 } from "@/enterprise/composables/useAiDateRange";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import { downloadFile } from "@/utils/dom";
 import {
@@ -480,7 +477,6 @@ const pendingJobStatusId = ref<string | null>(null);
 const confirmDeleteOpen = ref(false);
 const pendingDeleteRow = ref<AnyRow | null>(null);
 const pendingDeleteTab = ref<ActiveTab | null>(null);
-const catalogOpenTab = ref<ActiveTab | null>(null);
 const showScoreConfigLibrary = ref(false);
 const scoreConfigLibrarySelectedCount = ref(0);
 const scoreConfigLibraryImporting = ref(false);
@@ -777,10 +773,6 @@ watch(qualityRefreshing, (isLoading, wasLoading) => {
   if (wasLoading && !isLoading) qualityLastRunAt.value = Date.now();
 });
 
-const currentSingularLabel = computed(() =>
-  t(`onlineEvals.singular.${activeTab.value}`),
-);
-
 const pendingDeleteLabel = computed(() => {
   const tab = pendingDeleteTab.value;
   if (!tab || tab === "quality") return t("onlineEvals.actions.delete");
@@ -816,10 +808,6 @@ onBeforeMount(async () => {
 
 function rowIdOf(row: AnyRow): string {
   return rowIdOfPure(row, activeTab.value);
-}
-
-function findRowById(tab: ActiveTab, id: string): AnyRow | null {
-  return findRowByIdPure(tab, id, rowsByTab.value);
 }
 
 function pushRouteAction(extra: Record<string, string | undefined>) {
@@ -945,11 +933,6 @@ async function pauseJob(row: EvalJob) {
   }
 }
 
-function openFormPage(entity: FullPageEntity, mode: "create" | "edit") {
-  activeTab.value = entity;
-  formPage.value = { entity, mode };
-}
-
 function closeFormPage() {
   formPage.value = null;
   dialog.value = { open: false, mode: "create", row: null };
@@ -972,14 +955,6 @@ async function handleSaved() {
   scorerTypeDialog.value = false;
   clearRouteAction();
   await loadAll(orgId.value);
-}
-
-async function handleCatalogImported() {
-  await loadAll(orgId.value);
-}
-
-function toggleCatalog(tab: ActiveTab) {
-  catalogOpenTab.value = catalogOpenTab.value === tab ? null : tab;
 }
 
 function goToImportScoreConfig() {

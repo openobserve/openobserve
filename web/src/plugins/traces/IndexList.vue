@@ -176,13 +176,12 @@ import FieldRow from "@/components/common/FieldRow.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useDurationPercentiles, { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import useParser from "@/composables/useParser";
 import { SPAN_KIND_MAP, parseSpanKindWhereClause } from "@/utils/traces/constants";
-import { removeFieldFromWhereAST, logsUtils } from "@/composables/useLogs/logsUtils";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -190,14 +189,10 @@ export default defineComponent({
     FieldRow,
     OButton,
     OSelect,
-    OInput,
     OSpinner,
     OIcon,
     GroupedFieldList: defineAsyncComponent(
       () => import("@/components/common/GroupedFieldList.vue"),
-    ),
-    FieldListPagination: defineAsyncComponent(
-      () => import("@/components/common/FieldListPagination.vue"),
     ),
     GroupedFieldListPagination: defineAsyncComponent(
       () => import("@/components/common/FieldListPagination.vue"),
@@ -390,7 +385,7 @@ export default defineComponent({
     const fieldValuesCurrentFrom = ref<Record<string, number>>({});
     const fieldValuesCurrentKeyword = ref<Record<string, string>>({});
 
-    const { fnParsedSQL, fnUnparsedSQL } = logsUtils();
+    logsUtils();
 
     const removeFieldFromWhereStr = (
       whereClause: string,

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 
-import { computed, provide, ref, watch } from "vue";
+import { computed, provide, ref } from "vue";
 import type { TreeProps, TreeEmits, TreeNodeKey, TreeNode } from "./OTree.types";
 import { TREE_CONTEXT_KEY } from "./OTree.context";
 import OTreeNode from "./OTreeNode.vue";

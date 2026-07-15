@@ -9,7 +9,7 @@
 //   • `update:name` still mirrors the form-owned value back to the parent,
 //   • the data-test selectors + back/cancel/fullscreen wiring are preserved.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount, VueWrapper, flushPromises } from '@vue/test-utils';
 import ScriptToolbar from '@/components/actionScripts/ScriptToolbar.vue';
 

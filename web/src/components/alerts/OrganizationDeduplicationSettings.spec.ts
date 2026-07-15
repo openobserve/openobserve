@@ -97,7 +97,7 @@ describe("OrganizationDeduplicationSettings - rendering", () => {
   it("does not call service when config prop is provided", async () => {
     vi.clearAllMocks();
     const config = { enabled: true, alert_dedup_enabled: false, alert_fingerprint_groups: [] };
-    const w = await mountComp({ config });
+    await mountComp({ config });
     await flushPromises();
     expect(alertsService.getOrganizationDeduplicationConfig).not.toHaveBeenCalled();
   });

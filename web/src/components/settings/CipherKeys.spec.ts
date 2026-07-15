@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount, DOMWrapper, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import CipherKeys from "./CipherKeys.vue";
 import i18n from "@/locales";
@@ -336,7 +336,7 @@ describe("CipherKeys", () => {
         response: { data: { message: "Server error" } },
       });
 
-      const wrapper = createWrapper();
+      createWrapper();
       await nextTick();
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -359,7 +359,7 @@ describe("CipherKeys", () => {
         response: { data: { message: "Forbidden" } },
       });
 
-      const wrapper = createWrapper();
+      createWrapper();
       await nextTick();
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -679,9 +679,9 @@ describe("CipherKeys", () => {
     });
 
     it("should render action buttons with proper data-test attributes", async () => {
-      const wrapper = createWrapper();
+      createWrapper();
       await nextTick();
-      
+
       // These would be rendered in the actual table slots
       const testRow = { name: "test-key-1" };
       const editTestAttr = `cipherkey-list-${testRow.name}-update`;

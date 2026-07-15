@@ -605,8 +605,8 @@ export const logsUtils = () => {
       // array type to never here); cast keeps it compiling, runtime unchanged.
       query["stream"] = (selectedStream as string[]).join(",");
     } else if (
-      typeof selectedStream == "object" &&
-      selectedStream.hasOwnProperty("value")
+      typeof selectedStream === "object" &&
+      Object.prototype.hasOwnProperty.call(selectedStream, "value")
     ) {
       query["stream"] = (selectedStream as unknown as { value: string }).value;
     } else {

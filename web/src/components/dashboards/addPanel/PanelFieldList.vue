@@ -79,7 +79,7 @@
       </template>
 
       <!-- Field row -->
-      <template #field-row="{ row, index, draggable, isDragEnabled }">
+      <template #field-row="{ row, draggable, isDragEnabled }">
         <OFieldRow>
           <OIcon
             v-if="draggable"
@@ -100,7 +100,7 @@
           <template #actions>
             <!-- Standard chart actions -->
             <div
-              v-if="showStandardActions(row, index)"
+              v-if="showStandardActions(row)"
               class="flex items-center gap-0.5"
             >
               <OButton
@@ -184,7 +184,7 @@
 
         <!-- Geomap actions -->
         <div
-          v-if="showGeomapActions(row, index)"
+          v-if="showGeomapActions(row)"
           class="flex items-center gap-0.5"
         >
           <OButton
@@ -250,7 +250,7 @@
 
         <!-- Maps actions -->
         <div
-          v-if="showMapsActions(row, index)"
+          v-if="showMapsActions(row)"
           class="flex items-center gap-0.5"
         >
           <OButton
@@ -293,7 +293,7 @@
 
         <!-- Sankey actions -->
         <div
-          v-if="showSankeyActions(row, index)"
+          v-if="showSankeyActions(row)"
           class="flex items-center gap-0.5"
         >
           <OButton
@@ -445,7 +445,6 @@ import { computed, ref, watch, onMounted, inject } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
 import {
   applyPromqlSeed,
@@ -478,7 +477,7 @@ const dashboardPanelDataPageKey: string = inject(
 
 const store = useStore();
 const { t } = useI18n();
-const { getStreams, getStream } = useStreams();
+const { getStreams } = useStreams();
 const { showErrorNotification } = useNotifications();
 const { parsePromQlQuery } = usePromqlSuggestions();
 const emit = defineEmits<{ collapse: [] }>();
@@ -669,13 +668,6 @@ const streamOptions = computed(() =>
   }),
 );
 
-// ── Stream fields ──────────────────────────────────────────────────────
-
-const getStreamFields = useLoading(
-  async (fieldName: string, streamType: string) => {
-    return await getStream(fieldName, streamType, true);
-  },
-);
 
 // ── Query stream tracking ──────────────────────────────────────────────
 
@@ -911,7 +903,7 @@ const flattenGroupedFields = computed(() => {
     });
 
     if (
-      group.settings.hasOwnProperty("defined_schema_fields") &&
+      Object.prototype.hasOwnProperty.call(group.settings, "defined_schema_fields") &&
       group.settings.defined_schema_fields.length > 0
     ) {
       flattenedFields.push({
@@ -925,7 +917,7 @@ const flattenGroupedFields = computed(() => {
       for (const field of group.schema) {
         if (
           store.state.zoConfig.user_defined_schemas_enabled &&
-          group.settings.hasOwnProperty("defined_schema_fields") &&
+          Object.prototype.hasOwnProperty.call(group.settings, "defined_schema_fields") &&
           group.settings.defined_schema_fields.length > 0
         ) {
           if (group.settings.defined_schema_fields.includes(field.name)) {
@@ -1006,7 +998,7 @@ const customFieldNames = computed(() => {
 
 // ── Drag-and-drop ──────────────────────────────────────────────────────
 
-function isRowDragEnabled(row: FieldItem, _index: number): boolean {
+function isRowDragEnabled(row: FieldItem): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
   const currentQuery =
@@ -1017,14 +1009,14 @@ function isRowDragEnabled(row: FieldItem, _index: number): boolean {
   return true;
 }
 
-function onDragStart(row: FieldItem, _event: DragEvent) {
+function onDragStart(row: FieldItem) {
   dashboardPanelData.meta.dragAndDrop.dragging = true;
   dashboardPanelData.meta.dragAndDrop.dragElement = row;
   dashboardPanelData.meta.dragAndDrop.dragSource = "fieldList";
   dashboardPanelData.meta.dragAndDrop.dragSourceIndex = null;
 }
 
-function onDragEnd(_row: FieldItem, _event: DragEvent) {
+function onDragEnd() {
   cleanupDraggingFields();
 }
 
@@ -1040,7 +1032,7 @@ function onDragEnd(_row: FieldItem, _event: DragEvent) {
 // what caused both stream headers (`_anomalies`, `default`) to stack at
 // the top with all fields jammed underneath the *second* group. Returning
 // 0 preserves the natural section-by-section order from flattenGroupedFields.
-function sortFieldsFn(_a: FieldItem, _b: FieldItem): number {
+function sortFieldsFn(): number {
   return 0;
 }
 
@@ -1052,7 +1044,7 @@ function onSearchChange(value: string) {
 
 // ── Action visibility helpers ──────────────────────────────────────────
 
-function showStandardActions(row: FieldItem, _index: number): boolean {
+function showStandardActions(row: FieldItem): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
   if (dashboardPanelDataPageKey === "logs") return false;
@@ -1076,7 +1068,7 @@ function showStandardActions(row: FieldItem, _index: number): boolean {
   return true;
 }
 
-function showGeomapActions(row: FieldItem, _index: number): boolean {
+function showGeomapActions(row: FieldItem): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
   if (dashboardPanelDataPageKey === "logs") return false;
@@ -1090,7 +1082,7 @@ function showGeomapActions(row: FieldItem, _index: number): boolean {
   return dashboardPanelData.data.type === "geomap";
 }
 
-function showMapsActions(row: FieldItem, _index: number): boolean {
+function showMapsActions(row: FieldItem): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
   if (dashboardPanelDataPageKey === "logs") return false;
@@ -1104,7 +1096,7 @@ function showMapsActions(row: FieldItem, _index: number): boolean {
   return dashboardPanelData.data.type === "maps";
 }
 
-function showSankeyActions(row: FieldItem, _index: number): boolean {
+function showSankeyActions(row: FieldItem): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
   if (dashboardPanelDataPageKey === "logs") return false;

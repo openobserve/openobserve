@@ -441,12 +441,11 @@
 
 <script lang="ts">
 
-import { defineComponent, nextTick, onMounted, onBeforeUnmount, PropType, ref, watch, computed } from 'vue';
+import { defineComponent, nextTick, onMounted, PropType, ref, watch, computed } from 'vue';
 import { useStore } from 'vuex';
 import regexPatternsService from '@/services/regex_pattern';
 import { convertUnixToDateFormat, getImageURL } from '@/utils/zincutils';
 import { debounce } from "lodash-es";
-import store from '@/test/unit/helpers/store';
 import { useToast } from '@/lib/feedback/Toast/useToast';
 import { useI18n } from 'vue-i18n';
 import FullViewContainer from '../functions/FullViewContainer.vue';
@@ -460,7 +459,6 @@ import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export interface PatternAssociation {
