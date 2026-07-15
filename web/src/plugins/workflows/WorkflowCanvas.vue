@@ -28,9 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:nodes="workflowObj.currentSelectedWorkflow.nodes"
     v-model:edges="workflowObj.currentSelectedWorkflow.edges"
     class="workflow-flow o2vf_node"
+    :class="{ 'workflow-flow--readonly': readOnly }"
     :default-viewport="{ zoom: 0.9 }"
     :min-zoom="0.2"
     :max-zoom="4"
+    :nodes-draggable="!readOnly"
+    :nodes-connectable="!readOnly"
+    :edges-updatable="!readOnly"
     @node-change="onNodeChange"
     @nodes-change="onNodesChange"
     @edges-change="onEdgesChange"
@@ -108,6 +112,9 @@ const { onNodesInitialized, setViewport, viewport, dimensions, findNode } =
   useVueFlow();
 
 const vueFlowRef = ref<any>(null);
+// Read-only inspection canvas (the Runs view) — disables node drag/connect and,
+// via WorkflowNode, the hover add/delete + click-to-edit. Run overlays stay.
+const readOnly = computed(() => workflowObj.readOnly);
 const isCanvasEmpty = computed(
   () => workflowObj.currentSelectedWorkflow.nodes.length === 0,
 );
@@ -158,6 +165,11 @@ defineExpose({ vueFlowRef });
 .o2vf_node .vue-flow__node.dragging {
   cursor: grabbing;
   transition: none !important;
+}
+
+/* Read-only inspection canvas (Runs view): nodes aren't draggable/editable. */
+.workflow-flow--readonly .vue-flow__node {
+  cursor: default;
 }
 
 /* Per-type coloured hover glow (mirrors PipelineEditor): input=blue,

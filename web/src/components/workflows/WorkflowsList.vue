@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             table-id="workflows-workflow-list"
             width="100%"
             class="w-full h-full"
-            @row-click="openHistory"
+            @row-click="openRuns"
           >
             <template #toolbar>
               <div class="flex items-center gap-2 w-full">
@@ -220,18 +220,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:cancel="resetConfirmDialog"
     v-model="confirmDialogMeta.show"
   />
-
-  <!-- Run history — opened by clicking a workflow row. Clicking a run inside it
-       navigates to the editor with that run loaded. -->
-  <WorkflowHistoryDrawer
-    v-if="showHistory"
-    :open="showHistory"
-    :org-id="orgId"
-    :workflow-id="historyWorkflow.id"
-    :workflow-name="historyWorkflow.name"
-    @open-run="openRunInEditor"
-    @close="showHistory = false"
-  />
 </template>
 
 <script setup lang="ts">
@@ -253,7 +241,6 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import WorkflowHistoryDrawer from "@/components/workflows/WorkflowHistoryDrawer.vue";
 import WorkflowView from "@/components/workflows/WorkflowView.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
@@ -408,29 +395,15 @@ const editWorkflow = (row: any) => {
   });
 };
 
-// Run history — clicking a workflow row opens its history first (not the editor),
-// since viewing runs is the common case. Full-width modal drawer over the list.
-const showHistory = ref(false);
-const historyWorkflow = ref<any>({ id: "", name: "" });
-const openHistory = (row: any) => {
+// Row click → the dedicated read-only Runs view (viewing runs is the common
+// case; editing is the explicit pencil action). Hydrate from the row so the
+// canvas renders immediately — no async re-fetch.
+const openRuns = (row: any) => {
   if (!row?.id) return;
-  historyWorkflow.value = row;
-  showHistory.value = true;
-};
-
-// From the history drawer: clicking a run takes the user to the edit page with
-// that run loaded (read-only). Hydrate from the row so the editor renders the
-// graph immediately; the run_id query drives the run load in the editor.
-const openRunInEditor = (runId: string) => {
-  const row = historyWorkflow.value;
-  if (!row?.id) return;
-  // Close this (list) history drawer first — the editor opens its own
-  // side-by-side one, and leaving this mounted would stack two drawers.
-  showHistory.value = false;
   hydrateWorkflow(row);
   router.push({
-    name: "workflowEditor",
-    query: { id: row.id, name: row.name, org_identifier: orgId.value, run_id: runId },
+    name: "workflowRuns",
+    query: { id: row.id, name: row.name, org_identifier: orgId.value },
   });
 };
 

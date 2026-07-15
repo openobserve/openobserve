@@ -48,6 +48,9 @@ const WorkflowsList = () =>
 const WorkflowEditor = () =>
   import("@/components/workflows/WorkflowEditor.vue");
 
+const WorkflowRuns = () =>
+  import("@/components/workflows/WorkflowRuns.vue");
+
 const useEnterpriseRoutes = () => {
   const routes: any = [
     {
@@ -182,6 +185,18 @@ const useEnterpriseRoutes = () => {
           name: "workflowEditor",
           component: WorkflowEditor,
           meta: { title: "Edit Workflow" },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          // Dedicated READ-ONLY run-inspection surface (master-detail). Separate
+          // from the editor so viewing a past run never drops the user into the
+          // builder; deep-linkable by ?run_id.
+          path: "runs",
+          name: "workflowRuns",
+          component: WorkflowRuns,
+          meta: { title: "Workflow Runs" },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },

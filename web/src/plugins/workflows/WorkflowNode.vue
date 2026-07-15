@@ -245,7 +245,8 @@ const handleNodeHover = () => {
     clearTimeout(hideButtonsTimeout);
     hideButtonsTimeout = null;
   }
-  showButtons.value = true;
+  // No hover add/delete affordances on the read-only Runs inspection canvas.
+  showButtons.value = !workflowObj.readOnly;
   updateEdgeColors(props.id, NODE_ROLE_COLOR[meta.value?.ioType || "default"] || RESET_EDGE_COLOR);
 };
 const handleNodeLeave = () => {
@@ -273,7 +274,12 @@ const pluses = computed(() => {
   return [{ handle: "out", cls: "wf-plus-out", tag: "" }];
 });
 
-const onClick = () => editNode(props.id);
+// On the read-only Runs canvas the node body isn't editable — the error badge
+// (openResult) is the only affordance. In the editor, click opens the config.
+const onClick = () => {
+  if (workflowObj.readOnly) return;
+  editNode(props.id);
+};
 
 // Open the per-node Input/Output result drawer (from the ✓ / error badge).
 const openResult = () => {

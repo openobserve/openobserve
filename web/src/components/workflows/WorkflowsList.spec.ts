@@ -46,14 +46,6 @@ vi.mock("@/plugins/workflows/useWorkflowCanvas", () => ({
   hydrateWorkflow: (...a: any[]) => mockHydrate(...a),
 }));
 
-vi.mock("@/components/workflows/WorkflowHistoryDrawer.vue", () => ({
-  default: {
-    name: "WorkflowHistoryDrawer",
-    props: ["open", "orgId", "workflowId", "workflowName"],
-    emits: ["open-run", "close"],
-    template: '<div data-test="history-drawer-stub" />',
-  },
-}));
 
 vi.mock("@/components/workflows/WorkflowView.vue", () => ({
   default: {
@@ -705,30 +697,26 @@ describe("WorkflowsList", () => {
     });
   });
 
-  // ── history drawer ─────────────────────────────────────────────────────────
+  // ── runs navigation ────────────────────────────────────────────────────────
+  // Clicking a row opens the dedicated read-only Runs inspection view (not the
+  // editor, not a drawer) — hydrating the row first so the canvas renders at once.
 
-  describe("run history", () => {
-    const drawer = (w: any) => w.findComponent({ name: "WorkflowHistoryDrawer" });
-
-    it("is closed until a row is clicked", async () => {
-      wrapper = mountList();
-      await flushPromises();
-      expect(drawer(wrapper).exists()).toBe(false);
-    });
-
-    it("opens for the clicked row", async () => {
+  describe("runs navigation", () => {
+    it("navigates to the read-only Runs view for the clicked row", async () => {
       wrapper = mountList();
       await flushPromises();
 
       table(wrapper).vm.$emit("row-click", rows(wrapper)[0]);
       await nextTick();
 
-      expect(drawer(wrapper).exists()).toBe(true);
-      expect(drawer(wrapper).props()).toMatchObject({
-        open: true,
-        orgId: "default",
-        workflowId: "wf-1",
-        workflowName: "workflow-1",
+      expect(mockHydrate).toHaveBeenCalledTimes(1);
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "workflowRuns",
+        query: {
+          id: "wf-1",
+          name: "workflow-1",
+          org_identifier: "default",
+        },
       });
     });
 
@@ -739,42 +727,9 @@ describe("WorkflowsList", () => {
       table(wrapper).vm.$emit("row-click", { name: "ghost" });
       await nextTick();
 
-      expect(drawer(wrapper).exists()).toBe(false);
-    });
-
-    it("closes on the drawer's close event", async () => {
-      wrapper = mountList();
-      await flushPromises();
-      table(wrapper).vm.$emit("row-click", rows(wrapper)[0]);
-      await nextTick();
-
-      drawer(wrapper).vm.$emit("close");
-      await nextTick();
-
-      expect(drawer(wrapper).exists()).toBe(false);
-    });
-
-    it("navigates to the editor with the run loaded when a run is opened", async () => {
-      wrapper = mountList();
-      await flushPromises();
-      table(wrapper).vm.$emit("row-click", rows(wrapper)[0]);
-      await nextTick();
-
-      drawer(wrapper).vm.$emit("open-run", "run-9");
-      await nextTick();
-
-      // the list drawer closes so the editor's side-by-side one can take over
-      expect(drawer(wrapper).exists()).toBe(false);
-      expect(mockHydrate).toHaveBeenCalledTimes(1);
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        name: "workflowEditor",
-        query: {
-          id: "wf-1",
-          name: "workflow-1",
-          org_identifier: "default",
-          run_id: "run-9",
-        },
-      });
+      expect(mockRouter.push).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: "workflowRuns" }),
+      );
     });
   });
 

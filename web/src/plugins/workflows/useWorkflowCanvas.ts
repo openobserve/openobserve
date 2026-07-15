@@ -187,6 +187,10 @@ const defaultWorkflow = {
 const defaultObject = {
   dirtyFlag: false,
   isEditWorkflow: false,
+  // Read-only canvas (the dedicated Runs inspection view sets this): no node
+  // dragging/connecting, no hover add/delete, node clicks don't open the config
+  // drawer. Run badges + the per-node result drawer stay active.
+  readOnly: false,
   isEditNode: false,
   edgesChange: false,
   nodesChange: false,

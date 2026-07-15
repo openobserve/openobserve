@@ -69,15 +69,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #actions>
-        <!-- History (Runs) — only meaningful for a saved workflow. Opens the same
-             run-history drawer used from the list; clicking a run loads it into
-             this canvas read-only. -->
+        <!-- History (Runs) — only meaningful for a saved workflow. Navigates to
+             the dedicated read-only Runs inspection view (separate surface). -->
         <OButton
           v-if="workflowObj.isEditWorkflow"
           variant="outline"
           size="sm-action"
           data-test="workflow-editor-history"
-          @click="showHistory = true"
+          @click="openRuns"
         >
           {{ t("workflow.history.open") }}
         </OButton>
@@ -127,15 +126,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :on-item-click="paletteClick"
       />
       <!-- Canvas drop area — gray rounded inset card, matching the pipeline
-           editor's `#pipelineChartContainer` so both look identical. When the
-           history drawer is open it shrinks (mr) so the canvas reflows into the
-           visible area beside it instead of hiding under it. -->
+           editor's `#pipelineChartContainer` so both look identical. -->
       <div
-        class="flex-1 relative min-w-0 rounded-xl overflow-hidden mb-3 transition-[margin] duration-200"
-        :class="[
-          store.state.theme === 'dark' ? '' : 'bg-gray-100',
-          showHistory ? 'mr-[42%]' : '',
-        ]"
+        class="flex-1 relative min-w-0 rounded-xl overflow-hidden mb-3"
+        :class="store.state.theme === 'dark' ? '' : 'bg-gray-100'"
       >
         <WorkflowCanvas />
       </div>
@@ -166,23 +160,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Per-step Input/Output result drawer — opened by clicking a node's badge
          after a run; also hosts the Replay-from-here button. -->
     <WorkflowStepResultDrawer v-if="workflowObj.testRun.resultDrawer.show" />
-
-    <!-- Run history (Runs) — opens side-by-side with the canvas (seamless, scoped
-         to the workspace). Clicking a run loads it into the canvas read-only
-         (error nodes light up; click one for its Input/Output) while the drawer
-         stays open, so you can step through runs. -->
-    <WorkflowHistoryDrawer
-      v-if="showHistory"
-      :open="showHistory"
-      seamless
-      :width="42"
-      portal-target="#workflow-workspace"
-      :org-id="orgId()"
-      :workflow-id="workflowObj.currentSelectedWorkflow.id"
-      :workflow-name="workflowObj.currentSelectedWorkflow.name"
-      @open-run="onOpenRun"
-      @close="showHistory = false"
-    />
 
     <!-- Link-to-alerts prompt — shown once, right after a workflow is created, so
          the user can attach it to existing alerts without leaving for the alert
@@ -235,7 +212,6 @@ import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
 import WorkflowTestDialog from "./WorkflowTestDialog.vue";
 import WorkflowStepResultDrawer from "./WorkflowStepResultDrawer.vue";
-import WorkflowHistoryDrawer from "./WorkflowHistoryDrawer.vue";
 import WorkflowLinkAlertsDialog from "./WorkflowLinkAlertsDialog.vue";
 import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
 import NodePalette from "@/components/flow/NodePalette.vue";
@@ -243,7 +219,6 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useWorkflowCanvas, {
   workflowObj,
   hydrateWorkflow,
-  loadWorkflowRun,
   nodeMeta,
   ADDABLE_NODE_TYPES,
 } from "@/plugins/workflows/useWorkflowCanvas";
@@ -558,21 +533,16 @@ const confirmSaveAndTest = async () => {
   if (await persist()) workflowObj.testRun.show = true;
 };
 
-// Run history (Runs) drawer. Clicking a run loads it into THIS canvas read-only
-// (no navigation) — error nodes light up and open their Input/Output. The drawer
-// stays open (side-by-side) so runs can be stepped through.
-const showHistory = ref(false);
-const onOpenRun = async (runId: string) => {
-  const r = await loadWorkflowRun({
-    orgId: orgId(),
-    workflowId: workflowObj.currentSelectedWorkflow.id,
-    runId,
+// History → the dedicated read-only Runs inspection view (separate surface).
+const openRuns = () => {
+  router.push({
+    name: "workflowRuns",
+    query: {
+      id: workflowObj.currentSelectedWorkflow.id,
+      name: workflowObj.currentSelectedWorkflow.name,
+      org_identifier: orgId(),
+    },
   });
-  if (!r.ok)
-    toast({
-      message: r.error || t("workflow.history.loadRunError"),
-      variant: "error",
-    });
 };
 
 onMounted(async () => {
@@ -582,20 +552,6 @@ onMounted(async () => {
     // Edit-from-list already hydrated the shared state synchronously; only
     // re-fetch on a cold load (deep link / refresh) where it's missing.
     if (workflowObj.currentSelectedWorkflow?.id !== id) await loadWorkflow(id);
-    // Opened from the Executions history (…&run_id=…): load that past run so
-    // error nodes show their captured Input/Output (read-only).
-    const runId = query.run_id as string | undefined;
-    if (runId) {
-      const r = await loadWorkflowRun({ orgId: orgId(), workflowId: id, runId });
-      if (!r.ok)
-        toast({
-          message: r.error || t("workflow.history.loadRunError"),
-          variant: "error",
-        });
-      // Land with the side-by-side (minified) history panel open so the run sits
-      // next to its canvas — not the full-width list drawer.
-      else showHistory.value = true;
-    }
   } else {
     seedTrigger((query.trigger as string) || "alert_fired");
   }

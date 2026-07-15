@@ -1788,6 +1788,10 @@
     "status": "Status",
     "updated": "Updated",
     "actions": "Actions",
+    "runs": {
+      "title": "Workflow Runs",
+      "edit": "Edit Workflow"
+    },
     "history": {
       "button": "Runs",
       "title": "Workflow History",

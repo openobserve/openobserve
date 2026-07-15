@@ -70,12 +70,6 @@ vi.mock("@/plugins/workflows/WorkflowCanvas.vue", () => stub("WorkflowCanvas"));
 vi.mock("./WorkflowNodeDrawer.vue", () => stub("WorkflowNodeDrawer"));
 vi.mock("./WorkflowTestDialog.vue", () => stub("WorkflowTestDialog"));
 vi.mock("./WorkflowStepResultDrawer.vue", () => stub("WorkflowStepResultDrawer"));
-vi.mock("./WorkflowHistoryDrawer.vue", () =>
-  stub("WorkflowHistoryDrawer", {
-    props: ["open", "seamless", "width", "portalTarget", "orgId", "workflowId", "workflowName"],
-    emits: ["open-run", "close"],
-  }),
-);
 vi.mock("./WorkflowLinkAlertsDialog.vue", () =>
   stub("WorkflowLinkAlertsDialog", {
     props: ["workflowId", "workflowName"],
@@ -164,7 +158,6 @@ const dialogByTitle = (w: any, title: string) =>
 const saveTestDialog = (w: any) => dialogByTitle(w, t("workflow.test.saveToTestTitle"));
 const deleteDialog = (w: any) => dialogByTitle(w, t("workflow.deleteNodeTitle"));
 const palette = (w: any) => w.findComponent({ name: "NodePalette" });
-const historyDrawer = (w: any) => w.findComponent({ name: "WorkflowHistoryDrawer" });
 const linkDialog = (w: any) => w.findComponent({ name: "WorkflowLinkAlertsDialog" });
 
 const clickSave = async (w: any) => {
@@ -1114,6 +1107,8 @@ describe("WorkflowEditor", () => {
   });
 
   // ── history ────────────────────────────────────────────────────────────────
+  // The editor no longer inspects runs inline — the History button navigates to
+  // the dedicated read-only Runs view (a separate surface).
 
   describe("run history", () => {
     const openSaved = async (query: Record<string, any> = { id: "wf-1" }) => {
@@ -1123,119 +1118,25 @@ describe("WorkflowEditor", () => {
       await flushPromises();
     };
 
-    it("opens the side-by-side history drawer from the toolbar", async () => {
+    it("navigates to the Runs view from the toolbar History button", async () => {
       await openSaved();
-      expect(historyDrawer(wrapper).exists()).toBe(false);
 
       await wrapper.find('[data-test="workflow-editor-history"]').trigger("click");
 
-      expect(historyDrawer(wrapper).exists()).toBe(true);
-      expect(historyDrawer(wrapper).props()).toMatchObject({
-        open: true,
-        width: 42,
-        portalTarget: "#workflow-workspace",
-        orgId: "default",
-        workflowId: "wf-1",
-        workflowName: "my workflow",
-      });
-    });
-
-    it("closes the history drawer", async () => {
-      await openSaved();
-      await wrapper.find('[data-test="workflow-editor-history"]').trigger("click");
-
-      historyDrawer(wrapper).vm.$emit("close");
-      await nextTick();
-
-      expect(historyDrawer(wrapper).exists()).toBe(false);
-    });
-
-    it("loads a past run into the canvas when a run is opened", async () => {
-      getWorkflowRun.mockResolvedValue({
-        data: {
-          errors: { data: [{ node_id: "d1", error: ["boom"] }] },
-          data: { complete: [], node_map: {} },
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "workflowRuns",
+        query: {
+          id: "wf-1",
+          name: "my workflow",
+          org_identifier: "default",
         },
       });
-      await openSaved();
-      await wrapper.find('[data-test="workflow-editor-history"]').trigger("click");
-
-      historyDrawer(wrapper).vm.$emit("open-run", "run-1");
-      await flushPromises();
-
-      expect(getWorkflowRun).toHaveBeenCalledWith({
-        org_identifier: "default",
-        id: "wf-1",
-        run_id: "run-1",
-      });
-      expect(workflowObj.testRun.result.mode).toBe("history");
-      expect(workflowObj.testRun.result.errors.d1.error_count).toBe(1);
-      // the drawer stays open so runs can be stepped through
-      expect(historyDrawer(wrapper).exists()).toBe(true);
-      expect(mockToast).not.toHaveBeenCalled();
     });
 
-    it("toasts the API message when a run fails to load", async () => {
-      getWorkflowRun.mockRejectedValue({
-        response: { data: { message: "run gone" } },
-      });
-      await openSaved();
-      await wrapper.find('[data-test="workflow-editor-history"]').trigger("click");
-
-      historyDrawer(wrapper).vm.$emit("open-run", "run-1");
-      await flushPromises();
-
-      expect(mockToast).toHaveBeenCalledWith({
-        message: "run gone",
-        variant: "error",
-      });
-    });
-
-    it("falls back to the generic run-load error message", async () => {
-      getWorkflowRun.mockRejectedValue(new Error("network"));
-      await openSaved();
-      await wrapper.find('[data-test="workflow-editor-history"]').trigger("click");
-
-      historyDrawer(wrapper).vm.$emit("open-run", "run-1");
-      await flushPromises();
-
-      expect(mockToast).toHaveBeenCalledWith({
-        message: t("workflow.history.loadRunError"),
-        variant: "error",
-      });
-    });
-
-    it("loads the run and opens the history panel when deep-linked with ?run_id", async () => {
-      getWorkflowRun.mockResolvedValue({
-        data: { errors: { data: [] }, data: { complete: [], node_map: {} } },
-      });
+    it("does not load a run on mount even when deep-linked with ?run_id", async () => {
       await openSaved({ id: "wf-1", run_id: "run-7" });
-
-      expect(getWorkflowRun).toHaveBeenCalledWith({
-        org_identifier: "default",
-        id: "wf-1",
-        run_id: "run-7",
-      });
-      expect(historyDrawer(wrapper).exists()).toBe(true);
-    });
-
-    it("keeps the history panel closed and toasts when the deep-linked run fails", async () => {
-      getWorkflowRun.mockRejectedValue({ response: { data: { message: "gone" } } });
-      await openSaved({ id: "wf-1", run_id: "run-7" });
-
-      expect(mockToast).toHaveBeenCalledWith({ message: "gone", variant: "error" });
-      expect(historyDrawer(wrapper).exists()).toBe(false);
-    });
-
-    it("falls back to the generic message when the deep-linked run fails without one", async () => {
-      getWorkflowRun.mockRejectedValue(new Error("network"));
-      await openSaved({ id: "wf-1", run_id: "run-7" });
-
-      expect(mockToast).toHaveBeenCalledWith({
-        message: t("workflow.history.loadRunError"),
-        variant: "error",
-      });
-      expect(historyDrawer(wrapper).exists()).toBe(false);
+      // Run inspection lives entirely in the Runs view now.
+      expect(getWorkflowRun).not.toHaveBeenCalled();
     });
   });
 
@@ -1255,18 +1156,6 @@ describe("WorkflowEditor", () => {
       await flushPromises();
       expect(wrapper.find("#workflow-workspace .bg-gray-100").exists()).toBe(true);
       store.state.theme = "dark";
-    });
-
-    it("shrinks the canvas when the history drawer is open", async () => {
-      hydrateWorkflow(savedGraph());
-      mockRouter.currentRoute.value = { query: { id: "wf-1" } };
-      wrapper = mountEditor();
-      await flushPromises();
-      expect(wrapper.find(".mr-\\[42\\%\\]").exists()).toBe(false);
-
-      await wrapper.find('[data-test="workflow-editor-history"]').trigger("click");
-
-      expect(wrapper.find(".mr-\\[42\\%\\]").exists()).toBe(true);
     });
   });
 
