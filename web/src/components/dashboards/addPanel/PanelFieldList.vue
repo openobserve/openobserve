@@ -71,7 +71,7 @@
       <!-- Group header -->
       <template #group-header="{ row }">
         <div
-          class="h-7! w-full flex justify-between items-center rounded font-semibold pl-2 pr-1 text-xs cursor-default select-none bg-section-header-bg text-text-secondary"
+          class="h-7! w-full flex justify-between items-center rounded-sm font-semibold pl-2 pr-1 text-xs cursor-default select-none bg-section-header-bg text-text-secondary"
           :title="row.groupName"
         >
           <div class="flex-1 min-w-0">{{ row.groupName }}</div>
@@ -436,6 +436,7 @@
 import { computed, ref, watch, onMounted, inject } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
@@ -635,7 +636,7 @@ watch(
   { immediate: true },
 );
 
-const isDarkTheme = computed(() => store.state.theme === "dark");
+const { isDark } = useTheme();
 
 const streamOptions = computed(() =>
   (filteredStreams.value as any[]).map((s) => {
@@ -655,7 +656,7 @@ const streamOptions = computed(() =>
       // must be colour-coded to be worth anything; the default green-on-every-row
       // outline carried no information at all.
       badgeStyle: bucket
-        ? getBadgeStyle(bucket, isDarkTheme.value)
+        ? getBadgeStyle(bucket, isDark.value)
         : undefined,
     };
   }),

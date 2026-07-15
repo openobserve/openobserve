@@ -319,7 +319,8 @@ describe("CommonAutoComplete", () => {
       await wrapper.vm.$nextTick();
       
       const optionsContainer = wrapper.find('[data-test="common-auto-complete-options-container"]');
-      expect(optionsContainer.attributes("style")).toContain("background-color: white");
+      // Background is now driven by the theme-aware `bg-dropdown-bg` token class
+      expect(optionsContainer.classes()).toContain("bg-dropdown-bg");
     });
 
     it("should use dark theme background when theme is dark", async () => {
@@ -327,11 +328,10 @@ describe("CommonAutoComplete", () => {
       wrapper = createWrapper();
       wrapper.vm.showOptions = true;
       await wrapper.vm.$nextTick();
-      
+
       const optionsContainer = wrapper.find('[data-test="common-auto-complete-options-container"]');
-      const style = optionsContainer.attributes("style");
-      // Check for either hex or rgb format of the same dark color
-      expect(style).toMatch(/(background-color: #2d2d2d|background-color: rgb\(45, 45, 45\))/);
+      // The same `bg-dropdown-bg` token resolves to the dark surface via CSS
+      expect(optionsContainer.classes()).toContain("bg-dropdown-bg");
     });
   });
 

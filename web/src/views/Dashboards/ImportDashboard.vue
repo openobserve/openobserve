@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="card-container py-[0.625rem] pl-[0.625rem] mb-1 shrink-0"
               >
-                <div class="app-tabs-container h-[36px] w-fit">
+                <div class="app-tabs-container h-9 w-fit">
                   <app-tabs
                     data-test="dashboard-import-type-tabs"
                     class="tabs-selection-container"
@@ -174,10 +174,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-import-error-container"
               class="card-container h-full flex flex-col min-h-0 border-l border-border-default"
             >
-              <div class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0">Error Validations</div>
+              <div class="text-center text-sm font-semibold text-text-primary py-3 shrink-0">Error Validations</div>
               <OSeparator class="mt-1 shrink-0" />
               <div
-                class="error-section p-[10px] mb-[10px] flex-1 min-h-0 overflow-auto"
+                class="error-section p-2.5 mb-2.5 flex-1 min-h-0 overflow-auto"
                 v-if="dashboardErrorsToDisplay.length > 0"
               >
                 <div class="error-reporter-container">

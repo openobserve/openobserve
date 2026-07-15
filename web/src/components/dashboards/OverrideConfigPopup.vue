@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :show-pagination="false"
             />
           </div>
-          <div class="text-[11px] text-text-secondary">
+          <div class="text-2xs text-text-secondary">
             {{ t("dashboard.columnFormattingSampleNote") }}
           </div>
         </div>
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #illustration>
             <div
-              class="w-[72px] h-[72px] rounded-2xl bg-[rgba(128,128,128,0.08)] flex items-center justify-center text-text-secondary"
+              class="w-18 h-18 rounded-2xl bg-[rgba(128,128,128,0.08)] flex items-center justify-center text-text-secondary"
             >
               <OIcon name="tune" size="xl" />
             </div>
@@ -376,8 +376,8 @@ export default defineComponent({
     // Field-type badge colour (num = blue, text = grey).
     const badgeClass = (isNum: boolean) =>
       isNum
-        ? "text-[#2e55a3] bg-[rgba(46,85,163,0.1)]"
-        : "text-[#6b7280] bg-[rgba(107,114,128,0.12)]";
+        ? "text-field-type-number-text bg-field-type-number-bg"
+        : "text-field-type-string-text bg-field-type-string-bg";
 
     const getFieldLabel = (alias: string) => {
       if (!alias) return "";

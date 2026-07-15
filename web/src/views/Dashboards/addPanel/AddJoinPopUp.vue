@@ -89,23 +89,20 @@
     </div>
 
     <div class="flex items-center gap-4">
-      <div class="border-t border-gray-200 flex-1"></div>
+      <div class="border-t border-border-default flex-1"></div>
       <div
-        :class="[
-          'py-2 text-center text-xs',
-          store.state.theme === 'dark' ? 'text-white' : 'text-gray-700',
-        ]"
+        class="py-2 text-center text-xs text-text-primary"
         v-if="showJoinSummary"
       >
         Performing
         <span
-          class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold"
+          class="inline-flex items-center rounded-sm px-1.5 py-0.5 text-xs font-semibold"
           style="background-color: color-mix(in srgb, var(--color-accent) 15%, transparent); color: var(--color-accent);"
         >{{ joinTypeLabel }} Join</span> between
         <span class="font-semibold">{{ mainStream }}</span> and
         <span class="font-semibold">{{ modelValue.stream }}</span>
       </div>
-      <div class="border-t border-gray-200 flex-1"></div>
+      <div class="border-t border-border-default flex-1"></div>
     </div>
 
     <div class="mb-2.5 flex flex-col min-h-0 flex-1">
@@ -124,7 +121,7 @@
       <div
         v-for="(arg, argIndex) in modelValue.conditions"
         :key="argIndex + JSON.stringify(arg)"
-        class="mb-2.5 p-2.5 border border-border-default rounded"
+        class="mb-2.5 p-2.5 border border-border-default rounded-sm"
       >
         <div class="mb-2 font-medium">Clause {{ argIndex + 1 }}</div>
         <div class="flex items-center gap-2.5">

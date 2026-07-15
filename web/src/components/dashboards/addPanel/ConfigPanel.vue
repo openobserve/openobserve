@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div v-if="dashboardPanelData.data.type == 'custom_chart'" class="pb-8">
-    <div class="max-w-[300px] mx-3">
+    <div class="max-w-75 mx-3">
       <div class="mb-2 font-semibold">
         {{ t("dashboard.description") }}
       </div>
@@ -56,8 +56,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="column items-center py-4 text-center"
       data-test="dashboard-config-no-results"
     >
-      <OIcon name="search-off" size="md" class="mb-1 text-gray-400" />
-      <div class="text-gray-400 text-xs">
+      <OIcon name="search-off" size="md" class="mb-1 text-icon-color" />
+      <div class="text-text-muted text-xs">
         {{ t("dashboard.configPanelNoResultsFound", { query: searchQuery }) }}
       </div>
     </div>
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <div
           v-show="isConfigOptionVisible('general', 'description')"
-          class="max-w-[300px]"
+          class="max-w-75"
         >
           <div class="mb-2 font-semibold">
             {{ t("dashboard.description") }}
@@ -293,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Legend Width + unit selector -->
           <div
             v-if="shouldShowLegendWidth(dashboardPanelData)"
-            class="flex items-end justify-between gap-[6px] w-full min-w-0"
+            class="flex items-end justify-between gap-1.5 w-full min-w-0"
           >
             <OInput
               v-model.number="legendWidthValue"
@@ -345,7 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Legend Height + unit selector -->
           <div
             v-if="shouldShowLegendHeight(dashboardPanelData)"
-            class="flex items-end justify-between gap-[6px] w-full min-w-0"
+            class="flex items-end justify-between gap-1.5 w-full min-w-0"
           >
             <OInput
               v-model.number="legendHeightValue"

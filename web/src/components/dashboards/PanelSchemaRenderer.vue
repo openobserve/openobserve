@@ -202,11 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="absolute z-9999999 min-w-50 py-1 px-0 hidden whitespace-nowrap top-0 left-0 rounded border border-border-default shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
-        :class="{
-          'group/menu bg-[#2c2c2c] border-[#404040] shadow-[0_2px_8px_rgba(0,0,0,0.4)] crosslink-drilldown-menu--dark': store.state.theme === 'dark',
-          'bg-white': store.state.theme !== 'dark',
-        }"
+        class="absolute z-9999999 min-w-50 py-1 px-0 hidden whitespace-nowrap top-0 left-0 rounded-sm border border-dropdown-border bg-dropdown-bg shadow-[0_2px_8px_rgba(0,0,0,0.15)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
         data-test="drilldown-menu"
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
@@ -223,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           />
           <div
-            class="flex items-center py-2 px-4 cursor-pointer transition-colors duration-200 text-sm text-[#333] hover:bg-[#f5f5f5] active:bg-border-default group-[.crosslink-drilldown-menu--dark]/menu:text-[var(--color-border-default)] group-[.crosslink-drilldown-menu--dark]/menu:hover:bg-[#383838] group-[.crosslink-drilldown-menu--dark]/menu:active:bg-[#444444]"
+            class="flex items-center py-2 px-4 cursor-pointer transition-colors duration-200 text-sm text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg"
             :data-test="`drilldown-menu-item-${drilldown.name}`"
             @click="openDrilldown(index)"
           >
@@ -238,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         style="
-          border: 1px solid gray;
+          border: 1px solid var(--color-border-default);
           border-radius: 4px;
           padding: 3px;
           position: absolute;
@@ -251,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           overflow-wrap: break-word;
           z-index: 9999999;
         "
-        :class="store.state.theme === 'dark' ? 'bg-(--color-surface-base,#1a1a1a)' : 'bg-white'"
+        class="bg-surface-base"
         ref="annotationPopupRef"
       >
         <div
@@ -305,6 +301,8 @@ import {
   onUnmounted,
 } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
+import { chartColor } from "@/utils/chartTheme";
 import { useI18n } from "vue-i18n";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
@@ -517,6 +515,7 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const store = useStore();
+    const { isDark } = useTheme();
     const { t } = useI18n();
     const route = useRoute();
     const router = useRouter();
@@ -667,8 +666,7 @@ export default defineComponent({
         left: `${Math.max(0, width - COPY_BTN_PX - 2)}px`,
         top: `${Math.max(cyLocal, COPY_BTN_PX / 2)}px`,
         transform: "translateY(-50%)",
-        backgroundColor:
-          store?.state?.theme === "dark" ? "#27272a" : "#ffffff",
+        backgroundColor: (void isDark.value, chartColor("--color-surface-base")),
         boxShadow: "0 0 3px rgba(0, 0, 0, 0.35)",
       };
     };
@@ -1032,7 +1030,7 @@ export default defineComponent({
             // 2. localStorage saved color
             // 3. Org settings color
             // 4. Default theme color from store
-            const _themeMode = store.state.theme === "dark" ? "dark" : "light";
+            const _themeMode = isDark.value ? "dark" : "light";
             const primaryColor: string =
               (_themeMode === "dark"
                 ? store.state.tempThemeColors?.dark

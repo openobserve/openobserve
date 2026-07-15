@@ -42,11 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-markdown-editor-query-editor"
           language="javascript"
           class="javascript-query-editor"
-          style="padding-left: 20px; height: 100%; flex: 1"
-          :style="{
-            backgroundColor:
-              store.state.theme == 'dark' ? '#1e1e1e' : '#fafafa',
-          }"
+          style="padding-left: 20px; height: 100%; flex: 1; background-color: var(--color-code-block-bg)"
         />
       </div>
     </div>

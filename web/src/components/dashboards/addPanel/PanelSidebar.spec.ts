@@ -136,7 +136,7 @@ describe("PanelSidebar", () => {
       const icon = wrapper.find('[data-test="dashboard-sidebar"]');
       expect(icon.exists()).toBe(true);
       expect(icon.attributes("name")).toBe("expand-all");
-      expect(icon.classes()).toContain("mt-[10px]");
+      expect(icon.classes()).toContain("mt-2.5");
       expect(icon.classes()).toContain("rotate-90");
     });
 
@@ -441,7 +441,7 @@ describe("PanelSidebar", () => {
       wrapper = createWrapper({ modelValue: false });
 
       const icon = wrapper.find('[data-test="dashboard-sidebar"]');
-      expect(icon.classes()).toContain("mt-[10px]");
+      expect(icon.classes()).toContain("mt-2.5");
       expect(icon.classes()).toContain("rotate-90");
     });
 

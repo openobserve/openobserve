@@ -62,9 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <div v-else class="flex items-center gap-1">
             <input
-              :class="store.state.theme === 'dark' ? 'bg-gray-800' : ''"
               v-model="editTabObj.data.name"
-              class="flex-1 border border-(--q-primary) rounded p-1 outline-none min-w-0 focus:border-(--q-secondary)"
+              class="flex-1 border border-(--q-primary) rounded-sm p-1 outline-none min-w-0 focus:border-(--q-secondary) bg-input-bg"
               data-test="dashboard-tab-settings-tab-name-edit"
             />
             <OButton

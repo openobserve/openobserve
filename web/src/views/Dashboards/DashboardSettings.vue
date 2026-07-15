@@ -23,8 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
   <div
     data-test="dashboard-settings-main-container"
-    class="p-0"
-    :class="store.state.theme == 'dark' ? 'dark-mode bg-surface-panel' : 'bg-white'"
+    class="p-0 bg-surface-panel"
     style="min-height: inherit; height: 100%"
   >
 
@@ -159,10 +158,6 @@ export default defineComponent({
 
 .o-splitter__before {
   border-right: 1px solid var(--color-border-default);
-}
-
-.dark-mode .o-splitter__before {
-  border-right-color: rgba(255, 255, 255, 0.12);
 }
 
 .o-splitter__separator {

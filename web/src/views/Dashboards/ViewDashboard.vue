@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="selectedDate"
               v-show="store.state.printMode === false"
               ref="dateTimePicker"
-              class="dashboard-icons h-[30px] [transition:all_0.2s_ease]"
+              class="dashboard-icons h-7.5 [transition:all_0.2s_ease]"
               size="sm"
               v-model="selectedDate"
               :initialTimezone="initialTimezone"
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state?.zoConfig?.min_auto_refresh_interval || 5
               "
               @trigger="refreshData"
-              class="dashboard-icons hideOnPrintMode h-[30px] [transition:all_0.2s_ease]"
+              class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
               size="sm"
             />
             <OButton

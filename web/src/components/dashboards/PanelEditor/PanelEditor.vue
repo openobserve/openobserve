@@ -167,15 +167,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="p-2"
                   >
                     <div
-                      :style="{
-                        borderColor: '#c3920d',
-                        borderWidth: '1px',
-                        borderStyle: 'solid',
-                        backgroundColor:
-                          store.state.theme === 'dark' ? '#2a1f03' : '#faf2da',
-                        padding: '1%',
-                        borderRadius: '5px',
-                      }"
+                      class="border border-banner-warning-border bg-banner-warning-bg"
+                      style="padding: 1%; border-radius: 5px"
                     >
                       <div style="font-weight: 700">
                         Your chart is not up to date
@@ -917,9 +910,9 @@ const contentHeight = computed(() => {
 // Chart area class based on page type
 const chartAreaClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
-    return "h-[calc(100%-36px)] min-h-[140px]";
+    return "h-[calc(100%-36px)] min-h-35";
   }
-  return "min-h-[140px] mt-[40px]";
+  return "min-h-35 mt-10";
 });
 
 // Chart area style based on page type (uses CSS var for dynamic navbar height)

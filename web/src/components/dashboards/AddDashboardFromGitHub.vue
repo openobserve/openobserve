@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="error-outline"
             class="mb-2" style="width: 3em; height: 3em;" />
-          <div class="text-red-500">{{ error }}</div>
+          <div class="text-status-error-text">{{ error }}</div>
           <OButton
             variant="primary"
             size="sm"
@@ -62,12 +62,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-dashboard-github-search"
           />
 
-          <div class="text-xs text-gray-500 mb-2 px-1">
+          <div class="text-xs text-text-secondary mb-2 px-1">
             {{ filteredDashboards.length }} dashboard(s) available
           </div>
 
           <ul
-            class="dashboard-list flex flex-col rounded list-none p-0 m-0 max-h-[calc(100dvh-200px)] overflow-y-auto"
+            class="dashboard-list flex flex-col rounded-sm list-none p-0 m-0 max-h-[calc(100dvh-200px)] overflow-y-auto"
             :class="filteredDashboards.length > 0 ? 'border border-border' : ''"
           >
             <li
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="[
                 isSelected(dashboard)
                   ? 'selected-item bg-theme-tab-bg! border-primary'
-                  : 'border-transparent hover:bg-gray-50',
+                  : 'border-transparent hover:bg-surface-subtle',
               ]"
               data-test="add-dashboard-github-item"
             >

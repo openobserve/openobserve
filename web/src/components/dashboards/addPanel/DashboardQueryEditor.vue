@@ -17,13 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="col-auto" data-test="dashboard-panel-searchbar">
     <div
-      class="sql-bar flex flex-row items-center justify-between gap-x-3 h-10"
-      :style="{
-        backgroundColor:
-          store.state.theme === 'dark'
-            ? 'var(--color-theme-header-menu-bg)'
-            : 'var(--color-primary-100)',
-      }"
+      class="sql-bar flex flex-row items-center justify-between gap-x-3 h-10 bg-section-header-bg"
       @click.stop
     >
       <div
@@ -158,11 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #label>
             <img
               :src="getImageURL('images/common/function.svg')"
-              :style="{
-                width: '16px',
-                height: '16px',
-                filter: store.state.theme === 'dark' ? 'invert(1)' : 'none',
-              }"
+              class="w-4 h-4 dark:invert"
             />
           </template>
         </OSwitch>
@@ -264,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].vrlFunctionQuery && functionEditorPlaceholderFlag"
                     class="absolute top-0 left-0 right-0 bottom-0 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
                   >
-                    <span class="font-mono text-[var(--text-base)] [line-height:1.3125rem] text-[#a0aec0] dark:text-[#718096] whitespace-nowrap overflow-hidden text-ellipsis">{{ vrlPlaceholder }}</span>
+                    <span class="font-mono text-[var(--text-base)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ vrlPlaceholder }}</span>
                   </div>
                 </div>
                 <div style="flex-shrink: 0; width: 100%">

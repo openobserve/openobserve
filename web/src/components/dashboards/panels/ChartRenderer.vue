@@ -85,6 +85,8 @@ import {
   inject,
 } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
+import { chartColor } from "@/utils/chartTheme";
 import * as echarts from "echarts/core";
 import {
   BarChart,
@@ -226,6 +228,7 @@ export default defineComponent({
     const chartRef: any = ref(null);
     let chart: any;
     const store = useStore();
+    const { isDark } = useTheme();
 
     const cleanupChart = () => {
       // Remove all event listeners from chart
@@ -651,13 +654,10 @@ export default defineComponent({
         // change color and background color of tooltip
         options.tooltip &&
           options.tooltip.textStyle &&
-          (options.tooltip.textStyle.color =
-            theme === "dark" ? "#fff" : "#000");
+          (options.tooltip.textStyle.color = chartColor("--color-tooltip-text"));
         if (options.tooltip) {
-          options.tooltip.backgroundColor =
-            theme === "dark" ? "rgba(22,23,25,0.97)" : "rgba(255,255,255,0.97)";
-          options.tooltip.borderColor =
-            theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)";
+          options.tooltip.backgroundColor = chartColor("--color-tooltip-bg");
+          options.tooltip.borderColor = chartColor("--color-tooltip-border");
           options.tooltip.borderWidth = 1;
         }
         options.animation = false;
@@ -689,7 +689,7 @@ export default defineComponent({
         await nextTick();
         await nextTick();
         await nextTick();
-        const theme = store.state.theme === "dark" ? "dark" : "light";
+        const theme = isDark.value ? "dark" : "light";
         if (chartRef.value) {
           cleanupChart();
           chart = echarts.init(chartRef.value, theme, {
@@ -779,7 +779,7 @@ export default defineComponent({
         await nextTick();
         await nextTick();
         await nextTick();
-        const theme = store.state.theme === "dark" ? "dark" : "light";
+        const theme = isDark.value ? "dark" : "light";
         if (chartRef.value) {
           cleanupChart();
           chart = echarts.init(chartRef.value, theme, {

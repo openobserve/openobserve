@@ -26,7 +26,7 @@
             <div class="mr-2 relative w-3" style="min-height: 50px">
               <!-- Vertical Line using top & bottom instead of height -->
               <div
-                class="absolute top-0 w-px bg-[#001495] opacity-50"
+                class="absolute top-0 w-px bg-accent opacity-50"
                 :style="{
                   bottom:
                     argIndex === fields.args.length - 1

@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :id="scopeId"
       :class="[
         'prose prose-sm max-w-none px-2 py-1',
-        store.state?.theme === 'dark' && 'prose-invert',
+        isDark && 'prose-invert',
       ]"
       style="min-height: 100%; flex-shrink: 0"
       v-html="sanitizedContent"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
-import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { processVariableContent } from "@/utils/dashboard/variables/variablesUtils";
 import DOMPurify from "dompurify";
 
@@ -106,7 +106,7 @@ export default defineComponent({
     },
   },
   setup(props): any {
-    const store = useStore();
+    const { isDark } = useTheme();
 
     DOMPurify.addHook("afterSanitizeAttributes", (node) => {
       if (node.nodeName === "IFRAME") {
@@ -168,7 +168,7 @@ export default defineComponent({
 
     return {
       DOMPurify,
-      store,
+      isDark,
       scopeId,
       processedContent,
       sanitizedContent,

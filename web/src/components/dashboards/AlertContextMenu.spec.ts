@@ -160,14 +160,14 @@ describe("AlertContextMenu Component", () => {
       wrapper = createWrapper();
       const aboveItem = wrapper.find('[data-test="alert-context-menu-above"]');
       expect(aboveItem.exists()).toBe(true);
-      expect(aboveItem.classes()).toContain("hover:bg-[#f5f5f5]");
+      expect(aboveItem.classes()).toContain("hover:bg-dropdown-item-hover-bg");
     });
 
     it("should apply hover background utility class to below menu item", () => {
       wrapper = createWrapper();
       const belowItem = wrapper.find('[data-test="alert-context-menu-below"]');
       expect(belowItem.exists()).toBe(true);
-      expect(belowItem.classes()).toContain("hover:bg-[#f5f5f5]");
+      expect(belowItem.classes()).toContain("hover:bg-dropdown-item-hover-bg");
     });
 
     it("should apply cursor-pointer class to menu items", () => {

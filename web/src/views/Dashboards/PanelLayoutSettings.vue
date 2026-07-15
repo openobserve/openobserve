@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OForm>
 
-        <div class="text-[12px] flex items-center gap-1 mt-1">
+        <div class="text-xs flex items-center gap-1 mt-1">
           <span class="whitespace-nowrap">Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span>
           <OIcon
             name="info-outline"

@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click.stop="handleCustomValue(currentSearchTerm)"
           >
             {{ currentSearchTerm }}
-            <span class="text-gray-400 text-xs italic">(Custom)</span>
+            <span class="text-text-caption text-xs italic">(Custom)</span>
           </div>
         </template>
         <div
@@ -104,9 +104,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="handleCustomValue(currentSearchTerm)"
         >
           {{ currentSearchTerm }}
-          <span class="text-gray-400 text-xs italic">(Custom)</span>
+          <span class="text-text-caption text-xs italic">(Custom)</span>
         </div>
-        <div v-else class="italic text-gray-500 flex justify-center items-center py-3" data-test="variable-query-value-selector-no-data">
+        <div v-else class="italic text-text-muted flex justify-center items-center py-3" data-test="variable-query-value-selector-no-data">
           No Data Found
         </div>
       </template>

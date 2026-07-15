@@ -255,7 +255,7 @@ export default defineComponent({
 
 // "Unique value color" toggle — active tint (color-mix has no Tailwind form).
 .cf-toggle-active {
-  border-color: var(--color-primary-600, #1976d2) !important;
-  background: color-mix(in srgb, var(--color-primary-600, #1976d2) 7%, transparent) !important;
+  border-color: var(--color-primary-600) !important;
+  background: color-mix(in srgb, var(--color-primary-600) 7%, transparent) !important;
 }
 </style>

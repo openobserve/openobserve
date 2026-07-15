@@ -26,10 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="panel-sidebar-header-collapsed"
       @click="toggleSidebar"
     >
-      <!-- <div class="mt-[10px] text-[20px]">+</div> -->
+      <!-- <div class="mt-2.5 text-[20px]">+</div> -->
       <OIcon
         name="expand-all" size="sm"
-        class="mt-[10px] text-[20px] rotate-90"
+        class="mt-2.5 text-[20px] rotate-90"
         data-test="dashboard-sidebar"
       />
       <div
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-else
-      class="flex items-center justify-between h-[60px] px-[10px] shrink-0"
+      class="flex items-center justify-between h-15 px-2.5 shrink-0"
       data-test="panel-sidebar-header-expanded"
     >
       <div

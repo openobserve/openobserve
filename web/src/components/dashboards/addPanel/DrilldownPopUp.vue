@@ -117,7 +117,7 @@
 
     <div v-if="drilldownData.type == 'byDashboard'">
       <div style="margin-top: 10px">
-        <div class="flex items-center my-[10px] w-full">
+        <div class="flex items-center my-2.5 w-full">
           <OFormSelect
             name="data.folder"
             :options="folderList"
@@ -128,7 +128,7 @@
             data-test="dashboard-drilldown-folder-select"
           />
         </div>
-        <div class="flex items-center my-[10px] w-full" v-if="drilldownData.data.folder">
+        <div class="flex items-center my-2.5 w-full" v-if="drilldownData.data.folder">
           <OFormSelect
             name="data.dashboard"
             :options="dashboardList"
@@ -139,7 +139,7 @@
             data-test="dashboard-drilldown-dashboard-select"
           />
         </div>
-        <div class="flex items-center my-[10px] w-full" v-if="drilldownData.data.dashboard">
+        <div class="flex items-center my-2.5 w-full" v-if="drilldownData.data.dashboard">
           <OFormSelect
             name="data.tab"
             :options="tabList"

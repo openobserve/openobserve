@@ -19,17 +19,14 @@
       </template>
     </OInput>
     <div
-      class="options-container z-10 absolute left-0 right-0 top-[42px] max-h-25 overflow-y-auto border border-[#ccc]"
+      class="options-container z-10 absolute left-0 right-0 top-10.5 max-h-25 overflow-y-auto border border-dropdown-border bg-dropdown-bg"
       data-test="common-auto-complete-options-container"
       v-if="showOptions && fieldsFilteredOptions.length > 0"
-      :style="{
-        'background-color': store.state.theme === 'dark' ? '#2d2d2d' : 'white',
-      }"
     >
       <div
         v-for="(option, index) in fieldsFilteredOptions"
         :key="index"
-        class="p-2 cursor-pointer hover:bg-[#f0f0f0b1]"
+        class="p-2 cursor-pointer hover:bg-dropdown-item-hover-bg"
         @mousedown="selectOption(option)"
         data-test="common-auto-complete-option"
       >
@@ -42,7 +39,6 @@
 <script>
 import { ref, toRef, defineComponent, watch } from "vue";
 import { useSearchInputUsingRegex } from "@/composables/useSearchInputUsingRegex";
-import { useStore } from "vuex";
 import { useSlots } from "vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 
@@ -71,7 +67,6 @@ export default defineComponent({
   },
   emits: ["update:modelValue", "select"],
   setup(props, { emit }) {
-    const store = useStore();
     const showOptions = ref(false);
 
     // this is used to sync with modelvalue and q-input's v-model
@@ -129,7 +124,6 @@ export default defineComponent({
       hideOptions,
       onFocus,
       selectOption,
-      store,
       onModelValueChanged,
       inputValue,
       hasSlot,

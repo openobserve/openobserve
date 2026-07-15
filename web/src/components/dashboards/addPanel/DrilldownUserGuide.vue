@@ -12,7 +12,7 @@
   </div>
   <Teleport to="body">
   <div
-    class="user-guide p-[10px] overflow-y-auto [scrollbar-width:thin] [scrollbar-color:rgba(0,0,0,0.25)_rgba(0,0,0,0.05)]"
+    class="user-guide p-2.5 overflow-y-auto bg-surface-base [scrollbar-width:thin] [scrollbar-color:rgba(0,0,0,0.25)_rgba(0,0,0,0.05)]"
     v-show="showUserGuide"
     style="
       position: fixed;
@@ -20,14 +20,9 @@
       width: 500px;
       max-height: 300px;
       overflow-y: auto;
-      border: 1px solid gray;
+      border: 1px solid var(--color-border-default);
       border-radius: 5px;
       pointer-events: auto;
-    "
-    :class="
-      store.state.theme == 'dark'
-        ? 'theme-dark bg-surface-base'
-        : 'theme-light bg-white'
     "
     @mouseleave="showUserGuide = false"
     ref="userGuideDivRef"
@@ -41,10 +36,10 @@
     <p>You can reference a variable with the following format:</p>
     <ul>
       <li>
-        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${variable_name}</span>
+        <span class="bg-highlight bg-code-bg">${variable_name}</span>
         <br />
         (For Example, if your variable name is "test", you can use
-        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${test}</span>)
+        <span class="bg-highlight bg-code-bg">${test}</span>)
       </li>
     </ul>
 
@@ -53,8 +48,8 @@
     <div class="font-bold">Use current query</div>
     <p>You can reference current query with the following format:</p>
     <ul>
-      <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${query}</span></li>
-      <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${query_encoded}</span></li>
+      <li><span class="bg-highlight bg-code-bg">${query}</span></li>
+      <li><span class="bg-highlight bg-code-bg">${query_encoded}</span></li>
     </ul>
     <br />
 
@@ -63,17 +58,17 @@
       You can reference current selected Time period with the following format:
     </p>
     <ul>
-      <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${start_time}</span></li>
-      <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${end_time}</span></li>
+      <li><span class="bg-highlight bg-code-bg">${start_time}</span></li>
+      <li><span class="bg-highlight bg-code-bg">${end_time}</span></li>
     </ul>
     For Example:
-    <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">from=${start_time}&to=${end_time}</span>
+    <span class="bg-highlight bg-code-bg">from=${start_time}&to=${end_time}</span>
     <br />
     <span class="font-bold">Note: </span>
     <span
       >Even with a relative time period, you can still use
-      <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">start_time</span> and
-      <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">end_time</span>.</span
+      <span class="bg-highlight bg-code-bg">start_time</span> and
+      <span class="bg-highlight bg-code-bg">end_time</span>.</span
     >
     <br />
     <br />
@@ -82,15 +77,15 @@
 
     <ul>
       <li>
-        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${series.__name}</span> – The name of the
+        <span class="bg-highlight bg-code-bg">${series.__name}</span> – The name of the
         series.
       </li>
       <li>
-        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${series.__value}</span> – The numeric value
+        <span class="bg-highlight bg-code-bg">${series.__value}</span> – The numeric value
         of the data point.
       </li>
       <li>
-        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${series.__axisValue}</span> – The value on
+        <span class="bg-highlight bg-code-bg">${series.__axisValue}</span> – The value on
         the axis for the selected/clicked data point.
       </li>
     </ul>
@@ -103,15 +98,15 @@
     </p>
     <ul>
       <li>
-        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'"
+        <span class="bg-highlight bg-code-bg"
           >${row.field["field_label"]} or ${row.field.field_label}</span
         >
         <br />
         (For Example, if your want to use "test" column's value of clicked row,
-        you can use <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${row.field.test} </span> or
-        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${row.field["test"]}</span>)
+        you can use <span class="bg-highlight bg-code-bg">${row.field.test} </span> or
+        <span class="bg-highlight bg-code-bg">${row.field["test"]}</span>)
       </li>
-      <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${row.index}</span></li>
+      <li><span class="bg-highlight bg-code-bg">${row.index}</span></li>
     </ul>
 
     <br />
@@ -119,8 +114,8 @@
     <div class="font-bold">For Pie/Donut chart drilldown</div>
     <p>You can reference the series and value with the following variables:</p>
     <ul>
-      <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${series.__name}</span></li>
-      <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${series.__value}</span></li>
+      <li><span class="bg-highlight bg-code-bg">${series.__name}</span></li>
+      <li><span class="bg-highlight bg-code-bg">${series.__value}</span></li>
     </ul>
 
     <br />
@@ -133,14 +128,14 @@
     <ul>
       <li class="font-bold">Edge</li>
       <ul>
-        <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${edge.__source}</span></li>
-        <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${edge.__target}</span></li>
-        <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${edge.__value}</span></li>
+        <li><span class="bg-highlight bg-code-bg">${edge.__source}</span></li>
+        <li><span class="bg-highlight bg-code-bg">${edge.__target}</span></li>
+        <li><span class="bg-highlight bg-code-bg">${edge.__value}</span></li>
       </ul>
       <li class="font-bold">Node</li>
       <ul>
-        <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${node.__name}</span></li>
-        <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${node.__value}</span></li>
+        <li><span class="bg-highlight bg-code-bg">${node.__name}</span></li>
+        <li><span class="bg-highlight bg-code-bg">${node.__value}</span></li>
       </ul>
     </ul>
   </div>
@@ -149,7 +144,6 @@
 
 <script lang="ts">
 import { ref } from "vue";
-import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
@@ -157,7 +151,6 @@ export default {
   components: { OButton, OTooltip },
   name: "DrilldownUserGuide",
   setup() {
-    const store = useStore();
     const showUserGuide = ref(false);
 
     const userGuideBtnRef: any = ref(null);
@@ -175,7 +168,6 @@ export default {
     };
 
     return {
-      store,
       onUserGuideClick,
       showUserGuide,
       userGuideBtnRef,
@@ -191,11 +183,11 @@ export default {
   width: 6px;
 }
 .user-guide::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--color-border-strong);
   border-radius: 3px;
 }
 .user-guide::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--color-surface-subtle);
 }
 
 .user-guide ul,

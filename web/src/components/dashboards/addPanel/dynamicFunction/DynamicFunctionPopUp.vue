@@ -8,10 +8,10 @@
     "
   >
     <div style="width: auto; flex-shrink: 0;">
-      <div class="font-semibold text-[13px] pb-3" data-test="dynamic-function-popup-property-label">Property</div>
+      <div class="font-semibold text-compact pb-3" data-test="dynamic-function-popup-property-label">Property</div>
       <div style="display: flex; flex-direction: column; gap: 14px">
         <div>
-          <div class="text-[13px] font-normal leading-[70%] pb-0.75" data-test="dynamic-function-popup-label-text">Label</div>
+          <div class="text-compact font-normal leading-[70%] pb-0.75" data-test="dynamic-function-popup-label-text">Label</div>
           <OInput
             v-model="fields.label"
             size="sm"
@@ -20,7 +20,7 @@
           />
         </div>
         <div>
-          <div class="text-[13px] font-normal leading-[70%] pb-0.75">Alias</div>
+          <div class="text-compact font-normal leading-[70%] pb-0.75">Alias</div>
           <OInput
             v-model="fields.alias"
             size="sm"
@@ -73,7 +73,7 @@
       >
         <OTabPanel name="build">
           <div class="pt-2" style="max-height: 26.25rem; overflow: auto;">
-            <div class="font-semibold text-[13px] pb-3">Configuration</div>
+            <div class="font-semibold text-compact pb-3">Configuration</div>
             <SelectFunction
               v-model="fields"
               data-test="dynamic-function-popup-select-function"
@@ -121,7 +121,7 @@
           <OSelect
             v-model="getHavingCondition().operator"
             :options="havingOperators"
-            class="w-[60px]"
+            class="w-15"
             data-test="dynamic-function-popup-having-operator"
           />
 

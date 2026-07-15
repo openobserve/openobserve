@@ -18,12 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-if="!promqlMode && dashboardPanelData.data.type == 'maps'">
     <!-- name container -->
     <div style="display: flex; flex-direction: row" class="pl-3">
-      <div class="whitespace-nowrap min-w-[130px] flex items-center">
+      <div class="whitespace-nowrap min-w-32.5 flex items-center">
         {{ t("panel.mapname") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="Hint" />
       </div>
-      <span class="flex items-center ml-[2px] mr-[2px]">:</span>
+      <span class="flex items-center ml-0.5 mr-0.5">:</span>
       <div
         class="axis-container flex-1 w-full flex flex-wrap droppable border-transparent border-dashed border-2 scroll"
         :class="{
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs text-weight-bold text-center py-1"
+          class="text-xs font-bold text-center py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -143,12 +143,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSeparator />
     <!-- value for maps container -->
     <div style="display: flex; flex-direction: row" class="pl-3">
-      <div class="whitespace-nowrap min-w-[130px] flex items-center">
+      <div class="whitespace-nowrap min-w-32.5 flex items-center">
         {{ t("panel.mapvalue") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="Hint" />
       </div>
-      <span class="flex items-center ml-[2px] mr-[2px]">:</span>
+      <span class="flex items-center ml-0.5 mr-0.5">:</span>
       <div
         class="axis-container flex-1 w-full flex flex-wrap droppable border-transparent border-dashed border-2 scroll"
         :class="{
@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs text-weight-bold text-center py-1"
+          class="text-xs font-bold text-center py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex

@@ -18,12 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-if="!promqlMode && dashboardPanelData.data.type == 'geomap'">
     <!-- latitude container -->
     <div style="display: flex; flex-direction: row" class="pl-3">
-      <div class="whitespace-nowrap min-w-[130px] flex items-center">
+      <div class="whitespace-nowrap min-w-32.5 flex items-center">
         {{ t("panel.latitude") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="Hint" />
       </div>
-      <span class="flex items-center mx-[2px]">:</span>
+      <span class="flex items-center mx-0.5">:</span>
       <div
         class="axis-container droppable flex-1 w-full flex flex-wrap border-2 border-dashed border-transparent"
         :class="{
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs text-weight-bold text-center py-1"
+          class="text-xs font-bold text-center py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -139,12 +139,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSeparator />
     <!-- longitude container -->
     <div style="display: flex; flex-direction: row" class="pl-3">
-      <div class="whitespace-nowrap min-w-[130px] flex items-center">
+      <div class="whitespace-nowrap min-w-32.5 flex items-center">
         {{ t("panel.longitude") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="Hint" />
       </div>
-      <span class="flex items-center mx-[2px]">:</span>
+      <span class="flex items-center mx-0.5">:</span>
       <div
         class="axis-container droppable flex-1 w-full flex flex-wrap border-2 border-dashed border-transparent"
         :class="{
@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs text-weight-bold text-center py-1"
+          class="text-xs font-bold text-center py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -260,12 +260,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSeparator />
     <!-- weight container -->
     <div style="display: flex; flex-direction: row" class="pl-3">
-      <div class="whitespace-nowrap min-w-[130px] flex items-center">
+      <div class="whitespace-nowrap min-w-32.5 flex items-center">
         {{ t("panel.weight") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="WeightHint" />
       </div>
-      <span class="flex items-center mx-[2px]">:</span>
+      <span class="flex items-center mx-0.5">:</span>
       <div
         class="axis-container droppable flex-1 w-full flex flex-wrap border-2 border-dashed border-transparent"
         :class="{
@@ -367,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs text-weight-bold text-center py-1"
+          class="text-xs font-bold text-center py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex

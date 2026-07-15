@@ -240,16 +240,17 @@ describe('ScheduledDashboards', () => {
       expect(wrapper.emitted('update:open')?.[0]).toEqual([false]);
     });
 
-    it('should apply dark-mode class when theme is dark', () => {
+    it('should apply token-based surface class when theme is dark', () => {
       mockStore.state.theme = 'dark';
       const wrapper = createWrapper();
-      expect(wrapper.find('[data-test="scheduled-dashboards-container"]').classes()).toContain('dark-mode');
+      // Token-based surface utility handles dark mode; class is identical in both themes.
+      expect(wrapper.find('[data-test="scheduled-dashboards-container"]').classes()).toContain('bg-surface-panel');
     });
 
-    it('should apply light-mode class when theme is light', () => {
+    it('should apply token-based surface class when theme is light', () => {
       mockStore.state.theme = 'light';
       const wrapper = createWrapper();
-      expect(wrapper.find('[data-test="scheduled-dashboards-container"]').classes()).toContain('bg-white');
+      expect(wrapper.find('[data-test="scheduled-dashboards-container"]').classes()).toContain('bg-surface-panel');
     });
   });
 

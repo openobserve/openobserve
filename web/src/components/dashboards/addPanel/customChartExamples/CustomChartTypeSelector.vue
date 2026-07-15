@@ -63,15 +63,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="p-4"
           style="width: 160px; height: 100%; flex-shrink: 0; overflow-y: auto"
         >
-          <div class="text-sm font-medium mb-3 text-weight-bold">Chart Types</div>
+          <div class="text-sm font-medium mb-3 font-bold">Chart Types</div>
           <ul class="flex flex-col list-none p-0 m-0">
             <li
               v-for="(category, index) in chartCategories"
               :key="index"
               @click="scrollToCategory(category.chartLabel)"
-              class="flex items-center px-3 py-2 cursor-pointer rounded mb-1 transition-all duration-200 hover:bg-black/4"
+              class="flex items-center px-3 py-2 cursor-pointer rounded-sm mb-1 transition-all duration-200 hover:bg-black/4"
               :class="{
-                'bg-(--q-primary) text-white font-semibold': selectedCategory === category.chartLabel,
+                'bg-(--q-primary) text-text-inverse font-semibold': selectedCategory === category.chartLabel,
               }"
               data-test="chart-category-item"
             >
@@ -95,8 +95,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="text-center">
               <OIcon name="search-off" style="width: 4rem; height: 4rem;" />
-              <div class="text-xl font-semibold text-gray-400 mt-3">No results found</div>
-              <div class="text-sm text-gray-400 mt-2">
+              <div class="text-xl font-semibold text-text-muted mt-3">No results found</div>
+              <div class="text-sm text-text-muted mt-2">
                 Try searching with different keywords
               </div>
             </div>
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-category="category.chartLabel"
             data-test="chart-category-section"
           >
-            <div class="text-xl font-semibold mb-3 text-weight-medium">
+            <div class="text-xl font-semibold mb-3 font-medium">
               {{ category.chartLabel }}
             </div>
             <div class="flex gap-3">
@@ -122,13 +122,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OCard
                   class="cursor-pointer transition-all duration-200 h-full hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:-translate-y-0.5"
                   :class="{
-                    'border-2 border-(--q-primary) shadow-[0_4px_12px_rgba(var(--q-primary-rgb),0.3)]': selectedChart?.value === chart.value,
+                    'border-2 border-(--q-primary) shadow-[0_4px_12px_color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)]': selectedChart?.value === chart.value,
                   }"
                   @click="selectChart(chart)"
                   data-test="chart-type-card"
                 >
                   <OCardSection class="p-2">
-                    <div class="w-full h-37.5 flex items-center justify-center bg-[#f8f8f8] rounded overflow-hidden">
+                    <div class="w-full h-37.5 flex items-center justify-center bg-surface-subtle rounded-sm overflow-hidden">
                       <img
                         :src="chart.asset"
                         :alt="chart.label"
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </OCardSection>
                   <OCardSection class="pt-0 px-2 pb-2">
-                    <div class="text-xs text-center text-weight-medium">
+                    <div class="text-xs text-center font-medium">
                       {{ chart.label }}
                     </div>
                   </OCardSection>

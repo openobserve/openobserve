@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #header-right>
       <div class="flex items-center justify-end gap-2">
-        <div class="app-tabs-container h-[36px]">
+        <div class="app-tabs-container h-9">
           <AppTabs
             class="tabs-selection-container"
             :tabs="scheduledReportTypeTabs"
@@ -49,8 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       data-test="scheduled-dashboards-container"
-      class="scheduled-dashboards h-fit"
-      :class="store.state.theme === 'dark' ? 'dark-mode bg-surface-panel' : 'bg-white'"
+      class="scheduled-dashboards h-fit bg-surface-panel"
     >
     <OTable
       data-test="scheduled-dashboard-table"
@@ -401,25 +400,12 @@ const getTimeRangeValue = (dateTime: any) => {
 </script>
 
 <style>
-.dark-mode.scheduled-dashboards .rum-tabs {
-  border: 1px solid #464646;
-}
-
-.dark-mode.scheduled-dashboards .rum-tab:hover {
-  background: #464646;
-}
-
-.dark-mode.scheduled-dashboards .rum-tab.active {
-  background: #5960b2;
-  color: #ffffff !important;
-}
-
 .scheduled-dashboards thead tr {
   background-color: var(--color-table-header-bg);
 }
 
 .scheduled-dashboards .rum-tabs {
-  border: 1px solid #eaeaea;
+  border: 1px solid var(--color-border-default);
   height: fit-content;
   border-radius: 4px;
   overflow: hidden;
@@ -432,11 +418,11 @@ const getTimeRangeValue = (dateTime: any) => {
 }
 
 .scheduled-dashboards .rum-tab:hover {
-  background: #eaeaea;
+  background: var(--color-surface-subtle-hover);
 }
 
 .scheduled-dashboards .rum-tab.active {
-  background: #5960b2;
-  color: #ffffff !important;
+  background: var(--color-brand-indigo);
+  color: var(--color-white) !important;
 }
 </style>

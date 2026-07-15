@@ -280,11 +280,13 @@ describe("DashboardErrors", () => {
   });
 
   describe("theme reactivity", () => {
-    it("renders expand bar with inline background style", () => {
+    it("renders expand bar with the theme-aware background utility", () => {
       wrapper = mountComponent(["Test error"]);
 
       const expandBar = wrapper.find('[data-test="dashboard-errors-expand-bar"]');
-      expect(expandBar.attributes("style")).toBeDefined();
+      // Background is now driven by the theme-aware bg-section-header-bg token
+      // utility rather than an inline background style.
+      expect(expandBar.classes()).toContain("bg-section-header-bg");
     });
 
     it("handles dark theme without errors", () => {

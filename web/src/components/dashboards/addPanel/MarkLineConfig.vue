@@ -21,7 +21,7 @@
       :key="index"
     >
       <div
-        class="flex justify-between pb-3 mb-3 border-b border-gray-500"
+        class="flex justify-between pb-3 mb-3 border-b border-border-strong"
       >
         <div style="width: 90%" class="flex flex-col gap-2">
           <OSelect

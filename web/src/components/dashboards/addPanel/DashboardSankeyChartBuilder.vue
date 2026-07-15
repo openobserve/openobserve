@@ -18,12 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-if="!promqlMode && dashboardPanelData.data.type == 'sankey'">
     <!-- source container -->
     <div style="display: flex; flex-direction: row" class="pl-3">
-      <div class="layout-name whitespace-nowrap min-w-[130px] flex items-center">
+      <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
         {{ t("panel.source") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="Hint" />
       </div>
-      <span class="layout-separator flex items-center ml-[2px] mr-[2px]">:</span>
+      <span class="layout-separator flex items-center ml-0.5 mr-0.5">:</span>
       <div
         class="axis-container droppable scroll flex-1 w-full flex flex-wrap border-transparent border-dashed border-2"
         :class="{
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs text-weight-bold text-center py-1"
+          class="text-xs font-bold text-center py-1"
           data-test="dashboard-sankey-source-empty-hint"
           v-if="
             dashboardPanelData.data.queries[
@@ -144,12 +144,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSeparator />
     <!-- target container -->
     <div style="display: flex; flex-direction: row" class="pl-3">
-      <div class="layout-name whitespace-nowrap min-w-[130px] flex items-center">
+      <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
         {{ t("panel.target") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="Hint" />
       </div>
-      <span class="layout-separator flex items-center ml-[2px] mr-[2px]">:</span>
+      <span class="layout-separator flex items-center ml-0.5 mr-0.5">:</span>
       <div
         class="axis-container droppable scroll flex-1 w-full flex flex-wrap border-transparent border-dashed border-2"
         :class="{
@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs text-weight-bold text-center py-1"
+          class="text-xs font-bold text-center py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -269,12 +269,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSeparator />
     <!-- value container -->
     <div style="display: flex; flex-direction: row" class="pl-3">
-      <div class="layout-name whitespace-nowrap min-w-[130px] flex items-center">
+      <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
         {{ t("panel.value") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="Hint" />
       </div>
-      <span class="layout-separator flex items-center ml-[2px] mr-[2px]">:</span>
+      <span class="layout-separator flex items-center ml-0.5 mr-0.5">:</span>
       <div
         class="axis-container droppable scroll flex-1 w-full flex flex-wrap border-transparent border-dashed border-2"
         :class="{
@@ -380,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs text-weight-bold text-center py-1"
+          class="text-xs font-bold text-center py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex

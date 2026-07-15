@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('panel.name')"
                 required
                 labelPosition="inside"
-                class="dynamic-input min-w-[200px] max-w-[500px] [transition:width_0.2s_ease]"
+                class="dynamic-input min-w-50 max-w-125 [transition:width_0.2s_ease]"
                 :style="inputStyle"
               />
             </OForm>
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="store.state.theme === 'dark' ? 'theme-dark' : 'theme-light'"
       @click.self="handleCloseAddVariable"
     >
-      <div class="add-variable-drawer-panel px-6 pt-4 w-225 h-screen shadow-[-2px_0_8px_rgba(0,0,0,0.15)] overflow-hidden rounded-none!" :class="store.state.theme === 'dark' ? 'bg-[#1a1a1a]' : 'bg-white'">
+      <div class="add-variable-drawer-panel px-6 pt-4 w-225 h-screen shadow-[-2px_0_8px_rgba(0,0,0,0.15)] overflow-hidden rounded-none! bg-surface-base">
         <AddSettingVariable
           @save="handleSaveVariable"
           @close="handleCloseAddVariable"

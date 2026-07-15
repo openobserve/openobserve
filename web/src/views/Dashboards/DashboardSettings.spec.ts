@@ -197,7 +197,8 @@ describe("DashboardSettings.vue", () => {
 
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      expect(mainContainer.classes()).toContain("bg-white");
+      // Token-based surface utility handles dark mode; class is identical in both themes.
+      expect(mainContainer.classes()).toContain("bg-surface-panel");
       expect(mainContainer.classes()).not.toContain("dark-mode");
     });
 
@@ -207,7 +208,8 @@ describe("DashboardSettings.vue", () => {
 
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      expect(mainContainer.classes()).toContain("dark-mode");
+      // Token-based surface utility handles dark mode; class is identical in both themes.
+      expect(mainContainer.classes()).toContain("bg-surface-panel");
       expect(mainContainer.classes()).not.toContain("bg-white");
     });
 
@@ -477,8 +479,8 @@ describe("DashboardSettings.vue", () => {
 
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      // Should default to light theme behavior when theme is undefined
-      expect(mainContainer.classes()).toContain("bg-white");
+      // Token-based surface utility is theme-independent in markup.
+      expect(mainContainer.classes()).toContain("bg-surface-panel");
     });
 
     it("should handle null theme state", () => {
@@ -490,8 +492,8 @@ describe("DashboardSettings.vue", () => {
 
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      // Should default to light theme behavior when theme is null
-      expect(mainContainer.classes()).toContain("bg-white");
+      // Token-based surface utility is theme-independent in markup.
+      expect(mainContainer.classes()).toContain("bg-surface-panel");
     });
 
     it("should handle empty templates array", () => {

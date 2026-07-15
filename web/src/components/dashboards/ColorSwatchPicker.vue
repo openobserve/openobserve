@@ -128,7 +128,7 @@ export default defineComponent({
   width: 20px;
   height: 20px;
   border-radius: 5px;
-  border: 1px solid rgba(128, 128, 128, 0.3);
+  border: 1px solid var(--color-border-default);
   cursor: pointer;
   padding: 0;
   display: inline-flex;
@@ -141,8 +141,8 @@ export default defineComponent({
   }
 
   &--active {
-    border-color: var(--color-primary-600, #1976d2);
-    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.28);
+    border-color: var(--color-primary-600);
+    box-shadow: 0 0 0 2px var(--color-focus-ring);
   }
 }
 
@@ -166,7 +166,7 @@ export default defineComponent({
       left: 1px;
       right: 1px;
       height: 1.5px;
-      background: #e53935;
+      background: var(--color-status-negative);
       transform: rotate(-45deg);
       transform-origin: center;
     }

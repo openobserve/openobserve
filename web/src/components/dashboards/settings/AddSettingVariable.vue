@@ -21,8 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </DashboardHeader>
 
       <div
-        class="overflow-y-auto px-[3px] pb-4 flex-1 min-h-0 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded"
-        :class="store.state.theme === 'dark' ? '[scrollbar-color:#4b5563_transparent] [&::-webkit-scrollbar-thumb]:bg-[#4b5563]' : '[scrollbar-color:#d1d5db_transparent] [&::-webkit-scrollbar-thumb]:bg-[#d1d5db]'"
+        class="overflow-y-auto px-[3px] pb-4 flex-1 min-h-0 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-sm [scrollbar-color:var(--color-border-strong)_transparent] [&::-webkit-scrollbar-thumb]:bg-border-strong"
       >
         <OForm
           greedy
@@ -205,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <template #content>
                       {{ t('dashboard.filterInfoTooltip') }}
-                      <span class="bg-highlight" :class="store.state.theme === 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">$variableName</span>.
+                      <span class="bg-highlight bg-code-bg">$variableName</span>.
                     </template>
                   </OTooltip>
                 </div>
@@ -228,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="flex-2 min-w-0"
                     >
                       <template #empty>
-                        <span class="italic text-gray-400"
+                        <span class="italic text-text-secondary"
                           >{{ t('dashboard.noDataFound') }}</span
                         >
                       </template>
@@ -324,10 +323,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="variableData.type == 'custom'">
             <div class="flex">
               <div class="w-6"></div>
-              <div class="flex-1 font-semibold text-gray-500">
+              <div class="flex-1 font-semibold text-text-label">
                 {{ t('common.label') }}
               </div>
-              <div class="flex-1 font-semibold text-gray-500">
+              <div class="flex-1 font-semibold text-text-label">
                 {{ t('common.value') }}
               </div>
               <div class="w-12 flex items-center justify-center">
@@ -411,7 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- it can be first value or all values -->
           <div v-if="['query_values'].includes(variableData.type)">
             <div class="mt-1.5 mb-1.5">
-              <div class="mt-1.25 mb-1.25 text-sm font-semibold" :class="store.state.theme === 'dark' ? 'text-[#999999]' : 'text-[#666666]'">{{ t('dashboard.byDefaultSelect') }}</div>
+              <div class="mt-1.25 mb-1.25 text-sm font-semibold text-text-secondary">{{ t('dashboard.byDefaultSelect') }}</div>
               <OFormToggleGroup name="selectAllValueForMultiSelect">
                 <OToggleGroupItem
                   value="first"
@@ -513,8 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OForm>
       </div>
       <div
-        class="sticky bottom-0 left-0 w-full py-3 px-4 flex justify-end gap-3 z-10 border-t"
-        :class="store.state.theme === 'dark' ? 'border-t-[#333] [box-shadow:rgb(20,20,20)_0px_-4px_7px_0px]' : 'border-t-[#eee] [box-shadow:rgb(240,240,240)_0px_-4px_7px_0px]'"
+        class="sticky bottom-0 left-0 w-full py-3 px-4 flex justify-end gap-3 z-10 border-t border-t-border-default [box-shadow:rgb(240,240,240)_0px_-4px_7px_0px] dark:[box-shadow:rgb(20,20,20)_0px_-4px_7px_0px]"
       >
         <OButton
           variant="outline"

@@ -354,7 +354,7 @@ export default defineComponent({
         return safeHtml.replace(
           regex,
           (match) =>
-            `<mark class="bg-yellow-400 text-black rounded-sm shadow-sm">${match}</mark>`,
+            `<mark class="rounded-sm shadow-sm">${match}</mark>`,
         );
       } catch (e) {
         return safeHtml;
@@ -407,18 +407,18 @@ export default defineComponent({
 }
 
 .inspector-query-editor::-webkit-scrollbar-thumb {
-  background: rgba(128, 128, 128, 0.2);
+  background: var(--color-border-default);
   border-radius: 10px;
 }
 
 .inspector-query-editor::-webkit-scrollbar-thumb:hover {
-  background: rgba(128, 128, 128, 0.4);
+  background: var(--color-border-strong);
 }
 
 .inspector-query-editor mark {
   all: unset;
-  background-color: #facc15;
-  color: black;
+  background-color: var(--color-table-highlight-bg);
+  color: var(--color-table-highlight-text);
   border-radius: 2px;
   padding: 0;
 }

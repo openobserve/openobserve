@@ -2,7 +2,7 @@
   <div
     data-test="dashboard-group"
     :style="`--group-index: ${groupNestedIndex}; padding-left: ${groupNestedIndex > 0 ? '0.3125rem' : '0'}; background-color: rgba(89, 96, 178, calc(0.12 * var(--group-index)));`"
-    class="flex p-0 rounded-[5px]"
+    class="flex p-0 rounded-md"
   >
     <div class="flex flex-row flex-wrap items-center" data-test="dashboard-group-conditions">
       <div
@@ -60,7 +60,7 @@
         </ODropdownItem>
       </ODropdown>
     </div>
-    <div v-if="groupNestedIndex !== 0" class="border-l border-[#f5f5f5] flex justify-between items-center">
+    <div v-if="groupNestedIndex !== 0" class="border-l border-border-subtle flex justify-between items-center">
       <OButton
         variant="ghost"
         size="icon"

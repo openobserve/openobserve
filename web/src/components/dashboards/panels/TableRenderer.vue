@@ -318,7 +318,7 @@ export default defineComponent({
 </script>
 
 <style>
-/* Remove border-radius from the shared .container class (logs uses rounded corners) */
+/* Remove border-radius from the shared .container class (logs uses rounded-sm corners) */
 .table-wrapper .container {
   border-radius: 0;
 }
@@ -340,11 +340,7 @@ export default defineComponent({
 }
 
 .table-wrapper .pivot-section-border {
-  border-left: 2px solid rgba(0, 0, 0, 0.12) !important;
-}
-
-.body--dark .table-wrapper .pivot-section-border {
-  border-left-color: rgba(255, 255, 255, 0.12) !important;
+  border-left: 2px solid var(--color-table-row-divider) !important;
 }
 
 .table-wrapper .pivot-value-header {
@@ -358,7 +354,7 @@ export default defineComponent({
 }
 
 .table-wrapper .pivot-sticky-total-row td {
-  border-top: 2px solid rgba(0, 0, 0, 0.12);
+  border-top: 2px solid var(--color-table-row-divider);
 }
 
 /* Pivot header sort icons */
@@ -377,11 +373,11 @@ export default defineComponent({
 
 /* Sticky total column visual separator */
 .table-wrapper .pivot-total-col {
-  box-shadow: inset 4px 0 6px -2px rgba(0, 0, 0, 0.15) !important;
+  box-shadow: inset 4px 0 6px -2px var(--color-actions-column-shawdow) !important;
 }
 
 .table-wrapper .sticky-column.pivot-total-col {
-  box-shadow: 4px 0 8px rgba(0, 0, 0, 0.15), inset 4px 0 6px -2px rgba(0, 0, 0, 0.15) !important;
+  box-shadow: 4px 0 8px var(--color-actions-column-shawdow), inset 4px 0 6px -2px var(--color-actions-column-shawdow) !important;
 }
 
 @media print {
@@ -412,12 +408,8 @@ export default defineComponent({
     bottom: 0 !important;
     left: 0 !important;
     right: 0 !important;
-    background-color: #fff !important;
+    background-color: var(--color-surface-base) !important;
     z-index: 1 !important;
-  }
-
-  .body--dark .my-sticky-virtscroll-table [data-test="dashboard-table-pagination"] {
-    background-color: #1a1a2e !important;
   }
 }
 </style>

@@ -18,12 +18,13 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import DOMPurify from "dompurify";
 import HTMLRenderer from "./HTMLRenderer.vue";
 
-// Mock external dependencies
+// Mock external dependencies.
+// Mutable hoisted state so individual tests can drive the theme that
+// useTheme() -> useStore() reads (the component no longer exposes `store`).
+const mockStoreState = vi.hoisted(() => ({ theme: "light" }));
 vi.mock("vuex", () => ({
   useStore: () => ({
-    state: {
-      theme: "light",
-    },
+    state: mockStoreState,
   }),
 }));
 
@@ -73,6 +74,7 @@ describe("HTMLRenderer", () => {
     addHookSpy.mockClear();
     sanitizeSpy.mockClear();
     vi.clearAllMocks();
+    mockStoreState.theme = "light";
   });
 
   afterEach(() => {
@@ -252,18 +254,11 @@ describe("HTMLRenderer", () => {
     });
 
     it("should apply dark theme classes when theme is dark", () => {
-      // Create wrapper with dark theme store from the start
-      wrapper = mount(HTMLRenderer, {
-        global: {
-          plugins: [],
-          mocks: {
-            store: {
-              state: { theme: "dark" }
-            }
-          }
-        }
-      });
-      
+      // Drive theme via the mocked store before mounting so useTheme()'s
+      // isDark resolves to true on initial render.
+      mockStoreState.theme = "dark";
+      wrapper = createWrapper();
+
       const rendererElement = wrapper.find('[data-test="html-renderer"]');
       expect(rendererElement.classes()).toContain('prose');
       expect(rendererElement.classes()).toContain('prose-invert');
@@ -278,32 +273,24 @@ describe("HTMLRenderer", () => {
       
       // Unmount and recreate with dark theme to test the toggle effect
       wrapper.unmount();
-      
-      wrapper = mount(HTMLRenderer, {
-        global: {
-          plugins: [],
-          mocks: {
-            store: {
-              state: { theme: "dark" }
-            }
-          }
-        }
-      });
-      
+
+      mockStoreState.theme = "dark";
+      wrapper = createWrapper();
+
       rendererElement = wrapper.find('[data-test="html-renderer"]');
       expect(rendererElement.classes()).toContain('prose-invert');
     });
 
     it("should maintain theme classes with content updates", async () => {
+      // Mount already in dark theme, then update content and verify the
+      // prose-invert class persists across the content change.
+      mockStoreState.theme = "dark";
       wrapper = createWrapper({
         htmlContent: "<p>Initial content</p>"
       });
-      
-      wrapper.vm.store.state.theme = "dark";
-      await wrapper.vm.$nextTick();
-      
+
       await wrapper.setProps({ htmlContent: "<p>Updated content</p>" });
-      
+
       const rendererElement = wrapper.find('[data-test="html-renderer"]');
       expect(rendererElement.classes()).toContain('prose-invert');
       expect(rendererElement.html()).toContain("Updated content");
@@ -585,7 +572,8 @@ describe("HTMLRenderer", () => {
       
       expect(wrapper.vm.processedContent).toBeDefined();
       expect(wrapper.vm.DOMPurify).toBeDefined();
-      expect(wrapper.vm.store).toBeDefined();
+      // Component now exposes useTheme()'s isDark instead of a raw store.
+      expect(wrapper.vm.isDark).toBe(false);
     });
 
     it("should handle component unmounting cleanly", () => {

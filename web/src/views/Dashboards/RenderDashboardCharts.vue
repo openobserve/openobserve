@@ -156,7 +156,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :gs-min-w="getMinimumWidth(item.type)"
             :gs-min-h="getMinimumHeight(item.type)"
             class="grid-stack-item gridBackground bg-transparent! rounded-lg border-border-default!"
-            :class="store.state.theme == 'dark' ? 'dark border-border-default!' : ''"
           >
             <div class="grid-stack-item-content">
               <!-- Panel with Panel-Level Variables -->
@@ -1709,12 +1708,6 @@ export default defineComponent({
 /* When grid is static (disabled), hide resize handles */
 .grid-stack.grid-stack-static .ui-resizable-handle {
   display: none !important;
-}
-
-/* Dark-mode outline lives on the content child; pull it onto the design
-   token for a clean solid edge against the dark canvas. */
-.grid-stack-item.dark .grid-stack-item-content {
-  border-color: var(--color-border-default);
 }
 
 .grid-stack-item .grid-stack-item-content {
