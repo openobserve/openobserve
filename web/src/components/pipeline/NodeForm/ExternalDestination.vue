@@ -70,7 +70,7 @@ import DestinationPicker from "@/components/flow/forms/DestinationPicker.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
 const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });
-const emit = defineEmits(["get:destinations", "cancel:hideform"]);
+const emit = defineEmits(["cancel:hideform"]);
 
 const internalOpen = ref(!!props.open);
 watch(

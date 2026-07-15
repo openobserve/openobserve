@@ -104,7 +104,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <AssociateFunction
     v-if="pipelineObj.dialog.name === 'function'"
     :open="true"
-    :functions="functionOptions"
     :associated-functions="associatedFunctions"
     @cancel:hideform="resetDialog"
     @add:function="refreshFunctionList"

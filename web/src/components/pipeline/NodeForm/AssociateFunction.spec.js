@@ -128,7 +128,10 @@ describe("AssociateFunction.vue (drawer chrome)", () => {
     const picker = wrapper.findComponent({ name: "FunctionPicker" });
     expect(picker.props("initialName")).toBe("fn-b");
     expect(picker.props("initialAfterFlatten")).toBe(false);
-    expect(picker.props("isUpdating")).toBe(true);
+    // Editing a NODE must NOT bind `is-updating` — that flag means "editing an
+    // existing FUNCTION" and locks the select + disables the create-new name
+    // field. A node edit still has to let you re-point at a different function.
+    expect(picker.props("isUpdating")).toBeFalsy();
   });
 
   it("passes the already-associated names to the picker for uniqueness", () => {

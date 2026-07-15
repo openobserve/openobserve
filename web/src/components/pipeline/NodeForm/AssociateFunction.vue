@@ -83,12 +83,10 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 const props = withDefaults(
   defineProps<{
     open?: boolean;
-    functions?: any[];
     associatedFunctions?: string[];
   }>(),
   {
     open: false,
-    functions: () => [],
     associatedFunctions: () => [],
   },
 );
