@@ -114,15 +114,16 @@ describe("WorkflowFunction", () => {
       expect(Array.isArray(events[0].data)).toBe(true);
     });
 
-    it("locks the inline editor to JavaScript and seeds default code", () => {
+    it("locks the inline editor to JavaScript and seeds a concise comment", () => {
       const wrapper = createWrapper();
       expect(picker(wrapper).props("language")).toBe("javascript");
       const code = picker(wrapper).props("defaultCode");
-      // ready-to-edit boilerplate, not the typewriter placeholder
-      expect(code).toContain("return row;");
-      // the worked example touches both halves of the envelope
+      // A concise comment seed (mutate-in-place) — no `return row;` and not the
+      // old comment-heavy block that bloated saved functions.
       expect(code).toContain("row.meta");
-      expect(code).toContain("row.data");
+      expect(code).not.toContain("return row");
+      // lean — a few comment lines, not a big worked example
+      expect(code.split("\n").length).toBeLessThan(5);
     });
   });
 
