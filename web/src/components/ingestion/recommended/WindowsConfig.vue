@@ -9,10 +9,10 @@
         :class="selected === opt.value ? selectedCardClass : unselectedCardClass"
         @click="selected = opt.value"
       >
-        <OIcon :name="opt.icon" size="lg" :class="selected === opt.value ? 'text-[var(--q-primary)]' : 'text-gray-400'" />
+        <OIcon :name="opt.icon" size="lg" :class="selected === opt.value ? 'text-[var(--q-primary)]' : 'text-icon-color'" />
         <div>
           <div class="font-semibold text-sm">{{ opt.label }}</div>
-          <div class="text-xs mt-0.5" :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'">{{ opt.description }}</div>
+          <div class="text-xs mt-0.5 text-text-secondary">{{ opt.description }}</div>
         </div>
       </div>
     </div>
@@ -20,11 +20,10 @@
     <!-- EC2 IAM prerequisite note -->
     <div
       v-if="selected === 'ec2'"
-      class="flex gap-2 items-start rounded-lg p-3 mb-4 text-sm"
-      :class="store.state.theme === 'dark' ? 'bg-amber-950/40 border border-amber-800/50' : 'bg-amber-50 border border-amber-200'"
+      class="flex gap-2 items-start rounded-lg p-3 mb-4 text-sm bg-banner-warning-bg border border-banner-warning-border"
     >
-      <OIcon name="info" size="sm" class="text-amber-500 shrink-0 mt-0.5" />
-      <div :class="store.state.theme === 'dark' ? 'text-amber-200' : 'text-amber-900'">
+      <OIcon name="info" size="sm" class="text-banner-warning-text shrink-0 mt-0.5" />
+      <div class="text-banner-warning-text">
         <span class="font-semibold">IAM role required.</span>
         Attach an IAM role to your EC2 instance with
         <code class="font-mono text-xs">ec2:DescribeTags</code> and
@@ -104,15 +103,8 @@ const activeCommand = computed(() => {
   return `Invoke-WebRequest -Uri ${script} -OutFile install.ps1 ; .\\install.ps1 -URL ${endpoint.value.url}/api/${props.currOrgIdentifier}/ -AUTH_KEY [BASIC_PASSCODE]`;
 });
 
-const selectedCardClass = computed(() =>
-  store.state.theme === "dark"
-    ? "border-[var(--q-primary)] bg-blue-950/30"
-    : "border-[var(--q-primary)] bg-blue-50"
-);
+const selectedCardClass = "border-[var(--q-primary)] bg-status-info-bg";
 
-const unselectedCardClass = computed(() =>
-  store.state.theme === "dark"
-    ? "border-gray-700 bg-gray-800/40 hover:border-gray-500"
-    : "border-gray-200 bg-white hover:border-gray-300"
-);
+const unselectedCardClass =
+  "border-border-default bg-surface-base hover:border-border-strong";
 </script>

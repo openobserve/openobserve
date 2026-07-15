@@ -248,20 +248,12 @@ const accessKey = computed(() => {
   );
 });
 
-// Computed class for styling based on theme
-const quickInstallBgClass = computed(() => {
-  return store.state.theme === 'dark'
-    ? 'bg-gray-800 border border-gray-700'
-    : 'bg-blue-50 border border-blue-200';
-});
+// Theme-independent class strings (dark handled by design tokens)
+const quickInstallBgClass = 'bg-banner-info-bg border border-banner-info-border';
 
-const descriptionClass = computed(() => {
-  return store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700';
-});
+const descriptionClass = 'text-text-secondary';
 
-const hintClass = computed(() => {
-  return store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-600';
-});
+const hintClass = 'text-text-secondary';
 
 // Quick install command
 const quickInstallCmd = computed(() => {

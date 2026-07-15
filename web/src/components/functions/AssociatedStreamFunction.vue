@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #top>
         <div class="flex items-center w-full border-b border-border-default pb-2 mb-1">
-          <div class="text-[15px] font-[600]" data-test="log-stream-title-text">
+          <div class="text-sm font-[600]" data-test="log-stream-title-text">
             {{ t("logStream.header") }}
           </div>
           <div class="ml-auto" data-test="stream-association-search-input">
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               >
                 <div
-                  class="text-[15px] font-[600] flex items-center"
+                  class="text-sm font-[600] flex items-center"
                   data-test="log-stream-title-text"
                 >
                   {{ t("function.associatedFunctionHeader") }}

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="p-3 rounded border border-solid border-card-glass-border"
+    class="p-3 rounded-sm border border-solid border-card-glass-border"
     :class="statusClass"
     :data-test="dataTest"
   >
@@ -131,9 +131,9 @@ const statusClass = computed(() => {
   if (!props.status) return "";
 
   const classes = {
-    good: "bg-green-50 dark:bg-green-900/10",
-    "needs-improvement": "bg-yellow-50 dark:bg-yellow-900/10",
-    poor: "bg-red-50 dark:bg-red-900/10",
+    good: "bg-status-success-bg",
+    "needs-improvement": "bg-status-warning-bg",
+    poor: "bg-status-error-bg",
   };
 
   return classes[props.status] || "";
@@ -152,7 +152,7 @@ const statusIcon = computed(() => {
 });
 
 const statusColorClass = computed(() => {
-  if (!props.status) return "text-gray-500";
+  if (!props.status) return "text-text-secondary";
 
   const classes = {
     good: "text-status-positive",
@@ -160,7 +160,7 @@ const statusColorClass = computed(() => {
     poor: "text-status-negative",
   };
 
-  return classes[props.status] || "text-gray-500";
+  return classes[props.status] || "text-text-secondary";
 });
 
 const progressValue = computed(() => {

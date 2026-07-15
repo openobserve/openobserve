@@ -342,14 +342,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     Records: {{ job.total_records_processed?.toLocaleString() }}<br/>
                     Size: {{ job.total_bytes_fetched ? formatSizeFromMB(((job.total_bytes_fetched / 1024 / 1024).toFixed(2))) : '0 MB' }}
                   </span>
-                  <span v-if="job.status === 'failed'" :data-test="`enrichment-url-jobs-item-${index}-error`" class="block text-xs text-red-500 mt-2">
+                  <span v-if="job.status === 'failed'" :data-test="`enrichment-url-jobs-item-${index}-error`" class="block text-xs text-status-error-text mt-2">
                     Error: {{ job.error_message }}
                   </span>
                 </div>
               </li>
             </ul>
           </div>
-          <div v-else class="text-center p-3 text-gray-400">
+          <div v-else class="text-center p-3 text-text-muted">
             No URL jobs found
           </div>
       </div>

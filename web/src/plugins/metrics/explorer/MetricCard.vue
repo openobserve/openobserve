@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              semibold looked like a different COLOR at this size — denser
              glyphs, same grey-900. -->
         <span
-          class="whitespace-nowrap overflow-hidden text-ellipsis text-[0.8125rem] font-medium text-text-primary tracking-[0.02em]"
+          class="whitespace-nowrap overflow-hidden text-ellipsis text-compact font-medium text-text-primary tracking-[0.02em]"
           :title="card.name"
           >{{ card.name }}</span
         >
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            Anchoring means the two cannot drift apart if the band's padding ever
            changes. -->
       <div
-        class="absolute inset-y-0 right-2 z-10 flex items-center gap-0.5 rounded pl-2 bg-surface-base invisible group-hover:visible group-focus-within:visible [@media(hover:none)]:visible"
+        class="absolute inset-y-0 right-2 z-10 flex items-center gap-0.5 rounded-sm pl-2 bg-surface-base invisible group-hover:visible group-focus-within:visible [@media(hover:none)]:visible"
       >
         <!-- The bar lands exactly where the in-flow clock sits, so it carries
              its OWN copy — hovering must not make "how old is this data"
@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            editor icon still works, so the metric stays explorable. -->
       <div
         v-if="card.unsupported"
-        class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] opacity-65 text-text-secondary"
+        class="flex flex-col items-center justify-center gap-1.5 h-full text-2xs opacity-65 text-text-secondary"
         :data-test="`metrics-explorer-card-unsupported-${card.name}`"
       >
         <OIcon name="help-outline" size="sm" />
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            to load. The drill-in works: the editor renders the table properly. -->
       <div
         v-else-if="preview?.status === 'unavailable'"
-        class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] opacity-65 text-text-secondary"
+        class="flex flex-col items-center justify-center gap-1.5 h-full text-2xs opacity-65 text-text-secondary"
         :data-test="`metrics-explorer-card-nopreview-${card.name}`"
       >
         <OIcon name="table-chart" size="sm" />
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         v-else-if="preview?.status === 'error'"
-        class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] opacity-65 text-text-secondary"
+        class="flex flex-col items-center justify-center gap-1.5 h-full text-2xs opacity-65 text-text-secondary"
         :data-test="`metrics-explorer-card-error-${card.name}`"
       >
         <!-- The backend's message is the only thing that distinguishes a
@@ -378,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            region with no message and no way out. -->
       <div
         v-else-if="renderError"
-        class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] text-text-secondary"
+        class="flex flex-col items-center justify-center gap-1.5 h-full text-2xs text-text-secondary"
         :data-test="`metrics-explorer-card-render-error-${card.name}`"
       >
         <span class="inline-flex items-center gap-1 cursor-help">
@@ -515,6 +515,7 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import MetricCardChart from "./MetricCardChart.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -607,7 +608,7 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const root = ref<HTMLElement | null>(null);
-    const isDark = computed(() => store.state.theme === "dark");
+    const { isDark } = useTheme();
 
     const color = computed(() => cardColorForIndex(props.index, isDark.value));
     // Kept for the card's aria label; the VISIBLE badge renders through the

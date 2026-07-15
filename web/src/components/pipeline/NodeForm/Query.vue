@@ -78,11 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div
       data-test="add-stream-query-routing-section"
-      class="w-full h-full stream-routing-section"
-      :class="[
-        store.state.theme === 'dark' ? 'bg-surface-base' : 'bg-white',
-        { 'fullscreen-mode': isFullscreenMode },
-      ]"
+      class="w-full h-full stream-routing-section bg-surface-base"
+      :class="{ 'fullscreen-mode': isFullscreenMode }"
     >
     <!-- ── Rule ③ OWNER pattern ──────────────────────────────────────────────
          Query OWNS <OForm> (created with useOForm) and hands it to <OForm :form>.

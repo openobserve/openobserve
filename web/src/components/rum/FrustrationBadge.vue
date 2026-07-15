@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="tooltipText"
       data-test-tooltip="frustration-badge-tooltip"
     >{{ count }}</OTag>
-    <span v-else class="text-gray-400" data-test="frustration-badge-none">—</span>
+    <span v-else class="text-text-muted" data-test="frustration-badge-none">—</span>
   </div>
 </template>
 

@@ -32,8 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       data-test="add-function-node-routing-section"
-      class="flex flex-col h-full"
-      :class="store.state.theme === 'dark' ? 'bg-(--color-surface-base,#1a1a1a)' : 'bg-white'"
+      class="flex flex-col h-full bg-surface-base"
     >
 
 
@@ -58,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-if="createNewFunction"
-          class="text-sm text-gray-600 dark:text-gray-300"
+          class="text-sm text-text-secondary"
         >
           ({{ t("alerts.newFunctionAssociationMsg") }})
         </div>
@@ -93,16 +92,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="associate-function-definition-section"
             class="mt-4 mb-4"
           >
-            <OCard class="function-definition-card border border-[#e1e5e9] dark:border-[#2d3748] rounded-lg shadow-[0_2px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] overflow-hidden dark:bg-[#1a202c]">
-              <OCardSection role="header" class="function-definition-header bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)] dark:bg-[linear-gradient(135deg,#2d3748_0%,#1a202c_100%)] border-b border-b-[#e2e8f0] dark:border-b-[#4a5568]">
-                <div class="text-base font-semibold text-[#2d3748] dark:text-white">
+            <OCard class="function-definition-card border border-border-default rounded-lg shadow-[0_2px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] overflow-hidden bg-surface-base">
+              <OCardSection role="header" class="function-definition-header bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)] dark:bg-[linear-gradient(135deg,#2d3748_0%,#1a202c_100%)] border-b border-b-border-default">
+                <div class="text-base font-semibold text-text-heading">
                   {{ t("function.function_definition") }}
                 </div>
               </OCardSection>
               <OSeparator />
               <OCardSection class="p-0 function-definition-content">
-                <div class="function-code-container bg-[#fafbfc] dark:bg-[#0d1117] dark:border dark:border-[#21262d] rounded-none max-w-[584px] max-h-[250px] overflow-y-auto relative">
-                  <pre class="function-code text-[#2d3748] dark:text-[#f7fafc] bg-transparent m-0 p-4 font-[JetBrains_Mono,Fira_Code,Monaco,Menlo,Ubuntu_Mono,monospace] text-[13px] leading-normal whitespace-pre-wrap break-words border-0 font-normal cursor-default select-text">{{
+                <div class="function-code-container bg-code-block-bg dark:border dark:border-border-default rounded-none max-w-146 max-h-62.5 overflow-y-auto relative">
+                  <pre class="function-code text-code-block-text bg-transparent m-0 p-4 font-[JetBrains_Mono,Fira_Code,Monaco,Menlo,Ubuntu_Mono,monospace] text-compact leading-normal whitespace-pre-wrap break-words border-0 font-normal cursor-default select-text">{{
                     pipelineObj.functions[selectedFunction]?.function ||
                     "No definition available"
                   }}</pre>
@@ -119,19 +118,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <!-- Info note explaining RAF/RBF -->
-            <div class="bg-[#f9f290] text-[#2d3748] w-full rounded-md p-3 flex flex-col gap-2">
-              <div class="text-sm text-[#2d3748]">
+            <div class="bg-banner-warning-bg text-banner-warning-text w-full rounded-md p-3 flex flex-col gap-2">
+              <div class="text-sm text-banner-warning-text">
                 Function Execution Guidelines:
               </div>
-              <div class="flex flex-col gap-1 text-sm text-[#2d3748]">
+              <div class="flex flex-col gap-1 text-sm text-banner-warning-text">
                 <div class="flex items-start gap-2">
                   <OIcon
                     name="info"
                     size="sm"
-                    class="shrink-0 mt-0.5 text-amber-500"
+                    class="shrink-0 mt-0.5 text-status-warning-text"
                   />
                   <span>
-                    <span class="font-bold text-[#007bff]">RBF (Run Before Flattening):</span>
+                    <span class="font-bold text-text-link">RBF (Run Before Flattening):</span>
                     Function executes before data structure is flattened
                   </span>
                 </div>
@@ -139,10 +138,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon
                     name="info"
                     size="sm"
-                    class="shrink-0 mt-0.5 text-amber-500"
+                    class="shrink-0 mt-0.5 text-status-warning-text"
                   />
                   <span>
-                    <span class="font-bold text-[#007bff]">RAF (Run After Flattening):</span>
+                    <span class="font-bold text-text-link">RAF (Run After Flattening):</span>
                     Function executes after data structure is flattened
                   </span>
                 </div>
@@ -435,7 +434,7 @@ const filterFunctions = (val: any, update: any) => {
 }
 
 .function-code::selection {
-  background-color: #bee3f8;
+  background-color: var(--color-primary-100);
 }
 
 /* Custom scrollbar */
@@ -444,21 +443,21 @@ const filterFunctions = (val: any, update: any) => {
 }
 
 .function-code-container::-webkit-scrollbar-track {
-  background: #f7fafc;
+  background: var(--color-surface-subtle);
 }
 
 .function-code-container::-webkit-scrollbar-thumb {
-  background: #cbd5e0;
+  background: var(--color-border-strong);
   border-radius: 3px;
 }
 
 .function-code-container::-webkit-scrollbar-thumb:hover {
-  background: #a0aec0;
+  background: var(--color-text-caption);
 }
 
 .dark .function-code::selection {
-  background-color: #2b6cb0;
-  color: #ffffff;
+  background-color: var(--color-primary-600);
+  color: var(--color-text-inverse);
 }
 
 .dark .function-code-container::-webkit-scrollbar {
@@ -466,18 +465,18 @@ const filterFunctions = (val: any, update: any) => {
 }
 
 .dark .function-code-container::-webkit-scrollbar-track {
-  background: #0d1117;
+  background: var(--color-surface-subtle);
   border-radius: 4px;
 }
 
 .dark .function-code-container::-webkit-scrollbar-thumb {
-  background: #4a5568;
+  background: var(--color-border-strong);
   border-radius: 4px;
-  border: 1px solid #2d3748;
+  border: 1px solid var(--color-border-default);
 }
 
 .dark .function-code-container::-webkit-scrollbar-thumb:hover {
-  background: #718096;
+  background: var(--color-text-caption);
 }
 
 .pipeline-add-function .add-function-name-input {

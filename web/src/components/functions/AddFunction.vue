@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="!formData.function && functionEditorPlaceholderFlag"
                       class="absolute inset-0 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
                     >
-                      <span class="[font-family:monospace] text-[var(--text-base)] [line-height:1.3125rem] text-[#a0aec0] dark:text-[#718096] whitespace-nowrap overflow-hidden [text-overflow:ellipsis]">{{
+                      <span class="[font-family:monospace] text-[var(--text-base)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden [text-overflow:ellipsis]">{{
                         transType === '1' ? jsPlaceholder : vrlPlaceholder
                       }}</span>
                     </div>
@@ -105,18 +105,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="function"
                         v-model:is-expanded="expandState.functionError"
                         :label="transType === '1' ? t('function.jsErrorDetails') : t('function.errorDetails')"
-                        labelClass="text-red-600 font-semibold"
+                        labelClass="text-status-error-text font-semibold"
                       />
                       <div
                         v-if="expandState.functionError"
-                        class="px-2 pb-2 border-l-4 border-red-500"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'bg-gray-800'
-                            : 'bg-gray-100'
-                        "
+                        class="px-2 pb-2 border-l-4 border-status-negative bg-surface-subtle"
                       >
-                        <pre class="my-0 text-red-700" :class="store.state.theme === 'dark' ? 'text-red-400' : 'text-red-700'" style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px;">{{
+                        <pre class="my-0 text-status-error-text" style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px;">{{
                           vrlFunctionError
                         }}</pre>
                       </div>

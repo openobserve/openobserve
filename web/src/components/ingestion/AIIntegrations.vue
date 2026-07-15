@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #icon>
                         <img
                           v-if="(integration.logo || integration.logoDark) && !failedLogos.has(integration.slug)"
-                          :src="(store.state.theme === 'dark' && integration.logoDark) || integration.logo"
+                          :src="(isDark && integration.logoDark) || integration.logo"
                           :alt="`${integration.name} logo`"
                           class="ai-menu-logo"
                           loading="lazy"
@@ -117,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, watch, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
 import { aiCategories } from "./ai/data";
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue';
@@ -130,6 +131,7 @@ export default defineComponent({
   setup() {
     const { t } = useI18n();
     const store = useStore();
+    const { isDark } = useTheme();
     const router = useRouter();
     const route = useRoute();
 
@@ -222,6 +224,7 @@ export default defineComponent({
     return {
       t,
       store,
+      isDark,
       aiCategories,
       selectedCategory,
       selectedIntegration,
@@ -253,8 +256,8 @@ export default defineComponent({
 .ai-menu-mono {
   display: grid;
   place-items: center;
-  background: var(--q-primary, #3f7994);
-  color: #fff;
+  background: var(--q-primary, var(--color-accent));
+  color: var(--color-text-inverse);
   font-size: 10.5px;
   font-weight: 700;
   line-height: 1;

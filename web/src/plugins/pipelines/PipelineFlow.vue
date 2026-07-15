@@ -17,13 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- src/components/PipelineFlow.vue -->
 <template>
   <div data-test="pipeline-flow-container" class="flex items-center justify-between">
-     <div data-test="pipeline-flow-unsaved-changes-warning-text" v-show="pipelineObj.dirtyFlag" class="text-[#F5A623] border border-[#F5A623] rounded-sm flex items-center px-2 mr-3">
+     <div data-test="pipeline-flow-unsaved-changes-warning-text" v-show="pipelineObj.dirtyFlag" class="text-status-warning-text border border-status-warning-text rounded-sm flex items-center px-2 mr-3">
       <OIcon name="info" class="mr-1 " size="sm" />
      Unsaved changes detected. Click "Save" to preserve your updates.
    </div>
 
    <!-- Edge deletion help notification -->
-   <div v-if="showEdgeHelpNotification" class="edge-help-notification absolute top-5 left-1/2 -translate-x-1/2 z-[1000] bg-white text-[#374151] py-[10px] px-4 rounded-lg text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] border border-[#e5e7eb] flex items-center dark:bg-surface-base dark:text-[#f3f4f6] dark:border-[#374151] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] [animation:slideDown_0.3s_ease-out]">
+   <div v-if="showEdgeHelpNotification" class="edge-help-notification absolute top-5 left-1/2 -translate-x-1/2 z-[1000] bg-surface-base text-text-body py-2.5 px-4 rounded-lg text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] border border-border-default flex items-center dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] [animation:slideDown_0.3s_ease-out]">
      <OIcon name="info" class="mr-1" size="sm" />
      Press Backspace/Delete to remove the edge
    </div>
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         position="top-left">
     </Controls>
     </VueFlow>
-    <div v-if="isCanvasEmpty" data-test="pipeline-flow-empty-text" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[#888] text-[1.5em] text-center pointer-events-none z-10">
+    <div v-if="isCanvasEmpty" data-test="pipeline-flow-empty-text" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-text-muted text-[1.5em] text-center pointer-events-none z-10">
       {{ t('pipeline.dragDropNodesHere') }}
     </div>
     <!-- Add UI elements or buttons to interact with the methods -->

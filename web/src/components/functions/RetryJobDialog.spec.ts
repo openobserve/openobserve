@@ -251,11 +251,11 @@ describe("RetryJobDialog", () => {
     await wrapper.vm.$nextTick();
     await flushPromises();
 
-    // Dark mode is driven by Tailwind `dark:` variant utilities on the
-    // dialog rather than a runtime `dark-theme` class.
+    // Dark mode is driven by the theme-aware `bg-dialog-bg` token on the
+    // dialog rather than a runtime `dark-theme` class or a `dark:` variant.
     const dialog = document.body.querySelector(".retry-dialog");
     expect(dialog).not.toBeNull();
-    expect(dialog?.classList.contains("dark:bg-[#1e1e1e]")).toBe(true);
+    expect(dialog?.classList.contains("bg-dialog-bg")).toBe(true);
     wrapper.unmount();
   });
 

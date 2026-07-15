@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="h-full"
-    :class="store.state.theme === 'dark' ? 'bg-surface-base' : 'bg-white'"
+    class="h-full bg-surface-base"
   >
     <div>
       <div class="flex justify-between items-center px-3 py-2">
@@ -33,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div class="w-full bg-gray-300" style="height: 1px" />
+      <div class="w-full bg-separator" style="height: 1px" />
 
       <!-- Inline form — the Save button lives inside the <OForm>, so Enter submits
            natively via type="submit" (no form-id needed; R4 case 1). -->

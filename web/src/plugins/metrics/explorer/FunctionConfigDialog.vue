@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ exprOf(variant) }}
         </div>
 
-        <div class="relative h-[120px]">
+        <div class="relative h-30">
           <div
             v-if="previewOf(variant).status === 'error'"
             class="flex h-full flex-col items-center justify-center gap-1 text-xs text-text-secondary"
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             v-else-if="previewOf(variant).status === 'done' && isEmpty(variant)"
-            class="flex h-full items-center justify-center rounded text-xs text-text-secondary"
+            class="flex h-full items-center justify-center rounded-sm text-xs text-text-secondary"
             :data-test="`metrics-fn-nodata-${variant.id}`"
           >
             {{ t("metrics.explorer.noData") }}

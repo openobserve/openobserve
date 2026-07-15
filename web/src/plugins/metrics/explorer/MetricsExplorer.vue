@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="rail.label" side="right" />
             <span
               v-if="rail.glyph"
-              class="font-mono text-[11px] font-semibold leading-none tracking-tight"
+              class="font-mono text-2xs font-semibold leading-none tracking-tight"
               aria-hidden="true"
               >{{ rail.glyph }}</span
             >
@@ -256,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              pins the row at the button's height so it does not jump when the
              button appears. -->
         <div
-          class="flex items-center justify-between gap-2 px-3 pb-2 min-h-[36px]"
+          class="flex items-center justify-between gap-2 px-3 pb-2 min-h-9"
         >
           <p class="text-xs font-semibold text-text-primary">
             {{ railHint }}
@@ -445,6 +445,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { isEqual } from "lodash-es";
 
@@ -555,7 +556,7 @@ export default defineComponent({
     });
     const selectedDate = ref<any>(defaultSelectedDate());
 
-    const isDark = computed(() => store.state.theme === "dark");
+    const { isDark } = useTheme();
     const isGrid = computed(() => grid.viewMode.value === "grid");
     // The rendered slice. Colour index is a card's position here, which is a
     // prefix of the full sorted set, so colours stay stable as pages are added.

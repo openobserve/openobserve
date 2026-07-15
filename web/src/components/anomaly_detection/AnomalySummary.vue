@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="h-full flex flex-col relative">
     <div
-      class="text-[0.8125rem] leading-[2.2] flex-1 overflow-y-auto p-4"
+      class="text-compact leading-[2.2] flex-1 overflow-y-auto p-4"
       ref="summaryContainer"
       @scroll="checkScrollState"
     >
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="ghost"
         size="icon-sm"
-        class="pointer-events-auto backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.2)] !border-2 !border-[var(--color-accent)] !text-[var(--color-accent)] !bg-white/95 dark:!bg-[rgba(30,30,30,0.9)]"
+        class="pointer-events-auto backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.2)] !border-2 !border-accent !text-accent !bg-surface-overlay"
         data-test="anomaly-summary-scroll-btn"
         @click="scrollToBottom"
       >

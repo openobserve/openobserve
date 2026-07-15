@@ -34,7 +34,7 @@
         </div>
         <div v-else class="indexDetailsContainer p-5 w-full" style="height: 100vh">
           <div
-            class="titleContainer flex flex-col items-flex-start gap-5 bg-[#00000005] border border-input-border rounded-[5px] p-4"
+            class="titleContainer flex flex-col items-flex-start gap-5 bg-surface-subtle border border-input-border rounded-md p-4"
           >
             <div
               data-test="stream-details-container"
@@ -75,7 +75,7 @@
           <div class="flex items-center justify-between gap-4 mt-4">
             <div
               data-test="enrichment-schema-total-fields"
-              class="text-sm w-28.75 h-7.5 rounded-sm flex items-center justify-center bg-theme-accent text-white"
+              class="text-sm w-28.75 h-7.5 rounded-sm flex items-center justify-center bg-theme-accent text-text-inverse"
             >
                 All Fields ({{ schemaData.schema.length }})
             </div>

@@ -71,12 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="nodes-drag-container pr-3 w-50">
           <div
             data-test="pipeline-editor-nodes-list-title"
-            class="nodes-header mb-2 mx-2 text-base font-semibold px-1 pb-2 text-center border-b-2 tracking-wide relative"
-            :class="
-              store.state.theme === 'dark'
-                ? 'text-[rgba(255,255,255,0.95)] border-[rgba(255,255,255,0.2)]'
-                : 'text-[#1f2937] border-[#e5e7eb]'
-            "
+            class="nodes-header mb-2 mx-2 text-base font-semibold px-1 pb-2 text-center border-b-2 tracking-wide relative text-text-heading border-border-default"
           >
             {{ t("pipeline.nodes") }}
           </div>
@@ -94,8 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           id="pipelineChartContainer"
           ref="chartContainerRef"
-          class="relative-position pipeline-chart-container o2vf_node h-[82.6vh] rounded-xl w-[calc(100%-200px)]"
-          :class="store.state.theme === 'dark' ? '' : 'bg-gray-100'"
+          class="relative-position pipeline-chart-container o2vf_node h-[82.6vh] rounded-xl w-[calc(100%-200px)] bg-surface-subtle dark:bg-transparent"
           v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'"
         >
           <PipelineFlow />
@@ -195,6 +189,7 @@ import AssociateFunction from "@/components/pipeline/NodeForm/AssociateFunction.
 import functionsService from "@/services/jstransform";
 
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import pipelineService from "@/services/pipelines";
 import { onBeforeRouteLeave, useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -326,6 +321,7 @@ const pipeline = ref<Pipeline>({
 
 const router = useRouter();
 const store = useStore();
+const { isDark } = useTheme();
 
 const confirmDialogMeta: any = ref({
   show: false,
@@ -446,7 +442,7 @@ const jsonEditorAiBtnLogo = computed(() => {
   if (isJsonEditorAiHovered.value || store.state.isAiChatEnabled) {
     return getImageURL('images/common/ai_icon_dark.svg');
   }
-  return store.state.theme === 'dark'
+  return isDark.value
     ? getImageURL('images/common/ai_icon_dark.svg')
     : getImageURL('images/common/ai_icon_gradient.svg');
 });
@@ -1224,7 +1220,7 @@ const cleanupPipelinesContextProvider = () => {
   left: 0;
   width: 100%;
   height: 2px;
-  background: #8b5cf6;
+  background: var(--color-accent);
   border-radius: 1px;
 }
 
@@ -1261,7 +1257,7 @@ const cleanupPipelinesContextProvider = () => {
   cursor: grab;
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--color-surface-base);
   backdrop-filter: blur(10px);
 }
 
@@ -1278,10 +1274,10 @@ const cleanupPipelinesContextProvider = () => {
 
 .o2vf_node .o2vf_node_input,
 .o2vf_node .vue-flow__node-input {
-  border: 1px solid #60a5fa;
-  color: #1f2937;
+  border: 1px solid var(--color-status-info-text);
+  color: var(--color-text-body);
   border-radius: 12px;
-  background: rgba(239, 246, 255, 0.8);
+  background: var(--color-status-info-bg);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
   transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
   cursor: grab;
@@ -1308,18 +1304,18 @@ const cleanupPipelinesContextProvider = () => {
   cursor: grab;
   min-height: 36px;
   padding: 8px 16px;
-  border: 1px solid rgba(74, 222, 128, 0.4);
-  color: #1f2937;
+  border: 1px solid var(--color-status-positive);
+  color: var(--color-text-body);
   border-radius: 8px;
-  background: rgba(240, 253, 244, 0.9);
+  background: var(--color-status-success-bg);
   box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
   transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
 .o2vf_node .vue-flow__node-output:hover {
-  background: rgba(240, 253, 244, 1);
+  background: var(--color-status-success-bg);
   box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
-  border-color: rgba(74, 222, 128, 0.6);
+  border-color: var(--color-status-positive);
 }
 
 .o2vf_node .vue-flow__node-output:active,
@@ -1335,10 +1331,10 @@ const cleanupPipelinesContextProvider = () => {
 
 .o2vf_node .o2vf_node_default,
 .o2vf_node .vue-flow__node-default {
-  border: 1px solid #f59e0b;
-  color: #1f2937;
+  border: 1px solid var(--color-status-warning-text);
+  color: var(--color-text-body);
   border-radius: 12px;
-  background: rgba(255, 251, 235, 0.8);
+  background: var(--color-status-warning-bg);
   box-shadow: 0 4px 12px rgba(217, 119, 6, 0.1);
   transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
   cursor: grab;
@@ -1348,8 +1344,8 @@ const cleanupPipelinesContextProvider = () => {
 
 .o2vf_node .o2vf_node_default:hover,
 .o2vf_node .vue-flow__node-default:hover {
-  border: 1px solid #f59e0b !important;
-  background: rgba(255, 251, 235, 0.95) !important;
+  border: 1px solid var(--color-status-warning-text) !important;
+  background: var(--color-status-warning-bg) !important;
   box-shadow: 0 6px 16px rgba(217, 119, 6, 0.2) !important;
 }
 
@@ -1368,51 +1364,4 @@ const cleanupPipelinesContextProvider = () => {
   transition: none !important;
 }
 
-.dark .nodes-header::after {
-  background: #a855f7 !important;
-}
-
-.dark .vue-flow__node-input,
-.dark .o2vf_node_input {
-  background: rgba(30, 58, 138, 0.2) !important;
-  border: 1px solid rgba(96, 165, 250, 0.3) !important;
-  color: rgba(255, 255, 255, 0.9) !important;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1) !important;
-}
-
-.dark .vue-flow__node-input:hover,
-.dark .o2vf_node_input:hover {
-  background: rgba(30, 58, 138, 0.3) !important;
-  border-color: rgba(96, 165, 250, 0.5) !important;
-  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.2) !important;
-}
-
-.dark .vue-flow__node-output,
-.dark .o2vf_node_output {
-  background: rgba(20, 83, 45, 0.2) !important;
-  border: 1px solid rgba(74, 222, 128, 0.3) !important;
-  color: rgba(255, 255, 255, 0.9) !important;
-}
-
-.dark .vue-flow__node-output:hover,
-.dark .o2vf_node_output:hover {
-  background: rgba(20, 83, 45, 0.3) !important;
-  border-color: rgba(74, 222, 128, 0.5) !important;
-  box-shadow: 0 6px 16px rgba(34, 197, 94, 0.2) !important;
-}
-
-.dark .vue-flow__node-default,
-.dark .o2vf_node_default {
-  background: rgba(120, 53, 15, 0.2) !important;
-  border: 1px solid rgba(251, 146, 60, 0.3) !important;
-  color: rgba(255, 255, 255, 0.9) !important;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.1) !important;
-}
-
-.dark .vue-flow__node-default:hover,
-.dark .o2vf_node_default:hover {
-  background: rgba(120, 53, 15, 0.3) !important;
-  border-color: rgba(251, 146, 60, 0.5) !important;
-  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.2) !important;
-}
 </style>

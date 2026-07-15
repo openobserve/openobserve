@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import useIngestion from "@/composables/useIngestion";
 import { b64EncodeStandard } from "@/utils/zincutils";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -34,8 +35,7 @@ const props = defineProps<{
 
 const store = useStore();
 const { endpoint } = useIngestion();
-
-const isDark = computed(() => store.state?.theme === "dark");
+const { isDark } = useTheme();
 
 // The {url}/{org}/{token} the snippets are substituted with. `token` is the
 // base64 of email:password (the same value used for ingest tokens), WITHOUT the
@@ -125,7 +125,7 @@ const renderedSections = computed(() =>
           :href="safeHttpUrl(docUrl)"
           target="_blank"
           rel="noopener noreferrer"
-          class="text-blue-500 hover:text-blue-600"
+          class="text-text-link hover:text-text-link-hover"
           style="text-decoration: underline"
           >here</a
         >
@@ -146,7 +146,7 @@ const renderedSections = computed(() =>
 
 .o2-section {
   padding: 1.25rem 0;
-  border-top: 1px solid rgba(136, 136, 136, 0.18);
+  border-top: 1px solid var(--color-border-default);
 
   &:first-of-type {
     border-top: none;
@@ -174,7 +174,7 @@ const renderedSections = computed(() =>
 }
 
 .o2-card-md :deep(:not(pre) > code) {
-  background: rgba(136, 136, 136, 0.16);
+  background: var(--color-code-bg);
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
   font-weight: 400;

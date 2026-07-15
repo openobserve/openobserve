@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="step-anomaly-config h-full"
-    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <div
       class="step-content px-3 py-4 rounded-lg h-full overflow-y-auto overflow-x-hidden bg-surface-overlay border border-border-default"
@@ -120,16 +119,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="font-semibold flex items-center"
             style="width: 190px; height: 36px"
           >
-            SQL <span class="text-red-500 ml-1">*</span>
+            SQL <span class="text-status-error-text ml-1">*</span>
           </div>
           <div style="width: calc(100% - 190px)">
             <div
-              class="custom-sql-editor-wrapper h-[140px] rounded overflow-hidden"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'border border-white/[0.18]'
-                  : 'border border-black/[0.12]'
-              "
+              class="custom-sql-editor-wrapper h-35 rounded-sm overflow-hidden border border-border-default"
             >
               <QueryEditor
                 data-test-prefix="anomaly-custom-sql"
@@ -149,14 +143,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="!config.custom_sql"
-              class="text-red-8 pt-1"
+              class="text-status-error-text pt-1"
               style="font-size: 11px; line-height: 12px"
             >
               {{ t("alerts.anomaly.sqlRequired") }}
             </div>
             <div
               v-if="hasTimestampAlias"
-              class="text-red-8 pt-1"
+              class="text-status-error-text pt-1"
               data-test="anomaly-custom-sql-timestamp-alias-error"
               style="font-size: 11px; line-height: 12px"
             >
@@ -169,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="text-xs mt-1"
               :class="
-                store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'
+                'text-text-secondary'
               "
             >
               Query must return two columns: <code>time_bucket</code> and
@@ -185,9 +179,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Detection Function -->
           <div class="flex flex-row items-start gap-2">
-            <div class="w-[170px] min-w-[170px] min-h-8 leading-[1.4] text-[length:inherit] font-semibold">
+            <div class="w-42.5 min-w-42.5 min-h-8 leading-[1.4] text-[length:inherit] font-semibold">
               {{ t("alerts.detectionFunction") }}
-              <span class="text-red-500 ml-1">*</span>
+              <span class="text-status-error-text ml-1">*</span>
             </div>
             <div class="flex items-center gap-2">
               <OSelect
@@ -229,13 +223,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <!-- Detection Resolution -->
           <div class="flex flex-row items-start gap-2">
-            <div class="w-[170px] min-w-[170px] min-h-8 leading-[1.4] text-[length:inherit] font-semibold">
+            <div class="w-42.5 min-w-42.5 min-h-8 leading-[1.4] text-[length:inherit] font-semibold">
               {{ t("alerts.anomaly.detectionResolution") }}
-              <span class="text-red-500 ml-1">*</span>
+              <span class="text-status-error-text ml-1">*</span>
               <OIcon
                 name="info"
                 size="sm"
-                class="ml-1 cursor-pointer text-gray-400"
+                class="ml-1 cursor-pointer text-icon-color"
               >
                 <OTooltip
                   side="right"
@@ -270,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   !config.histogram_interval_value ||
                   config.histogram_interval_value < 1
                 "
-                class="text-red-8 pt-1"
+                class="text-status-error-text pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 Field is required!
@@ -285,11 +279,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="font-semibold flex items-center"
             style="width: 190px; height: 36px"
           >
-            Detection Resolution <span class="text-red-500 ml-1">*</span>
+            Detection Resolution <span class="text-status-error-text ml-1">*</span>
             <OIcon
               name="info"
               size="sm"
-              class="ml-1 cursor-pointer text-gray-400"
+              class="ml-1 cursor-pointer text-icon-color"
             >
               <OTooltip
                 side="right"
@@ -324,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 !config.histogram_interval_value ||
                 config.histogram_interval_value < 1
               "
-              class="text-red-8 pt-1"
+              class="text-status-error-text pt-1"
               style="font-size: 11px; line-height: 12px"
             >
               Field is required!
@@ -336,13 +330,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="grid grid-cols-2 gap-3 items-start mb-4! pb-0!">
           <!-- Check Every -->
           <div class="flex flex-row items-start gap-2">
-            <div class="w-[170px] min-w-[170px] min-h-8 leading-[1.4] text-[length:inherit] font-semibold">
+            <div class="w-42.5 min-w-42.5 min-h-8 leading-[1.4] text-[length:inherit] font-semibold">
               {{ t("alerts.anomaly.checkEvery") }}
-              <span class="text-red-500 ml-1">*</span>
+              <span class="text-status-error-text ml-1">*</span>
               <OIcon
                 name="info"
                 size="sm"
-                class="ml-1 cursor-pointer text-gray-400"
+                class="ml-1 cursor-pointer text-icon-color"
               >
                 <OTooltip
                   side="right"
@@ -377,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   !config.schedule_interval_value ||
                   config.schedule_interval_value < 1
                 "
-                class="text-red-8 pt-1"
+                class="text-status-error-text pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 Field is required!
@@ -386,13 +380,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <!-- Look Back Window -->
           <div class="flex flex-row items-start gap-2">
-            <div class="w-[170px] min-w-[170px] min-h-8 leading-[1.4] text-[length:inherit] font-semibold">
+            <div class="w-42.5 min-w-42.5 min-h-8 leading-[1.4] text-[length:inherit] font-semibold">
               {{ t("alerts.anomaly.lookBackWindow") }}
-              <span class="text-red-500 ml-1">*</span>
+              <span class="text-status-error-text ml-1">*</span>
               <OIcon
                 name="info"
                 size="sm"
-                class="ml-1 cursor-pointer text-gray-400"
+                class="ml-1 cursor-pointer text-icon-color"
               >
                 <OTooltip
                   side="right"
@@ -427,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   !config.detection_window_value ||
                   config.detection_window_value < 1
                 "
-                class="text-red-8 pt-1"
+                class="text-status-error-text pt-1"
                 style="font-size: 11px; line-height: 12px"
                 data-test="anomaly-detection-window-error"
               >
@@ -441,13 +435,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="grid grid-cols-2 gap-3 items-start mb-4! pb-0!">
           <!-- Training Window -->
           <div class="flex flex-row items-start gap-2">
-            <div class="w-[170px] min-w-[170px] min-h-8 leading-[1.4] text-[length:inherit] font-semibold">
+            <div class="w-42.5 min-w-42.5 min-h-8 leading-[1.4] text-[length:inherit] font-semibold">
               {{ t("alerts.trainingWindow") }}
-              <span class="text-red-500 ml-1">*</span>
+              <span class="text-status-error-text ml-1">*</span>
               <OIcon
                 name="info"
                 size="sm"
-                class="ml-1 cursor-pointer text-gray-400"
+                class="ml-1 cursor-pointer text-icon-color"
               >
                 <OTooltip side="right" align="center" max-width="300px">
                   <template #content><span style="font-size: 14px">
@@ -470,7 +464,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 class="static-text text-xs"
                 :class="
-                  store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'
+                  'text-text-secondary'
                 "
               >
                 days (seasonality:
@@ -484,12 +478,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <!-- Retrain Every -->
           <div class="flex flex-row items-start gap-2">
-            <div class="w-[170px] min-w-[170px] min-h-8 leading-[1.4] text-[length:inherit] font-semibold">
+            <div class="w-42.5 min-w-42.5 min-h-8 leading-[1.4] text-[length:inherit] font-semibold">
               {{ t("alerts.anomaly.retrainEvery") }}
               <OIcon
                 name="info"
                 size="sm"
-                class="ml-1 cursor-pointer text-gray-400"
+                class="ml-1 cursor-pointer text-icon-color"
               >
                 <OTooltip
                   side="right"
@@ -521,7 +515,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="info"
               size="sm"
-              class="ml-1 cursor-pointer text-gray-400"
+              class="ml-1 cursor-pointer text-icon-color"
             >
                 <OTooltip
                   side="right"
@@ -537,7 +531,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Header row: range labels + load button -->
               <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-2">
-                  <span class="text-xs text-gray-400">{{
+                  <span class="text-xs text-text-secondary">{{
                     t("alerts.anomaly.anomalyScoreRange")
                   }}</span>
                   <span
@@ -572,11 +566,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="min-h-45 relative flex-1">
                   <div
                     v-if="!previewActive"
-                    class="w-full h-45 flex flex-col items-center justify-center rounded border border-dashed border-border-default"
+                    class="w-full h-45 flex flex-col items-center justify-center rounded-sm border border-dashed border-border-default"
                     :class="
-                      store.state.theme === 'dark'
-                        ? 'text-gray-400'
-                        : 'text-gray-400'
+                      'text-text-secondary'
                     "
                     data-test="anomaly-sensitivity-empty"
                   >
@@ -625,7 +617,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       { value: 75, label: '75' },
                       { value: 100, label: '100' },
                     ]"
-                    class="sensitivity-range-slider mt-[14px] h-[145px]! [--color-slider-track-fill:var(--color-accent)] [--color-slider-thumb:var(--color-accent)] [--color-slider-thumb-border:white] [--color-slider-value:var(--color-text-secondary)]"
+                    class="sensitivity-range-slider mt-3.5 h-[145px]! [--color-slider-track-fill:var(--color-accent)] [--color-slider-thumb:var(--color-accent)] [--color-slider-thumb-border:white] [--color-slider-value:var(--color-text-secondary)]"
                     data-test="anomaly-threshold-range"
                     @update:model-value="onThresholdRangeChange"
                   />

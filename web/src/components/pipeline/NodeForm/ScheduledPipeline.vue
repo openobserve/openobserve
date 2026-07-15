@@ -31,8 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="scheduled-pipeline-field-list-collapsed-bar"
           @click="collapseFieldList"
         >
-          <OIcon name="expand-all" size="sm" class="rotate-90 mt-[10px] text-[20px]" />
-          <div class="[writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-[12px]">{{ t("pipeline.buildQuery") }}</div>
+          <OIcon name="expand-all" size="sm" class="rotate-90 mt-2.5 text-[20px]" />
+          <div class="[writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-xs">{{ t("pipeline.buildQuery") }}</div>
         </div>
 
         <OSplitter
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                       </div>
                                     </div>
                                   </template>
-                                  <div v-else class="pl-2 py-1 text-[0.7rem] text-o2-text-secondary">
+                                  <div v-else class="pl-2 py-1 text-[0.7rem] text-text-secondary">
                                     {{ durationPercentileErrMsg || "No values found" }}
                                   </div>
                                 </template>
@@ -238,17 +238,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="flex items-center gap-2"
                     >
                       <div
-                        class="font-bold flex items-center gap-1 w-[160px] shrink-0"
+                        class="font-bold flex items-center gap-1 w-40 shrink-0"
                       >
                         <span>{{ t("pipeline.trigger") }}</span>
                         <OIcon
                           name="info"
                           size="sm"
-                          class="cursor-pointer text-gray-400"
+                          class="cursor-pointer text-icon-color"
                         >
                           <OTooltip side="right" max-width="300px">
                             <template #content>
-                              <span class="text-[14px]">
+                              <span class="text-sm">
                                 Based upon the condition of trigger the
                                 pipeline will get trigger <br />
                                 e.g. if the trigger value is &gt;100 and the query
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div
                         data-test="scheduled-pipeline-aggregation-title"
-                        class="w-[172px] shrink-0"
+                        class="w-43 shrink-0"
                       >
                         {{ t("pipeline.aggregation") }}
                       </div>
@@ -366,9 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           size="sm"
                           class="ml-1 cursor-pointer"
                           :class="
-                            store.state.theme === 'dark'
-                              ? 'text-gray-400'
-                              : 'text-gray-400'
+                            'text-text-secondary'
                           "
                         >
                           <OTooltip side="right" max-width="300px">
@@ -448,7 +446,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               !aggregationData.having.value.toString().trim()
                                 .length
                             "
-                            class="text-red-8 pt-1 absolute"
+                            class="text-status-error-text pt-1 absolute"
                             style="font-size: 11px; line-height: 12px"
                           >
                             {{ t("pipeline.fieldRequired") }}
@@ -465,14 +463,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :options="triggerOperators"
                                 style="
                                   width: 88px;
-                                  border: 1px solid rgba(0, 0, 0, 0.05);
+                                  border: 1px solid var(--color-border-subtle);
                                 "
                               />
                             </div>
                             <div
                               class="flex items-center"
                               style="
-                                border: 1px solid rgba(0, 0, 0, 0.05);
+                                border: 1px solid var(--color-border-subtle);
                                 border-left: none;
                               "
                             >
@@ -495,12 +493,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   height: 40px;
                                   font-weight: normal;
                                 "
-                                :class="
-                                  store.state.theme === 'dark'
-                                    ? 'bg-gray-800'
-                                    : 'bg-gray-100'
-                                "
-                                class="flex justify-center items-center"
+                                class="flex justify-center items-center bg-surface-subtle"
                               >
                                 {{ t("alerts.times") }}
                               </div>
@@ -512,7 +505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               !triggerData.operator ||
                               !Number(triggerData.threshold)
                             "
-                            class="text-red-8 pt-1 absolute"
+                            class="text-status-error-text pt-1 absolute"
                             style="font-size: 11px; line-height: 12px"
                           >
                             {{ t("pipeline.fieldRequired") }}
@@ -523,17 +516,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex items-center gap-2">
                       <div
                         data-test="scheduled-pipeline-cron-toggle-title"
-                        class="font-bold flex items-center gap-1 w-[160px] shrink-0"
+                        class="font-bold flex items-center gap-1 w-40 shrink-0"
                       >
                         <span>{{ t("alerts.crontitle") + " *" }}</span>
                         <OIcon
                           name="info"
                           size="sm"
-                          class="cursor-pointer text-gray-400"
+                          class="cursor-pointer text-icon-color"
                         >
                           <OTooltip side="right" max-width="300px">
                             <template #content>
-                              <span class="text-[14px]">
+                              <span class="text-sm">
                                 Configure the option to enable a cron
                                 expression.
                               </span>
@@ -549,25 +542,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex items-start gap-2">
                       <div
                         data-test="scheduled-pipeline-frequency-title"
-                        class="font-bold flex items-center gap-1 w-[160px] shrink-0 pt-2"
+                        class="font-bold flex items-center gap-1 w-40 shrink-0 pt-2"
                       >
                         <span>{{ t("alerts.frequency") + " *" }}</span>
                         <OIcon
                           name="info"
                           size="sm"
-                          class="cursor-pointer text-gray-400"
+                          class="cursor-pointer text-icon-color"
                         >
                           <OTooltip side="right">
                             <template #content>
                               <span
-                                class="text-[14px]"
+                                class="text-sm"
                                 v-if="triggerData.frequency_type == 'minutes'"
                                 >How often the task should be executed.<br />
                                 e.g., 2 minutes means that the task will run
                                 every 2 minutes and will be processed based on
                                 the other parameters provided.</span
                               >
-                              <span class="text-[14px]" v-else>
+                              <span class="text-sm" v-else>
                                 Pattern: * * * * * * means every second.
                                 <br />
                                 Format: [Second (optional) 0-59] [Minute 0-59]
@@ -595,7 +588,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon
                             name="warning"
                             size="sm"
-                            class="cursor-pointer text-orange-500"
+                            class="cursor-pointer text-status-warning-text"
                           >
                             <OTooltip
                               side="right"
@@ -632,12 +625,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </OFormInput>
                             <div
                               data-test="scheduled-pipeline-frequency-unit"
-                              :class="[
-                                'flex justify-center items-center min-w-[60px] px-2 font-normal',
-                                store.state.theme === 'dark'
-                                  ? 'bg-gray-800'
-                                  : 'bg-gray-100',
-                              ]"
+                              class="flex justify-center items-center min-w-15 px-2 font-normal bg-surface-subtle"
                             >
                               {{ t("alerts.minutes") }}
                             </div>
@@ -645,7 +633,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <div
                             v-if="frequencyError"
                             data-test="scheduled-pipeline-frequency-error-text"
-                            class="text-red-700 text-[11px] leading-3"
+                            class="text-status-error-text text-2xs leading-3"
                           >
                             {{ frequencyError }}
                           </div>
@@ -674,17 +662,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex items-start gap-2">
                       <div
                         data-test="scheduled-pipeline-period-title"
-                        class="font-bold flex items-center gap-1 w-[160px] shrink-0 pt-2"
+                        class="font-bold flex items-center gap-1 w-40 shrink-0 pt-2"
                       >
                         <span>{{ t("alerts.period") + " *" }}</span>
                         <OIcon
                           name="info"
                           size="sm"
-                          class="cursor-pointer text-gray-400"
+                          class="cursor-pointer text-icon-color"
                         >
                           <OTooltip side="right" max-width="300px">
                             <template #content>
-                              <span class="text-[14px]">
+                              <span class="text-sm">
                                 Period for which the query should run.<br />
                                 e.g. 10 minutes means that whenever the query
                                 will run it will use the last 10 minutes of
@@ -718,12 +706,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </OFormInput>
                           <div
                             data-test="scheduled-pipeline-period-unit"
-                            :class="[
-                              'flex justify-center items-center min-w-[60px] px-2 font-normal',
-                              store.state.theme === 'dark'
-                                ? 'bg-gray-800'
-                                : 'bg-gray-100',
-                            ]"
+                            class="flex justify-center items-center min-w-15 px-2 font-normal bg-surface-subtle"
                           >
                             {{ t("alerts.minutes") }}
                           </div>
@@ -734,14 +717,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div
                           v-if="periodError"
                           data-test="scheduled-pipeline-period-error-text"
-                          class="text-red-700 text-[11px] leading-3"
+                          class="text-status-error-text text-2xs leading-3"
                         >
                           {{ periodError }}
                         </div>
                         <div
                           v-else-if="Number(triggerData.period)"
                           data-test="scheduled-pipeline-period-warning-text"
-                          class="text-accent text-[12px] leading-3 py-0.5"
+                          class="text-accent text-xs leading-3 py-0.5"
                         >
                           Note: The period should be the same as frequency.
                         </div>
@@ -750,17 +733,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex items-center gap-2">
                       <div
                         data-test="scheduled-pipeline-delay-title"
-                        class="font-bold flex items-center gap-1 w-[160px] shrink-0"
+                        class="font-bold flex items-center gap-1 w-40 shrink-0"
                       >
                         <span>{{ t("pipeline.delay") }}</span>
                         <OIcon
                           name="info"
                           size="sm"
-                          class="cursor-pointer text-gray-400"
+                          class="cursor-pointer text-icon-color"
                         >
                           <OTooltip side="right" max-width="300px">
                             <template #content>
-                              <span class="text-[14px]"
+                              <span class="text-sm"
                                 >Delay for which the pipeline is scheduled to
                                 run.<br />
                                 e.g. 10 minutes delay means that the pipeline
@@ -783,12 +766,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                         <div
                           data-test="scheduled-pipeline-delay-unit"
-                          :class="[
-                            'flex justify-center items-center min-w-[60px] px-2 font-normal',
-                            store.state.theme === 'dark'
-                              ? 'bg-gray-800'
-                              : 'bg-gray-100',
-                          ]"
+                          class="flex justify-center items-center min-w-15 px-2 font-normal bg-surface-subtle"
                         >
                           {{ t("alerts.minutes") }}
                         </div>
@@ -799,10 +777,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div></div>
 
                   <div
-                    class="flex justify-start items-end mt-4 pb-4 w-full"
-                    :class="
-                      store.state.theme === 'dark' ? 'bg-surface-base' : 'bg-white'
-                    "
+                    class="flex justify-start items-end mt-4 pb-4 w-full bg-surface-base"
                   ></div>
                 </div>
             </div>
@@ -852,7 +827,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="!query && queryEditorPlaceholderFlag && expandState.query"
                       class="query-editor-placeholder-overlay absolute inset-0 flex items-start pt-0.75 pl-[2.15rem] pr-2 pointer-events-none z-1 select-none"
                     >
-                      <span class="query-editor-placeholder-typewriter [font-family:monospace] text-[var(--text-base)] [line-height:1.3125rem] text-[#a0aec0] dark:text-[#718096] whitespace-nowrap overflow-hidden text-ellipsis">{{ editorPlaceholder }}</span>
+                      <span class="query-editor-placeholder-typewriter [font-family:monospace] text-[var(--text-base)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ editorPlaceholder }}</span>
                     </div>
                   </div>
 
@@ -937,8 +912,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div
-                class="border-t border-card-glass-border sticky bottom-0 px-4 py-3 z-10"
-                :class="store.state.theme === 'dark' ? 'bg-surface-base' : 'bg-white'"
+                class="border-t border-card-glass-border sticky bottom-0 px-4 py-3 z-10 bg-surface-base"
               >
                 <div class="flex justify-end gap-2">
                   <OButton
@@ -1027,6 +1001,7 @@ import {
 import FieldsInput from "@/components/alerts/FieldsInput.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import {
   getImageURL,
   useLocalTimezone,
@@ -1296,6 +1271,7 @@ const collapseFields = ref(false);
 
 
 const store = useStore();
+const { isDark } = useTheme();
 
 const functionEditorPlaceholderFlag = ref(true);
 
@@ -2692,7 +2668,7 @@ const getBtnLogo = computed(() => {
     return getImageURL("images/common/ai_icon_dark.svg");
   }
 
-  return store.state.theme === "dark"
+  return isDark.value
     ? getImageURL("images/common/ai_icon_dark.svg")
     : getImageURL("images/common/ai_icon_gradient.svg");
 });

@@ -1,7 +1,6 @@
 <template>
   <div
-    class="py-[2px]"
-    :class="store.state.theme === 'dark' ? 'bg-gray-500' : 'bg-gray-200 '"
+    class="py-0.5 bg-section-header-bg"
   >
     <div
       class="flex justify-between"
@@ -13,24 +12,14 @@
           v-if="showExpandIcon"
           name="keyboard-arrow-up"
           @click.stop="expanded = !expanded"
-          class="mr-1 cursor-pointer transition-all"
-          :class="[
-            store.state.theme === 'dark'
-              ? 'text-gray-100'
-              : 'text-gray-500',
-            expanded ? 'transform rotate-180' : '',
-          ]"
+          class="mr-1 cursor-pointer transition-all text-text-secondary"
+          :class="expanded ? 'transform rotate-180' : ''"
           size="md"
         />
         <div
           @click="showExpandIcon ? expanded = !expanded : null"
-          class="text-[14px] font-bold"
-          :class="[
-            store.state.theme === 'dark'
-              ? 'text-gray-100'
-              : 'text-gray-500',
-            labelClass,
-          ]"
+          class="text-sm font-bold text-text-secondary"
+          :class="labelClass"
         >
           {{ label }}
         </div>

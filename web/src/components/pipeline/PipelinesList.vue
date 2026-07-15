@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <div class="flex flex-col">
                   <div>View Error</div>
-                  <div class="text-xs text-gray-500">
+                  <div class="text-xs text-text-caption">
                     {{
                       new Date(
                         row.last_error.last_error_timestamp / 1000,
@@ -244,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-start justify-center">
               <div
                 data-test="scheduled-pipeline-expanded-sql"
-                class="w-full overflow-y-auto p-2.5 border border-[#ddd] border-l-[3px] border-l-[#7a54a2] h-full max-h-[200px] whitespace-normal bg-[#e8e8e8] text-black"
+                class="w-full overflow-y-auto p-2.5 border border-border-default border-l-[3px] border-l-accent h-full max-h-50 whitespace-normal bg-surface-subtle text-text-body"
               >
                 <pre style="text-wrap: wrap">{{ row?.sql_query }} </pre>
               </div>
@@ -376,16 +376,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="closeErrorDialog"
   >
     <template #header-left>
-      <OIcon name="error" size="md" class="text-[#ef4444]" />
+      <OIcon name="error" size="md" class="text-status-error-text" />
     </template>
 
     <div v-if="errorDialog.data" class="pipeline-error-content px-6 py-5 max-h-[60vh] overflow-y-auto">
       <!-- Error Summary -->
       <div v-if="errorDialog.data.last_error.error_summary" class="mb-4">
-        <div class="section-label mb-2 text-[13px] font-semibold tracking-[0.02em] opacity-80">
+        <div class="section-label mb-2 text-compact font-semibold tracking-[0.02em] opacity-80">
           {{ t("pipeline_list.error_summary") }}
         </div>
-        <div class="error-summary-box p-4 rounded-lg font-mono text-[13px] leading-[1.6] whitespace-pre-wrap wrap-break-word bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)] text-[#dc2626]">
+        <div class="error-summary-box p-4 rounded-lg font-mono text-compact leading-[1.6] whitespace-pre-wrap wrap-break-word bg-banner-error-soft-bg border border-banner-error-soft-border text-banner-error-soft-text">
           {{ errorDialog.data.last_error.error_summary }}
         </div>
       </div>
@@ -397,7 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Object.keys(errorDialog.data.last_error.node_errors).length > 0
         "
       >
-        <div class="section-label mb-3 text-[13px] font-semibold tracking-[0.02em] opacity-80">
+        <div class="section-label mb-3 text-compact font-semibold tracking-[0.02em] opacity-80">
           {{ t("pipeline_list.node_errors") }}
         </div>
         <div class="node-errors-container flex flex-col gap-3">
@@ -405,11 +405,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(nodeError, nodeId) in errorDialog.data.last_error
               .node_errors"
             :key="nodeId"
-            class="node-error-item p-4 rounded-lg bg-[rgba(0,0,0,0.02)] border border-[rgba(0,0,0,0.08)] transition-all hover:bg-[rgba(0,0,0,0.04)]"
+            class="node-error-item p-4 rounded-lg bg-surface-subtle border border-border-subtle transition-all hover:bg-interactive-hover-bg"
           >
             <div class="node-error-header flex items-center justify-between mb-2.5">
               <span class="node-name font-semibold text-sm">{{ nodeError.node_name || nodeId }}</span>
-              <span class="node-type text-xs px-2.5 py-1 rounded-xl bg-[rgba(99,102,241,0.1)] text-[#6366f1] font-medium">{{ nodeError.node_type }}</span>
+              <span class="node-type text-xs px-2.5 py-1 rounded-xl bg-badge-indigo-soft-bg text-badge-indigo-soft-text font-medium">{{ nodeError.node_type }}</span>
             </div>
             <div
               v-if="
@@ -420,7 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(msg, idx) in nodeError.error_messages"
                 :key="idx"
-                class="error-message p-3 rounded-md bg-[rgba(239,68,68,0.06)] border-l-[3px] border-l-[#ef4444] font-mono text-xs leading-[1.5] whitespace-pre-wrap wrap-break-word text-[#991b1b]"
+                class="error-message p-3 rounded-md bg-banner-error-soft-bg border-l-[3px] border-l-status-negative font-mono text-xs leading-[1.5] whitespace-pre-wrap wrap-break-word text-banner-error-soft-text"
               >
                 {{ msg }}
               </div>

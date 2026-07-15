@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ resource.resource_method || "GET" }}
             {{ resource.resource_url }}
           </div>
-          <div class="flex items-center gap-2 text-gray-400">
+          <div class="flex items-center gap-2 text-text-secondary">
             <div class="flex items-center">
               <OIcon name="schedule" size="sm" class="mr-1" />
               <span>{{
@@ -74,11 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div>
             <div class="flex py-2 px-3 border-b border-solid border-card-glass-border" v-if="resource.resource_type">
-              <div class="w-[150px] text-text-secondary font-medium shrink-0">Type:</div>
+              <div class="w-37.5 text-text-secondary font-medium shrink-0">Type:</div>
               <div class="flex-1 text-text-primary break-words">{{ resource.resource_type }}</div>
             </div>
             <div class="flex py-2 px-3 border-b border-solid border-card-glass-border" v-if="resource.resource_size">
-              <div class="w-[150px] text-text-secondary font-medium shrink-0">Size:</div>
+              <div class="w-37.5 text-text-secondary font-medium shrink-0">Size:</div>
               <div class="flex-1 text-text-primary break-words">
                 {{ formatBytes(resource.resource_size) }}
               </div>
@@ -87,24 +87,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex py-2 px-3 border-b border-solid border-card-glass-border"
               v-if="resource.resource_render_blocking_status"
             >
-              <div class="w-[150px] text-text-secondary font-medium shrink-0">Render Blocking:</div>
+              <div class="w-37.5 text-text-secondary font-medium shrink-0">Render Blocking:</div>
               <div class="flex-1 text-text-primary break-words">
                 {{ resource.resource_render_blocking_status }}
               </div>
             </div>
             <div class="flex py-2 px-3 border-b border-solid border-card-glass-border" v-if="resource.session?.id">
-              <div class="w-[150px] text-text-secondary font-medium shrink-0">Session ID:</div>
+              <div class="w-37.5 text-text-secondary font-medium shrink-0">Session ID:</div>
               <div class="flex-1 text-text-primary break-words">
                 <code
                   data-test="resource-detail-drawer-session-id-text"
-                  class="font-mono text-sm px-2 py-1 bg-surface-accent rounded text-text-primary"
+                  class="font-mono text-sm px-2 py-1 bg-surface-accent rounded-sm text-text-primary"
                 >{{
                   formatSessionId(resource.session.id)
                 }}</code>
               </div>
             </div>
             <div class="flex py-2 px-3" v-if="resource.view?.url">
-              <div class="w-[150px] text-text-secondary font-medium shrink-0">Page URL:</div>
+              <div class="w-37.5 text-text-secondary font-medium shrink-0">Page URL:</div>
               <div class="flex-1 text-text-primary truncate" :title="resource.view.url">
                 {{ resource.view.url }}
               </div>
@@ -126,13 +126,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- No Trace ID Notice -->
         <div
           v-else
-          class="p-3 text-center bg-surface-accent rounded"
+          class="p-3 text-center bg-surface-accent rounded-sm"
         >
           <OIcon name="info" size="md" class="mb-2" />
-          <div class="text-gray-400">
+          <div class="text-text-secondary">
             No trace information available for this resource.
           </div>
-          <div class="text-xs text-gray-400 mt-1">
+          <div class="text-xs text-text-caption mt-1">
             Trace correlation requires browser SDK v0.3.3+ with trace
             propagation enabled.
           </div>
@@ -256,7 +256,7 @@ const getStatusIcon = (statusCode: number) => {
 };
 
 const getStatusColorClass = (statusCode: number) => {
-  if (!statusCode) return "text-gray-500";
+  if (!statusCode) return "text-text-secondary";
   if (statusCode >= 200 && statusCode < 300) return "text-status-positive";
   if (statusCode >= 300 && statusCode < 400) return "text-info";
   if (statusCode >= 400 && statusCode < 500) return "text-warning";

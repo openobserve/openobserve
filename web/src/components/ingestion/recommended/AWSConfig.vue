@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="m-3 mt-1">
     <div class="mb-4">
-      <div data-test="aws-config-page-title" class="text-2xl font-semibold leading-[1.3] m-0 mb-1.5" :class="store.state.theme === 'dark' ? 'text-[#e0e0e0]' : 'text-[#1a1a1a]'">
+      <div data-test="aws-config-page-title" class="text-2xl font-semibold leading-[1.3] m-0 mb-1.5 text-text-heading">
         AWS Integrations
       </div>
-      <div data-test="aws-config-page-description" class="text-sm m-0 mb-4" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
+      <div data-test="aws-config-page-description" class="text-sm m-0 mb-4 text-text-secondary">
         Set up AWS monitoring in one click or configure individual services for granular control.
       </div>
 
@@ -49,10 +49,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="mt-8">
       <div class="mb-3">
-        <div class="text-base font-semibold m-0" :class="store.state.theme === 'dark' ? 'text-[#e0e0e0]' : 'text-[#333]'">
+        <div class="text-base font-semibold m-0 text-text-heading">
           Manual Configuration
         </div>
-        <div class="text-sm m-0" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
+        <div class="text-sm m-0 text-text-secondary">
           Use these credentials for custom AWS integrations or manual setup.
         </div>
       </div>

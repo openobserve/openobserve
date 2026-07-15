@@ -517,7 +517,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="flex text-[15px]! font-bold! leading-[1.4]!"
+          class="flex text-sm! font-bold! leading-[1.4]!"
           align="left"
           style="
             text-align: left;
@@ -535,7 +535,7 @@ function getIcon(data, ioType) {
       <div
         v-if="hasNodeError"
         data-test="pipeline-node-error-badge"
-        class="absolute top-[-12px] right-[-12px] w-[20px] h-[20px] bg-[#ef4444] border-2 border-white rounded-full flex items-center justify-center cursor-pointer z-[15] shadow-[0_2px_6px_rgba(239,68,68,0.5)] transition-all duration-200 error-badge"
+        class="absolute top-[-12px] right-[-12px] w-5 h-5 bg-status-negative border-2 border-white rounded-full flex items-center justify-center cursor-pointer z-[15] shadow-[0_2px_6px_rgba(239,68,68,0.5)] transition-all duration-200 error-badge"
         @click.stop="navigateToFunction(data.name)"
       >
         <OIcon name="error" size="sm" />
@@ -545,7 +545,7 @@ function getIcon(data, ioType) {
             pipelineObj.currentSelectedPipeline?.last_error?.node_errors?.[id]
               ?.error_count
           "
-          class="absolute top-[-6px] right-[-6px] bg-[#dc2626] text-white text-[9px] font-bold min-w-[14px] h-[14px] rounded-[7px] flex items-center justify-center px-[3px] border-[1.5px] border-solid border-white shadow-[0_1px_3px_rgba(0,0,0,0.4)]"
+          class="absolute top-[-6px] right-[-6px] bg-status-negative text-button-destructive-foreground text-[9px] font-bold min-w-3.5 h-3.5 rounded-[7px] flex items-center justify-center px-[3px] border-[1.5px] border-solid border-white shadow-[0_1px_3px_rgba(0,0,0,0.4)]"
         >
           {{
             pipelineObj.currentSelectedPipeline.last_error.node_errors[id]
@@ -563,7 +563,7 @@ function getIcon(data, ioType) {
 
       <div
         v-show="showButtons"
-        class="absolute top-[-30px] right-0 flex gap-[6px] transition-all duration-300 z-10 pt-[5px] px-[5px] pb-[10px] node-action-buttons"
+        class="absolute top-[-30px] right-0 flex gap-1.5 transition-all duration-300 z-10 pt-[5px] px-[5px] pb-2.5 node-action-buttons"
         :data-test="`pipeline-node-${io_type}-actions`"
         :style="{ '--node-color': getNodeColor(io_type) }"
         @mouseenter="handleActionButtonsEnter"
@@ -573,7 +573,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-[20px]! w-[20px]! h-[20px]! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+          class="min-w-5! w-5! h-5! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -582,7 +582,7 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="fixed bg-[#dc2626] text-white py-[6px] px-[10px] rounded-md text-[11px] z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none whitespace-nowrap"
+          class="fixed bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-md text-2xs z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none whitespace-nowrap"
           style="left: 15px"
         >
           Delete Node
@@ -624,7 +624,7 @@ function getIcon(data, ioType) {
       <div class="container">
         <div
           v-if="data.stream_name && data.stream_name.hasOwnProperty('label')"
-          class="flex text-[15px]! font-bold! leading-[1.4]!"
+          class="flex text-sm! font-bold! leading-[1.4]!"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -636,7 +636,7 @@ function getIcon(data, ioType) {
         </div>
         <div
           v-else
-          class="flex text-[15px]! font-bold! leading-[1.4]!"
+          class="flex text-sm! font-bold! leading-[1.4]!"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -649,7 +649,7 @@ function getIcon(data, ioType) {
       </div>
       <div
         v-show="showButtons"
-        class="absolute top-[-30px] right-0 flex gap-[6px] transition-all duration-300 z-10 pt-[5px] px-[5px] pb-[10px] node-action-buttons"
+        class="absolute top-[-30px] right-0 flex gap-1.5 transition-all duration-300 z-10 pt-[5px] px-[5px] pb-2.5 node-action-buttons"
         :data-test="`pipeline-node-${io_type}-actions`"
         :style="{ '--node-color': getNodeColor(io_type) }"
         @mouseenter="handleActionButtonsEnter"
@@ -659,7 +659,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-[20px]! w-[20px]! h-[20px]! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+          class="min-w-5! w-5! h-5! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -668,7 +668,7 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="fixed bg-[#dc2626] text-white py-[6px] px-[10px] rounded-md text-[11px] z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none whitespace-nowrap"
+          class="fixed bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-md text-2xs z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none whitespace-nowrap"
           style="left: 15px"
         >
           Delete Node
@@ -708,7 +708,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="flex text-[15px]! font-bold! leading-[1.4]!"
+          class="flex text-sm! font-bold! leading-[1.4]!"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -721,7 +721,7 @@ function getIcon(data, ioType) {
       </div>
       <div
         v-show="showButtons"
-        class="absolute top-[-30px] right-0 flex gap-[6px] transition-all duration-300 z-10 pt-[5px] px-[5px] pb-[10px] node-action-buttons"
+        class="absolute top-[-30px] right-0 flex gap-1.5 transition-all duration-300 z-10 pt-[5px] px-[5px] pb-2.5 node-action-buttons"
         :data-test="`pipeline-node-${io_type}-actions`"
         :style="{ '--node-color': getNodeColor(io_type) }"
         @mouseenter="handleActionButtonsEnter"
@@ -731,7 +731,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-[20px]! w-[20px]! h-[20px]! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+          class="min-w-5! w-5! h-5! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -740,7 +740,7 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="fixed bg-[#dc2626] text-white py-[6px] px-[10px] rounded-md text-[11px] z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none whitespace-nowrap"
+          class="fixed bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-md text-2xs z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none whitespace-nowrap"
           style="left: 15px"
         >
           Delete Node
@@ -781,7 +781,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="flex text-[15px]! font-bold! leading-[1.4]!"
+          class="flex text-sm! font-bold! leading-[1.4]!"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -795,7 +795,7 @@ function getIcon(data, ioType) {
 
       <div
         v-show="showButtons"
-        class="absolute top-[-30px] right-0 flex gap-[6px] transition-all duration-300 z-10 pt-[5px] px-[5px] pb-[10px] node-action-buttons"
+        class="absolute top-[-30px] right-0 flex gap-1.5 transition-all duration-300 z-10 pt-[5px] px-[5px] pb-2.5 node-action-buttons"
         :data-test="`pipeline-node-${io_type}-actions`"
         :style="{ '--node-color': getNodeColor(io_type) }"
         @mouseenter="handleActionButtonsEnter"
@@ -805,7 +805,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-[20px]! w-[20px]! h-[20px]! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+          class="min-w-5! w-5! h-5! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -814,7 +814,7 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="fixed bg-[#dc2626] text-white py-[6px] px-[10px] rounded-md text-[11px] z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none whitespace-nowrap"
+          class="fixed bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-md text-2xs z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none whitespace-nowrap"
           style="left: 15px"
         >
           Delete Node
@@ -854,7 +854,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="text-[15px]! font-bold! leading-[1.4]!"
+          class="text-sm! font-bold! leading-[1.4]!"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -868,7 +868,7 @@ function getIcon(data, ioType) {
 
       <div
         v-show="showButtons"
-        class="absolute top-[-30px] right-0 flex gap-[6px] transition-all duration-300 z-10 pt-[5px] px-[5px] pb-[10px] node-action-buttons"
+        class="absolute top-[-30px] right-0 flex gap-1.5 transition-all duration-300 z-10 pt-[5px] px-[5px] pb-2.5 node-action-buttons"
         :data-test="`pipeline-node-${io_type}-actions`"
         :style="{ '--node-color': getNodeColor(io_type) }"
         @mouseenter="handleActionButtonsEnter"
@@ -878,7 +878,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-[20px]! w-[20px]! h-[20px]! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+          class="min-w-5! w-5! h-5! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -887,7 +887,7 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="fixed bg-[#dc2626] text-white py-[6px] px-[10px] rounded-md text-[11px] z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none whitespace-nowrap"
+          class="fixed bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-md text-2xs z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none whitespace-nowrap"
           style="left: 15px"
         >
           Delete Node
@@ -928,7 +928,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="text-[15px]! font-bold! leading-[1.4]!"
+          class="text-sm! font-bold! leading-[1.4]!"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -967,7 +967,7 @@ function getIcon(data, ioType) {
                   <strong>{{ t("pipeline.samplingLabel") }}:</strong>
                   {{ t("pipeline.samplingAllTraces") }}
                 </div>
-                <div class="mt-2 text-xs text-gray-400">
+                <div class="mt-2 text-xs text-text-caption">
                   {{ t("pipeline.llmEvaluationDescription") }}
                 </div>
               </div>
@@ -978,7 +978,7 @@ function getIcon(data, ioType) {
 
       <div
         v-show="showButtons"
-        class="absolute top-[-30px] right-0 flex gap-[6px] transition-all duration-300 z-10 pt-[5px] px-[5px] pb-[10px] node-action-buttons"
+        class="absolute top-[-30px] right-0 flex gap-1.5 transition-all duration-300 z-10 pt-[5px] px-[5px] pb-2.5 node-action-buttons"
         :data-test="`pipeline-node-${io_type}-actions`"
         :style="{ '--node-color': getNodeColor(io_type) }"
         @mouseenter="handleActionButtonsEnter"
@@ -988,7 +988,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-[20px]! w-[20px]! h-[20px]! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+          class="min-w-5! w-5! h-5! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -997,7 +997,7 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="fixed bg-[#dc2626] text-white py-[6px] px-[10px] rounded-md text-[11px] z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none whitespace-nowrap"
+          class="fixed bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-md text-2xs z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none whitespace-nowrap"
           style="left: 15px"
         >
           Delete Node

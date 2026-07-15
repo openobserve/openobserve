@@ -213,8 +213,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Training failed for <strong>{{ pendingRetrainRow?.name }}</strong> with the following error:
         </div>
         <pre
-          class="text-xs whitespace-pre-wrap break-all rounded p-2 mb-2"
-          style="background: rgba(0,0,0,0.06); max-height: 120px; overflow-y: auto"
+          class="text-xs whitespace-pre-wrap break-all rounded-sm p-2 mb-2 bg-surface-subtle"
+          style="max-height: 120px; overflow-y: auto"
         >{{ pendingRetrainRow.last_error }}</pre>
         <div class="text-sm">Fix the issue above, then retry training.</div>
       </template>
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <strong>{{ pendingRetrainRow?.name }}</strong>?
           The existing model will be replaced once training completes.
         </p>
-        <div v-if="pendingRetrainRow?.training_completed_at" class="text-xs text-gray-400">
+        <div v-if="pendingRetrainRow?.training_completed_at" class="text-xs text-text-caption">
           Last trained: {{ formatTimestamp(pendingRetrainRow.training_completed_at) }}
         </div>
       </template>

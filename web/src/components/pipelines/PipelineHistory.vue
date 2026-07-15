@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           t(`pipeline.searchHistory`) || 'Select or search pipeline...'
         "
         data-test="pipeline-history-search-select"
-        class="min-w-[250px]"
+        class="min-w-62.5"
         clearable
       >
         <template #empty>
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="row.is_realtime ? 'Real-time' : 'Scheduled'">
               <OIcon
                 :name="row.is_realtime ? 'check-circle' : 'schedule'"
-                :class="row.is_realtime ? 'text-status-positive' : 'text-gray-500'"
+                :class="row.is_realtime ? 'text-status-positive' : 'text-text-muted'"
                 size="md"
               />
             </OTooltip>
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="row.is_silenced ? 'Silenced' : 'Not Silenced'">
               <OIcon
                 :name="row.is_silenced ? 'volume-off' : 'volume-up'"
-                :class="row.is_silenced ? 'text-gray-500' : 'text-status-positive'"
+                :class="row.is_silenced ? 'text-text-muted' : 'text-status-positive'"
                 size="md"
               />
             </OTooltip>
@@ -253,15 +253,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="py-1">
             <div class="flex gap-3">
               <div class="w-1/2">
-                <div class="text-xs text-gray-400 mb-1">
+                <div class="text-xs text-text-label mb-1">
                   Pipeline Name
                 </div>
-                <div class="text-sm text-weight-medium">
+                <div class="text-sm font-medium">
                   {{ selectedRow.pipeline_name }}
                 </div>
               </div>
               <div class="w-1/2">
-                <div class="text-xs text-gray-400 mb-1">Status</div>
+                <div class="text-xs text-text-label mb-1">Status</div>
                 <OTag type="queryStatus" :value="selectedRow.status" />
               </div>
             </div>
@@ -273,13 +273,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="py-1">
             <div class="flex gap-3">
               <div class="w-1/2">
-                <div class="text-xs text-gray-400 mb-1">Timestamp</div>
+                <div class="text-xs text-text-label mb-1">Timestamp</div>
                 <div class="text-sm">
                   {{ formatDate(selectedRow.timestamp) }}
                 </div>
               </div>
               <div class="w-1/2">
-                <div class="text-xs text-gray-400 mb-1">Duration</div>
+                <div class="text-xs text-text-label mb-1">Duration</div>
                 <div class="text-sm">
                   {{
                     formatDuration(
@@ -297,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="py-1">
             <div class="flex gap-3">
               <div class="w-1/2">
-                <div class="text-xs text-gray-400 mb-1">Type</div>
+                <div class="text-xs text-text-label mb-1">Type</div>
                 <div class="text-sm">
                   <OIcon
                     :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
@@ -308,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="w-1/2">
-                <div class="text-xs text-gray-400 mb-1">Silenced</div>
+                <div class="text-xs text-text-label mb-1">Silenced</div>
                 <div class="text-sm">
                   <OIcon
                     v-if="selectedRow.is_silenced"
@@ -338,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="py-1">
               <div class="flex gap-3">
                 <div v-if="selectedRow.evaluation_took_in_secs" class="w-1/3">
-                  <div class="text-xs text-gray-400 mb-1">
+                  <div class="text-xs text-text-label mb-1">
                     Evaluation Time
                   </div>
                   <div class="text-sm">
@@ -346,17 +346,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div v-if="selectedRow.query_took" class="w-1/3">
-                  <div class="text-xs text-gray-400 mb-1">Query Time</div>
+                  <div class="text-xs text-text-label mb-1">Query Time</div>
                   <div class="text-sm">
                     {{ (selectedRow.query_took / 1000).toFixed(2) }}ms
                   </div>
                 </div>
                 <div v-if="selectedRow.retries > 0" class="w-1/3">
-                  <div class="text-xs text-gray-400 mb-1">Retries</div>
+                  <div class="text-xs text-text-label mb-1">Retries</div>
                   <div class="text-sm">{{ selectedRow.retries }}</div>
                 </div>
                 <div v-if="selectedRow.delay_in_secs" class="w-1/3">
-                  <div class="text-xs text-gray-400 mb-1">Delay</div>
+                  <div class="text-xs text-text-label mb-1">Delay</div>
                   <div class="text-sm">{{ selectedRow.delay_in_secs }}s</div>
                 </div>
                 <div
@@ -366,7 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   class="w-1/3"
                 >
-                  <div class="text-xs text-gray-400 mb-1">
+                  <div class="text-xs text-text-label mb-1">
                     Result Status
                   </div>
                   <div class="text-sm">
@@ -388,8 +388,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="selectedRow.source_node">
             <OSeparator class="my-2" />
             <div class="py-1">
-              <div class="text-xs text-gray-400 mb-1">Source Node</div>
-              <div class="text-sm font-mono text-[13px]">
+              <div class="text-xs text-text-label mb-1">Source Node</div>
+              <div class="text-sm font-mono text-compact">
                 {{ selectedRow.source_node }}
               </div>
             </div>
@@ -399,12 +399,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="selectedRow.error">
             <OSeparator class="my-2" />
             <div class="py-1">
-              <div class="text-xs text-gray-400 mb-1">
+              <div class="text-xs text-text-label mb-1">
                 <OIcon name="error" size="xs" class="mr-1" />
                 Error Details
               </div>
               <div
-                class="rounded border border-solid border-negative/30 p-2 mt-2 bg-red-500/5"
+                class="rounded-sm border border-solid border-status-negative/30 p-2 mt-2 bg-status-error-bg"
               >
                 <pre
                   class="text-sm"
@@ -425,12 +425,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="selectedRow.success_response">
             <OSeparator class="my-2" />
             <div class="py-1">
-              <div class="text-xs text-gray-400 mb-1">
+              <div class="text-xs text-text-label mb-1">
                 <OIcon name="check-circle" size="xs" class="mr-1" />
                 Response
               </div>
               <div
-                class="rounded border border-solid border-positive/30 p-2 mt-2 bg-green-500/5"
+                class="rounded-sm border border-solid border-status-positive/30 p-2 mt-2 bg-status-success-bg"
               >
                 <pre
                   class="text-sm"
@@ -466,11 +466,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="closeErrorDialog"
     >
       <template #header-left>
-        <OIcon name="error" size="md" class="text-[#ef4444]" />
+        <OIcon name="error" size="md" class="text-status-error-text" />
       </template>
       <div class="mb-4">
-        <div class="text-[13px] font-semibold tracking-[0.02em] opacity-80 mb-2">Error Summary</div>
-        <div class="p-4 rounded-lg font-mono text-[13px] leading-[1.6] whitespace-pre-wrap wrap-break-word bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)] text-[#dc2626]">
+        <div class="text-compact font-semibold tracking-[0.02em] opacity-80 mb-2">Error Summary</div>
+        <div class="p-4 rounded-lg font-mono text-compact leading-[1.6] whitespace-pre-wrap wrap-break-word bg-banner-error-soft-bg border border-banner-error-soft-border text-banner-error-soft-text">
           {{ errorMessage?.error }}
         </div>
       </div>

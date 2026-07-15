@@ -42,20 +42,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :navigable="step > 1"
         >
           <div class="text-sm font-medium mb-3" style="font-weight: 500">
-            Select Destination Type <span class="text-red">*</span>
+            Select Destination Type <span class="text-status-error-text">*</span>
           </div>
           <div class="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 mb-4">
             <div
               v-for="destType in destinationTypes"
               :key="destType.value"
               :data-test="`destination-type-card-${destType.value}`"
-              class="destination-type-card relative flex flex-col items-center justify-center py-[20px] px-3 border-2 rounded-xl cursor-pointer [transition:all_0.3s_ease] min-h-[120px] hover:-translate-y-0.5"
-              :class="[
-                { selected: destinationType === destType.value },
-                store.state.theme === 'dark'
-                  ? 'border-[#424242] bg-[#1e1e1e] hover:border-[#5d9cec] hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]'
-                  : 'border-border-default bg-white hover:border-card-glass-border hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
-              ]"
+              class="destination-type-card relative flex flex-col items-center justify-center py-5 px-3 border-2 rounded-xl cursor-pointer [transition:all_0.3s_ease] min-h-30 hover:-translate-y-0.5 border-border-default bg-surface-base hover:border-card-glass-border hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]"
+              :class="{ selected: destinationType === destType.value }"
               @click="form.setFieldValue('destination_type', destType.value)"
             >
               <img
@@ -68,12 +63,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 :name="destType.icon"
                 size="lg"
-                class="card-icon mb-2 text-[#666] [transition:color_0.3s_ease]"
+                class="card-icon mb-2 text-icon-color [transition:color_0.3s_ease]"
               />
-              <div class="card-label text-[13px] font-medium text-center leading-[1.3] mt-1 text-text-primary">{{ destType.label }}</div>
+              <div class="card-label text-compact font-medium text-center leading-[1.3] mt-1 text-text-primary">{{ destType.label }}</div>
               <div
                 v-if="destinationType === destType.value"
-                class="absolute top-[0.375rem] right-[0.375rem] w-5 h-5 rounded-full overflow-hidden bg-status-positive text-white flex items-center justify-center z-[1]"
+                class="absolute top-[0.375rem] right-[0.375rem] w-5 h-5 rounded-full overflow-hidden bg-status-positive text-text-inverse flex items-center justify-center z-[1]"
               >
                 <!-- eslint-disable-next-line vue/max-attributes-per-line -->
                 <OIcon name="check" size="xs" />
@@ -206,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Destination-specific Metadata Section -->
           <div v-if="showMetadataFields" class="flex flex-col gap-4 mt-4">
-            <div class="w-full text-[14px] font-bold text-input-label">
+            <div class="w-full text-sm font-bold text-input-label">
               Metadata Configuration
             </div>
 
@@ -342,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Connection Notes Card -->
           <OCard
-            class="connection-notes-card rounded-lg border border-[#e3f2fd] mb-6 mt-4 bg-banner-info-bg!"
+            class="connection-notes-card rounded-lg border border-banner-info-border mb-6 mt-4 bg-banner-info-bg!"
           >
             <OCardSection role="body">
               <div class="flex items-center mb-2">
@@ -367,11 +362,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ol>
                 <div
                   v-if="connectionNotes.example"
-                  class="mt-2 p-2 rounded-md text-[13px]"
-                  :class="store.state.theme === 'dark' ? 'bg-gray-600' : 'bg-white'"
+                  class="mt-2 p-2 rounded-md text-compact bg-surface-base"
                 >
                   <strong>Example:</strong>
-                  <code class="ml-1 bg-transparent p-0 font-[Monaco,Menlo,'Ubuntu_Mono',monospace] text-[#1976d2]">{{ connectionNotes.example }}</code>
+                  <code class="ml-1 bg-transparent p-0 font-[Monaco,Menlo,'Ubuntu_Mono',monospace] text-text-link">{{ connectionNotes.example }}</code>
                 </div>
               </div>
             </OCardSection>
@@ -1291,7 +1285,7 @@ defineExpose({
 <style>
 .destination-type-card.selected {
   border-color: var(--color-card-glass-border);
-  background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
+  background: var(--color-status-info-bg);
   box-shadow: 0 4px 16px rgba(25, 118, 210, 0.2);
 }
 
@@ -1300,20 +1294,6 @@ defineExpose({
 }
 
 .destination-type-card.selected .card-label {
-  color: #333333;
-}
-
-.dark .destination-type-card.selected {
-  border-color: #5d9cec;
-  background: linear-gradient(135deg, #1a3a52 0%, #1e1e1e 100%);
-  box-shadow: 0 4px 16px rgba(93, 156, 236, 0.25);
-}
-
-.dark .destination-type-card.selected .card-icon {
-  color: #5d9cec;
-}
-
-.dark .destination-type-card.selected .card-label {
-  color: #ffffff;
+  color: var(--color-text-body);
 }
 </style>

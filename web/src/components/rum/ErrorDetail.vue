@@ -30,19 +30,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ column.error_message }}
     </div>
     <div class="text-xs flex items-center mt-1">
-      <span class="mr-3 text-gray-500"> {{ column.service }}</span>
+      <span class="mr-3 text-text-secondary"> {{ column.service }}</span>
       <div
         class="mr-3"
         :class="
           column.error_handling === 'unhandled'
-            ? 'text-red-6 px-1 border border-[rgb(246,68,68)] rounded'
-            : 'text-gray-500'
+            ? 'text-status-error-text px-1 border border-status-negative rounded-sm'
+            : 'text-text-secondary'
         "
       >
         {{ column.error_handling }}
       </div>
-      <OIcon name="schedule" size="sm" class="text-gray-500" />
-      <span class="pl-1 text-gray-500">{{
+      <OIcon name="schedule" size="sm" class="text-icon-color" />
+      <span class="pl-1 text-text-secondary">{{
         getFormattedDate(column.zo_sql_timestamp / 1000)
       }}</span>
     </div>

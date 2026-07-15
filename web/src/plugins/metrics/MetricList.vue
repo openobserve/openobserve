@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #trigger>
                     <div class="flex items-center min-w-0">
                       <OFieldLabel :field="row" class="flex-1 min-w-0" />
-                      <div class="absolute h-full right-0 top-0 z-[5] bg-[#e8e8e8] px-[6px] invisible flex items-center group-hover:visible group-hover:opacity-100 dark:group-hover:bg-[#3f4143]">
+                      <div class="absolute h-full right-0 top-0 z-[5] bg-surface-subtle px-1.5 invisible flex items-center group-hover:visible group-hover:opacity-100">
                         <OButton
                           icon-left="add"
                           :data-test="`metrics-list-add-${row.name}-label-btn`"
@@ -120,13 +120,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <ul>
                             <label class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50 pr-0">
                               <div
-                                class="flex flex wrap justify-between"
+                                class="flex flex wrap justify-between text-text-secondary"
                                 style="width: calc(100% - 46px)"
-                                :class="
-                                  store.state.theme === 'dark'
-                                    ? 'text-gray-300'
-                                    : 'text-gray-500'
-                                "
                               >
                                 <div
                                   :title="value.key"
@@ -144,12 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 </div>
                               </div>
                               <div
-                                class="flex flex"
-                                :class="
-                                  store.state.theme === 'dark'
-                                    ? 'text-white'
-                                    : 'text-black'
-                                "
+                                class="flex flex text-text-primary"
                               >
                                 <OButton
                                   class="mr-1"

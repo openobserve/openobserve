@@ -10,7 +10,7 @@
        >
        <DropzoneBackground
         :style="{
-          backgroundColor:  '#e7f3ff',
+          backgroundColor: 'var(--color-surface-panel)',
           transition: 'background-color 0.2s ease',
         }"
       >
@@ -189,49 +189,49 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
   <style>
   /* Node background colors — parent-context compound selectors, must stay in CSS */
   .pipeline-view-tooltip .vue-flow__node-input .btn-fixed-width {
-    background-color: rgba(219, 234, 254, 0.8) !important;
-    border-color: #3b82f6 !important;
-    color: #000000 !important;
+    background-color: var(--color-status-info-bg) !important;
+    border-color: var(--color-status-info-text) !important;
+    color: var(--color-text-body) !important;
     padding: 8px 12px !important;
   }
 
   .pipeline-view-tooltip .vue-flow__node-output .btn-fixed-width {
-    background-color: rgba(220, 252, 231, 0.8) !important;
-    border-color: #22c55e !important;
-    color: #000000 !important;
+    background-color: var(--color-status-success-bg) !important;
+    border-color: var(--color-status-positive) !important;
+    color: var(--color-text-body) !important;
     padding: 8px 12px !important;
   }
 
   .pipeline-view-tooltip .vue-flow__node-default .btn-fixed-width {
-    background-color: rgba(255, 237, 168, 0.8) !important;
-    border-color: #f59e0b !important;
-    color: #000000 !important;
+    background-color: var(--color-status-warning-bg) !important;
+    border-color: var(--color-status-warning-text) !important;
+    color: var(--color-text-body) !important;
     padding: 8px 12px !important;
   }
 
   /* Handle colors — ::before pseudo-elements, must stay in CSS */
   .pipeline-view-tooltip .handle_input {
-    background: #dbeafe !important;
+    background: var(--color-status-info-bg) !important;
   }
 
   .pipeline-view-tooltip .handle_input::before {
-    background: #3b82f6 !important;
+    background: var(--color-status-info-text) !important;
   }
 
   .pipeline-view-tooltip .handle_output {
-    background: #dcfce7 !important;
+    background: var(--color-status-success-bg) !important;
   }
 
   .pipeline-view-tooltip .handle_output::before {
-    background: #22c55e !important;
+    background: var(--color-status-positive) !important;
   }
 
   .pipeline-view-tooltip .handle_default {
-    background: #fef3c7 !important;
+    background: var(--color-status-warning-bg) !important;
   }
 
   .pipeline-view-tooltip .handle_default::before {
-    background: #f59e0b !important;
+    background: var(--color-status-warning-text) !important;
   }
 
   /* Hide action buttons in tooltip */

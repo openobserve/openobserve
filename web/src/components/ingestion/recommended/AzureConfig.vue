@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="m-3 mt-1 max-w-[860px]">
+  <div class="m-3 mt-1 max-w-215">
     <!-- Header -->
     <div class="flex items-start gap-4 mb-6">
       <OIcon
@@ -24,10 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex-shrink-0"
       />
       <div>
-        <div class="text-sm font-medium m-0 mb-1" :class="store.state.theme === 'dark' ? 'text-[#e0e0e0]' : 'text-[#1a1a1a]'">
+        <div class="text-sm font-medium m-0 mb-1 text-text-heading">
           Azure Activity Logs
         </div>
-        <div class="text-sm m-0" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
+        <div class="text-sm m-0 text-text-secondary">
           Stream Azure subscription activity logs to OpenObserve via Event Hub.
           The ARM template sets up the Event Hub infrastructure — you then
           configure Azure to export logs to it.
@@ -37,8 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Step 1 -->
     <div
-      class="mb-4 p-4 rounded border-l-[3px] border-l-solid"
-      :class="store.state.theme === 'dark' ? 'bg-[rgba(255,255,255,0.04)] border-l-[#404040]' : 'bg-[#fafafa] border-l-[#e0e0e0]'"
+      class="mb-4 p-4 rounded-sm border-l-[3px] border-l-solid bg-surface-panel border-l-border-default"
     >
       <div
         style="
@@ -48,12 +47,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           align-items: start;
         "
       >
-        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-[0.85rem] shrink-0 bg-[#1976d2] text-white">1</div>
+        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-[0.85rem] shrink-0 bg-accent text-text-inverse">1</div>
         <div>
-          <div class="font-semibold mb-1" :class="store.state.theme === 'dark' ? 'text-[#e0e0e0]' : 'text-[#1a1a1a]'">
+          <div class="font-semibold mb-1 text-text-heading">
             Deploy ARM Template
           </div>
-          <div class="text-sm m-0 mb-3" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
+          <div class="text-sm m-0 mb-3 text-text-secondary">
             Creates an Event Hub namespace, Event Hub, and all required
             resources in your Azure subscription.
           </div>
@@ -74,8 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Step 2 -->
     <div
-      class="mb-4 p-4 rounded border-l-[3px] border-l-solid"
-      :class="store.state.theme === 'dark' ? 'bg-[rgba(255,255,255,0.04)] border-l-[#404040]' : 'bg-[#fafafa] border-l-[#e0e0e0]'"
+      class="mb-4 p-4 rounded-sm border-l-[3px] border-l-solid bg-surface-panel border-l-border-default"
     >
       <div
         style="
@@ -85,12 +83,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           align-items: start;
         "
       >
-        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-[0.85rem] shrink-0 bg-[#1976d2] text-white">2</div>
+        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-[0.85rem] shrink-0 bg-accent text-text-inverse">2</div>
         <div>
-          <div class="font-semibold mb-1" :class="store.state.theme === 'dark' ? 'text-[#e0e0e0]' : 'text-[#1a1a1a]'">
+          <div class="font-semibold mb-1 text-text-heading">
             Configure Diagnostic Settings
           </div>
-          <div class="text-sm mb-3" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
+          <div class="text-sm mb-3 text-text-secondary">
             After the ARM deployment completes, route Activity Logs to the Event
             Hub that was created.
           </div>
@@ -103,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Portal instructions -->
           <div v-if="step2Mode === 'portal'">
-            <ol class="text-sm pl-4 space-y-1" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
+            <ol class="text-sm pl-4 space-y-1 text-text-secondary">
               <li>
                 Go to
                 <strong
@@ -133,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Categories -->
             <div class="mb-4">
               <div class="flex items-center justify-between mb-2">
-                <div class="text-xs font-semibold" :class="store.state.theme === 'dark' ? 'text-[#d0d0d0]' : 'text-[#333]'">
+                <div class="text-xs font-semibold text-text-body">
                   Log categories to enable
                 </div>
                 <div class="flex gap-2">
@@ -180,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <div>
-                <div class="text-xs mb-1" :class="store.state.theme === 'dark' ? 'text-[#d0d0d0]' : 'text-[#333]'">
+                <div class="text-xs mb-1 text-text-body">
                   Resource Group
                 </div>
                 <OInput
@@ -191,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div>
-                <div class="text-xs mb-1" :class="store.state.theme === 'dark' ? 'text-[#d0d0d0]' : 'text-[#333]'">
+                <div class="text-xs mb-1 text-text-body">
                   Deployment Name
                 </div>
                 <OInput
@@ -205,12 +203,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div
               v-if="enabledCategories.length === 0"
-              class="text-sm text-red-500 mb-3"
+              class="text-sm text-status-error-text mb-3"
             >
               Select at least one log category above.
             </div>
             <div v-else>
-              <div class="text-xs mb-2" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
+              <div class="text-xs mb-2 text-text-secondary">
                 Run this command after your ARM deployment completes:
               </div>
               <CopyContent
@@ -225,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Manual Configuration -->
     <div class="mt-6">
-      <div class="font-semibold text-sm mb-2" :class="store.state.theme === 'dark' ? 'text-[#d0d0d0]' : 'text-[#333]'">
+      <div class="font-semibold text-sm mb-2 text-text-body">
         Manual Configuration (for reference)
       </div>
       <CopyContent :content="manualContent" />

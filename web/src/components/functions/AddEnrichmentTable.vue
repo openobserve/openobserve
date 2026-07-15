@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Data Source Selection (only for new tables) -->
             <div v-if="!isUpdating" class="flex flex-col gap-2">
-              <div class="text-gray-500 font-bold">{{ t('function.dataSource') }}</div>
+              <div class="text-text-label font-bold">{{ t('function.dataSource') }}</div>
               <OFormOptionGroup
                 name="source"
                 data-test="add-enrichment-table-source"
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Append/Replace Mode Toggle (only when updating URL-based tables) -->
             <div v-if="isUpdating && formData.source === 'url'" class="flex flex-col gap-2">
-              <div class="text-gray-500 font-bold">Update Mode</div>
+              <div class="text-text-label font-bold">Update Mode</div>
               <OFormOptionGroup
                 name="updateMode"
                 data-test="add-enrichment-table-update-mode"
@@ -95,13 +95,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="isUpdating && formData.source === 'url' && formData.urlJobs && formData.urlJobs.length > 0"
               class="flex flex-col gap-2"
             >
-              <div class="text-gray-500 font-bold text-[0.8125rem]">
+              <div class="text-text-label font-bold text-compact">
                 Existing URLs ({{ formData.urlJobs.length }})
               </div>
-              <div class="rounded-md border border-card-glass-border bg-gray-50 p-2 flex flex-col gap-1">
+              <div class="rounded-md border border-card-glass-border bg-surface-panel p-2 flex flex-col gap-1">
                 <div v-for="(job, index) in formData.urlJobs" :key="job.id">
                   <div class="flex items-center gap-2">
-                    <span class="font-medium text-gray-400 text-xs">{{ Number(index) + 1 }}.</span>
+                    <span class="font-medium text-text-caption text-xs">{{ Number(index) + 1 }}.</span>
                     <OIcon
                       :name="job.status === 'completed' ? 'check-circle' : job.status === 'failed' ? 'warning' : job.status === 'processing' ? 'sync' : 'schedule'"
                       size="sm"
@@ -110,10 +110,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         job.status === 'completed' ? 'text-status-positive' :
                         job.status === 'failed' ? 'text-status-negative' :
                         job.status === 'processing' ? 'text-accent' :
-                        'text-gray-500'
+                        'text-icon-color'
                       ]"
                     />
-                    <div class="text-gray-500 text-[0.8125rem] break-all">
+                    <div class="text-text-secondary text-compact break-all">
                       {{ job.url }}
                     </div>
                   </div>
@@ -125,12 +125,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Mode explanation (always show for URL-based tables in edit mode) -->
             <div
               v-if="isUpdating && formData.source === 'url'"
-              class="text-sm text-gray-600 p-3 rounded-lg"
+              class="text-sm text-text-secondary p-3 rounded-lg"
               :class="{
-                'bg-blue-50': formData.updateMode === 'reload',
-                'bg-green-50': formData.updateMode === 'append',
-                'bg-yellow-50': formData.updateMode === 'replace_failed',
-                'bg-orange-50': formData.updateMode === 'replace'
+                'bg-status-info-bg': formData.updateMode === 'reload',
+                'bg-status-success-bg': formData.updateMode === 'append',
+                'bg-status-warning-bg': formData.updateMode === 'replace_failed',
+                'bg-status-error-bg': formData.updateMode === 'replace'
               }"
             >
               <template v-if="formData.updateMode === 'reload'">
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template v-else-if="formData.updateMode === 'append'">
                 <strong>Append Mode:</strong> Add a new URL to existing ones. Data from all URLs will be combined.
-                <div class="mt-2 text-orange-700">
+                <div class="mt-2 text-status-warning-text">
                   <strong>Important:</strong> The new CSV file must have the same columns as the existing data. The enrichment table schema cannot be changed.
                 </div>
               </template>
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <pre
               v-if="compilationErr"
-              class="font-bold text-sm text-red-600 whitespace-pre-wrap"
+              class="font-bold text-sm text-status-error-text whitespace-pre-wrap"
             >{{ compilationErr }}</pre>
           </div>
       </div>

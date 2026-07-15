@@ -24,8 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         data-test="learn-web-vitals-link"
-        class="font-bold ml-3 px-2 rounded mt-2 py-1 text-sm w-fit flex items-center"
-        :class="store.state.theme === 'dark' ? 'bg-indigo-7' : 'bg-indigo-2'"
+        class="font-bold ml-3 px-2 rounded-sm mt-2 py-1 text-sm w-fit flex items-center bg-badge-indigo-soft-bg"
       >
         <OIcon
           name="info"
@@ -36,9 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <a
           href="https://web.dev/articles/vitals"
           title="https://web.dev/articles/vitals"
-          class="ml-1"
+          class="ml-1 text-badge-indigo-soft-text"
           target="_blank"
-          :class="store.state.theme === 'dark' ? 'text-white' : 'text-gray-800'"
         >
           {{ t("rum.clickHereLabel") }}
         </a>

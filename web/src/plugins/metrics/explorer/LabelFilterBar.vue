@@ -34,8 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="labelFilterKey(filter)"
         type="fieldTag"
         value="primarysm"
-        shape="rounded"
-        class="max-w-[250px]"
+        shape="rounded-sm"
+        class="max-w-62.5"
       >
         <span class="font-mono text-xs truncate"
           >{{ filter.label }} {{ filter.operator || "=" }}
@@ -59,8 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :key="labelFilterKey(filter)"
       type="fieldTag"
       value="primarysm"
-      shape="rounded"
-      class="min-w-0 max-w-[250px]"
+      shape="rounded-sm"
+      class="min-w-0 max-w-62.5"
       :data-test="`metrics-explorer-label-chip-${filter.label}`"
     >
       <!-- The chip truncates its value; the tooltip is where the whole matcher
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       type="countChip"
       value="neutral"
       size="sm"
-      shape="rounded"
+      shape="rounded-sm"
       clickable
       class="shrink-0 h-7"
       role="button"

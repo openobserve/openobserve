@@ -776,7 +776,7 @@ export default defineComponent({
 }
 
 .scrollable-list::-webkit-scrollbar-thumb {
-  background-color: #888;
+  background-color: var(--color-border-strong);
   border-radius: 4px;
 }
 

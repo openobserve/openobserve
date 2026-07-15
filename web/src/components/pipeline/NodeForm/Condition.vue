@@ -50,8 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div
       data-test="add-condition-section"
-      class="stream-routing-section w-full min-h-full"
-      :class="store.state.theme === 'dark' ? 'bg-surface-base' : 'bg-white'"
+      class="stream-routing-section w-full min-h-full bg-surface-base"
     >
 
 
@@ -74,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :stream-fields="filteredColumns"
               :group="conditionGroup"
               :depth="0"
-              condition-input-width="w-[130px]"
+              condition-input-width="w-32.5"
               :allow-custom-columns="true"
               module="pipelines"
               @add-condition="(updatedGroup) => updateGroup(updatedGroup)"
@@ -82,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @remove-group="(groupId) => removeConditionGroup(groupId)"
               @input:update="(name, field) => onInputUpdate(name, field)"
             />
-            <div v-else class="p-3 text-gray-400">Loading conditions...</div>
+            <div v-else class="p-3 text-text-muted">Loading conditions...</div>
           </div>
           <!-- Schema error for the bridged FilterGroup model (no OForm* field to
                render it, so surface the form-level `conditions` error here). -->
@@ -94,48 +93,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ conditionsError }}
           </div>
           <div
-            class="note-container bg-[#f9f290] text-[#2d3748] w-full rounded-md p-3 my-3 flex flex-col gap-2"
+            class="note-container bg-banner-warning-bg text-banner-warning-text w-full rounded-md p-3 my-3 flex flex-col gap-2"
             data-test="add-condition-note-container"
           >
             <div
-              class="text-sm text-gray-800"
+              class="text-sm text-banner-warning-text"
               data-test="add-condition-note-heading"
             >
               Condition value Guidelines:
             </div>
             <div
-              class="flex flex-col gap-1 text-sm text-gray-800"
+              class="flex flex-col gap-1 text-sm text-banner-warning-text"
               data-test="add-condition-note-info"
             >
               <div class="flex items-start gap-2">
-                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
+                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
                 <span>
                   To check for an empty value, use
-                  <span class="highlight font-bold text-[#007bff]">""</span>. Example:
-                  <span class="code font-mono py-[1px] px-[4px] rounded-[3px] bg-[rgba(0,0,0,0.06)] text-[#b30059]">app_name != ""</span>
+                  <span class="highlight font-bold text-text-link">""</span>. Example:
+                  <span class="code font-mono py-[1px] px-1 rounded-sm bg-code-bg text-code-text">app_name != ""</span>
                 </span>
               </div>
               <div class="flex items-start gap-2">
-                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
+                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
                 <span>
                   To check for an Null value, use
-                  <span class="highlight font-bold text-[#007bff]">null</span>. Example:
-                  <span class="code font-mono py-[1px] px-[4px] rounded-[3px] bg-[rgba(0,0,0,0.06)] text-[#b30059]">app_name != null</span>
+                  <span class="highlight font-bold text-text-link">null</span>. Example:
+                  <span class="code font-mono py-[1px] px-1 rounded-sm bg-code-bg text-code-text">app_name != null</span>
                 </span>
               </div>
               <div class="flex items-start gap-2">
-                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
+                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
                 <span>
                   To add a custom column, type column name and press
-                  <span class="highlight font-bold text-[#007bff]">Enter</span>.
+                  <span class="highlight font-bold text-text-link">Enter</span>.
                 </span>
               </div>
               <div class="flex items-start gap-2">
-                <OIcon name="warning" size="sm" class="shrink-0 mt-0.5 text-red-500" />
+                <OIcon name="warning" size="sm" class="shrink-0 mt-0.5 text-status-error-text" />
                 <span>If conditions are not met, the record will be dropped.</span>
               </div>
               <div class="flex items-start gap-2">
-                <OIcon name="warning" size="sm" class="shrink-0 mt-0.5 text-red-500" />
+                <OIcon name="warning" size="sm" class="shrink-0 mt-0.5 text-status-error-text" />
                 <span>If the record does not have the specified field, it will be dropped.</span>
               </div>
             </div>

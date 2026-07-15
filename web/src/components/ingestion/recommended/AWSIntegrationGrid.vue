@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTabs
         v-model="activeCategory"
         dense
-        class="text-gray-400"
+        class="text-tab-text-color"
         data-test="aws-integration-category-tabs"
       >
         <OTab name="all" label="All Services" />
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="filteredIntegrations.length === 0"
-      class="text-center py-12 text-[#666] dark:text-[#999]"
+      class="text-center py-12 text-text-muted"
     >
       <OIcon name="search-off" class="mb-2" style="width: 3rem; height: 3rem;" />
       <div class="text-base">No integrations found matching your search</div>

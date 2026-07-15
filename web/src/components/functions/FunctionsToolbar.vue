@@ -27,19 +27,19 @@
           <OFormRadioGroup name="transType" orientation="horizontal" class="items-center gap-4">
             <div class="flex items-center gap-1">
               <ORadio value="0" data-test="function-transform-type-vrl-radio" />
-              <span class="text-[13px] font-medium leading-none">{{ transformTypeOptions[0]?.label }}</span>
+              <span class="text-compact font-medium leading-none">{{ transformTypeOptions[0]?.label }}</span>
             </div>
             <!-- JavaScript option only shown in _meta organization -->
             <div v-if="transformTypeOptions[1]" class="flex items-center gap-1">
               <ORadio value="1" data-test="function-transform-type-js-radio" />
-              <span class="text-[13px] font-medium leading-none">{{ transformTypeOptions[1]?.label }}</span>
+              <span class="text-compact font-medium leading-none">{{ transformTypeOptions[1]?.label }}</span>
             </div>
           </OFormRadioGroup>
           <!-- Info icon with tooltip -->
           <OIcon
             name="info-outline"
             size="sm"
-            class="cursor-pointer text-gray-500 shrink-0"
+            class="cursor-pointer text-icon-color shrink-0"
           >
             <OTooltip>
               <template #content>
@@ -117,6 +117,7 @@ import { inject } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import config from "../../aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -135,6 +136,7 @@ const { t } = useI18n();
 const router = useRouter();
 
 const store = useStore();
+const { isDark } = useTheme();
 
 const props = defineProps({
   disableName: {
@@ -181,7 +183,7 @@ const getBtnLogo = computed(() => {
         return getImageURL('images/common/ai_icon_dark.svg')
       }
 
-      return store.state.theme === 'dark'
+      return isDark.value
         ? getImageURL('images/common/ai_icon_dark.svg')
         : getImageURL('images/common/ai_icon_gradient.svg')
     })

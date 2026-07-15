@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="filteredEvent.id + '-' + index"
         >
           <div
-            class="mb-1 px-2 py-2 cursor-pointer rounded hover:bg-[#ededed] hover:text-black"
+            class="mb-1 px-2 py-2 cursor-pointer rounded-sm hover:bg-interactive-hover-bg hover:text-text-body"
             @click="handleEventClick(filteredEvent)"
             :data-test="`player-event-row-${filteredEvent.type}`"
           >

@@ -221,12 +221,16 @@ describe("ErrorStackTrace Component", () => {
     // Assert
     const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
     const firstStyle = stackLines[0].attributes("style");
-    expect(firstStyle).toContain("border-top: 1px solid rgb(224, 224, 224)");
+    expect(firstStyle).toContain(
+      "border-top: 1px solid var(--color-border-default)",
+    );
 
     for (let i = 1; i < stackLines.length; i++) {
       const style = stackLines[i].attributes("style");
       if (style) {
-        expect(style).not.toContain("border-top: 1px solid rgb(224, 224, 224)");
+        expect(style).not.toContain(
+          "border-top: 1px solid var(--color-border-default)",
+        );
       }
     }
   });
@@ -259,7 +263,9 @@ describe("ErrorStackTrace Component", () => {
     const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
     expect(stackLines).toHaveLength(1);
     const style = stackLines[0].attributes("style");
-    expect(style).toContain("border-top: 1px solid rgb(224, 224, 224)");
+    expect(style).toContain(
+      "border-top: 1px solid var(--color-border-default)",
+    );
     expect(style).toContain("border-radius: 0 0 4px 4px");
   });
 

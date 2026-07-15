@@ -102,7 +102,7 @@ const richContent = computed(() =>
           :href="safeHttpUrl(docURL)"
           target="_blank"
           rel="noopener noreferrer"
-          class="text-blue-500 hover:text-blue-600"
+          class="text-text-link hover:text-text-link-hover"
           style="text-decoration: underline"
           >here</a
         >

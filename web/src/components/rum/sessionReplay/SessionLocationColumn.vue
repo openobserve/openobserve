@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="circle-icon"
           name="circle"
           size="xs"
-          class="mx-1.5 text-gray-400 shrink-0"
+          class="mx-1.5 text-icon-color shrink-0"
         />
         <span class="truncate">{{ part }}</span>
       </template>

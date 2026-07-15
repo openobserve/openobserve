@@ -1,5 +1,5 @@
 <template>
-  <div data-test="add-stream-routing-section" class="bg-white h-full">
+  <div data-test="add-stream-routing-section" class="bg-surface-base h-full">
     <div class="py-2 px-3 flex justify-between items-center">
       <div class="text-[18px]">Stream Routing</div>
       <OIcon
@@ -82,8 +82,7 @@
       />
 
       <div
-        class="flex justify-start mt-4 py-2 w-full gap-2"
-        :class="store.state.theme === 'dark' ? 'bg-surface-base' : 'bg-white'"
+        class="flex justify-start mt-4 py-2 w-full gap-2 bg-surface-base"
       >
         <OButton
           data-test="add-report-cancel-btn"

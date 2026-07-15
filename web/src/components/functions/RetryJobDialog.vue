@@ -19,11 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <Transition name="fade">
       <div
         v-if="modelValue"
-        class="retry-dialog-backdrop fixed top-0 left-0 w-full h-full bg-[rgba(0,0,0,0.5)] flex justify-center items-center z-[9999]"
+        class="retry-dialog-backdrop fixed top-0 left-0 w-full h-full bg-dialog-overlay flex justify-center items-center z-[9999]"
         @click="handleBackdropClick"
       >
         <div
-          class="retry-dialog bg-white dark:bg-[#1e1e1e] dark:text-border-default rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.15)] w-[90%] max-w-[600px] max-h-[90vh] flex flex-col overflow-hidden"
+          class="retry-dialog bg-dialog-bg text-text-body rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.15)] w-[90%] max-w-150 max-h-[90vh] flex flex-col overflow-hidden"
           ref="dialogRef"
           @click.stop
           role="dialog"
@@ -31,10 +31,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Header -->
           <div
-            class="retry-dialog-header flex justify-between items-center py-5 px-6 border-b border-[#eaeaea] dark:border-[#3a3a3a]"
+            class="retry-dialog-header flex justify-between items-center py-5 px-6 border-b border-border-default"
           >
             <h3
-              class="retry-dialog-title text-lg font-semibold m-0 text-[#333] dark:text-border-default"
+              class="retry-dialog-title text-lg font-semibold m-0 text-text-body"
             >Retry Enrichment Table Job</h3>
             <OButton
               variant="ghost"
@@ -50,22 +50,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="retry-dialog-content p-6 overflow-y-auto flex-1"
           >
             <div
-              class="table-info mb-5 p-4 bg-[#f8f9fa] dark:bg-[#2a2a2a] rounded-md"
+              class="table-info mb-5 p-4 bg-surface-subtle rounded-md"
             >
               <div
                 class="info-row flex mb-2 last:mb-0"
               >
-                <span class="font-semibold min-w-[60px] text-[#666]"
+                <span class="font-semibold min-w-15 text-text-secondary"
                 >Table:</span>
-                <span class="text-[#333] break-words"
+                <span class="text-text-body break-words"
                 >{{ tableName }}</span>
               </div>
               <div
                 class="info-row flex mb-2 last:mb-0"
               >
-                <span class="font-semibold min-w-[60px] text-[#666]"
+                <span class="font-semibold min-w-15 text-text-secondary"
                 >URL:</span>
-                <span class="text-[#333] break-words font-mono text-[13px]"
+                <span class="text-text-body break-words font-mono text-compact"
                 >{{ url }}</span>
               </div>
             </div>
@@ -73,9 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Range Support Warning -->
             <div
               v-if="!supportsRange"
-              class="warning-banner flex gap-3 p-4 bg-[#fff3cd] dark:bg-[#3d3516] border border-[#ffc107] dark:border-[#a67c00] rounded-md mb-5"
+              class="warning-banner flex gap-3 p-4 bg-banner-warning-bg border border-banner-warning-border rounded-md mb-5"
             >
-              <OIcon name="warning" size="sm" class="text-[#ff9800] shrink-0" />
+              <OIcon name="warning" size="sm" class="text-banner-warning-text shrink-0" />
               <div
                 class="warning-text flex-1"
               >
@@ -93,14 +93,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="mt-5"
             >
               <p
-                class="options-title font-semibold mb-4 text-[#333] dark:text-border-default"
+                class="options-title font-semibold mb-4 text-text-body"
               >How would you like to retry?</p>
 
               <div
-                class="option-card border-2 border-border-default dark:border-[#3a3a3a] rounded-lg mb-3 transition-all duration-200 cursor-pointer hover:border-[#1976d2] hover:bg-[#f5f9ff] dark:hover:border-[#1976d2] dark:hover:bg-[#1a2332]"
+                class="option-card border-2 border-border-default rounded-lg mb-3 transition-all duration-200 cursor-pointer hover:border-accent hover:bg-interactive-hover-bg"
                 :class="[
                   { selected: !resumeFromLast },
-                  !resumeFromLast ? 'border-[#1976d2]! bg-[#e3f2fd]!' : ''
+                  !resumeFromLast ? 'border-accent! bg-surface-accent!' : ''
                 ]"
               >
                 <label
@@ -117,13 +117,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex flex-col gap-2"
                   >
                     <div
-                      class="option-header flex items-center gap-[10px] font-semibold text-[#333] dark:text-border-default"
+                      class="option-header flex items-center gap-2.5 font-semibold text-text-body"
                     >
-                      <OIcon name="refresh" size="sm" class="text-[#1976d2]" />
+                      <OIcon name="refresh" size="sm" class="text-accent" />
                       <span class="flex-1">Start from Beginning</span>
                     </div>
                     <p
-                      class="m-0 text-sm text-[#666] leading-normal"
+                      class="m-0 text-sm text-text-secondary leading-normal"
                     >
                       Download the entire file from scratch. All previous progress will be discarded.
                     </p>
@@ -132,10 +132,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div
-                class="option-card border-2 border-border-default dark:border-[#3a3a3a] rounded-lg mb-3 transition-all duration-200 cursor-pointer hover:border-[#1976d2] hover:bg-[#f5f9ff] dark:hover:border-[#1976d2] dark:hover:bg-[#1a2332]"
+                class="option-card border-2 border-border-default rounded-lg mb-3 transition-all duration-200 cursor-pointer hover:border-accent hover:bg-interactive-hover-bg"
                 :class="[
                   { selected: resumeFromLast },
-                  resumeFromLast ? 'border-[#1976d2]! bg-[#e3f2fd]!' : ''
+                  resumeFromLast ? 'border-accent! bg-surface-accent!' : ''
                 ]"
               >
                 <label
@@ -152,16 +152,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex flex-col gap-2"
                   >
                     <div
-                      class="option-header flex items-center gap-[10px] font-semibold text-[#333] dark:text-border-default"
+                      class="option-header flex items-center gap-2.5 font-semibold text-text-body"
                     >
-                      <OIcon name="play-arrow" size="sm" class="text-[#1976d2]" />
+                      <OIcon name="play-arrow" size="sm" class="text-accent" />
                       <span class="flex-1">Resume from Last Position</span>
                       <span
-                        class="bg-[#4caf50] text-white py-[2px] px-2 rounded-full text-[11px] font-semibold uppercase"
+                        class="bg-badge-success-solid-bg text-badge-success-solid-text py-0.5 px-2 rounded-full text-2xs font-semibold uppercase"
                       >Recommended</span>
                     </div>
                     <p
-                      class="m-0 text-sm text-[#666] leading-normal"
+                      class="m-0 text-sm text-text-secondary leading-normal"
                     >
                       Continue downloading from where it stopped.
                       <span v-if="lastBytePosition > 0">
@@ -176,13 +176,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Footer -->
           <div
-            class="retry-dialog-footer py-4 px-6 border-t border-[#eaeaea] dark:border-[#3a3a3a] flex justify-end gap-3"
+            class="retry-dialog-footer py-4 px-6 border-t border-border-default flex justify-end gap-3"
           >
             <OButton
               variant="outline"
               size="sm-action"
               @click="handleCancel"
-              class="min-w-[100px]"
+              class="min-w-25"
             >
               Cancel
             </OButton>
@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="primary"
               size="sm-action"
               @click="handleConfirm"
-              class="min-w-[100px]"
+              class="min-w-25"
             >
               Retry
             </OButton>
@@ -361,25 +361,13 @@ export default defineComponent({
 .warning-text strong {
   display: block;
   margin-bottom: 4px;
-  color: #d68400;
+  color: var(--color-banner-warning-text);
 }
 
 .warning-text p {
   margin: 0;
   font-size: 14px;
-  color: #856404;
-}
-
-.dark .warning-text strong {
-  color: #ffb84d;
-}
-
-.dark .warning-text p {
-  color: #d4a86a;
-}
-
-.dark .option-card.selected {
-  background-color: #1a2332;
+  color: var(--color-banner-warning-text);
 }
 
 .fade-enter-active,

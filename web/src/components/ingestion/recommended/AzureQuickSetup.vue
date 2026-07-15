@@ -23,10 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="cloud" size="xl" />
           </div>
           <div class="flex-1">
-            <h5 class="text-lg font-bold m-0 mb-2 title" :class="store.state.theme === 'dark' ? 'text-border-default' : 'text-[#1a1a1a]'">
+            <h5 class="text-lg font-bold m-0 mb-2 title text-text-heading">
               Azure Function Integration
             </h5>
-            <p class="text-sm m-0 mb-4 description" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
+            <p class="text-sm m-0 mb-4 description text-text-secondary">
               Deploy the OpenObserve Azure Function to collect logs from any
               Azure service through diagnostic settings and Event Hub.
             </p>
@@ -83,8 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OCardSection class="pt-4">
             <div class="text-sm details-section">
               <h6
-                class="text-base font-semibold m-0 mb-3 details-title"
-                :class="store.state.theme === 'dark' ? 'text-[#d0d0d0]' : 'text-[#333]'"
+                class="text-base font-semibold m-0 mb-3 details-title text-text-body"
               >
                 Supported Azure Services ({{ includedServices.length }})
               </h6>
@@ -96,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="service.name"
                     class="w-full col-sm-6"
                   >
-                    <div class="service-item p-2 rounded border transition-all duration-200 ease-in-out" :class="store.state.theme === 'dark' ? 'border-[#404040] bg-[rgba(255,255,255,0.05)]' : 'border-border-default bg-[#fafafa]'">
+                    <div class="service-item p-2 rounded-sm border transition-all duration-200 ease-in-out border-border-default bg-surface-panel">
                       <div class="flex items-start gap-2">
                         <OIcon
                           :name="getCategoryIcon(service.category)"
@@ -105,13 +104,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           color="primary"
                         />
                         <div class="flex-1">
-                          <div class="font-medium text-sm service-name" :class="store.state.theme === 'dark' ? 'text-border-default' : 'text-[#1a1a1a]'">
+                          <div class="font-medium text-sm service-name text-text-heading">
                             {{ service.name }}
                           </div>
-                          <div class="text-xs mt-0.5 service-description" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
+                          <div class="text-xs mt-0.5 service-description text-text-secondary">
                             {{ service.description }}
                           </div>
-                          <div class="text-xs mt-1 font-medium service-category" :class="store.state.theme === 'dark' ? 'text-[#808080]' : 'text-[#999]'">
+                          <div class="text-xs mt-1 font-medium service-category text-text-caption">
                             {{ formatCategory(service.category) }}
                           </div>
                         </div>
@@ -122,27 +121,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <h6
-                class="text-base font-semibold m-0 mb-3 details-title"
-                :class="store.state.theme === 'dark' ? 'text-[#d0d0d0]' : 'text-[#333]'"
+                class="text-base font-semibold m-0 mb-3 details-title text-text-body"
               >
                 How It Works
               </h6>
 
               <div class="mb-3">
-                <div class="font-semibold mb-1 detail-label" :class="store.state.theme === 'dark' ? 'text-[#d0d0d0]' : 'text-[#333]'">
+                <div class="font-semibold mb-1 detail-label text-text-body">
                   Architecture:
                 </div>
-                <div class="detail-value" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
+                <div class="detail-value text-text-secondary">
                   Azure Service → Diagnostic Settings → Event Hub → Azure
                   Function → OpenObserve
                 </div>
               </div>
 
               <div class="mb-3">
-                <div class="font-semibold mb-1 detail-label" :class="store.state.theme === 'dark' ? 'text-[#d0d0d0]' : 'text-[#333]'">
+                <div class="font-semibold mb-1 detail-label text-text-body">
                   What You Need:
                 </div>
-                <ul class="list-disc ml-5 space-y-1 detail-value" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
+                <ul class="list-disc ml-5 space-y-1 detail-value text-text-secondary">
                   <li>Azure subscription with appropriate permissions</li>
                   <li>Event Hub namespace and hub</li>
                   <li>Azure Function App</li>
@@ -151,10 +149,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div class="mb-3">
-                <div class="font-semibold mb-1 detail-label" :class="store.state.theme === 'dark' ? 'text-[#d0d0d0]' : 'text-[#333]'">
+                <div class="font-semibold mb-1 detail-label text-text-body">
                   Setup Steps:
                 </div>
-                <ol class="list-decimal ml-5 space-y-1 detail-value" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
+                <ol class="list-decimal ml-5 space-y-1 detail-value text-text-secondary">
                   <li>Create an Event Hub namespace and hub</li>
                   <li>Deploy the Azure Function from GitHub</li>
                   <li>Configure function with OpenObserve credentials</li>
@@ -166,10 +164,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div>
-                <div class="font-semibold mb-1 detail-label" :class="store.state.theme === 'dark' ? 'text-[#d0d0d0]' : 'text-[#333]'">
+                <div class="font-semibold mb-1 detail-label text-text-body">
                   Cost Considerations:
                 </div>
-                <div class="detail-value" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
+                <div class="detail-value text-text-secondary">
                   Charges apply for Event Hub throughput, Azure Function
                   execution, and OpenObserve storage. Refer to Azure and
                   OpenObserve pricing for details.
@@ -375,6 +373,5 @@ export default defineComponent({
 </script>
 
 <style>
-.body--light .azure-quick-setup .service-item:hover { background-color: #f5f5f5; }
-.body--dark .azure-quick-setup .service-item:hover { background-color: rgba(255, 255, 255, 0.08); }
+.azure-quick-setup .service-item:hover { background-color: var(--color-surface-subtle-hover); }
 </style>

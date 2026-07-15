@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch, nextTick } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
@@ -67,7 +68,7 @@ const props = defineProps<{
 const store = useStore();
 const router = useRouter();
 const { getStreams } = useStreams();
-const isDark = computed(() => store.state?.theme === "dark");
+const { isDark } = useTheme();
 
 // The detected stream type drives the status copy + the "View …" destination.
 // traces / logs land in their explorers; metrics (which fan out into many

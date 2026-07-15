@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="error-header-unhandled-badge"
           :class="
             error.error_handling === 'unhandled'
-              ? 'text-red-6 border border-[rgb(246,68,68)] rounded text-sm px-1 mr-2'
+              ? 'text-status-error-text border border-status-negative rounded-sm text-sm px-1 mr-2'
               : ''
           "
         >
