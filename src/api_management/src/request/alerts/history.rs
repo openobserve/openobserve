@@ -38,7 +38,7 @@ use crate::{
             auth::UserEmail, http::get_or_create_trace_id, stream::get_settings_max_query_range,
         },
     },
-    handler::http::extractors::Headers,
+    extractors::Headers,
     service::{
         alerts::alert::get_by_id,
         search::{self as SearchService},
@@ -485,7 +485,7 @@ pub async fn get_alert_history(
                     .get("alerts")
                     .map_or("alerts", |model| model.key);
 
-                match crate::handler::http::auth::validator::list_objects_for_user(
+                match crate::auth::validator::list_objects_for_user(
                     &org_id,
                     user_id,
                     "GET",
@@ -827,7 +827,7 @@ pub async fn get_all_anomaly_history(
             let alert_object_type = o2_openfga::meta::mapping::OFGA_MODELS
                 .get("alerts")
                 .map_or("alerts", |m| m.key);
-            match crate::handler::http::auth::validator::list_objects_for_user(
+            match crate::auth::validator::list_objects_for_user(
                 &org_id,
                 user_id,
                 "GET",

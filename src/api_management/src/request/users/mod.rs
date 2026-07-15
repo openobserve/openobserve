@@ -52,10 +52,8 @@ use crate::{
         },
         utils::auth::{UserEmail, generate_presigned_url, is_valid_email},
     },
-    handler::http::{
-        extractors::Headers,
-        request::{BulkDeleteRequest, BulkDeleteResponse},
-    },
+    extractors::Headers,
+    request::{BulkDeleteRequest, BulkDeleteResponse},
     service::users,
 };
 
@@ -619,7 +617,7 @@ pub async fn authentication(
             return unauthorized_error(resp);
         }
     }
-    match crate::handler::http::auth::validator::validate_user(&auth.name, &auth.password).await {
+    match crate::auth::validator::validate_user(&auth.name, &auth.password).await {
         Ok(v) => {
             if v.is_valid {
                 resp.status = true;
@@ -778,9 +776,7 @@ pub async fn get_auth(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        use crate::{
-            common::meta::user::AuthTokensExt, handler::http::auth::validator::ID_TOKEN_HEADER,
-        };
+        use crate::{auth::validator::ID_TOKEN_HEADER, common::meta::user::AuthTokensExt};
 
         let mut resp = SignInResponse::default();
 
@@ -852,9 +848,7 @@ pub async fn get_auth(
 
             use o2_dex::service::auth::get_user_from_token;
 
-            use crate::handler::http::auth::validator::{
-                validate_user, validate_user_for_query_params,
-            };
+            use crate::auth::validator::{validate_user, validate_user_for_query_params};
 
             let (name, password) = if let Some((name, password)) = get_user_from_token(&auth_header)
             {

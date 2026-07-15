@@ -27,7 +27,7 @@ use crate::{
         },
         utils::auth::UserEmail,
     },
-    handler::http::extractors::Headers,
+    extractors::Headers,
     service::ingestion_tokens,
 };
 

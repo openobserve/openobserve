@@ -22,11 +22,9 @@ use crate::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::auth::{UserEmail, is_root_user},
     },
-    handler::http::{
-        extractors::Headers,
-        models::destinations::Template,
-        request::{BulkDeleteRequest, BulkDeleteResponse},
-    },
+    extractors::Headers,
+    models::destinations::Template,
+    request::{BulkDeleteRequest, BulkDeleteResponse},
     service::alerts::templates,
 };
 
@@ -190,10 +188,8 @@ pub async fn list_templates(
     #[cfg(feature = "enterprise")]
     {
         let user_id = &user_email.user_id;
-        match crate::handler::http::auth::validator::list_objects_for_user(
-            &org_id, user_id, "GET", "template",
-        )
-        .await
+        match crate::auth::validator::list_objects_for_user(&org_id, user_id, "GET", "template")
+            .await
         {
             Ok(list) => {
                 _permitted = list;

@@ -27,10 +27,8 @@ use crate::{
         },
         utils::auth::UserEmail,
     },
-    handler::http::{
-        extractors::Headers,
-        request::{BulkDeleteRequest, BulkDeleteResponse},
-    },
+    extractors::Headers,
+    request::{BulkDeleteRequest, BulkDeleteResponse},
 };
 
 #[cfg(feature = "enterprise")]
@@ -63,9 +61,7 @@ pub async fn create_role(
     Path(org_id): Path<String>,
     Json(user_req): Json<UserRoleRequest>,
 ) -> Response {
-    use crate::{
-        common::meta::user::is_standard_role, handler::http::auth::jwt::format_role_name_only,
-    };
+    use crate::{auth::jwt::format_role_name_only, common::meta::user::is_standard_role};
 
     let role_name = format_role_name_only(user_req.role.trim());
 
@@ -316,13 +312,8 @@ pub async fn get_roles(
     let mut permitted;
     // Get List of allowed objects
 
-    match crate::handler::http::auth::validator::list_objects_for_user(
-        &org_id,
-        &user_email.user_id,
-        "GET",
-        "role",
-    )
-    .await
+    match crate::auth::validator::list_objects_for_user(&org_id, &user_email.user_id, "GET", "role")
+        .await
     {
         Ok(list) => {
             permitted = list;
@@ -805,7 +796,7 @@ pub async fn create_group(
     Path(org_id): Path<String>,
     Json(user_group): Json<UserGroup>,
 ) -> Response {
-    use crate::handler::http::auth::jwt::format_role_name_only;
+    use crate::auth::jwt::format_role_name_only;
 
     let mut user_grp = user_group;
     user_grp.name = format_role_name_only(user_grp.name.trim());
@@ -951,7 +942,7 @@ pub async fn get_groups(
     let mut permitted;
     // Get List of allowed objects
 
-    match crate::handler::http::auth::validator::list_objects_for_user(
+    match crate::auth::validator::list_objects_for_user(
         &org_id,
         &user_email.user_id,
         "GET",

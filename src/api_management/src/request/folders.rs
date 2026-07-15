@@ -18,14 +18,14 @@ use config::meta::folder::Folder;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::models::folders::{
+    models::folders::{
         CreateFolderRequestBody, CreateFolderResponseBody, FolderType, GetFolderResponseBody,
         ListFoldersResponseBody, UpdateFolderRequestBody,
     },
     service::folders,
 };
 #[cfg(feature = "enterprise")]
-use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
+use crate::{common::utils::auth::UserEmail, extractors::Headers};
 
 /// CreateFolder
 #[utoipa::path(

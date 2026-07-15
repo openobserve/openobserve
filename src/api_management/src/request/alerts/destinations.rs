@@ -30,11 +30,9 @@ use crate::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::{auth::UserEmail, ssrf_guard::SsrfGuard},
     },
-    handler::http::{
-        extractors::Headers,
-        models::destinations::{Destination, DestinationType},
-        request::{BulkDeleteRequest, BulkDeleteResponse},
-    },
+    extractors::Headers,
+    models::destinations::{Destination, DestinationType},
+    request::{BulkDeleteRequest, BulkDeleteResponse},
     service::alerts::destinations,
 };
 
@@ -432,13 +430,8 @@ pub async fn list_destinations(
     #[cfg(feature = "enterprise")]
     {
         let user_id = &user_email.user_id;
-        match crate::handler::http::auth::validator::list_objects_for_user(
-            &org_id,
-            user_id,
-            "GET",
-            "destination",
-        )
-        .await
+        match crate::auth::validator::list_objects_for_user(&org_id, user_id, "GET", "destination")
+            .await
         {
             Ok(list) => {
                 _permitted = list;

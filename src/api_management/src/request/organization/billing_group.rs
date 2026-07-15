@@ -20,7 +20,7 @@ use utoipa::ToSchema;
 
 use crate::{
     common::{meta::http::HttpResponse, utils::auth::UserEmail},
-    handler::http::extractors::Headers,
+    extractors::Headers,
 };
 
 #[derive(Deserialize, ToSchema)]
