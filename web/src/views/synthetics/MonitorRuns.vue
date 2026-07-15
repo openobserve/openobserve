@@ -93,6 +93,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </template>
+            <!-- Status Timeline — runs query error state -->
+            <template v-else-if="runsError">
+              <div class="px-2">
+                <div
+                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                >
+                  <div
+                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+                  >
+                    <span class="font-bold text-sm text-text-heading">Status Timeline</span>
+                  </div>
+                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="flex items-center justify-center py-6 text-[0.75rem] text-status-error-text">
+                    <span class="flex items-center gap-1">
+                      <OIcon name="error" size="xs" />
+                      {{ runsError }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </template>
             <template v-else>
               <div class="px-2">
               <MonitorStatusTimeline
@@ -128,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-for="card in kpiCards"
                   :key="card.key"
                   class="card-container rounded-lg flex flex-col px-2 pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+                  :class="kpiError ? 'border-l-status-error-text border-l-[3px]' : ''"
                   :data-test="`monitor-runs-kpi-${card.key}`"
                 >
                   <div class="flex flex-col gap-[0.25rem]">
@@ -138,12 +160,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span v-if="card.unit"> ({{ card.unit }}) </span>
                     </div>
                     <div class="flex items-baseline gap-[0.2rem]">
-                      <span
-                        class="text-[1.4rem] font-bold leading-none text-[var(--o2-text-primary)]"
-                        :class="card.valueClass"
-                      >
-                        {{ card.value }}
-                      </span>
+                      <!-- Per-card error indicator -->
+                      <template v-if="kpiError">
+                        <span class="flex items-center gap-1 text-[0.75rem] text-status-error-text">
+                          <OIcon name="error" size="xs" class="shrink-0" />
+                          {{ kpiError }}
+                        </span>
+                      </template>
+                      <template v-else>
+                        <span
+                          class="text-[1.4rem] font-bold leading-none text-[var(--o2-text-primary)]"
+                          :class="card.valueClass"
+                        >
+                          {{ card.value }}
+                        </span>
+                      </template>
                     </div>
                   </div>
                 </div>
@@ -201,16 +232,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Response Time
                     </span>
                     <span class="flex-1" />
-                    <OBadge variant="default" size="sm">
+                    <OBadge v-if="!histogramError" variant="default" size="sm">
                       p95 {{ p95Label }}
                     </OBadge>
+                    <span
+                      v-else
+                      class="inline-flex items-center gap-1 text-xs text-status-error-text"
+                    >
+                      <OIcon name="error_outline" size="xs" />
+                      Error
+                    </span>
                   </div>
                   <div class="border-t border-[var(--o2-border-color)]" />
                   <div class="min-h-[180px] p-0">
                     <ChartRenderer
+                      v-if="!histogramError"
                       :data="{ options: responseChartOption }"
                       height="180px"
                     />
+                    <div v-else class="flex flex-col items-center justify-center h-[180px] gap-1 text-sm text-text-secondary">
+                      <OIcon name="error_outline" size="sm" class="text-status-error-text" />
+                      <span>{{ histogramError }}</span>
+                    </div>
                   </div>
                 </div>
                 <div
@@ -223,16 +266,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Errors Over Time
                     </span>
                     <span class="flex-1" />
-                    <OBadge variant="error" size="sm">
+                    <OBadge v-if="!histogramError" variant="error" size="sm">
                       {{ failCount }} failed
                     </OBadge>
+                    <span
+                      v-else
+                      class="inline-flex items-center gap-1 text-xs text-status-error-text"
+                    >
+                      <OIcon name="error_outline" size="xs" />
+                      Error
+                    </span>
                   </div>
                   <div class="border-t border-[var(--o2-border-color)]" />
                   <div class="min-h-[180px] p-0">
                     <ChartRenderer
+                      v-if="!histogramError"
                       :data="{ options: errorChartOption }"
                       height="180px"
                     />
+                    <div v-else class="flex flex-col items-center justify-center h-[180px] gap-1 text-sm text-text-secondary">
+                      <OIcon name="error_outline" size="sm" class="text-status-error-text" />
+                      <span>{{ histogramError }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -277,6 +332,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <SkeletonBox width="36px" height="12px" rounded />
                     </div>
+                  </div>
+                </div>
+              </div>
+              </div>
+            </template>
+            <!-- Breakdown Cards — runs query error state -->
+            <template v-else-if="runsError">
+              <div class="px-2">
+              <div class="grid grid-cols-3 gap-2">
+                <div
+                  v-for="dim in ['Browser','Location','Device']"
+                  :key="dim"
+                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                >
+                  <div
+                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
+                  >
+                    <span class="font-bold text-sm text-text-heading">
+                      Pass Rate by {{ dim }}
+                    </span>
+                  </div>
+                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="flex items-center justify-center py-8 text-[0.75rem] text-status-error-text">
+                    <span class="flex items-center gap-1">
+                      <OIcon name="error" size="xs" />
+                      {{ runsError }}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -567,39 +649,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
                 <template #cell-duration="{ row }">
-                  <span class="font-mono tabular-nums text-xs">
+                  <span class="tabular-nums text-sm">
                     {{ (row as VisibleRun).duration }}
                   </span>
                 </template>
                 <template #cell-location="{ row }">
                   <span
-                    class="inline-flex items-center gap-1 text-xs text-text-secondary"
+                    class="inline-flex items-center gap-1 text-sm text-text-primary"
                   >
                     <OIcon
                       :name="locationIcon((row as VisibleRun).location)"
-                      size="xs"
+                      size="sm"
                     />
                     {{ (row as VisibleRun).location }}
                   </span>
                 </template>
                 <template #cell-browser="{ row }">
                   <span
-                    class="inline-flex items-center gap-1 text-xs text-text-secondary"
+                    class="inline-flex items-center gap-1 text-sm text-text-primary"
                   >
                     <OIcon
                       :name="browserIcon((row as VisibleRun).browser)"
-                      size="xs"
+                      size="sm"
                     />
                     {{ (row as VisibleRun).browser }}
                   </span>
                 </template>
                 <template #cell-device="{ row }">
                   <span
-                    class="inline-flex items-center gap-1 text-xs text-text-secondary"
+                    class="inline-flex items-center gap-1 text-sm text-text-primary"
                   >
                     <OIcon
                       :name="deviceIconName((row as VisibleRun).device)"
-                      size="xs"
+                      size="sm"
                     />
                     {{ deviceLabel((row as VisibleRun).device) }}
                   </span>
@@ -622,19 +704,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </template>
                 <template #cell-trigger_type="{ row }">
-                  <span class="text-xs text-text-secondary">
+                  <span class="text-sm text-text-primary">
                     {{ (row as VisibleRun).triggerType }}
                   </span>
                 </template>
               </OTable>
             </OCard>
 
-            <!-- Empty state -->
-            <div class="px-2">
+            <!-- Empty state below the table -->
+            <div v-if="visibleRuns.length === 0 && !runsLoading" class="px-2">
               <OEmptyState
-                v-if="visibleRuns.length === 0 && !runsLoading"
                 preset="no-results"
-                size="sm"
+                size="block"
                 data-test="monitor-runs-empty"
                 @action="resetFilters"
               />
@@ -643,197 +724,371 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
 
         <!-- ════════════ STEPS ════════════ -->
+        <!-- ════════════ STEPS ════════════ -->
         <OTabPanel name="steps">
           <div
             class="mx-auto px-2 py-2 flex flex-col gap-2"
           >
+            <!-- Header -->
             <div class="flex items-center gap-2.5">
               <span class="font-bold text-sm text-text-heading">
-                Cross-run step analysis
+                {{ t("synthetics.results.steps.title") }}
               </span>
               <span class="text-xs text-text-secondary">
-                Grouped over {{ windowLabel }} &middot;
-                {{ allRuns.length }} runs
+                {{ t("synthetics.results.steps.title") }} &middot;
+                {{ stepGroupsData.length }} steps
               </span>
               <span class="flex-1" />
-              <OToggleGroup v-model="stepsGroupBy" variant="default">
-                <OToggleGroupItem value="step" size="sm"
-                  >By Step Name</OToggleGroupItem
-                >
-                <OToggleGroupItem value="locator" size="sm"
-                  >By Locator</OToggleGroupItem
-                >
-              </OToggleGroup>
             </div>
 
-            <OCard class="p-0">
-              <div
-                class="grid grid-cols-[1fr_110px_120px_110px_1fr_1fr_32px] gap-2.5 px-4 py-2 bg-surface-subtle border-b border-border-default text-[11px] font-semibold text-text-secondary uppercase tracking-wide"
-              >
-                <span>{{ primaryColLabel }}</span>
-                <span>Fail Rate</span>
-                <span>Avg Duration</span>
-                <span>Trend</span>
-                <span>Browser</span>
-                <span>Location</span>
-                <span />
+            <!-- Loading skeleton -->
+            <template v-if="stepsLoading || !stepsHasLoadedOnce">
+              <div class="grid grid-cols-2 gap-2">
+                <div class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden">
+                  <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
+                    <SkeletonBox width="100px" height="14px" rounded />
+                  </div>
+                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="p-4"><SkeletonBox width="100%" height="160px" rounded /></div>
+                </div>
+                <div class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden">
+                  <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
+                    <SkeletonBox width="100px" height="14px" rounded />
+                  </div>
+                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="p-4"><SkeletonBox width="100%" height="160px" rounded /></div>
+                </div>
               </div>
-              <div v-for="(g, gi) in stepGroups" :key="gi">
-                <!-- Group row (manual expand/collapse) -->
-                <div>
-                  <div
-                    class="grid grid-cols-[1fr_110px_120px_110px_1fr_1fr_32px] gap-2.5 px-4 py-2.5 border-b border-border-default items-center cursor-pointer hover:bg-surface-subtle"
-                    @click="toggleStepGroup(g._key)"
-                  >
-                    <div class="min-w-0">
-                      <div
-                        class="font-semibold text-xs text-text-heading truncate"
-                        :class="
-                          stepsGroupBy === 'locator'
-                            ? 'font-mono tabular-nums'
-                            : ''
-                        "
-                      >
-                        {{ g.name }}
-                      </div>
-                      <div v-if="g.sub" class="text-[11px] text-text-secondary">
-                        {{ g.sub }}
-                      </div>
-                    </div>
-                    <div class="flex flex-col gap-1">
-                      <span
-                        class="font-mono tabular-nums font-bold text-xs"
-                        :style="{ color: g.failColor }"
-                      >
-                        {{ g.failRate }}
-                      </span>
-                      <div
-                        class="h-[5px] rounded-full bg-text-disabled/25! overflow-hidden"
-                      >
-                        <div
-                          class="h-full rounded-full"
-                          :style="{
-                            width: g.failRateBarPct,
-                            background: g.failBarColor,
-                          }"
-                        />
-                      </div>
-                    </div>
-                    <div class="flex flex-col gap-1">
-                      <span
-                        class="font-mono tabular-nums text-xs text-text-body"
-                      >
-                        {{ g.avgDuration }}
-                      </span>
-                      <div
-                        class="h-[5px] rounded-full bg-text-disabled/25! overflow-hidden"
-                      >
-                        <div
-                          class="h-full rounded-full bg-primary-400"
-                          :style="{ width: g.durationBarPct }"
-                        />
-                      </div>
-                    </div>
-                    <svg viewBox="0 0 90 24" class="w-[90px] h-6 block">
-                      <polyline
-                        :points="g.trendPts"
-                        fill="none"
-                        :stroke="g.trendColor"
-                        stroke-width="1.5"
-                        vector-effect="non-scaling-stroke"
-                      />
-                    </svg>
-                    <div class="flex gap-1.5 flex-wrap">
-                      <OBadge
-                        v-for="bc in g.browserChips"
-                        :key="bc.label"
-                        size="sm"
-                        :style="{ background: bc.bg, color: bc.color }"
-                      >
-                        {{ bc.label }}
-                      </OBadge>
-                    </div>
-                    <div class="flex gap-1.5 flex-wrap">
-                      <OBadge
-                        v-for="lc in g.locationChips"
-                        :key="lc.label"
-                        size="sm"
-                        :style="{ background: lc.bg, color: lc.color }"
-                      >
-                        {{ lc.label }}
-                      </OBadge>
-                    </div>
-                    <OIcon
-                      name="expand_more"
-                      size="sm"
-                      class="text-text-secondary transition-transform duration-150"
-                      :class="{ 'rotate-180': g.expanded }"
+              <div v-for="n in 5" :key="n" class="card-container rounded-lg overflow-hidden">
+                <div class="h-10 bg-[var(--o2-border-color)] opacity-20" />
+              </div>
+            </template>
+
+            <!-- Steps query error — compact inline indicator -->
+            <template v-else-if="stepsError">
+              <div
+                class="px-2 flex items-center gap-2"
+                data-test="monitor-runs-steps-error"
+              >
+                <OIcon name="error_outline" size="xs" class="text-status-error-text shrink-0" />
+                <span class="text-xs text-status-error-text truncate flex-1 min-w-0">{{ stepsError }}</span>
+                <OButton
+                  variant="ghost"
+                  size="xs"
+                  class="underline! text-xs!"
+                  data-test="monitor-runs-steps-retry-btn"
+                  @click="emit('refresh')"
+                >
+                  Retry
+                </OButton>
+              </div>
+            </template>
+
+            <!-- Real content -->
+            <template v-else>
+              <!-- Panels 1 & 2: Bar charts side by side -->
+              <div class="grid grid-cols-2 gap-2">
+                <!-- Panel 1: Failed Steps Bar Chart -->
+                <div
+                  v-if="stepFailures.length > 0"
+                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                >
+                  <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
+                    <span class="font-bold text-sm text-text-heading">
+                      {{ t("synthetics.results.steps.failedSteps") }}
+                    </span>
+                    <span class="flex-1" />
+                    <span class="text-xs text-text-secondary">
+                      {{ t("synthetics.results.steps.failedStepsDescription") }}
+                    </span>
+                  </div>
+                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="min-h-[160px] p-0">
+                    <ChartRenderer
+                      :data="{ options: failedStepsChartOption }"
+                      height="160px"
                     />
                   </div>
-                  <div
-                    v-if="g.expanded"
-                    class="grid grid-cols-2 gap-4 px-4 py-3 bg-surface-subtle border-b border-border-default"
-                  >
-                    <div>
-                      <div
-                        class="text-[10px] font-bold text-text-secondary uppercase tracking-wide mb-1.5"
-                      >
-                        Fail rate by browser
-                      </div>
-                      <div
-                        v-for="br in g.browserRows"
-                        :key="br.name"
-                        class="flex items-center gap-2.5 py-1"
-                      >
-                        <span class="w-[70px] text-xs text-text-body">{{
-                          br.name
-                        }}</span>
-                        <div
-                          class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden"
-                        >
-                          <div
-                            class="h-full rounded-full"
-                            :style="{ width: br.pct, background: br.barColor }"
-                          />
+                </div>
+                <div
+                  v-else
+                  class="card-container rounded-lg flex items-center justify-center py-8 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
+                >
+                  <OBadge variant="success" size="md">
+                    {{ t("synthetics.results.steps.noFailures") }}
+                  </OBadge>
+                </div>
+
+                <!-- Panel 2: Slowest Steps Bar Chart -->
+                <div
+                  v-if="stepDurations.length > 0"
+                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                >
+                  <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
+                    <span class="font-bold text-sm text-text-heading">
+                      {{ t("synthetics.results.steps.slowestSteps") }}
+                    </span>
+                    <span class="flex-1" />
+                    <span class="text-xs text-text-secondary">
+                      {{ t("synthetics.results.steps.slowestStepsDescription") }}
+                    </span>
+                  </div>
+                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="min-h-[160px] p-0">
+                    <ChartRenderer
+                      :data="{ options: slowestStepsChartOption }"
+                      height="160px"
+                    />
+                  </div>
+                </div>
+                <div
+                  v-else
+                  class="card-container rounded-lg flex items-center justify-center py-8 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
+                >
+                  <span class="text-sm text-text-secondary">No step duration data</span>
+                </div>
+              </div>
+
+              <!-- Panel 3: Steps Analysis Table -->
+              <OCard class="p-0">
+                <div
+                  class="grid grid-cols-[1fr_90px_90px_90px_90px_1fr_1fr_32px] gap-2.5 px-4 py-2 bg-surface-subtle border-b border-border-default text-[11px] font-semibold text-text-secondary uppercase tracking-wide"
+                >
+                  <span>{{ t("synthetics.results.steps.stepName") }}</span>
+                  <span>{{ t("synthetics.results.steps.failRate") }}</span>
+                  <span>{{ t("synthetics.results.steps.flakyRate") }}</span>
+                  <span>{{ t("synthetics.results.steps.avgDuration") }}</span>
+                  <span>{{ t("synthetics.results.steps.trend") }}</span>
+                  <span>{{ t("synthetics.results.steps.browser") }}</span>
+                  <span>{{ t("synthetics.results.steps.location") }}</span>
+                  <span />
+                </div>
+                <div v-for="g in stepGroupsDisplay" :key="g._key">
+                  <div>
+                    <div
+                      class="grid grid-cols-[1fr_90px_90px_90px_90px_1fr_1fr_32px] gap-2.5 px-4 py-2.5 border-b border-border-default items-center cursor-pointer hover:bg-surface-subtle"
+                      @click="toggleStepGroup(g._key)"
+                    >
+                      <div class="min-w-0">
+                        <div class="font-semibold text-xs text-text-heading truncate">
+                          {{ g.name }}
                         </div>
-                        <span
-                          class="font-mono tabular-nums text-xs text-text-secondary w-10 text-right"
-                          >{{ br.pct }}</span
-                        >
+                        <div v-if="g.sub" class="text-[11px] text-text-secondary font-mono truncate">
+                          {{ g.sub }}
+                        </div>
                       </div>
+                      <div class="flex flex-col gap-1">
+                        <span class="font-mono tabular-nums font-bold text-xs" :style="{ color: g.failColor }">
+                          {{ g.failRateDisplay }}
+                        </span>
+                        <div class="h-[5px] rounded-full bg-text-disabled/25! overflow-hidden">
+                          <div class="h-full rounded-full" :style="{ width: g.failRateBarPct, background: g.failBarColor }" />
+                        </div>
+                      </div>
+                      <div>
+                        <span class="font-mono tabular-nums text-xs" :style="{ color: g.flakyColor }">
+                          {{ g.flakyRateDisplay }}
+                        </span>
+                      </div>
+                      <div class="flex flex-col gap-1">
+                        <span class="font-mono tabular-nums text-xs text-text-body">{{ g.avgDuration }}</span>
+                        <div class="h-[5px] rounded-full bg-text-disabled/25! overflow-hidden">
+                          <div class="h-full rounded-full bg-primary-400" :style="{ width: g.durationBarPct }" />
+                        </div>
+                      </div>
+                      <svg viewBox="0 0 90 24" class="w-[90px] h-6 block">
+                        <polyline
+                          :points="g.trendPts"
+                          fill="none"
+                          :stroke="g.trendColor"
+                          stroke-width="1.5"
+                          vector-effect="non-scaling-stroke"
+                        />
+                      </svg>
+                      <div class="flex gap-1.5 flex-wrap">
+                        <OBadge
+                          v-for="bc in g.browserChips"
+                          :key="bc.label"
+                          size="sm"
+                          :style="{ background: bc.bg, color: bc.color }"
+                        >
+                          {{ bc.label }}
+                        </OBadge>
+                      </div>
+                      <div class="flex gap-1.5 flex-wrap">
+                        <OBadge
+                          v-for="lc in g.locationChips"
+                          :key="lc.label"
+                          size="sm"
+                          :style="{ background: lc.bg, color: lc.color }"
+                        >
+                          {{ lc.label }}
+                        </OBadge>
+                      </div>
+                      <OIcon
+                        name="expand_more"
+                        size="sm"
+                        class="text-text-secondary transition-transform duration-150"
+                        :class="{ 'rotate-180': g.expanded }"
+                      />
                     </div>
-                    <div>
-                      <div
-                        class="text-[10px] font-bold text-text-secondary uppercase tracking-wide mb-1.5"
-                      >
-                        Fail rate by location
-                      </div>
-                      <div
-                        v-for="lr in g.locationRows"
-                        :key="lr.name"
-                        class="flex items-center gap-2.5 py-1"
-                      >
-                        <span class="w-[90px] text-xs text-text-body">{{
-                          lr.name
-                        }}</span>
-                        <div
-                          class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden"
-                        >
-                          <div
-                            class="h-full rounded-full"
-                            :style="{ width: lr.pct, background: lr.barColor }"
-                          />
+                    <div
+                      v-if="g.expanded"
+                      class="grid grid-cols-2 gap-4 px-4 py-3 bg-surface-subtle border-b border-border-default"
+                    >
+                      <div>
+                        <div class="text-[10px] font-bold text-text-secondary uppercase tracking-wide mb-1.5">
+                          {{ t("synthetics.results.steps.byBrowser") }}
                         </div>
-                        <span
-                          class="font-mono tabular-nums text-xs text-text-secondary w-10 text-right"
-                          >{{ lr.pct }}</span
-                        >
+                        <div v-for="br in g.browserRows" :key="br.name" class="flex items-center gap-2.5 py-1">
+                          <span class="w-[70px] text-xs text-text-body">{{ br.name }}</span>
+                          <div class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden">
+                            <div class="h-full rounded-full" :style="{ width: br.pct, background: br.barColor }" />
+                          </div>
+                          <span class="font-mono tabular-nums text-xs text-text-secondary w-10 text-right">{{ br.pct }}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <div class="text-[10px] font-bold text-text-secondary uppercase tracking-wide mb-1.5">
+                          {{ t("synthetics.results.steps.byLocation") }}
+                        </div>
+                        <div v-for="lr in g.locationRows" :key="lr.name" class="flex items-center gap-2.5 py-1">
+                          <span class="w-[90px] text-xs text-text-body">{{ lr.name }}</span>
+                          <div class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden">
+                            <div class="h-full rounded-full" :style="{ width: lr.pct, background: lr.barColor }" />
+                          </div>
+                          <span class="font-mono tabular-nums text-xs text-text-secondary w-10 text-right">{{ lr.pct }}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
+                <div
+                  v-if="stepGroupsDisplay.length === 0"
+                  class="flex items-center justify-center py-12 text-sm text-text-secondary"
+                >
+                  No step data for the selected time range
+                </div>
+              </OCard>
+
+              <!-- Panels 4 & 5: Recent Failures + Flakiest Steps side by side -->
+              <div class="grid grid-cols-2 gap-2">
+                <!-- Panel 4: Recent Step Failures -->
+                <div
+                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                >
+                  <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
+                    <span class="font-bold text-sm text-text-heading">
+                      {{ t("synthetics.results.steps.recentFailures") }}
+                    </span>
+                    <span class="flex-1" />
+                    <span class="text-xs text-text-secondary">
+                      {{ t("synthetics.results.steps.recentFailuresDescription") }}
+                    </span>
+                  </div>
+                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div v-if="failureInstances.length > 0" class="max-h-[320px] overflow-y-auto">
+                    <div
+                      v-for="fi in failureInstances"
+                      :key="`${fi.runId}-${fi.stepName}`"
+                      class="flex items-center gap-2 px-3 py-2 border-b border-border-default last:border-b-0 hover:bg-surface-subtle"
+                    >
+                      <span class="text-xs text-text-secondary whitespace-nowrap w-[58px]">
+                        {{ relativeFromNow(fi.timestamp * 1000) }}
+                      </span>
+                      <span class="font-semibold text-xs text-text-heading truncate flex-1 min-w-0">
+                        {{ fi.stepName }}
+                      </span>
+                      <OBadge :variant="fi.isFlaky ? 'warning' : 'error'" size="sm" class="shrink-0">
+                        {{ fi.isFlaky ? t("synthetics.results.steps.flaky") : t("synthetics.results.failed") }}
+                      </OBadge>
+                      <span class="text-xs text-text-secondary shrink-0">{{ fi.browser }}</span>
+                      <span class="text-xs text-text-secondary shrink-0">{{ fi.location }}</span>
+                      <span class="text-xs text-text-muted font-mono truncate max-w-[140px]" :title="fi.error">
+                        {{ fi.error || "—" }}
+                      </span>
+                      <OIcon name="open_in_new" size="xs" class="text-text-secondary cursor-pointer shrink-0" />
+                    </div>
+                  </div>
+                  <div v-else class="flex items-center justify-center py-8 text-sm text-text-secondary">
+                    {{ t("synthetics.results.steps.noRecentFailures") }}
+                  </div>
+                </div>
+
+                <!-- Panel 5: Flakiest Steps -->
+                <div
+                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                >
+                  <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
+                    <span class="font-bold text-sm text-text-heading">
+                      {{ t("synthetics.results.steps.flakiestSteps") }}
+                    </span>
+                    <span class="flex-1" />
+                    <span class="text-xs text-text-secondary">
+                      {{ t("synthetics.results.steps.flakiestStepsDescription") }}
+                    </span>
+                  </div>
+                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div v-if="flakyStepsDisplay.length > 0" class="max-h-[320px] overflow-y-auto">
+                    <div
+                      v-for="fs in flakyStepsDisplay"
+                      :key="fs.stepName"
+                      class="flex items-center gap-3 px-3 py-2 border-b border-border-default last:border-b-0 hover:bg-surface-subtle"
+                    >
+                      <span class="font-semibold text-xs text-text-heading flex-1 min-w-0 truncate">
+                        {{ fs.stepName }}
+                      </span>
+                      <span class="font-bold text-sm text-status-warning-text tabular-nums w-[36px] text-right">
+                        {{ fs.flakyCount }}
+                      </span>
+                      <span class="text-xs text-text-secondary tabular-nums w-[44px] text-right">
+                        {{ fs.flakyRateDisplay }}
+                      </span>
+                      <span class="text-xs text-text-muted tabular-nums w-[44px] text-right">
+                        {{ fs.failRateDisplay }}
+                      </span>
+                      <svg viewBox="0 0 60 16" class="w-[60px] h-4 block shrink-0">
+                        <polyline
+                          :points="fs.trendPts"
+                          fill="none"
+                          :stroke="fs.trendColor"
+                          stroke-width="1.2"
+                          vector-effect="non-scaling-stroke"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                  <div v-else class="flex items-center justify-center py-8">
+                    <OBadge variant="success" size="md">
+                      {{ t("synthetics.results.steps.noFlakySteps") }}
+                    </OBadge>
+                  </div>
+                </div>
               </div>
-            </OCard>
+
+              <!-- Panel 6: Step Duration Trend Chart -->
+              <div
+                v-if="trendBuckets.length > 0"
+                class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+              >
+                <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
+                  <span class="font-bold text-sm text-text-heading">
+                    {{ t("synthetics.results.steps.stepDurationTrend") }}
+                  </span>
+                  <span class="flex-1" />
+                  <span class="text-xs text-text-secondary">
+                    {{ t("synthetics.results.steps.stepDurationTrendDescription") }}
+                  </span>
+                </div>
+                <div class="border-t border-[var(--o2-border-color)]" />
+                <div class="min-h-[200px] p-0">
+                  <ChartRenderer
+                    :data="{ options: stepDurationTrendOption }"
+                    height="200px"
+                  />
+                </div>
+              </div>
+            </template>
           </div>
         </OTabPanel>
 
@@ -895,6 +1150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -930,9 +1186,12 @@ import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 
 defineOptions({ name: "SyntheticMonitorRuns" });
 
+const { t } = useI18n();
+
 const emit = defineEmits<{
   (e: "edit"): void;
   (e: "open-run", runId: string, executionId: string): void;
+  (e: "refresh"): void;
 }>();
 
 // ── Props ────────────────────────────────────────────────────────────────
@@ -953,205 +1212,16 @@ const runsLoading = computed(() => synthetics.runsLoading.value);
 const kpiHasLoadedOnce = computed(() => synthetics.kpiHasLoadedOnce.value);
 const histogramHasLoadedOnce = computed(() => synthetics.histogramHasLoadedOnce.value);
 const runsHasLoadedOnce = computed(() => synthetics.runsHasLoadedOnce.value);
-
-// ── Seeded random (deterministic mock data) ──────────────────────────────
-function seedRand(seed: number) {
-  let s = seed;
-  return () => {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    return s / 4294967296;
-  };
-}
-
-// ── Mock data generators ────────────────────────────────────────────────
-function stepNames(): string[] {
-  return [
-    "Open homepage",
-    "Open search",
-    "Search query",
-    "Submit search",
-    "Search results",
-    "Results shown",
-    "Open first product",
-    "Product page",
-    "Add to cart",
-    "Go to checkout",
-    "Fill card number",
-    "Place order",
-  ];
-}
-
-function stepMeta(): Record<
-  string,
-  { locator: string | null; browsers: string[] }
-> {
-  return {
-    "Open homepage": {
-      locator: null,
-      browsers: ["Chromium", "Firefox", "WebKit"],
-    },
-    "Open search": {
-      locator: 'css=[data-testid="search-icon"]',
-      browsers: ["Chromium", "Firefox", "WebKit"],
-    },
-    "Search query": {
-      locator: "css=#search",
-      browsers: ["Chromium", "Firefox", "WebKit"],
-    },
-    "Submit search": {
-      locator: null,
-      browsers: ["Chromium", "Firefox", "WebKit"],
-    },
-    "Search results": {
-      locator: null,
-      browsers: ["Chromium", "Firefox", "WebKit"],
-    },
-    "Results shown": {
-      locator: 'text="results for"',
-      browsers: ["Chromium", "Firefox", "WebKit"],
-    },
-    "Open first product": {
-      locator: "testid=result-0",
-      browsers: ["Chromium", "Firefox", "WebKit"],
-    },
-    "Product page": {
-      locator: null,
-      browsers: ["Chromium", "Firefox", "WebKit"],
-    },
-    "Add to cart": {
-      locator: "css=.btn-add-to-cart",
-      browsers: ["Chromium", "Firefox", "WebKit"],
-    },
-    "Go to checkout": {
-      locator: "css=.btn-checkout",
-      browsers: ["Chromium", "Firefox", "WebKit"],
-    },
-    "Fill card number": {
-      locator: "css=#card-number",
-      browsers: ["Chromium", "Firefox", "WebKit"],
-    },
-    "Place order": {
-      locator: "testid=place-order-btn",
-      browsers: ["Chromium", "Firefox", "WebKit"],
-    },
-  };
-}
-
-function errorPatterns(): string[] {
-  return [
-    'TimeoutError: waiting for selector `[data-testid="place-order-btn"]`',
-    "Selector not found: .btn-checkout",
-    "Navigation timeout exceeded: /api/checkout/session",
-    'AssertionError: expected text "results for"',
-  ];
-}
-
-interface MockRun {
-  id: number;
-  runId: string;
-  ageMin: number;
-  scheduledTs: number;
-  timestamp: number;
-  duration: number;
-  status: "pass" | "fail";
-  location: string;
-  browser: string;
-  device: string;
-  triggerType: string;
-  failedStep: string | null;
-  locator: string | null;
-  action: string | null;
-  errorPattern: string | null;
-  artifacts: {
-    screenshot: boolean;
-    replay: boolean;
-    trace: boolean;
-    rum: boolean;
-  };
-}
-
-function generateRuns(timeRange?: {
-  startTimeMs: number;
-  endTimeMs: number;
-}): MockRun[] {
-  const r = seedRand(77);
-  const locations = ["us-east-1", "eu-west-1", "ap-south-1"];
-  const browsers = ["Chromium", "Firefox", "WebKit"];
-  const devices = ["Desktop", "Tablet", "Mobile"];
-  const steps = stepNames();
-  const meta = stepMeta();
-  const errs = errorPatterns();
-  const runs: MockRun[] = [];
-
-  const timeSpan = timeRange
-    ? timeRange.endTimeMs - timeRange.startTimeMs
-    : 26 * 17 * 60 * 1000; // default ~7h span
-  const baseTime = timeRange ? timeRange.endTimeMs : Date.now();
-
-  const NUM_LOGICAL_RUNS = 26;
-  let idCounter = 1;
-  for (
-    let logicalRunIdx = 0;
-    logicalRunIdx < NUM_LOGICAL_RUNS;
-    logicalRunIdx++
-  ) {
-    const runId = "run-" + String(5000 - logicalRunIdx);
-    const numExecutions = 3 + Math.floor(r() * 16); // 3–18 executions per run
-    const intervalFraction = logicalRunIdx / NUM_LOGICAL_RUNS;
-    const scheduledBase = baseTime - Math.round(intervalFraction * timeSpan);
-
-    for (let execIdx = 0; execIdx < numExecutions; execIdx++) {
-      const isFail = r() < 0.22;
-      const dur = isFail
-        ? Math.round(20000 + r() * 15000)
-        : Math.round(1800 + r() * 3200);
-      const errIdx = Math.floor(r() * errs.length);
-      const failedStep = isFail ? steps[8 + Math.floor(r() * 4)] : null;
-      const locator = failedStep ? meta[failedStep].locator : null;
-
-      runs.push({
-        id: idCounter++,
-        runId,
-        ageMin: Math.round((baseTime - scheduledBase) / 60000),
-        scheduledTs: scheduledBase,
-        timestamp: scheduledBase + Math.round(r() * 30000),
-        triggerType: "schedule",
-        duration: dur,
-        status: isFail ? ("fail" as const) : ("pass" as const),
-        location: locations[Math.floor(r() * locations.length)],
-        browser: browsers[Math.floor(r() * browsers.length)],
-        device: devices[r() < 0.7 ? 0 : r() < 0.85 ? 1 : 2],
-        failedStep,
-        locator,
-        action: failedStep
-          ? ["Place order", "Go to checkout", "Add to cart"].includes(
-              failedStep,
-            )
-            ? "click"
-            : "type"
-          : null,
-        errorPattern: isFail ? errs[errIdx] : null,
-        artifacts: {
-          screenshot: true,
-          replay: r() < 0.7,
-          trace: true,
-          rum: r() < 0.9,
-        },
-      });
-    }
-  }
-  return runs;
-}
+const stepsLoading = computed(() => synthetics.stepsLoading.value);
+const stepsHasLoadedOnce = computed(() => synthetics.stepsHasLoadedOnce.value);
+const kpiError = computed(() => synthetics.kpiError.value);
+const histogramError = computed(() => synthetics.histogramError.value);
+const runsError = computed(() => synthetics.runsError.value);
+const stepsError = computed(() => synthetics.stepsError.value);
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 function fmtDur(ms: number): string {
   return ms >= 1000 ? (ms / 1000).toFixed(1) + "s" : ms + "ms";
-}
-function fmtAge(min: number): string {
-  if (min < 60) return min + "m ago";
-  const h = Math.floor(min / 60);
-  if (h < 24) return h + "h ago";
-  return Math.floor(h / 24) + "d ago";
 }
 
 function browserIcon(name: string): string {
@@ -1175,20 +1245,17 @@ function locationIcon(region: string): string {
   return "location-on";
 }
 
-function sparkPts(seed: number, n: number, base: number, vol: number): string {
-  const r = seedRand(seed);
-  const pts: string[] = [];
-  for (let i = 0; i < n; i++) {
-    const v = base + Math.sin(i / 3) * vol * 0.4 + (r() - 0.5) * vol;
-    const x = (i / (n - 1)) * 120;
-    const y = 28 - Math.max(2, Math.min(28, v));
-    pts.push(x.toFixed(1) + "," + y.toFixed(1));
-  }
-  return pts.join(" ");
-}
-
 // ── State ────────────────────────────────────────────────────────────────
 const activeTab = ref("overview");
+
+// ── Seeded random (for fallback mock data in charts/timeline) ────────────
+function seedRand(seed: number) {
+  let s = seed;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
 /** Time range from the parent (microseconds). Updated on each refresh call. */
 const timeRangeMicros = ref<{ startTime: number; endTime: number } | null>(
   null,
@@ -1222,7 +1289,6 @@ const failedStepFilter = ref("all");
 const locatorFilter = ref("");
 const actionFilter = ref("all");
 const errorFilter = ref<string | null>(null);
-const stepsGroupBy = ref<"step" | "locator">("step");
 const expandedRows = ref<Record<string, boolean>>({});
 
 // Composite key that changes when any filter changes — ensures the runs
@@ -1682,6 +1748,110 @@ const statusOptions = [
   { key: "fail", label: "Failed", dot: "var(--o2-status-error-text)" },
 ];
 
+// ── Mock fallback data (used by Overview/Errors tabs when no real data) ────
+function stepNames(): string[] {
+  return [
+    "Open homepage", "Open search", "Search query", "Submit search",
+    "Search results", "Results shown", "Open first product", "Product page",
+    "Add to cart", "Go to checkout", "Fill card number", "Place order",
+  ];
+}
+function stepMeta(): Record<string, { locator: string | null; browsers: string[] }> {
+  return {
+    "Open homepage": { locator: null, browsers: ["Chromium", "Firefox", "WebKit"] },
+    "Open search": { locator: 'css=[data-testid="search-icon"]', browsers: ["Chromium", "Firefox", "WebKit"] },
+    "Search query": { locator: "css=#search", browsers: ["Chromium", "Firefox", "WebKit"] },
+    "Submit search": { locator: null, browsers: ["Chromium", "Firefox", "WebKit"] },
+    "Search results": { locator: null, browsers: ["Chromium", "Firefox", "WebKit"] },
+    "Results shown": { locator: 'text="results for"', browsers: ["Chromium", "Firefox", "WebKit"] },
+    "Open first product": { locator: "testid=result-0", browsers: ["Chromium", "Firefox", "WebKit"] },
+    "Product page": { locator: null, browsers: ["Chromium", "Firefox", "WebKit"] },
+    "Add to cart": { locator: "css=.btn-add-to-cart", browsers: ["Chromium", "Firefox", "WebKit"] },
+    "Go to checkout": { locator: "css=.btn-checkout", browsers: ["Chromium", "Firefox", "WebKit"] },
+    "Fill card number": { locator: "css=#card-number", browsers: ["Chromium", "Firefox", "WebKit"] },
+    "Place order": { locator: "testid=place-order-btn", browsers: ["Chromium", "Firefox", "WebKit"] },
+  };
+}
+function errorPatterns(): string[] {
+  return [
+    'TimeoutError: waiting for selector `[data-testid="place-order-btn"]`',
+    "Selector not found: .btn-checkout",
+    "Navigation timeout exceeded: /api/checkout/session",
+    'AssertionError: expected text "results for"',
+  ];
+}
+function fmtAge(min: number): string {
+  if (min < 60) return min + "m ago";
+  const h = Math.floor(min / 60);
+  if (h < 24) return h + "h ago";
+  return Math.floor(h / 24) + "d ago";
+}
+interface MockRun {
+  id: number; runId: string; ageMin: number; scheduledTs: number;
+  timestamp: number; duration: number; status: "pass" | "fail";
+  location: string; browser: string; device: string; triggerType: string;
+  failedStep: string | null; locator: string | null; action: string | null;
+  errorPattern: string | null;
+  artifacts: { screenshot: boolean; replay: boolean; trace: boolean; rum: boolean };
+}
+function generateRuns(timeRange?: { startTimeMs: number; endTimeMs: number }): MockRun[] {
+  const r = seedRand(77);
+  const locations = ["us-east-1", "eu-west-1", "ap-south-1"];
+  const browsers = ["Chromium", "Firefox", "WebKit"];
+  const devices = ["Desktop", "Tablet", "Mobile"];
+  const steps = stepNames();
+  const meta = stepMeta();
+  const errs = errorPatterns();
+  const runs: MockRun[] = [];
+  const timeSpan = timeRange ? timeRange.endTimeMs - timeRange.startTimeMs : 26 * 17 * 60 * 1000;
+  const baseTime = timeRange ? timeRange.endTimeMs : Date.now();
+  const NUM_LOGICAL_RUNS = 26;
+  let idCounter = 1;
+  for (let logicalRunIdx = 0; logicalRunIdx < NUM_LOGICAL_RUNS; logicalRunIdx++) {
+    const runId = "run-" + String(5000 - logicalRunIdx);
+    const numExecutions = 3 + Math.floor(r() * 16);
+    const intervalFraction = logicalRunIdx / NUM_LOGICAL_RUNS;
+    const scheduledBase = baseTime - Math.round(intervalFraction * timeSpan);
+    for (let execIdx = 0; execIdx < numExecutions; execIdx++) {
+      const isFail = r() < 0.22;
+      const dur = isFail ? Math.round(20000 + r() * 15000) : Math.round(1800 + r() * 3200);
+      const errIdx = Math.floor(r() * errs.length);
+      const failedStep = isFail ? steps[8 + Math.floor(r() * 4)] : null;
+      const locator = failedStep ? meta[failedStep].locator : null;
+      runs.push({
+        id: idCounter++, runId,
+        ageMin: Math.round((baseTime - scheduledBase) / 60000),
+        scheduledTs: scheduledBase, timestamp: scheduledBase + Math.round(r() * 30000),
+        triggerType: "schedule", duration: dur, status: isFail ? "fail" : "pass",
+        location: locations[Math.floor(r() * locations.length)],
+        browser: browsers[Math.floor(r() * browsers.length)],
+        device: devices[r() < 0.7 ? 0 : r() < 0.85 ? 1 : 2],
+        failedStep, locator,
+        action: failedStep ? (["Place order", "Go to checkout", "Add to cart"].includes(failedStep) ? "click" : "type") : null,
+        errorPattern: isFail ? errs[errIdx] : null,
+        artifacts: { screenshot: true, replay: r() < 0.7, trace: true, rum: r() < 0.9 },
+      });
+    }
+  }
+  return runs;
+}
+
+// ── Error groups (Errors tab) ────────────────────────────────────────────
+interface ErrorGroup { pattern: string; count: number; lastSeen: string; }
+const errorGroups = computed<ErrorGroup[]>(() => {
+  const errs = errorPatterns();
+  const runs = allRuns.value;
+  return errs
+    .map((pattern) => {
+      const matches = runs.filter((r) => r.errorPattern === pattern);
+      const lastSeen = matches.length ? fmtAge(Math.min(...matches.map((m) => m.ageMin))) : "—";
+      return { pattern, count: matches.length, lastSeen };
+    })
+    .filter((e) => e.count > 0)
+    .sort((a, b) => b.count - a.count);
+});
+const errorGroupCount = computed(() => errorGroups.value.length);
+
 const failedStepOptions = computed<SelectOption[]>(() => {
   const meta = stepMeta();
   const withLocator = stepNames().filter((n) => meta[n].locator);
@@ -1763,12 +1933,147 @@ const runColumns: OTableColumnDef[] = [
   },
 ];
 
-// ── Step groups ──────────────────────────────────────────────────────────
-interface StepGroupRow {
+// ── Steps: real data from composable ────────────────────────────────────
+const stepFailures = computed(() => synthetics.stepStats.value.stepFailures);
+const stepDurations = computed(() => synthetics.stepStats.value.stepDurations);
+const stepGroupsData = computed(() => synthetics.stepStats.value.stepGroups);
+const flakyStepsData = computed(() => synthetics.stepStats.value.flakySteps);
+const failureInstances = computed(() => synthetics.stepStats.value.failureInstances);
+const trendBuckets = computed(() => synthetics.stepStats.value.trendBuckets);
+
+// ── Display helpers for step analysis ────────────────────────────────────
+
+function colorForRate(pct: number): string {
+  return pct >= 15
+    ? "var(--o2-status-error-text)"
+    : pct >= 5
+      ? "var(--o2-warning-600)"
+      : "var(--o2-text-secondary)";
+}
+function barColorForRate(pct: number): string {
+  return pct >= 15
+    ? "var(--o2-status-error-text)"
+    : pct >= 5
+      ? "var(--o2-warning-500)"
+      : "var(--o2-status-success-text)";
+}
+function chipColorForRate(pct: number) {
+  return pct >= 15
+    ? { bg: "var(--o2-error-50)", color: "var(--o2-status-error-text)" }
+    : pct >= 5
+      ? { bg: "var(--o2-warning-50)", color: "var(--o2-warning-700)" }
+      : { bg: "var(--o2-success-50)", color: "var(--o2-success-700)" };
+}
+function sparklinePts(rates: number[], width: number, height: number): string {
+  if (rates.length < 2) {
+    const y = height - Math.max(2, 2);
+    return `0,${y} ${width},${y}`;
+  }
+  const maxR = Math.max(...rates, 0.01);
+  const pts: string[] = [];
+  for (let i = 0; i < rates.length; i++) {
+    const x = (i / (rates.length - 1)) * width;
+    const y = height - Math.max(2, (rates[i] / maxR) * (height - 4));
+    pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  }
+  return pts.join(" ");
+}
+function engineShortLabel(engine: string): string {
+  const m: Record<string, string> = {
+    chromium: "CR",
+    firefox: "FF",
+    webkit: "WK",
+  };
+  return m[engine.toLowerCase()] ?? engine.slice(0, 2).toUpperCase();
+}
+
+// ── Panel 1 + 2: Bar chart options ───────────────────────────────────────
+
+const failedStepsChartOption = computed(() => {
+  const errorColor = cssVar("--o2-status-error-text", "#dc2626");
+  const axisColor = cssVar("--o2-text-caption", "#6c707e");
+  const splitColor = cssVar("--o2-border-color", "#e2e8f0");
+  const data = stepFailures.value
+    .slice(0, 15)
+    .map((s) => ({ name: s.stepName, value: s.failCount }))
+    .reverse();
+
+  return {
+    grid: { left: 8, right: 40, top: 4, bottom: 4, containLabel: true },
+    tooltip: { trigger: "axis" as const },
+    xAxis: {
+      type: "value" as const,
+      axisLabel: { color: axisColor, fontSize: 10 },
+      splitLine: { lineStyle: { color: splitColor, type: "dashed" as const } },
+    },
+    yAxis: {
+      type: "category" as const,
+      data: data.map((d) => d.name),
+      axisLabel: { color: axisColor, fontSize: 10, width: 120, overflow: "truncate" },
+      axisLine: { lineStyle: { color: splitColor } },
+    },
+    series: [
+      {
+        type: "bar" as const,
+        data: data.map((d) => ({
+          value: d.value,
+          itemStyle: { color: errorColor, borderRadius: [0, 2, 2, 0] },
+        })),
+        barMaxWidth: 16,
+      },
+    ],
+  };
+});
+
+const slowestStepsChartOption = computed(() => {
+  const primaryColor = cssVar("--o2-primary-color", "#3b82f6");
+  const axisColor = cssVar("--o2-text-caption", "#6c707e");
+  const splitColor = cssVar("--o2-border-color", "#e2e8f0");
+  const data = stepDurations.value
+    .slice(0, 15)
+    .map((s) => ({ name: s.stepName, value: s.avgDurationMs }))
+    .reverse();
+
+  return {
+    grid: { left: 8, right: 44, top: 4, bottom: 4, containLabel: true },
+    tooltip: {
+      trigger: "axis" as const,
+      valueFormatter: (val: number) => fmtDur(val),
+    },
+    xAxis: {
+      type: "value" as const,
+      axisLabel: { color: axisColor, fontSize: 10 },
+      splitLine: { lineStyle: { color: splitColor, type: "dashed" as const } },
+    },
+    yAxis: {
+      type: "category" as const,
+      data: data.map((d) => d.name),
+      axisLabel: { color: axisColor, fontSize: 10, width: 120, overflow: "truncate" },
+      axisLine: { lineStyle: { color: splitColor } },
+    },
+    series: [
+      {
+        type: "bar" as const,
+        data: data.map((d) => ({
+          value: d.value,
+          itemStyle: { color: primaryColor, borderRadius: [0, 2, 2, 0] },
+        })),
+        barMaxWidth: 16,
+      },
+    ],
+  };
+});
+
+// ── Panel 3: Steps Analysis Table display rows ───────────────────────────
+
+interface StepGroupDisplayRow {
+  _key: string;
   name: string;
   sub: string | null;
-  failRate: string;
+  failRateDisplay: string;
+  flakyRateDisplay: string;
   failColor: string;
+  flakyColor: string;
   failRateBarPct: string;
   failBarColor: string;
   avgDuration: string;
@@ -1781,146 +2086,132 @@ interface StepGroupRow {
   locationRows: { name: string; pct: string; barColor: string }[];
   expanded: boolean;
 }
-interface StepGroupEntry extends StepGroupRow {
-  _key: string;
-}
 
-const stepGroups = computed<StepGroupRow[]>(() => {
-  const steps = stepNames();
-  const meta = stepMeta();
-  const rS = seedRand(55);
+const stepGroupsDisplay = computed<StepGroupDisplayRow[]>(() => {
+  const groups = stepGroupsData.value;
+  if (groups.length === 0) return [];
 
-  const colorForRate = (pct: number) =>
-    pct >= 15
-      ? "var(--o2-status-error-text)"
-      : pct >= 5
-        ? "var(--o2-warning-600)"
-        : "var(--o2-text-secondary)";
-  const barColorForRate = (pct: number) =>
-    pct >= 15
-      ? "var(--o2-status-error-text)"
-      : pct >= 5
-        ? "var(--o2-warning-500)"
-        : "var(--o2-status-success-text)";
-  const chipStyleForRate = (pct: number) =>
-    pct >= 15
-      ? { bg: "var(--o2-error-50)", color: "var(--o2-status-error-text)" }
-      : pct >= 5
-        ? { bg: "var(--o2-warning-50)", color: "var(--o2-warning-700)" }
-        : { bg: "var(--o2-success-50)", color: "var(--o2-success-700)" };
+  const maxFailRate = Math.max(...groups.map((g) => g.failRate), 0.01);
+  const maxDuration = Math.max(...groups.map((g) => g.avgDurationMs), 1);
 
-  const rawGroups = steps.map((name) => {
-    const m = meta[name];
-    const failRate =
-      name === "Place order"
-        ? 18 + Math.round(rS() * 8)
-        : m.locator
-          ? Math.round(rS() * 4)
-          : 0;
-    const avgDur = name === "Place order" ? 8200 : Math.round(80 + rS() * 500);
-    const browserRows = ["Chromium", "Firefox", "WebKit"].map((b) => ({
-      name: b,
-      pct: Math.max(0, Math.round(failRate + (rS() - 0.5) * 10)),
-    }));
-    const locationRows = ["us-east-1", "eu-west-1", "ap-south-1"].map((l) => ({
-      name: l,
-      pct: Math.max(0, Math.round(failRate + (rS() - 0.5) * 12)),
-    }));
+  return groups.map((g, i) => {
+    const failPct = Math.round(g.failRate * 100);
+    const failBarWidth = Math.round((g.failRate / maxFailRate) * 100);
+
+    return {
+      _key: `step-${i}`,
+      name: g.name,
+      sub: g.sub,
+      failRateDisplay: failPct + "%",
+      flakyRateDisplay: g.flakyRate.toFixed(1) + "%",
+      failColor: colorForRate(failPct),
+      flakyColor: g.flakyRate >= 5 ? "var(--o2-status-warning-text)" : "var(--o2-text-secondary)",
+      failRateBarPct: failBarWidth + "%",
+      failBarColor: barColorForRate(failPct),
+      avgDuration: fmtDur(g.avgDurationMs),
+      durationBarPct: Math.round((g.avgDurationMs / maxDuration) * 100) + "%",
+      trendPts: sparklinePts(g.recentRates, 90, 24),
+      trendColor: g.failRate >= 0.1
+        ? "var(--o2-status-error-text)"
+        : "var(--o2-primary-500)",
+      browserChips: g.browserStats.map((bs) => {
+        const failPct = bs.total > 0 ? Math.round((bs.failures / bs.total) * 100) : 0;
+        const c = chipColorForRate(failPct);
+        return {
+          label: engineShortLabel(bs.name) + " " + failPct + "%",
+          bg: c.bg,
+          color: c.color,
+        };
+      }),
+      locationChips: g.locationStats.map((ls) => {
+        const failPct = ls.total > 0 ? Math.round((ls.failures / ls.total) * 100) : 0;
+        const c = chipColorForRate(failPct);
+        return { label: ls.name + " " + failPct + "%", bg: c.bg, color: c.color };
+      }),
+      browserRows: g.browserStats.map((bs) => {
+        const pct = bs.total > 0 ? Math.round((bs.failures / bs.total) * 100) : 0;
+        return { name: bs.name, pct: pct + "%", barColor: barColorForRate(pct) };
+      }),
+      locationRows: g.locationStats.map((ls) => {
+        const pct = ls.total > 0 ? Math.round((ls.failures / ls.total) * 100) : 0;
+        return { name: ls.name, pct: pct + "%", barColor: barColorForRate(pct) };
+      }),
+      expanded: !!expandedRows.value[`step-${i}`],
+    };
+  });
+});
+
+// ── Panel 5: Flakiest Steps display rows ─────────────────────────────────
+
+const flakyStepsDisplay = computed(() => {
+  return flakyStepsData.value.map((fs) => ({
+    ...fs,
+    flakyRateDisplay: fs.flakyRate.toFixed(1) + "%",
+    failRateDisplay: fs.failRate.toFixed(1) + "%",
+    trendPts: sparklinePts(fs.recentFlakyRates, 60, 16),
+    trendColor: fs.flakyRate >= 10
+      ? "var(--o2-status-warning-text)"
+      : "var(--o2-primary-500)",
+  }));
+});
+
+// ── Panel 6: Step Duration Trend chart option ────────────────────────────
+
+const STEP_TREND_COLORS = [
+  "#3b82f6", "#ef4444", "#22c55e", "#f59e0b",
+  "#8b5cf6", "#06b6d4", "#ec4899", "#f97316",
+  "#94a3b8",
+];
+
+const stepDurationTrendOption = computed(() => {
+  const axisColor = cssVar("--o2-text-caption", "#6c707e");
+  const splitColor = cssVar("--o2-border-color", "#e2e8f0");
+  const buckets = trendBuckets.value;
+  if (buckets.length === 0) return {};
+
+  const seriesNames = [...new Set(buckets.map((b) => b.stepName))];
+  const series = seriesNames.map((name, idx) => {
+    const data = buckets
+      .filter((b) => b.stepName === name)
+      .map((b) => [b.tsMs, b.avgDurationMs] as [number, number]);
     return {
       name,
-      locator: m.locator,
-      failRate,
-      avgDur,
-      browserRows,
-      locationRows,
+      type: "line" as const,
+      smooth: true,
+      showSymbol: false,
+      data,
+      lineStyle: {
+        color: STEP_TREND_COLORS[idx % STEP_TREND_COLORS.length],
+        width: 1.5,
+      },
+      connectNulls: true,
     };
   });
 
-  const maxAvgDur = Math.max(...rawGroups.map((g) => g.avgDur), 1);
-  const maxFailRate = Math.max(...rawGroups.map((g) => g.failRate), 1);
-
-  const buildRow = (
-    g: (typeof rawGroups)[number],
-    key: string,
-    mono?: boolean,
-  ): StepGroupEntry => ({
-    _key: key,
-    name: mono ? (g.locator ?? g.name) : g.name,
-    sub: mono ? "Used in: " + g.name : g.locator || null,
-    failRate: g.failRate + "%",
-    failColor: colorForRate(g.failRate),
-    failRateBarPct: Math.round((g.failRate / maxFailRate) * 100) + "%",
-    failBarColor: barColorForRate(g.failRate),
-    durationBarPct: Math.round((g.avgDur / maxAvgDur) * 100) + "%",
-    avgDuration: fmtDur(g.avgDur),
-    trendPts: sparkPts(
-      mono ? 300 + rawGroups.indexOf(g) : 200 + rawGroups.indexOf(g),
-      16,
-      24 - g.failRate,
-      6,
-    ),
-    trendColor:
-      g.failRate >= 10
-        ? "var(--o2-status-error-text)"
-        : "var(--o2-primary-500)",
-    browserChips: g.browserRows.map((b) => {
-      const c = chipStyleForRate(b.pct);
-      return {
-        label: b.name.slice(0, 2).toUpperCase() + " " + b.pct + "%",
-        bg: c.bg,
-        color: c.color,
-      };
-    }),
-    locationChips: g.locationRows.map((l) => {
-      const c = chipStyleForRate(l.pct);
-      return { label: l.name + " " + l.pct + "%", bg: c.bg, color: c.color };
-    }),
-    browserRows: g.browserRows.map((b) => ({
-      ...b,
-      pct: b.pct + "%",
-      barColor: barColorForRate(b.pct),
-    })),
-    locationRows: g.locationRows.map((l) => ({
-      ...l,
-      pct: l.pct + "%",
-      barColor: barColorForRate(l.pct),
-    })),
-    expanded: !!expandedRows.value[key],
-  });
-
-  if (stepsGroupBy.value === "step") {
-    return rawGroups.map((g, i) => buildRow(g, "step-" + i));
-  }
-  return rawGroups
-    .filter((g) => g.locator)
-    .map((g, i) => buildRow(g, "loc-" + i, true));
+  return {
+    grid: { left: 44, right: 16, top: 16, bottom: 28 },
+    tooltip: {
+      trigger: "axis" as const,
+      valueFormatter: (val: number) => fmtDur(val),
+    },
+    legend: {
+      bottom: 0,
+      textStyle: { color: axisColor, fontSize: 10 },
+      data: seriesNames,
+    },
+    xAxis: {
+      type: "time" as const,
+      axisLabel: { color: axisColor, fontSize: 10 },
+      axisLine: { lineStyle: { color: splitColor } },
+    },
+    yAxis: {
+      type: "value" as const,
+      axisLabel: { color: axisColor, fontSize: 10, formatter: (v: number) => fmtDur(v) },
+      splitLine: { lineStyle: { color: splitColor, type: "dashed" as const } },
+    },
+    series,
+  };
 });
-
-const primaryColLabel = computed(() =>
-  stepsGroupBy.value === "step" ? "Step Name" : "Locator",
-);
-
-// ── Error groups ─────────────────────────────────────────────────────────
-interface ErrorGroup {
-  pattern: string;
-  count: number;
-  lastSeen: string;
-}
-const errorGroups = computed<ErrorGroup[]>(() => {
-  const errs = errorPatterns();
-  const runs = allRuns.value;
-  return errs
-    .map((pattern) => {
-      const matches = runs.filter((r) => r.errorPattern === pattern);
-      const lastSeen = matches.length
-        ? fmtAge(Math.min(...matches.map((m) => m.ageMin)))
-        : "—";
-      return { pattern, count: matches.length, lastSeen };
-    })
-    .filter((e) => e.count > 0)
-    .sort((a, b) => b.count - a.count);
-});
-const errorGroupCount = computed(() => errorGroups.value.length);
 
 // ── Chart options ────────────────────────────────────────────────────────
 function cssVar(name: string, fallback: string): string {

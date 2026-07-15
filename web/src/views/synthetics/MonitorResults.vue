@@ -82,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :monitor-status="monitorStatus"
         @edit="editMonitor"
         @open-run="openRunDetail"
+        @refresh="refresh"
       />
     </div>
   </div>
