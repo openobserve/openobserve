@@ -86,230 +86,236 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div
-      class="flex items-center gap-2 px-4 py-2 border-b border-border-default"
-    >
-      <!-- The scope toggle lives INSIDE the field, the way the dashboard list's
-           folder scope does: it is a property of the search — which metrics you
-           are looking through — not another control sitting beside it. The field
-           grows to fill the bar so the toggle sits at its right edge. -->
-      <OSearchInput
-        v-model="grid.searchTerm.value"
-        size="sm"
-        clearable
-        :debounce="200"
-        :placeholder="t('metrics.explorer.searchPlaceholder')"
-        data-test="metrics-explorer-search"
-        class="flex-1 min-w-0"
-      >
-        <template #icon-right>
-          <OToggleGroup
-            :model-value="grid.hideEmptyPanels.value ? 'with-data' : 'all'"
-            type="single"
-            class="self-center"
-            data-test="metrics-explorer-data-scope"
-            @update:model-value="onDataScope"
-          >
-            <OToggleGroupItem
-              value="with-data"
-              size="xs"
-              icon-left="show-chart"
-              :title="t('metrics.explorer.withDataTitle')"
-              data-test="metrics-explorer-hide-empty"
-              >{{ t("metrics.explorer.withData") }}</OToggleGroupItem
-            >
-            <OToggleGroupItem
-              value="all"
-              size="xs"
-              icon-left="all-inclusive"
-              :title="t('metrics.explorer.allTitle')"
-              data-test="metrics-explorer-show-all"
-              >{{ t("metrics.explorer.all") }}</OToggleGroupItem
-            >
-          </OToggleGroup>
-        </template>
-      </OSearchInput>
-
-      <!-- Announced, so a screen reader hears the count change as the user types.
-           `shrink-0` + `nowrap`: the search field grows to fill the bar and was
-           squeezing both of these until "60 of 3,315" broke across two lines. -->
-      <span
-        aria-live="polite"
-        data-test="metrics-explorer-count"
-        class="shrink-0 whitespace-nowrap text-xs text-text-secondary tabular-nums"
-        >{{ resultCountLabel }}</span
-      >
-
-      <!-- OToggleGroup takes OToggleGroupItem children; it has no `items` prop.
-           Passing one renders an empty group. -->
-      <OToggleGroup
-        v-model="sortModel"
-        type="single"
-        data-test="metrics-explorer-sort"
-      >
-        <OToggleGroupItem
-          v-for="opt in sortOptions"
-          :key="opt.value"
-          :value="opt.value"
-          size="sm"
-          :data-test="`metrics-explorer-sort-${opt.value}`"
-          >{{ opt.label }}</OToggleGroupItem
-        >
-      </OToggleGroup>
-
-      <OToggleGroup
-        v-model="viewModel"
-        type="single"
-        data-test="metrics-explorer-view"
-      >
-        <OToggleGroupItem
-          v-for="opt in viewOptions"
-          :key="opt.value"
-          :value="opt.value"
-          size="sm"
-          :icon-left="opt.icon"
-          :tooltip="opt.label"
-          :data-test="`metrics-explorer-view-${opt.value}`"
-        />
-      </OToggleGroup>
-    </div>
-
+    <!-- Body: two columns that START ON THE SAME LINE. The left facet panel and
+         the right column (search row + grid) both begin here, so the panel gets
+         the full height and the search bar starts exactly where the grid cards
+         start — not spanning the page above the panel. -->
     <div class="flex flex-1 min-h-0">
-      <!-- gap-2.5 / pt-3, not gap-1 / p-2: the corner count badges straddle
-           each button's top-right edge with an 8px overhang, and they need the
-           room between items — and above the FIRST item — to poke into without
-           touching a neighbour or the toolbar border. -->
-      <nav
-        class="flex flex-col gap-2.5 pl-2 pr-3 pb-2 pt-3 border-r border-border-default"
+      <!-- Left column: the facet selector (Prefix/Suffix/Type) as its OWN header,
+           with the always-open facet panel beneath — one self-contained column,
+           the same shape as the Dashboards page's Folders panel (header on top,
+           list below). The selector is part of this panel, not the search row. -->
+      <aside
+        class="w-60 flex-none flex flex-col min-h-0 border-r border-border-default"
         :aria-label="t('metrics.explorer.railsAriaLabel')"
       >
-        <!-- OTooltip nests INSIDE the button and attaches to it — the pattern
-             the rest of the app uses. (Pass the label via the `content` prop,
-             not a default slot: a default slot would make this wrapper mode and
-             render the label as the button's own text.) -->
-        <!-- Prefix and suffix are `A_` / `_Z` glyphs rather than icons: no icon
-             in the registry says "matches the START of the name" as plainly as
-             the underscore's position does. The OTooltip comes FIRST so that,
-             having no preceding sibling, it attaches to the whole button rather
-             than to the glyph span. -->
-        <div v-for="rail in rails" :key="rail.id" class="relative">
-          <OButton
-            :variant="grid.activeRail.value === rail.id ? 'primary' : 'ghost'"
-            size="icon"
-            :icon-left="rail.icon"
-            :aria-label="rail.label"
-            :aria-pressed="String(grid.activeRail.value === rail.id)"
-            :data-test="`metrics-explorer-rail-${rail.id}`"
-            @click="toggleRail(rail.id)"
-          >
-            <OTooltip :content="rail.label" side="right" />
-            <span
-              v-if="rail.glyph"
-              class="font-mono text-[11px] font-semibold leading-none tracking-tight"
-              aria-hidden="true"
-              >{{ rail.glyph }}</span
-            >
-          </OButton>
-          <!-- The registry's countChip at its own xs size, exactly as every
-               other count badge in the app renders it — this wrapper only
-               POSITIONS it, straddling the button's corner notification-style.
-               The overhang fits the rail's gap-2.5 / pt-3 breathing room. -->
-          <OTag
-            v-if="rail.count"
-            type="countChip"
-            value="primary"
-            size="xs"
-            class="absolute -top-2 -right-2 z-10 pointer-events-none"
-            :data-test="`metrics-explorer-rail-count-${rail.id}`"
-            >{{ rail.count }}</OTag
-          >
-        </div>
-
-        <!-- Favorites is not a fourth selector: it narrows the grid to pinned
-             metrics and composes with whatever the three panels have selected.
-             Hence the divider. -->
-        <!-- Negative margin claws back most of the rail's gap-2.5 on either
-             side — the divider is a hairline, not a section break. -->
-        <div class="-my-1.5 border-t border-border-default" />
-
-        <OButton
-          :variant="grid.showFavoritesOnly.value ? 'primary' : 'ghost'"
-          size="icon"
-          :icon-left="
-            grid.showFavoritesOnly.value ? 'favorite' : 'favorite-border'
-          "
-          :aria-label="favoritesTooltip"
-          :aria-pressed="String(grid.showFavoritesOnly.value)"
-          data-test="metrics-explorer-rail-favorite"
-          @click="grid.showFavoritesOnly.value = !grid.showFavoritesOnly.value"
-        >
-          <OTooltip :content="favoritesTooltip" side="right" />
-        </OButton>
-      </nav>
-
-      <aside
-        v-if="showRailPanel"
-        class="w-60 flex-none flex flex-col min-h-0 py-2 border-r border-border-default"
-      >
-        <!-- The title row owns Clear: it clears the ACTIVE panel's selection,
-             whichever tab that is, and only shows while there is one. min-h
-             pins the row at the button's height so it does not jump when the
-             button appears. -->
+        <!-- Panel header: the facet selector, stretched to fill the column.
+             Clear does NOT live here (it collided with the tabs in a 240px
+             column); it sits in each facet's search row below instead. -->
         <div
-          class="flex items-center justify-between gap-2 px-3 pb-2 min-h-[36px]"
+          class="shrink-0 flex items-center px-2 py-2 border-b border-border-default"
         >
-          <p class="text-xs font-semibold text-text-primary">
-            {{ railHint }}
-          </p>
-          <OButton
-            v-if="railHasSelection"
-            variant="ghost-primary"
-            size="xs"
-            data-test="metrics-explorer-rail-clear"
-            @click="clearActiveRail"
+          <OToggleGroup
+            :model-value="grid.activeRail.value"
+            type="single"
+            class="flex w-full"
+            data-test="metrics-explorer-rail-toggle"
+            @update:model-value="selectRail"
           >
-            {{ t("metrics.explorer.facets.clear") }}
-          </OButton>
+            <OToggleGroupItem
+              v-for="rail in rails"
+              :key="rail.id"
+              :value="rail.id"
+              size="sm"
+              class="flex-1"
+              :data-test="`metrics-explorer-rail-${rail.id}`"
+            >
+              <span class="flex items-center gap-1.5">
+                <span>{{ rail.label }}</span>
+                <OTag
+                  v-if="rail.count"
+                  type="countChip"
+                  value="primary"
+                  size="xs"
+                  :data-test="`metrics-explorer-rail-count-${rail.id}`"
+                  >{{ rail.count }}</OTag
+                >
+              </span>
+            </OToggleGroupItem>
+          </OToggleGroup>
         </div>
 
+        <!-- Clear rides in each facet's search row (right edge), where there is
+             horizontal room — so it never collides with the tabs or shifts the
+             list. `has-selection` shows it only when there is something to clear. -->
         <PrefixFilterPanel
           v-if="grid.activeRail.value === 'prefix'"
           mode="prefix"
-          class="flex-1"
+          class="flex-1 min-h-0 py-2"
           :facets="grid.prefixFacets.value"
           :selected="grid.selectedPrefixes.value"
+          :has-selection="railHasSelection"
           @update:selected="onPrefixChange"
+          @clear="clearActiveRail"
         />
         <PrefixFilterPanel
           v-else-if="grid.activeRail.value === 'suffix'"
           mode="suffix"
-          class="flex-1"
+          class="flex-1 min-h-0 py-2"
           :facets="grid.suffixFacets.value"
           :selected="grid.selectedSuffixes.value"
+          :has-selection="railHasSelection"
           @update:selected="onSuffixChange"
+          @clear="clearActiveRail"
         />
 
         <div
           v-else-if="grid.activeRail.value === 'type'"
-          class="flex flex-col gap-1 px-3 overflow-y-auto"
+          class="flex flex-col min-h-0"
         >
-          <OCheckbox
-            v-for="facet in grid.typeFacets.value"
-            :key="facet.id"
-            size="xs"
-            :model-value="grid.selectedTypes.value.has(facet.id)"
-            :label="`${badgeLabels[facet.id]} (${facet.count})`"
-            :data-test="`metrics-explorer-type-${facet.id}`"
-            @update:model-value="toggleType(facet.id)"
-          />
+          <!-- Type has no facet search, but carries the SAME always-present
+               "Clear filters" row so the affordance is consistent across all
+               three facets. Count + button always shown; button disabled when
+               nothing is selected — no disappearing controls, no shift. -->
+          <div
+            class="flex items-center justify-between gap-2 px-3 pb-2"
+          >
+            <span class="text-xs text-text-secondary tabular-nums">
+              {{ t("metrics.explorer.facets.selectedCount", { count: grid.selectedTypes.value.size }) }}
+            </span>
+            <OButton
+              variant="ghost-primary"
+              size="xs"
+              :disabled="!railHasSelection"
+              data-test="metrics-explorer-type-clear"
+              @click="clearActiveRail"
+            >
+              {{ t("metrics.explorer.facets.clearFilters") }}
+            </OButton>
+          </div>
+          <div class="flex flex-col gap-1 px-3 pb-2 overflow-y-auto">
+            <OCheckbox
+              v-for="facet in grid.typeFacets.value"
+              :key="facet.id"
+              size="xs"
+              :model-value="grid.selectedTypes.value.has(facet.id)"
+              :label="`${badgeLabels[facet.id]} (${facet.count})`"
+              :data-test="`metrics-explorer-type-${facet.id}`"
+              @update:model-value="toggleType(facet.id)"
+            />
+          </div>
         </div>
       </aside>
 
-      <section
-        ref="scrollRef"
-        class="flex-1 min-w-0 overflow-y-auto p-3"
-        data-test="metrics-explorer-scroll"
-      >
+      <!-- Right column: the search row on top, the grid beneath. Its left edge
+           is where the grid cards start, so the search bar is width-matched to
+           the cards (not the full page), and the facet panel to its left runs
+           the full height alongside it. -->
+      <div class="flex-1 min-w-0 flex flex-col min-h-0">
+        <div
+          class="flex items-center gap-2 px-3 py-2 border-b border-border-default"
+        >
+          <!-- The scope toggle lives INSIDE the field, the way the dashboard
+               list's folder scope does: it is a property of the search — which
+               metrics you are looking through — not another control beside it. -->
+          <OSearchInput
+            v-model="grid.searchTerm.value"
+            size="sm"
+            clearable
+            :debounce="200"
+            :placeholder="t('metrics.explorer.searchPlaceholder')"
+            data-test="metrics-explorer-search"
+            class="flex-1 min-w-0"
+          >
+            <template #icon-right>
+              <OToggleGroup
+                :model-value="grid.hideEmptyPanels.value ? 'with-data' : 'all'"
+                type="single"
+                class="self-center"
+                data-test="metrics-explorer-data-scope"
+                @update:model-value="onDataScope"
+              >
+                <OToggleGroupItem
+                  value="with-data"
+                  size="xs"
+                  icon-left="show-chart"
+                  :title="t('metrics.explorer.withDataTitle')"
+                  data-test="metrics-explorer-hide-empty"
+                  >{{ t("metrics.explorer.withData") }}</OToggleGroupItem
+                >
+                <OToggleGroupItem
+                  value="all"
+                  size="xs"
+                  icon-left="all-inclusive"
+                  :title="t('metrics.explorer.allTitle')"
+                  data-test="metrics-explorer-show-all"
+                  >{{ t("metrics.explorer.all") }}</OToggleGroupItem
+                >
+              </OToggleGroup>
+            </template>
+          </OSearchInput>
+
+          <!-- Announced, so a screen reader hears the count change as the user
+               types. `shrink-0` + `nowrap` so the growing search field does not
+               wrap "60 of 3,315" across two lines. -->
+          <span
+            aria-live="polite"
+            data-test="metrics-explorer-count"
+            class="shrink-0 whitespace-nowrap text-xs text-text-secondary tabular-nums"
+            >{{ resultCountLabel }}</span
+          >
+
+          <OToggleGroup
+            v-model="sortModel"
+            type="single"
+            data-test="metrics-explorer-sort"
+          >
+            <OToggleGroupItem
+              v-for="opt in sortOptions"
+              :key="opt.value"
+              :value="opt.value"
+              size="sm"
+              :data-test="`metrics-explorer-sort-${opt.value}`"
+              >{{ opt.label }}</OToggleGroupItem
+            >
+          </OToggleGroup>
+
+          <OToggleGroup
+            v-model="viewModel"
+            type="single"
+            data-test="metrics-explorer-view"
+          >
+            <OToggleGroupItem
+              v-for="opt in viewOptions"
+              :key="opt.value"
+              :value="opt.value"
+              size="sm"
+              :icon-left="opt.icon"
+              :tooltip="opt.label"
+              :data-test="`metrics-explorer-view-${opt.value}`"
+            />
+          </OToggleGroup>
+
+          <!-- Saved Views entry point — NAVIGATION to named views (not a
+               per-metric favourite; that is the pin on each card). The full
+               picker lands in Phase 3 over the /savedviews API; until then it
+               toggles the existing "show pinned only" filter as a stand-in. -->
+          <OButton
+            variant="outline"
+            size="sm-action"
+            icon-left="favorite-border"
+            data-test="metrics-explorer-saved-views"
+            @click="grid.showFavoritesOnly.value = !grid.showFavoritesOnly.value"
+          >
+            {{ t("metrics.explorer.savedViews.button") }}
+            <OTag
+              v-if="grid.favorites.value.length"
+              type="countChip"
+              value="primary"
+              size="xs"
+              class="ml-1"
+              data-test="metrics-explorer-saved-views-count"
+              >{{ grid.favorites.value.length }}</OTag
+            >
+            <OTooltip :content="t('metrics.explorer.savedViews.tooltip')" />
+          </OButton>
+        </div>
+
+        <section
+          ref="scrollRef"
+          class="flex-1 min-w-0 overflow-y-auto p-3"
+          data-test="metrics-explorer-scroll"
+        >
         <div v-if="grid.loading.value" class="flex flex-col items-center justify-center gap-2.5 h-3/5 opacity-80">
           <OSpinner size="lg" />
           <span>{{ t("metrics.explorer.loading") }}</span>
@@ -416,7 +422,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ showMoreLabel }}
           </OButton>
         </div>
-      </section>
+        </section>
+      </div>
     </div>
 
     <FunctionConfigDialog
@@ -458,7 +465,6 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
-import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -635,9 +641,16 @@ export default defineComponent({
     /* ---------------------------------------------------------- layout */
 
     const containerWidth = ref(1200);
+    // Grid view holds at most two columns (a 2-up layout): wider cards give the
+    // sparkline more horizontal room and let more of the metric name show. On a
+    // narrow container it still drops to one; it never grows past two.
+    const MAX_GRID_COLUMNS = 2;
     const columns = computed(() =>
       isGrid.value
-        ? Math.max(1, Math.floor(containerWidth.value / CARD_MIN_WIDTH))
+        ? Math.min(
+            MAX_GRID_COLUMNS,
+            Math.max(1, Math.floor(containerWidth.value / CARD_MIN_WIDTH)),
+          )
         : 1,
     );
 
@@ -671,50 +684,37 @@ export default defineComponent({
     // key in OIcon's registry — an unknown name renders nothing, silently.
     const rails = computed<
       Array<{
-        id: string;
+        id: "prefix" | "suffix" | "type";
         label: string;
-        icon?: IconName;
-        glyph?: string;
-        /** Active selections in this rail's panel — the icon's corner badge. */
+        /** Active selections in this rail's panel — the toggle's count. */
         count: number;
       }>
     >(() => [
       {
         id: "prefix",
-        glyph: "A_",
-        label: t("metrics.explorer.filterByPrefix"),
+        label: t("metrics.explorer.tabPrefix"),
         count: grid.selectedPrefixes.value.size,
       },
       {
         id: "suffix",
-        glyph: "_Z",
-        label: t("metrics.explorer.filterBySuffix"),
+        label: t("metrics.explorer.tabSuffix"),
         count: grid.selectedSuffixes.value.size,
       },
       {
         id: "type",
-        icon: "filter-list",
-        label: t("metrics.explorer.metricType"),
+        label: t("metrics.explorer.tabType"),
         count: grid.selectedTypes.value.size,
       },
     ]);
 
-    const showRailPanel = computed(() => !!grid.activeRail.value);
-
-    // Clicking the active rail icon toggles its panel shut.
-    const toggleRail = (id: any) => {
-      grid.activeRail.value = grid.activeRail.value === id ? "" : id;
+    // The facet panel is always open — selecting a facet switches which one it
+    // shows; it never collapses to nothing. OToggleGroup emits `undefined` on a
+    // re-click (it models a deselect); we IGNORE that so the active facet stays
+    // put and the panel never blanks. Default is prefix (grid composable).
+    const selectRail = (id: string | number | undefined) => {
+      if (!id) return;
+      grid.activeRail.value = id as "prefix" | "suffix" | "type";
     };
-
-    const railHint = computed(() =>
-      t(
-        grid.activeRail.value === "prefix"
-          ? "metrics.explorer.filterByPrefix"
-          : grid.activeRail.value === "suffix"
-            ? "metrics.explorer.filterBySuffix"
-            : "metrics.explorer.metricType",
-      ),
-    );
 
     /** The ACTIVE panel's selection — what the title row's Clear acts on. */
     const activeRailSelection = computed(() =>
@@ -732,14 +732,6 @@ export default defineComponent({
     const clearActiveRail = () => {
       activeRailSelection.value.value = new Set();
     };
-
-    const favoritesTooltip = computed(() =>
-      grid.showFavoritesOnly.value
-        ? t("metrics.explorer.showAllMetrics")
-        : t("metrics.explorer.favorites", {
-            count: grid.favorites.value.length,
-          }),
-    );
 
     /** The empty state's single way out: every filter, including no-data. */
     const onClearAllFilters = () => {
@@ -1355,12 +1347,9 @@ export default defineComponent({
       visibleCards,
       resultCountLabel,
       rails,
-      showRailPanel,
-      toggleRail,
-      railHint,
+      selectRail,
       railHasSelection,
       clearActiveRail,
-      favoritesTooltip,
       onClearAllFilters,
       toggleType,
       onPrefixChange,

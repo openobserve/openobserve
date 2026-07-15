@@ -19,8 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex flex-col min-h-0"
     :data-test="`metrics-explorer-${mode}-panel`"
   >
-    <!-- The rail's own search — narrows the facet list, not the grid. Clear
-         lives in the title row above, beside the panel's name. -->
+    <!-- The rail's own search — narrows the facet LIST, not the grid. Its own
+         inline ✕ clears the SEARCH TEXT only. Clearing the selected FILTERS is a
+         separate, explicitly-labelled row below, so the two are never confused. -->
     <div class="px-3 pb-2">
       <OInput
         v-model="search"
@@ -30,6 +31,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :aria-label="searchAriaLabel"
         :data-test="`metrics-explorer-${mode}-search`"
       />
+    </div>
+
+    <!-- "Clear filters" — acts on the SELECTED facets (not the search box). Both
+         the count and the button are ALWAYS present (no disappearing controls):
+         the count reads "0 selected" and the button is disabled when nothing is
+         selected, so the row never changes size and the control is always
+         discoverable. Distinct from the search box's own inline ✕, which clears
+         the search text. -->
+    <div class="flex items-center justify-between gap-2 px-3 pb-2">
+      <span class="text-xs text-text-secondary tabular-nums">
+        {{ t("metrics.explorer.facets.selectedCount", { count: selected.size }) }}
+      </span>
+      <OButton
+        variant="ghost-primary"
+        size="xs"
+        :disabled="!hasSelection"
+        :data-test="`metrics-explorer-${mode}-clear`"
+        @click="emit('clear')"
+      >
+        {{ t("metrics.explorer.facets.clearFilters") }}
+      </OButton>
     </div>
 
     <!-- Scrollable, keyboard-navigable checkbox list. -->
@@ -92,6 +114,7 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 
 /** A rail facet. Counts are recomputed by the caller against the OTHER active
@@ -106,11 +129,15 @@ const props = defineProps<{
   mode: "prefix" | "suffix";
   facets: Facet[];
   selected: Set<string>;
+  /** Whether this facet has any selection — drives the "Clear filters" row. */
+  hasSelection?: boolean;
 }>();
 
 const emit = defineEmits<{
   /** Always a NEW Set — never a mutation of the prop. */
   (e: "update:selected", value: Set<string>): void;
+  /** Clear THIS facet's selection (distinct from the search box's own clear). */
+  (e: "clear"): void;
 }>();
 
 const { t } = useI18n();

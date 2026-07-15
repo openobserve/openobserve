@@ -3942,6 +3942,13 @@
       "filterByPrefix": "Filter by prefix",
       "filterBySuffix": "Filter by suffix",
       "metricType": "Metric type",
+      "tabPrefix": "Prefix",
+      "tabSuffix": "Suffix",
+      "tabType": "Type",
+      "savedViews": {
+        "button": "Saved Views",
+        "tooltip": "Your saved views — filters and pinned metrics you can return to"
+      },
       "favorites": "Favorites ({count})",
       "showAllMetrics": "Show all metrics",
       "loading": "Loading metrics…",
@@ -3984,6 +3991,8 @@
         "favoriteRemoveTooltip": "Remove from favorites",
         "openAria": "Open {name} in the editor",
         "openTooltip": "Open in editor",
+        "moreActions": "More actions",
+        "moreActionsAria": "More actions for {name}",
         "unsupported": "Unsupported type (v1)",
         "noPreview": "No preview — open in editor",
         "queryFailedAria": "{name} query failed: {error}",
@@ -4025,6 +4034,8 @@
       },
       "facets": {
         "clear": "Clear",
+        "clearFilters": "Clear filters",
+        "selectedCount": "{count} selected",
         "searchPrefixes": "Search prefixes",
         "searchSuffixes": "Search suffixes",
         "searchPrefixesAria": "Search prefix filters",

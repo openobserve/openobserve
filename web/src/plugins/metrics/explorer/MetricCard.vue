@@ -59,76 +59,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </div>
 
-      <!-- Last Refreshed — the SAME element the dashboard panel bar carries
-           (PanelErrorButtons): 🕑 with the relative tooltip, in the header, at
-           the right. A card restored from cache says how old its data really
-           is instead of passing it off as live. -->
-      <span
-        v-if="preview?.lastTriggeredAt"
-        class="lastRefreshedAt ml-auto text-[smaller] whitespace-nowrap overflow-hidden text-ellipsis shrink-0"
-        :data-test="`metrics-explorer-card-last-refreshed-${card.name}`"
-      >
-        <span class="text-[smaller] mr-0.5">
-          🕑
-          <OTooltip side="bottom" align="end">
-            <template #content
-              >Last Refreshed:
-              <RelativeTime :timestamp="preview.lastTriggeredAt"
-            /></template>
-          </OTooltip>
-        </span>
-        <RelativeTime
-          :timestamp="preview.lastTriggeredAt"
-          :full-time-prefix="t('metrics.explorer.card.lastRefreshedPrefix')"
-        />
-      </span>
+      <!-- Spacer, then the right-hand cluster (PanelContainer: title, `flex-1`
+           spacer, then the action row). -->
+      <div class="flex-1" />
 
-      <!-- Visible on focus as well as hover: a hover-only affordance is not
-           keyboard reachable. Touch devices have no hover, so it stays visible
-           there too.
-
-           Absolutely positioned ON PURPOSE. `invisible` is visibility:hidden,
-           which still reserves the box — in flow, these buttons were stealing
-           ~120px from the metric name and truncating it even on cards with
-           plenty of room. Out of flow, the name gets the full width and the
-           actions overlay it only while they are actually shown. -->
-      <!-- The bar paints its own background so it can overlay the metric name;
-           that background must match the band it sits on, or it shows as a patch
-           of the wrong shade.
-
-           Anchored to the BAND (which is `relative`) with `inset-y-0`, so it is
-           exactly as tall as the band by construction. A fixed `h-6` + `top-1`
-           was 28px against a ~25px band, and the extra 3px hung over the chart.
-           Anchoring means the two cannot drift apart if the band's padding ever
-           changes. -->
-      <div
-        class="absolute inset-y-0 right-2 z-10 flex items-center gap-0.5 rounded pl-2 bg-surface-base invisible group-hover:visible group-focus-within:visible [@media(hover:none)]:visible"
-      >
-        <!-- The bar lands exactly where the in-flow clock sits, so it carries
-             its OWN copy — hovering must not make "how old is this data"
-             unreadable, it is half the reason to look at the card. -->
-        <span
-          v-if="preview?.lastTriggeredAt"
-          class="lastRefreshedAt text-[smaller] whitespace-nowrap mr-1"
-        >
-          <span class="text-[smaller] mr-0.5">🕑</span>
-          <RelativeTime
-            :timestamp="preview.lastTriggeredAt"
-            :full-time-prefix="t('metrics.explorer.card.lastRefreshedPrefix')"
-          />
-        </span>
-
-        <!-- OTooltip goes INSIDE the button, not around it: nested, it binds
-             its own hover listeners to its parent element. That is what the
-             rest of the app does (583 of 590 usages) and it reads more cleanly
-             on an OButton than a wrapper would. Wrapping also works — it did
-             not until the `open` prop default was fixed in OTooltip.vue, which
-             is worth knowing if you are reading an older comment of mine that
-             blamed OButton. -->
-
-        <!-- The help text is a full sentence and never fit on the card; a
-             truncated half-sentence is worse than none. It lives here instead,
-             where it can be read in full. -->
+      <!-- The action row: `size="icon"` buttons sitting adjacent (no gap).
+           Order (left→right): Help → Configure → Open → Pin → 🕑 clock → Refresh.
+           Secondary/info actions (Help, Config) group on the left; the primary
+           card actions (Open, Pin) in the middle; the freshness cluster (clock +
+           Refresh) sits rightmost, matching how the dashboard bar keeps refresh
+           and the last-refreshed stamp together at the edge. -->
+      <div class="flex flex-nowrap items-center shrink-0">
+        <!-- Help — the SAME element the dashboard panel bar uses for its panel
+             description (PanelContainer `dashboard-panel-description-info`): an
+             info-outline icon with a width-capped, pre-wrapped OTooltip. NOT a
+             dropdown item — a full help sentence in an unbounded menu item blew
+             the menu out to full-page width. This keeps the long text in a
+             bounded floating tooltip where it reads in full. -->
         <OButton
           v-if="card.help"
           variant="ghost"
@@ -143,24 +90,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`metrics-explorer-card-help-${card.name}`"
           @click.stop
         >
-          <OTooltip :content="card.help" max-width="360px" />
+          <OTooltip side="bottom" align="end" max-width="13.75rem">
+            <template #content
+              ><div class="whitespace-pre-wrap">{{ card.help }}</div></template
+            >
+          </OTooltip>
         </OButton>
 
-        <OButton
-          v-if="!card.unsupported"
-          variant="ghost"
-          size="icon"
-          icon-left="refresh"
-          :loading="preview?.status === 'loading'"
-          :aria-label="
-            t('metrics.explorer.card.refreshAria', { name: card.name })
-          "
-          :data-test="`metrics-explorer-card-refresh-${card.name}`"
-          @click="$emit('refresh', card)"
-        >
-          <OTooltip :content="t('metrics.explorer.card.refreshTooltip')" />
-        </OButton>
-
+        <!-- Configure — visible icon button (only when the card is configurable).
+             Was in a ⋮ menu; promoted out because the menu was down to a single
+             item once refresh became a first-class button and help became an
+             info tooltip. -->
         <OButton
           v-if="card.configurable"
           variant="ghost"
@@ -175,6 +115,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('metrics.explorer.card.configureTooltip')" />
         </OButton>
 
+        <!-- The drill-in. Deliberately the ONLY thing that navigates; the chart
+             and card are not click targets, so the metric name stays selectable.
+             Kept as a discrete tinted icon (not buried in ⋮) — it is the primary
+             action on the card. -->
+        <OButton
+          variant="ghost-primary"
+          size="icon"
+          icon-left="open-in-new"
+          :aria-label="t('metrics.explorer.card.openAria', { name: card.name })"
+          :data-test="`metrics-explorer-card-select-${card.name}`"
+          @click="$emit('select', card)"
+        >
+          <OTooltip :content="t('metrics.explorer.card.openTooltip')" />
+        </OButton>
+
+        <!-- Pin (star). Always visible — this is the affordance users could not
+             find when it was hover-gated. -->
         <OButton
           variant="ghost"
           size="icon"
@@ -199,23 +156,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
 
-        <!-- The drill-in. An icon rather than a "Select" label: the word said
-             nothing about where it led, and it was the one text button in a bar
-             of icons. `ghost-primary` keeps it tinted, so it still reads as the
-             primary action among the ghost icons beside it.
-
-             Deliberately the ONLY thing that navigates. The chart is not a click
-             target and the card is not a button — making them so is what used to
-             swallow any attempt to select the metric name. -->
-        <OButton
-          variant="ghost-primary"
-          size="icon"
-          icon-left="open-in-new"
-          :aria-label="t('metrics.explorer.card.openAria', { name: card.name })"
-          :data-test="`metrics-explorer-card-select-${card.name}`"
-          @click="$emit('select', card)"
+        <!-- Last Refreshed — the SAME element the dashboard panel bar carries
+             (PanelErrorButtons): 🕑 with the relative tooltip. `ml-1.25` matches
+             PanelErrorButtons' spacing. A card restored from cache says how old
+             its data really is instead of passing it off as live. -->
+        <span
+          v-if="preview?.lastTriggeredAt"
+          class="lastRefreshedAt ml-1.25 mr-0.5 text-[smaller] whitespace-nowrap overflow-hidden text-ellipsis shrink-0"
+          :data-test="`metrics-explorer-card-last-refreshed-${card.name}`"
         >
-          <OTooltip :content="t('metrics.explorer.card.openTooltip')" />
+          <span class="text-[smaller] mr-0.5">
+            🕑
+            <OTooltip side="bottom" align="end">
+              <template #content
+                >Last Refreshed:
+                <RelativeTime :timestamp="preview.lastTriggeredAt"
+              /></template>
+            </OTooltip>
+          </span>
+          <RelativeTime
+            :timestamp="preview.lastTriggeredAt"
+            :full-time-prefix="t('metrics.explorer.card.lastRefreshedPrefix')"
+          />
+        </span>
+
+        <!-- Refresh — always visible, rightmost with the clock (the freshness
+             cluster). Re-runs this card's query, dropping the cached response so
+             a metric that has started emitting shows up. -->
+        <OButton
+          v-if="!card.unsupported"
+          variant="ghost"
+          size="icon"
+          icon-left="refresh"
+          :loading="preview?.status === 'loading'"
+          :aria-label="
+            t('metrics.explorer.card.refreshAria', { name: card.name })
+          "
+          :data-test="`metrics-explorer-card-refresh-${card.name}`"
+          @click="$emit('refresh', card)"
+        >
+          <OTooltip :content="t('metrics.explorer.card.refreshTooltip')" />
         </OButton>
       </div>
     </div>

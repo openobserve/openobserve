@@ -42,7 +42,7 @@ const grid = vi.hoisted(() => {
     labelFilters: { value: [] },
     sortBy: { value: "a-z" },
     viewMode: { value: "grid" },
-    activeRail: { value: "" },
+    activeRail: { value: "prefix" },
     showFavoritesOnly: { value: false },
     hideEmptyPanels: { value: true },
     emptyHiddenCount: { value: 0 },
@@ -143,11 +143,18 @@ const mountExplorer = () =>
         // Rendered rather than stubbed away: a toggle group's CHILDREN are the
         // options, and `stubs: true` drops the default slot — so a group with no
         // items at all, or with the wrong ones, looked identical to a correct one.
+        // The facet segmented control AND its items are the control under test
+        // (Prefix/Suffix/Type + the sort/view/scope toggles) — a `stubs: true`
+        // would drop the item children and the group would look empty regardless
+        // of correctness. Render-through so the items' data-test attrs exist.
         OToggleGroup: {
           template: '<div><slot /></div>',
         },
         OToggleGroupItem: {
           template: '<button type="button"><slot /></button>',
+        },
+        OTag: {
+          template: '<span><slot /></span>',
         },
       },
     },
@@ -277,6 +284,63 @@ describe("MetricsExplorer wiring", () => {
       await flushPromises();
 
       expect(grid.sweepSlice).toHaveBeenCalledWith({ skipCache: false });
+    });
+  });
+
+  describe("the facet selector lives on the search row, over an always-open panel", () => {
+    it("renders Prefix/Suffix/Type as a segmented toggle on the search row", () => {
+      // The facet selector moved out of the left column onto the search row (it
+      // scopes which metrics you are searching). The left column is now just the
+      // panel body for whichever facet is selected.
+      const wrapper = mountExplorer();
+
+      expect(
+        wrapper.find('[data-test="metrics-explorer-rail-prefix"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="metrics-explorer-rail-suffix"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="metrics-explorer-rail-type"]').exists(),
+      ).toBe(true);
+    });
+
+    it("offers Saved Views as a distinct navigation button, not a rail heart", () => {
+      // The old rail heart was really a 'show pinned only' filter jammed into the
+      // facet rail. Saved Views is navigation to named views — it lives with the
+      // list controls, and per-metric favouriting is the pin on each card.
+      const wrapper = mountExplorer();
+
+      expect(
+        wrapper.find('[data-test="metrics-explorer-saved-views"]').exists(),
+      ).toBe(true);
+      // The rail heart is gone.
+      expect(
+        wrapper.find('[data-test="metrics-explorer-rail-favorite"]').exists(),
+      ).toBe(false);
+    });
+
+    it("shows the active facet panel without a click — the panel is always open", () => {
+      // Regression guard for the redesign: the panel used to be gated behind
+      // clicking a rail icon (showRailPanel = !!activeRail). Now prefix is the
+      // default and the panel is on screen at mount.
+      const wrapper = mountExplorer();
+
+      expect(wrapper.findComponent({ name: "PrefixFilterPanel" }).exists()).toBe(
+        true,
+      );
+    });
+
+    it("selecting a facet switches it — and a re-click deselect never collapses the panel", async () => {
+      const wrapper = mountExplorer();
+
+      (wrapper.vm as any).selectRail("type");
+      expect(grid.activeRail.value).toBe("type");
+
+      // OToggleGroup emits `undefined` when the active item is clicked again
+      // (a deselect). selectRail must IGNORE it so the panel never blanks.
+      (wrapper.vm as any).selectRail(undefined);
+      expect(grid.activeRail.value).toBe("type");
     });
   });
 });

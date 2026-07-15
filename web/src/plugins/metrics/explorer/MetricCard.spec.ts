@@ -91,22 +91,27 @@ describe("MetricCard (ported to @/lib)", () => {
       ).toBe(true);
     });
 
-    it("does NOT print the help text on the card body", () => {
+    it("does NOT print the help text as a plain label on the card", () => {
       // It is a full sentence that never fitted; a truncated half-sentence is
-      // worse than none, and it cost the chart ~18px of height.
+      // worse than none, and it cost the chart ~18px of height. It lives in the
+      // info-icon's tooltip (bounded, pre-wrapped) — never as bare visible text
+      // on the card. The tooltip content is not rendered until opened, so the
+      // help sentence is absent from the card's text at rest.
       wrapper = createWrapper();
       expect(wrapper.text()).not.toContain(
         "Seconds the CPUs spent in each mode.",
       );
     });
 
-    it("offers the help text through an info action instead", () => {
+    it("offers the help text through an info-icon button, reachable by a screen reader", () => {
+      // Same pattern as the dashboard panel's description info icon: an
+      // info-outline button whose aria-label carries the full help sentence, so
+      // it is announced — not hidden behind hover alone.
       wrapper = createWrapper();
       const help = wrapper.find(
         '[data-test="metrics-explorer-card-help-node_cpu_seconds_total"]',
       );
       expect(help.exists()).toBe(true);
-      // Reachable by a screen reader, not only by hovering a tooltip.
       expect(help.attributes("aria-label")).toContain(
         "Seconds the CPUs spent in each mode.",
       );
@@ -189,6 +194,41 @@ describe("MetricCard (ported to @/lib)", () => {
         )
         .trigger("click");
       expect(wrapper.emitted("toggle-favorite")).toBeTruthy();
+    });
+
+    it("shows the pin, drill-in, refresh and configure at rest — no hover gate", () => {
+      // The whole point of the redesign: the controls used to live behind an
+      // `invisible group-hover:visible` bar — undiscoverable, unreachable by
+      // keyboard, dead on touch. Every action is in the DOM unconditionally now.
+      wrapper = createWrapper();
+      expect(
+        wrapper
+          .find(
+            '[data-test="metrics-explorer-card-favorite-node_cpu_seconds_total"]',
+          )
+          .exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find(
+            '[data-test="metrics-explorer-card-select-node_cpu_seconds_total"]',
+          )
+          .exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find(
+            '[data-test="metrics-explorer-card-refresh-node_cpu_seconds_total"]',
+          )
+          .exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="metrics-explorer-card-fn-node_cpu_seconds_total"]')
+          .exists(),
+      ).toBe(true);
+      // No leftover hover-gating class anywhere in the card.
+      expect(wrapper.html()).not.toContain("group-hover:visible");
     });
 
     it("routes the error state's Retry through refresh, not a plain re-request", async () => {
