@@ -44,8 +44,10 @@ useShortcuts([
 ]);
 ```
 
-- Use `useShortcut(id, handler, options)` for a single one, `useShortcuts([...])`
-  for a set.
+- `useShortcut(key, handler, options)` binds a **raw key** (`useShortcut("n", …)`)
+  — it does **not** resolve a registry `id`, so it skips the registry's platform
+  mapping/scope/label. For a single **registry-driven** shortcut use
+  `useShortcuts([{ id, handler }])` (the `id` form), and the same for a set.
 - **Scope is automatic.** A registry entry's scope is activated while the
   component is mounted and restored on unmount, so page-level shortcuts only fire
   on their page. You rarely pass `scope` explicitly.
@@ -83,7 +85,9 @@ whenever the shortcut is real and registered.
 
 ## Public API (from `@/lib/vue-shortcut-manager`)
 
-- `useShortcut(idOrKey, handler, options?)` — bind one shortcut.
+- `useShortcut(key, handler, options?)` — bind one shortcut by **raw key** only
+  (no registry-`id` resolution; to bind a registered `id`, use
+  `useShortcuts([{ id, handler }])`).
 - `useShortcuts(inputs[], scope?)` — bind several; each is `{ id, handler }`
   (registry-driven, preferred) or `{ key, handler, … }` (inline).
 - `useShortcutList(scope?)` — read the active shortcuts (e.g. to render a custom

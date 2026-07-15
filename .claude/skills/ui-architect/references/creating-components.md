@@ -30,7 +30,7 @@ Groups under `lib/`: `core/`, `forms/`, `navigation/`, `overlay/`, `feedback/`, 
 
 ## 2. Folder contract
 
-Every component — **and every member of a family** — gets its own three files, co-located in the family folder, all `O`-prefixed:
+**New** components — and every member of a family — get their own three files, co-located in the family folder, all `O`-prefixed. (A few older components predate this and carry an `index.ts` barrel or declare props inline in the `.vue` — e.g. `OEmptyState`; follow the contract below for anything new rather than copying those.)
 
 ```
 web/src/lib/{group}/{Family}/

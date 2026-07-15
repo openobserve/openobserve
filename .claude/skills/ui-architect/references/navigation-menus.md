@@ -47,8 +47,9 @@ These are produced by three files — learn which one owns each surface:
 | IAM sub-nav | `web/src/views/IdentityAccessManagement.vue` → sections array |
 | Routes (by domain) | the router composables in [§1](#1-register-the-route) |
 
-> The rail renderer is `web/src/lib/core/Navbar/ONavbar.vue` (+ `MenuLink.vue`,
-> `ONavGroup.vue`) and the item type is `NavItem` in
+> The rail renderer is `web/src/lib/core/Navbar/ONavbar.vue` (+ `ONavGroup.vue` in
+> the same folder, and `MenuLink.vue` at `web/src/components/MenuLink.vue`) and the
+> item type is `NavItem` in
 > `web/src/lib/core/Navbar/ONavbar.types.ts`. You almost never edit these — you
 > edit the **data** files above.
 
@@ -80,7 +81,7 @@ and installs the global `beforeEach` that sets `document.title` from
 
 | Domain | Composable file | Owns |
 | --- | --- | --- |
-| Core product (logs, metrics, traces, dashboards, streams, alerts, pipeline…) | `web/src/composables/shared/router.ts` (`userRoutes()` → `homeChildRoutes`) | most in-app pages |
+| Core product (logs, metrics, traces, dashboards, streams, alerts, pipeline…) | `web/src/composables/shared/router.ts` (`useRoutes()` → `homeChildRoutes`) | most in-app pages |
 | Settings / Management | `web/src/composables/shared/useManagementRoutes.ts` | `/settings/*` |
 | IAM | `web/src/composables/shared/useEnterpriseRoutes.ts` | `/iam/*`, incidents, actions |
 | Ingestion | `web/src/composables/shared/useIngestionRoutes.ts` | `/ingestion/*` |

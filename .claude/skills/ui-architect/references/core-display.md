@@ -264,7 +264,7 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 **Use when:** Rendering any icon. `name` is an `IconName` from the registry (Material Symbols), or an `img:<path>` string for an external image.
 **Don't use for:** Decorative illustrations in empty states — those come from `OEmptyState`.
 **Key props:**
-- `name` (`IconName | string`, required — registry name or `img:<path>`). There are ~650 registry names; discover them in `@/lib/core/Icon/OIcon.icons.ts` (the exported `iconRegistry` / `IconName` type). Do not guess — check the registry.
+- `name` (`IconName | string`, required — registry name or `img:<path>`). There are several hundred registry names; discover them in `@/lib/core/Icon/OIcon.icons.ts` (the exported `iconRegistry` / `IconName` type). Do not guess — check the registry.
 - `size` (`xs` | `sm` | `md` | `lg` | `xl` — default `md`; xs=12px, sm=16px, md=24px, lg=32px, xl=40px)
 - `label` (string — accessible label; sets `role="img"`, otherwise the icon is `aria-hidden`)
 

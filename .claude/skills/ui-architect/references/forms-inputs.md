@@ -107,7 +107,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Use when:** Choosing one or many values from a **known option list** — single or `multiple`, optionally `searchable` (built-in filter), `creatable`, grouped, virtualized, with chips, "Select All", and per-option icons.
 **Don't use for:** Free-text entry with suggestions where the typed text itself is the value (use `OCombobox`); a plain text field (use `OInput`); a small set of always-visible mutually-exclusive/multi options laid out inline (use `OOptionGroup` / `ORadioGroup` / `OCheckboxGroup`).
 **Key props:** `modelValue` (`SelectValue | SelectValue[]`, where `SelectValue = string | number | boolean | null`), `options` (`SelectOption[]` — `{ label, value?, disabled?, header? }`; or use the default slot for custom/grouped items), `multiple` (default `false`), `maxVisibleChips` (default computed from trigger width), `searchable` (default `true`), `searchDebounce` (default `0`), `hideSelected` (default `false`), `selectAll` (default off — multi listbox only), `creatable` (default `false` — emits `create`), `searchPlaceholder` (default `"Search..."`), `labelKey`/`valueKey`/`iconKey`, `label`, `required`, `placeholder`, `errorMessage`, `error` (default `false`), `clearable` (default `false`), `disabled` (default `false`), `size` (`"sm"` | `"md"` default), `width` (`"xs"`|`"sm"`|`"md"`|`"lg"`|`"full"` default), `labelPosition` (`"inside"` | `"outside"` default), `loading` (default off — spinner replaces chevron), `rowClickSingleSelect` (default `false`), `optionTooltip` (default `false`), `helpText`, `id`, `name`, `dropdownStyle`.
-**Slots:** `default` (render `OSelectItem`/`OSelectGroup`), `trigger` (`{ value }`), `chip` (`{ label, value }`), `empty`, `before-options`, `icon-left`, `icon-right`, `tooltip`
+**Slots:** `default` (render `OSelectItem`/`OSelectGroup`), `trigger` (`{ value }`), `chip` (`{ label, value }`), `empty`, `before-options`, `after-options`, `icon-left`, `tooltip` (OSelect has `icon-left` only — no `icon-right`)
 **Emits:** `update:modelValue`, `clear`, `search`, `create`, `open`, `close`, `blur`, `change`, `keydown`
 **Example:**
 ```vue
@@ -418,12 +418,12 @@ When no O2 component fits your use case, **build a reusable control** instead of
 2. **Build the headless version first** — a plain component that owns its value via `v-model` (props `modelValue`, emits `update:modelValue`). No form knowledge.
 3. **Add the form wrapper** if it will go inside `<OForm>` — a sibling component that `inject(FORM_CONTEXT_KEY)`, renders the headless version inside a `<Field :name="...">`, and wires validation/value/blur to the field.
 
-**Example: SecretInput (app-specific, headless only)**
+**Illustrative example — a `SecretInput` control** *(hypothetical: there is no `SecretInput` in this repo; it only shows the shape of a headless control you'd build)*
 
-Used standalone to accept a secret token with reveal/copy controls. Not inside `<OForm>` in the current use case, so only the headless version exists.
+Say you need a field that accepts a secret token with reveal/copy controls and nothing in O2 fits. The headless version owns its value via `v-model` and has no form knowledge:
 
 ```vue
-<!-- web/src/components/common/SecretInput.vue -->
+<!-- SecretInput.vue — illustrative, not a real file -->
 <template>
   <div class="flex gap-2 items-end">
     <OInput
@@ -504,18 +504,11 @@ const copyToClipboard = async () => {
 />
 ```
 
-**To use inside a form** (if needed later), wire it via the form's `setFieldValue` — don't build an `OFormSecretInput`:
-```vue
-<OForm :schema="schema" :default-values="defaults" @submit="save">
-  <div class="space-y-2">
-    <label>{{ t('field.token') }}</label>
-    <SecretInput
-      :model-value="formInputs.token"
-      @update:model-value="formInputs.token = $event"
-    />
-  </div>
-</OForm>
-```
-
-The component stays stateless; the form owns the value via the `formInputs` ref.
-**Family:** Form wrapper for `OOptionGroup`.
+**To use inside `<OForm>`**, add the form wrapper (step 3) rather than bridging by
+hand: a sibling `OFormSecretInput` that `inject(FORM_CONTEXT_KEY)`, renders the
+headless `SecretInput` inside a `<Field :name>`, and wires value/blur/error to the
+field — modeled on `OFormInput`. That keeps the field name-bound and schema-owned,
+consistent with every other `OForm*` control (see
+[forms-validation.md](forms-validation.md)). Reserve the manual
+`setFieldValue`/`v-model` bridge for a control that genuinely can't host a form
+wrapper (a third-party editor like Monaco).

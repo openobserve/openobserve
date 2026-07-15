@@ -420,13 +420,16 @@ export const notificationChannelDefaults = (): NotificationChannelForm => ({
     >
       <!-- Schema fields: OForm* components with name= -->
       <OFormInput name="name" :label="t('notificationChannels.name')" required />
-      <OFormSelect name="type" :label="t('notificationChannels.type')" :items="typeOptions" required />
+      <OFormSelect name="type" :label="t('notificationChannels.type')" :options="typeOptions" required />
       <OFormInput name="destination_url" :label="t('notificationChannels.destination')" required />
       <OFormInput name="retry_count" type="number" :label="t('notificationChannels.retryCount')" required />
       <OFormCheckbox name="enabled" :label="t('notificationChannels.enabled')" />
 
-      <!-- Non-schema field: reusable SecretInput (custom component) -->
-      <!-- Wired via v-model bridge — auth_token is schema-owned, SecretInput is dumb -->
+      <!-- Non-schema field bridged by hand — SecretInput here is an illustrative
+           custom control (not a real repo component); if it could be a form
+           wrapper you'd use <OFormSecretInput name="auth_token" /> instead.
+           auth_token stays schema-owned; the control is value-dumb -->
+
       <div class="space-y-2">
         <label class="text-sm font-medium">{{ t('notificationChannels.authToken') }}</label>
         <SecretInput

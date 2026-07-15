@@ -1,6 +1,6 @@
 # Overlay & Navigation
 
-O2 overlay primitives (Dialog, Drawer, Dropdown, Popover, Tooltip) and navigation primitives (Pagination, Stepper, Tabs). All are headless-first wrappers over reka-ui with design-system tokens — pick by intent, not by looks.
+O2 overlay primitives (Dialog, Drawer, Dropdown, Popover, Tooltip) and navigation primitives (Pagination, Stepper, Tabs). The overlay primitives are headless-first wrappers over reka-ui; the navigation primitives (Pagination, Stepper) are custom implementations (Tabs uses only reka-ui's `Primitive`). All carry design-system tokens — pick by intent, not by looks.
 
 ## Table of contents
 
