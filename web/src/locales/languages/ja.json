@@ -1919,6 +1919,11 @@
     "tooltipPromptTemplate": "LLM に送信されたプロンプト。評価時の動的値のプレースホルダーとして {input}、{output}、{context} を使用してください。"
   },
   "function": {
+    "csvFileRequired": "CSV ファイルは必須です！",
+    "urlRequired": "URL は必須です！",
+    "urlMustStartWithHttp": "URL は http:// または https:// で始まる必要があります",
+    "nameRequired": "この項目は必須です！",
+    "invalidMethodName": "無効なメソッド名です。文字またはアンダースコアで始める必要があります。使用できるのは文字、数字、アンダースコアのみです。",
     "header": "関数",
     "subtitle": "パイプラインに適用される再利用可能な VRL 機能",
     "clickTestFunctionHint": "イベントを確認するには、「テスト機能」をクリックしてください",
@@ -4313,7 +4318,16 @@
     "dimensionWidth": "幅 (ピクセル)",
     "dimensionHeight": "高さ (ピクセル)",
     "imagePreview": "インラインダッシュボードのプレビュー画像を含める",
-    "customDimensions": "カスタムディメンション (アドバンス)"
+    "customDimensions": "カスタムディメンション (アドバンス)",
+    "validation": {
+      "resourceNameInvalid": ":、?、/、# などの文字とスペースは使用できません。",
+      "invalidCron": "無効な cron 式です。",
+      "cronSixFields": "cron 式は正確に 6 つのフィールドが必要です:[秒] [分] [時] [日] [月] [曜日]",
+      "cronMinInterval": "頻度は {seconds} 秒より大きくする必要があります。",
+      "dateFormat": "日付の形式が正しくありません。",
+      "timeFormat": "時刻の形式が正しくありません。",
+      "invalidEmails": "有効なメールアドレスを追加してください。"
+    }
   },
   "queries": {
     "runningQueries": "実行中のクエリ",
@@ -5605,7 +5619,11 @@
       "authEditNote": "認証情報は読み取ることができません。ローテーションする場合のみAPIキーを再入力してください。",
       "cannotRename": "作成後に名前を変更することはできません。",
       "availableModelsHelp": "任意。このプロバイダーで利用可能なモデルのカンマ区切りリスト。",
-      "saveError": "プロバイダを保存できませんでした"
+      "saveError": "プロバイダを保存できませんでした",
+      "nameRequired": "Provider name is required",
+      "typeRequired": "Provider type is required",
+      "defaultModelRequired": "Default model is required",
+      "apiKeyRequired": "API key is required"
     },
     "scoreConfig": {
       "booleanValues": "true / false",
@@ -5722,6 +5740,12 @@
       "falseIsHealthyHint": "true のスコアは品質の問題をトリガーします。",
       "thresholdEmptyHint": "これを空のままにすると、このディメンションは製品全体の品質ステータスシグナルに寄与しません。スコアは引き続き記録されますが、問題インジケーターをトリガーしません。",
       "saveError": "スコア設定を保存できませんでした",
+      "validation": {
+        "nameRequired": "Name is required",
+        "nameFormat": "Use lowercase letters, numbers, and underscores only",
+        "minRequired": "Min is required",
+        "maxRequired": "Max is required"
+      },
       "empty": {
         "title": "まだスコア設定がありません",
         "description": "スコア設定は、スコアラーが生成するディメンション（名前、データ型、値の範囲、健全性しきい値）を定義します。オンライン評価の構成を開始するには、1つ作成してください。",
@@ -5955,6 +5979,20 @@
       },
       "requestBodyLabel": "リクエスト本文テンプレート",
       "saveError": "スコアラーを保存できませんでした",
+      "validation": {
+        "nameRequired": "Scorer name is required",
+        "scoreConfigRequired": "A score config is required",
+        "providerRequired": "A provider is required",
+        "endpointRequired": "An endpoint URL is required",
+        "bearerTokenRequired": "Token is required",
+        "basicUsernameRequired": "Username is required",
+        "basicPasswordRequired": "Password is required",
+        "apiKeyHeaderRequired": "Header name is required",
+        "apiKeyTokenRequired": "Token is required",
+        "timeoutInvalid": "Timeout must be 0 or greater",
+        "retriesInvalid": "Retries must be 0 or greater",
+        "duplicateFieldName": "Field names must be unique"
+      },
       "versionsLoadError": "スコア設定バージョンを読み込めませんでした",
       "testPanel": {
         "title": "このスコアラーをテスト",
@@ -6134,7 +6172,12 @@
       "selectAtLeastOne": "スコアラーを少なくとも 1 人選択してください",
       "saveError": "評価ジョブの保存に失敗しました",
       "createdAndActivated": "評価ジョブが作成され、有効化されました",
-      "createdButActivateFailed": "評価ジョブは作成されましたが、有効化に失敗しました"
+      "createdButActivateFailed": "評価ジョブは作成されましたが、有効化に失敗しました",
+      "validation": {
+        "nameRequired": "Job name is required",
+        "streamRequired": "A stream is required",
+        "samplingValueRequired": "A sampling value is required"
+      }
     }
   },
   "llmProviders": {

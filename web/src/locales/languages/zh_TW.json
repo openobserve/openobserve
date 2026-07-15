@@ -1490,6 +1490,11 @@
     "tooltipPromptTemplate": "傳送給 LLM 的提示。使用 {input}、{output} 和 {context} 作為評估時動態值的預留位置。"
   },
   "function": {
+    "csvFileRequired": "CSV 檔案為必填！",
+    "urlRequired": "URL 為必填！",
+    "urlMustStartWithHttp": "URL 必須以 http:// 或 https:// 開頭",
+    "nameRequired": "此欄位為必填！",
+    "invalidMethodName": "方法名稱無效。必須以字母或底線開頭，且只能使用字母、數字和底線。",
     "header": "函式",
     "add": "新增函式",
     "search": "搜尋函式",
@@ -3671,7 +3676,16 @@
     "reloadReports": "重新載入報表",
     "moveToFolder": "移動至資料夾",
     "deleteReportsTitle": "刪除報表",
-    "deleteReportsMsg": "您確定要刪除 {count} 個報表嗎？"
+    "deleteReportsMsg": "您確定要刪除 {count} 個報表嗎？",
+    "validation": {
+      "resourceNameInvalid": "不允許使用 :、?、/、# 等字元和空格。",
+      "invalidCron": "無效的 Cron 運算式！",
+      "cronSixFields": "Cron 運算式必須正好包含 6 個欄位：[秒] [分鐘] [小時] [日] [月] [星期]",
+      "cronMinInterval": "頻率應大於 {seconds} 秒。",
+      "dateFormat": "日期格式不正確！",
+      "timeFormat": "時間格式不正確！",
+      "invalidEmails": "請新增有效的電子郵件！"
+    }
   },
   "queries": {
     "runningQueries": "執行中的查詢",
@@ -5218,7 +5232,11 @@
       "authEditNote": "憑證無法再次讀取。僅在您想輪替時才重新輸入 API 金鑰。",
       "cannotRename": "建立後無法重新命名。",
       "availableModelsHelp": "選用。此供應商上可用模型的逗號分隔清單。",
-      "saveError": "儲存供應商失敗"
+      "saveError": "儲存供應商失敗",
+      "nameRequired": "Provider name is required",
+      "typeRequired": "Provider type is required",
+      "defaultModelRequired": "Default model is required",
+      "apiKeyRequired": "API key is required"
     },
     "scoreConfig": {
       "booleanValues": "true / false",
@@ -5333,6 +5351,12 @@
       "falseIsHealthyHint": "評分為 true 會觸發品質問題。",
       "thresholdEmptyHint": "保留此欄位為空表示此維度不會貢獻於產品中的品質狀態訊號。評分仍會被記錄，但不會觸發問題指示。",
       "saveError": "儲存評分設定失敗",
+      "validation": {
+        "nameRequired": "Name is required",
+        "nameFormat": "Use lowercase letters, numbers, and underscores only",
+        "minRequired": "Min is required",
+        "maxRequired": "Max is required"
+      },
       "empty": {
         "title": "尚無評分設定",
         "description": "評分設定定義您的評分器產生的維度 — 名稱、資料類型、值範圍與健康閾值。建立一個以開始設定線上評估。",
@@ -5574,6 +5598,20 @@
       },
       "requestBodyLabel": "請求主體範本",
       "saveError": "儲存評分器失敗",
+      "validation": {
+        "nameRequired": "Scorer name is required",
+        "scoreConfigRequired": "A score config is required",
+        "providerRequired": "A provider is required",
+        "endpointRequired": "An endpoint URL is required",
+        "bearerTokenRequired": "Token is required",
+        "basicUsernameRequired": "Username is required",
+        "basicPasswordRequired": "Password is required",
+        "apiKeyHeaderRequired": "Header name is required",
+        "apiKeyTokenRequired": "Token is required",
+        "timeoutInvalid": "Timeout must be 0 or greater",
+        "retriesInvalid": "Retries must be 0 or greater",
+        "duplicateFieldName": "Field names must be unique"
+      },
       "versionsLoadError": "載入評分設定版本失敗",
       "testPanel": {
         "title": "測試此評分器",
@@ -5763,7 +5801,12 @@
       "selectAtLeastOne": "請至少選擇一個評分器",
       "saveError": "儲存評估作業失敗",
       "createdAndActivated": "評估作業已建立並啟用",
-      "createdButActivateFailed": "評估作業已建立，但啟用失敗"
+      "createdButActivateFailed": "評估作業已建立，但啟用失敗",
+      "validation": {
+        "nameRequired": "Job name is required",
+        "streamRequired": "A stream is required",
+        "samplingValueRequired": "A sampling value is required"
+      }
     }
   },
   "llmProviders": {

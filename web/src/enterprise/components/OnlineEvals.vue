@@ -248,6 +248,7 @@ the Free Software Foundation, either version 3 of the License, or
             @activate="(row: EvalJob) => activateJob(row)"
             @pause="(row: EvalJob) => pauseJob(row)"
             @delete="(row: EvalJob) => deleteRow(row)"
+            @delete-bulk="(ids: string[]) => deleteJobsBulk(ids)"
             @refresh="loadAll(orgId)"
           />
         </div>
@@ -346,12 +347,8 @@ the Free Software Foundation, either version 3 of the License, or
 
       <ConfirmDialog
         v-model="confirmDeleteOpen"
-        :title="pendingDeleteLabel"
-        :message="
-          t('onlineEvals.deleteConfirmMessage', {
-            name: pendingDeleteRow?.name ?? '',
-          })
-        "
+        :title="deleteDialogTitle"
+        :message="deleteDialogMessage"
         @update:ok="performDelete"
         @update:cancel="cancelDelete"
       />
@@ -480,6 +477,9 @@ const pendingJobStatusId = ref<string | null>(null);
 const confirmDeleteOpen = ref(false);
 const pendingDeleteRow = ref<AnyRow | null>(null);
 const pendingDeleteTab = ref<ActiveTab | null>(null);
+// Ids for a pending bulk delete (jobs tab). Non-empty => the confirm dialog and
+// performDelete operate on the whole batch instead of a single `pendingDeleteRow`.
+const pendingBulkDeleteIds = ref<string[]>([]);
 const catalogOpenTab = ref<ActiveTab | null>(null);
 const showScoreConfigLibrary = ref(false);
 const scoreConfigLibrarySelectedCount = ref(0);
@@ -788,6 +788,24 @@ const pendingDeleteLabel = computed(() => {
     label: t(`onlineEvals.singular.${tab}`),
   });
 });
+
+const isBulkDelete = computed(() => pendingBulkDeleteIds.value.length > 0);
+
+const deleteDialogTitle = computed(() =>
+  isBulkDelete.value
+    ? t("onlineEvals.job.deleteBulkTitle")
+    : pendingDeleteLabel.value,
+);
+
+const deleteDialogMessage = computed(() =>
+  isBulkDelete.value
+    ? t("onlineEvals.job.deleteBulkConfirm", {
+        count: pendingBulkDeleteIds.value.length,
+      })
+    : t("onlineEvals.deleteConfirmMessage", {
+        name: pendingDeleteRow.value?.name ?? "",
+      }),
+);
 
 watch(activeTab, (next) => {
   filterQuery.value = "";
@@ -1194,13 +1212,25 @@ function deleteRow(row: AnyRow) {
   confirmDeleteOpen.value = true;
 }
 
+function deleteJobsBulk(ids: string[]) {
+  if (ids.length === 0) return;
+  pendingBulkDeleteIds.value = [...ids];
+  pendingDeleteTab.value = "jobs";
+  confirmDeleteOpen.value = true;
+}
+
 function cancelDelete() {
   confirmDeleteOpen.value = false;
   pendingDeleteRow.value = null;
   pendingDeleteTab.value = null;
+  pendingBulkDeleteIds.value = [];
 }
 
 async function performDelete() {
+  if (pendingBulkDeleteIds.value.length > 0) {
+    await performBulkJobsDelete();
+    return;
+  }
   const row = pendingDeleteRow.value;
   const tab = pendingDeleteTab.value;
   if (!row || !tab) return;
@@ -1231,6 +1261,37 @@ async function performDelete() {
     );
   } finally {
     pendingDeleteRow.value = null;
+    pendingDeleteTab.value = null;
+  }
+}
+
+// Bulk-delete the selected eval jobs. Deletions run in parallel; if any fail we
+// surface an error but still reload so the successfully deleted rows disappear.
+async function performBulkJobsDelete() {
+  const ids = [...pendingBulkDeleteIds.value];
+  if (ids.length === 0) return;
+  try {
+    const results = await Promise.allSettled(
+      ids.map((id) => onlineEvalsService.jobs.delete(orgId.value, id)),
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed > 0) {
+      showError(
+        (results.find((r) => r.status === "rejected") as PromiseRejectedResult)
+          ?.reason,
+        t("onlineEvals.deleteError", {
+          label: t("onlineEvals.singular.jobs").toLowerCase(),
+        }),
+      );
+    } else {
+      toast({
+        variant: "success",
+        message: t("onlineEvals.job.deletedBulk", { count: ids.length }),
+      });
+    }
+    await loadAll(orgId.value);
+  } finally {
+    pendingBulkDeleteIds.value = [];
     pendingDeleteTab.value = null;
   }
 }

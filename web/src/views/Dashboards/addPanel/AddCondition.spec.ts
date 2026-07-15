@@ -39,7 +39,7 @@ vi.mock("../../../composables/dashboard/useDashboardPanel", () => ({
   })),
 }));
 
-// Mock DOM methods to prevent Quasar errors
+// Mock DOM methods to prevent errors from missing DOM APIs
 Object.defineProperty(Element.prototype, "removeAttribute", {
   writable: true,
   value: vi.fn(),

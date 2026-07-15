@@ -5,7 +5,7 @@
 //
 // Field ownership (R1-strict — every editable control inside <OForm> is
 // form-owned):
-//   • stream_type — required select. RESTORED from the Quasar BEFORE baseline:
+//   • stream_type — required select. RESTORED from the BEFORE baseline:
 //                   the original required BOTH stream_type AND stream_name, but
 //                   the O-component migration only validated stream_name.
 //   • stream_name — required select (creatable on output nodes).

@@ -67,8 +67,6 @@ const platform = {
   },
 };
 
-// Install Quasar with platform
-
 describe("ServiceAccountsList Component", () => {
   let wrapper;
   let mockRouter;
@@ -160,12 +158,7 @@ describe("ServiceAccountsList Component", () => {
         },
         mocks: {
           $router: mockRouter,
-          $route: mockRouter.currentRoute.value,
-          $q: {
-            platform,
-            notify: notifyMock,
-            dialog: dialogMock
-          }
+          $route: mockRouter.currentRoute.value
         },
         stubs: {
           'router-link': true,
@@ -194,13 +187,6 @@ describe("ServiceAccountsList Component", () => {
       },
       attachTo: document.body
     });
-
-    // Set up wrapper's $q.notify and dialog after mount — mutate in place
-    // so the closure-captured $q inside setup() also picks up the mocks
-    if (wrapper.vm.$q) {
-      wrapper.vm.$q.notify = notifyMock;
-      wrapper.vm.$q.dialog = dialogMock;
-    }
 
     // Mock the router in wrapper.vm if needed
     if (!wrapper.vm.$router) {

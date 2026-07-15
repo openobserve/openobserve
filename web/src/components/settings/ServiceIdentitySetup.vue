@@ -3117,7 +3117,7 @@ function getDisambiguationOptions(rowIndex: number) {
     }));
 }
 
-/** Returns a Quasar color token for a stream type chip */
+/** Returns a color token for a stream type chip */
 function streamTypeColor(streamType: string): string {
   const map: Record<string, string> = {
     logs: "blue",

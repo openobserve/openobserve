@@ -12,7 +12,7 @@ export interface DialogProps {
 
   /**
    * Prevents the dialog from closing when the user clicks the overlay
-   * or presses Escape. Equivalent to Quasar `persistent`.
+   * or presses Escape. Equivalent to a persistent dialog.
    * @default false
    */
   persistent?: boolean;

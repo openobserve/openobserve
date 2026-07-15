@@ -126,7 +126,7 @@ jobs:
           ./coverage.sh run-cov
 
           # cleanup
-          rm -rf data ./json ./src/infra/data
+          rm -rf data ./json ./src/infra/data ./src/core/data
 
           # Run with sqlite
           echo "Running with sqlite"

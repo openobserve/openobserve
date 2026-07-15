@@ -111,13 +111,6 @@ vi.mock("@/composables/useNotifications", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// @quasar/extras/material-icons-outlined — just needs to export a string
-// ---------------------------------------------------------------------------
-vi.mock("@quasar/extras/material-icons-outlined", () => ({
-  outlinedClose: "close",
-}));
-
-// ---------------------------------------------------------------------------
 // zincutils
 // ---------------------------------------------------------------------------
 vi.mock("@/utils/zincutils", () => ({

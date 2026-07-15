@@ -316,7 +316,7 @@ test.describe("Metrics Alert Notification Chain", () => {
         testLogger.info('=== PHASE 1: Verify alert exists in list ===');
         await pm.alertsPage.searchAlert(ALERT_NAME);
         // Use getByText instead of verifyAlertCreated's getByRole('cell') —
-        // Quasar QTable cells are unreliable with ARIA role matching.
+        // The table cells are unreliable with ARIA role matching.
         await expect(page.getByText(ALERT_NAME).first()).toBeVisible({ timeout: 15000 });
         testLogger.info('Alert found in list', { name: ALERT_NAME });
 

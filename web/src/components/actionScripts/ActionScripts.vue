@@ -274,7 +274,7 @@ import {
   getImageURL,
   getUUID,
   verifyOrganizationStatus,
-  convertUnixToQuasarFormat,
+  convertUnixToDateFormat,
 } from "@/utils/zincutils";
 import type { Alert, AlertListItem } from "@/ts/interfaces/index";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -519,15 +519,15 @@ export default defineComponent({
               created_by: data.created_by,
               created_at_raw: data.created_at || null,
               created_at: data.created_at
-                ? convertUnixToQuasarFormat(data.created_at)
+                ? convertUnixToDateFormat(data.created_at)
                 : "-",
               last_run_at_raw: data.last_run_at || null,
               last_run_at: data.last_run_at
-                ? convertUnixToQuasarFormat(data.last_run_at)
+                ? convertUnixToDateFormat(data.last_run_at)
                 : "-",
               last_successful_at_raw: data.last_successful_at || null,
               last_successful_at: data.last_successful_at
-                ? convertUnixToQuasarFormat(data.last_successful_at)
+                ? convertUnixToDateFormat(data.last_successful_at)
                 : "-",
               status: data.status,
               execution_details_type: data.execution_details_type,

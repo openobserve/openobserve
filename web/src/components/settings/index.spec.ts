@@ -73,11 +73,6 @@ const mockRouterReplace = vi.fn().mockResolvedValue(undefined);
 router.push = mockRouterPush;
 router.replace = mockRouterReplace;
 
-// Mock Quasar
-const mockQuasar = {
-  notify: vi.fn(),
-};
-
 const createWrapper = (props = {}, options = {}) => {
   return mount(SettingsIndex, {
     props: {
@@ -87,7 +82,6 @@ const createWrapper = (props = {}, options = {}) => {
       plugins: [i18n, router],
       mocks: {
         $store: mockStore,
-        $q: mockQuasar,
       },
       provide: {
         store: mockStore,

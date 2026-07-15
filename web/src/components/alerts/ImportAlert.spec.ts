@@ -21,16 +21,6 @@ vi.mock("@/composables/useStreams", () => ({
   }),
 }));
 
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: vi.fn(() => ({
-      notify: vi.fn(),
-    })),
-  };
-});
-
 vi.mock("vue-router", () => ({
   useRouter: vi.fn(() => ({
     push: vi.fn(),

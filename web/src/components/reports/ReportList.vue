@@ -324,7 +324,7 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
-import { formatDate } from "@/utils/date";
+import { convertUnixToDateFormat } from "@/utils/date";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -477,7 +477,7 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
       ...report,
       last_triggered_at_raw: report.last_triggered_at || null,
       last_triggered_at: report.last_triggered_at
-        ? convertUnixToQuasarFormat(report.last_triggered_at)
+        ? convertUnixToDateFormat(report.last_triggered_at)
         : "-",
     }));
 
@@ -616,12 +616,6 @@ const clearSearch = () => {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function convertUnixToQuasarFormat(unixMicroseconds: any) {
-  if (!unixMicroseconds) return "";
-  const unixSeconds = unixMicroseconds / 1e6;
-  const dateToFormat = new Date(unixSeconds * 1000);
-  return formatDate(dateToFormat.toISOString(), "YYYY-MM-DDTHH:mm:ssZ");
-}
 
 const filterData = (rows: any[], terms: any) => {
   const lc = terms.toLowerCase();

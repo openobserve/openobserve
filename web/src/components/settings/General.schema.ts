@@ -5,7 +5,7 @@
 // chips are pure-UI controls with their own inline actions and are decoupled
 // OUTSIDE the form, so they are NOT in this schema.
 //
-// Restores the Quasar BEFORE rules (truthy→Zod inversion):
+// Restores the original BEFORE rules (truthy→Zod inversion):
 //   • scrapeInterval: `!!v || scrapeIntervalRequired` (+ HTML min=0)
 //       → required AND ≥ 0 (0 is a valid value).
 //   • maxSeriesPerQuery: empty→pass; else `v>=1000 && v<=1000000`

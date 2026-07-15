@@ -1,0 +1,2115 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use std::sync::Arc;
+
+use axum::{
+    body::Body,
+    extract::Query,
+    http::{StatusCode, header},
+    response::{IntoResponse, Response},
+};
+use axum_extra::extract::{
+    CookieJar,
+    cookie::{Cookie, SameSite},
+};
+use config::{
+    Config, META_ORG_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
+    SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
+    cluster::LOCAL_NODE,
+    get_config, get_instance_id,
+    meta::{
+        cluster::{NodeStatus, Role, RoleGroup},
+        function::ZoFunction,
+        search::{HashFileRequest, HashFileResponse},
+    },
+    stats::{CacheStats, CacheStatsAsync},
+    utils::{base64, json},
+};
+use hashbrown::HashMap;
+use infra::{
+    cache, cluster, file_list,
+    schema::{
+        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+        STREAM_STATS_EXISTS,
+    },
+};
+use serde::Serialize;
+use time;
+use utoipa::ToSchema;
+#[cfg(feature = "enterprise")]
+use {
+    crate::common::utils::jwt::verify_decode_token,
+    crate::handler::http::auth::{
+        jwt::process_token,
+        validator::{ID_TOKEN_HEADER, PKCE_STATE_ORG, get_user_email_from_auth_str},
+    },
+    crate::service::self_reporting::audit,
+    config::{ider, utils::time::now_micros},
+    o2_dex::{
+        config::{get_config as get_dex_config, refresh_config as refresh_dex_config},
+        service::auth::{exchange_code, get_dex_jwks, get_dex_login, refresh_token},
+    },
+    o2_enterprise::enterprise::common::{
+        auditor::{AuditMessage, Protocol, ResponseMeta},
+        config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
+        settings::{get_logo, get_logo_dark, get_logo_text},
+    },
+    o2_enterprise::enterprise::license::{
+        block_feature_for_report_failure, last_reported_timestamp,
+    },
+    o2_openfga::config::{
+        get_config as get_openfga_config, refresh_config as refresh_openfga_config,
+    },
+};
+
+use crate::{
+    common::{
+        meta::{
+            http::HttpResponse as MetaHttpResponse,
+            user::{AuthTokens, AuthTokensExt},
+        },
+        utils::auth::{UserEmail, is_root_user},
+    },
+    handler::http::extractors::Headers,
+    service::{
+        db,
+        search::{
+            datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
+            grpc::tantivy_result_cache,
+        },
+    },
+};
+
+/// Macro to conditionally select a value based on the "enterprise" feature flag.
+///
+/// # Usage
+/// ```rust
+/// let value = enterprise_value!(default_expr, enterprise_expr);
+/// ```
+///
+/// If the "enterprise" feature is enabled, returns `enterprise_expr`.
+/// Otherwise, returns `default_expr`.
+macro_rules! enterprise_value {
+    ($default:expr, $enterprise:expr) => {{
+        #[cfg(feature = "enterprise")]
+        {
+            $enterprise
+        }
+        #[cfg(not(feature = "enterprise"))]
+        {
+            $default
+        }
+    }};
+
+    ($default:expr, $enterprise:expr, $block_feat:expr) => {{
+        #[cfg(feature = "enterprise")]
+        {
+            if $block_feat { $default } else { $enterprise }
+        }
+        #[cfg(not(feature = "enterprise"))]
+        {
+            $default
+        }
+    }};
+}
+
+#[derive(Serialize, serde::Deserialize, ToSchema)]
+pub struct HealthzResponse {
+    status: String,
+}
+
+#[cfg(feature = "enterprise")]
+pub fn reload_enterprise_config() -> Result<(), anyhow::Error> {
+    refresh_o2_config()
+        .and_then(|_| refresh_dex_config())
+        .and_then(|_| refresh_openfga_config())
+}
+
+#[derive(Serialize)]
+struct ConfigResponse<'a> {
+    version: String,
+    instance: String,
+    commit_hash: String,
+    build_date: String,
+    build_type: String,
+    default_fts_keys: Vec<String>,
+    default_secondary_index_fields: Vec<String>,
+    default_quick_mode_fields: Vec<String>,
+    telemetry_enabled: bool,
+    default_functions: Vec<ZoFunction<'a>>,
+    sql_reserved_keywords: Vec<String>,
+    sql_base64_enabled: bool,
+    timestamp_column: String,
+    data_retention_days: i64,
+    extended_data_retention_days: i64,
+    restricted_routes_on_empty_data: bool,
+    sso_enabled: bool,
+    native_login_enabled: bool,
+    service_account_enabled: bool,
+    rbac_enabled: bool,
+    super_cluster_enabled: bool,
+    query_on_stream_selection: bool,
+    show_stream_stats_doc_num: bool,
+    custom_logo_text: String,
+    custom_slack_url: String,
+    custom_docs_url: String,
+    rum: Rum,
+    custom_logo_img: Option<String>,
+    custom_logo_dark_img: Option<String>,
+    custom_hide_menus: String,
+    custom_hide_self_logo: bool,
+    meta_org: String,
+    quick_mode_enabled: bool,
+    user_defined_schemas_enabled: bool,
+    user_defined_schema_max_fields: usize,
+    all_fields_name: String,
+    usage_enabled: bool,
+    usage_publish_interval: i64,
+    ingestion_url: String,
+    web_url: String,
+    #[cfg(feature = "enterprise")]
+    streaming_aggregation_enabled: bool,
+    min_auto_refresh_interval: u32,
+    query_default_limit: i64,
+    max_dashboard_series: usize,
+    actions_enabled: bool,
+    streaming_enabled: bool,
+    histogram_enabled: bool,
+    timechart_enabled: bool,
+    max_query_range: i64,
+    ai_enabled: bool,
+    dashboard_placeholder: String,
+    dashboard_show_symbol_enabled: bool,
+    dashboard_show_field_as_json_enabled: bool,
+    ingest_flatten_level: u32,
+    #[cfg(feature = "enterprise")]
+    license_expiry: i64,
+    #[cfg(feature = "enterprise")]
+    license_server_url: String,
+    #[cfg(feature = "enterprise")]
+    ingestion_quota_used: f64,
+    #[cfg(feature = "enterprise")]
+    ingestion_history: Vec<o2_enterprise::enterprise::license::UsageResult>,
+    log_page_default_field_list: String,
+    query_values_default_num: i64,
+    alert_preview_timerange_minutes: i64,
+    incidents_enabled: bool,
+    service_streams_enabled: bool,
+    model_pricing_enabled: bool,
+    online_evals_enabled: bool,
+    anomaly_detection_enabled: bool,
+    synthetics_enabled: bool,
+    enable_cross_linking: bool,
+    show_fts_field_values: bool,
+    search_inspector_enabled: bool,
+    auto_query_enabled: bool,
+    #[cfg(feature = "enterprise")]
+    last_usage_report_ts: i64,
+    #[cfg(feature = "enterprise")]
+    org_storage_providers: String,
+    #[cfg(feature = "enterprise")]
+    org_storage_region: String,
+    #[cfg(feature = "cloud")]
+    billing_group_allowed_orgs: String,
+}
+
+#[derive(Serialize, serde::Deserialize)]
+struct Rum {
+    pub enabled: bool,
+    pub client_token: String,
+    pub application_id: String,
+    pub site: String,
+    pub service: String,
+    pub env: String,
+    pub version: String,
+    pub organization_identifier: String,
+    pub api_version: String,
+    pub insecure_http: bool,
+}
+
+impl Rum {
+    /// Create a new [`Rum`] instance from [`Config`]
+    pub fn from_cfg(cfg: Arc<Config>) -> Self {
+        Self {
+            enabled: cfg.rum.enabled,
+            client_token: cfg.rum.client_token.to_string(),
+            application_id: cfg.rum.application_id.to_string(),
+            site: cfg.rum.site.to_string(),
+            service: cfg.rum.service.to_string(),
+            env: cfg.rum.env.to_string(),
+            version: cfg.rum.version.to_string(),
+            organization_identifier: cfg.rum.organization_identifier.to_string(),
+            api_version: cfg.rum.api_version.to_string(),
+            insecure_http: cfg.rum.insecure_http,
+        }
+    }
+}
+
+/// Healthz
+#[utoipa::path(
+    get,
+    path = "/healthz",
+    tag = "Meta",
+    operation_id = "HealthCheck",
+    summary = "System health check",
+    description = "Performs a basic health check to verify that the OpenObserve service is running and responding to \
+                   requests. Returns a simple status indicator that can be used by load balancers, monitoring systems, \
+                   and orchestration platforms to determine service availability and readiness.",
+    responses(
+        (status = 200, description="Status OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "ok"}))
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn healthz() -> impl IntoResponse {
+    axum::Json(HealthzResponse {
+        status: "ok".to_string(),
+    })
+}
+
+/// Healthz HEAD
+/// Vector pipeline healthcheck support
+pub async fn healthz_head() -> impl IntoResponse {
+    StatusCode::OK
+}
+
+/// Healthz of the node for scheduled status
+#[utoipa::path(
+    get,
+    path = "/schedulez",
+    tag = "Meta",
+    operation_id = "SchedulerHealthCheck",
+    summary = "Scheduler node health check",
+    description = "Checks the health and scheduling availability of the current node. Returns success only if the node \
+                   is both online and enabled for task scheduling. Used by cluster management systems to determine \
+                   which nodes are available for workload distribution and background job processing.",
+    responses(
+        (status = 200, description="Status OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "ok"})),
+        (status = 404, description="Status Not OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "not ok"})),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn schedulez() -> impl IntoResponse {
+    let node_id = LOCAL_NODE.uuid.clone();
+
+    let (code, status) = if let Some(node) = cluster::get_node_by_uuid(&node_id).await {
+        if node.scheduled && node.status == NodeStatus::Online {
+            (StatusCode::OK, "ok")
+        } else {
+            (StatusCode::NOT_FOUND, "not ok")
+        }
+    } else {
+        (StatusCode::NOT_FOUND, "not ok")
+    };
+
+    (
+        code,
+        axum::Json(HealthzResponse {
+            status: status.to_string(),
+        }),
+    )
+}
+
+pub async fn zo_config() -> impl IntoResponse {
+    let cfg = get_config();
+    #[cfg(feature = "enterprise")]
+    let o2cfg = get_o2_config();
+    #[cfg(feature = "enterprise")]
+    let dex_cfg = get_dex_config();
+    #[cfg(feature = "enterprise")]
+    let openfga_cfg = get_openfga_config();
+
+    #[cfg(feature = "enterprise")]
+    let block_features = block_feature_for_report_failure().await;
+
+    let sso_enabled = enterprise_value!(false, dex_cfg.dex_enabled, block_features);
+    let native_login_enabled = enterprise_value!(true, dex_cfg.native_login_enabled);
+    let service_account_enabled = cfg.auth.service_account_enabled;
+    let rbac_enabled = enterprise_value!(false, openfga_cfg.enabled, block_features);
+    let actions_enabled = enterprise_value!(false, o2cfg.actions.enabled);
+    let super_cluster_enabled = enterprise_value!(false, o2cfg.super_cluster.enabled);
+
+    #[cfg(feature = "enterprise")]
+    let org_storage_providers = o2cfg.org_storage.allowed_providers.clone();
+    #[cfg(feature = "enterprise")]
+    let org_storage_region = o2cfg.org_storage.region.clone();
+
+    let custom_logo_text = enterprise_value!(
+        "".to_string(),
+        get_logo_text()
+            .await
+            .unwrap_or_else(|| o2cfg.common.custom_logo_text.clone())
+    );
+    let custom_slack_url = enterprise_value!("", &o2cfg.common.custom_slack_url);
+    let custom_docs_url = enterprise_value!("", &o2cfg.common.custom_docs_url);
+    let logo = enterprise_value!(None, get_logo().await);
+    let logo_dark = enterprise_value!(None, get_logo_dark().await);
+    let custom_hide_menus = enterprise_value!("", &o2cfg.common.custom_hide_menus);
+    let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
+    let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled);
+    let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
+    let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
+    // Anomaly detection is on when the enterprise feature is compiled in, unless turned off at
+    // runtime via O2_ANOMALY_DETECTION_DISABLED. When disabled the UI hides the anomaly tab.
+    let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
+    let online_evals_enabled = enterprise_value!(false, o2cfg.common.online_evals_enabled);
+    let synthetics_enabled = enterprise_value!(false, o2cfg.synthetics.enabled);
+
+    #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
+    let build_type = "cloud";
+    #[cfg(feature = "enterprise")]
+    let build_type = "enterprise";
+    #[cfg(not(any(feature = "cloud", feature = "enterprise")))]
+    let build_type = "opensource";
+
+    #[cfg(feature = "enterprise")]
+    let expiry_time = o2_enterprise::enterprise::license::get_expiry_time().await;
+    #[cfg(feature = "enterprise")]
+    let license_server_url = o2cfg.common.license_server_url.to_string();
+    #[cfg(feature = "enterprise")]
+    let ingestion_quota_used = o2_enterprise::enterprise::license::ingestion_used() * 100.0;
+    #[cfg(feature = "enterprise")]
+    let ingestion_history = o2_enterprise::enterprise::license::get_ingestion_history().await;
+    #[cfg(feature = "enterprise")]
+    let last_usage_report_ts = last_reported_timestamp().await;
+
+    let usage_enabled = enterprise_value!(cfg.common.usage_enabled, true);
+
+    // max usage reporting interval can be 10 mins, because we
+    // need relatively recent data for usage calculations
+    let usage_publish_interval = enterprise_value!(
+        cfg.common.usage_publish_interval,
+        (10 * 60).min(cfg.common.usage_publish_interval)
+    );
+
+    #[cfg(feature = "cloud")]
+    let billing_group_allowed_orgs = o2cfg.cloud.billing_group_allowed_orgs.clone();
+
+    axum::Json(ConfigResponse {
+        version: config::VERSION.to_string(),
+        instance: get_instance_id(),
+        commit_hash: config::COMMIT_HASH.to_string(),
+        build_date: config::BUILD_DATE.to_string(),
+        build_type: build_type.to_string(),
+        telemetry_enabled: cfg.common.telemetry_enabled,
+        default_fts_keys: SQL_FULL_TEXT_SEARCH_FIELDS
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+        default_secondary_index_fields: SQL_SECONDARY_INDEX_SEARCH_FIELDS
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+        default_quick_mode_fields: QUICK_MODEL_FIELDS.to_vec(),
+        default_functions: DEFAULT_FUNCTIONS.to_vec(),
+        sql_reserved_keywords: config::meta::sql::sql_reserved_keywords().to_vec(),
+        sql_base64_enabled: cfg.common.ui_sql_base64_enabled,
+        timestamp_column: TIMESTAMP_COL_NAME.to_string(),
+        data_retention_days: cfg.compact.data_retention_days,
+        extended_data_retention_days: cfg.compact.extended_data_retention_days,
+        restricted_routes_on_empty_data: cfg.common.restricted_routes_on_empty_data,
+        sso_enabled,
+        native_login_enabled,
+        service_account_enabled,
+        rbac_enabled,
+        super_cluster_enabled,
+        query_on_stream_selection: cfg.common.query_on_stream_selection,
+        show_stream_stats_doc_num: cfg.common.show_stream_dates_doc_num,
+        custom_logo_text,
+        custom_slack_url: custom_slack_url.to_string(),
+        custom_docs_url: custom_docs_url.to_string(),
+        custom_logo_img: logo,
+        custom_logo_dark_img: logo_dark,
+        custom_hide_menus: custom_hide_menus.to_string(),
+        custom_hide_self_logo,
+        rum: Rum::from_cfg(cfg.clone()),
+        meta_org: META_ORG_ID.to_string(),
+        quick_mode_enabled: cfg.limit.quick_mode_enabled,
+        user_defined_schemas_enabled: cfg.common.allow_user_defined_schemas,
+        user_defined_schema_max_fields: cfg.limit.user_defined_schema_max_fields,
+        all_fields_name: cfg.common.column_all.to_string(),
+        usage_enabled,
+        usage_publish_interval,
+        ingestion_url: cfg.common.ingestion_url.to_string(),
+        web_url: cfg.common.web_url.to_string(),
+        #[cfg(feature = "enterprise")]
+        streaming_aggregation_enabled: cfg.common.feature_query_streaming_aggs,
+        min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
+        query_default_limit: cfg.limit.query_default_limit,
+        max_dashboard_series: cfg.limit.max_dashboard_series,
+        actions_enabled,
+        streaming_enabled: cfg.http_streaming.streaming_enabled,
+        histogram_enabled: cfg.limit.histogram_enabled,
+        timechart_enabled: cfg.limit.timechart_enabled,
+        max_query_range: cfg.limit.default_max_query_range_days * 24,
+        ai_enabled,
+        dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
+        dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
+        dashboard_show_field_as_json_enabled: cfg.common.dashboard_show_field_as_json_enabled,
+        ingest_flatten_level: cfg.limit.ingest_flatten_level,
+        #[cfg(feature = "enterprise")]
+        license_expiry: expiry_time,
+        log_page_default_field_list: cfg.common.log_page_default_field_list.clone(),
+        #[cfg(feature = "enterprise")]
+        license_server_url,
+        #[cfg(feature = "enterprise")]
+        ingestion_quota_used,
+        #[cfg(feature = "enterprise")]
+        ingestion_history,
+        query_values_default_num: cfg.limit.query_values_default_num,
+        alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
+        incidents_enabled,
+        service_streams_enabled,
+        model_pricing_enabled: cfg.common.model_pricing_enabled,
+        online_evals_enabled,
+        anomaly_detection_enabled,
+        synthetics_enabled,
+        enable_cross_linking: cfg.common.enable_cross_linking,
+        show_fts_field_values: cfg.common.show_fts_field_values,
+        search_inspector_enabled: cfg.common.search_inspector_enabled,
+        auto_query_enabled: cfg.common.auto_query_enabled,
+        #[cfg(feature = "enterprise")]
+        last_usage_report_ts,
+        #[cfg(feature = "enterprise")]
+        org_storage_providers,
+        #[cfg(feature = "enterprise")]
+        org_storage_region,
+        #[cfg(feature = "cloud")]
+        billing_group_allowed_orgs,
+    })
+}
+
+pub async fn cache_status() -> impl IntoResponse {
+    let cfg = get_config();
+    let mut stats: HashMap<&str, json::Value> = HashMap::with_capacity(45);
+    stats.insert("LOCAL_NODE_UUID", json::json!(LOCAL_NODE.uuid.clone()));
+    stats.insert("LOCAL_NODE_NAME", json::json!(&cfg.common.instance_name));
+    stats.insert("LOCAL_NODE_ROLE", json::json!(&cfg.common.node_role));
+
+    let (stream_num, stream_schema_num) = get_stream_schema_status().await;
+    stats.insert(
+        "STREAMS",
+        json::json!({"stream_num": stream_num,"schema_num": stream_schema_num}),
+    );
+
+    // Use trait-based approach for cache statistics
+    // From src/infra/src/cache/stats.rs
+    let (len, cap, mem_size) = cache::stats::get_cache_stats();
+    stats.insert(
+        "STREAM_STATS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    // Schema caches - from src/infra/src/schema/mod.rs
+    let (len, cap, mem_size) = STREAM_SCHEMAS.stats().await;
+    stats.insert(
+        "STREAM_SCHEMAS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = STREAM_SCHEMAS_LATEST.stats().await;
+    stats.insert(
+        "STREAM_SCHEMAS_LATEST",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = STREAM_SETTINGS.stats().await;
+    stats.insert(
+        "STREAM_SETTINGS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = STREAM_RECORD_ID_GENERATOR.stats();
+    stats.insert(
+        "STREAM_RECORD_ID_GENERATOR",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = STREAM_STATS_EXISTS.stats();
+    stats.insert(
+        "STREAM_STATS_EXISTS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    // File data caches - from src/infra/src/cache/file_data/
+    let (disk_data_total_size, disk_data_used_size, disk_data_items) =
+        cache::file_data::disk::stats(cache::file_data::disk::FileType::Data).await;
+    let (disk_result_total_size, disk_result_used_size, disk_result_items) =
+        cache::file_data::disk::stats(cache::file_data::disk::FileType::Result).await;
+    let (disk_aggregation_total_size, disk_aggregation_used_size, disk_aggregation_items) =
+        cache::file_data::disk::stats(cache::file_data::disk::FileType::Aggregation).await;
+    let (mem_total_size, mem_used_size, mem_items) = cache::file_data::memory::stats().await;
+    stats.insert(
+            "FILE_DATA",
+            json::json!({
+                "disk": {
+                    "file_data":{"total_size": disk_data_total_size, "used_size": disk_data_used_size, "items": disk_data_items},
+                    "result_cache":{"total_size": disk_result_total_size, "used_size": disk_result_used_size, "items": disk_result_items},
+                    "aggregation_cache":{"total_size": disk_aggregation_total_size, "used_size": disk_aggregation_used_size, "items": disk_aggregation_items},
+                },
+                "memory":{"total_size": mem_total_size, "used_size": mem_used_size, "items": mem_items}
+            }),
+        );
+
+    let file_list_num = file_list::len().await;
+    let file_list_last_update_at = file_list::get_max_update_at().await.unwrap_or_default();
+    let (last_check_updated_at, _) = db::compact::stats::get_offset().await;
+
+    stats.insert(
+        "FILE_LIST",
+        json::json!({
+            "num":file_list_num,
+            "last_update_at": file_list_last_update_at,
+            "last_check_updated_at": last_check_updated_at,
+        }),
+    );
+
+    stats.insert(
+        "DATAFUSION",
+        json::json!({"file_stat_cache": {
+            "file_num": file_statistics_cache::GLOBAL_CACHE.len(),
+            "mem_size": file_statistics_cache::GLOBAL_CACHE.memory_size()
+        }}),
+    );
+    stats.insert(
+        "INVERTED_INDEX",
+        json::json!({"result_cache": {
+            "file_num": tantivy_result_cache::GLOBAL_CACHE.len(),
+            "mem_size": tantivy_result_cache::GLOBAL_CACHE.memory_size()
+        }}),
+    );
+
+    #[cfg(feature = "enterprise")]
+    let (total_count, expired_count) = crate::service::search::cardinality::get_cache_stats().await;
+    #[cfg(not(feature = "enterprise"))]
+    let (total_count, expired_count) = (0, 0);
+    stats.insert(
+        "CARDINALITY",
+        json::json!({"total_count": total_count, "expired_count": expired_count}),
+    );
+
+    // query cache
+    let (len, cap, mem_size) = crate::service::promql::search::get_cache_stats().await;
+    stats.insert(
+        "PROMQL_QUERY_CACHE",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    // Config caches from src/core/src/common/infra/config.rs
+    let (len, cap, mem_size) = crate::common::infra::config::KVS.stats();
+    stats.insert(
+        "KVS_CACHE",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::QUERY_FUNCTIONS.stats();
+    stats.insert(
+        "QUERY_FUNCTIONS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::ALERTS_TEMPLATES.stats();
+    stats.insert(
+        "ALERTS_TEMPLATES",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::DESTINATIONS.stats();
+    stats.insert(
+        "DESTINATIONS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::ENRICHMENT_TABLES.stats();
+    stats.insert(
+        "ENRICHMENT_TABLES",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::ORGANIZATION_SETTING
+        .stats()
+        .await;
+    stats.insert(
+        "ORGANIZATION_SETTING",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::ORGANIZATIONS.stats().await;
+    stats.insert(
+        "ORGANIZATIONS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::METRIC_CLUSTER_MAP
+        .stats()
+        .await;
+    stats.insert(
+        "METRIC_CLUSTER_MAP",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::METRIC_CLUSTER_LEADER
+        .stats()
+        .await;
+    stats.insert(
+        "METRIC_CLUSTER_LEADER",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::STREAM_ALERTS.stats().await;
+    stats.insert(
+        "STREAM_ALERTS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::ALERTS.stats().await;
+    stats.insert(
+        "ALERTS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::REALTIME_ALERT_TRIGGERS
+        .stats()
+        .await;
+    stats.insert(
+        "REALTIME_ALERT_TRIGGERS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::STREAM_EXECUTABLE_PIPELINES
+        .stats()
+        .await;
+    stats.insert(
+        "STREAM_EXECUTABLE_PIPELINES",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::PIPELINE_STREAM_MAPPING
+        .stats()
+        .await;
+    stats.insert(
+        "PIPELINE_STREAM_MAPPING",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::SCHEDULED_PIPELINES
+        .stats()
+        .await;
+    stats.insert(
+        "SCHEDULED_PIPELINES",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::common::infra::config::SYSTEM_SETTINGS.stats().await;
+    stats.insert(
+        "SYSTEM_SETTINGS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    // Cluster caches (5) from src/infra/src/cluster/mod.rs
+    let (len, cap, mem_size) = infra::cluster::QUERIER_INTERACTIVE_CONSISTENT_HASH
+        .stats()
+        .await;
+    stats.insert(
+        "QUERIER_INTERACTIVE_CONSISTENT_HASH",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = infra::cluster::QUERIER_BACKGROUND_CONSISTENT_HASH
+        .stats()
+        .await;
+    stats.insert(
+        "QUERIER_BACKGROUND_CONSISTENT_HASH",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = infra::cluster::COMPACTOR_CONSISTENT_HASH.stats().await;
+    stats.insert(
+        "COMPACTOR_CONSISTENT_HASH",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = infra::cluster::FLATTEN_COMPACTOR_CONSISTENT_HASH
+        .stats()
+        .await;
+    stats.insert(
+        "FLATTEN_COMPACTOR_CONSISTENT_HASH",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = infra::cluster::NODES_HEALTH_CHECK.stats().await;
+    stats.insert(
+        "NODES_HEALTH_CHECK",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    // File list caches (2) from src/core/src/service/db/file_list/mod.rs
+    let (len, cap, mem_size) = crate::service::db::file_list::DELETED_FILES.stats();
+    stats.insert(
+        "DELETED_FILES",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    let (len, cap, mem_size) = crate::service::db::file_list::DEDUPLICATE_FILES.stats();
+    stats.insert(
+        "DEDUPLICATE_FILES",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    // Organization streams cache from
+    // src/core/src/service/db/compact/organization.rs line 21
+    let (len, cap, mem_size) = crate::service::db::compact::organization::STREAMS.stats();
+    stats.insert(
+        "COMPACT_ORGANIZATION_STREAMS",
+        json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+    );
+
+    // Ingester caches (conditional on role)
+    let is_ingester =
+        cfg.common.node_role.contains("ingester") || cfg.common.node_role.contains("all");
+    if is_ingester {
+        use ingester;
+
+        let (len, cap, mem_size) = ingester::WAL_PARQUET_METADATA.stats().await;
+        stats.insert(
+            "INGESTER_WAL_METADATA",
+            json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+        );
+
+        let (len, cap, mem_size) = ingester::get_immutables_cache_stats().await;
+        stats.insert(
+            "INGESTER_IMMUTABLES",
+            json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+        );
+
+        let (len, cap, mem_size) = ingester::get_processing_tables_cache_stats().await;
+        stats.insert(
+            "INGESTER_PROCESSING_TABLES",
+            json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
+        );
+    }
+
+    axum::Json(stats)
+}
+
+pub async fn config_reload(Headers(user_email): Headers<UserEmail>) -> impl IntoResponse {
+    let user_id = user_email.user_id.as_str();
+    if !is_root_user(user_id) {
+        return (
+            StatusCode::FORBIDDEN,
+            axum::Json(serde_json::json!({"message": "Only root users can reload config"})),
+        );
+    }
+    if let Err(e) = config::refresh_config() {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({"status": e.to_string()})),
+        );
+    }
+    #[cfg(feature = "enterprise")]
+    if let Err(e) = reload_enterprise_config() {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({"status": e.to_string()})),
+        );
+    }
+    let status = "successfully reloaded config";
+    // Audit this event
+    #[cfg(feature = "enterprise")]
+    audit(AuditMessage {
+        user_email: user_id.to_string(),
+        org_id: "".to_string(),
+        _timestamp: now_micros(),
+        protocol: Protocol::Http,
+        response_meta: ResponseMeta {
+            http_method: "GET".to_string(),
+            http_path: "/config/reload".to_string(),
+            http_query_params: "".to_string(),
+            http_body: "".to_string(),
+            http_response_code: 200,
+            error_msg: None,
+            trace_id: None,
+        },
+    })
+    .await;
+    (
+        StatusCode::OK,
+        axum::Json(serde_json::json!({"status": status})),
+    )
+}
+
+/// Recursively walk through a JSON object and redact sensitive values
+fn hide_sensitive_fields(value: &mut serde_json::Value) {
+    if let Some(obj) = value.as_object_mut() {
+        for (key, val) in obj.iter_mut() {
+            let key_lower = key.to_lowercase();
+
+            // Simple rule: contains any of these sensitive keywords
+            // Also hide header values that might contain credentials
+            let is_sensitive = key_lower.contains("password")
+                || key_lower.contains("secret")
+                || key_lower.contains("key")
+                || key_lower.contains("auth")
+                || key_lower.contains("token")
+                || key_lower.contains("credential")
+                || (key_lower.contains("header") && key_lower.contains("value"));
+
+            if is_sensitive && let Some(s) = val.as_str() {
+                *val = if s.is_empty() {
+                    serde_json::json!("[not set]")
+                } else {
+                    serde_json::json!("[hidden]")
+                };
+            }
+
+            if val.is_object() {
+                hide_sensitive_fields(val);
+            }
+        }
+    }
+}
+
+pub async fn config_runtime() -> impl IntoResponse {
+    let cfg = get_config();
+    let mut config_value = match serde_json::to_value(cfg.as_ref()) {
+        Ok(v) => v,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(
+                    serde_json::json!({"error": format!("Failed to serialize config: {e}")}),
+                ),
+            );
+        }
+    };
+
+    hide_sensitive_fields(&mut config_value);
+
+    const METADATA_KEY: &str = "_metadata";
+    let metadata_response = json::json!({
+        "version": config::VERSION,
+        "commit_hash": config::COMMIT_HASH,
+        "build_date": config::BUILD_DATE,
+        "instance_id": get_instance_id(),
+    });
+
+    let mut final_response = if let serde_json::Value::Object(o) = config_value {
+        o
+    } else {
+        serde_json::Map::new()
+    };
+
+    final_response.insert(METADATA_KEY.to_string(), metadata_response);
+
+    (
+        StatusCode::OK,
+        axum::Json(serde_json::Value::Object(final_response)),
+    )
+}
+
+async fn get_stream_schema_status() -> (usize, usize) {
+    let r = STREAM_SCHEMAS.read().await;
+    let stream_num = r.len();
+    let stream_schema_num = r.values().fold(0, |acc, val| acc + val.len());
+
+    drop(r);
+    (stream_num, stream_schema_num)
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn redirect(Query(query): Query<std::collections::HashMap<String, String>>) -> Response {
+    use axum_extra::extract::cookie::{Cookie, SameSite};
+    use config::meta::user::UserRole;
+    use itertools::Itertools;
+
+    use crate::common::meta::user::AuthTokens;
+
+    let code = match query.get("code") {
+        Some(code) => code,
+        None => {
+            return Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from("no code in request"))
+                .unwrap();
+        }
+    };
+    let query_string = query.iter().map(|(k, v)| format!("{k}={v}")).join("&");
+    let mut audit_message = AuditMessage {
+        user_email: "".to_string(),
+        org_id: "".to_string(),
+        _timestamp: now_micros(),
+        protocol: Protocol::Http,
+        response_meta: ResponseMeta {
+            http_method: "GET".to_string(),
+            http_path: "/config/redirect".to_string(),
+            http_body: "".to_string(),
+            http_query_params: query_string,
+            http_response_code: 302,
+            error_msg: None,
+            trace_id: None,
+        },
+    };
+
+    match query.get("state") {
+        Some(code) => match crate::service::kv::get(PKCE_STATE_ORG, code).await {
+            Ok(_) => {
+                let _ = crate::service::kv::delete(PKCE_STATE_ORG, code).await;
+            }
+            Err(_) => {
+                // Bad Request
+                audit_message.response_meta.http_response_code = 400;
+                audit(audit_message).await;
+                return Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .body(Body::from("invalid state in request"))
+                    .unwrap();
+            }
+        },
+
+        None => {
+            // Bad Request
+            audit_message.response_meta.http_response_code = 400;
+            audit(audit_message).await;
+            return Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from("no state in request"))
+                .unwrap();
+        }
+    };
+
+    log::info!("entering exchange_code: {code}");
+
+    match exchange_code(code).await {
+        Ok(login_data) => {
+            let login_url;
+            let access_token = login_data.access_token;
+            let keys = get_dex_jwks().await;
+            let token_ver = verify_decode_token(
+                &access_token,
+                &keys,
+                &get_dex_config().client_id,
+                true,
+                true,
+            );
+            let id_token;
+            match token_ver {
+                Ok(res) => {
+                    // check for service accounts , do not to allow login
+                    if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await
+                        && db_user
+                            .organizations
+                            .iter()
+                            .any(|org| org.role.eq(&UserRole::ServiceAccount))
+                    {
+                        return Response::builder()
+                            .status(StatusCode::UNAUTHORIZED)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Body::from("\"Service accounts are not allowed to login\""))
+                            .unwrap();
+                    }
+
+                    // Check if email is allowed by domain management system
+                    match o2_enterprise::enterprise::domain_management::is_email_allowed(
+                        &res.0.user_email,
+                    )
+                    .await
+                    {
+                        Ok(allowed) => {
+                            if !allowed {
+                                audit_message.response_meta.http_response_code = 403;
+                                audit_message._timestamp = now_micros();
+                                audit(audit_message).await;
+                                return Response::builder()
+                                    .status(StatusCode::UNAUTHORIZED)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Body::from("\"Unauthorized\""))
+                                    .unwrap();
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("Failed to check domain management: {e}");
+                            // Fail open - allow access if domain management check fails
+                            // This prevents system lockouts due to configuration errors
+                        }
+                    }
+
+                    audit_message.user_email = res.0.user_email.clone();
+                    id_token = json::to_string(&json::json!({
+                        "email": res.0.user_email,
+                        "name": res.0.user_name,
+                        "family_name": res.0.family_name,
+                        "given_name": res.0.given_name,
+                        "is_valid": res.0.is_valid,
+                    }))
+                    .unwrap();
+                    let url_params = match process_token(res).await {
+                        Ok(v) => v.map(|(new_user, pending_invites)| {
+                            format!("&new_user_login={new_user}&pending_invites={pending_invites}")
+                        }),
+                        Err(_) => {
+                            return Response::builder()
+                                .status(StatusCode::UNAUTHORIZED)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Body::from("\"Email Domain not allowed\""))
+                                .unwrap();
+                        }
+                    };
+                    login_url = format!(
+                        "{}#id_token={}.{}{}",
+                        login_data.url,
+                        ID_TOKEN_HEADER,
+                        base64::encode(&id_token),
+                        url_params.unwrap_or_default()
+                    );
+                }
+                Err(e) => {
+                    audit_message.response_meta.http_response_code = 400;
+                    audit_message._timestamp = now_micros();
+                    audit(audit_message).await;
+                    return Response::builder()
+                        .status(StatusCode::UNAUTHORIZED)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Body::from(format!("\"{e}\"")))
+                        .unwrap();
+                }
+            }
+
+            // generate new UUID for access token & store token in DB
+            let session_id = ider::uuid();
+
+            if access_token.is_empty() {
+                audit_message.response_meta.http_response_code = 400;
+                audit_message._timestamp = now_micros();
+                audit(audit_message).await;
+                return Response::builder()
+                    .status(StatusCode::UNAUTHORIZED)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from("\"access token is empty\""))
+                    .unwrap();
+            }
+
+            // store session_id in cluster co-ordinator
+            if crate::service::session::set_session(&session_id, &access_token)
+                .await
+                .is_none()
+            {
+                log::error!(
+                    "Failed to store session {} in cluster coordinator",
+                    session_id
+                );
+            }
+
+            let access_token = format!("session {session_id}");
+
+            let tokens = json::to_string(&AuthTokens {
+                access_token,
+                refresh_token: login_data.refresh_token,
+            })
+            .unwrap();
+            let cfg = get_config();
+            let tokens = base64::encode(&tokens);
+
+            let mut auth_cookie = Cookie::new("auth_tokens", tokens);
+            auth_cookie.set_expires(
+                time::OffsetDateTime::now_utc() + time::Duration::seconds(cfg.auth.cookie_max_age),
+            );
+            auth_cookie.set_http_only(true);
+            auth_cookie.set_secure(cfg.auth.cookie_secure_only);
+            auth_cookie.set_path("/");
+            if cfg.auth.cookie_same_site_lax {
+                auth_cookie.set_same_site(SameSite::Lax);
+            } else {
+                auth_cookie.set_same_site(SameSite::None);
+            }
+            log::info!("Redirecting user after processing token");
+
+            audit_message._timestamp = now_micros();
+            audit(audit_message).await;
+            Response::builder()
+                .status(StatusCode::FOUND)
+                .header(header::LOCATION, login_url)
+                .header(header::SET_COOKIE, auth_cookie.to_string())
+                .body(Body::empty())
+                .unwrap()
+        }
+        Err(e) => {
+            audit_message.response_meta.http_response_code = 400;
+            audit_message._timestamp = now_micros();
+            audit(audit_message).await;
+            Response::builder()
+                .status(StatusCode::UNAUTHORIZED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(format!("\"{e}\"")))
+                .unwrap()
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn dex_login() -> impl IntoResponse {
+    use o2_dex::meta::auth::PreLoginData;
+
+    if block_feature_for_report_failure().await {
+        return crate::common::meta::http::HttpResponse::internal_error(
+            "feature blocked due to usage reporting failure",
+        );
+    }
+
+    let login_data: PreLoginData = get_dex_login();
+    let state = login_data.state.clone();
+    let _ = crate::service::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
+
+    crate::common::meta::http::HttpResponse::json(login_data.url)
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn refresh_token_with_dex(
+    cookies: CookieJar,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    use axum_extra::extract::cookie::{Cookie, SameSite};
+
+    if block_feature_for_report_failure().await {
+        return Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .body(Body::from("feature blocked due to usage reporting failure"))
+            .unwrap();
+    }
+
+    let query_string = query
+        .iter()
+        .map(|(k, v)| format!("{}={}", k, v))
+        .collect::<Vec<_>>()
+        .join("&");
+    let mut audit_message = AuditMessage {
+        user_email: "".to_string(),
+        org_id: "".to_string(),
+        _timestamp: now_micros(),
+        protocol: Protocol::Http,
+        response_meta: ResponseMeta {
+            http_method: "GET".to_string(),
+            http_path: "/config/dex_refresh".to_string(),
+            http_body: "".to_string(),
+            http_query_params: query_string,
+            http_response_code: 302,
+            error_msg: None,
+            trace_id: None,
+        },
+    };
+
+    let token = if let Some(cookie) = cookies.get("auth_tokens") {
+        let decoded_cookie = config::utils::base64::decode(cookie.value()).unwrap_or_default();
+        let auth_tokens: AuthTokens = json::from_str(&decoded_cookie).unwrap_or_default();
+
+        // remove old session id from cluster co-ordinator
+        let access_token = auth_tokens.access_token;
+        if access_token.starts_with("session") {
+            crate::service::session::remove_session(access_token.strip_prefix("session ").unwrap())
+                .await;
+        }
+
+        auth_tokens.refresh_token
+    } else {
+        return Response::builder()
+            .status(StatusCode::UNAUTHORIZED)
+            .body(Body::empty())
+            .unwrap();
+    };
+
+    // Exchange the refresh token for a new access token
+    match refresh_token(&token).await {
+        Ok((access_token, refresh_token_str)) => {
+            // generate new UUID for access token & store token in DB
+            let session_id = ider::uuid();
+
+            if access_token.is_empty() {
+                audit_message.response_meta.http_response_code = 400;
+                audit_message._timestamp = now_micros();
+                audit(audit_message).await;
+                return Response::builder()
+                    .status(StatusCode::UNAUTHORIZED)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from("\"access token is empty\""))
+                    .unwrap();
+            }
+
+            // Blocklist: a refresh must not resurrect a blocked user. Decode the freshly minted
+            // access token; if the identity is blocked, deny WITHOUT minting a session and clear
+            // the auth cookie, so the FE's 401 → /dex_refresh → retry loop terminates
+            // at the login page.
+            {
+                let keys = get_dex_jwks().await;
+                let refreshed_email = verify_decode_token(
+                    &access_token,
+                    &keys,
+                    &get_dex_config().client_id,
+                    false,
+                    true,
+                )
+                .ok()
+                .map(|ver| ver.0.user_email);
+                let blocked = match &refreshed_email {
+                    Some(email) => matches!(
+                        o2_enterprise::enterprise::domain_management::evaluate_cached(email).await,
+                        o2_enterprise::enterprise::domain_management::meta::AccessDecision::Deny
+                    ),
+                    None => false,
+                };
+                if blocked {
+                    let email = refreshed_email.unwrap_or_default();
+                    log::warn!("Blocked external identity denied at token refresh: {email}");
+                    audit_message.response_meta.http_response_code = 401;
+                    audit_message._timestamp = now_micros();
+                    audit(audit_message).await;
+
+                    let conf = get_config();
+                    let cleared = base64::encode(&json::to_string(&AuthTokens::default()).unwrap());
+                    let mut auth_cookie = Cookie::new("auth_tokens", cleared);
+                    auth_cookie.set_expires(
+                        time::OffsetDateTime::now_utc()
+                            + time::Duration::seconds(conf.auth.cookie_max_age),
+                    );
+                    auth_cookie.set_http_only(true);
+                    auth_cookie.set_secure(conf.auth.cookie_secure_only);
+                    auth_cookie.set_path("/");
+                    if conf.auth.cookie_same_site_lax {
+                        auth_cookie.set_same_site(SameSite::Lax);
+                    } else {
+                        auth_cookie.set_same_site(SameSite::None);
+                    }
+                    return Response::builder()
+                        .status(StatusCode::UNAUTHORIZED)
+                        .header(header::SET_COOKIE, auth_cookie.to_string())
+                        .body(Body::empty())
+                        .unwrap();
+                }
+            }
+
+            // store session_id in cluster co-ordinator
+            if crate::service::session::set_session(&session_id, &access_token)
+                .await
+                .is_none()
+            {
+                log::error!(
+                    "Failed to store session {} in cluster coordinator",
+                    session_id
+                );
+            }
+
+            let access_token = format!("session {session_id}");
+
+            let tokens = json::to_string(&AuthTokens {
+                access_token,
+                refresh_token: refresh_token_str,
+            })
+            .unwrap();
+            let conf = get_config();
+            let tokens = base64::encode(&tokens);
+
+            let mut auth_cookie = Cookie::new("auth_tokens", tokens);
+            auth_cookie.set_expires(
+                time::OffsetDateTime::now_utc() + time::Duration::seconds(conf.auth.cookie_max_age),
+            );
+            auth_cookie.set_http_only(true);
+            auth_cookie.set_secure(conf.auth.cookie_secure_only);
+            auth_cookie.set_path("/");
+            if conf.auth.cookie_same_site_lax {
+                auth_cookie.set_same_site(SameSite::Lax);
+            } else {
+                auth_cookie.set_same_site(SameSite::None);
+            }
+
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(header::SET_COOKIE, auth_cookie.to_string())
+                .body(Body::empty())
+                .unwrap()
+        }
+        Err(_) => {
+            let conf = get_config();
+            let tokens = json::to_string(&AuthTokens::default()).unwrap();
+            let tokens = base64::encode(&tokens);
+
+            let mut auth_cookie = Cookie::new("auth_tokens", tokens);
+            auth_cookie.set_expires(
+                time::OffsetDateTime::now_utc() + time::Duration::seconds(conf.auth.cookie_max_age),
+            );
+            auth_cookie.set_http_only(true);
+            auth_cookie.set_secure(conf.auth.cookie_secure_only);
+            auth_cookie.set_path("/");
+            if conf.auth.cookie_same_site_lax {
+                auth_cookie.set_same_site(SameSite::Lax);
+            } else {
+                auth_cookie.set_same_site(SameSite::None);
+            }
+
+            Response::builder()
+                .status(StatusCode::UNAUTHORIZED)
+                .header(header::LOCATION, "/")
+                .header(header::SET_COOKIE, auth_cookie.to_string())
+                .body(Body::empty())
+                .unwrap()
+        }
+    }
+}
+
+fn prepare_empty_cookie<'a, T: Serialize + ?Sized>(
+    cookie_name: &'a str,
+    token_struct: &T,
+    conf: &Arc<Config>,
+) -> Cookie<'a> {
+    let tokens = json::to_string(token_struct).unwrap();
+    let tokens = base64::encode(&tokens);
+    let mut auth_cookie = Cookie::new(cookie_name, tokens);
+    auth_cookie.set_max_age(time::Duration::seconds(conf.auth.cookie_max_age));
+    auth_cookie.set_http_only(true);
+    auth_cookie.set_secure(conf.auth.cookie_secure_only);
+    auth_cookie.set_path("/");
+    if conf.auth.cookie_same_site_lax {
+        auth_cookie.set_same_site(SameSite::Lax);
+    } else {
+        auth_cookie.set_same_site(SameSite::None);
+    }
+    auth_cookie
+}
+
+pub async fn logout(
+    cookies: CookieJar,
+    #[cfg(feature = "enterprise")] headers: http::HeaderMap,
+) -> Response {
+    // remove the session
+    let conf = get_config();
+
+    #[cfg(feature = "enterprise")]
+    let auth_str = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
+    // Only get the user email from the auth_str, no need to check for permissions and others
+    #[cfg(feature = "enterprise")]
+    let user_email = get_user_email_from_auth_str(&auth_str).await;
+
+    if let Some(cookie) = cookies.get("auth_tokens") {
+        let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+        let auth_tokens: AuthTokens =
+            json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
+        let access_token = auth_tokens.access_token;
+
+        if access_token.starts_with("session") {
+            crate::service::session::remove_session(access_token.strip_prefix("session ").unwrap())
+                .await;
+        }
+    };
+    let auth_cookie = prepare_empty_cookie("auth_tokens", &AuthTokens::default(), &conf);
+    let auth_ext_cookie = prepare_empty_cookie("auth_ext", &AuthTokensExt::default(), &conf);
+
+    #[cfg(feature = "enterprise")]
+    if let Some(user_email) = user_email {
+        audit(AuditMessage {
+            user_email,
+            org_id: "".to_string(),
+            _timestamp: now_micros(),
+            protocol: Protocol::Http,
+            response_meta: ResponseMeta {
+                http_method: "GET".to_string(),
+                http_path: "/config/logout".to_string(),
+                http_query_params: "".to_string(),
+                http_body: "".to_string(),
+                http_response_code: 200,
+                error_msg: None,
+                trace_id: None,
+            },
+        })
+        .await;
+    }
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::LOCATION, "/")
+        .header(header::SET_COOKIE, auth_cookie.to_string())
+        .header(header::SET_COOKIE, auth_ext_cookie.to_string())
+        .body(Body::empty())
+        .unwrap()
+}
+
+pub async fn enable_node(
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    let node_id = LOCAL_NODE.uuid.clone();
+    let Some(mut node) = cluster::get_node_by_uuid(&node_id).await else {
+        return MetaHttpResponse::not_found("node not found");
+    };
+
+    let enable = match query.get("value").and_then(|v| v.parse::<bool>().ok()) {
+        Some(v) => v,
+        None => {
+            return MetaHttpResponse::bad_request(
+                "invalid or missing 'value' query parameter (expected true or false)",
+            );
+        }
+    };
+    node.scheduled = enable;
+    if !node.scheduled {
+        // release all the searching files
+        crate::common::infra::wal::clean_lock_files();
+
+        #[cfg(feature = "enterprise")]
+        {
+            log::info!("[NODE] Disabling node, initiating graceful drain");
+
+            // If this is an ingester node, set draining mode and flush
+            if LOCAL_NODE.is_ingester() {
+                // Flush memory to WAL
+                if let Err(e) = ingester::flush_all().await {
+                    log::error!("[NODE] Error flushing ingester during disable: {e}");
+                    return MetaHttpResponse::internal_error(e);
+                }
+                // Set draining flag to trigger immediate S3 upload after flush memory to disk
+                o2_enterprise::enterprise::drain::set_draining(true);
+                log::info!("[NODE] Ingester flushed successfully, S3 upload will be prioritized");
+            }
+        }
+    } else {
+        #[cfg(feature = "enterprise")]
+        {
+            // Re-enabling the node
+            if LOCAL_NODE.is_ingester() {
+                o2_enterprise::enterprise::drain::set_draining(false);
+            }
+        }
+    }
+    match crate::common::infra::cluster::update_local_node(&node).await {
+        Ok(_) => MetaHttpResponse::json(true),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+pub async fn flush_node() -> Response {
+    if !LOCAL_NODE.is_ingester() {
+        return MetaHttpResponse::not_found("local node is not an ingester");
+    };
+
+    // release all the searching files
+    crate::common::infra::wal::clean_lock_files();
+
+    match ingester::flush_all().await {
+        Ok(_) => MetaHttpResponse::json(true),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn drain_status() -> Response {
+    let is_ingester = LOCAL_NODE.is_ingester();
+    let response = o2_enterprise::enterprise::drain::get_drain_status(is_ingester);
+    MetaHttpResponse::json(response)
+}
+
+pub async fn list_node() -> Response {
+    let nodes = cluster::get_cached_nodes(|_| true).await;
+    MetaHttpResponse::json(nodes)
+}
+
+pub async fn node_metrics() -> Response {
+    let metrics = config::utils::sysinfo::get_node_metrics();
+    MetaHttpResponse::json(metrics)
+}
+
+pub async fn consistent_hash(axum::Json(body): axum::Json<HashFileRequest>) -> Response {
+    let mut ret = HashFileResponse::default();
+    for file in body.files.iter() {
+        let mut nodes = hashbrown::HashMap::new();
+        nodes.insert(
+            "querier_interactive".to_string(),
+            cluster::get_node_from_consistent_hash(
+                file,
+                &Role::Querier,
+                Some(RoleGroup::Interactive),
+            )
+            .await
+            .unwrap_or_default(),
+        );
+        nodes.insert(
+            "querier_background".to_string(),
+            cluster::get_node_from_consistent_hash(
+                file,
+                &Role::Querier,
+                Some(RoleGroup::Background),
+            )
+            .await
+            .unwrap_or_default(),
+        );
+        ret.files.insert(file.clone(), nodes);
+    }
+    MetaHttpResponse::json(ret)
+}
+
+pub async fn refresh_nodes_list() -> Response {
+    match cluster::cache_node_list().await {
+        Ok(node_ids) => MetaHttpResponse::json(node_ids),
+        Err(e) => {
+            log::error!("[CLUSTER] refresh_node_list failed: {}", e);
+            MetaHttpResponse::internal_error(e.to_string())
+        }
+    }
+}
+
+pub async fn refresh_user_sessions() -> Response {
+    let _ = db::session::cache().await.map_err(|e| {
+        log::error!("[CLUSTER] refresh_user_sessions failed: {}", e);
+        e
+    });
+    MetaHttpResponse::json("user sessions refreshed")
+}
+
+// List of all available cache modules
+const CACHE_MODULES: &[&str] = &[
+    "schema",
+    "organization",
+    "user",
+    "session",
+    "functions",
+    "pipeline",
+    "alerts",
+    "destinations",
+    "templates",
+    "short_url",
+    "realtime_triggers",
+    "org_users",
+    "compact_retention",
+];
+
+// Helper function to reload cache for a specific module
+async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
+    match module {
+        "schema" => db::schema::cache().await,
+        "organization" => db::organization::cache().await,
+        "user" => db::user::cache().await,
+        "session" => db::session::cache().await,
+        "functions" => db::functions::cache().await,
+        "pipeline" => db::pipeline::cache().await,
+        "alerts" => db::alerts::alert::cache().await,
+        "destinations" => db::alerts::destinations::cache().await,
+        "templates" => db::alerts::templates::cache().await,
+        "short_url" => db::short_url::cache().await,
+        "realtime_triggers" => db::alerts::realtime_triggers::cache().await,
+        "org_users" => db::org_users::cache().await,
+        "org_ingestion_tokens" => db::org_ingestion_tokens::cache().await,
+        "compact_retention" => db::compact::retention::cache().await,
+        _ => Err(anyhow::anyhow!("unsupported module")),
+    }
+}
+
+pub async fn cache_reload(
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    let modules_str = match query.get("module") {
+        Some(m) => m,
+        None => {
+            return MetaHttpResponse::bad_request(
+                "missing 'module' query parameter (e.g., ?module=schema,user,functions or ?module=all)",
+            );
+        }
+    };
+
+    let mut modules: Vec<&str> = modules_str.split(',').map(|s| s.trim()).collect();
+    if modules.is_empty() {
+        return MetaHttpResponse::bad_request("module parameter cannot be empty");
+    }
+
+    // Expand "all" to all available modules
+    if modules.contains(&"all") {
+        modules = CACHE_MODULES.to_vec();
+    }
+
+    let total_modules = modules.len();
+    let mut results: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut success_count = 0;
+    let mut failed_count = 0;
+
+    for module in modules {
+        match reload_module_cache(module).await {
+            Ok(_) => {
+                results.insert(module.to_string(), "success".to_string());
+                success_count += 1;
+                log::info!(
+                    "[CACHE_RELOAD] Successfully reloaded cache for module: {}",
+                    module
+                );
+            }
+            Err(e) => {
+                let error_msg = format!("failed: {}", e);
+                results.insert(module.to_string(), error_msg.clone());
+                failed_count += 1;
+                log::error!(
+                    "[CACHE_RELOAD] Failed to reload cache for module {}: {}",
+                    module,
+                    e
+                );
+            }
+        }
+    }
+
+    let status = if failed_count == 0 {
+        "success"
+    } else if success_count > 0 {
+        "partial"
+    } else {
+        "failed"
+    };
+
+    let response = json::json!({
+        "status": status,
+        "results": results,
+        "summary": {
+            "total": total_modules,
+            "success": success_count,
+            "failed": failed_count,
+        }
+    });
+
+    MetaHttpResponse::json(response)
+}
+
+#[cfg(test)]
+mod tests {
+    use arrow_schema::Schema;
+    use serde_json;
+
+    use super::*;
+
+    #[test]
+    fn test_healthz_response_different_status() {
+        let response = HealthzResponse {
+            status: "not ok".to_string(),
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"status\":\"not ok\""));
+    }
+
+    #[test]
+    fn test_healthz_response_empty_status() {
+        let response = HealthzResponse {
+            status: "".to_string(),
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"status\":\"\""));
+    }
+
+    #[test]
+    fn test_rum_serialization() {
+        let rum = Rum {
+            enabled: true,
+            client_token: "test_token".to_string(),
+            application_id: "test_app".to_string(),
+            site: "test_site".to_string(),
+            service: "test_service".to_string(),
+            env: "test_env".to_string(),
+            version: "1.0.0".to_string(),
+            organization_identifier: "test_org".to_string(),
+            api_version: "v1".to_string(),
+            insecure_http: false,
+        };
+
+        let json = serde_json::to_string(&rum).unwrap();
+        assert!(json.contains("\"enabled\":true"));
+        assert!(json.contains("\"client_token\":\"test_token\""));
+        assert!(json.contains("\"application_id\":\"test_app\""));
+        assert!(json.contains("\"insecure_http\":false"));
+    }
+
+    #[test]
+    fn test_rum_serialization_disabled() {
+        let rum = Rum {
+            enabled: false,
+            client_token: "".to_string(),
+            application_id: "".to_string(),
+            site: "".to_string(),
+            service: "".to_string(),
+            env: "".to_string(),
+            version: "".to_string(),
+            organization_identifier: "".to_string(),
+            api_version: "".to_string(),
+            insecure_http: true,
+        };
+
+        let json = serde_json::to_string(&rum).unwrap();
+        assert!(json.contains("\"enabled\":false"));
+        assert!(json.contains("\"insecure_http\":true"));
+    }
+
+    #[test]
+    fn test_rum_with_special_characters() {
+        let rum = Rum {
+            enabled: true,
+            client_token: "token_with_special_chars!@#$%".to_string(),
+            application_id: "app-id.with.dots".to_string(),
+            site: "site with spaces".to_string(),
+            service: "service/with/slashes".to_string(),
+            env: "env_with_underscores".to_string(),
+            version: "1.0.0-beta+build.1".to_string(),
+            organization_identifier: "org-123-test".to_string(),
+            api_version: "v2.1".to_string(),
+            insecure_http: false,
+        };
+
+        let json = serde_json::to_string(&rum).unwrap();
+        assert!(json.contains("token_with_special_chars!@#$%"));
+        assert!(json.contains("app-id.with.dots"));
+        assert!(json.contains("site with spaces"));
+        assert!(json.contains("service/with/slashes"));
+        assert!(json.contains("1.0.0-beta+build.1"));
+    }
+
+    #[test]
+    fn test_healthz_response_structure() {
+        // Test that we can create and serialize a HealthzResponse
+        let response = HealthzResponse {
+            status: "ok".to_string(),
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"status\":\"ok\""));
+    }
+
+    #[test]
+    fn test_prepare_empty_cookie_basic() {
+        use std::sync::Arc;
+
+        use serde::Serialize;
+
+        #[derive(Serialize)]
+        struct TestToken {
+            value: String,
+        }
+
+        let test_token = TestToken {
+            value: "test_value".to_string(),
+        };
+
+        let config = Arc::new(Config::default());
+        let cookie = prepare_empty_cookie("test_cookie", &test_token, &config);
+        let cookie_str = cookie.to_string();
+
+        assert!(cookie_str.starts_with("test_cookie="));
+        assert!(cookie_str.contains("Path=/"));
+        assert!(cookie_str.contains("HttpOnly"));
+    }
+
+    #[test]
+    fn test_prepare_empty_cookie_security_settings() {
+        use std::sync::Arc;
+
+        use serde::Serialize;
+
+        #[derive(Serialize)]
+        struct EmptyToken {}
+
+        let empty_token = EmptyToken {};
+        let config = Arc::new(Config::default());
+        let cookie = prepare_empty_cookie("auth_cookie", &empty_token, &config);
+        let cookie_str = cookie.to_string();
+
+        assert!(cookie_str.contains("HttpOnly"));
+        assert!(cookie_str.contains("Path=/"));
+        assert!(cookie_str.contains("Max-Age="));
+    }
+
+    #[test]
+    fn test_prepare_empty_cookie_different_names() {
+        use std::sync::Arc;
+
+        use serde::Serialize;
+
+        #[derive(Serialize)]
+        struct TestData {
+            id: i32,
+        }
+
+        let test_data = TestData { id: 42 };
+        let config = Arc::new(Config::default());
+
+        let cookie1 = prepare_empty_cookie("cookie1", &test_data, &config);
+        let cookie2 = prepare_empty_cookie("cookie2", &test_data, &config);
+        let cookie1_str = cookie1.to_string();
+        let cookie2_str = cookie2.to_string();
+
+        assert!(cookie1_str.starts_with("cookie1="));
+        assert!(cookie2_str.starts_with("cookie2="));
+    }
+
+    #[tokio::test]
+    async fn test_get_stream_schema_status_empty() {
+        let mut w = STREAM_SCHEMAS.write().await;
+        w.insert("test".to_string(), vec![(1, Schema::empty())]);
+        drop(w);
+        let (stream_num, stream_schema_num) = get_stream_schema_status().await;
+        assert!(stream_num > 0);
+        assert!(stream_schema_num > 0);
+    }
+
+    #[test]
+    fn test_rum_deserialization() {
+        let json = r#"{
+            "enabled": true,
+            "client_token": "token123",
+            "application_id": "app123",
+            "site": "site123",
+            "service": "service123",
+            "env": "prod",
+            "version": "2.0.0",
+            "organization_identifier": "org123",
+            "api_version": "v2",
+            "insecure_http": true
+        }"#;
+
+        let rum: Rum = serde_json::from_str(json).unwrap();
+        assert!(rum.enabled);
+        assert_eq!(rum.client_token, "token123");
+        assert_eq!(rum.application_id, "app123");
+        assert!(rum.insecure_http);
+    }
+
+    #[test]
+    fn test_rum_round_trip_serialization() {
+        let original = Rum {
+            enabled: false,
+            client_token: "round_trip_token".to_string(),
+            application_id: "round_trip_app".to_string(),
+            site: "round_trip_site".to_string(),
+            service: "round_trip_service".to_string(),
+            env: "staging".to_string(),
+            version: "0.1.0".to_string(),
+            organization_identifier: "round_trip_org".to_string(),
+            api_version: "v1.5".to_string(),
+            insecure_http: false,
+        };
+
+        let json = serde_json::to_string(&original).unwrap();
+        let deserialized: Rum = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(original.enabled, deserialized.enabled);
+        assert_eq!(original.client_token, deserialized.client_token);
+        assert_eq!(original.application_id, deserialized.application_id);
+        assert_eq!(original.site, deserialized.site);
+        assert_eq!(original.service, deserialized.service);
+        assert_eq!(original.env, deserialized.env);
+        assert_eq!(original.version, deserialized.version);
+        assert_eq!(
+            original.organization_identifier,
+            deserialized.organization_identifier
+        );
+        assert_eq!(original.api_version, deserialized.api_version);
+        assert_eq!(original.insecure_http, deserialized.insecure_http);
+    }
+
+    #[test]
+    fn test_healthz_response_round_trip_serialization() {
+        let original = HealthzResponse {
+            status: "healthy".to_string(),
+        };
+
+        let json = serde_json::to_string(&original).unwrap();
+        let deserialized: HealthzResponse = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(original.status, deserialized.status);
+    }
+
+    #[test]
+    fn test_prepare_empty_cookie_with_complex_data() {
+        use std::sync::Arc;
+
+        use serde::Serialize;
+
+        #[derive(Serialize)]
+        struct ComplexData {
+            nested: NestedData,
+            array: Vec<String>,
+            flag: bool,
+        }
+
+        #[derive(Serialize)]
+        struct NestedData {
+            id: u64,
+            name: String,
+        }
+
+        let complex_data = ComplexData {
+            nested: NestedData {
+                id: 12345,
+                name: "test_nested".to_string(),
+            },
+            array: vec!["item1".to_string(), "item2".to_string()],
+            flag: true,
+        };
+
+        let config = Arc::new(Config::default());
+        let cookie = prepare_empty_cookie("complex_cookie", &complex_data, &config);
+
+        assert_eq!(cookie.name(), "complex_cookie");
+        assert!(!cookie.value().is_empty());
+
+        // Verify the cookie value is base64 encoded JSON
+        let decoded_str = base64::decode(cookie.value()).unwrap();
+        let json_str = decoded_str;
+        let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+
+        assert_eq!(parsed["nested"]["id"], 12345);
+        assert_eq!(parsed["nested"]["name"], "test_nested");
+        assert_eq!(parsed["flag"], true);
+        assert_eq!(parsed["array"][0], "item1");
+    }
+
+    #[test]
+    fn test_rum_with_unicode_characters() {
+        let rum = Rum {
+            enabled: true,
+            client_token: "тестовый_токен".to_string(),
+            application_id: "应用程序_id".to_string(),
+            site: "サイト名".to_string(),
+            service: "خدمة_اختبار".to_string(),
+            env: "環境_test".to_string(),
+            version: "1.0.0-α".to_string(),
+            organization_identifier: "org_测试".to_string(),
+            api_version: "v1.0-β".to_string(),
+            insecure_http: false,
+        };
+
+        let json = serde_json::to_string(&rum).unwrap();
+        let deserialized: Rum = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(rum.client_token, deserialized.client_token);
+        assert_eq!(rum.application_id, deserialized.application_id);
+        assert_eq!(rum.site, deserialized.site);
+        assert_eq!(rum.version, deserialized.version);
+    }
+
+    #[test]
+    fn test_healthz_response_with_long_status() {
+        let long_status = "a".repeat(1000);
+        let response = HealthzResponse {
+            status: long_status.clone(),
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        let deserialized: HealthzResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.status, long_status);
+    }
+
+    #[test]
+    fn test_rum_default_values() {
+        let rum = Rum {
+            enabled: false,
+            client_token: String::new(),
+            application_id: String::new(),
+            site: String::new(),
+            service: String::new(),
+            env: String::new(),
+            version: String::new(),
+            organization_identifier: String::new(),
+            api_version: String::new(),
+            insecure_http: false,
+        };
+
+        let json = serde_json::to_string(&rum).unwrap();
+        assert!(json.contains("\"enabled\":false"));
+        assert!(json.contains("\"client_token\":\"\""));
+        assert!(json.contains("\"insecure_http\":false"));
+    }
+
+    #[test]
+    fn test_prepare_empty_cookie_with_empty_data() {
+        use std::sync::Arc;
+
+        use serde::Serialize;
+
+        #[derive(Serialize)]
+        struct EmptyStruct;
+
+        let empty_data = EmptyStruct;
+        let config = Arc::new(Config::default());
+        let cookie = prepare_empty_cookie("empty_cookie", &empty_data, &config);
+
+        assert_eq!(cookie.name(), "empty_cookie");
+        assert!(!cookie.value().is_empty()); // Even empty struct gets base64 encoded
+
+        // Verify it's valid base64 encoded JSON
+        let decoded_str = base64::decode(cookie.value()).unwrap();
+        let json_str = decoded_str;
+        let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+        // Empty structs serialize as null in serde, not as objects
+        assert!(parsed.is_null() || parsed.is_object());
+    }
+
+    #[test]
+    fn test_prepare_empty_cookie_serialization_error_handling() {
+        use std::sync::Arc;
+
+        use serde::Serialize;
+
+        #[derive(Serialize)]
+        struct ValidData {
+            value: String,
+        }
+
+        let valid_data = ValidData {
+            value: "test".to_string(),
+        };
+        let config = Arc::new(Config::default());
+        let cookie = prepare_empty_cookie("valid_cookie", &valid_data, &config);
+
+        // Should not panic and should produce valid cookie
+        assert_eq!(cookie.name(), "valid_cookie");
+        assert!(!cookie.value().is_empty());
+    }
+
+    #[test]
+    fn test_rum_field_types() {
+        let rum = Rum {
+            enabled: true,
+            client_token: "token".to_string(),
+            application_id: "app".to_string(),
+            site: "site".to_string(),
+            service: "service".to_string(),
+            env: "env".to_string(),
+            version: "1.0".to_string(),
+            organization_identifier: "org".to_string(),
+            api_version: "v1".to_string(),
+            insecure_http: false,
+        };
+
+        // Test that all boolean fields work correctly
+        assert!(rum.enabled);
+        assert!(!rum.insecure_http);
+
+        // Test that all string fields are properly set
+        assert!(!rum.client_token.is_empty());
+        assert!(!rum.application_id.is_empty());
+        assert!(!rum.site.is_empty());
+        assert!(!rum.service.is_empty());
+        assert!(!rum.env.is_empty());
+        assert!(!rum.version.is_empty());
+        assert!(!rum.organization_identifier.is_empty());
+        assert!(!rum.api_version.is_empty());
+    }
+}
