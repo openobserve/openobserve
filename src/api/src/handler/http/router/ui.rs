@@ -26,7 +26,7 @@ use config::get_config;
 use rust_embed_for_web::{EmbedableFile, RustEmbed};
 
 #[derive(RustEmbed)]
-#[folder = "web/dist/"]
+#[folder = "../../web/dist/"]
 struct WebAssets;
 
 /// Serve static files from embedded web assets
