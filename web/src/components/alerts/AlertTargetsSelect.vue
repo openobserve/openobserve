@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :options="options"
       multiple
       :error="error"
+      :collapsible-groups="isEnterprise"
       class="min-w-[180px] max-w-[300px]"
       data-test="alert-destinations-select"
       @update:model-value="onUpdate"
