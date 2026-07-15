@@ -59,45 +59,71 @@ export default [
       prettier,
     },
     rules: {
-      // Disable noisy rules inherited from recommended configs
-      "prettier/prettier": "off",
-      "no-unused-vars": "off",
-      "@typescript-eslint/no-unused-vars": "off",
+      // ── Strictness rollout — see docs/lint-and-typecheck-strictness-rollout.md ──
+      //
+      // Kept OFF permanently:
+      //   no-undef       → TypeScript already checks undefined symbols; this rule
+      //                    can't see Vue macros / auto-imports / type-only refs
+      //                    (~5k false positives). typescript-eslint recommends off.
+      //   no-unused-vars → superseded by @typescript-eslint/no-unused-vars below.
       "no-undef": "off",
-      "no-prototype-builtins": "off",
-      "no-async-promise-executor": "off",
-      "no-empty": "off",
-      "no-self-assign": "off",
-      "no-useless-escape": "off",
-      "no-redeclare": "off",
-      "no-unsafe-optional-chaining": "off",
-      "no-import-assign": "off",
-      "no-useless-catch": "off",
-      "no-unreachable": "off",
-      "no-case-declarations": "off",
-      "no-shadow-restricted-names": "off",
+      "no-unused-vars": "off",
+      //
+      // Formatter / style — owned by the formatter + a separate team decision,
+      // not this lint gate.
+      "prettier/prettier": "off",
       "vue/max-attributes-per-line": "off",
-      "vue/no-mutating-props": "off",
-      "vue/no-unused-components": "off",
-      "vue/no-dupe-keys": "off",
-      "vue/no-side-effects-in-computed-properties": "off",
-      "vue/require-valid-default-prop": "off",
-      "vue/no-unused-vars": "off",
-      "vue/no-use-v-if-with-v-for": "off",
-      "vue/no-reserved-component-names": "off",
-      "vue/valid-v-for": "off",
-      "vue/valid-v-else-if": "off",
-      "vue/require-v-for-key": "off",
-      "vue/return-in-computed-property": "off",
-      "vue/require-toggle-inside-transition": "off",
-      "vue/no-deprecated-v-bind-sync": "off",
-      "vue/no-parsing-error": "off",
-      "vue/valid-next-tick": "off",
-      "vue/no-v-text-v-html-on-component": "off",
-      "vue/prefer-import-from-vue": "off",
-      "vue/valid-attribute-name": "off",
-      "vue/no-ref-as-operand": "off",
       "vue/multi-word-component-names": "off",
+      //
+      // Zero current violations → locked straight to "error".
+      "no-shadow-restricted-names": "error",
+      "vue/valid-v-else-if": "error",
+      "vue/no-deprecated-v-bind-sync": "error",
+      "vue/no-v-text-v-html-on-component": "error",
+      //
+      // Ratchet targets — surfaced as "warn" so they don't fail the `lint:errors`
+      // (--quiet) CI gate while we drive each bucket to zero and flip it to "error".
+      //
+      // Unused code (single source of truth; `_`-prefix opts out).
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrors: "none",
+        },
+      ],
+      // Bucket 1 — real bugs.
+      "no-unreachable": "warn",
+      "no-self-assign": "warn",
+      "no-redeclare": "warn",
+      "no-case-declarations": "warn",
+      "no-unsafe-optional-chaining": "warn",
+      "no-import-assign": "warn",
+      "vue/no-dupe-keys": "warn",
+      "vue/no-ref-as-operand": "warn",
+      "vue/no-side-effects-in-computed-properties": "warn",
+      "vue/return-in-computed-property": "warn",
+      "vue/require-valid-default-prop": "warn",
+      "vue/require-v-for-key": "warn",
+      "vue/valid-v-for": "warn",
+      "vue/valid-attribute-name": "warn",
+      "vue/valid-next-tick": "warn",
+      "vue/no-parsing-error": "warn",
+      "vue/no-use-v-if-with-v-for": "warn",
+      "vue/no-reserved-component-names": "warn",
+      "vue/require-toggle-inside-transition": "warn",
+      "vue/prefer-import-from-vue": "warn",
+      // Bucket 2 — low-risk / mechanical.
+      "no-prototype-builtins": "warn",
+      "no-useless-escape": "warn",
+      "no-empty": "warn",
+      "no-useless-catch": "warn",
+      "no-async-promise-executor": "warn",
+      // Bucket 4 — Vue correctness.
+      "vue/no-mutating-props": "warn",
+      "vue/no-unused-components": "warn",
+      "vue/no-unused-vars": "warn",
 
       // Enforced rules
       "vue/no-restricted-html-elements": [
