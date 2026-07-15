@@ -10,7 +10,7 @@ import CheckBrowserDevices from './CheckBrowserDevices.vue'
 import CheckRUM from './CheckRUM.vue'
 import CheckCapture from './CheckCapture.vue'
 
-defineProps<{
+const props = defineProps<{
   check: BrowserCheck
   checkType?: 'browser' | 'api'
   locations?: SyntheticsLocation[]
@@ -18,6 +18,7 @@ defineProps<{
   devices?: SyntheticsDevice[]
   destinations?: string[]
   folders?: SyntheticsFolder[]
+  validationErrors?: Record<string, string>
 }>()
 const emit = defineEmits<{
   'update:check': [value: BrowserCheck]
@@ -35,6 +36,7 @@ function handleUpdate(value: BrowserCheck) {
       <CheckDetails
         :check="check"
         :folders="folders ?? []"
+        :validation-errors="props.validationErrors ?? {}"
         data-test="synthetics-check-configure-details"
         @update:check="handleUpdate"
       />

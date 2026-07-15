@@ -9,7 +9,11 @@ import OSwitch from '@/lib/forms/Switch/OSwitch.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 
-const props = defineProps<{ check: BrowserCheck; folders?: SyntheticsFolder[] }>()
+const props = defineProps<{
+  check: BrowserCheck
+  folders?: SyntheticsFolder[]
+  validationErrors?: Record<string, string>
+}>()
 const emit = defineEmits<{ 'update:check': [value: BrowserCheck] }>()
 
 const { t } = useI18n()
@@ -86,6 +90,8 @@ function handleTagKeydown(event: KeyboardEvent) {
         v-model="name"
         :label="t('synthetics.checkDetails.name')"
         required
+        :error="!!props.validationErrors?.name"
+        :error-message="props.validationErrors?.name"
         :placeholder="t('synthetics.checkDetails.namePlaceholder')"
         data-test="synthetics-check-details-name-input"
       />
@@ -108,6 +114,8 @@ function handleTagKeydown(event: KeyboardEvent) {
         v-model="url"
         :label="t('synthetics.checkDetails.startingUrl')"
         required
+        :error="!!props.validationErrors?.url"
+        :error-message="props.validationErrors?.url"
         :placeholder="t('synthetics.checkDetails.startingUrlPlaceholder')"
         data-test="synthetics-check-details-url-input"
       />

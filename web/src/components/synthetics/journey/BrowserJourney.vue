@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { BrowserStep, ReplayPhase, StepReplayResult } from '@/types/synthetics'
 import type { StepDotState } from './JourneySteps.vue'
 import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
@@ -159,6 +160,7 @@ const multiSelectEnabled = computed(() =>
 // ── Recording state ────────────────────────────────────────────────────────
 // All Chrome-extension messaging lives in the composable; this component only
 // reflects its reactive state and merges the result into the journey on stop.
+const { t } = useI18n()
 const recorder = useSyntheticsRecorder()
 const isRecording = recorder.isRecording
 const capturedSteps = recorder.liveSteps
@@ -170,8 +172,44 @@ watch([selectedCount, isRecording], ([count, recording]) => {
   emit('selection-changed', { count, isRecording: recording })
 })
 
-// Expose selection state for the parent's sticky footer
-defineExpose({ selectedCount, isRecording, deleteSelectedSteps, stopActiveRecording, stopActiveReplay })
+// ── Step selector validation ──────────────────────────────────────────────
+const selectorErrors = ref<Set<string>>(new Set())
+
+function validateStepSelectors(): boolean {
+  const errors = new Set<string>()
+  for (const step of props.modelValue) {
+    if (
+      SELECTOR_ACTIONS_CONST.includes(step.action as any) &&
+      (!step.selector || step.selector.trim() === '')
+    ) {
+      errors.add(step.id)
+    }
+  }
+  selectorErrors.value = errors
+  // Auto-expand errored steps so the inline error is visible
+  if (errors.size > 0) {
+    expandedStepIds.value = [
+      ...new Set([...expandedStepIds.value, ...errors]),
+    ]
+  }
+  return errors.size === 0
+}
+
+function clearSelectorError(stepId: string) {
+  const next = new Set(selectorErrors.value)
+  next.delete(stepId)
+  selectorErrors.value = next
+}
+
+// Expose selection state + validation for the parent's sticky footer
+defineExpose({
+  selectedCount,
+  isRecording,
+  deleteSelectedSteps,
+  stopActiveRecording,
+  stopActiveReplay,
+  validateStepSelectors,
+})
 
 function startRecording() {
   recorder.startRecording(props.startUrl ?? '').catch((err) => {
@@ -711,8 +749,11 @@ function openChromeExtensions() {
                 label="Selector"
                 placeholder="#my-button or .class-name"
                 class="w-100!"
+                :required="true"
+                :error="selectorErrors.has(row.id)"
+                :error-message="selectorErrors.has(row.id) ? t('synthetics.validation.selectorRequired', { step: row.name || 'Step ' + (props.modelValue.indexOf(row) + 1) }) : ''"
                 data-test="synthetics-journey-step-selector-input"
-                @update:model-value="(v: any) => handleStepUpdate(row, { selector: v })"
+                @update:model-value="(v: any) => { handleStepUpdate(row, { selector: v }); clearSelectorError(row.id) }"
               />
             </div>
           </template>

@@ -6275,6 +6275,13 @@
       "loadFailed": "Failed to load check configuration.",
       "loadFailedTitle": "Failed to load"
     },
+    "validation": {
+      "nameRequired": "Name is required",
+      "urlRequired": "Starting URL is required",
+      "urlInvalid": "Enter a valid URL starting with http:// or https://",
+      "locationsRequired": "Select at least one location",
+      "selectorRequired": "Selector is required for \"{step}\""
+    },
     "results": {
       "title": "Monitor Results",
       "monitors": "Monitors",

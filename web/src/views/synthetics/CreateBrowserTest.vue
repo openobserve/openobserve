@@ -8,6 +8,7 @@ import type { BrowserCheck, SyntheticsLocation, SyntheticsDevice, SyntheticsFold
 import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
 import { journeyToWireSteps } from '@/utils/synthetics/mapRecordedStep'
 import { buildCreateBrowserTestPayload, mapResponseToBrowserCheck } from '@/utils/synthetics/buildPayload'
+import { makeBrowserCheckGateSchema, makeBrowserCheckSaveSchema } from '@/components/synthetics/CreateBrowserTest.schema'
 import { getFoldersListByType } from '@/utils/commons'
 import syntheticsService from '@/services/synthetics'
 import destinationService from '@/services/alert_destination'
@@ -55,6 +56,11 @@ const startUrl = ref('')
 const editId = ref<string | null>(null)
 const isLoadingEdit = ref(false)
 const loadError = ref(false)
+const urlError = ref('')
+const validationErrors = ref<Record<string, string>>({})
+
+const gateSchema = computed(() => makeBrowserCheckGateSchema(t))
+const saveSchema = computed(() => makeBrowserCheckSaveSchema(t))
 
 // Extension setup state — persists across phases in this session.
 // `extensionInstalled` is now driven by a real runtime probe (not a manual click).
@@ -204,7 +210,24 @@ function commitGate() {
   isDirty.value = true
 }
 
+function validateGateUrl() {
+  const result = gateSchema.value.shape.url.safeParse(startUrl.value.trim())
+  urlError.value = result.success ? '' : (result.error.issues[0]?.message ?? '')
+  return result.success
+}
+
+function clearUrlError() {
+  urlError.value = ''
+}
+
+const isGateUrlValid = computed(() => {
+  const trimmed = startUrl.value.trim()
+  if (!trimmed) return false
+  return gateSchema.value.shape.url.safeParse(trimmed).success
+})
+
 async function onRecordClick() {
+  if (!validateGateUrl()) return
   commitGate()
   const installed = await probeExtension()
   extensionReady.value = installed
@@ -217,6 +240,7 @@ async function onRecordClick() {
 }
 
 function buildManually() {
+  if (!validateGateUrl()) return
   commitGate()
   autoRecord.value = false
   phase.value = 'editor'
@@ -310,7 +334,35 @@ function beforeUnloadHandler(e: BeforeUnloadEvent) {
 }
 
 async function saveCheck() {
+  // ── Pre-save validation ───────────────────────────────────────────
+  validationErrors.value = {}
+  const toValidate = {
+    name: check.value.name,
+    url: check.value.url,
+    locations: check.value.locations,
+    journey: check.value.journey,
+  }
+  const result = saveSchema.value.safeParse(toValidate)
+  if (!result.success) {
+    const errors: Record<string, string> = {}
+    for (const issue of result.error.issues) {
+      const path = issue.path.join('.')
+      if (!errors[path]) errors[path] = issue.message
+    }
+    validationErrors.value = errors
+    // Switch to the relevant tab so inline errors are visible
+    if (errors['name'] || errors['url'] || errors['locations']) {
+      currentStep.value = 2
+    } else if (Object.keys(errors).some((k) => k.startsWith('journey.'))) {
+      // Step selector errors — switch to Journey tab and auto-expand
+      currentStep.value = 1
+      journeyRef.value?.validateStepSelectors?.()
+    }
+    return
+  }
+
   isSaving.value = true
+  validationErrors.value = {}
   const dismiss = toast({ variant: 'loading', message: 'Saving check…', timeout: 0 })
   try {
     const org = store.state.selectedOrganization.identifier
@@ -332,7 +384,7 @@ async function saveCheck() {
     dismiss()
     toast({
       variant: 'error',
-      message: err?.response?.data?.message || err?.response?.data?.error || 'Failed to save check.',
+      message: err?.response?.data?.message || 'Failed to save check.',
     })
     console.error('[synthetics] save failed', err)
   } finally {
@@ -348,6 +400,14 @@ const showBulkDeleteDialog = ref(false)
 function onDeleteSelected() {
   journeyRef.value?.deleteSelectedSteps()
   showBulkDeleteDialog.value = false
+}
+
+function onContinueToConfigure() {
+  // Validate step selectors before allowing transition
+  const valid = journeyRef.value?.validateStepSelectors?.() ?? true
+  if (!valid) return
+  journeyStepDone.value = true
+  currentStep.value = 2
 }
 
 // ── Replay — uses the composable's phase-based state machine ────────────────
@@ -414,13 +474,17 @@ function onClearResults() {
 
         <div class="mb-6">
           <label for="synthetics-start-url" class="mb-1 block">
-            Starting URL <span class="text-[var(--o2-status-error-text)]">*</span>
+            Starting URL <span class="text-[var(--color-status-error-text)]">*</span>
           </label>
           <OInput
             id="synthetics-start-url"
             v-model="startUrl"
             placeholder="https://shop.example.com/"
+            :error="!!urlError"
+            :error-message="urlError"
             data-test="synthetics-create-url-input"
+            @update:model-value="clearUrlError"
+            @blur="validateGateUrl"
           >
             <template #prefix>
               <OIcon name="link" size="sm" />
@@ -443,7 +507,7 @@ function onClearResults() {
         <div class="flex gap-3 mb-6">
           <OButton
             variant="primary"
-            :disabled="!startUrl.trim()"
+            :disabled="!isGateUrlValid"
             data-test="synthetics-create-record-btn"
             @click="onRecordClick"
           >
@@ -454,7 +518,7 @@ function onClearResults() {
           </OButton>
           <OButton
             variant="outline"
-            :disabled="!startUrl.trim()"
+            :disabled="!isGateUrlValid"
             data-test="synthetics-create-build-btn"
             @click="buildManually"
           >
@@ -642,6 +706,7 @@ function onClearResults() {
             :devices="devices"
             :destinations="destinations"
             :folders="folders"
+            :validation-errors="validationErrors"
             class="w-full!"
             @refresh:destinations="fetchDestinations"
             @update:check="onConfigureUpdate"
@@ -671,7 +736,7 @@ function onClearResults() {
           <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetic' })">
             Cancel
           </OButton>
-          <OButton variant="primary" size="sm" data-test="synthetics-create-continue-btn" @click="journeyStepDone = true; currentStep = 2">
+          <OButton variant="primary" size="sm" data-test="synthetics-create-continue-btn" @click="onContinueToConfigure">
             Continue
             <template #suffix><OIcon name="chevron-right" size="sm" /></template>
           </OButton>
