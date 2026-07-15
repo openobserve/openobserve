@@ -125,7 +125,8 @@ impl From<AlertError> for Response {
             | AlertError::AlertNotFound
             | AlertError::AlertDestinationNotFound { .. }
             | AlertError::AlertTemplateNotFound { .. }
-            | AlertError::StreamNotFound { .. } => MetaHttpResponse::not_found(value),
+            | AlertError::StreamNotFound { .. }
+            | AlertError::AlertWorkflowNotFound { .. } => MetaHttpResponse::not_found(value),
             AlertError::DecodeVrl(err) => MetaHttpResponse::bad_request(err),
             AlertError::ParseCron(err) => MetaHttpResponse::bad_request(err),
             AlertError::SendNotificationError { .. } | AlertError::ResolveStreamNameError(_) => {

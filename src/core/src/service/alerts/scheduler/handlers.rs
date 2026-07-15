@@ -957,7 +957,7 @@ async fn handle_alert_triggers(
                     );
                     if let Some(batch) =
                         crate::service::alerts::grouping::get_ready_batch(&fingerprint)
-                        && let Err(e) = crate::job::alert_grouping::send_grouped_notification_sync(
+                        && let Err(e) = crate::service::alerts::grouping::send_grouped_notification(
                             &scheduler_trace_id,
                             batch,
                         )

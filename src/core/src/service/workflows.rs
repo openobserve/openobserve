@@ -11,8 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    common::infra::config::ALERTS,
-    job::get_nats_lock,
+    common::{infra::config::ALERTS, utils::get_nats_lock},
     service::{
         db,
         pipeline::batch_execution::{ExecutablePipeline, WorkflowResult},
