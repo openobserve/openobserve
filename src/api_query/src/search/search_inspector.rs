@@ -40,12 +40,10 @@ use crate::{
             stream::get_settings_max_query_range,
         },
     },
-    handler::http::{
-        extractors::Headers,
-        request::search::{
-            error_utils,
-            utils::{StreamPermissionResourceType, check_stream_permissions},
-        },
+    extractors::Headers,
+    search::{
+        error_utils,
+        utils::{StreamPermissionResourceType, check_stream_permissions},
     },
     service::{
         search::{inspector::*, sql::visitor::cipher_key::get_cipher_key_names},
@@ -240,7 +238,7 @@ pub async fn get_search_profile(
                     }
                 };
 
-                if !crate::handler::http::auth::validator::check_permissions(
+                if !crate::service::authz::check_permissions(
                     &user_id,
                     AuthExtractor {
                         auth: "".to_string(),

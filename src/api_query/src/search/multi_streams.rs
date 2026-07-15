@@ -63,9 +63,8 @@ use crate::{
             stream::get_settings_max_query_range,
         },
     },
-    handler::http::request::search::{
-        Headers, error_utils::map_error_to_http_response, utils::SearchStreamGuard,
-    },
+    extractors::Headers,
+    search::{error_utils::map_error_to_http_response, utils::SearchStreamGuard},
     service::{
         search::{self as SearchService, streaming::process_search_stream_request_multi},
         self_reporting::report_request_usage_stats,
@@ -297,7 +296,7 @@ pub async fn search_multi(
                     get_user(Some(&org_id), user_id).await.unwrap();
                 let stream_type_str = stream_type.as_str();
 
-                if !crate::handler::http::auth::validator::check_permissions(
+                if !crate::service::authz::check_permissions(
                     user_id,
                     AuthExtractor {
                         auth: "".to_string(),
@@ -341,7 +340,7 @@ pub async fn search_multi(
                     let user: config::meta::user::User =
                         get_user(Some(&org_id), user_id).await.unwrap();
 
-                    if !crate::handler::http::auth::validator::check_permissions(
+                    if !crate::service::authz::check_permissions(
                         user_id,
                         AuthExtractor {
                             auth: "".to_string(),
@@ -1323,7 +1322,7 @@ pub async fn search_multi_stream(
 
             // Check permissions for each unique stream
             for stream_name in stream_names {
-                if !crate::handler::http::auth::validator::check_permissions(
+                if !crate::service::authz::check_permissions(
                     &user_id,
                     AuthExtractor {
                         auth: "".to_string(),
