@@ -1,0 +1,1712 @@
+{
+  "totals": {
+    "themeTernary": 186,
+    "darkMechanism": 390,
+    "unscopedStyle": 206,
+    "styleBlockHex": 805,
+    "stylePxUnit": 1077,
+    "arbPx": 174,
+    "arbZ": 49,
+    "arbTextSize": 323,
+    "arbRadius": 25,
+    "hexClass": 269,
+    "rawPalette": 102,
+    "inlineHexStyle": 27,
+    "inlineHexBind": 11,
+    "bareRounded": 26,
+    "tsHex": 471
+  },
+  "files": {
+    "App.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "components/AutoRefreshInterval.vue": {
+      "unscopedStyle": 1
+    },
+    "components/CodeQueryEditor.vue": {
+      "themeTernary": 4,
+      "unscopedStyle": 1,
+      "darkMechanism": 6,
+      "styleBlockHex": 8,
+      "stylePxUnit": 5
+    },
+    "components/CustomDateTimePicker.vue": {
+      "arbPx": 2,
+      "arbZ": 1
+    },
+    "components/DatabaseDeprecationBanner.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "components/DateTime.vue": {
+      "arbTextSize": 2,
+      "unscopedStyle": 1,
+      "stylePxUnit": 1
+    },
+    "components/DateTimePicker.vue": {
+      "arbTextSize": 1,
+      "unscopedStyle": 1,
+      "arbPx": 2,
+      "stylePxUnit": 1
+    },
+    "components/EnterpriseUpgradeDialog.vue": {
+      "arbRadius": 2,
+      "arbTextSize": 2,
+      "unscopedStyle": 1,
+      "arbZ": 1,
+      "stylePxUnit": 2
+    },
+    "components/Header.vue": {
+      "themeTernary": 3,
+      "darkMechanism": 3
+    },
+    "components/JsonPreview.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "components/MenuLink.vue": {
+      "hexClass": 1,
+      "arbTextSize": 2
+    },
+    "components/O2AIChat.vue": {
+      "hexClass": 8,
+      "themeTernary": 14,
+      "arbTextSize": 1,
+      "unscopedStyle": 1,
+      "arbZ": 2,
+      "darkMechanism": 42,
+      "styleBlockHex": 167,
+      "stylePxUnit": 216
+    },
+    "components/O2AIConfirmDialog.vue": {
+      "unscopedStyle": 1,
+      "styleBlockHex": 4,
+      "stylePxUnit": 5
+    },
+    "components/PredefinedThemes.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 2
+    },
+    "components/QueryEditor.vue": {
+      "hexClass": 1
+    },
+    "components/QueryPlanDialog.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 1
+    },
+    "components/RichTextInput.vue": {
+      "unscopedStyle": 1,
+      "arbZ": 1,
+      "styleBlockHex": 4,
+      "stylePxUnit": 17
+    },
+    "components/TelemetryCorrelationPanel.vue": {
+      "unscopedStyle": 1
+    },
+    "components/TenstackTable.vue": {
+      "themeTernary": 2,
+      "unscopedStyle": 2,
+      "arbPx": 4,
+      "darkMechanism": 2,
+      "stylePxUnit": 1
+    },
+    "components/ThemeSwitcher.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 2
+    },
+    "components/WebinarBanner.vue": {
+      "rawPalette": 1,
+      "hexClass": 5,
+      "arbTextSize": 1,
+      "unscopedStyle": 1,
+      "arbZ": 1
+    },
+    "components/about/FeatureComparisonTable.vue": {
+      "arbTextSize": 3
+    },
+    "components/actionScripts/EditScript.vue": {
+      "rawPalette": 5
+    },
+    "components/actionScripts/FileItem.vue": {
+      "rawPalette": 5,
+      "arbPx": 2
+    },
+    "components/actionScripts/ScriptEditor.vue": {
+      "rawPalette": 3
+    },
+    "components/ai-assistant/welcome/CapabilityCards.vue": {
+      "arbRadius": 1,
+      "unscopedStyle": 1,
+      "arbZ": 4,
+      "styleBlockHex": 2
+    },
+    "components/ai-assistant/welcome/PromptSuggestions.vue": {
+      "hexClass": 2
+    },
+    "components/ai-assistant/welcome/WelcomeGreeting.vue": {
+      "hexClass": 3,
+      "themeTernary": 1,
+      "arbTextSize": 3,
+      "unscopedStyle": 1,
+      "arbPx": 3,
+      "darkMechanism": 1
+    },
+    "components/ai_toolsets/AddAiToolset.vue": {
+      "rawPalette": 4,
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "components/alerts/AddAlert.vue": {
+      "unscopedStyle": 1,
+      "arbPx": 1,
+      "stylePxUnit": 23
+    },
+    "components/alerts/AddTemplate.vue": {
+      "arbTextSize": 1
+    },
+    "components/alerts/AlertHistory.vue": {
+      "unscopedStyle": 1
+    },
+    "components/alerts/AlertHistoryDrawer.vue": {
+      "hexClass": 2,
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "components/alerts/AlertHistoryTimeline.vue": {
+      "arbTextSize": 2,
+      "arbPx": 1,
+      "styleBlockHex": 2,
+      "stylePxUnit": 12
+    },
+    "components/alerts/AlertInsights.vue": {
+      "unscopedStyle": 1
+    },
+    "components/alerts/AlertList.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 1
+    },
+    "components/alerts/AlertSettingsHelpDrawer.vue": {
+      "stylePxUnit": 2
+    },
+    "components/alerts/AlertSummary.vue": {
+      "unscopedStyle": 1,
+      "arbZ": 1,
+      "styleBlockHex": 1
+    },
+    "components/alerts/AlertWizardRightColumn.vue": {
+      "darkMechanism": 1
+    },
+    "components/alerts/AlertsContainer.vue": {
+      "arbTextSize": 1
+    },
+    "components/alerts/DestinationPreview.vue": {
+      "hexClass": 89,
+      "arbTextSize": 9,
+      "unscopedStyle": 1,
+      "styleBlockHex": 5,
+      "stylePxUnit": 1
+    },
+    "components/alerts/DestinationTestResult.vue": {
+      "arbTextSize": 4
+    },
+    "components/alerts/FilterGroup.vue": {
+      "arbTextSize": 1,
+      "stylePxUnit": 3
+    },
+    "components/alerts/HorizontalStepper.vue": {
+      "unscopedStyle": 1,
+      "arbZ": 1,
+      "stylePxUnit": 8
+    },
+    "components/alerts/ImportSemanticGroups.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 4
+    },
+    "components/alerts/IncidentAlertTriggersTable.vue": {
+      "unscopedStyle": 1
+    },
+    "components/alerts/IncidentDetailDrawer.vue": {
+      "rawPalette": 38,
+      "themeTernary": 25,
+      "arbTextSize": 10,
+      "unscopedStyle": 1,
+      "darkMechanism": 28,
+      "styleBlockHex": 2,
+      "stylePxUnit": 2
+    },
+    "components/alerts/IncidentList.vue": {
+      "unscopedStyle": 1
+    },
+    "components/alerts/IncidentServiceGraph.vue": {
+      "inlineHexStyle": 5,
+      "themeTernary": 1,
+      "unscopedStyle": 1,
+      "darkMechanism": 7,
+      "styleBlockHex": 16,
+      "stylePxUnit": 10
+    },
+    "components/alerts/IncidentTimeline.vue": {
+      "inlineHexStyle": 5,
+      "inlineHexBind": 4,
+      "themeTernary": 13,
+      "unscopedStyle": 1,
+      "darkMechanism": 14,
+      "stylePxUnit": 2
+    },
+    "components/alerts/PrebuiltDestinationSelector.vue": {
+      "unscopedStyle": 1,
+      "arbZ": 2
+    },
+    "components/alerts/QueryEditorDialog.vue": {
+      "rawPalette": 4,
+      "hexClass": 5,
+      "themeTernary": 5,
+      "arbTextSize": 3,
+      "unscopedStyle": 1,
+      "arbPx": 12,
+      "arbZ": 2,
+      "darkMechanism": 5
+    },
+    "components/alerts/SemanticFieldGroupsConfig.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 3
+    },
+    "components/alerts/TagInput.vue": {
+      "unscopedStyle": 1,
+      "arbPx": 2,
+      "stylePxUnit": 1
+    },
+    "components/alerts/steps/Advanced.vue": {
+      "themeTernary": 1,
+      "arbPx": 1,
+      "darkMechanism": 1
+    },
+    "components/alerts/steps/AlertSettings.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "components/alerts/steps/CompareWithPast.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "components/alerts/steps/Deduplication.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "components/alerts/steps/QueryConfig.vue": {
+      "themeTernary": 1,
+      "unscopedStyle": 1,
+      "darkMechanism": 1,
+      "styleBlockHex": 1,
+      "stylePxUnit": 8
+    },
+    "components/anomaly_detection/AnomalySummary.vue": {
+      "unscopedStyle": 1
+    },
+    "components/anomaly_detection/steps/AnomalyDetectionConfig.vue": {
+      "arbPx": 1
+    },
+    "components/cipherkeys/AddAkeylessType.vue": {
+      "unscopedStyle": 1,
+      "arbPx": 8
+    },
+    "components/cipherkeys/AddOpenobserveType.vue": {
+      "arbPx": 2
+    },
+    "components/common/AppDialog.vue": {
+      "unscopedStyle": 1
+    },
+    "components/common/AppPageHeader.vue": {
+      "arbTextSize": 1
+    },
+    "components/common/BaseImport.vue": {
+      "arbTextSize": 1,
+      "unscopedStyle": 1
+    },
+    "components/common/FieldExpansion.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 1
+    },
+    "components/common/FieldListPagination.vue": {
+      "arbTextSize": 8,
+      "unscopedStyle": 1
+    },
+    "components/common/FieldTypeBadge.vue": {
+      "arbRadius": 1,
+      "arbTextSize": 1
+    },
+    "components/common/FieldValuesPanel.vue": {
+      "arbRadius": 1,
+      "arbTextSize": 2
+    },
+    "components/common/JsonEditor.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "components/common/LoadingProgress.vue": {
+      "rawPalette": 2,
+      "unscopedStyle": 1,
+      "arbPx": 1,
+      "arbZ": 1
+    },
+    "components/common/SectionRail.vue": {
+      "arbTextSize": 1
+    },
+    "components/common/empty-states/EmptyState.vue": {
+      "unscopedStyle": 1
+    },
+    "components/common/sidebar/FolderList.vue": {
+      "unscopedStyle": 1
+    },
+    "components/common/sidebar/InlineSelectFolderDropdown.vue": {
+      "stylePxUnit": 7
+    },
+    "components/common/sidebar/SearchFieldList.vue": {
+      "bareRounded": 3
+    },
+    "components/cross-linking/CrossLinkUserGuide.vue": {
+      "themeTernary": 1,
+      "unscopedStyle": 1,
+      "darkMechanism": 1
+    },
+    "components/dashboards/AddDashboardFromGitHub.vue": {
+      "unscopedStyle": 1
+    },
+    "components/dashboards/ColorSwatchPicker.vue": {
+      "styleBlockHex": 8,
+      "stylePxUnit": 9
+    },
+    "components/dashboards/ColumnFormatControls.vue": {
+      "stylePxUnit": 1
+    },
+    "components/dashboards/OverrideConfigPopup.vue": {
+      "arbTextSize": 1,
+      "arbPx": 3,
+      "stylePxUnit": 4
+    },
+    "components/dashboards/PanelEditor/PanelEditor.vue": {
+      "rawPalette": 1,
+      "unscopedStyle": 1,
+      "stylePxUnit": 1
+    },
+    "components/dashboards/PanelErrorButtons.vue": {
+      "unscopedStyle": 1
+    },
+    "components/dashboards/QueryInspector.vue": {
+      "arbTextSize": 1,
+      "unscopedStyle": 1,
+      "stylePxUnit": 4
+    },
+    "components/dashboards/addPanel/ColorPaletteDropDown.vue": {
+      "arbRadius": 1,
+      "unscopedStyle": 1
+    },
+    "components/dashboards/addPanel/ConfigPanel.vue": {
+      "unscopedStyle": 1,
+      "arbPx": 2,
+      "stylePxUnit": 1
+    },
+    "components/dashboards/addPanel/CustomChartEditor.vue": {
+      "unscopedStyle": 1
+    },
+    "components/dashboards/addPanel/CustomHTMLEditor.vue": {
+      "rawPalette": 1,
+      "unscopedStyle": 1
+    },
+    "components/dashboards/addPanel/CustomMarkdownEditor.vue": {
+      "rawPalette": 1,
+      "unscopedStyle": 1
+    },
+    "components/dashboards/addPanel/DashboardGeoMapsQueryBuilder.vue": {
+      "arbPx": 6
+    },
+    "components/dashboards/addPanel/DashboardMapsQueryBuilder.vue": {
+      "arbPx": 4
+    },
+    "components/dashboards/addPanel/DashboardSankeyChartBuilder.vue": {
+      "arbPx": 6
+    },
+    "components/dashboards/addPanel/DrilldownUserGuide.vue": {
+      "stylePxUnit": 2
+    },
+    "components/dashboards/addPanel/PanelSidebar.vue": {
+      "arbTextSize": 2
+    },
+    "components/dashboards/addPanel/ShowLegendsPopup.vue": {
+      "inlineHexStyle": 1,
+      "inlineHexBind": 1,
+      "unscopedStyle": 1,
+      "arbPx": 1
+    },
+    "components/dashboards/addPanel/customChartExamples/customChartTemplates/bar3dDataset.ts": {
+      "tsHex": 13
+    },
+    "components/dashboards/addPanel/customChartExamples/customChartTemplates/bar3dPunchCard.ts": {
+      "tsHex": 5
+    },
+    "components/dashboards/addPanel/customChartExamples/customChartTemplates/confidenceBand.ts": {
+      "tsHex": 5
+    },
+    "components/dashboards/addPanel/customChartExamples/customChartTemplates/dataTransformAggregate.ts": {
+      "tsHex": 5
+    },
+    "components/dashboards/addPanel/customChartExamples/customChartTemplates/funnelCustomize.ts": {
+      "tsHex": 1
+    },
+    "components/dashboards/addPanel/customChartExamples/customChartTemplates/intradayBreaks1.ts": {
+      "tsHex": 2
+    },
+    "components/dashboards/addPanel/customChartExamples/customChartTemplates/multipleXAxis.ts": {
+      "tsHex": 2
+    },
+    "components/dashboards/addPanel/customChartExamples/customChartTemplates/pieBorderRadius.ts": {
+      "tsHex": 1
+    },
+    "components/dashboards/addPanel/customChartExamples/customChartTemplates/radarCustom.ts": {
+      "tsHex": 7
+    },
+    "components/dashboards/addPanel/customChartExamples/customChartTemplates/scatter3dDataset.ts": {
+      "tsHex": 11
+    },
+    "components/dashboards/addPanel/customChartExamples/customChartTemplates/scatter3dScatterMatrix.ts": {
+      "tsHex": 12
+    },
+    "components/dashboards/addPanel/customChartExamples/customChartTemplates/scatterPolynomialRegression.ts": {
+      "tsHex": 1
+    },
+    "components/dashboards/addPanel/dynamicFunction/SelectFunction.vue": {
+      "unscopedStyle": 1
+    },
+    "components/dashboards/panels/ChartRenderer.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 1
+    },
+    "components/dashboards/panels/HTMLRenderer.vue": {
+      "unscopedStyle": 2
+    },
+    "components/dashboards/panels/TableRenderer.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 11
+    },
+    "components/dashboards/settings/AddSettingVariable.vue": {
+      "arbPx": 1
+    },
+    "components/dashboards/settings/VariableAdHocValueSelector.vue": {
+      "rawPalette": 4,
+      "themeTernary": 2,
+      "bareRounded": 1,
+      "unscopedStyle": 1,
+      "darkMechanism": 2
+    },
+    "components/dashboards/settings/VariableSettings.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "components/functions/AddEnrichmentTable.vue": {
+      "unscopedStyle": 1
+    },
+    "components/functions/AddFunction.vue": {
+      "themeTernary": 1,
+      "unscopedStyle": 1,
+      "arbPx": 1,
+      "darkMechanism": 1,
+      "stylePxUnit": 1
+    },
+    "components/functions/EnrichmentSchema.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "components/functions/EnrichmentTableList.vue": {
+      "unscopedStyle": 1
+    },
+    "components/functions/FunctionList.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 2
+    },
+    "components/functions/RetryJobDialog.vue": {
+      "unscopedStyle": 1,
+      "arbZ": 1,
+      "stylePxUnit": 4
+    },
+    "components/functions/StreamRouting.vue": {
+      "arbTextSize": 1
+    },
+    "components/functions/TestFunction.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 4
+    },
+    "components/iam/quota/Quota.vue": {
+      "hexClass": 6,
+      "inlineHexStyle": 1,
+      "inlineHexBind": 1,
+      "themeTernary": 6,
+      "unscopedStyle": 1,
+      "arbZ": 2,
+      "darkMechanism": 12
+    },
+    "components/iam/roles/PermissionsTable.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 1
+    },
+    "components/iam/users/User.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 4
+    },
+    "components/ingestion/AIIntegrations.vue": {
+      "stylePxUnit": 4
+    },
+    "components/ingestion/ai/AIIntegrationDetail.vue": {
+      "arbTextSize": 1
+    },
+    "components/ingestion/ai/content/AIIntegrationCard.vue": {
+      "stylePxUnit": 2
+    },
+    "components/ingestion/ai/content/richCard/buildFromMarkdown.ts": {
+      "tsHex": 1
+    },
+    "components/ingestion/recommended/AWSIndividualServices.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 3
+    },
+    "components/ingestion/recommended/AWSQuickSetup.vue": {
+      "arbTextSize": 8
+    },
+    "components/ingestion/recommended/AzureConfig.vue": {
+      "arbTextSize": 2
+    },
+    "components/ingestion/recommended/AzureQuickSetup.vue": {
+      "unscopedStyle": 1
+    },
+    "components/ingestion/recommended/GCPConfig.vue": {
+      "arbTextSize": 1
+    },
+    "components/ingestion/setupCard/SetupCardRenderer.vue": {
+      "styleBlockHex": 38,
+      "stylePxUnit": 86
+    },
+    "components/ingestion/setupCard/content/aerospike.ts": {
+      "tsHex": 1
+    },
+    "components/ingestion/setupCard/content/cassandra.ts": {
+      "tsHex": 1
+    },
+    "components/ingestion/setupCard/content/databricks.ts": {
+      "tsHex": 1
+    },
+    "components/ingestion/setupCard/content/dynamodb.ts": {
+      "tsHex": 1
+    },
+    "components/ingestion/setupCard/content/mongodb.ts": {
+      "tsHex": 1
+    },
+    "components/ingestion/setupCard/content/mysql.ts": {
+      "tsHex": 1
+    },
+    "components/ingestion/setupCard/content/oracle.ts": {
+      "tsHex": 1
+    },
+    "components/ingestion/setupCard/content/postgres.ts": {
+      "tsHex": 1
+    },
+    "components/ingestion/setupCard/content/redis.ts": {
+      "tsHex": 1
+    },
+    "components/ingestion/setupCard/content/rum.ts": {
+      "tsHex": 1
+    },
+    "components/ingestion/setupCard/content/snowflake.ts": {
+      "tsHex": 1
+    },
+    "components/ingestion/setupCard/content/sqlServer.ts": {
+      "tsHex": 1
+    },
+    "components/ingestion/setupCard/content/zookeeper.ts": {
+      "tsHex": 1
+    },
+    "components/login/GetStarted.vue": {
+      "hexClass": 6,
+      "themeTernary": 3,
+      "arbTextSize": 2,
+      "darkMechanism": 3
+    },
+    "components/login/Login.vue": {
+      "hexClass": 1,
+      "themeTernary": 2,
+      "darkMechanism": 2
+    },
+    "components/login/SsoLogin.vue": {
+      "hexClass": 1,
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "components/logs/LogsHighLighting.vue": {
+      "themeTernary": 1,
+      "unscopedStyle": 1,
+      "darkMechanism": 1
+    },
+    "components/logstream/AssociatedRegexPatterns.vue": {
+      "unscopedStyle": 1,
+      "arbPx": 2
+    },
+    "components/logstream/explore/SearchBar.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 1
+    },
+    "components/logstream/schema.vue": {
+      "themeTernary": 1,
+      "arbTextSize": 2,
+      "unscopedStyle": 1,
+      "darkMechanism": 1,
+      "stylePxUnit": 4
+    },
+    "components/pipeline/NodeForm/AssociateFunction.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 5
+    },
+    "components/pipeline/NodeForm/Condition.vue": {
+      "unscopedStyle": 1,
+      "arbPx": 2,
+      "stylePxUnit": 4
+    },
+    "components/pipeline/NodeForm/CreateDestinationForm.vue": {
+      "unscopedStyle": 1,
+      "arbZ": 1,
+      "styleBlockHex": 1,
+      "stylePxUnit": 2
+    },
+    "components/pipeline/NodeForm/ScheduledPipeline.vue": {
+      "themeTernary": 1,
+      "arbTextSize": 4,
+      "unscopedStyle": 1,
+      "darkMechanism": 1
+    },
+    "components/pipeline/NodeForm/Stream.vue": {
+      "unscopedStyle": 1,
+      "arbPx": 3
+    },
+    "components/pipeline/NodeSidebar.vue": {
+      "arbTextSize": 1,
+      "unscopedStyle": 1,
+      "styleBlockHex": 5,
+      "stylePxUnit": 15
+    },
+    "components/pipeline/PipelineEditor.vue": {
+      "unscopedStyle": 1,
+      "styleBlockHex": 6,
+      "stylePxUnit": 31
+    },
+    "components/pipeline/PipelineView.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 6
+    },
+    "components/promql/components/OperationsList.vue": {
+      "rawPalette": 1,
+      "unscopedStyle": 1
+    },
+    "components/queries/QueryList.vue": {
+      "unscopedStyle": 1
+    },
+    "components/queries/RunningQueriesList.vue": {
+      "unscopedStyle": 1
+    },
+    "components/queries/SummaryList.vue": {
+      "unscopedStyle": 1
+    },
+    "components/query-plan/QueryPlanNode.vue": {
+      "arbTextSize": 1
+    },
+    "components/reports/CreateReport.vue": {
+      "rawPalette": 8,
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "components/rum/ErrorsList.vue": {
+      "unscopedStyle": 1,
+      "styleBlockHex": 2,
+      "stylePxUnit": 2
+    },
+    "components/rum/EventDetailDrawerContent.vue": {
+      "themeTernary": 1,
+      "arbTextSize": 10,
+      "unscopedStyle": 1,
+      "darkMechanism": 1
+    },
+    "components/rum/PlayerEventsSidebar.vue": {
+      "unscopedStyle": 1
+    },
+    "components/rum/PlayerTracesTab.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 1
+    },
+    "components/rum/SessionsList.vue": {
+      "unscopedStyle": 1,
+      "styleBlockHex": 2,
+      "stylePxUnit": 2
+    },
+    "components/rum/common/performance/MetricCard.vue": {
+      "arbTextSize": 2
+    },
+    "components/rum/errorTracking/view/ErrorEvents.vue": {
+      "stylePxUnit": 1
+    },
+    "components/rum/errorTracking/view/ErrorHeader.vue": {
+      "arbTextSize": 1
+    },
+    "components/rum/errorTracking/view/PrettyStackTrace.vue": {
+      "arbTextSize": 1,
+      "unscopedStyle": 1
+    },
+    "components/rum/sessionReplay/SessionActivitySparkline.vue": {
+      "stylePxUnit": 1
+    },
+    "components/settings/AddRegexPattern.vue": {
+      "themeTernary": 1,
+      "unscopedStyle": 1,
+      "arbPx": 6,
+      "darkMechanism": 1,
+      "stylePxUnit": 1
+    },
+    "components/settings/BuiltInModelPricingTab.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 2
+    },
+    "components/settings/DiscoveredServices.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "components/settings/General.vue": {
+      "themeTernary": 7,
+      "unscopedStyle": 1,
+      "darkMechanism": 11,
+      "styleBlockHex": 3
+    },
+    "components/settings/License.vue": {
+      "themeTernary": 3,
+      "unscopedStyle": 1,
+      "darkMechanism": 3,
+      "styleBlockHex": 2,
+      "stylePxUnit": 1
+    },
+    "components/settings/ModelPricingEditor.vue": {
+      "arbRadius": 3,
+      "arbTextSize": 1,
+      "unscopedStyle": 2,
+      "arbPx": 3
+    },
+    "components/settings/ModelPricingList.vue": {
+      "unscopedStyle": 1,
+      "arbPx": 1,
+      "arbZ": 1,
+      "stylePxUnit": 13
+    },
+    "components/settings/Nodes.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 4
+    },
+    "components/settings/OrgStorageEditor.vue": {
+      "inlineHexStyle": 1,
+      "inlineHexBind": 1,
+      "themeTernary": 6,
+      "arbTextSize": 3,
+      "arbZ": 1,
+      "darkMechanism": 7
+    },
+    "components/settings/OrgStorageSettings.vue": {
+      "themeTernary": 6,
+      "arbRadius": 1,
+      "arbPx": 7,
+      "darkMechanism": 6,
+      "styleBlockHex": 1,
+      "stylePxUnit": 2
+    },
+    "components/settings/ServiceIdentityConfig.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 1
+    },
+    "components/settings/ServiceIdentitySetup.vue": {
+      "arbTextSize": 7,
+      "unscopedStyle": 1,
+      "styleBlockHex": 2
+    },
+    "components/settings/TestModelMatchDialog.vue": {
+      "arbTextSize": 3,
+      "unscopedStyle": 2,
+      "arbPx": 4,
+      "stylePxUnit": 1
+    },
+    "components/shared/HomeViewSkeleton.vue": {
+      "arbRadius": 1,
+      "arbTextSize": 3,
+      "unscopedStyle": 1,
+      "stylePxUnit": 3
+    },
+    "components/shared/SkeletonBox.vue": {
+      "bareRounded": 2,
+      "unscopedStyle": 1
+    },
+    "components/shared/grid/NoOrganizationSelected.vue": {
+      "arbTextSize": 1
+    },
+    "components/traces/FlameGraphView.vue": {
+      "inlineHexStyle": 5,
+      "arbTextSize": 2
+    },
+    "composables/dashboard/useColumnFormatting.ts": {
+      "tsHex": 14
+    },
+    "composables/dashboard/useDashboardPanelDefaults.ts": {
+      "tsHex": 1
+    },
+    "composables/dashboard/usePanelFields.ts": {
+      "tsHex": 12
+    },
+    "composables/useAiIcon.ts": {
+      "darkMechanism": 1
+    },
+    "composables/useAlertForm.ts": {
+      "tsHex": 1
+    },
+    "composables/useLatencyInsightsDashboard.ts": {
+      "tsHex": 4
+    },
+    "composables/useLogsHighlighter.ts": {
+      "darkMechanism": 1
+    },
+    "composables/useMetricsCorrelationDashboard.ts": {
+      "tsHex": 2
+    },
+    "composables/useMetricsExplorer.ts": {
+      "tsHex": 12
+    },
+    "composables/useServiceGraphTree.ts": {
+      "tsHex": 8
+    },
+    "enterprise/components/OnlineEvals.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 1
+    },
+    "enterprise/components/billings/BillingGroup.vue": {
+      "arbTextSize": 14,
+      "arbPx": 2
+    },
+    "enterprise/components/billings/UsageMemberList.vue": {
+      "arbTextSize": 2,
+      "unscopedStyle": 1,
+      "arbPx": 2,
+      "stylePxUnit": 1
+    },
+    "enterprise/components/billings/UsageReportBanner.vue": {
+      "hexClass": 4
+    },
+    "enterprise/components/billings/enterprisePlan.vue": {
+      "arbTextSize": 3
+    },
+    "enterprise/components/billings/plans.vue": {
+      "arbTextSize": 2,
+      "arbPx": 3
+    },
+    "enterprise/components/billings/proPlan.vue": {
+      "inlineHexStyle": 1,
+      "arbTextSize": 3
+    },
+    "enterprise/components/billings/usage.vue": {
+      "arbRadius": 3
+    },
+    "enterprise/components/billings/usageDailyPanelSchema.ts": {
+      "tsHex": 4
+    },
+    "enterprise/components/onlineEvals/forms/EvalJobDetail.vue": {
+      "arbTextSize": 3,
+      "unscopedStyle": 1,
+      "styleBlockHex": 12,
+      "stylePxUnit": 3
+    },
+    "enterprise/components/onlineEvals/forms/JobFormPage.vue": {
+      "unscopedStyle": 1,
+      "arbPx": 3,
+      "stylePxUnit": 3
+    },
+    "enterprise/components/onlineEvals/forms/ProviderFormPage.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 1
+    },
+    "enterprise/components/onlineEvals/forms/ScoreConfigDetail.vue": {
+      "unscopedStyle": 1,
+      "styleBlockHex": 5
+    },
+    "enterprise/components/onlineEvals/forms/ScoreConfigDialog.vue": {
+      "arbTextSize": 4,
+      "unscopedStyle": 1,
+      "arbPx": 3,
+      "styleBlockHex": 16,
+      "stylePxUnit": 75
+    },
+    "enterprise/components/onlineEvals/forms/ScorerDetail.vue": {
+      "arbTextSize": 3,
+      "styleBlockHex": 11
+    },
+    "enterprise/components/onlineEvals/forms/ScorerFormPage.vue": {
+      "arbTextSize": 3,
+      "unscopedStyle": 1,
+      "arbPx": 2,
+      "stylePxUnit": 2
+    },
+    "enterprise/components/onlineEvals/forms/ScorerTypeDialog.vue": {
+      "unscopedStyle": 1,
+      "styleBlockHex": 1,
+      "stylePxUnit": 1
+    },
+    "enterprise/components/onlineEvals/forms/job/JobFilterBuilder.vue": {
+      "unscopedStyle": 1
+    },
+    "enterprise/components/onlineEvals/forms/scorer/ScorerTestPanel.vue": {
+      "unscopedStyle": 1,
+      "arbPx": 1,
+      "styleBlockHex": 1
+    },
+    "enterprise/components/onlineEvals/quality/QualityConfigSidebar.vue": {
+      "hexClass": 3,
+      "arbTextSize": 1,
+      "unscopedStyle": 1,
+      "styleBlockHex": 3,
+      "stylePxUnit": 5
+    },
+    "enterprise/components/onlineEvals/quality/QualityDetailPanel.vue": {
+      "arbTextSize": 2,
+      "unscopedStyle": 1,
+      "styleBlockHex": 1,
+      "stylePxUnit": 6
+    },
+    "enterprise/components/onlineEvals/quality/QualityKpiCard.vue": {
+      "arbTextSize": 5
+    },
+    "enterprise/components/onlineEvals/quality/QualityKpiSkeleton.vue": {
+      "unscopedStyle": 1,
+      "arbPx": 1
+    },
+    "layouts/MainLayout.vue": {
+      "themeTernary": 3,
+      "bareRounded": 1,
+      "unscopedStyle": 1,
+      "darkMechanism": 3
+    },
+    "lib/core/Badge/OBadge.vue": {
+      "bareRounded": 1,
+      "arbTextSize": 1
+    },
+    "lib/core/Badge/OTag.vue": {
+      "bareRounded": 1
+    },
+    "lib/core/Button/OButton.vue": {
+      "hexClass": 9,
+      "arbTextSize": 1,
+      "arbPx": 1
+    },
+    "lib/core/Code/OCodeBlock.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 2,
+      "styleBlockHex": 31,
+      "stylePxUnit": 5
+    },
+    "lib/core/Collapsible/OCollapsible.vue": {
+      "unscopedStyle": 1
+    },
+    "lib/core/EmptyState/EmptyStateIngestionCard.vue": {
+      "unscopedStyle": 1,
+      "styleBlockHex": 11
+    },
+    "lib/core/EmptyState/EmptyStateIngestionChip.vue": {
+      "unscopedStyle": 1
+    },
+    "lib/core/EmptyState/OEmptyState.vue": {
+      "unscopedStyle": 1
+    },
+    "lib/core/EmptyState/illustrations/EmptyAlert.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 2
+    },
+    "lib/core/EmptyState/illustrations/EmptyAllClear.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 4
+    },
+    "lib/core/EmptyState/illustrations/EmptyBoard.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 1
+    },
+    "lib/core/EmptyState/illustrations/EmptyBox.vue": {
+      "unscopedStyle": 1
+    },
+    "lib/core/EmptyState/illustrations/EmptyBrokenPanel.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 3
+    },
+    "lib/core/EmptyState/illustrations/EmptyBuilder.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 12
+    },
+    "lib/core/EmptyState/illustrations/EmptyCheck.vue": {
+      "unscopedStyle": 1
+    },
+    "lib/core/EmptyState/illustrations/EmptyConnect.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 15
+    },
+    "lib/core/EmptyState/illustrations/EmptyError.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 8
+    },
+    "lib/core/EmptyState/illustrations/EmptyExplorer.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 7
+    },
+    "lib/core/EmptyState/illustrations/EmptyFunction.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 5
+    },
+    "lib/core/EmptyState/illustrations/EmptyHistory.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 4
+    },
+    "lib/core/EmptyState/illustrations/EmptyHourglass.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 1
+    },
+    "lib/core/EmptyState/illustrations/EmptyLogs.vue": {
+      "unscopedStyle": 1
+    },
+    "lib/core/EmptyState/illustrations/EmptyPipeline.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 2
+    },
+    "lib/core/EmptyState/illustrations/EmptyQuery.vue": {
+      "unscopedStyle": 1
+    },
+    "lib/core/EmptyState/illustrations/EmptyReport.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 3
+    },
+    "lib/core/EmptyState/illustrations/EmptySchedule.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 2
+    },
+    "lib/core/EmptyState/illustrations/EmptyServiceGraph.vue": {
+      "stylePxUnit": 12
+    },
+    "lib/core/EmptyState/illustrations/EmptyTrace.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 1
+    },
+    "lib/core/EmptyState/illustrations/EmptyWaiting.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 2
+    },
+    "lib/core/Navbar/ONavGroup.vue": {
+      "themeTernary": 1,
+      "arbTextSize": 1,
+      "darkMechanism": 2,
+      "stylePxUnit": 1
+    },
+    "lib/core/Navbar/ONavbar.vue": {
+      "unscopedStyle": 1,
+      "darkMechanism": 1,
+      "styleBlockHex": 1,
+      "stylePxUnit": 2
+    },
+    "lib/core/Table/composables/useTableHighlight.ts": {
+      "tsHex": 8
+    },
+    "lib/core/Table/sub-components/OTableBodyCell.vue": {
+      "arbRadius": 1,
+      "unscopedStyle": 1,
+      "arbPx": 2,
+      "styleBlockHex": 3,
+      "stylePxUnit": 6
+    },
+    "lib/core/Table/sub-components/OTableBodyRow.vue": {
+      "unscopedStyle": 1,
+      "styleBlockHex": 1,
+      "stylePxUnit": 1
+    },
+    "lib/core/Table/sub-components/OTableColumnToggle.vue": {
+      "arbTextSize": 1
+    },
+    "lib/core/Table/sub-components/OTableHeader.vue": {
+      "bareRounded": 2
+    },
+    "lib/core/Table/sub-components/OTableLoading.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 1
+    },
+    "lib/core/Table/sub-components/OTablePagination.vue": {
+      "unscopedStyle": 1
+    },
+    "lib/data/Timeline/OTimeline.vue": {
+      "unscopedStyle": 1
+    },
+    "lib/feedback/Skeleton/OSkeleton.vue": {
+      "unscopedStyle": 1,
+      "styleBlockHex": 1
+    },
+    "lib/feedback/Toast/OToast.vue": {
+      "unscopedStyle": 1
+    },
+    "lib/forms/Color/OColor.vue": {
+      "arbZ": 1
+    },
+    "lib/forms/Combobox/OCombobox.vue": {
+      "arbTextSize": 1
+    },
+    "lib/forms/DateTime/OFormDateTimeRange.vue": {
+      "rawPalette": 1
+    },
+    "lib/forms/DateTimeRange/ODateRangeCalendar.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 1
+    },
+    "lib/forms/File/OFile.vue": {
+      "arbTextSize": 1
+    },
+    "lib/forms/Input/OInput.vue": {
+      "arbRadius": 2
+    },
+    "lib/forms/Range/ORange.vue": {
+      "unscopedStyle": 1
+    },
+    "lib/forms/Select/OSelect.vue": {
+      "arbTextSize": 3,
+      "arbZ": 2
+    },
+    "lib/forms/Slider/OSlider.vue": {
+      "unscopedStyle": 1
+    },
+    "lib/forms/Time/OTime.vue": {
+      "unscopedStyle": 1
+    },
+    "lib/lists/FieldList/OFieldLabel.vue": {
+      "arbTextSize": 1
+    },
+    "lib/lists/FieldList/OFieldList.vue": {
+      "arbRadius": 3,
+      "unscopedStyle": 1,
+      "arbZ": 2,
+      "styleBlockHex": 1
+    },
+    "lib/navigation/Tabs/OTabs.vue": {
+      "arbPx": 2
+    },
+    "lib/overlay/Dropdown/ODropdown.vue": {
+      "arbZ": 1
+    },
+    "lib/overlay/Tooltip/OTooltip.vue": {
+      "arbZ": 1
+    },
+    "lib/vue-shortcut-manager/ShortcutCheatsheet.vue": {
+      "arbTextSize": 4
+    },
+    "plugins/correlation/CorrelatedLogsTable.vue": {
+      "themeTernary": 1,
+      "unscopedStyle": 1,
+      "darkMechanism": 1,
+      "stylePxUnit": 1
+    },
+    "plugins/correlation/DimensionFilterEditor.vue": {
+      "rawPalette": 5
+    },
+    "plugins/correlation/TelemetryCorrelationDashboard.vue": {
+      "rawPalette": 5,
+      "unscopedStyle": 1
+    },
+    "plugins/correlation/TimeRangeEditor.vue": {
+      "rawPalette": 1
+    },
+    "plugins/logs/DetailTable.vue": {
+      "themeTernary": 3,
+      "unscopedStyle": 1,
+      "darkMechanism": 3
+    },
+    "plugins/logs/FunctionSelector.vue": {
+      "themeTernary": 3,
+      "darkMechanism": 3
+    },
+    "plugins/logs/Index.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 2
+    },
+    "plugins/logs/IndexList.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "plugins/logs/JsonPreview.vue": {
+      "themeTernary": 5,
+      "darkMechanism": 5
+    },
+    "plugins/logs/SearchBar.vue": {
+      "themeTernary": 11,
+      "unscopedStyle": 1,
+      "arbPx": 3,
+      "arbZ": 4,
+      "darkMechanism": 11
+    },
+    "plugins/logs/SearchJobInspector.vue": {
+      "themeTernary": 2,
+      "arbTextSize": 4,
+      "darkMechanism": 2
+    },
+    "plugins/logs/SearchResult.vue": {
+      "themeTernary": 3,
+      "darkMechanism": 3
+    },
+    "plugins/logs/SyntaxGuide.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "plugins/logs/TenstackTable.vue": {
+      "themeTernary": 1,
+      "unscopedStyle": 2,
+      "arbPx": 1,
+      "darkMechanism": 1,
+      "styleBlockHex": 4,
+      "stylePxUnit": 2
+    },
+    "plugins/logs/TransformSelector.vue": {
+      "themeTernary": 3,
+      "darkMechanism": 4
+    },
+    "plugins/logs/patterns/PatternCard.vue": {
+      "arbTextSize": 1,
+      "unscopedStyle": 1
+    },
+    "plugins/logs/patterns/PatternDetailsDialog.vue": {
+      "unscopedStyle": 1
+    },
+    "plugins/logs/patterns/PatternList.vue": {
+      "unscopedStyle": 1,
+      "darkMechanism": 1,
+      "styleBlockHex": 2,
+      "stylePxUnit": 1
+    },
+    "plugins/logs/patterns/WildcardValuePopover.vue": {
+      "arbTextSize": 1,
+      "unscopedStyle": 1,
+      "stylePxUnit": 2
+    },
+    "plugins/metrics/MetricLegends.vue": {
+      "themeTernary": 1,
+      "unscopedStyle": 1,
+      "darkMechanism": 1
+    },
+    "plugins/metrics/MetricList.vue": {
+      "themeTernary": 1,
+      "unscopedStyle": 1,
+      "arbZ": 1,
+      "darkMechanism": 1
+    },
+    "plugins/metrics/SyntaxGuideMetrics.vue": {
+      "themeTernary": 1,
+      "unscopedStyle": 1,
+      "arbPx": 16,
+      "darkMechanism": 1
+    },
+    "plugins/metrics/explorer/FunctionConfigDialog.vue": {
+      "arbTextSize": 1
+    },
+    "plugins/metrics/explorer/MetricCard.vue": {
+      "arbTextSize": 1
+    },
+    "plugins/pipelines/CustomNode.vue": {
+      "inlineHexStyle": 1,
+      "bareRounded": 6,
+      "arbRadius": 1,
+      "arbTextSize": 1,
+      "unscopedStyle": 1,
+      "arbPx": 13,
+      "arbZ": 7,
+      "darkMechanism": 12,
+      "styleBlockHex": 18,
+      "stylePxUnit": 22
+    },
+    "plugins/pipelines/PipelineFlow.vue": {
+      "inlineHexStyle": 1,
+      "inlineHexBind": 1,
+      "unscopedStyle": 1,
+      "arbZ": 1,
+      "stylePxUnit": 1
+    },
+    "plugins/traces/DbSpanDetails.vue": {
+      "arbTextSize": 1
+    },
+    "plugins/traces/Index.vue": {
+      "arbTextSize": 3,
+      "unscopedStyle": 1,
+      "styleBlockHex": 2,
+      "stylePxUnit": 7
+    },
+    "plugins/traces/IndexList.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 2
+    },
+    "plugins/traces/LLMContentRenderer.vue": {
+      "unscopedStyle": 1,
+      "styleBlockHex": 3,
+      "stylePxUnit": 23
+    },
+    "plugins/traces/LLMErrorTable.vue": {
+      "arbTextSize": 2
+    },
+    "plugins/traces/LLMInsightsDashboard.vue": {
+      "arbTextSize": 3
+    },
+    "plugins/traces/LLMInsightsSkeleton.vue": {
+      "themeTernary": 6,
+      "unscopedStyle": 1,
+      "darkMechanism": 6,
+      "styleBlockHex": 7
+    },
+    "plugins/traces/LLMSchemaPanel.vue": {
+      "arbTextSize": 2,
+      "stylePxUnit": 2
+    },
+    "plugins/traces/SearchBar.vue": {
+      "arbPx": 1,
+      "arbZ": 1
+    },
+    "plugins/traces/SearchResult.vue": {
+      "bareRounded": 1
+    },
+    "plugins/traces/ServiceGraph.vue": {
+      "arbTextSize": 3,
+      "unscopedStyle": 1,
+      "stylePxUnit": 4
+    },
+    "plugins/traces/ServiceGraphEdgeSidePanel.vue": {
+      "hexClass": 8,
+      "themeTernary": 2,
+      "unscopedStyle": 1,
+      "arbZ": 1,
+      "darkMechanism": 46,
+      "styleBlockHex": 169,
+      "stylePxUnit": 59
+    },
+    "plugins/traces/ServiceGraphNodeSidePanel.vue": {
+      "hexClass": 1,
+      "arbTextSize": 1,
+      "unscopedStyle": 1,
+      "darkMechanism": 8,
+      "styleBlockHex": 22,
+      "stylePxUnit": 3
+    },
+    "plugins/traces/ServicesCatalog.vue": {
+      "bareRounded": 1,
+      "arbTextSize": 10,
+      "unscopedStyle": 1
+    },
+    "plugins/traces/SessionDetails.vue": {
+      "arbTextSize": 36,
+      "arbPx": 2,
+      "arbZ": 1,
+      "styleBlockHex": 1,
+      "stylePxUnit": 3
+    },
+    "plugins/traces/SessionRibbon.vue": {
+      "arbRadius": 2,
+      "arbTextSize": 4,
+      "arbPx": 5
+    },
+    "plugins/traces/SpanBlock.vue": {
+      "inlineHexStyle": 1,
+      "inlineHexBind": 1
+    },
+    "plugins/traces/SyntaxGuide.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "plugins/traces/ThreadToolCalls.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 2,
+      "styleBlockHex": 32,
+      "stylePxUnit": 11
+    },
+    "plugins/traces/ThreadView.vue": {
+      "hexClass": 17,
+      "themeTernary": 1,
+      "bareRounded": 6,
+      "arbRadius": 1,
+      "arbTextSize": 19,
+      "unscopedStyle": 1,
+      "arbPx": 6,
+      "arbZ": 1,
+      "darkMechanism": 2,
+      "styleBlockHex": 34,
+      "stylePxUnit": 9
+    },
+    "plugins/traces/TraceDAG.vue": {
+      "hexClass": 97,
+      "arbTextSize": 1,
+      "unscopedStyle": 1,
+      "darkMechanism": 1,
+      "styleBlockHex": 1
+    },
+    "plugins/traces/TraceDetails.vue": {
+      "arbRadius": 1,
+      "unscopedStyle": 2,
+      "arbPx": 6,
+      "darkMechanism": 3,
+      "stylePxUnit": 2
+    },
+    "plugins/traces/TraceDetailsSidebar.vue": {
+      "inlineHexStyle": 1,
+      "bareRounded": 1,
+      "arbTextSize": 2,
+      "unscopedStyle": 3,
+      "darkMechanism": 28,
+      "styleBlockHex": 61,
+      "stylePxUnit": 71
+    },
+    "plugins/traces/TraceEvaluationsView.vue": {
+      "rawPalette": 11,
+      "inlineHexStyle": 1,
+      "inlineHexBind": 1,
+      "arbTextSize": 21,
+      "unscopedStyle": 1,
+      "darkMechanism": 1,
+      "styleBlockHex": 4,
+      "stylePxUnit": 8
+    },
+    "plugins/traces/TraceTree.vue": {
+      "arbTextSize": 1,
+      "unscopedStyle": 1,
+      "styleBlockHex": 2
+    },
+    "plugins/traces/TurnPreviewCard.vue": {
+      "arbTextSize": 3,
+      "arbPx": 3
+    },
+    "plugins/traces/components/TraceErrorTab.vue": {
+      "arbTextSize": 9,
+      "unscopedStyle": 1,
+      "darkMechanism": 14,
+      "styleBlockHex": 28,
+      "stylePxUnit": 1
+    },
+    "plugins/traces/components/TraceLatencyCell.vue": {
+      "inlineHexStyle": 1,
+      "inlineHexBind": 1
+    },
+    "plugins/traces/components/TraceServiceCell.vue": {
+      "arbTextSize": 1
+    },
+    "plugins/traces/components/TracesSearchResultList.vue": {
+      "unscopedStyle": 1
+    },
+    "plugins/traces/config/llmInsightsPanels.ts": {
+      "tsHex": 7
+    },
+    "plugins/traces/llmTrendPanel.utils.ts": {
+      "tsHex": 8
+    },
+    "plugins/traces/metrics/TracesAnalysisDashboard.vue": {
+      "arbTextSize": 10,
+      "unscopedStyle": 1,
+      "darkMechanism": 6,
+      "styleBlockHex": 6,
+      "stylePxUnit": 1
+    },
+    "plugins/traces/metrics/TracesMetricsContextMenu.vue": {
+      "arbZ": 1
+    },
+    "plugins/traces/metrics/TracesMetricsDashboard.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 4
+    },
+    "stores/index.ts": {
+      "tsHex": 3
+    },
+    "utils/alerts/alertChartData.ts": {
+      "tsHex": 1
+    },
+    "utils/dashboard/chartColorUtils.ts": {
+      "tsHex": 6
+    },
+    "utils/dashboard/colorPalette.ts": {
+      "darkMechanism": 5
+    },
+    "utils/dashboard/convertGeoMapData.ts": {
+      "tsHex": 12
+    },
+    "utils/dashboard/convertMapsData.ts": {
+      "tsHex": 12
+    },
+    "utils/dashboard/convertPromQLData.ts": {
+      "tsHex": 3,
+      "darkMechanism": 2
+    },
+    "utils/dashboard/defaultFields.ts": {
+      "tsHex": 2
+    },
+    "utils/dashboard/promql/convertPromQLChartData.ts": {
+      "tsHex": 1
+    },
+    "utils/dashboard/promql/convertPromQLGeoChart.ts": {
+      "tsHex": 12
+    },
+    "utils/dashboard/promql/convertPromQLMapsChart.ts": {
+      "tsHex": 11
+    },
+    "utils/dashboard/promql/convertPromQLTimeSeriesChart.ts": {
+      "tsHex": 1
+    },
+    "utils/dashboard/promql/shared/spectral.ts": {
+      "tsHex": 11
+    },
+    "utils/dashboard/sql/charts/convertSQLHeatmapChart.ts": {
+      "tsHex": 1,
+      "darkMechanism": 1
+    },
+    "utils/dashboard/sql/charts/convertSQLLineAreaChart.ts": {
+      "tsHex": 1,
+      "darkMechanism": 1
+    },
+    "utils/dashboard/sql/charts/convertSQLMetricChart.ts": {
+      "darkMechanism": 2
+    },
+    "utils/dashboard/sql/charts/convertSQLStackedChart.ts": {
+      "tsHex": 1,
+      "darkMechanism": 1
+    },
+    "utils/dashboard/sql/shared/contextBuilder.ts": {
+      "tsHex": 1,
+      "darkMechanism": 1
+    },
+    "utils/dashboard/sql/shared/seriesBuilder.ts": {
+      "tsHex": 1
+    },
+    "utils/dashboard/sqlTimeSeriesConverter.ts": {
+      "tsHex": 2,
+      "darkMechanism": 2
+    },
+    "utils/dashboard/streaming/overlayNewDataOnOldOptions.ts": {
+      "tsHex": 2
+    },
+    "utils/logs/convertLogData.ts": {
+      "tsHex": 40,
+      "darkMechanism": 2
+    },
+    "utils/logs/keyValueParser.ts": {
+      "tsHex": 26
+    },
+    "utils/logs/statusParser.ts": {
+      "tsHex": 34
+    },
+    "utils/metrics/metricPalette.ts": {
+      "tsHex": 2
+    },
+    "utils/query/vrlLanguage.ts": {
+      "tsHex": 28
+    },
+    "utils/query/vrlLanguageDefinition.ts": {
+      "tsHex": 10
+    },
+    "utils/theme.ts": {
+      "tsHex": 23,
+      "darkMechanism": 4
+    },
+    "utils/themeManager.ts": {
+      "darkMechanism": 1
+    },
+    "utils/traces/convertTraceData.ts": {
+      "tsHex": 40
+    },
+    "utils/traces/traceColors.ts": {
+      "darkMechanism": 2
+    },
+    "utils/traces/treeTooltipHelpers.ts": {
+      "tsHex": 2
+    },
+    "utils/traces/treeVisualizationEngine.ts": {
+      "tsHex": 22
+    },
+    "views/About.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "views/AwsMarketplaceSetup.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "views/AzureMarketplaceSetup.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "views/CorrelationDemo.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 2
+    },
+    "views/Dashboards/DashboardSettings.vue": {
+      "unscopedStyle": 1
+    },
+    "views/Dashboards/ImportDashboard.vue": {
+      "unscopedStyle": 1,
+      "arbPx": 1,
+      "stylePxUnit": 3
+    },
+    "views/Dashboards/RenderDashboardCharts.vue": {
+      "unscopedStyle": 1,
+      "styleBlockHex": 1
+    },
+    "views/Dashboards/ScheduledDashboards.vue": {
+      "unscopedStyle": 1,
+      "stylePxUnit": 3
+    },
+    "views/Dashboards/ViewDashboard.vue": {
+      "unscopedStyle": 1,
+      "styleBlockHex": 1
+    },
+    "views/Dashboards/addPanel/AddPanel.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "views/EmptyStateDemo.vue": {
+      "arbTextSize": 1
+    },
+    "views/Error404.vue": {
+      "arbTextSize": 1
+    },
+    "views/HomeChatHistory.vue": {
+      "unscopedStyle": 1
+    },
+    "views/HomeView.vue": {
+      "unscopedStyle": 1,
+      "styleBlockHex": 22,
+      "stylePxUnit": 34
+    },
+    "views/Ingestion.vue": {
+      "rawPalette": 1
+    },
+    "views/Login.vue": {
+      "themeTernary": 1,
+      "darkMechanism": 1
+    },
+    "views/OverviewTab.vue": {
+      "unscopedStyle": 1,
+      "arbZ": 1
+    },
+    "views/RUM/AppErrors.vue": {
+      "unscopedStyle": 1,
+      "styleBlockHex": 2,
+      "stylePxUnit": 2
+    },
+    "views/RUM/AppSessions.vue": {
+      "unscopedStyle": 1,
+      "styleBlockHex": 2,
+      "stylePxUnit": 2
+    },
+    "views/RUM/SessionViewer.vue": {
+      "inlineHexStyle": 2,
+      "arbPx": 1
+    },
+    "views/UsageTab.vue": {
+      "stylePxUnit": 6
+    }
+  }
+}
