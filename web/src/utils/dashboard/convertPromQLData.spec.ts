@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { convertPromQLData } from "./convertPromQLData";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
+import { chartColor } from "@/utils/chartTheme";
 
 // Mock dependencies
 vi.mock("./convertDataIntoUnitValue", () => ({
@@ -806,8 +807,12 @@ describe("Convert PromQL Data Utils", () => {
       );
 
       expect(result.options).toBeDefined();
-      expect(result.options.tooltip.textStyle.color).toBe("#fff");
-      expect(result.options.tooltip.backgroundColor).toBe("rgba(22,23,25,0.97)");
+      expect(result.options.tooltip.textStyle.color).toBe(
+        chartColor("--color-tooltip-text"),
+      );
+      expect(result.options.tooltip.backgroundColor).toBe(
+        chartColor("--color-tooltip-bg"),
+      );
     });
 
     it("should handle non-UTC timezone", async () => {
@@ -1859,8 +1864,12 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.tooltip.backgroundColor).toBe("rgba(22,23,25,0.97)");
-      expect(result.options.tooltip.textStyle.color).toBe("#fff");
+      expect(result.options.tooltip.backgroundColor).toBe(
+        chartColor("--color-tooltip-bg"),
+      );
+      expect(result.options.tooltip.textStyle.color).toBe(
+        chartColor("--color-tooltip-text"),
+      );
     });
 
     it("should configure tooltip backgroundColor for light theme", async () => {
@@ -1894,8 +1903,12 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.tooltip.backgroundColor).toBe("rgba(255,255,255,0.97)");
-      expect(result.options.tooltip.textStyle.color).toBe("#000");
+      expect(result.options.tooltip.backgroundColor).toBe(
+        chartColor("--color-tooltip-bg"),
+      );
+      expect(result.options.tooltip.textStyle.color).toBe(
+        chartColor("--color-tooltip-text"),
+      );
     });
 
     it("should handle legend width calculation without explicit configuration", async () => {
@@ -2124,7 +2137,9 @@ describe("Convert PromQL Data Utils", () => {
       );
 
       // Test that dark theme sets correct backgroundColor (line 662)
-      expect(resultDark.options.tooltip.backgroundColor).toBe("rgba(22,23,25,0.97)");
+      expect(resultDark.options.tooltip.backgroundColor).toBe(
+        chartColor("--color-tooltip-bg"),
+      );
 
       // Test light theme
       const mockStoreLight = {
@@ -2145,7 +2160,9 @@ describe("Convert PromQL Data Utils", () => {
       );
 
       // Test that light theme sets correct backgroundColor (line 662)
-      expect(resultLight.options.tooltip.backgroundColor).toBe("rgba(255,255,255,0.97)");
+      expect(resultLight.options.tooltip.backgroundColor).toBe(
+        chartColor("--color-tooltip-bg"),
+      );
     });
 
     it("should test metric chart renderItem function (lines 704-724)", async () => {

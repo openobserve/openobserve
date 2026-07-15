@@ -17,6 +17,7 @@ import { toZonedTime } from "date-fns-tz";
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { formatDate, isTimeSeries } from "../../dateTimeUtils";
 import { getDataValue } from "../../aliasUtils";
+import { chartColor } from "@/utils/chartTheme";
 import { type SQLContext } from "../shared/types";
 import {
   HEATMAP_SPLIT_AREA,
@@ -149,11 +150,10 @@ export function applyHeatmapChart(ctx: SQLContext): void {
   ((options.tooltip = {
     position: "top",
     textStyle: {
-      color: store.state.theme === "dark" ? "#fff" : "#000",
+      color: chartColor("--color-tooltip-text"),
       fontSize: 12,
     },
-    backgroundColor:
-      store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
+    backgroundColor: chartColor("--color-tooltip-bg"),
     formatter: (params: any) => {
       try {
         // show tooltip for hovered panel only for other we only need axis so just return empty string

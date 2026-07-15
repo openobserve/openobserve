@@ -25,6 +25,7 @@ import {
   heatmapValueLabel,
 } from "./heatmapDefaults";
 import { SPECTRAL_HEATMAP_STOP_COUNT } from "./promql/shared/spectral";
+import { chartColor } from "@/utils/chartTheme";
 
 describe("shared heatmap defaults", () => {
   it("runs the colour ramp cool-to-warm", () => {
@@ -41,11 +42,11 @@ describe("shared heatmap defaults", () => {
     // Without a border ECharts paints cells edge to edge and a dense heatmap
     // collapses into solid horizontal bands.
     expect(heatmapCellItemStyle({ state: { theme: "dark" } })).toEqual({
-      borderColor: "#1e1e1e",
+      borderColor: chartColor("--color-surface-base"),
       borderWidth: 1,
     });
     expect(heatmapCellItemStyle({ state: { theme: "light" } })).toEqual({
-      borderColor: "#ffffff",
+      borderColor: chartColor("--color-surface-base"),
       borderWidth: 1,
     });
   });

@@ -19,6 +19,7 @@ import {
   TOOLTIP_SCROLL_STYLE,
 } from "./shared/types";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
+import { chartColor } from "@/utils/chartTheme";
 import {
   deaccumulateHistogramSeries,
   HistogramSeriesInput,
@@ -308,14 +309,11 @@ export class HeatmapConverter implements PromQLChartConverter {
       tooltip: {
         position: "top",
         textStyle: {
-          color: store.state.theme === "dark" ? "#fff" : "#000",
+          color: chartColor("--color-tooltip-text"),
           fontSize: 12,
         },
         enterable: true,
-        backgroundColor:
-          store.state.theme === "dark"
-            ? "rgba(0,0,0,1)"
-            : "rgba(255,255,255,1)",
+        backgroundColor: chartColor("--color-tooltip-bg"),
         extraCssText: TOOLTIP_SCROLL_STYLE,
         formatter: (params: any) => {
           try {
@@ -479,14 +477,11 @@ export class HeatmapConverter implements PromQLChartConverter {
       tooltip: {
         position: "top",
         textStyle: {
-          color: store.state.theme === "dark" ? "#fff" : "#000",
+          color: chartColor("--color-tooltip-text"),
           fontSize: 12,
         },
         enterable: true,
-        backgroundColor:
-          store.state.theme === "dark"
-            ? "rgba(0,0,0,1)"
-            : "rgba(255,255,255,1)",
+        backgroundColor: chartColor("--color-tooltip-bg"),
         extraCssText: TOOLTIP_SCROLL_STYLE,
         formatter: (params: any) => {
           try {

@@ -28,6 +28,7 @@
  */
 
 import { SPECTRAL_HEATMAP_STOPS } from "./promql/shared/spectral";
+import { chartColor } from "@/utils/chartTheme";
 
 /**
  * Stroke every cell in the panel background colour.
@@ -38,7 +39,7 @@ import { SPECTRAL_HEATMAP_STOPS } from "./promql/shared/spectral";
  */
 export function heatmapCellItemStyle(store: any) {
   return {
-    borderColor: store?.state?.theme === "dark" ? "#1e1e1e" : "#ffffff",
+    borderColor: chartColor("--color-surface-base"),
     borderWidth: 1,
   };
 }
