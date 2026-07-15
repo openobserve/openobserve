@@ -4314,7 +4314,16 @@
     "dimensionWidth": "Largura (px)",
     "dimensionHeight": "Altura (px)",
     "imagePreview": "Incluir imagem de visualização do painel em linha",
-    "customDimensions": "Dimensões personalizadas (avançadas)"
+    "customDimensions": "Dimensões personalizadas (avançadas)",
+    "validation": {
+      "resourceNameInvalid": "Caracteres como :, ?, /, # e espaços não são permitidos.",
+      "invalidCron": "Expressão Cron inválida!",
+      "cronSixFields": "A expressão Cron deve ter exatamente 6 campos: [Segundo] [Minuto] [Hora] [Dia do mês] [Mês] [Dia da semana]",
+      "cronMinInterval": "A frequência deve ser maior que {seconds} segundos.",
+      "dateFormat": "O formato da data está incorreto!",
+      "timeFormat": "O formato da hora está incorreto!",
+      "invalidEmails": "Adicione e-mails válidos!"
+    }
   },
   "queries": {
     "runningQueries": "Executando consultas",

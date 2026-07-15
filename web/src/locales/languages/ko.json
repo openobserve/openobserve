@@ -4314,7 +4314,16 @@
     "dimensionWidth": "너비 (픽셀)",
     "dimensionHeight": "높이 (픽셀)",
     "imagePreview": "인라인 대시보드 미리 보기 이미지 포함",
-    "customDimensions": "사용자 지정 치수 (고급)"
+    "customDimensions": "사용자 지정 치수 (고급)",
+    "validation": {
+      "resourceNameInvalid": ":, ?, /, # 및 공백과 같은 문자는 사용할 수 없습니다.",
+      "invalidCron": "잘못된 크론 표현식입니다!",
+      "cronSixFields": "크론 표현식은 정확히 6개의 필드가 있어야 합니다: [초] [분] [시] [일] [월] [요일]",
+      "cronMinInterval": "빈도는 {seconds}초보다 커야 합니다.",
+      "dateFormat": "날짜 형식이 올바르지 않습니다!",
+      "timeFormat": "시간 형식이 올바르지 않습니다!",
+      "invalidEmails": "유효한 이메일을 추가하세요!"
+    }
   },
   "queries": {
     "runningQueries": "쿼리 실행",

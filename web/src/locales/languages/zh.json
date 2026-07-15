@@ -4314,7 +4314,16 @@
     "dimensionWidth": "宽度 (px)",
     "dimensionHeight": "高度 (px)",
     "imagePreview": "包括内联仪表板预览图片",
-    "customDimensions": "自定义尺寸（高级）"
+    "customDimensions": "自定义尺寸（高级）",
+    "validation": {
+      "resourceNameInvalid": "不允许使用 :、?、/、# 等字符和空格。",
+      "invalidCron": "无效的 Cron 表达式！",
+      "cronSixFields": "Cron 表达式必须正好包含 6 个字段：[秒] [分钟] [小时] [日] [月] [星期]",
+      "cronMinInterval": "频率应大于 {seconds} 秒。",
+      "dateFormat": "日期格式不正确！",
+      "timeFormat": "时间格式不正确！",
+      "invalidEmails": "请添加有效的电子邮件！"
+    }
   },
   "queries": {
     "runningQueries": "运行查询",
