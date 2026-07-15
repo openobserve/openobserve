@@ -73,12 +73,14 @@ test.describe("Alerts UI Operations", () => {
     timeout: FIVE_MINUTES_MS
   }, async ({ page }) => {
     const suffix = pm.alertsPage.generateRandomString();
-    // Unique per-run stream (self-ingested below). Avoids the shared fixed-name
-    // 'auto_playwright_stream' fixture, which on the shared cloud org gets deleted by
-    // OTHER concurrent branch runs and — because cloud deletion is async and can take
-    // minutes — sits stuck "being deleted", never re-appearing in the wizard's stream
-    // dropdown and timing this test out. A freshly-named stream is never mid-deletion.
-    const streamName = 'auto_pw_stream_' + suffix;
+    // Pre-warmed per-run stream (ingested by global-setup-alpha1.js, reaped by
+    // /^auto_pw_stream_/ in cleanup). MUST match global-setup's SHARED_ALERT_STREAM.
+    // The alert wizard's stream dropdown serves a page-load-warmed in-memory cache; a
+    // stream ingested at test time registers in the backend in ~2s but is never in that
+    // cache, so the wizard can't select it. Pre-warming into the initial fetch (same as
+    // e2e_automate) is what makes it selectable. Per-run token keeps it unique so other
+    // branches' cleanup can't delete it mid-run. Tests still top-up ingest below.
+    const streamName = 'auto_pw_stream_' + (process.env.GITHUB_RUN_ID || 'local');
 
     // Ingest test data for the stream
     await pm.commonActions.ingestTestData(streamName);
@@ -132,12 +134,14 @@ test.describe("Alerts UI Operations", () => {
     timeout: THREE_MINUTES_MS
   }, async ({ page }) => {
     const suffix = pm.alertsPage.generateRandomString();
-    // Unique per-run stream (self-ingested below). Avoids the shared fixed-name
-    // 'auto_playwright_stream' fixture, which on the shared cloud org gets deleted by
-    // OTHER concurrent branch runs and — because cloud deletion is async and can take
-    // minutes — sits stuck "being deleted", never re-appearing in the wizard's stream
-    // dropdown and timing this test out. A freshly-named stream is never mid-deletion.
-    const streamName = 'auto_pw_stream_' + suffix;
+    // Pre-warmed per-run stream (ingested by global-setup-alpha1.js, reaped by
+    // /^auto_pw_stream_/ in cleanup). MUST match global-setup's SHARED_ALERT_STREAM.
+    // The alert wizard's stream dropdown serves a page-load-warmed in-memory cache; a
+    // stream ingested at test time registers in the backend in ~2s but is never in that
+    // cache, so the wizard can't select it. Pre-warming into the initial fetch (same as
+    // e2e_automate) is what makes it selectable. Per-run token keeps it unique so other
+    // branches' cleanup can't delete it mid-run. Tests still top-up ingest below.
+    const streamName = 'auto_pw_stream_' + (process.env.GITHUB_RUN_ID || 'local');
 
     // Ensure stream has data
     await pm.commonActions.ingestTestData(streamName);
@@ -191,12 +195,14 @@ test.describe("Alerts UI Operations", () => {
     timeout: FIVE_MINUTES_MS
   }, async ({ page }) => {
     const suffix = pm.alertsPage.generateRandomString();
-    // Unique per-run stream (self-ingested below). Avoids the shared fixed-name
-    // 'auto_playwright_stream' fixture, which on the shared cloud org gets deleted by
-    // OTHER concurrent branch runs and — because cloud deletion is async and can take
-    // minutes — sits stuck "being deleted", never re-appearing in the wizard's stream
-    // dropdown and timing this test out. A freshly-named stream is never mid-deletion.
-    const streamName = 'auto_pw_stream_' + suffix;
+    // Pre-warmed per-run stream (ingested by global-setup-alpha1.js, reaped by
+    // /^auto_pw_stream_/ in cleanup). MUST match global-setup's SHARED_ALERT_STREAM.
+    // The alert wizard's stream dropdown serves a page-load-warmed in-memory cache; a
+    // stream ingested at test time registers in the backend in ~2s but is never in that
+    // cache, so the wizard can't select it. Pre-warming into the initial fetch (same as
+    // e2e_automate) is what makes it selectable. Per-run token keeps it unique so other
+    // branches' cleanup can't delete it mid-run. Tests still top-up ingest below.
+    const streamName = 'auto_pw_stream_' + (process.env.GITHUB_RUN_ID || 'local');
 
     // Ensure stream has data
     await pm.commonActions.ingestTestData(streamName);
