@@ -84,11 +84,19 @@ export class JobSchedulerPage {
       // find the trace_id's position in the API response — that position equals the
       // row's data-test index.
       async _getJobRowIndex(trace_id, timeout = 15000) {
+        // The scheduler-list view can still be mounting after navigation / job
+        // submission — the "Get Jobs" button is present in the DOM but not yet
+        // visible/actionable. Clicking immediately (as before) let the click retry
+        // silently until the test deadline while waitForResponse timed out with no
+        // GET ever firing (observed intermittently on the cancel flow in CI). Gate on
+        // the button being visible first, then wire up the response listener and click.
+        const getJobsBtn = this.page.locator('[data-test="search-scheduler-get-jobs-btn"]');
+        await getJobsBtn.waitFor({ state: 'visible', timeout: 30000 });
         const responsePromise = this.page.waitForResponse(
             resp => resp.url().includes('/search_jobs') && resp.request().method() === 'GET',
             { timeout }
         );
-        await this.page.locator('[data-test="search-scheduler-get-jobs-btn"]').click();
+        await getJobsBtn.click();
         const response = await responsePromise;
         const jobs = await response.json();
         return jobs.findIndex(job => job.trace_id === trace_id);

@@ -585,6 +585,21 @@ test.describe("Severity Color Mapping Tests - Issue #9439", () => {
       debug:    '#00acc1', // severity 7
     };
 
+    // Wait for the results table to actually render its per-row status color bars
+    // before reading them. The fixed 3s wait in beforeEach can be too short on
+    // cloud/alpha (search results stream in), leaving an empty table so
+    // getSeverityColors() returns 0 rows and verified.size is 0 (observed flaky in CI).
+    // Poll until at least the expected number of distinct-level bars have rendered.
+    await expect
+      .poll(
+        async () =>
+          pageManager.logsPage.page
+            .locator('tbody tr[data-index] [data-test="log-table-row-status-color"]')
+            .count(),
+        { timeout: 30000, message: 'severity status color bars did not render in time' },
+      )
+      .toBeGreaterThanOrEqual(Object.keys(expectedColorByLevel).length);
+
     // Get severity colors using POM method
     const results = await pageManager.logsPage.getSeverityColors();
     testLogger.info(`Found ${results.length} rows with status color bars`);
