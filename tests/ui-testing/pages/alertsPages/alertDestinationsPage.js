@@ -1069,6 +1069,9 @@ export class AlertDestinationsPage {
         if (!transitioned) {
             await confirmField.waitFor({ state: 'visible', timeout: 15000 });
         }
+        // Hard settle so the type-specific form (fields, prebuilt template) fully renders
+        // before the caller starts filling — under load the render lags the transition.
+        await this.page.waitForTimeout(2000);
         testLogger.debug('Selected destination type and form loaded', { type });
     }
 
@@ -1077,6 +1080,7 @@ export class AlertDestinationsPage {
      * @param {string} url - Webhook URL
      */
     async fillWebhookUrl(url) {
+        await this.page.waitForTimeout(1500);
         const input = this.page.locator(this.webhookInputAnyField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(url);
@@ -1099,6 +1103,7 @@ export class AlertDestinationsPage {
      * @param {string} key - Integration key
      */
     async fillIntegrationKey(key) {
+        await this.page.waitForTimeout(1500);
         const input = this.page.locator(this.integrationKeyInputField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(key);
@@ -1110,6 +1115,7 @@ export class AlertDestinationsPage {
      * @param {string} severity - Severity level (e.g., 'critical', 'error', 'warning', 'info')
      */
     async selectSeverity(severity) {
+        await this.page.waitForTimeout(1500);
         const select = this.page.locator(this.severitySelect).first();
         await select.waitFor({ state: 'visible', timeout: 10000 });
         await select.click();
@@ -1131,6 +1137,7 @@ export class AlertDestinationsPage {
      * @param {string} name - Destination name
      */
     async fillDestinationName(name) {
+        await this.page.waitForTimeout(1500);
         const field = this.page.locator(this.destinationNameInputField);
         // Prebuilt forms scroll the name field around as sections (webhook, template,
         // headers) render; scroll it into view and retry so a transient re-render can't
@@ -1186,6 +1193,9 @@ export class AlertDestinationsPage {
         await expect(saveBtn).toBeEnabled({ timeout: 15000 });
         // force-click bypasses any residual toast overlay still occupying pointer events.
         await saveBtn.click({ force: true, timeout: 10000 });
+        // Hard settle: the create/update API + form-close (expectSuccessNotification waits
+        // for the title to hide) can lag under load; give the request time to complete.
+        await this.page.waitForTimeout(3000);
         testLogger.debug('Clicked Save button');
     }
 
@@ -2091,6 +2101,7 @@ export class AlertDestinationsPage {
      * @param {string} apiKey - Opsgenie API key
      */
     async fillOpsgenieApiKey(apiKey) {
+        await this.page.waitForTimeout(1500);
         const input = this.page.locator(this.opsgenieApiKeyInputField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(apiKey);
@@ -2175,6 +2186,7 @@ export class AlertDestinationsPage {
      * @param {string} url - ServiceNow instance URL
      */
     async fillServiceNowInstanceUrl(url) {
+        await this.page.waitForTimeout(1500);
         const input = this.page.locator(this.servicenowInstanceUrlInputField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(url);
@@ -2186,6 +2198,7 @@ export class AlertDestinationsPage {
      * @param {string} username - ServiceNow username
      */
     async fillServiceNowUsername(username) {
+        await this.page.waitForTimeout(1500);
         const input = this.page.locator(this.servicenowUsernameInputField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(username);
@@ -2197,6 +2210,7 @@ export class AlertDestinationsPage {
      * @param {string} password - ServiceNow password
      */
     async fillServiceNowPassword(password) {
+        await this.page.waitForTimeout(1500);
         const input = this.page.locator(this.servicenowPasswordInputField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(password);

@@ -101,6 +101,10 @@ export class AlertCreationWizard {
      */
     async _pickStreamFromOpenDropdown(streamName, scopedOption, popover) {
         await popover.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        // Hard settle: under 5-worker load the shared org's stream-list fetch (fired when
+        // the dropdown opens) is slow; give it a fixed window to land before filtering so
+        // we don't type over an empty list.
+        await this.page.waitForTimeout(4000);
         // Type the filter FIRST — the dropdown renders matching options in response to the
         // typed query, so options are not necessarily present before typing. Then wait
         // GENEROUSLY (30s) for the specific option to render: under 5-worker load the
@@ -108,6 +112,7 @@ export class AlertCreationWizard {
         // arrived. The long wait resolves as soon as the option appears (fast path unaffected).
         await this.page.keyboard.press('Control+a');
         await this.page.keyboard.type(streamName, { delay: 30 });
+        await this.page.waitForTimeout(2000);
 
         if (await scopedOption().isVisible({ timeout: 30000 }).catch(() => false)) {
             await scopedOption().click();
