@@ -29,8 +29,16 @@ vi.mock("@/utils/zincutils", () => ({
   getUUID: () => "uuid",
 }));
 
+vi.mock("@vue-flow/core", () => ({
+  useVueFlow: () => ({
+    screenToFlowCoordinate: (p: any) => p,
+    onNodesInitialized: vi.fn(),
+    updateNode: vi.fn(),
+  }),
+}));
+
 import workflowService from "@/services/workflows";
-import {
+import useWorkflowCanvas, {
   workflowObj,
   loadWorkflowRun,
 } from "@/plugins/workflows/useWorkflowCanvas";
@@ -111,5 +119,39 @@ describe("loadWorkflowRun — history run response mapping", () => {
     const r = await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r4" });
     expect(r.ok).toBe(false);
     expect(r.error).toBe("nope");
+  });
+});
+
+// The Save-before-Test prompt keys off `dirtyFlag`. VueFlow fires onEdgesChange
+// for non-structural changes too (select/dimensions), and inspecting a run
+// (hover a node → click its error badge → Esc) triggers those. Only a real edit
+// (edge added/removed) should dirty the workflow — otherwise a second Test wrongly
+// asks to save unchanged work.
+describe("onEdgesChange — dirty flag only on structural changes", () => {
+  const { onEdgesChange } = useWorkflowCanvas();
+
+  beforeEach(() => {
+    workflowObj.isEditWorkflow = true;
+    workflowObj.dirtyFlag = false;
+  });
+
+  it("does NOT dirty on a select change (e.g. click / Esc during run inspection)", () => {
+    onEdgesChange([{ type: "select", id: "e1", selected: true }]);
+    expect(workflowObj.dirtyFlag).toBe(false);
+  });
+
+  it("does NOT dirty on a dimensions change", () => {
+    onEdgesChange([{ type: "dimensions", id: "e1" }]);
+    expect(workflowObj.dirtyFlag).toBe(false);
+  });
+
+  it("DOES dirty when an edge is added", () => {
+    onEdgesChange([{ type: "add", item: { id: "e2" } }]);
+    expect(workflowObj.dirtyFlag).toBe(true);
+  });
+
+  it("DOES dirty when an edge is removed", () => {
+    onEdgesChange([{ type: "remove", id: "e1" }]);
+    expect(workflowObj.dirtyFlag).toBe(true);
   });
 });

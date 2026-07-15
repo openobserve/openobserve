@@ -472,8 +472,17 @@ export default function useWorkflowCanvas() {
   }
 
   function onEdgesChange(changes: any[]) {
-    if (workflowObj.isEditWorkflow) workflowObj.dirtyFlag = true;
-    if (changes.length > 0) workflowObj.edgesChange = true;
+    // VueFlow fires this for cosmetic/interaction changes too — `select`,
+    // `dimensions` — not just add/remove, and hovering a node recolours its
+    // connected edges. Only a STRUCTURAL change (an edge added or removed) is a
+    // real edit, so gate the dirty flag on that. Otherwise inspecting a run
+    // (hover a node → click its error badge → Esc) would mark the workflow
+    // unsaved and wrongly force a Save-before-Test on the next run.
+    const structural = changes.some(
+      (c: any) => c?.type === "add" || c?.type === "remove",
+    );
+    if (structural && workflowObj.isEditWorkflow) workflowObj.dirtyFlag = true;
+    if (structural) workflowObj.edgesChange = true;
   }
 
   // Manual wiring (dragging between handles). Programmatic add uses addNodeAfter.
