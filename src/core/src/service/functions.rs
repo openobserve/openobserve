@@ -66,13 +66,6 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
     }
     let func_trans_type = func.trans_type.unwrap_or(0);
 
-    // JavaScript functions are only allowed in _meta org (for SSO claim parsing)
-    if func_trans_type == 1 && org_id != "_meta" {
-        return Ok(MetaHttpResponse::bad_request(
-            "JavaScript functions are only allowed in the '_meta' organization. Please use VRL functions for other organizations.",
-        ));
-    }
-
     if let Some(_existing_fn) = check_existing_fn(&org_id, &func.name).await {
         Ok(MetaHttpResponse::bad_request(FN_ALREADY_EXIST))
     } else {

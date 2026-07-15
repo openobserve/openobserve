@@ -265,6 +265,22 @@ async fn validate_workflow(workflow: &Workflow) -> Result<(), anyhow::Error> {
                 ));
             }
         }
+
+        if let NodeData::Function(function_params) = &node.data {
+            // Load the function to check its trans_type
+            let function = super::db::functions::get(&workflow.org_id, &function_params.name)
+                .await
+                .map_err(|e| {
+                    anyhow::anyhow!("Failed to load function '{}': {}", function_params.name, e)
+                })?;
+
+            if function.is_vrl() {
+                return Err(anyhow::anyhow!(
+                    "Vrl functions cannot be used in workflows. Function '{}' is a VRL function. Please use JS functions instead.",
+                    function_params.name
+                ));
+            }
+        }
     }
 
     config::meta::pipeline::validate_nodes_edges(&workflow.nodes, &workflow.edges)?;
