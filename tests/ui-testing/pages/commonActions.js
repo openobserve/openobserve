@@ -238,20 +238,52 @@ export class CommonActions {
         const baseUrl = process.env["ZO_BASE_URL"];
         const orgName = getOrgIdentifier();
         const data = [{"level":"info","job":"test","log":"test message for openobserve. this data ingestion has been done using a playwright automation script."}];
+        const ingestUrl = `${baseUrl}/api/${orgName}/${streamName}/_json`;
+        const listUrl = `${baseUrl}/api/${orgName}/streams?type=logs`;
 
-        const response = await this.page.request.post(`${baseUrl}/api/${orgName}/${streamName}/_json`, {
-            headers,
-            data
-        });
-        const responseData = await response.json().catch(() => ({ error: 'Failed to parse JSON' }));
-        testLogger.debug('Ingestion response', { response: responseData });
+        // Ingest with a retry loop around the "stream is being deleted" race.
+        // Shared fixed-name streams (e.g. auto_playwright_stream) are deleted by
+        // cleanup.spec.js at the start of the shard, and OpenObserve deletes streams
+        // ASYNCHRONOUSLY. An ingest that lands while the background deletion is still in
+        // progress is rejected with:
+        //   400 {"message":"Error# stream [<name>] is being deleted"}
+        // Previously the response status was never checked, so this 400 was silently
+        // swallowed: the stream was never (re)created, the alert wizard's stream dropdown
+        // stayed empty, and the whole test burned ~8 min of dropdown retries before timing
+        // out. Here we detect the in-flight deletion, wait for it to clear, then re-POST to
+        // recreate the stream so callers get a stream that actually exists.
+        let responseData;
+        let ingested = false;
+        const maxIngestAttempts = 12; // ~55s worst case; deletion under load can be slow
+        for (let attempt = 1; attempt <= maxIngestAttempts; attempt++) {
+            const response = await this.page.request.post(ingestUrl, { headers, data });
+            responseData = await response.json().catch(() => ({ error: 'Failed to parse JSON' }));
+            testLogger.debug('Ingestion response', { response: responseData, status: response.status(), attempt });
+
+            if (response.ok()) { ingested = true; break; }
+
+            const msg = (responseData && responseData.message) || '';
+            if (/is being deleted/i.test(msg)) {
+                // Stream is mid-deletion. Wait for it to fully drop out of the list before
+                // retrying, so the next POST recreates it fresh instead of being rejected.
+                testLogger.warn('Stream is mid-deletion, waiting for it to clear before re-ingesting', { streamName, attempt });
+                await this.page.waitForTimeout(5000);
+                continue;
+            }
+            // Any other error is not something a retry can fix — stop and let the poll below
+            // surface the missing stream.
+            testLogger.warn('Ingestion returned an unexpected error', { streamName, status: response.status(), response: responseData });
+            break;
+        }
+        if (!ingested) {
+            testLogger.warn('Ingest did not succeed after retries', { streamName });
+        }
 
         // Poll the streams API until this stream is registered before returning. Callers
         // open the alert wizard right after and pick this stream from the dropdown; under
         // concurrent CI load the wizard's stream-list fetch can run before registration
         // completes, so the freshly-ingested stream never renders as an option (the exact
         // failure seen for auto_playwright_stream). Mirrors initializeAlertTestStream.
-        const listUrl = `${baseUrl}/api/${orgName}/streams?type=logs`;
         let registered = false;
         for (let i = 0; i < 20 && !registered; i++) {
             const listResp = await this.page.request.get(listUrl, { headers }).catch(() => null);
