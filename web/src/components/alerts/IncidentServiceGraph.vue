@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="incident-service-graph min-h-[400px] flex flex-col m-3 p-5 rounded-xl overflow-hidden transition-all duration-200 bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] border border-[#e5e7eb] shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)]"
+    class="incident-service-graph min-h-100 flex flex-col m-3 p-5 rounded-xl overflow-hidden transition-all duration-200 bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] border border-border-default shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)]"
     style="height: calc(100vh - 202px); position: relative;"
   >
     <!-- Info Icon → Graph Legend popover (hover to show, like the previous behavior) -->
@@ -28,25 +28,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="info-outline" size="sm" />
       </OButton>
       <div
-        class="graph-legend absolute top-[calc(100%+8px)] right-0 min-w-[240px] py-[14px] px-4 text-[13px] leading-normal text-[#1f2937] bg-white border border-border-default rounded-lg shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] opacity-0 invisible -translate-y-1 transition-all duration-150 pointer-events-none whitespace-nowrap"
+        class="graph-legend absolute top-[calc(100%+8px)] right-0 min-w-60 py-3.5 px-4 text-compact leading-normal text-text-body bg-surface-overlay border border-border-default rounded-lg shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] opacity-0 invisible -translate-y-1 transition-all duration-150 pointer-events-none whitespace-nowrap"
         role="tooltip"
       >
         <div class="font-semibold text-sm mb-2.5">Graph Legend</div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <span class="graph-legend__dot text-[14px] leading-none w-[14px] text-center shrink-0" style="color: #ef4444;">●</span>
+          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0" style="color: var(--color-status-negative);">●</span>
           Red = Potential Root Cause
         </div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <span class="graph-legend__dot text-[14px] leading-none w-[14px] text-center shrink-0" style="color: #f97316;">●</span>
+          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0" style="color: var(--color-status-warning-text);">●</span>
           Orange = High Frequency
         </div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <span class="graph-legend__dot text-[14px] leading-none w-[14px] text-center shrink-0" style="color: #3b82f6;">●</span>
+          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0" style="color: var(--color-text-link);">●</span>
           Blue = Normal
         </div>
         <div class="graph-legend__divider h-px bg-border-default my-2" />
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <span class="graph-legend__dot text-[14px] leading-none w-[14px] text-center shrink-0" style="color: #a78bfa;">→</span>
+          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0" style="color: #a78bfa;">→</span>
           Purple arrows show temporal flow
         </div>
       </div>
@@ -55,8 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Loading State -->
     <div
       v-if="loading"
-      class="flex items-center justify-center h-full"
-      :class="isDarkMode ? 'bg-gray-900/50' : 'bg-white/50'"
+      class="flex items-center justify-center h-full bg-surface-base/50"
     >
       <OSpinner size="md" />
     </div>
@@ -66,12 +65,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="!graphData || !graphData.nodes || graphData.nodes.length === 0"
       class="flex flex-col items-center justify-center gap-3 h-full"
     >
-      <OIcon name="hub" :class="isDarkMode ? 'text-gray-600' : 'text-gray-300'" style="width: 48px; height: 48px;" />
+      <OIcon name="hub" class="text-text-muted" style="width: 48px; height: 48px;" />
       <div class="text-center">
-        <div class="text-sm font-medium" :class="isDarkMode ? 'text-gray-400' : 'text-gray-600'">
+        <div class="text-sm font-medium text-text-secondary">
           Service Graph Unavailable
         </div>
-        <div class="text-xs mt-1" :class="isDarkMode ? 'text-gray-500' : 'text-gray-400'">
+        <div class="text-xs mt-1 text-text-secondary">
           No topology data available for this incident.
         </div>
       </div>
@@ -521,7 +520,7 @@ export default defineComponent({
                 html += `Last Fired: ${lastTime}<br/>`;
               }
               if (index === 0) {
-                html += `<br/><span style="color: #ef4444;">⚠ First Alert (Potential Root Cause)</span>`;
+                html += `<br/><span style="color: var(--color-status-negative);">⚠ First Alert (Potential Root Cause)</span>`;
               }
               html += `</div>`;
               return html;

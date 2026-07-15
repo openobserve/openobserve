@@ -18,30 +18,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col gap-1.5 w-full shrink-0 px-1 py-2">
     <!-- Header row: oldest … legend … newest -->
     <div class="flex items-center justify-between px-1">
-      <span class="text-[11px] tabular-nums" style="color: var(--color-text-caption)">
+      <span class="text-2xs tabular-nums" style="color: var(--color-text-caption)">
         {{ oldestLabel }}
       </span>
 
       <div class="flex items-center gap-3">
-        <span v-if="firingCount > 0" class="flex items-center gap-1 text-[11px]">
+        <span v-if="firingCount > 0" class="flex items-center gap-1 text-2xs">
           <span class="inline-block w-2 h-2 rounded-sm" style="background: var(--color-badge-error-solid-bg)" />
           <span class="font-medium" style="color: var(--color-badge-error-soft-text)">{{ firingCount }} Firing</span>
         </span>
-        <span class="flex items-center gap-1 text-[11px]" style="color: var(--color-text-secondary)">
+        <span class="flex items-center gap-1 text-2xs" style="color: var(--color-text-secondary)">
           <span class="inline-block w-2 h-2 rounded-sm" style="background: var(--color-badge-success-solid-bg)" />
           {{ okCount }} Ok
         </span>
-        <span v-if="skippedCount > 0" class="flex items-center gap-1 text-[11px]" style="color: var(--color-text-muted)">
+        <span v-if="skippedCount > 0" class="flex items-center gap-1 text-2xs" style="color: var(--color-text-muted)">
           <span class="inline-block w-2 h-2 rounded-sm" style="background: var(--color-border-default)" />
           {{ skippedCount }} Skipped
         </span>
-        <span v-if="hasFlappingZone" class="flex items-center gap-1 text-[11px] font-semibold" style="color: #7c3aed; filter: brightness(0.9)">
+        <span v-if="hasFlappingZone" class="flex items-center gap-1 text-2xs font-semibold" style="color: var(--color-badge-purple-ol-text); filter: brightness(0.9)">
           <span class="inline-block w-2 h-2 rounded-sm o2-flap-swatch" />
           Flapping
         </span>
       </div>
 
-      <span class="text-[11px] tabular-nums" style="color: var(--color-text-caption)">
+      <span class="text-2xs tabular-nums" style="color: var(--color-text-caption)">
         {{ newestLabel }}
       </span>
     </div>
@@ -50,12 +50,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-col gap-[3px] w-full px-1">
 
     <!-- Strip -->
-    <div class="flex gap-[2px] w-full h-6 items-stretch" style="overflow: visible">
+    <div class="flex gap-0.5 w-full h-6 items-stretch" style="overflow: visible">
       <template v-for="(seg, i) in segments" :key="i">
         <!-- Flapping zone — alternating hatched red/green cells + callout pill -->
         <div
           v-if="seg.type === 'flapping'"
-          class="flex gap-[2px] items-stretch relative"
+          class="flex gap-0.5 items-stretch relative"
           :style="{ flex: seg.weight, minWidth: '12px' }"
           @mouseenter="hoveredIndex = i"
           @mouseleave="hoveredIndex = null"
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(cell, c) in seg.cells"
             :key="c"
-            class="flex-1 rounded-sm min-w-[6px]"
+            class="flex-1 rounded-sm min-w-1.5"
             :style="flapCellStyle(cell.status)"
           />
         </div>
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Normal block -->
         <div
           v-else
-          class="flex-1 rounded-sm min-w-[4px] cursor-default relative transition-opacity duration-100 hover:opacity-75"
+          class="flex-1 rounded-sm min-w-1 cursor-default relative transition-opacity duration-100 hover:opacity-75"
           :style="{ flex: seg.weight, background: blockColor(seg.status) }"
           @mouseenter="hoveredIndex = i"
           @mouseleave="hoveredIndex = null"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Transition tick labels — placed by cumulative width; labels that would
          overlap the previously shown one are skipped to keep them readable. -->
-    <div class="w-full relative h-[14px]">
+    <div class="w-full relative h-3.5">
       <span
         v-for="(tick, i) in tickLabels"
         :key="i"
@@ -396,7 +396,7 @@ function flapCellStyle(status: string) {
       transparent 1px,
       transparent 3px
     ),
-    #7c3aed;
+    var(--color-badge-purple-solid-bg);
 }
 
 /* Persistent purple callout pill above a flapping zone */
@@ -414,8 +414,8 @@ function flapCellStyle(status: string) {
   border-radius: 9999px;
   font-size: 12px;
   font-weight: 600;
-  color: #fff;
-  background: #7c3aed;
+  color: var(--color-badge-purple-solid-text);
+  background: var(--color-badge-purple-solid-bg);
   box-shadow: var(--shadow-md);
   pointer-events: none;
 }
@@ -426,7 +426,7 @@ function flapCellStyle(status: string) {
   left: 50%;
   transform: translateX(-50%);
   border: 5px solid transparent;
-  border-top-color: #7c3aed;
+  border-top-color: var(--color-badge-purple-solid-bg);
 }
 
 .o2-timeline-tooltip {

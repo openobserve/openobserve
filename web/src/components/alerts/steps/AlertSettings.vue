@@ -21,12 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Section header -->
     <div
-      class="flex items-center py-2.5 px-3"
-      :class="store.state.theme === 'dark' ? 'border-b border-[#343434]' : 'border-b border-[#eeeeee]'"
+      class="flex items-center py-2.5 px-3 border-b border-border-default"
     >
       <div class="w-0.75 h-4 rounded-xs mr-2 shrink-0 bg-[var(--q-primary)]" />
       <span
-        class="text-[13px] font-semibold tracking-[0.01em] text-text-primary"
+        class="text-compact font-semibold tracking-[0.01em] text-text-primary"
       >{{
         t("alerts.alertSettings.sectionTitle")
       }}</span>
@@ -71,9 +70,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     height: 28px;
                     font-size: 13px;
                   "
-                  :class="
-                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
-                  "
                   class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
@@ -86,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   formData.trigger_condition.silence === null ||
                   formData.trigger_condition.silence === ''
                 "
-                class="text-red-8 pt-1"
+                class="text-status-error-text pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
@@ -109,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :options="formattedDestinations"
                   data-test="alert-destinations-select"
                   multiple
-                  class="min-w-[180px] max-w-[300px]"
+                  class="min-w-45 max-w-75"
                   @update:model-value="emitDestinationsUpdate"
                 >
                   <template #empty>{{
@@ -140,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   destinationsTouched &&
                   (!localDestinations || localDestinations.length === 0)
                 "
-                class="text-red-8 pt-1"
+                class="text-status-error-text pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
@@ -191,9 +187,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     font-weight: normal;
                     font-size: 13px;
                   "
-                  :class="
-                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
-                  "
                   class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
@@ -201,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="!Number(formData.trigger_condition.period)"
-                class="text-red-8 pt-1"
+                class="text-status-error-text pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
@@ -245,9 +238,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     height: 28px;
                     font-size: 13px;
                   "
-                  :class="
-                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
-                  "
                   class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
                 >
                   {{ t("alerts.minutes") }}
@@ -260,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   formData.trigger_condition.silence === null ||
                   formData.trigger_condition.silence === ''
                 "
-                class="text-red-8 pt-1"
+                class="text-status-error-text pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
@@ -290,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="alert-destinations-select"
                   multiple
                   :error="destinationError"
-                  class="min-w-[180px] max-w-[300px]"
+                  class="min-w-45 max-w-75"
                   @update:model-value="
                     destinationError = false;
                     emitDestinationsUpdate();
@@ -324,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   destinationsTouched &&
                   (!localDestinations || localDestinations.length === 0)
                 "
-                class="text-red-8 pt-1"
+                class="text-status-error-text pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}

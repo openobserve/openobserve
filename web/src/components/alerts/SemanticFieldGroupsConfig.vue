@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-xl font-semibold">
         {{ t("settings.correlation.semanticFieldGroupsTitle") }}
       </div>
-      <div class="text-xs text-gray-400">
+      <div class="text-xs text-text-secondary">
         {{ t("correlation.semanticFieldGroupsCaption") }}
       </div>
     </div>
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @delete="removeGroupByFilter(index)"
       />
     </div>
-    <div v-else class="text-center p-4 text-gray-400">
+    <div v-else class="text-center p-4 text-text-muted">
       <OIcon name="info" size="md" class="mb-2" />
       <div>
         {{
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Total groups indicator -->
-    <div v-if="localGroups.length > 0" class="text-xs text-gray-400 mt-2">
+    <div v-if="localGroups.length > 0" class="text-xs text-text-secondary mt-2">
       {{
         t("correlation.showingGroups", {
           filterGroupLength: filteredGroups.length,
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("correlation.deduplicateFields") }} *
         <OTooltip :content="t('correlation.deduplicateFieldTooltip')" />
       </div>
-      <div class="text-xs text-gray-400 mb-3">
+      <div class="text-xs text-text-secondary mb-3">
         {{ t("correlation.alertDeduplicationMessage") }}
       </div>
       <div class="flex flex-wrap gap-3">
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="localFingerprintFields.length === 0"
-        class="text-red-500 text-xs mt-2"
+        class="text-status-error-text text-xs mt-2"
       >
         {{ t("correlation.atLeastOneDeduplicationField") }}
       </div>

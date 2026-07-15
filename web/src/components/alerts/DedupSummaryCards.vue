@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OCard data-test="total-alerts-card" class="border border-border-default transition-all duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
       <OCardSection class="p-4">
         <div data-test="total-alerts-value" class="text-2xl font-semibold">{{ summary.total_alerts }}</div>
-        <div data-test="total-alerts-label" class="text-sm text-gray-600">Total Alerts</div>
+        <div data-test="total-alerts-label" class="text-sm text-text-secondary">Total Alerts</div>
       </OCardSection>
     </OCard>
 
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div data-test="alerts-with-dedup-value" class="text-2xl font-semibold">{{ summary.alerts_with_dedup }}</div>
           <OIcon data-test="dedup-filter-icon" name="filter-alt" size="sm" />
         </div>
-        <div data-test="alerts-with-dedup-label" class="text-sm text-gray-600 flex items-center gap-1">
+        <div data-test="alerts-with-dedup-label" class="text-sm text-text-secondary flex items-center gap-1">
           Using Deduplication
           <OIcon data-test="dedup-info-icon" name="info-outline" size="xs" class="cursor-pointer" />
             <OTooltip data-test="dedup-info-tooltip" content="Alerts with deduplication configured" />
@@ -44,18 +44,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="suppression-rate-card"
       class="border border-border-default transition-all duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
       :class="{
-        'bg-green-50': summary.suppression_rate > 0.5,
-        'bg-yellow-50': summary.suppression_rate > 0 && summary.suppression_rate <= 0.5
+        'bg-status-success-bg': summary.suppression_rate > 0.5,
+        'bg-status-warning-bg': summary.suppression_rate > 0 && summary.suppression_rate <= 0.5
       }"
     >
       <OCardSection class="p-4">
         <div data-test="suppression-rate-value" class="text-2xl font-semibold" :class="{
-          'text-green-700': summary.suppression_rate > 0.5,
-          'text-yellow-700': summary.suppression_rate > 0 && summary.suppression_rate <= 0.5
+          'text-status-success-text': summary.suppression_rate > 0.5,
+          'text-status-warning-text': summary.suppression_rate > 0 && summary.suppression_rate <= 0.5
         }">
           {{ formatPercentage(summary.suppression_rate) }}
         </div>
-        <div data-test="suppression-rate-label" class="text-sm text-gray-600 flex items-center gap-1">
+        <div data-test="suppression-rate-label" class="text-sm text-text-secondary flex items-center gap-1">
           Suppression Rate (24h)
           <OIcon data-test="suppression-info-icon" name="info-outline" size="xs" class="cursor-pointer" />
             <OTooltip data-test="suppression-info-tooltip">
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div data-test="pending-batches-value" class="text-2xl font-semibold">{{ summary.pending_batches }}</div>
           <OIcon data-test="pending-batches-icon" name="group-work" size="sm" />
         </div>
-        <div data-test="pending-batches-label" class="text-sm text-gray-600 flex items-center gap-1">
+        <div data-test="pending-batches-label" class="text-sm text-text-secondary flex items-center gap-1">
           Pending Batches
           <OIcon data-test="pending-batches-info-icon" name="info-outline" size="xs" class="cursor-pointer" />
             <OTooltip data-test="pending-batches-info-tooltip" content="Alerts waiting to be grouped together" />

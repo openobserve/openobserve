@@ -16,40 +16,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div ref="multiWindowContainerRef" class="step-compare-with-past w-full h-full flex flex-col mx-auto" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content rounded-lg flex-1 min-h-0 overflow-auto bg-surface-overlay border border-border-default" :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'">
-      <div class="section-header flex items-center gap-0 py-2.5 px-3" :class="store.state.theme === 'dark' ? 'border-b border-[#343434]' : 'border-b border-[#eeeeee]'">
+    <div class="step-content rounded-lg flex-1 min-h-0 overflow-auto bg-surface-overlay border border-border-default">
+      <div class="section-header flex items-center gap-0 py-2.5 px-3 border-b border-border-default">
         <div class="section-header-accent w-0.75 h-4 rounded-xs mr-2 shrink-0 bg-[var(--q-primary)]" />
-        <span class="section-header-title text-[13px] font-semibold text-text-primary">{{ t('alerts.steps.compareWithPast') }}</span>
+        <span class="section-header-title text-compact font-semibold text-text-primary">{{ t('alerts.steps.compareWithPast') }}</span>
       </div>
       <div class="px-3 pb-2">
       <!-- Alert set for header -->
-      <div class="multi-window-text flex items-center gap-2 py-2 mt-3 font-bold text-sm leading-6 align-middle" :class="store.state.theme === 'dark' ? 'text-white' : 'text-[#3d3d3d]'">
+      <div class="multi-window-text flex items-center gap-2 py-2 mt-3 font-bold text-sm leading-6 align-middle text-text-body">
         <span>{{ t('alerts.compareWithPast.alertSetFor') }}</span>
         <div class="h-px border-line flex-1"></div>
       </div>
 
       <!-- Current Window -->
-      <div class="flex flex-row justify-between items-start min-h-27.5 px-3 py-2 bg-card-glass-bg"
-        :class="store.state.theme === 'dark' ? 'border border-[#343434]' : 'border border-[#e6e6e6]'">
-        <div class="multi-window-text w-auto text-left font-bold text-sm leading-6 align-middle" :class="store.state.theme === 'dark' ? 'text-white' : 'text-[#3d3d3d]'">
+      <div class="flex flex-row justify-between items-start min-h-27.5 px-3 py-2 bg-card-glass-bg border border-border-default">
+        <div class="multi-window-text w-auto text-left font-bold text-sm leading-6 align-middle text-text-body">
           {{ t('alerts.compareWithPast.currentWindow') }}
         </div>
 
         <div class="flex flex-col items-start gap-2">
-          <div class="multi-window-text w-auto text-left font-bold text-sm leading-6 align-middle" :class="store.state.theme === 'dark' ? 'text-white' : 'text-[#3d3d3d]'">
+          <div class="multi-window-text w-auto text-left font-bold text-sm leading-6 align-middle text-text-body">
             {{ t('alerts.compareWithPast.cycle') }}
             <span class="cursor-pointer">
               <OIcon
                 name="info"
                 size="sm"
                 class="ml-1 cursor-pointer"
-                :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
+                :class="'text-text-secondary'"
                />
                 <OTooltip :content="t('alerts.compareWithPast.cycleTooltip')" side="right" align="center" max-width="300px" />
             </span>
           </div>
           <div class="flex justify-between items-start gap-4">
-            <div class="w-[300px] font-normal leading-5 text-sm">
+            <div class="w-75 font-normal leading-5 text-sm">
               {{ t('alerts.compareWithPast.runningFor', { period: convertMinutesToDisplayValue(period), frequency: convertMinutesToDisplayValue(frequency) }) }}
             </div>
             <div>
@@ -70,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Comparing with header -->
-      <div v-if="localMultiTimeRange.length > 0" class="multi-window-text flex items-center gap-2 py-2 mt-2 font-bold text-sm leading-6 align-middle" :class="store.state.theme === 'dark' ? 'text-white' : 'text-[#3d3d3d]'">
+      <div v-if="localMultiTimeRange.length > 0" class="multi-window-text flex items-center gap-2 py-2 mt-2 font-bold text-sm leading-6 align-middle text-text-body">
         <span>{{ t('alerts.compareWithPast.comparingWith') }}</span>
         <div class="h-px border-line flex-1"></div>
       </div>
@@ -79,10 +78,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(picker, index) in localMultiTimeRange"
         :key="picker.uuid"
-        class="reference-window-container flex flex-row justify-between items-start min-h-27.5 mt-2 px-3 py-2"
-        :class="store.state.theme === 'dark' ? ['bg-card-glass-bg', 'border', 'border-[#343434]'] : ['bg-card-glass-bg', 'border', 'border-[#e6e6e6]']"
+        class="reference-window-container flex flex-row justify-between items-start min-h-27.5 mt-2 px-3 py-2 bg-card-glass-bg border border-border-default"
       >
-        <div class="multi-window-text w-auto text-left font-bold text-sm leading-6 align-middle" :class="store.state.theme === 'dark' ? 'text-white' : 'text-[#3d3d3d]'">
+        <div class="multi-window-text w-auto text-left font-bold text-sm leading-6 align-middle text-text-body">
           {{ t('alerts.compareWithPast.referenceWindow') }} {{ index + 1 }}
         </div>
 
@@ -96,12 +94,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="info"
                 size="sm"
                 class="ml-1 cursor-pointer"
-                :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
+                :class="'text-text-secondary'"
                />
                 <OTooltip :content="t('alerts.compareWithPast.timeFrameTooltip')" side="right" align="center" max-width="300px" />
             </span>
           </div>
-          <div class="datetime-picker-wrapper mt-2 border rounded !border-[#d0d0d0] dark:!border-[#4a4a4a]">
+          <div class="datetime-picker-wrapper mt-2 border rounded-sm !border-border-default">
             <CustomDateTimePicker
               v-model="picker.offSet"
               :picker="picker"
@@ -114,20 +112,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Cycle Info -->
         <div class="flex flex-col items-start gap-2">
-          <div class="multi-window-text w-auto text-left font-bold text-sm leading-6 align-middle" :class="store.state.theme === 'dark' ? 'text-white' : 'text-[#3d3d3d]'">
+          <div class="multi-window-text w-auto text-left font-bold text-sm leading-6 align-middle text-text-body">
             {{ t('alerts.compareWithPast.cycle') }}
             <span class="cursor-pointer">
               <OIcon
                 name="info"
                 size="sm"
                 class="ml-1 cursor-pointer"
-                :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
+                :class="'text-text-secondary'"
                />
                 <OTooltip :content="t('alerts.compareWithPast.cycleTooltip')" side="right" align="center" max-width="300px" />
             </span>
           </div>
           <div class="flex justify-between items-start gap-4">
-            <div class="w-[300px] text-sm font-normal">
+            <div class="w-75 text-sm font-normal">
               {{ t('alerts.compareWithPast.comparingText', { offset: getDisplayValue(picker.offSet) }) }}
             </div>
             <div>

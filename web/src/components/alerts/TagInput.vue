@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="tag-input-container" class="w-full h-full">
     <div
       data-test="tag-input-wrapper"
-      class="tag-input-wrapper relative flex flex-col px-[5px] py-0 border border-(--color-card-glass-border,rgba(0,0,0,0.12)) rounded bg-card-glass-bg min-h-14 h-full w-full max-w-full cursor-text transition-colors duration-300 overflow-hidden"
+      class="tag-input-wrapper relative flex flex-col px-[5px] py-0 border border-(--color-card-glass-border,rgba(0,0,0,0.12)) rounded-sm bg-card-glass-bg min-h-14 h-full w-full max-w-full cursor-text transition-colors duration-300 overflow-hidden"
       :class="{ 'has-content': hasContent }"
     >
       <label
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="inputValue"
           type="text"
           :placeholder="modelValue.length > 0 ? '' : placeholder"
-          class="tag-input [flex:1_1_100px] min-w-[100px] border-0 outline-none bg-transparent p-1 text-sm text-(--q-color-text-primary)"
+          class="tag-input [flex:1_1_100px] min-w-25 border-0 outline-none bg-transparent p-1 text-sm text-(--q-color-text-primary)"
           @keydown.enter.prevent="addTag"
           @input="handleInput"
           @keydown.delete="handleBackspace"

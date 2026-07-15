@@ -176,7 +176,7 @@ limitations under the License.
           tabindex="0"
         >
           <template v-slot:hint>
-            <span class="text-xs text-gray-400">
+            <span class="text-xs text-text-secondary">
               Comma-separated CC email addresses
             </span>
           </template>
@@ -191,7 +191,7 @@ limitations under the License.
           tabindex="0"
         >
           <template v-slot:hint>
-            <span class="text-xs text-gray-400">
+            <span class="text-xs text-text-secondary">
               Custom subject line (defaults to alert name)
             </span>
           </template>
@@ -232,7 +232,7 @@ limitations under the License.
           label="EU Region"
         >
           <template v-slot:hint>
-            <span class="text-xs text-gray-400">
+            <span class="text-xs text-text-secondary">
               Enable for EU-based Opsgenie instances
             </span>
           </template>

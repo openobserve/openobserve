@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div v-else-if="isUpdatingDestination" class="p-3 text-center">
               <OSpinner size="md" data-test="add-destination-loading-indicator" />
-              <div class="mt-2 text-gray-400">Loading destination data...</div>
+              <div class="mt-2 text-text-muted">Loading destination data...</div>
             </div>
 
             <!-- Template selector for prebuilt destinations -->
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 valueKey="value"
                 tabindex="0"
               />
-              <div class="text-xs text-gray-400 mt-1">
+              <div class="text-xs text-text-secondary mt-1">
                 {{ t('alert_destinations.templateHelp', {
                   type: getDestinationTypeName(formData.destination_type),
                   name: defaultPrebuiltTemplateName,
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="w-full pb-3"
           >
-            <div class="app-tabs-container h-[36px] mr-2 w-fit">
+            <div class="app-tabs-container h-9 mr-2 w-fit">
               <app-tabs
                 data-test="add-destination-tabs"
                 :tabs="tabs"

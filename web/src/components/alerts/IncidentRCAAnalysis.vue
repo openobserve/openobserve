@@ -33,20 +33,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="analysisInFlight || rcaLoading"
       data-test="rca-inflight-container"
-      class="flex items-center gap-3 rounded-lg px-4 py-3 mb-2 flex-shrink-0"
-      :class="isDarkMode ? 'bg-indigo-900/20 border border-indigo-700/40' : 'bg-indigo-50 border border-indigo-200'"
+      class="flex items-center gap-3 rounded-lg px-4 py-3 mb-2 flex-shrink-0 bg-status-info-bg border border-banner-info-border"
     >
       <OSpinner variant="dots" size="xs" />
       <div>
         <p
-          class="text-sm font-medium mb-0"
-          :class="isDarkMode ? 'text-indigo-200' : 'text-indigo-800'"
+          class="text-sm font-medium mb-0 text-status-info-text"
         >
           {{ hasExistingRca ? 'AI SRE Agent is seeing what changed since the last analysis…' : 'AI SRE Agent is analyzing this incident, please wait…' }}
         </p>
         <p
-          class="text-xs mt-0.5 mb-0"
-          :class="isDarkMode ? 'text-indigo-300/70' : 'text-indigo-600/70'"
+          class="text-xs mt-0.5 mb-0 text-status-info-text opacity-70"
         >
           {{ hasExistingRca ? 'The report will be updated once the analysis is complete.' : 'The report will appear here once the analysis is complete.' }}
         </p>
@@ -57,8 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="rcaLoading && rcaStreamContent"
       data-test="rca-stream-container"
-      class="rca-container rounded p-3 flex-1 overflow-auto border"
-      :class="isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'"
+      class="rca-container rounded-sm p-3 flex-1 overflow-auto border bg-surface-base border-border-default"
     >
       <div
         data-test="rca-stream-content"
@@ -68,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Existing analysis content -->
-    <div v-else-if="hasExistingRca && !rcaLoading" data-test="rca-existing-container" class="rca-container rounded p-3 flex-1 overflow-auto border" :class="isDarkMode ? ' border-gray-700' : 'bg-white border-gray-200'">
+    <div v-else-if="hasExistingRca && !rcaLoading" data-test="rca-existing-container" class="rca-container rounded-sm p-3 flex-1 overflow-auto border bg-surface-base border-border-default">
       <div
         data-test="rca-existing-content"
         class="text-sm whitespace-pre-wrap rca-content"

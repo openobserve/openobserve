@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="template-body-editor"
                 ref="queryEditorRef"
                 editor-id="template-body-editor"
-                class="w-full min-h-[310px]! rounded-[5px] border border-card-glass-border resize-y overflow-auto mb-3"
+                class="w-full min-h-77.5! rounded-md border border-card-glass-border resize-y overflow-auto mb-3"
                 language="markdown"
                 v-model:query="formData.body"
               />
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="template-body-editor"
                 ref="queryEditorRef"
                 editor-id="template-body-editor"
-                class="w-full min-h-[310px]! rounded-[5px] border border-card-glass-border resize-y overflow-auto mb-3"
+                class="w-full min-h-77.5! rounded-md border border-card-glass-border resize-y overflow-auto mb-3"
                 language="json"
                 v-model:query="formData.body"
               />
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="flex justify-end gap-2 px-4 py-4 w-full bg-[var(--q-card-background)] border-t border-border-default"
+            class="flex justify-end gap-2 px-4 py-4 w-full bg-[var(--color-surface-base)] border-t border-border-default"
           >
             <OButton
               v-close-popup
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 data-test="add-template-sample-template-text"
-                class="bg-black/[0.07] px-2 rounded"
+                class="bg-black/[0.07] px-2 rounded-sm"
               >
                 <pre class="text-[10px] my-0">
                     {{ template.body }}

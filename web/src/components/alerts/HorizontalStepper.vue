@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="w-full py-6">
-    <div class="flex justify-between items-start relative max-w-[1200px] mx-auto px-4 stepper-container">
+    <div class="flex justify-between items-start relative max-w-300 mx-auto px-4 stepper-container">
       <div
         v-for="(step, index) in steps"
         :key="step.id"
@@ -33,19 +33,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step indicator -->
         <div class="step-indicator-wrapper flex items-center w-full relative">
           <div
-            class="step-indicator w-[40px] h-[40px] rounded-full flex items-center justify-center font-semibold text-base transition-all duration-300 ease-in-out relative z-[2] shrink-0 border-2"
+            class="step-indicator w-10 h-10 rounded-full flex items-center justify-center font-semibold text-base transition-all duration-300 ease-in-out relative z-[2] shrink-0 border-2"
             :class="
               step.hasError
-                ? 'bg-[#d32f2f] text-white border-[#d32f2f]'
+                ? 'bg-stepper-indicator-error text-stepper-indicator-fg border-stepper-indicator-error'
                 : completedSteps.includes(step.id) && currentStep !== step.id
-                  ? 'bg-[#2e7d32] text-white border-[#2e7d32]'
+                  ? 'bg-stepper-indicator-done text-stepper-indicator-fg border-stepper-indicator-done'
                   : currentStep === step.id
-                    ? isDarkMode
-                      ? 'bg-[#1976d2] text-white border-[#1976d2] shadow-[0_0_0_4px_rgba(25,118,210,0.2)]'
-                      : 'bg-[#1976d2] text-white border-[#1976d2] shadow-[0_0_0_4px_rgba(25,118,210,0.1)]'
-                    : isDarkMode
-                      ? 'bg-[#424242] text-[#9e9e9e] border-[#616161]'
-                      : 'bg-[#f5f5f5] text-[#757575] border-border-default'
+                    ? 'bg-stepper-indicator-active text-stepper-indicator-fg border-stepper-indicator-active shadow-[0_0_0_4px_rgba(25,118,210,0.15)]'
+                    : 'bg-stepper-indicator-default text-stepper-indicator-default-text border-border-default'
             "
           >
             <OIcon
@@ -65,35 +61,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Connector line -->
           <div
             v-if="index < steps.length - 1"
-            class="step-connector flex-1 h-[2px] mx-2 transition-all duration-300 ease-in-out"
+            class="step-connector flex-1 h-0.5 mx-2 transition-all duration-300 ease-in-out"
             :class="
               completedSteps.includes(step.id)
-                ? 'bg-[#2e7d32]'
-                : isDarkMode
-                  ? 'bg-[#616161]'
-                  : 'bg-border-default'
+                ? 'bg-stepper-connector-done'
+                : 'bg-stepper-connector'
             "
           ></div>
         </div>
 
         <!-- Step label -->
-        <div class="step-label mt-3 text-center max-w-[150px]">
+        <div class="step-label mt-3 text-center max-w-37.5">
           <div
             class="text-sm font-semibold mb-1"
             :class="
               currentStep === step.id
-                ? isDarkMode
-                  ? 'text-white'
-                  : 'text-[#1976d2] font-bold'
-                : isDarkMode
-                  ? 'text-border-default'
-                  : 'text-[#424242]'
+                ? 'text-stepper-title-active font-bold'
+                : 'text-stepper-title-default'
             "
           >{{ step.label }}</div>
           <div
             v-if="step.description"
-            class="text-xs opacity-70"
-            :class="isDarkMode ? 'text-[#bdbdbd]' : 'text-[#757575]'"
+            class="text-xs opacity-70 text-text-secondary"
           >
             {{ step.description }}
           </div>
@@ -104,8 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, type PropType } from "vue";
-import { useStore } from "vuex";
+import { defineComponent, type PropType } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export interface Step {
@@ -136,10 +124,6 @@ export default defineComponent({
   },
   emits: ["update:currentStep"],
   setup(props, { emit }) {
-    const store = useStore();
-
-    const isDarkMode = computed(() => store.state.theme === "dark");
-
     const canNavigateToStep = (stepId: number): boolean => {
       // Can always navigate to completed steps or current step
       if (props.completedSteps.includes(stepId) || stepId === props.currentStep) {
@@ -159,7 +143,6 @@ export default defineComponent({
     };
 
     return {
-      isDarkMode,
       canNavigateToStep,
       handleStepClick,
     };

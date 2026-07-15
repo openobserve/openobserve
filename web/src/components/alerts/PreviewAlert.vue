@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="chartPanelRef"
-    :class="store.state.theme !== 'dark' ? 'border border-[#e6e6e6]' : 'border border-[rgb(39,39,39)]'"
+    class="border border-border-default"
     style="
       height: 100%;
       position: relative;

@@ -31,19 +31,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Status Indicator -->
           <div
             v-if="evaluationStatus && !isRealTime"
-            class="alert-status-indicator group flex items-center gap-1.5 px-2 py-1 rounded border-l-[0.1875rem] border-l-solid bg-[rgba(76,175,80,0.08)] border-l-[#4caf50]"
+            class="alert-status-indicator group flex items-center gap-1.5 px-2 py-1 rounded-sm border-l-[0.1875rem] border-l-solid bg-status-success-bg border-l-status-positive"
             :class="{
               'status-indicator-light': store.state.theme !== 'dark',
-              'bg-[rgba(158,158,158,0.08)] border-l-[#9e9e9e]': !evaluationStatus.wouldTrigger,
-              'bg-[rgba(76,175,80,0.04)]': store.state.theme !== 'dark' && evaluationStatus.wouldTrigger,
-              'bg-[rgba(158,158,158,0.04)]': store.state.theme !== 'dark' && !evaluationStatus.wouldTrigger,
+              'bg-surface-subtle border-l-border-strong': !evaluationStatus.wouldTrigger,
             }"
             data-test="alert-status-indicator"
           >
             <OIcon
               :name="evaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" size="sm"
               class="text-xs flex-shrink-0"
-              :class="evaluationStatus.wouldTrigger ? 'text-green-500' : 'text-gray-400'"
+              :class="evaluationStatus.wouldTrigger ? 'text-status-positive' : 'text-text-muted'"
             />
             <span class="text-xs font-semibold tracking-wide uppercase flex-shrink-0 whitespace-nowrap">
               {{ evaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}

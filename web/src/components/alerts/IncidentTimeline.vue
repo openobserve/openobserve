@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="min-h-[400px] flex flex-col h-full">
+  <div class="min-h-100 flex flex-col h-full">
 
     <!-- Loading -->
     <div v-if="loading" class="flex justify-center items-center py-12">
@@ -25,11 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty state -->
     <div
       v-else-if="events.length === 0"
-      class="flex flex-col items-center justify-center py-16 text-gray-500"
+      class="flex flex-col items-center justify-center py-16 text-text-muted"
     >
       <OIcon name="forum" class="mb-3 opacity-40" style="width: 56px; height: 56px;" />
       <div class="text-base font-medium mb-1">No activity yet</div>
-      <div class="text-sm text-gray-400">Events and comments will appear here</div>
+      <div class="text-sm text-text-muted">Events and comments will appear here</div>
     </div>
 
     <!-- Activity Feed with Timeline -->
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="absolute left-3 top-0 bottom-0 w-0.5"
           :style="{
-            backgroundColor: store.state.theme === 'dark' ? '#2d333b' : '#e5e7eb',
+            backgroundColor: 'var(--color-border-default)',
             marginTop: '12px',
             marginBottom: '12px'
           }"
@@ -79,8 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="getUserId(event) !== 'System'"
                     class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative"
                     :style="{
-                      backgroundColor: store.state.theme === 'dark' ? '#181a1b' : '#ffffff',
-                      border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
+                      backgroundColor: 'var(--color-surface-base)',
+                      border: '1px solid var(--color-border-default)'
                     }"
                   >
                     <OIcon
@@ -94,8 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else
                     class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative"
                     :style="{
-                      backgroundColor: store.state.theme === 'dark' ? '#2d333b' : '#f6f8fa',
-                      border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
+                      backgroundColor: 'var(--color-surface-subtle)',
+                      border: '1px solid var(--color-border-default)'
                     }"
                   >
                     <OIcon
@@ -113,13 +113,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-if="getUserId(event) !== 'System'">
                       <span
                         class="font-semibold text-sm"
-                        :class="store.state.theme === 'dark' ? 'text-gray-100' : 'text-gray-900'"
+                        :class="'text-text-heading'"
                       >
                         {{ getUserId(event) }}
                       </span>
                       <span
                         v-if="event.type !== 'SeverityUpgrade' && event.type !== 'SeverityOverride'"
-                        class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
+                        class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-semibold"
                         :style="{
                           backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
                           border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ getEventBadgeText(event) }}
                       </span>
                       <span class="text-sm"
-                        :class="store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700'"
+                        :class="'text-text-body'"
                         v-html="DOMPurify.sanitize(getInlineEventText(event))"
                       ></span>
                     </template>
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- AI events: "AI SRE" badge first, then message text -->
                       <template v-if="event.type === 'ai_analysis_begin' || event.type === 'ai_analysis_complete' || event.type === 'ai_analysis_failed'">
                         <span
-                          class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
+                          class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-semibold"
                           :style="{
                             backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
                             border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
@@ -149,14 +149,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OTooltip v-if="event.type === 'ai_analysis_failed' && getFailureTooltip(event)" :delay="300" side="bottom" align="start" :max-width="'24rem'" :content="getFailureTooltip(event)" />
                         </span>
                         <span class="text-sm"
-                          :class="store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700'"
+                          :class="'text-text-body'"
                           v-html="DOMPurify.sanitize(getInlineEventText(event))"
                         ></span>
                       </template>
                       <!-- For Alert events, show badge first -->
                       <template v-else-if="event.type === 'Alert'">
                         <span
-                          class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
+                          class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-semibold"
                           :style="{
                             backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
                             border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
@@ -166,19 +166,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ getEventBadgeText(event) }}
                         </span>
                         <span class="text-sm"
-                          :class="store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700'"
+                          :class="'text-text-body'"
                           v-html="DOMPurify.sanitize(getInlineEventText(event))"
                         ></span>
                       </template>
                       <!-- All other system events: text then badge (except severity changes) -->
                       <template v-else>
                         <span class="text-sm"
-                          :class="store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700'"
+                          :class="'text-text-body'"
                           v-html="getInlineEventText(event)"
                         ></span>
                         <span
                           v-if="event.type !== 'SeverityUpgrade' && event.type !== 'SeverityOverride'"
-                          class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
+                          class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-semibold"
                           :style="{
                             backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
                             border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                     </template>
                     <span class="text-xs"
-                      :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'"
+                      :class="'text-text-secondary'"
                     >
                       {{ formatRelativeTime(event.timestamp) }}
                     </span>
@@ -207,8 +207,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative"
                     :style="{
-                      backgroundColor: store.state.theme === 'dark' ? '#181a1b' : '#ffffff',
-                      border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
+                      backgroundColor: 'var(--color-surface-base)',
+                      border: '1px solid var(--color-border-default)'
                     }"
                   >
                     <OIcon
@@ -224,24 +224,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Comment Box -->
                   <div
                     class="rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-                    :style="store.state.theme === 'dark'
-                      ? { backgroundColor: '#181a1b', border: '1px solid #3f4447' }
-                      : { backgroundColor: '#ffffff', border: '1px solid #d1d5db' }"
+                    :style="{ backgroundColor: 'var(--color-surface-base)', border: '1px solid var(--color-border-default)' }"
                   >
                     <!-- Header -->
                     <div
                       class="px-4 py-2 flex items-center gap-2 border-b"
-                      :style="store.state.theme === 'dark'
-                        ? { backgroundColor: '#0f1011', borderBottomColor: '#3f4447' }
-                        : { backgroundColor: '#f9fafb', borderBottomColor: '#e5e7eb' }"
+                      :style="{ backgroundColor: 'var(--color-surface-subtle)', borderBottomColor: 'var(--color-border-default)' }"
                     >
                       <span class="font-semibold text-sm"
-                        :class="store.state.theme === 'dark' ? 'text-gray-100' : 'text-gray-900'"
+                        :class="'text-text-heading'"
                       >
                         {{ getUserId(event) }}
                       </span>
                       <span class="text-xs"
-                        :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'"
+                        :class="'text-text-secondary'"
                       >
                         commented {{ formatRelativeTime(event.timestamp) }}
                       </span>
@@ -250,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Comment Body -->
                     <div class="px-4 py-3">
                       <div class="text-sm whitespace-pre-wrap break-words leading-relaxed"
-                        :class="store.state.theme === 'dark' ? 'text-gray-200' : 'text-gray-800'"
+                        :class="'text-text-body'"
                       >
                         {{ event.data?.comment || '' }}
                       </div>
@@ -273,8 +269,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="w-6 h-6 rounded-full flex items-center justify-center"
             :style="{
-              backgroundColor: store.state.theme === 'dark' ? '#181a1b' : '#ffffff',
-              border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
+              backgroundColor: 'var(--color-surface-base)',
+              border: '1px solid var(--color-border-default)'
             }"
           >
             <OIcon

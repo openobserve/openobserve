@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :subLabel="t('alerts.deduplication.subtitle')"
           icon="filter-alt"
           class="w-full w-full pl-4 pr-2 py-2"
-          :iconClass="'mt-[2px]'"
+          :iconClass="'mt-0.5'"
         />
       </div>
 
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="info"
                   size="sm"
                   class="ml-1 cursor-pointer"
-                  :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
+                  :class="'text-text-secondary'"
                  />
                   <OTooltip
                     side="right"
@@ -49,15 +49,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :content="t('alerts.deduplication.fingerprintFieldsTooltip')"
                   />
               </div>
-              <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              <div class="text-sm text-text-secondary mb-2">
                 {{ t("alerts.deduplication.fingerprintFieldsHint") }}
               </div>
               <OSelect
                 v-model="localConfig.fingerprint_fields"
                 :options="availableFields"
-                class="showLabelOnTop no-case"
-                :class="store.state.theme === 'dark' ? 'input-box-bg-dark input-border-dark' : 'input-box-bg-light input-border-light'"
-                multiple
+                class="showLabelOnTop no-case"                multiple
                 valueKey="value"
                 labelKey="label"
                 @update:model-value="emitUpdate"
@@ -78,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="info"
                   size="sm"
                   class="ml-1 cursor-pointer"
-                  :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
+                  :class="'text-text-secondary'"
                  />
                   <OTooltip
                     side="right"
@@ -87,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :content="t('alerts.deduplication.timeWindowTooltip')"
                   />
               </div>
-              <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              <div class="text-sm text-text-secondary mb-2">
                 {{ t("alerts.deduplication.timeWindowHint") }}
               </div>
               <OInput
@@ -95,9 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="number"
                 min="1"
                 suffix="minutes"
-                :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
-                :class="store.state.theme === 'dark' ? 'input-box-bg-dark input-border-dark' : 'input-box-bg-light input-border-light'"
-                @update:model-value="emitUpdate"
+                :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"                @update:model-value="emitUpdate"
               />
             </div>
 

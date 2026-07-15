@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <!-- Show ID as read-only caption for existing groups -->
-        <div v-if="localGroup.id" class="text-xs text-gray-400">
+        <div v-if="localGroup.id" class="text-xs text-text-secondary">
           {{ t("common.id") }}: {{ localGroup.id }}
         </div>
         <OSwitch

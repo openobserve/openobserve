@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Loading State -->
       <div v-if="isLoading" class="text-center p-4">
         <OSpinner variant="dots" size="lg" />
-        <div class="text-sm text-gray-400 mt-3">Analyzing file...</div>
+        <div class="text-sm text-text-muted mt-3">Analyzing file...</div>
       </div>
 
       <!-- Diff Preview -->
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="max-h-[calc(100vh-400px)] overflow-y-auto">
           <!-- Additions -->
           <div v-if="diffData.additions.length > 0" class="mb-3">
-            <div class="text-sm font-semibold border-b border-separator text-green-500 p-2">
+            <div class="text-sm font-semibold border-b border-separator text-status-positive p-2">
               <OIcon name="add-circle" size="sm" />
               New ({{ selectedAdditions.length }}/{{
                 diffData.additions.length
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Modifications -->
           <div v-if="diffData.modifications.length > 0" class="mb-3">
-            <div class="text-sm font-semibold border-b border-separator text-amber-500 p-2">
+            <div class="text-sm font-semibold border-b border-separator text-status-warning-text p-2">
               <OIcon name="edit" size="sm" />
               Modified ({{ selectedModifications.length }}/{{
                 diffData.modifications.length
@@ -227,8 +227,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Empty State -->
       <div v-else class="empty-state text-center p-4">
         <OIcon name="cloud-upload" class="mb-3" style="width: 64px; height: 64px;" />
-        <div class="text-xl font-semibold text-gray-400 mb-2">Upload a JSON file</div>
-        <div class="text-sm text-gray-400">
+        <div class="text-xl font-semibold text-text-muted mb-2">Upload a JSON file</div>
+        <div class="text-sm text-text-secondary">
           The system will analyze the file and show you what will change
         </div>
       </div>
@@ -273,11 +273,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex gap-3">
       <div class="w-1/2">
-        <div class="text-sm font-medium text-red-500 mb-2">Current</div>
+        <div class="text-sm font-medium text-status-error-text mb-2">Current</div>
         <div class="text-xs mb-1">
           {{ selectedModification?.current.fields.length }} fields
         </div>
-        <div class="max-h-[250px] overflow-y-auto p-2 bg-[var(--q-dark)] rounded">
+        <div class="max-h-62.5 overflow-y-auto p-2 bg-[var(--q-dark)] rounded-sm">
           <OTag
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
@@ -290,11 +290,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="w-1/2">
-        <div class="text-sm font-medium text-green-500 mb-2">Proposed</div>
+        <div class="text-sm font-medium text-status-positive mb-2">Proposed</div>
         <div class="text-xs mb-1">
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
-        <div class="max-h-[250px] overflow-y-auto p-2 bg-[var(--q-dark)] rounded">
+        <div class="max-h-62.5 overflow-y-auto p-2 bg-[var(--q-dark)] rounded-sm">
           <OTag
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"

@@ -24,12 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Section header -->
       <div
-        class="section-header flex items-center py-[10px] px-3"
-        :class="store.state.theme === 'dark' ? 'border-b border-[#343434]' : 'border-b border-[#eeeeee]'"
+        class="section-header flex items-center py-2.5 px-3 border-b border-border-default"
       >
-        <div class="section-header-accent w-[3px] h-4 rounded-[2px] mr-2 shrink-0 bg-[var(--q-primary)]" />
+        <div class="section-header-accent w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--q-primary)]" />
         <span
-          class="section-header-title text-[13px] font-semibold text-text-primary"
+          class="section-header-title text-compact font-semibold text-text-primary"
         >{{
           t("alerts.additional_settings") || "Additional Settings"
         }}</span>
@@ -39,8 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Template Override -->
         <div>
           <div
-            class="subsection-label flex items-center text-xs font-semibold mb-2"
-            :class="store.state.theme === 'dark' ? 'text-[#9ca3af]' : 'text-[#6b7280]'"
+            class="subsection-label flex items-center text-xs font-semibold mb-2 text-text-secondary"
           >
             <span>{{ t("alerts.template") }}</span>
             <OButton
@@ -60,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :options="formattedTemplates"
               clearable
               :placeholder="t('alerts.advanced.selectTemplate')"
-              class="min-w-[240px] max-w-[300px]"
+              class="min-w-60 max-w-75"
               data-test="advanced-template-override-select"
               @update:model-value="emitTemplateUpdate"
             >
@@ -80,8 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Context Variables -->
         <div>
           <div
-            class="subsection-label flex items-center text-xs font-semibold mb-2"
-            :class="store.state.theme === 'dark' ? 'text-[#9ca3af]' : 'text-[#6b7280]'"
+            class="subsection-label flex items-center text-xs font-semibold mb-2 text-text-secondary"
           >
             <span>{{ t("alerts.additionalVariables") }}</span>
             <OButton
@@ -116,14 +113,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-variables-key-input"
                 v-model="variable.key"
                 :placeholder="t('common.name')"
-                class="min-w-[140px]"
+                class="min-w-35"
                 @update:model-value="emitUpdate"
               />
               <OInput
                 data-test="alert-variables-value-input"
                 v-model="variable.value"
                 :placeholder="t('common.value')"
-                class="min-w-[200px]"
+                class="min-w-50"
                 @update:model-value="emitUpdate"
               />
               <OButton
@@ -150,8 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Description -->
         <div>
           <div
-            class="subsection-label flex items-center text-xs font-semibold mb-2"
-            :class="store.state.theme === 'dark' ? 'text-[#9ca3af]' : 'text-[#6b7280]'"
+            class="subsection-label flex items-center text-xs font-semibold mb-2 text-text-secondary"
           >
             <span>{{ t("alerts.description") }}</span>
           </div>
@@ -167,8 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div>
           <div class="flex items-center justify-between mb-2">
             <div
-              class="subsection-label flex items-center text-xs font-semibold"
-              :class="store.state.theme === 'dark' ? 'text-[#9ca3af]' : 'text-[#6b7280]'"
+              class="subsection-label flex items-center text-xs font-semibold text-text-secondary"
             >
               <span>{{ t("alerts.row") }}</span>
               <OButton

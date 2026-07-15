@@ -78,13 +78,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center gap-2">
               <div class="col-auto">
                 <OTag type="diffCategory" value="new" class="text-sm!">
-                  <strong class="text-[15px]">{{ diffData.additions.length }}</strong
+                  <strong class="text-sm">{{ diffData.additions.length }}</strong
                   >&nbsp;New
                 </OTag>
               </div>
               <div class="col-auto">
                 <OTag type="diffCategory" value="modified" class="text-sm!">
-                  <strong class="text-[15px]">{{ diffData.modifications.length }}</strong
+                  <strong class="text-sm">{{ diffData.modifications.length }}</strong
                   >&nbsp;Modified
                 </OTag>
               </div>
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="card-container groups-scroll-container flex-1 overflow-y-auto overflow-x-hidden p-2">
             <!-- Additions -->
             <div v-if="diffData.additions.length > 0" class="mb-2">
-              <div class="text-sm font-semibold border-b border-separator mb-1 text-green-500 p-1">
+              <div class="text-sm font-semibold border-b border-separator mb-1 text-status-positive p-1">
                 <OIcon name="add-circle" size="sm" />
                 New ({{ selectedAdditions.length }}/{{
                   diffData.additions.length
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-for="group in diffData.additions"
                   :key="group.id"
                   data-test="semantic-groups-addition-item"
-                  class="compact-item flex items-start gap-2 px-2 py-1 min-h-[44px] cursor-pointer hover:bg-muted/50"
+                  class="compact-item flex items-start gap-2 px-2 py-1 min-h-11 cursor-pointer hover:bg-muted/50"
                   @click="toggleAddition(group.id)"
                 >
                   <div class="flex items-start shrink-0 pt-1">
@@ -140,8 +140,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                   <div class="flex flex-col flex-1 min-w-0 px-2">
-                    <span class="text-[13px] font-medium">{{ group.display }}</span>
-                    <span class="block text-[11px] text-muted-foreground truncate">
+                    <span class="text-compact font-medium">{{ group.display }}</span>
+                    <span class="block text-2xs text-muted-foreground truncate">
                       {{ group.id }} • {{ group.fields.length }} fields
                       <OTag v-if="group.normalize" type="normalizeState" value="true" class="ml-1" />
                     </span>
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Modifications -->
             <div v-if="diffData.modifications.length > 0" class="mb-2">
-              <div class="text-sm font-semibold border-b border-separator mb-1 text-amber-500 p-1">
+              <div class="text-sm font-semibold border-b border-separator mb-1 text-status-warning-text p-1">
                 <OIcon name="edit" size="sm" />
                 Modified ({{ selectedModifications.length }}/{{
                   diffData.modifications.length
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-for="mod in diffData.modifications"
                   :key="mod.proposed.id"
                   data-test="semantic-groups-modification-item"
-                  class="compact-item flex items-start gap-2 px-2 py-1 min-h-[44px] cursor-pointer hover:bg-muted/50"
+                  class="compact-item flex items-start gap-2 px-2 py-1 min-h-11 cursor-pointer hover:bg-muted/50"
                   @click="toggleModification(mod.proposed.id)"
                 >
                   <div class="flex items-start shrink-0 pt-1">
@@ -184,8 +184,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                   <div class="flex flex-col flex-1 min-w-0 px-2">
-                    <span class="text-[13px] font-medium">{{ mod.proposed.display }}</span>
-                    <span class="block text-[11px] text-muted-foreground truncate">
+                    <span class="text-compact font-medium">{{ mod.proposed.display }}</span>
+                    <span class="block text-2xs text-muted-foreground truncate">
                       {{ mod.proposed.id }} • {{ mod.current.fields.length }} → {{ mod.proposed.fields.length }} fields
                     </span>
                   </div>
@@ -213,11 +213,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <li
                     v-for="group in diffData.unchanged"
                     :key="group.id"
-                    class="compact-item flex items-center gap-2 px-2 py-1 min-h-[44px]"
+                    class="compact-item flex items-center gap-2 px-2 py-1 min-h-11"
                   >
                     <div class="flex flex-col flex-1 min-w-0 px-2">
-                      <span class="text-[13px]">{{ group.display }}</span>
-                      <span class="block text-[11px] text-muted-foreground">{{ group.id }} • {{ group.fields.length }} fields</span>
+                      <span class="text-compact">{{ group.display }}</span>
+                      <span class="block text-2xs text-muted-foreground">{{ group.id }} • {{ group.fields.length }} fields</span>
                     </div>
                   </li>
                 </ul>
@@ -232,10 +232,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="card-container p-4 text-center"
         >
           <OIcon name="cloud-upload" class="mb-3" style="width: 64px; height: 64px;" />
-          <div class="text-xl font-semibold text-gray-400 mb-2">
+          <div class="text-xl font-semibold text-text-muted mb-2">
             Upload a JSON file to get started
           </div>
-          <div class="text-sm text-gray-400">
+          <div class="text-sm text-text-secondary">
             The system will analyze the file and show you what will change
           </div>
         </div>
@@ -284,11 +284,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex gap-3">
       <div class="w-1/2">
-        <div class="text-sm font-medium text-red-500 mb-2">Current</div>
+        <div class="text-sm font-medium text-status-error-text mb-2">Current</div>
         <div class="text-xs mb-1">
           {{ selectedModification?.current.fields.length }} fields
         </div>
-        <div class="field-chips-container max-h-[250px] overflow-y-auto p-2 bg-surface-base rounded">
+        <div class="field-chips-container max-h-62.5 overflow-y-auto p-2 bg-surface-base rounded-sm">
           <OTag
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
@@ -301,11 +301,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="w-1/2">
-        <div class="text-sm font-medium text-green-500 mb-2">Proposed</div>
+        <div class="text-sm font-medium text-status-positive mb-2">Proposed</div>
         <div class="text-xs mb-1">
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
-        <div class="field-chips-container max-h-[250px] overflow-y-auto p-2 bg-surface-base rounded">
+        <div class="field-chips-container max-h-62.5 overflow-y-auto p-2 bg-surface-base rounded-sm">
           <OTag
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"

@@ -43,12 +43,12 @@ limitations under the License. -->
           </div>
 
           <!-- Name -->
-          <div data-test="destination-type-name" class="card-title text-[0.8125rem] font-medium mt-1 mb-0 text-text-primary [line-height:1.3] text-center">
+          <div data-test="destination-type-name" class="card-title text-compact font-medium mt-1 mb-0 text-text-primary [line-height:1.3] text-center">
             {{ type.name }}
           </div>
 
           <!-- Description -->
-          <div data-test="destination-type-description" class="card-description text-[0.6875rem] text-text-secondary mt-1 mb-0 [line-height:1.2] grow text-center hidden">
+          <div data-test="destination-type-description" class="card-description text-2xs text-text-secondary mt-1 mb-0 [line-height:1.2] grow text-center hidden">
             {{ type.description }}
           </div>
         </div>
@@ -74,10 +74,10 @@ limitations under the License. -->
           <div data-test="destination-type-icon" class="mb-2 text-icon-color group-[.selected]/dest-card:text-[var(--color-accent)]">
             <OIcon name="settings" size="md" />
           </div>
-          <div data-test="destination-type-name" class="card-title text-[0.8125rem] font-medium mt-1 mb-0 text-text-primary [line-height:1.3] text-center">
+          <div data-test="destination-type-name" class="card-title text-compact font-medium mt-1 mb-0 text-text-primary [line-height:1.3] text-center">
             {{ t('alerts.customDestination') }}
           </div>
-          <div data-test="destination-type-description" class="card-description text-[0.6875rem] text-text-secondary mt-1 mb-0 [line-height:1.2] grow text-center hidden">
+          <div data-test="destination-type-description" class="card-description text-2xs text-text-secondary mt-1 mb-0 [line-height:1.2] grow text-center hidden">
             {{ t('alerts.customDestinationDescription') }}
           </div>
         </div>

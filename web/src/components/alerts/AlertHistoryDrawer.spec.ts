@@ -592,8 +592,8 @@ describe("AlertHistoryDrawer.vue", () => {
       const vm = wrapper.vm as any;
       // Store theme is "dark" by default in test helper
       // getRowClass takes a row object with status property
-      expect(vm.getRowClass({ status: "firing" })).toBe("!bg-[#2d1b1b]");
-      expect(vm.getRowClass({ status: "error" })).toBe("!bg-[#2d1b1b]");
+      expect(vm.getRowClass({ status: "firing" })).toBe("!bg-status-error-bg");
+      expect(vm.getRowClass({ status: "error" })).toBe("!bg-status-error-bg");
       expect(vm.getRowClass({ status: "ok" })).toBe("");
       expect(vm.getRowClass({ status: "success" })).toBe("");
     });

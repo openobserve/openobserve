@@ -37,9 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="titleInputRef"
           :class="[
             'font-bold px-2 py-1 rounded-md outline-none border-2',
-            store.state.theme === 'dark'
-              ? 'text-blue-400 bg-blue-900/50 border-blue-500'
-              : 'text-blue-600 bg-blue-50 border-blue-400'
+            'text-text-link bg-status-info-bg border-text-link'
           ]"
           style="min-width: 300px; max-width: 500px;"
         />
@@ -187,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Tab Content Container -->
       <div class="flex flex-1 overflow-hidden">
       <!-- Left Column: Incident Details (only show on Incident Analysis tab, HIDDEN for Overview) -->
-      <div v-if="activeTab === 'incidentAnalysis'" class="w-[400px] min-w-[400px] max-w-[400px] flex-shrink-0 flex flex-col h-full" style="order: 1;">
+      <div v-if="activeTab === 'incidentAnalysis'" class="w-100 min-w-100 max-w-100 flex-shrink-0 flex flex-col h-full" style="order: 1;">
 
         <!-- Table of Contents (only on Incident Analysis) -->
         <IncidentTableOfContents
@@ -330,10 +328,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t('alerts.incidents.incidentTimeline') }}
                     </div>
                     <div
-                      class="px-2 py-0.5 rounded text-xs font-medium"
+                      class="px-2 py-0.5 rounded-sm text-xs font-medium"
                       :style="{
                         backgroundColor: 'var(--color-surface-panel)',
-                        color: store.state.theme === 'dark' ? '#9CA3AF' : '#6B7280'
+                        color: 'var(--color-text-secondary)'
                       }"
                     >
                       UTC
@@ -358,7 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         class="w-2.5 h-2.5 rounded-full flex-shrink-0 z-10 mt-2"
                         :style="{
-                          backgroundColor: '#10B981'
+                          backgroundColor: 'var(--color-timeline-dot-success)'
                         }"
                       ></div>
                       <div class="flex-1">
@@ -378,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         class="w-2.5 h-2.5 rounded-full flex-shrink-0 z-10 mt-2"
                         :style="{
-                          backgroundColor: '#F59E0B'
+                          backgroundColor: 'var(--color-status-warning-text)'
                         }"
                       ></div>
                       <div class="flex-1">
@@ -398,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         class="w-2.5 h-2.5 rounded-full flex-shrink-0 z-10 mt-2"
                         :style="{
-                          backgroundColor: incidentDetails?.status === 'resolved' ? '#10B981' : '#EF4444'
+                          backgroundColor: incidentDetails?.status === 'resolved' ? 'var(--color-timeline-dot-success)' : 'var(--color-timeline-dot-destructive)'
                         }"
                       ></div>
                       <div class="flex-1">
@@ -446,17 +444,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t('alerts.incidents.incidentId') }}
                       </div>
                       <div
-                        class="flex items-center gap-2 px-2.5 py-1 rounded border text-xs font-mono min-w-0"
+                        class="flex items-center gap-2 px-2.5 py-1 rounded-sm border text-xs font-mono min-w-0"
                         :style="{
                           backgroundColor: 'var(--color-surface-panel)',
-                          borderColor: store.state.theme === 'dark' ? '#444444' : '#E7EAEE',
-                          color: store.state.theme === 'dark' ? '#E5E7EB' : '#374151'
+                          borderColor: 'var(--color-border-default)',
+                          color: 'var(--color-text-body)'
                         }"
                       >
                         <span class="truncate flex-1 min-w-0">{{ incidentDetails?.id || 'N/A' }}</span>
                         <OIcon
                           :name="copiedField === 'incident_id' ? 'check' : 'content-copy'" size="sm"
-                          :class="copiedField === 'incident_id' ? 'text-green-500' : 'opacity-60 hover:opacity-100 hover:text-blue-500'"
+                          :class="copiedField === 'incident_id' ? 'text-status-positive' : 'opacity-60 hover:opacity-100 hover:text-text-link'"
                           class="cursor-pointer transition-all flex-shrink-0"
                           style="font-size: 14px; cursor: pointer;"
                           @click="copyToClipboard(incidentDetails?.id, 'incident_id')"
@@ -470,17 +468,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t('alerts.incidents.incidentName') }}
                       </div>
                       <div
-                        class="flex items-center gap-2 px-2.5 py-1 rounded border text-xs min-w-0"
+                        class="flex items-center gap-2 px-2.5 py-1 rounded-sm border text-xs min-w-0"
                         :style="{
                           backgroundColor: 'var(--color-surface-panel)',
-                          borderColor: store.state.theme === 'dark' ? '#444444' : '#E7EAEE',
-                          color: store.state.theme === 'dark' ? '#E5E7EB' : '#374151'
+                          borderColor: 'var(--color-border-default)',
+                          color: 'var(--color-text-body)'
                         }"
                       >
                         <span class="truncate flex-1 min-w-0">{{ incidentDetails?.title || 'N/A' }}</span>
                         <OIcon
                           :name="copiedField === 'incident_title' ? 'check' : 'content-copy'" size="sm"
-                          :class="copiedField === 'incident_title' ? 'text-green-500' : 'opacity-60 hover:opacity-100 hover:text-blue-500'"
+                          :class="copiedField === 'incident_title' ? 'text-status-positive' : 'opacity-60 hover:opacity-100 hover:text-text-link'"
                           class="cursor-pointer transition-all flex-shrink-0"
                           style="font-size: 14px; cursor: pointer;"
                           @click="copyToClipboard(incidentDetails?.title, 'incident_title')"
@@ -494,17 +492,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         Correlated By
                       </div>
                       <div
-                        class="flex items-center gap-2 px-2.5 py-1 rounded border text-xs min-w-0"
+                        class="flex items-center gap-2 px-2.5 py-1 rounded-sm border text-xs min-w-0"
                         :style="{
                           backgroundColor: 'var(--color-surface-panel)',
-                          borderColor: store.state.theme === 'dark' ? '#444444' : '#E7EAEE',
-                          color: store.state.theme === 'dark' ? '#E5E7EB' : '#374151'
+                          borderColor: 'var(--color-border-default)',
+                          color: 'var(--color-text-body)'
                         }"
                       >
                         <span class="truncate flex-1 min-w-0">{{ getCorrelationMethodLabel(incidentDetails?.key_type) }}</span>
                         <OIcon
                           :name="copiedField === 'key_type' ? 'check' : 'content-copy'" size="sm"
-                          :class="copiedField === 'key_type' ? 'text-green-500' : 'opacity-60 hover:opacity-100 hover:text-blue-500'"
+                          :class="copiedField === 'key_type' ? 'text-status-positive' : 'opacity-60 hover:opacity-100 hover:text-text-link'"
                           class="cursor-pointer transition-all flex-shrink-0"
                           style="font-size: 14px; cursor: pointer;"
                           @click="copyToClipboard(getCorrelationMethodLabel(incidentDetails?.key_type), 'key_type')"
@@ -674,7 +672,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :key="key"
                       class="py-2.5 border-b flex gap-2"
                       :style="{
-                        borderColor: store.state.theme === 'dark' ? '#444444' : '#E7EAEE'
+                        borderColor: 'var(--color-border-default)'
                       }"
                       :class="{ 'border-b-0': key === Object.keys(incidentDetails.group_values)[Object.keys(incidentDetails.group_values).length - 1] }"
                     >
@@ -728,7 +726,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :key="alert.id"
                       class="py-2.5 border-b"
                       :style="{
-                        borderColor: store.state.theme === 'dark' ? '#444444' : '#E7EAEE'
+                        borderColor: 'var(--color-border-default)'
                       }"
                       :class="{ 'border-b-0': index === sortedAlertsByTriggerCount.length - 1 }"
                     >
@@ -811,7 +809,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Right Section: Trigger Details -->
-          <div class="w-[400px] flex-shrink-0 flex flex-col pt-4">
+          <div class="w-100 flex-shrink-0 flex flex-col pt-4">
             <div
               :class="[
                 'border border-card-glass-border rounded-md overflow-hidden flex flex-col flex-1'
@@ -821,9 +819,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 :class="[
                   '!bg-[var(--color-theme-table-header-bg)] px-3 py-2 flex items-center gap-2 border-b flex-shrink-0',
-                  store.state.theme === 'dark'
-                    ? 'border-gray-700'
-                    : 'border-gray-200'
+                  'border-border-default'
                 ]"
               >
                 <OIcon name="info" size="sm" class="opacity-80" />
@@ -921,26 +917,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Alert Conditions Section -->
-                  <div :class="['rounded border flex flex-col border-card-glass-border rounded-md',]" class="overflow-hidden" style="height: 392px;">
-                    <div :class="['!bg-[var(--color-theme-table-header-bg)] px-2.5 py-1.5 border-b flex items-center justify-between flex-shrink-0', store.state.theme === 'dark' ? 'border-gray-700' : 'border-gray-200']">
-                      <span :class="'text-text-secondary'" class="text-[11px] font-semibold uppercase tracking-wide">
+                  <div :class="['rounded-sm border flex flex-col border-card-glass-border rounded-md',]" class="overflow-hidden" style="height: 392px;">
+                    <div :class="['!bg-[var(--color-theme-table-header-bg)] px-2.5 py-1.5 border-b flex items-center justify-between flex-shrink-0', 'border-border-default']">
+                      <span :class="'text-text-secondary'" class="text-2xs font-semibold uppercase tracking-wide">
                         {{ alerts[selectedAlertIndex]?.query_condition?.type === 'sql' ? 'SQL Query' : alerts[selectedAlertIndex]?.query_condition?.type === 'promql' ? 'PromQL Query' : 'Conditions' }}
                       </span>
                     </div>
                     <div class="p-2.5 overflow-y-auto flex-1">
                       <!-- SQL Query -->
                       <div v-if="alerts[selectedAlertIndex]?.query_condition?.sql">
-                        <pre :class="['text-[0.8rem] overflow-x-auto whitespace-pre-wrap break-words', store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-800']">{{ alerts[selectedAlertIndex]?.query_condition?.sql }}</pre>
+                        <pre :class="['text-[0.8rem] overflow-x-auto whitespace-pre-wrap break-words', 'text-text-body']">{{ alerts[selectedAlertIndex]?.query_condition?.sql }}</pre>
                       </div>
 
                       <!-- PromQL Query -->
                       <div v-else-if="alerts[selectedAlertIndex]?.query_condition?.promql">
-                        <pre :class="['text-[0.8rem] overflow-x-auto whitespace-pre-wrap break-words', store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-800']">{{ alerts[selectedAlertIndex]?.query_condition?.promql }}</pre>
+                        <pre :class="['text-[0.8rem] overflow-x-auto whitespace-pre-wrap break-words', 'text-text-body']">{{ alerts[selectedAlertIndex]?.query_condition?.promql }}</pre>
                       </div>
 
                       <!-- Custom Conditions -->
                       <div v-else-if="alerts[selectedAlertIndex]?.query_condition?.conditions">
-                        <pre :class="['text-[0.8rem] overflow-x-auto whitespace-pre-wrap break-words', store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-800']">if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.conditions) }}</pre>
+                        <pre :class="['text-[0.8rem] overflow-x-auto whitespace-pre-wrap break-words', 'text-text-body']">if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.conditions) }}</pre>
                       </div>
 
                       <!-- No conditions -->
@@ -2639,18 +2635,18 @@ export default defineComponent({
             const classes = [
               'rca-h1 font-bold text-lg text-center mb-4 pb-2 border-b-2',
               // TODO: Discuss with team - h2 section separators with background and left border
-              // Remove 'rca-section-bg px-4 py-3 rounded border-l-4 border-blue-600' if not approved
-              'rca-h2 font-bold text-lg mt-5 mb-3 text-blue-600 rca-section-bg px-4 py-3 rounded border-l-4 border-blue-600',
+              // Remove 'rca-section-bg px-4 py-3 rounded-sm border-l-4 border-blue-600' if not approved
+              'rca-h2 font-bold text-lg mt-5 mb-3 text-blue-600 rca-section-bg px-4 py-3 rounded-sm border-l-4 border-blue-600',
               'rca-h3 font-semibold text-base mt-4 mb-2',
               'rca-h4 font-semibold text-sm mt-3 mb-2 text-gray-700',
             ];
             return `<div id="${id}" class="${classes[depth - 1] || ''}">${parsedText}</div>`;
           },
           code({ text }: any) {
-            return `<div class="rca-code-block bg-gray-100 border border-gray-300 rounded p-3 my-3 overflow-x-auto"><pre class="text-sm font-mono whitespace-pre m-0"><code>${text}</code></pre></div>`;
+            return `<div class="rca-code-block bg-gray-100 border border-gray-300 rounded-sm p-3 my-3 overflow-x-auto"><pre class="text-sm font-mono whitespace-pre m-0"><code>${text}</code></pre></div>`;
           },
           codespan({ text }: any) {
-            return `<code class="rca-inline-code bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono">${text}</code>`;
+            return `<code class="rca-inline-code bg-gray-100 px-1.5 py-0.5 rounded-sm text-sm font-mono">${text}</code>`;
           },
           list(token: any) {
             const body = token.items.map((item: any) => this.listitem(item)).join('');
@@ -2684,7 +2680,7 @@ export default defineComponent({
               body += '</tr>';
             }
 
-            return `<div class="rca-table-wrapper my-4 overflow-x-auto"><table class="rca-table w-full border border-table-header-border rounded"><thead class="bg-table-header-bg">${header}</thead><tbody>${body}</tbody></table></div>`;
+            return `<div class="rca-table-wrapper my-4 overflow-x-auto"><table class="rca-table w-full border border-table-header-border rounded-sm"><thead class="bg-table-header-bg">${header}</thead><tbody>${body}</tbody></table></div>`;
           },
           blockquote({ tokens }: any) {
             const text = this.parser.parse(tokens);

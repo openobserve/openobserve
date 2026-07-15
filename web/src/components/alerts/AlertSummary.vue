@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="alerts-alert-summary" class="h-full flex flex-col relative">
-    <div data-test="alerts-alert-summary-content" class="text-[0.8125rem] leading-[2.2] flex-1 min-h-0 overflow-y-auto p-4 flex flex-col" ref="summaryContainer" @scroll="checkIfShouldShowScrollButton">
+    <div data-test="alerts-alert-summary-content" class="text-compact leading-[2.2] flex-1 min-h-0 overflow-y-auto p-4 flex flex-col" ref="summaryContainer" @scroll="checkIfShouldShowScrollButton">
       <p v-if="summaryText" data-test="alerts-alert-summary-text" class="summary-text m-0 whitespace-pre-line tracking-[0.03em]" v-html="DOMPurify.sanitize(summaryText)" @click="handleSummaryClick"></p>
-      <div v-else data-test="alerts-alert-summary-empty-state" class="flex flex-col items-center justify-center h-full min-h-[120px] gap-2 p-4">
+      <div v-else data-test="alerts-alert-summary-empty-state" class="flex flex-col items-center justify-center h-full min-h-30 gap-2 p-4">
         <OIcon name="article" size="lg" class="opacity-20" />
-        <span class="text-[0.8125rem] font-medium text-center opacity-50">{{ t('alerts.summary.configureAlert') || 'Configure your alert to see a summary' }}</span>
+        <span class="text-compact font-medium text-center opacity-50">{{ t('alerts.summary.configureAlert') || 'Configure your alert to see a summary' }}</span>
       </div>
     </div>
 

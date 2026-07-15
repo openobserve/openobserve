@@ -23,10 +23,10 @@ limitations under the License.
 
     <div data-test="destination-preview-card" class="w-full">
         <!-- Slack Preview -->
-        <div v-if="type === 'slack'" data-test="slack-preview" class="slack-message max-w-[600px] mx-auto bg-white border border-border-default rounded-lg p-4 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+        <div v-if="type === 'slack'" data-test="slack-preview" class="slack-message max-w-150 mx-auto bg-white border border-border-default rounded-lg p-4 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div class="slack-message-container flex gap-3">
             <div class="slack-avatar">
-              <div class="avatar-circle w-[36px] h-[36px] bg-[#4a154b] text-white rounded flex items-center justify-center font-bold text-[0.875rem]">OO</div>
+              <div class="avatar-circle w-9 h-9 bg-[#4a154b] text-white rounded-sm flex items-center justify-center font-bold text-sm">OO</div>
             </div>
             <div class="slack-content flex-1">
               <div class="slack-header flex items-center gap-2 mb-2">
@@ -37,20 +37,20 @@ limitations under the License.
                 <div class="slack-block-header text-lg font-bold mb-3 text-[#1d1c1d]">🚨 High CPU Usage</div>
                 <div class="slack-fields grid grid-cols-2 gap-2 mb-3">
                   <div class="slack-field">
-                    <div class="field-label font-bold text-[#1d1c1d] text-[0.875rem]">Stream:</div>
-                    <div class="field-value text-[#616061] text-[0.875rem]">system-metrics</div>
+                    <div class="field-label font-bold text-[#1d1c1d] text-sm">Stream:</div>
+                    <div class="field-value text-[#616061] text-sm">system-metrics</div>
                   </div>
                   <div class="slack-field">
-                    <div class="field-label font-bold text-[#1d1c1d] text-[0.875rem]">Type:</div>
-                    <div class="field-value text-[#616061] text-[0.875rem]">metrics</div>
+                    <div class="field-label font-bold text-[#1d1c1d] text-sm">Type:</div>
+                    <div class="field-value text-[#616061] text-sm">metrics</div>
                   </div>
                   <div class="slack-field">
-                    <div class="field-label font-bold text-[#1d1c1d] text-[0.875rem]">Status:</div>
-                    <div class="field-value text-[#616061] text-[0.875rem]">🔴 Firing</div>
+                    <div class="field-label font-bold text-[#1d1c1d] text-sm">Status:</div>
+                    <div class="field-value text-[#616061] text-sm">🔴 Firing</div>
                   </div>
                   <div class="slack-field">
-                    <div class="field-label font-bold text-[#1d1c1d] text-[0.875rem]">Count:</div>
-                    <div class="field-value text-[#616061] text-[0.875rem]">15</div>
+                    <div class="field-label font-bold text-[#1d1c1d] text-sm">Count:</div>
+                    <div class="field-value text-[#616061] text-sm">15</div>
                   </div>
                 </div>
                 <div class="slack-threshold mb-3 text-[#1d1c1d] text-sm">
@@ -65,11 +65,11 @@ limitations under the License.
         </div>
 
         <!-- MS Teams Preview -->
-        <div v-if="type === 'msteams'" data-test="msteams-preview" class="teams-card max-w-[600px] mx-auto bg-white border border-[#e1e5e9] rounded-lg overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+        <div v-if="type === 'msteams'" data-test="msteams-preview" class="teams-card max-w-150 mx-auto bg-white border border-[#e1e5e9] rounded-lg overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div data-test="msteams-card-content" class="teams-card-content">
             <div class="teams-header bg-[#464775] text-white p-4">
               <div class="teams-title text-[1.125rem] font-bold mb-1">🚨 Alert: High CPU Usage</div>
-              <div class="teams-subtitle text-[0.875rem] opacity-90">OpenObserve Alert Notification</div>
+              <div class="teams-subtitle text-sm opacity-90">OpenObserve Alert Notification</div>
             </div>
             <div class="teams-facts p-4 grid gap-2">
               <div class="teams-fact flex justify-between py-1 border-b border-[#f3f2f1]">
@@ -104,16 +104,16 @@ limitations under the License.
         </div>
 
         <!-- Email Preview -->
-        <div v-if="type === 'email'" data-test="email-preview" class="email-client max-w-[600px] mx-auto bg-white border border-[#ddd] rounded-lg overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+        <div v-if="type === 'email'" data-test="email-preview" class="email-client max-w-150 mx-auto bg-white border border-[#ddd] rounded-lg overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div class="email-header bg-[#f8f9fa] p-4 border-b border-[#e9ecef]">
             <div data-test="email-subject" class="email-subject font-bold text-base mb-2">
               Subject: 🚨 OpenObserve Alert Notification
             </div>
-            <div data-test="email-from" class="email-from text-[#6c757d] text-[0.875rem] mb-1">
+            <div data-test="email-from" class="email-from text-[#6c757d] text-sm mb-1">
               From: alerts@openobserve.ai
             </div>
-            <div class="email-to text-[#6c757d] text-[0.875rem] mb-1">To: admin@example.com</div>
-            <div class="email-time text-[#6c757d] text-[0.875rem] mb-1">{{ getCurrentTime() }}</div>
+            <div class="email-to text-[#6c757d] text-sm mb-1">To: admin@example.com</div>
+            <div class="email-time text-[#6c757d] text-sm mb-1">{{ getCurrentTime() }}</div>
           </div>
           <div data-test="email-body" class="email-body p-6">
             <div class="email-alert-header">
@@ -154,10 +154,10 @@ limitations under the License.
         </div>
 
         <!-- PagerDuty Preview -->
-        <div v-if="type === 'pagerduty'" data-test="pagerduty-preview" class="pagerduty-incident max-w-[600px] mx-auto bg-white border border-[#ddd] rounded-lg overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+        <div v-if="type === 'pagerduty'" data-test="pagerduty-preview" class="pagerduty-incident max-w-150 mx-auto bg-white border border-[#ddd] rounded-lg overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div class="pagerduty-header bg-[#06ac38] text-white p-4 flex justify-between items-center">
             <div class="pagerduty-title font-bold text-[1.125rem]">PagerDuty Incident</div>
-            <div class="pagerduty-status bg-[#d13212] py-1 px-2 rounded text-xs font-bold">Triggered</div>
+            <div class="pagerduty-status bg-[#d13212] py-1 px-2 rounded-sm text-xs font-bold">Triggered</div>
           </div>
           <div class="pagerduty-content p-6">
             <div class="m-0 mb-4 text-[#2d3748] font-bold text-[1.17rem]">OpenObserve Alert: High CPU Usage</div>
@@ -182,7 +182,7 @@ limitations under the License.
         </div>
 
         <!-- ServiceNow Preview -->
-        <div v-if="type === 'servicenow'" data-test="servicenow-preview" class="servicenow-incident max-w-[600px] mx-auto bg-white border border-[#ddd] rounded-lg overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+        <div v-if="type === 'servicenow'" data-test="servicenow-preview" class="servicenow-incident max-w-150 mx-auto bg-white border border-[#ddd] rounded-lg overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div class="servicenow-header bg-[#81b5a1] text-white p-4 flex justify-between items-center">
             <div class="servicenow-title font-bold text-[1.125rem]">ServiceNow Incident</div>
             <div class="servicenow-number [font-family:monospace] font-bold">INC0000123</div>
@@ -200,7 +200,7 @@ limitations under the License.
             <div class="servicenow-field mb-3 text-[#4a5568]">
               <strong>State:</strong> New
             </div>
-            <div class="servicenow-description bg-[#f8f9fa] p-4 rounded text-[#4a5568] [white-space:pre-line] mt-4">
+            <div class="servicenow-description bg-[#f8f9fa] p-4 rounded-sm text-[#4a5568] [white-space:pre-line] mt-4">
               <strong>Description:</strong><br>
               Alert Details:<br><br>
               Stream: system-metrics<br>
@@ -214,10 +214,10 @@ limitations under the License.
         </div>
 
         <!-- Opsgenie Preview -->
-        <div v-if="type === 'opsgenie'" data-test="opsgenie-preview" class="opsgenie-alert max-w-[600px] mx-auto bg-white border border-[#ddd] rounded-lg overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+        <div v-if="type === 'opsgenie'" data-test="opsgenie-preview" class="opsgenie-alert max-w-150 mx-auto bg-white border border-[#ddd] rounded-lg overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div class="opsgenie-header bg-[#172b4d] text-white p-4 flex justify-between items-center">
             <div class="opsgenie-title font-bold text-[1.125rem]">Opsgenie Alert</div>
-            <div class="opsgenie-priority bg-[#ffab00] text-[#172b4d] py-1 px-2 rounded font-bold">P3</div>
+            <div class="opsgenie-priority bg-[#ffab00] text-[#172b4d] py-1 px-2 rounded-sm font-bold">P3</div>
           </div>
           <div class="opsgenie-content p-6">
             <div class="m-0 mb-4 text-[#2d3748] font-bold text-[1.17rem]">OpenObserve Alert: High CPU Usage</div>

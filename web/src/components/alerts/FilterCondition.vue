@@ -2,7 +2,7 @@
     <div class="flex items-start gap-1 flex-no-wrap">
       <!-- V2: Fixed-width left column for alignment -->
       <!-- All conditions have the same width for the operator/label section -->
-      <div class="flex items-center justify-center mt-1 min-w-[60px]">
+      <div class="flex items-center justify-center mt-1 min-w-15">
         <!-- First condition in root group -->
         <template v-if="index === 0 && depth === 0">
           <span class="text-sm">if</span>
@@ -16,7 +16,7 @@
         <!-- Other conditions: show operator + toggle button -->
         <template v-else>
           <span
-            class="text-sm font-medium min-w-[30px] lowercase"
+            class="text-sm font-medium min-w-7.5 lowercase"
             data-test="alert-conditions-operator-label"
             :data-test-label="computedLabel"
           >
@@ -27,7 +27,7 @@
             data-test="alert-conditions-toggle-operator-btn"
             variant="ghost"
             size="icon-circle-sm"
-            class="h-[26px] flex-shrink-0 text-button-primary! hover:bg-[color-mix(in_srgb,var(--color-button-primary)_10%,transparent)]!"
+            class="h-6.5 flex-shrink-0 text-button-primary! hover:bg-[color-mix(in_srgb,var(--color-button-primary)_10%,transparent)]!"
             @click="toggleOperator"
           >
             <OIcon name="restart-alt" size="sm" />
@@ -62,7 +62,7 @@
             v-model="condition.operator"
             :options="triggerOperators"
             :dropdownStyle="{ textTransform: 'capitalize' }"
-            :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'w-[70px]' : computedInputWidth)]"
+            :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'w-17.5' : computedInputWidth)]"
             :error="!!operatorError"
             :searchable="false"
             :error-message="operatorError"
@@ -78,7 +78,7 @@
             :placeholder="t('common.value')"
             :error="!!valueError"
             :error-message="valueError"
-            :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'w-[110px]' : computedValueWidth)]"
+            :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'w-27.5' : computedValueWidth)]"
             data-test="alert-conditions-value-input"
             @update:model-value="() => { valueError = ''; emits('input:update', 'conditions', condition) }"
             @blur="validateValue"
@@ -232,12 +232,12 @@ const toggleOperator = () => {
 
 const computedInputWidth = computed(() => {
   // If custom width is provided, use it; otherwise use default responsive width
-  return props.inputWidth || (store.state.isAiChatEnabled ? '' : 'xl:min-w-[200px] lg:min-w-[90px] lg:w-fit');
+  return props.inputWidth || (store.state.isAiChatEnabled ? '' : 'xl:min-w-50 lg:min-w-22.5 lg:w-fit');
 });
 
 const computedValueWidth = computed(() => {
   // If custom width is provided, use it; otherwise use default responsive width
-  return props.inputWidth || (store.state.isAiChatEnabled ? 'w-[110px]' : 'xl:min-w-[200px] lg:w-fit lg:min-w-[80px]');
+  return props.inputWidth || (store.state.isAiChatEnabled ? 'w-27.5' : 'xl:min-w-50 lg:w-fit lg:min-w-20');
 });
 
 

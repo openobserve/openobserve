@@ -1,15 +1,12 @@
 ﻿<template>
     <!-- Preview Section (only for root level) -->
     <div v-if="depth === 0 && showSqlPreview && previewString"
-         class="mb-2 p-2 rounded border w-full max-h-[3.2em] overflow-y-auto"
-         :class="store.state.theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-300'">
+         class="mb-2 p-2 rounded-sm border w-full max-h-[3.2em] overflow-y-auto bg-surface-panel border-border-default">
       <div class="flex items-start gap-1 min-w-0">
-        <span class="font-medium text-xs flex-shrink-0 leading-[1.3]"
-              :class="store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700'">
+        <span class="font-medium text-xs flex-shrink-0 leading-[1.3] text-text-body">
           Preview:
         </span>
-        <span class="text-[10px] font-mono leading-[1.3] min-w-0 break-words"
-              :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-600'">
+        <span class="text-[10px] font-mono leading-[1.3] min-w-0 break-words text-text-secondary">
           {{ previewString }}
         </span>
       </div>
@@ -47,11 +44,11 @@
         </OToggleGroup>
       </div>
       <!-- Spacer for root group to maintain consistent spacing -->
-      <div v-else class="h-[14px]"></div>
+      <div v-else class="h-3.5"></div>
 
       <!-- Group content -->
 
-      <div v-if="isOpen" class="overflow-x-auto group-container" :class="store.state.theme === 'dark' ? 'dark-mode-group' : 'light-mode-group'">
+      <div v-if="isOpen" class="overflow-x-auto group-container">
         <!-- Items in group (V2 uses 'conditions' array) -->
         <div class="ml-2 whitespace-nowrap " v-for="(item, index) in props.group.conditions" :key="index">
           <FilterGroup
@@ -102,7 +99,7 @@
             @click="addCondition(props.group.groupId)"
             >
             <OIcon class="mr-1 font-bold" size="xs" style="border-radius: 50%; border: 1px solid;" name="add" />
-            <span class="text-[0.75rem] font-bold">Condition</span>
+            <span class="text-xs font-bold">Condition</span>
             <OTooltip :delay="300" :content="t('alerts.conditions.addConditionTooltip')" />
         </OButton>
         <OButton
@@ -114,7 +111,7 @@
             :disabled="depth >= 2"
             >
             <OIcon class="mr-1 font-bold" size="xs" style="border-radius: 50%; border: 1px solid;" name="add" />
-            <span class="text-[0.75rem] font-bold">{{ t('alerts.conditions.conditionGroup') }}</span>
+            <span class="text-xs font-bold">{{ t('alerts.conditions.conditionGroup') }}</span>
             <OTooltip v-if="depth < 2" :delay="300" :content="t('alerts.conditions.addConditionGroupTooltip')" />
             <OTooltip v-else :delay="300" :content="t('alerts.conditions.maxDepthReachedTooltip')" />
         </OButton>
@@ -126,7 +123,7 @@
             @click="reorderItems()"
             >
             <OIcon class="mr-1 font-bold" size="xs" name="swap-vert" />
-            <span class="text-[0.75rem] font-bold">Reorder</span>
+            <span class="text-xs font-bold">Reorder</span>
             <OTooltip :delay="300" content="Reorder items: Conditions first, then Groups" />
         </OButton>
      </div>
@@ -146,6 +143,7 @@
     import { computed, ref, watch } from 'vue';
     import FilterCondition from './FilterCondition.vue';
     import { useStore } from 'vuex';
+    import useTheme from '@/composables/useTheme';
     import OButton from '@/lib/core/Button/OButton.vue';
     import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
     import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
@@ -224,6 +222,7 @@
   const showPreview = ref(true);
 
   const store = useStore();
+  const { isDark } = useTheme();
   const { t } = useI18n();
 
   // V2: Use logicalOperator (AND/OR) instead of label (and/or)
@@ -416,9 +415,7 @@ function hslToCSS(h: number, s: number, l: number) {
   return `hsl(${h}, ${s}%, ${l}%)`;
 }
 const computedStyleMap = computed(() => {
-  const isDark = store.state.theme === 'dark';
-
-  if (isDark) {
+  if (isDark.value) {
     const baseColor = '#212121';
     const { h, s, l } = hexToHSL(baseColor);
     const newLightness = Math.min(l + props.depth * 1, 90); // 1% per depth step
@@ -489,14 +486,10 @@ defineExpose({
 
   </script>
 
-  <style>
+  <style scoped>
 
-    .group-container.dark-mode-group {
-      scrollbar-color: #818181 var(--color-surface-base); /* thumb color, track color */
-    }
-
-    .group-container.light-mode-group {
-      scrollbar-color: #999 #ffffff;
+    .group-container {
+      scrollbar-color: var(--color-border-strong) var(--color-surface-base); /* thumb color, track color */
     }
 
     /* For more control using WebKit scrollbar styling */
@@ -505,21 +498,12 @@ defineExpose({
       height: 4px !important;
     }
 
-    .group-container.dark-mode-group::-webkit-scrollbar-track {
-      background: red;
+    .group-container::-webkit-scrollbar-track {
+      background: var(--color-surface-base);
     }
 
-    .group-container.dark-mode-group::-webkit-scrollbar-thumb {
-      background-color: #b10000;
-      border-radius: 4px;
-    }
-
-    .group-container.light-mode-group::-webkit-scrollbar-track {
-      background: #ffffff;
-    }
-
-    .group-container.light-mode-group::-webkit-scrollbar-thumb {
-      background-color: #999;
+    .group-container::-webkit-scrollbar-thumb {
+      background-color: var(--color-border-strong);
       border-radius: 4px;
     }
 

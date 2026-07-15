@@ -13,33 +13,18 @@
             :name="icon"
             size="sm"
             class="mr-2   rounded-full px-1 py-1  "
-            :class="[
-              store.state.theme === 'dark'
-                ? 'text-gray-100 bg-gray-600'
-                : 'bg-[#f2f1f1] text-[#555555]',
-                iconClass
-            ]"
+            :class="['text-text-body bg-surface-subtle', iconClass]"
           />
           <img
             v-else
             data-test="container-image"
             :src="image"
             class="mr-2 rounded-full px-1 py-1"
-            :class="[
-              store.state.theme === 'dark'
-                ? 'text-gray-100 bg-gray-600'
-                : 'bg-[#f2f1f1] text-[#555555]',
-                iconClass
-            ]"
+            :class="['text-text-body bg-surface-subtle', iconClass]"
           />
           <div data-test="container-label-wrapper" class="flex flex-col items-start justify-start">
            <span data-test="container-label"> {{ label }}</span>
-            <div data-test="container-sublabel" class="text-[13px] h-[20px]"
-            :class="[
-              store.state.theme === 'dark'
-                ? 'text-[#c6c6c6]'
-                : 'text-gray-900',
-            ]"
+            <div data-test="container-sublabel" class="text-compact h-5 text-text-body"
             >
                 {{ subLabel }}
             </div>
@@ -49,13 +34,7 @@
           <OIcon
             data-test="expand-toggle-icon"
             :name="expanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'"
-            class="rounded-full p-1 mt-2"
-
-            :class="[
-              store.state.theme === 'dark'
-                ? 'text-gray-100  bg-gray-600'
-                : 'text-gray-900 bg-gray-300',
-            ]"
+            class="rounded-full p-1 mt-2 text-text-body bg-surface-subtle"
             size="sm"
           />
         </div>
@@ -68,8 +47,7 @@
   </template>
   <script setup lang="ts">
   import { computed } from "vue";
-  import { useStore } from "vuex";
-  
+
   const props = defineProps({
     name: {
       type: String,
@@ -110,9 +88,7 @@
   });
   
   const emits = defineEmits(["update:isExpanded"]);
-  
-  const store = useStore();
-  
+
   const expanded = computed({
     get: () => props.isExpanded,
     set: (value) => emits("update:isExpanded", value),

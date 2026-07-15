@@ -189,26 +189,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="row.is_real_time === 'anomaly'"
                       name="query-stats"
                       size="sm"
-                      class="text-blue-600 shrink-0"
+                      class="text-status-info-text shrink-0"
                     />
                     <OIcon
                       v-else-if="row.is_real_time"
                       name="bolt"
                       size="sm"
-                      class="text-orange-500 shrink-0"
+                      class="text-status-warning-text shrink-0"
                     />
                     <OIcon
                       v-else
                       name="schedule"
                       size="sm"
-                      class="text-gray-400 shrink-0"
+                      class="text-icon-color shrink-0"
                     />
                     <span class="truncate">{{ row.name || "--" }}</span>
                   </div>
                   <OTooltip
                     v-if="row.name"
                     :content="row.name"
-                    content-class="max-w-[400px] whitespace-normal break-words text-xs"
+                    content-class="max-w-100 whitespace-normal break-words text-xs"
                   />
                 </template>
 
@@ -475,9 +475,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template #bottom>
-                  <div class="flex w-full justify-between items-center h-[48px]">
+                  <div class="flex w-full justify-between items-center h-12">
                     <div
-                      class="o2-table-footer-title flex items-center w-[200px] mr-md"
+                      class="o2-table-footer-title flex items-center w-50 mr-md"
                     >
                       {{ resultTotal }} {{ t("alerts.header") }}
                     </div>

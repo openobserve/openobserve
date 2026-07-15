@@ -228,7 +228,7 @@ describe("AlertHistorySummary.vue", () => {
     it("should return correct CSS class for unknown state", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      expect(vm.getStateColorClass("unknown")).toContain("gray");
+      expect(vm.getStateColorClass("unknown")).toBe("text-status-neutral-text");
     });
   });
 

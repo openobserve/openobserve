@@ -87,7 +87,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="showFailedOnly"
           :label="t('alerts.insights.filters.failedOnly')"
           class="o2-toggle-button-sm"
-          :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
           @update:model-value="onFilterChange"
           data-test="failed-only-toggle"
           >
@@ -100,7 +99,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="showSilencedOnly"
           :label="t('alerts.insights.filters.silenced')"
           class="o2-toggle-button-sm"
-          :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
           @update:model-value="onFilterChange"
           data-test="silenced-only-toggle"
           >
@@ -112,12 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="[panelId, filter] in rangeFilters"
             :key="panelId"
-            class="inline-flex items-center rounded py-1 px-3 text-sm cursor-default"
-            :class="
-              store.state.theme === 'dark'
-                ? 'bg-indigo-900 text-indigo-100'
-                : 'bg-blue-100 text-blue-800'
-            "
+            class="inline-flex items-center rounded-sm py-1 px-3 text-sm cursor-default bg-status-info-bg text-status-info-text"
             data-test="range-filter-chip"
           >
             <span class="chip-label">
@@ -223,10 +216,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div :style="{ visibility: isLoading ? 'hidden' : 'visible' }">
-            <div v-if="!dashboardData" class="p-5 text-center text-[#666]">
+            <div v-if="!dashboardData" class="p-5 text-center text-text-muted">
               {{ t("alerts.insights.loading.dashboardConfig") }}
             </div>
-            <div v-else-if="!show" class="p-5 text-center text-[#666]">
+            <div v-else-if="!show" class="p-5 text-center text-text-muted">
               {{ t("alerts.insights.loading.refreshing") }}
             </div>
             <RenderDashboardCharts

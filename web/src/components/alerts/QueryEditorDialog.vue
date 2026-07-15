@@ -36,19 +36,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-lg font-semibold text-dialog-header-text truncate block">{{ t('alerts.addConditions') }}</span>
 
           <!-- Separator -->
-          <div class="w-px h-4 opacity-30" :class="store.state.theme === 'dark' ? 'bg-gray-400' : 'bg-gray-500'" />
+          <div class="w-px h-4 opacity-30 bg-border-strong" />
 
           <!-- Stream Type + Stream Name -->
           <div class="flex items-center gap-2">
-            <div v-if="streamType" class="inline-flex flex-row items-center gap-[5px] py-[3px] px-[10px] rounded-md" :class="store.state.theme === 'dark' ? 'bg-[rgba(59,130,246,0.12)] border border-[rgba(59,130,246,0.3)]' : 'bg-[rgba(59,130,246,0.08)] border border-[rgba(59,130,246,0.25)]'">
-              <span class="text-[11px] font-semibold" :class="store.state.theme === 'dark' ? 'text-[#94a3b8]' : 'text-[#64748b]'">Stream Type</span>
-              <span class="text-[11px] opacity-30" :class="store.state.theme === 'dark' ? 'text-[#64748b]' : 'text-[#94a3b8]'">:</span>
-              <span class="text-xs font-bold" :class="store.state.theme === 'dark' ? 'text-[#60a5fa]' : 'text-[#2563eb]'">{{ streamType }}</span>
+            <div v-if="streamType" class="inline-flex flex-row items-center gap-[5px] py-[3px] px-2.5 rounded-md" :class="store.state.theme === 'dark' ? 'bg-[rgba(59,130,246,0.12)] border border-[rgba(59,130,246,0.3)]' : 'bg-[rgba(59,130,246,0.08)] border border-[rgba(59,130,246,0.25)]'">
+              <span class="text-2xs font-semibold text-text-label">Stream Type</span>
+              <span class="text-2xs opacity-30 text-text-label">:</span>
+              <span class="text-xs font-bold text-text-link">{{ streamType }}</span>
             </div>
             <span v-if="streamType && streamName" class="opacity-20 select-none">|</span>
-            <div class="inline-flex flex-row items-center gap-[5px] py-[3px] px-[10px] rounded-md" :class="store.state.theme === 'dark' ? 'bg-[rgba(139,92,246,0.12)] border border-[rgba(139,92,246,0.3)]' : 'bg-[rgba(139,92,246,0.08)] border border-[rgba(139,92,246,0.25)]'">
-              <span class="text-[11px] font-semibold" :class="store.state.theme === 'dark' ? 'text-[#94a3b8]' : 'text-[#64748b]'">Stream Name</span>
-              <span class="text-[11px] opacity-30" :class="store.state.theme === 'dark' ? 'text-[#64748b]' : 'text-[#94a3b8]'">:</span>
+            <div class="inline-flex flex-row items-center gap-[5px] py-[3px] px-2.5 rounded-md" :class="store.state.theme === 'dark' ? 'bg-[rgba(139,92,246,0.12)] border border-[rgba(139,92,246,0.3)]' : 'bg-[rgba(139,92,246,0.08)] border border-[rgba(139,92,246,0.25)]'">
+              <span class="text-2xs font-semibold text-text-label">Stream Name</span>
+              <span class="text-2xs opacity-30 text-text-label">:</span>
               <span v-if="streamName" class="text-xs font-bold" :class="store.state.theme === 'dark' ? 'text-[#a78bfa]' : 'text-[#7c3aed]'">{{ streamName }}</span>
               <span v-else class="text-xs font-bold opacity-40 italic" :class="store.state.theme === 'dark' ? 'text-[#a78bfa]' : 'text-[#7c3aed]'">none</span>
             </div>
@@ -85,8 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Left Section (25%) — Field Browser -->
             <div
-              class="h-full rounded-lg overflow-hidden p-[10px]"
-              :class="store.state.theme === 'dark' ? 'border border-[#2d3748] bg-[#1a1a1a]' : 'border border-[#e5e7eb] bg-white'"
+              class="h-full rounded-lg overflow-hidden p-2.5 border border-border-default bg-surface-base"
             >
               <SearchFieldList
                 :fields="fieldListItems"
@@ -106,17 +105,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex-[3] w-full flex flex-col overflow-visible" style="min-height: 220px;">
                   <!-- Editor Pane (no overflow:hidden bottom clip issue for status bar) -->
                   <div
-                    class="flex-1 w-full flex flex-col overflow-hidden rounded-lg"
-                    :class="store.state.theme === 'dark' ? 'border border-[#2d3748]' : 'border border-[#e5e7eb]'"
+                    class="flex-1 w-full flex flex-col overflow-hidden rounded-lg border border-border-default"
                     style="border-bottom: none; border-bottom-left-radius: 0; border-bottom-right-radius: 0;"
                   >
                     <!-- Pane Header -->
                     <div
-                      class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0"
-                      :class="store.state.theme === 'dark' ? 'bg-white/[0.04] border-b border-[#2d3748]' : 'bg-[#f3f4f6] border-b border-[#e5e7eb]'"
+                      class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0 bg-surface-subtle border-b border-border-default"
                     >
                       <div class="flex items-center gap-2">
-                        <div class="w-[3px] h-[14px] rounded-[2px] shrink-0 bg-(--q-primary)" />
+                        <div class="w-[3px] h-3.5 rounded-sm shrink-0 bg-(--q-primary)" />
                         <span class="text-xs font-semibold">{{ localTab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
                       </div>
                       <div class="flex items-center gap-2">
@@ -124,7 +121,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-if="localTab !== 'promql'"
                           :model-value="!sqlEditorMaximized"
                           class="o2-toggle-button-xs"
-                          :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
                           @update:model-value="(val) => val ? restoreVrlEditor() : (sqlEditorMaximized = true)"
                         >
                           <OTooltip :delay="400" :content="sqlEditorMaximized ? 'show VRL editor' : 'hide VRL editor'" />
@@ -133,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="alert-run-query-btn"
                           variant="primary"
                           size="sm"
-                          class="h-[28px] text-xs rounded-md px-3!"
+                          class="h-7 text-xs rounded-md px-3!"
                           :disabled="localTab == 'sql' ? localSqlQuery == '' : localPromqlQuery == ''"
                           @click="localTab === 'sql' ? runSqlQuery() : runPromqlQuery()"
                         >
@@ -166,22 +162,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="(localTab === 'sql' ? !localSqlQuery : !localPromqlQuery) && queryEditorPlaceholderFlag"
                         class="absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
                       >
-                        <span class="font-mono text-[var(--text-base)] [line-height:1.3125rem] text-[#a0aec0] whitespace-nowrap overflow-hidden text-ellipsis">{{ fullEditorPlaceholder }}</span>
+                        <span class="font-mono text-[var(--text-base)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ fullEditorPlaceholder }}</span>
                       </div>
                     </div>
                   </div>
 
                   <!-- Status bar: outside overflow:hidden pane so border-bottom is never clipped -->
                   <div
-                    class="relative h-[22px] shrink-0 text-[13px] font-medium cursor-default"
+                    class="relative h-5.5 shrink-0 text-compact font-medium cursor-default"
                     :class="[
                       sqlStatusBarClasses,
-                      store.state.theme === 'dark'
-                        ? 'border-l border-r border-b border-[#2d3748] rounded-bl-lg rounded-br-lg'
-                        : 'border-l border-r border-b border-[#e5e7eb] rounded-bl-lg rounded-br-lg'
+                      'border-l border-r border-b border-border-default rounded-bl-lg rounded-br-lg'
                     ]"
                   >
-                    <div class="absolute inset-0 flex items-center gap-[5px] px-[10px] overflow-hidden">
+                    <div class="absolute inset-0 flex items-center gap-[5px] px-2.5 overflow-hidden">
                       <template v-if="sqlStatusState === 'sql-status-bar--error'">
                         <OIcon name="error-outline" size="xs" style="flex-shrink:0;" />
                         <span class="whitespace-nowrap overflow-hidden text-ellipsis min-w-0 flex-1">{{ localSqlQueryErrorMsg || sqlQueryErrorMsg }}</span>
@@ -222,18 +216,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="localTab !== 'promql'"
                   class="w-full flex flex-col overflow-hidden rounded-lg"
                   :class="[
-                    store.state.theme === 'dark' ? 'border border-[#2d3748]' : 'border border-[#e5e7eb]',
+                    'border border-border-default',
                     sqlEditorMaximized ? 'flex-none' : 'flex-[2]'
                   ]"
                   :style="sqlEditorMaximized ? '' : 'min-height: 160px;'"
                 >
                   <!-- Pane Header -->
                   <div
-                    class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0"
-                    :class="store.state.theme === 'dark' ? 'bg-white/[0.04] border-b border-[#2d3748]' : 'bg-[#f3f4f6] border-b border-[#e5e7eb]'"
+                    class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0 bg-surface-subtle border-b border-border-default"
                   >
                     <div class="flex items-center gap-2">
-                      <div class="w-[3px] h-[14px] rounded-[2px] shrink-0 bg-(--q-secondary)" />
+                      <div class="w-[3px] h-3.5 rounded-sm shrink-0 bg-(--q-secondary)" />
                       <span class="text-xs font-semibold">VRL Editor</span>
                     </div>
                     <div v-if="!sqlEditorMaximized" class="flex gap-2 items-center">
@@ -263,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="alert-apply-vrl-btn"
                         variant="primary"
                         size="sm"
-                        class="h-[28px] text-xs rounded-md px-3!"
+                        class="h-7 text-xs rounded-md px-3!"
                         :disabled="vrlFunctionContent == ''"
                         @click="runTestFunction"
                       >
@@ -302,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="!vrlFunctionContent && functionEditorPlaceholderFlag"
                       class="absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
                     >
-                      <span class="font-mono text-[var(--text-base)] [line-height:1.3125rem] text-[#a0aec0] whitespace-nowrap overflow-hidden text-ellipsis">{{ vrlPlaceholder }}</span>
+                      <span class="font-mono text-[var(--text-base)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ vrlPlaceholder }}</span>
                     </div>
                   </div>
                 </div>
@@ -314,22 +307,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Query Result Pane -->
               <div
-                class="flex-1 flex flex-col overflow-hidden rounded-lg"
-                :class="store.state.theme === 'dark' ? 'border border-[#2d3748]' : 'border border-[#e5e7eb]'"
+                class="flex-1 flex flex-col overflow-hidden rounded-lg border border-border-default"
                 style="min-height: 220px;"
               >
                 <!-- Pane Header -->
                 <div
-                  class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0"
-                  :class="store.state.theme === 'dark' ? 'bg-white/[0.04] border-b border-[#2d3748]' : 'bg-[#f3f4f6] border-b border-[#e5e7eb]'"
+                  class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0 bg-surface-subtle border-b border-border-default"
                 >
                   <div class="flex items-center gap-2">
-                    <div class="w-[3px] h-[14px] rounded-[2px] shrink-0 bg-(--q-primary)" />
+                    <div class="w-[3px] h-3.5 rounded-sm shrink-0 bg-(--q-primary)" />
                     <span class="text-xs font-semibold">Query Result</span>
                     <span
                       v-if="multiTimeRange && multiTimeRange.length > 0"
-                      class="text-[10px] font-bold py-px px-[7px] rounded tracking-[0.04em]"
-                      :class="store.state.theme === 'dark' ? 'bg-blue-500/[0.12] border border-blue-500/30 text-[#60a5fa]' : 'bg-blue-500/[0.08] border border-blue-500/25 text-[#2563eb]'"
+                      class="text-[10px] font-bold py-px px-[7px] rounded-sm tracking-[0.04em] bg-status-info-bg border border-banner-info-border text-text-link"
                     >results across all time windows</span>
                   </div>
                 </div>
@@ -371,26 +361,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Combined Output Pane (SQL + VRL only) -->
               <div
                 v-if="localTab !== 'promql'"
-                class="flex-1 flex flex-col overflow-hidden rounded-lg"
-                :class="store.state.theme === 'dark' ? 'border border-[#2d3748]' : 'border border-[#e5e7eb]'"
+                class="flex-1 flex flex-col overflow-hidden rounded-lg border border-border-default"
                 style="min-height: 200px;"
               >
                 <!-- Pane Header -->
                 <div
-                  class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0"
-                  :class="store.state.theme === 'dark' ? 'bg-white/[0.04] border-b border-[#2d3748]' : 'bg-[#f3f4f6] border-b border-[#e5e7eb]'"
+                  class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0 bg-surface-subtle border-b border-border-default"
                 >
                   <div class="flex items-center gap-2">
-                    <div class="w-[3px] h-[14px] rounded-[2px] shrink-0 bg-(--q-secondary)" />
+                    <div class="w-[3px] h-3.5 rounded-sm shrink-0 bg-(--q-secondary)" />
                     <span class="text-xs font-semibold">Combined Output</span>
                     <span
-                      class="text-[10px] font-bold py-px px-[7px] rounded tracking-[0.04em]"
-                      :class="store.state.theme === 'dark' ? 'bg-violet-500/[0.15] border border-violet-500/30 text-[#a78bfa]' : 'bg-violet-500/[0.10] border border-violet-500/25 text-[#7c3aed]'"
+                      class="text-[10px] font-bold py-px px-[7px] rounded-sm tracking-[0.04em] bg-badge-purple-soft-bg border border-badge-purple-ol-border text-badge-purple-ol-text"
                     >SQL + VRL</span>
                   </div>
                   <!-- Running indicator -->
                   <div v-if="runFnQueryLoading" class="flex items-center gap-1">
-                    <span class="w-[6px] h-[6px] rounded-full bg-emerald-500 [animation:pulse_1.5s_ease-in-out_infinite]" />
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 [animation:pulse_1.5s_ease-in-out_infinite]" />
                     <span class="text-[10px] font-semibold text-emerald-400">Running</span>
                   </div>
                 </div>
@@ -435,9 +422,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- AI Chat Panel -->
       <div
-        class="ml-2 w-[24.5vw] max-w-full min-w-[75px]"
+        class="ml-2 w-[24.5vw] max-w-full min-w-[75px] bg-surface-base"
         v-if="store.state.isAiChatEnabled"
-        :class="store.state.theme == 'dark' ? 'bg-[#1f2937]' : 'bg-white'"
       >
         <O2AIChat
           :header-height="48"
@@ -454,6 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch, type PropType, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import { debounce } from "lodash-es";
@@ -543,6 +530,7 @@ const emit = defineEmits([
 
 const { t } = useI18n();
 const store = useStore();
+const { isDark } = useTheme();
 const { buildQueryPayload } = useQuery();
 const { sqlParser } = useParser();
 
@@ -564,15 +552,14 @@ const sqlStatusState = computed(() => {
 });
 
 const sqlStatusBarClasses = computed(() => {
-  const isDark = store.state.theme === 'dark';
-  const neutralBg = isDark ? 'bg-white/[0.04] text-[#9ca3af]' : 'bg-[#f3f4f6] text-[#6b7280]';
+  const neutralBg = 'bg-surface-subtle text-text-secondary';
   const map: Record<string, string> = {
     'sql-status-bar--hint':    neutralBg,
     'sql-status-bar--idle':    neutralBg,
     'sql-status-bar--loading': 'bg-[rgba(139,92,246,0.06)] text-[#8b5cf6]',
-    'sql-status-bar--error':   'bg-[rgba(239,68,68,0.08)] text-[#ef4444] cursor-pointer',
-    'sql-status-bar--empty':   'bg-[rgba(245,158,11,0.06)] text-[#f59e0b]',
-    'sql-status-bar--success': 'bg-[rgba(16,185,129,0.06)] text-[#10b981]',
+    'sql-status-bar--error':   'bg-status-error-bg text-status-error-text cursor-pointer',
+    'sql-status-bar--empty':   'bg-status-warning-bg text-status-warning-text',
+    'sql-status-bar--success': 'bg-status-success-bg text-status-positive',
   };
   return map[sqlStatusState.value] ?? '';
 });
@@ -1166,7 +1153,7 @@ const getBtnLogo = computed(() => {
     return getImageURL('images/common/ai_icon_dark.svg')
   }
 
-  return store.state.theme === 'dark'
+  return isDark.value
     ? getImageURL('images/common/ai_icon_dark.svg')
     : getImageURL('images/common/ai_icon_gradient.svg')
 })

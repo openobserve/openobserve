@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="incident-list" class="h-full">
+  <div data-test="incident-list" class="incident-list h-full">
     <PageLayout
       :header-class="'shrink-0 px-4 border-b border-border-default'"
     >
@@ -200,8 +200,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Bottom -->
         <template #bottom>
-          <div class="flex w-full justify-between items-center h-[48px]">
-            <div class="o2-table-footer-title flex items-center w-[100px] mr-md">
+          <div class="flex w-full justify-between items-center h-12">
+            <div class="o2-table-footer-title flex items-center w-25 mr-md">
               {{ visibleIncidents.length }} {{ visibleIncidents.length === 1 ? 'Incident' : 'Incidents' }}
             </div>
           </div>
@@ -653,84 +653,32 @@ export default defineComponent({
 </script>
 
 <style>
-/* Status badge styling */
-.status-open {
-  border: 1px solid #dc2626;
-}
+/* Status badge styling — theme-aware via tokens */
+.incident-list .status-open { border: 1px solid var(--color-status-negative); }
+.incident-list .status-acknowledged { border: 1px solid var(--color-status-warning-text); }
+.incident-list .status-resolved { border: 1px solid var(--color-status-positive); }
+.incident-list .status-default { border: 1px solid var(--color-border-default); }
 
-.status-acknowledged {
-  border: 1px solid #d97706;
-}
+/* Severity badge styling — theme-aware via tokens */
+.incident-list .severity-p1 { border: 1px solid var(--color-status-negative); }
+.incident-list .severity-p2 { border: 1px solid var(--color-status-warning-text); }
+.incident-list .severity-p3 { border: 1px solid var(--color-status-warning-text); }
+.incident-list .severity-p4 { border: 1px solid var(--color-border-default); }
+.incident-list .severity-default { border: 1px solid var(--color-border-default); }
 
-.status-resolved {
-  border: 1px solid #065f46;
-}
-
-.status-default {
-  border: 1px solid #6b7280;
-}
-
-/* Severity badge styling */
-.severity-p1 {
-  border: 1px solid #991b1b;
-}
-
-.severity-p2 {
-  border: 1px solid #c2410c;
-}
-
-.severity-p3 {
-  border: 1px solid #92400e;
-}
-
-.severity-p4 {
-  border: 1px solid #6b7280;
-}
-
-.severity-default {
-  border: 1px solid #6b7280;
-}
-
-/* Dark mode adjustments for status and severity badges */
-body.body--dark .status-open { border: 1px solid #fca5a5; }
-body.body--dark .status-acknowledged { border: 1px solid #fbbf24; }
-body.body--dark .status-resolved { border: 1px solid #6ee7b7; }
-body.body--dark .status-default { border: 1px solid #d1d5db; }
-body.body--dark .severity-p1 { border: 1px solid #fca5a5; }
-body.body--dark .severity-p2 { border: 1px solid #fdba74; }
-body.body--dark .severity-p3 { border: 1px solid #fcd34d; }
-body.body--dark .severity-p4 { border: 1px solid #d1d5db; }
-body.body--dark .severity-default { border: 1px solid #d1d5db; }
-
-/* Color scheme matching schema.scss type badges */
-.badge-blue { border: 1px solid #1d4ed8; }
-.badge-green { border: 1px solid #065f46; }
-.badge-yellow { border: 1px solid #92400e; }
-.badge-pink { border: 1px solid #9f1239; }
-.badge-purple { border: 1px solid #7c3aed; }
-.badge-orange { border: 1px solid #c2410c; }
-.badge-cyan { border: 1px solid #0e7490; }
-.badge-indigo { border: 1px solid #4f46e5; }
-.badge-teal { border: 1px solid #0f766e; }
-.badge-red { border: 1px solid #dc2626; }
-.badge-gray { border: 1px solid #4b5563; }
-.badge-amber { border: 1px solid #d97706; }
-.badge-violet { border: 1px solid #7c3aed; }
-.badge-rose { border: 1px solid #e11d48; }
-
-/* Dark mode adjustments */
-body.body--dark .badge-blue { border: 1px solid #93c5fd; }
-body.body--dark .badge-green { border: 1px solid #6ee7b7; }
-body.body--dark .badge-yellow { border: 1px solid #fcd34d; }
-body.body--dark .badge-pink { border: 1px solid #f9a8d4; }
-body.body--dark .badge-purple { border: 1px solid #c4b5fd; }
-body.body--dark .badge-orange { border: 1px solid #fdba74; }
-body.body--dark .badge-cyan { border: 1px solid #67e8f9; }
-body.body--dark .badge-indigo { border: 1px solid #a5b4fc; }
-body.body--dark .badge-teal { border: 1px solid #5eead4; }
-body.body--dark .badge-red { border: 1px solid #fca5a5; }
-body.body--dark .badge-gray { border: 1px solid #d1d5db; }
-body.body--dark .badge-amber { border: 1px solid #fbbf24; }
-body.body--dark .badge-violet { border: 1px solid #c4b5fd; }
-body.body--dark .badge-rose { border: 1px solid #fda4af; }
+/* Color scheme matching schema.scss type badges — theme-aware badge outline tokens */
+.incident-list .badge-blue { border: 1px solid var(--color-badge-blue-ol-border); }
+.incident-list .badge-green { border: 1px solid var(--color-badge-success-ol-border); }
+.incident-list .badge-yellow { border: 1px solid var(--color-badge-warning-ol-border); }
+.incident-list .badge-pink { border: 1px solid var(--color-badge-error-ol-border); }
+.incident-list .badge-purple { border: 1px solid var(--color-badge-purple-ol-border); }
+.incident-list .badge-orange { border: 1px solid var(--color-badge-orange-ol-border); }
+.incident-list .badge-cyan { border: 1px solid var(--color-badge-cyan-ol-border); }
+.incident-list .badge-indigo { border: 1px solid var(--color-badge-indigo-ol-border); }
+.incident-list .badge-teal { border: 1px solid var(--color-badge-teal-ol-border); }
+.incident-list .badge-red { border: 1px solid var(--color-badge-error-ol-border); }
+.incident-list .badge-gray { border: 1px solid var(--color-badge-default-ol-border); }
+.incident-list .badge-amber { border: 1px solid var(--color-badge-amber-ol-border); }
+.incident-list .badge-violet { border: 1px solid var(--color-badge-purple-ol-border); }
+.incident-list .badge-rose { border: 1px solid var(--color-badge-error-ol-border); }
 </style>

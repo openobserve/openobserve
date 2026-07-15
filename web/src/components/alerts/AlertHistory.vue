@@ -53,11 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #icon-left>
             <OIcon
               class="o2-search-input-icon"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-search-input-icon-dark'
-                  : 'o2-search-input-icon-light'
-              "
               name="search" size="sm"
             />
           </template>
@@ -160,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-dedup="{ row }">
             <span v-if="!row.dedup_enabled" class="text-text-primary">-</span>
-            <div v-else-if="row.dedup_suppressed" class="text-red-500">
+            <div v-else-if="row.dedup_suppressed" class="text-status-error-text">
               <OIcon name="block" size="sm">
                 <OTooltip>
                   <template #content>
@@ -183,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OIcon>
               <span class="text-xs ml-1">×{{ row.group_size || 1 }}</span>
             </div>
-            <div v-else class="text-green-500 flex items-center justify-center">
+            <div v-else class="text-status-positive flex items-center justify-center">
               <OIcon name="check-circle" size="md">
                 <OTooltip>
                   <template #content>
@@ -369,7 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   Error Details
                 </div>
-                <div class="rounded border border-solid border-negative/30 p-2 mt-2 bg-red-500/5">
+                <div class="rounded-sm border border-solid border-negative/30 p-2 mt-2 bg-status-error-bg">
                   <pre
                     class="text-sm"
                     style="
@@ -397,7 +392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   Response
                 </div>
-                <div class="rounded border border-solid border-positive/30 p-2 mt-2 bg-green-500/5">
+                <div class="rounded-sm border border-solid border-positive/30 p-2 mt-2 bg-status-success-bg">
                   <pre
                     class="text-sm"
                     style="
@@ -424,10 +419,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="closeErrorDialog"
     >
       <template #header-left>
-        <OIcon name="error" size="sm" class="text-red-500" />
+        <OIcon name="error" size="sm" class="text-status-error-text" />
       </template>
       <template #header-right>
-        <div class="flex items-center text-[13px] opacity-70 ml-9 text-xs">
+        <div class="flex items-center text-compact opacity-70 ml-9 text-xs">
           <span class="mr-1">Last error:</span>
           <OIcon name="schedule" size="xs" class="mr-1" />
           {{ errorMessage.last_error_timestamp && new Date(errorMessage.last_error_timestamp / 1000).toLocaleString() }}
@@ -436,7 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="mb-4">
         <div class="text-sm font-semibold tracking-[0.02em] opacity-80 mb-2">Error Summary</div>
-        <div class="p-4 rounded-lg font-mono text-[13px] leading-[1.6] whitespace-pre-wrap wrap-break-word bg-[rgba(239,68,68,0.08)] border border-solid border-[rgba(239,68,68,0.2)] text-[#dc2626]">
+        <div class="p-4 rounded-lg font-mono text-compact leading-[1.6] whitespace-pre-wrap wrap-break-word bg-status-error-bg border border-solid border-status-negative text-status-error-text">
           {{ errorMessage.error }}
         </div>
       </div>

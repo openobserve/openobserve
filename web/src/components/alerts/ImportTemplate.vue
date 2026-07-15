@@ -31,13 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="w-full h-full flex flex-col border-l border-border-default" style="min-width: 400px;">
         <div
           v-if="templateErrorsToDisplay.length > 0 || tempalteCreators.length > 0"
-          class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0"
+          class="text-center text-sm font-semibold text-text-primary py-3 shrink-0"
         >
           {{ templateErrorsToDisplay.length > 0 ? 'Error Validations' : 'Output Messages' }}
         </div>
-        <div v-else class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0">Output Messages</div>
+        <div v-else class="text-center text-sm font-semibold text-text-primary py-3 shrink-0">Output Messages</div>
         <OSeparator class="mt-1 shrink-0" />
-        <div class="flex-1 min-h-0 overflow-auto [resize:none] w-full min-w-[400px]">
+        <div class="flex-1 min-h-0 overflow-auto [resize:none] w-full min-w-100">
         <!-- Template Errors Section -->
         <div
           class="error-section p-2.5 mb-2.5"

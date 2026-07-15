@@ -18,12 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="step-query-config w-full min-w-0 h-full overflow-auto mx-auto" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
     <div class="step-content rounded-lg min-h-full w-full min-w-0 overflow-hidden box-border bg-surface-overlay border border-border-default">
       <!-- Section header -->
-      <div class="section-header flex items-center gap-0 py-2.5 px-3"
-        :class="store.state.theme === 'dark'
-          ? 'border-b border-[#343434]'
-          : 'border-b border-[#eeeeee]'">
+      <div class="section-header flex items-center gap-0 py-2.5 px-3 border-b border-border-default">
         <div class="section-header-accent w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-[var(--q-primary)]" />
-        <span class="section-header-title text-[13px] font-semibold tracking-[0.01em] text-text-primary">{{ t('alerts.queryConfig.sectionTitle') }}</span>
+        <span class="section-header-title text-compact font-semibold tracking-[0.01em] text-text-primary">{{ t('alerts.queryConfig.sectionTitle') }}</span>
       </div>
       <div class="px-3 py-2 min-w-0 w-full box-border">
       <!-- Query Mode Tabs (hidden for real-time alerts) -->
@@ -71,10 +68,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- LOGS/TRACES -->
             <template v-if="isEventBased">
               <!-- Alert if row -->
-              <div class="flex items-center gap-3 py-2 px-3 rounded-md text-[13px]" data-test="alert-if-row-logs">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0">{{ t('alerts.threshold') }}*</span>
+              <div class="flex items-center gap-3 py-2 px-3 rounded-md text-compact" data-test="alert-if-row-logs">
+                <span class="condition-label font-bold text-compact whitespace-nowrap min-w-22.5 shrink-0">{{ t('alerts.threshold') }}*</span>
                 <div class="flex flex-nowrap items-center gap-2">
-                  <div class="min-w-[130px] max-w-[180px]">
+                  <div class="min-w-32.5 max-w-45">
                     <OSelect
                       v-model="selectedFunction"
                       :options="logFunctionOptions"
@@ -86,14 +83,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <!-- "of [field]" shown for measure modes -->
                   <template v-if="selectedFunction !== 'total_events'">
-                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.conditionOf') }}</span>
+                    <span class="condition-text font-semibold text-compact whitespace-nowrap">{{ t('alerts.conditionOf') }}</span>
                     <OSelect
                       v-model="logMeasureColumn"
                       :options="numericColumns"
                       searchable
                       :placeholder="t('alerts.placeholders.selectColumn')"
                       :error="columnSelectError"
-                      :class="['min-w-[140px] max-w-[200px]']"
+                      :class="['min-w-35 max-w-50']"
                       @update:model-value="columnSelectError = false; onLogMeasureColumnChange($event)"
                     />
                   </template>
@@ -103,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OSelect
                       v-model="triggerOperator"
                       :options="numericOperators"
-                      class="min-w-[70px] max-w-[120px]"
+                      class="min-w-17.5 max-w-30"
                       data-test="alert-trigger-operator-select"
                       :searchable="false"
                       @update:model-value="onTriggerOperatorChange"
@@ -113,23 +110,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       type="number"
                       data-test="alert-trigger-threshold-input"
                       @blur="restoreDefaultThreshold"
-                      class="min-w-[60px] max-w-[80px]"
+                      class="min-w-15 max-w-20"
                       min="1"
                       :error="!!triggerThresholdError"
                       :error-message="triggerThresholdError"
                       @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
                     />
-                    <span v-if="streamName" class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.matchingTypeFound', { type: streamType === 'traces' ? 'traces' : 'logs' }) }}</span>
+                    <span v-if="streamName" class="condition-text font-semibold text-compact whitespace-nowrap">{{ t('alerts.matchingTypeFound', { type: streamType === 'traces' ? 'traces' : 'logs' }) }}</span>
                   </template>
 
                   <!-- MEASURE mode -->
                   <template v-else>
-                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.conditionIs') }}</span>
+                    <span class="condition-text font-semibold text-compact whitespace-nowrap">{{ t('alerts.conditionIs') }}</span>
                     <OSelect
                       v-model="conditionOperator"
                       :options="numericOperators"
                       :searchable="false"
-                      class="min-w-[70px] max-w-[120px]"
+                      class="min-w-17.5 max-w-30"
                       data-test="alert-condition-operator-select"
                       @update:model-value="onConditionOperatorChange"
                     />
@@ -137,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model="conditionValue"
                       type="number"
                       :placeholder="t('alerts.placeholders.value')"
-                      class="min-w-[80px] max-w-[120px]"
+                      class="min-w-20 max-w-30"
                       :error="!!conditionValueError"
                       :error-message="conditionValueError"
                       @update:model-value="conditionValueError = ''; onConditionValueChange($event)"
@@ -147,8 +144,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- group by row (hidden for count mode) -->
-              <div v-if="selectedFunction !== 'total_events'" class="flex items-center gap-3 py-2 px-3 rounded-md text-[13px]" data-test="alert-group-by-row">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0">
+              <div v-if="selectedFunction !== 'total_events'" class="flex items-center gap-3 py-2 px-3 rounded-md text-compact" data-test="alert-group-by-row">
+                <span class="condition-label font-bold text-compact whitespace-nowrap min-w-22.5 shrink-0">
                   {{ t('alerts.groupBy') }}
                   <OTooltip :content="t('alerts.queryConfig.groupByTooltip')" :delay="300" side="top" />
                 </span>
@@ -170,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         variant="ghost"
                         size="icon-circle-sm"
-                        class="text-gray-400 hover:text-red-500"
+                        class="text-icon-color hover:text-status-error-text"
                         @click="deleteLogGroupByColumn(index)"
                       >
                         <OIcon name="close" size="sm" />
@@ -190,8 +187,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- no. of groups row — visible only when group-by fields are added -->
-              <div v-if="selectedFunction !== 'total_events' && hasLogGroupByFields" class="flex items-center gap-3 py-2 px-3 rounded-md text-[13px]" data-test="alert-having-groups-row">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0">
+              <div v-if="selectedFunction !== 'total_events' && hasLogGroupByFields" class="flex items-center gap-3 py-2 px-3 rounded-md text-compact" data-test="alert-having-groups-row">
+                <span class="condition-label font-bold text-compact whitespace-nowrap min-w-22.5 shrink-0">
                   {{ t('alerts.queryConfig.havingGroups') }}
                   <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" :delay="300" side="top" />
                 </span>
@@ -200,13 +197,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="triggerOperator"
                     :options="numericOperators"
                     :searchable="false"
-                    class="min-w-[70px] max-w-[120px]"
+                    class="min-w-17.5 max-w-30"
                     @update:model-value="onTriggerOperatorChange"
                   />
                   <OInput
                     v-model="triggerThreshold"
                     type="number"
-                    class="min-w-[60px] max-w-[80px]"
+                    class="min-w-15 max-w-20"
                     min="1"
                     @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
                     @blur="restoreDefaultThreshold"
@@ -218,10 +215,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- METRICS -->
             <template v-else>
               <!-- Alert if row -->
-              <div class="flex items-center gap-3 py-2 px-3 rounded-md text-[13px]">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0">{{ t('alerts.threshold') }}*</span>
+              <div class="flex items-center gap-3 py-2 px-3 rounded-md text-compact">
+                <span class="condition-label font-bold text-compact whitespace-nowrap min-w-22.5 shrink-0">{{ t('alerts.threshold') }}*</span>
                 <div class="flex flex-nowrap items-center gap-2">
-                  <div class="min-w-[130px] max-w-[180px]">
+                  <div class="min-w-32.5 max-w-45">
                     <OSelect
                       v-model="selectedFunction"
                       :options="logFunctionOptions"
@@ -234,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- "of [field]" hidden for count mode -->
                   <template v-if="selectedFunction !== 'total_events'">
-                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.conditionOf') }}</span>
+                    <span class="condition-text font-semibold text-compact whitespace-nowrap">{{ t('alerts.conditionOf') }}</span>
                     <div style="position: relative; display: inline-flex;">
                       <OSelect
                         v-model="inputData.aggregation.having.column"
@@ -249,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <OTooltip v-if="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')" :content="t('alerts.metricsValueFieldTooltip')" :delay="300" side="bottom" />
                     </div>
-                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.conditionIs') }}</span>
+                    <span class="condition-text font-semibold text-compact whitespace-nowrap">{{ t('alerts.conditionIs') }}</span>
                   </template>
 
                   <!-- Count mode for metrics -->
@@ -269,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :error-message="triggerThresholdError"
                       @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
                     />
-                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.matchingMetricsFound') }}</span>
+                    <span class="condition-text font-semibold text-compact whitespace-nowrap">{{ t('alerts.matchingMetricsFound') }}</span>
                   </template>
 
                   <!-- Measure mode for metrics -->
@@ -295,8 +292,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- group by row — hidden for count mode -->
-              <div v-if="inputData.aggregation && selectedFunction !== 'total_events'" class="flex items-center gap-3 py-2 px-3 rounded-md text-[13px]">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0">
+              <div v-if="inputData.aggregation && selectedFunction !== 'total_events'" class="flex items-center gap-3 py-2 px-3 rounded-md text-compact">
+                <span class="condition-label font-bold text-compact whitespace-nowrap min-w-22.5 shrink-0">
                   {{ t('alerts.groupBy') }}
                   <OTooltip :content="t('alerts.queryConfig.groupByTooltip')" :delay="300" side="top" />
                 </span>
@@ -317,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         variant="ghost"
                         size="icon-circle-sm"
-                        class="text-gray-400 hover:text-red-500"
+                        class="text-icon-color hover:text-status-error-text"
                         @click="deleteGroupByColumn(index)"
                       >
                         <OIcon name="close" size="sm" />
@@ -336,8 +333,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- no. of groups row — visible only when group-by fields are added -->
-              <div v-if="selectedFunction !== 'total_events' && hasMetricGroupByFields" class="flex items-center gap-3 py-2 px-3 rounded-md text-[13px]">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0">
+              <div v-if="selectedFunction !== 'total_events' && hasMetricGroupByFields" class="flex items-center gap-3 py-2 px-3 rounded-md text-compact">
+                <span class="condition-label font-bold text-compact whitespace-nowrap min-w-22.5 shrink-0">
                   {{ t('alerts.queryConfig.havingGroups') }}
                   <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" :delay="300" side="top" />
                 </span>
@@ -346,13 +343,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="triggerOperator"
                     :options="numericOperators"
                     :searchable="false"
-                    class="min-w-[70px] max-w-[120px]"
+                    class="min-w-17.5 max-w-30"
                     @update:model-value="onTriggerOperatorChange"
                   />
                   <OInput
                     v-model="triggerThreshold"
                     type="number"
-                    class="min-w-[60px] max-w-[80px]"
+                    class="min-w-15 max-w-20"
                     min="1"
                     @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
                     @blur="restoreDefaultThreshold"
@@ -363,8 +360,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Check every row -->
             <div class="flex items-center
-             gap-3 py-2 px-3 rounded-md text-[13px]">
-              <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0" style="line-height: 28px;">
+             gap-3 py-2 px-3 rounded-md text-compact">
+              <span class="condition-label font-bold text-compact whitespace-nowrap min-w-22.5 shrink-0" style="line-height: 28px;">
                 Check every *
                 <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
               </span>
@@ -424,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </template>
 
-                  <span class="condition-text font-semibold text-[13px] whitespace-nowrap">on these</span>
+                  <span class="condition-text font-semibold text-compact whitespace-nowrap">on these</span>
                   <div
                     class="flex items-center gap-1 cursor-pointer select-none filters-inline-toggle px-2 py-0.5 rounded-md transition-colors bg-surface-panel hover:bg-primary-50"
                     @click="toggleFilters"
@@ -434,32 +431,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="xs"
                       :class="filterCount > 0
                         ? 'text-[var(--q-primary)]'
-                        : (store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500')"
+                        : ('text-text-secondary')"
                     />
                     <span class="text-xs font-semibold"
                           :class="filterCount > 0
                             ? 'text-[var(--q-primary)]'
-                            : (store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-600')">
+                            : ('text-text-body')">
                       filters
                     </span>
                     <span v-if="filterCount > 0"
-                          class="text-[11px] px-1.5 py-0 rounded-full font-bold leading-5"
-                          :class="store.state.theme === 'dark' ? 'bg-blue-800 text-blue-200' : 'bg-blue-100 text-blue-700'">
+                          class="text-2xs px-1.5 py-0 rounded-full font-bold leading-5"
+                          :class="'bg-status-info-bg text-status-info-text'">
                       {{ filterCount }}
                     </span>
                     <OIcon
                       :name="showFilters ? 'expand-more' : 'chevron-right'"
                       size="sm"
-                      :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'"
+                      :class="'text-text-secondary'"
                     />
                     <!-- Review your SQL query hint -->
                     <span v-if="generatedSqlQuery && !showFilters"
                           class="text-xs italic ml-1 whitespace-nowrap cursor-help underline decoration-dotted underline-offset-[2px]"
-                          :class="store.state.theme === 'dark' ? 'text-gray-500' : 'text-gray-400'">
+                          :class="'text-text-secondary'">
                       view the alert query
                       <OTooltip :delay="200" side="bottom">
                         <template #content>
-                          <pre class="hljs text-xs m-0 whitespace-pre-wrap font-mono p-2 rounded" v-html="highlightedSqlQuery" />
+                          <pre class="hljs text-xs m-0 whitespace-pre-wrap font-mono p-2 rounded-sm" v-html="highlightedSqlQuery" />
                         </template>
                       </OTooltip>
                     </span>
@@ -467,11 +464,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Cron description + error -->
-                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="text-[11px] ml-0 italic"
-                     :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'">
+                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="text-2xs ml-0 italic"
+                     :class="'text-text-secondary'">
                   {{ cronDescription }}
                 </div>
-                <div v-if="frequencyMode === 'cron' && cronError" class="text-red-500 text-[11px] ml-0">
+                <div v-if="frequencyMode === 'cron' && cronError" class="text-status-error-text text-2xs ml-0">
                   {{ cronError }}
                 </div>
               </div>
@@ -509,32 +506,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="xs"
                   :class="filterCount > 0
                     ? 'text-[var(--q-primary)]'
-                    : (store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500')"
+                    : ('text-text-secondary')"
                 />
                 <span class="text-xs font-semibold"
                       :class="filterCount > 0
                         ? 'text-[var(--q-primary)]'
-                        : (store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-600')">
+                        : ('text-text-body')">
                   filters
                 </span>
                 <span v-if="filterCount > 0"
-                      class="text-[11px] px-1.5 py-0 rounded-full font-bold leading-5"
-                      :class="store.state.theme === 'dark' ? 'bg-blue-800 text-blue-200' : 'bg-blue-100 text-blue-700'">
+                      class="text-2xs px-1.5 py-0 rounded-full font-bold leading-5"
+                      :class="'bg-status-info-bg text-status-info-text'">
                   {{ filterCount }}
                 </span>
                 <OIcon
                   :name="showFilters ? 'expand-more' : 'chevron-right'"
                   size="sm"
-                  :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'"
+                  :class="'text-text-secondary'"
                 />
                 <!-- Review your SQL query hint -->
                 <span v-if="generatedSqlQuery && !showFilters"
                       class="text-xs italic ml-1 whitespace-nowrap cursor-help underline decoration-dotted underline-offset-[2px]"
-                      :class="store.state.theme === 'dark' ? 'text-gray-500' : 'text-gray-400'">
+                      :class="'text-text-secondary'">
                   view the alert query
                   <OTooltip :delay="200" side="bottom">
                     <template #content>
-                      <pre class="hljs text-xs m-0 whitespace-pre-wrap font-mono p-2 rounded" v-html="highlightedSqlQuery" />
+                      <pre class="hljs text-xs m-0 whitespace-pre-wrap font-mono p-2 rounded-sm" v-html="highlightedSqlQuery" />
                     </template>
                   </OTooltip>
                 </span>
@@ -572,7 +569,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div style="display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;"
                 :style="{ width: showVrl && localTab === 'sql' ? '50%' : '100%' }">
                 <div class="flex items-center justify-between shrink-0 h-9 px-2.5"
-                  :class="store.state.theme === 'dark' ? 'bg-white/4 border-b border-[#2d3748]' : 'bg-gray-100 border-b border-[#e5e7eb]'">
+                  :class="'bg-surface-subtle border-b border-border-default'">
                   <div class="flex items-center gap-2">
                     <div class="w-0.75 h-3.5 rounded-sm shrink-0 bg-(--q-primary)" />
                     <span class="text-xs font-semibold">{{ localTab === 'sql' ? t('alerts.sqlEditor') : t('alerts.promqlEditor') }}</span>
@@ -614,9 +611,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- VRL pane — with its own header, side-by-side with SQL pane -->
               <div v-if="showVrl && localTab === 'sql'"
                 style="display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; width: 50%;"
-                :style="{ borderLeft: store.state.theme === 'dark' ? '1px solid #2d3748' : '1px solid #e5e7eb' }">
+                :style="{ borderLeft: '1px solid var(--color-border-default)' }">
                 <div class="flex items-center justify-between shrink-0 h-9 px-2.5"
-                  :class="store.state.theme === 'dark' ? 'bg-white/4 border-b border-[#2d3748]' : 'bg-gray-100 border-b border-[#e5e7eb]'">
+                  :class="'bg-surface-subtle border-b border-border-default'">
                   <div class="flex items-center gap-2">
                     <div class="w-0.75 h-3.5 rounded-sm shrink-0 bg-(--q-secondary)" />
                     <span class="text-xs font-semibold">VRL Editor</span>
@@ -671,8 +668,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Status bar — outside overflow:hidden so borders render correctly -->
           <div
             v-if="localTab !== 'promql'"
-            class="inline-sql-status-bar relative h-[22px] shrink-0 text-[13px] font-medium cursor-default"
-            :class="[inlineStatusState, store.state.theme === 'dark' ? 'sql-status-bar--dark' : 'sql-status-bar--light']"
+            class="inline-sql-status-bar relative h-5.5 shrink-0 text-compact font-medium cursor-default"
+            :class="inlineStatusState"
           >
             <div class="sql-status-bar__inner">
               <template v-if="inlineStatusState === 'sql-status-bar--error'">
@@ -695,8 +692,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="isRealTime === 'false'" class="flex flex-col gap-0 mt-2 px-1">
 
             <!-- Check every -->
-            <div class="flex items-start gap-3 py-2 px-3 rounded-md text-[13px]">
-              <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[160px] w-[160px] shrink-0" style="line-height: 28px;">
+            <div class="flex items-start gap-3 py-2 px-3 rounded-md text-compact">
+              <span class="condition-label font-bold text-compact whitespace-nowrap min-w-40 w-40 shrink-0" style="line-height: 28px;">
                 Check every *
                 <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
               </span>
@@ -750,19 +747,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </template>
                 </div>
-                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="text-[11px] italic"
-                     :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'">
+                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="text-2xs italic"
+                     :class="'text-text-secondary'">
                   {{ cronDescription }}
                 </div>
-                <div v-if="frequencyMode === 'cron' && cronError" class="text-red-500 text-[11px]">
+                <div v-if="frequencyMode === 'cron' && cronError" class="text-status-error-text text-2xs">
                   {{ cronError }}
                 </div>
               </div>
             </div>
 
             <!-- SQL: Alert if No. of events -->
-            <div v-if="localTab === 'sql'" class="flex items-center gap-3 py-2 px-3 rounded-md text-[13px]">
-              <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[160px] w-[160px] shrink-0">{{ t('alerts.alertIfNoOfEvents') }} *</span>
+            <div v-if="localTab === 'sql'" class="flex items-center gap-3 py-2 px-3 rounded-md text-compact">
+              <span class="condition-label font-bold text-compact whitespace-nowrap min-w-40 w-40 shrink-0">{{ t('alerts.alertIfNoOfEvents') }} *</span>
               <div class="flex items-center gap-2">
                 <OSelect
                   v-model="triggerOperator"
@@ -788,8 +785,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- PromQL: Alert if the value is + Having series -->
             <template v-if="localTab === 'promql' && promqlCondition">
-              <div class="flex items-center gap-3 py-2 px-3 rounded-md text-[13px]">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[160px] w-[160px] shrink-0">{{ t('alerts.alertIfValueIs') }} *
+              <div class="flex items-center gap-3 py-2 px-3 rounded-md text-compact">
+                <span class="condition-label font-bold text-compact whitespace-nowrap min-w-40 w-40 shrink-0">{{ t('alerts.alertIfValueIs') }} *
                   <OTooltip content="Alert when the PromQL expression evaluates to this condition for a time series. Example: &gt;= 100 triggers when the result is 100 or more." :delay="300" side="top" />
                 </span>
                 <div class="flex items-center gap-2">
@@ -815,8 +812,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
-              <div class="flex items-center gap-3 py-2 px-3 rounded-md text-[13px]">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[160px] w-[160px] shrink-0">{{ t('alerts.havingSeries') }} *
+              <div class="flex items-center gap-3 py-2 px-3 rounded-md text-compact">
+                <span class="condition-label font-bold text-compact whitespace-nowrap min-w-40 w-40 shrink-0">{{ t('alerts.havingSeries') }} *
                   <OTooltip content="Minimum number of time series that must satisfy the condition above to trigger the alert." :delay="300" side="top" />
                 </span>
                 <div class="flex items-center gap-2">
@@ -2327,55 +2324,36 @@ export default defineComponent({
   flex: 1;
 }
 
-.inline-sql-status-bar.sql-status-bar--hint    { background: #f3f4f6; color: #6b7280; }
-.inline-sql-status-bar.sql-status-bar--idle    { background: #f3f4f6; color: #6b7280; }
-.inline-sql-status-bar.sql-status-bar--error   { background: rgba(239, 68, 68, 0.08); color: #ef4444; cursor: pointer; }
+.inline-sql-status-bar.sql-status-bar--hint    { background: var(--color-surface-subtle); color: var(--color-text-secondary); }
+.inline-sql-status-bar.sql-status-bar--idle    { background: var(--color-surface-subtle); color: var(--color-text-secondary); }
+.inline-sql-status-bar.sql-status-bar--error   { background: var(--color-status-error-bg); color: var(--color-status-error-text); cursor: pointer; }
 
-.inline-sql-status-bar.sql-status-bar--light {
-  border-left: 1px solid #e5e7eb;
-  border-right: 1px solid #e5e7eb;
-  border-bottom: 1px solid #e5e7eb;
+.inline-sql-status-bar {
+  border-left: 1px solid var(--color-border-default);
+  border-right: 1px solid var(--color-border-default);
+  border-bottom: 1px solid var(--color-border-default);
   border-bottom-left-radius: 8px;
   border-bottom-right-radius: 8px;
-}
-.inline-sql-status-bar.sql-status-bar--dark {
-  border-left: 1px solid #2d3748;
-  border-right: 1px solid #2d3748;
-  border-bottom: 1px solid #2d3748;
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
-}
-.inline-sql-status-bar.sql-status-bar--dark.sql-status-bar--hint,
-.inline-sql-status-bar.sql-status-bar--dark.sql-status-bar--idle {
-  background: rgba(255, 255, 255, 0.04);
-  color: #d1d5db;
 }
 
 /* global tooltip selectors */
 :global(.sql-preview-tooltip) {
-  background: #1e1e1e !important;
+  background: var(--color-code-block-bg) !important;
   padding: 0 !important;
   border-radius: 6px !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
 }
 
 :global(.sql-preview-tooltip) .hljs {
-  background: #1e1e1e !important;
+  background: var(--color-code-block-bg) !important;
   border-radius: 6px;
 }
 
 /* descendant color overrides for condition labels/text */
-.light-mode .condition-label {
-  color: rgba(0, 0, 0, 0.8);
+.condition-label {
+  color: var(--color-text-body);
 }
-.light-mode .condition-text {
-  color: rgba(0, 0, 0, 0.7);
-}
-
-.dark-mode .condition-label {
-  color: rgba(255, 255, 255, 0.9);
-}
-.dark-mode .condition-text {
-  color: rgba(255, 255, 255, 0.75);
+.condition-text {
+  color: var(--color-text-secondary);
 }
 </style>

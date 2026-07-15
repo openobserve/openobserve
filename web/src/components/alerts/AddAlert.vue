@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag v-if="anomalyConfig.status" type="anomalyStatus" :value="anomalyConfig.status" />
             <span
               v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
-              class="text-[11px] whitespace-nowrap text-text-secondary"
+              class="text-2xs whitespace-nowrap text-text-secondary"
             >
               Last run: {{ anomalyFormatTs(anomalyConfig.last_detection_run) }}
             </span>
@@ -81,14 +81,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex items-center gap-1.5 min-w-0"
           >
             <div class="flex items-center gap-1.5 shrink-0">
-              <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="text-text-primary">*</span></div>
+              <div class="text-xs font-semibold whitespace-nowrap text-text-label">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="text-text-primary">*</span></div>
               <OInput
                 v-if="!isAnomalyMode"
                 ref="step1Ref"
                 v-model="formData.name"
                 data-test="add-alert-name-input"
                 :placeholder="t('alerts.alertNamePlaceholder')"
-                class="topbar-name-input text-sm h-[28px]! min-h-[28px]! min-w-[120px] max-w-[150px]"
+                class="topbar-name-input text-sm h-7! min-h-7! min-w-30 max-w-37.5"
                 :class="alertNameError ? 'field-error' : ''"
                 @update:model-value="alertNameError = false"
               />
@@ -97,13 +97,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ref="anomalyNameRef"
                 v-model="anomalyConfig.name"
                 :placeholder="t('alerts.anomalyNamePlaceholder')"
-                class="topbar-name-input text-sm h-[28px]! min-h-[28px]! min-w-[120px] max-w-[150px]"
+                class="topbar-name-input text-sm h-7! min-h-7! min-w-30 max-w-37.5"
               />
             </div>
 
             <!-- Folder -->
             <div class="flex items-center gap-1.5 shrink-0">
-              <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t('alerts.folder') }}</div>
+              <div class="text-xs font-semibold whitespace-nowrap text-text-label">{{ t('alerts.folder') }}</div>
               <InlineSelectFolderDropdown
                 :model-value="activeFolderId"
                 type="alerts"
@@ -122,21 +122,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Stream Name & Stream Type -->
       <div class="card-container shrink-0 stream-config-card [container-type:inline-size] [container-name:stream-config]">
-        <div class="flex items-center gap-0 py-[10px] px-3 border-b border-[#e6e6e6] dark:border-border-default">
+        <div class="flex items-center gap-0 py-2.5 px-3 border-b border-border-default">
           <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--q-primary)]" />
-          <span class="text-[13px] font-semibold tracking-[0.01em]">{{ t('alerts.streamConfig') }} <span class="text-text-primary">*</span></span>
+          <span class="text-compact font-semibold tracking-[0.01em]">{{ t('alerts.streamConfig') }} <span class="text-text-primary">*</span></span>
         </div>
         <div class="flex items-center gap-4 px-3 py-2">
         <!-- Stream Type -->
         <div class="flex items-center gap-1.5">
-          <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t("alerts.streamType") }} <span class="text-text-primary">*</span></div>
+          <div class="text-xs font-semibold whitespace-nowrap text-text-label">{{ t("alerts.streamType") }} <span class="text-text-primary">*</span></div>
           <OSelect
             ref="streamTypeRef"
             data-test="add-alert-stream-type-select-dropdown"
             v-model="formData.stream_type"
             :options="streamTypes"
             :searchable="false"
-            class="stream-type-select h-[28px]! min-h-[28px]!"
+            class="stream-type-select h-7! min-h-7!"
             :class="streamTypeError ? 'field-error' : ''"
             :disabled="beingUpdated || anomalyEditMode"
             @update:model-value="streamTypeError = false; updateStreams()"
@@ -145,14 +145,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Stream Name -->
         <div class="flex items-center gap-1.5">
-          <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t("alerts.stream_name") }} <span class="text-text-primary">*</span></div>
+          <div class="text-xs font-semibold whitespace-nowrap text-text-label">{{ t("alerts.stream_name") }} <span class="text-text-primary">*</span></div>
           <OSelect
             ref="streamNameRef"
             data-test="add-alert-stream-name-select-dropdown"
             v-model="formData.stream_name"
             :options="indexOptions"
             :loading="isFetchingStreams"
-            class="stream-name-select h-[28px]! min-h-[28px]!"
+            class="stream-name-select h-7! min-h-7!"
             :class="streamNameError ? 'field-error' : ''"
             :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
             @update:model-value="streamNameError = false; updateStreamFields($event)"
@@ -162,13 +162,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Alert Type -->
         <div class="flex items-center gap-1.5">
-          <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t("alerts.alertType") || 'Alert Type' }}</div>
+          <div class="text-xs font-semibold whitespace-nowrap text-text-label">{{ t("alerts.alertType") || 'Alert Type' }}</div>
           <OSelect
             data-test="add-alert-type-select-dropdown"
             v-model="formData.is_real_time"
             :options="alertTypeOptions"
             :disabled="beingUpdated || anomalyEditMode"
-            class="alert-type-select h-[28px]! min-h-[28px]!"
+            class="alert-type-select h-7! min-h-7!"
             :searchable="false"
           />
         </div>

@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex-1 overflow-y-auto pr-2">
       <div class="mb-6">
         <GroupHeader :title="t('alerts.correlation.title')" :showIcon="false" class="mb-2" />
-        <div class="text-sm text-gray-400">
+        <div class="text-sm text-text-secondary">
           {{ t('alerts.correlation.description') }}
         </div>
-        <div class="text-sm text-gray-400 mt-2 italic">
+        <div class="text-sm text-text-secondary mt-2 italic">
           {{ t('alerts.correlation.semanticFieldNote') }}
         </div>
         <OButton
@@ -63,12 +63,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Cross-Alert Fingerprint Groups -->
       <div class="mb-6" v-if="localConfig.enabled && localConfig.alert_dedup_enabled">
         <div class="font-semibold pb-2 flex items-center">
-          {{ t('alerts.correlation.fingerprintGroups') }} <span class="text-red-500 ml-1">*</span>
+          {{ t('alerts.correlation.fingerprintGroups') }} <span class="text-status-error-text ml-1">*</span>
           <OIcon
             name="info"
             size="sm"
             class="ml-1 cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
+            :class="'text-text-secondary'"
           >
             <OTooltip
               side="right"
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OIcon>
         </div>
-        <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+        <div class="text-sm text-text-secondary mb-2">
           {{ t('alerts.correlation.fingerprintGroupsHint') }}
         </div>
         <div class="flex flex-col gap-2">
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <div
             v-if="!localConfig.alert_fingerprint_groups || localConfig.alert_fingerprint_groups.length === 0"
-            class="text-red-500 text-sm mt-1"
+            class="text-status-error-text text-sm mt-1"
           >
             {{ t('alerts.correlation.fingerprintGroupsRequired') }}
           </div>
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="info"
             size="sm"
             class="ml-1 cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
+            :class="'text-text-secondary'"
            />
             <OTooltip
               side="right"
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :content="t('alerts.correlation.defaultWindowTooltip')"
             />
         </div>
-        <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+        <div class="text-sm text-text-secondary mb-2">
           {{ t('alerts.correlation.defaultWindowDescription') }}
         </div>
         <OInput
@@ -124,18 +124,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           min="1"
           width="md"
           :placeholder="t('alerts.correlation.defaultWindowPlaceholder')"
-          :class="
-            store.state.theme === 'dark'
-              ? 'input-box-bg-dark input-border-dark'
-              : 'input-box-bg-light input-border-light'
-          "
           @update:model-value="emitUpdate"
         />
       </div>
     </div>
 
     <!-- Sticky footer with buttons -->
-    <div class="flex justify-end gap-3 pt-4 pb-2 border-t border-gray-200 dark:border-gray-700 bg-inherit sticky bottom-0">
+    <div class="flex justify-end gap-3 pt-4 pb-2 border-t border-border-default bg-inherit sticky bottom-0">
       <OButton variant="outline" size="sm-action" @click="$emit('cancel')">{{ t('alerts.correlation.cancelButton') }}</OButton>
       <OButton
         variant="primary"

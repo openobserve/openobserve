@@ -174,7 +174,7 @@ const getStateColorClass = (state: string) => {
     case "completed":
       return "text-status-positive";
     default:
-      return "text-gray-500";
+      return "text-status-neutral-text";
   }
 };
 
