@@ -22,6 +22,7 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import { nextTick } from "vue";
 import * as vueRouter from "vue-router";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -712,6 +713,58 @@ describe("CreateReport", () => {
       expect(
         wrapper.find('[data-test="add-report-share-step"]').exists(),
       ).toBe(false);
+    });
+
+    // Regression: enabling "Cached Report" AFTER a Continue click must not leave
+    // the report unsavable. A Continue click validates via validateField("submit");
+    // because the schema is form-level, that run records EVERY failing path —
+    // including the still-empty, out-of-step title/emails — into the form-level
+    // errorMap.onDynamic. Enabling Cached Report drops those requirements, but
+    // handleSubmit() re-validates only fields, never re-running/clearing that
+    // form-level result, so in the real browser Save stayed silently blocked
+    // (isFormValid stayed false). The values watcher now clears the form-level
+    // error SYNCHRONOUSLY once the schema passes.
+    //
+    // Timing note: assert after nextTick, NOT flushPromises. Without the fix,
+    // jsdom's async onDynamicAsync validator eventually re-runs and clears the
+    // stale error on the next flush — which masks the bug — but that async clear
+    // does not happen in the real browser. The fix's watcher clears it on the
+    // same tick as the value change, so the nextTick assertion is what actually
+    // distinguishes fixed from unfixed.
+    it("clears the stale form-level error synchronously when cached is enabled after a Continue click", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+
+      // Step 1 & 2 valid; NOT cached; Share (title/emails) left empty.
+      setField(wrapper, "dashboards[0].folder", "folder-1");
+      setField(wrapper, "dashboards[0].dashboard", "dash-1");
+      setField(wrapper, "dashboards[0].tabs", "tab-1");
+      setField(wrapper, "name", "continue-then-cache");
+      await flushPromises();
+
+      // Click "Continue" on step 1 → the form-level schema runs and stamps the
+      // out-of-step title/emails errors onto the form's errorMap.onDynamic.
+      await wrapper
+        .find('[data-test="add-report-step1-continue-btn"]')
+        .trigger("click");
+      await flushPromises();
+      const form = (wrapper.vm as any).form;
+      expect(form.state.errorMap?.onDynamic).toBeTruthy();
+      expect(form.state.isValid).toBe(false);
+
+      // Enable Cached Report → title/emails become irrelevant. The watcher must
+      // clear the stale form-level error on THIS tick (no async round-trip).
+      setField(wrapper, "isCachedReport", true);
+      await nextTick();
+      expect(form.state.errorMap?.onDynamic ?? null).toBe(null);
+      expect(form.state.isValid).toBe(true);
+      expect(form.state.canSubmit).toBe(true);
+
+      // Save now goes through (regressed: the stale form-level error blocked it).
+      await submitForm(wrapper);
+      expect(reports.createReportV2).toHaveBeenCalledTimes(1);
+      const payload = vi.mocked(reports.createReportV2).mock.calls[0][1] as any;
+      expect(payload.destinations).toEqual([]);
     });
   });
 

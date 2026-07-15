@@ -1126,6 +1126,28 @@ watch(
         form.setFieldMeta(name, { ...meta, errorMap: {} });
       }
     }
+
+    // Also reconcile the FORM-LEVEL error map, not just per-field metas. A
+    // Continue click validates via validateField("submit"); because the schema is
+    // form-level, that runs the WHOLE Zod schema and records EVERY failing path —
+    // including out-of-step fields like title/emails — into the form's own
+    // errorMap.onDynamic. When the form later becomes fully valid (e.g. enabling
+    // "Cached Report" drops the title/emails requirement), clearing the field
+    // metas above is not enough: handleSubmit() re-validates fields but never
+    // re-runs or clears this form-level result, so isFormValid (and thus
+    // canSubmit) stays false and Save is silently blocked. Clear it here once the
+    // whole schema passes — like the loop above, this ONLY clears, so it can never
+    // reveal an error early.
+    if (res.success) {
+      const em: any = form.state.errorMap ?? {};
+      if (em.onDynamic != null || em.onDynamicAsync != null) {
+        form.setErrorMap({
+          ...em,
+          onDynamic: undefined,
+          onDynamicAsync: undefined,
+        });
+      }
+    }
   },
   { deep: true },
 );
