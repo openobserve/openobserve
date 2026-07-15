@@ -47,13 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- pick existing destination -->
-    <OForm
-      v-else
-      ref="formRef"
-      :schema="destinationSchema"
-      :default-values="defaultValues"
-      @submit="onFormSubmit"
-    >
+    <OForm v-else :form="form">
       <OFormSelect
         name="selectedDestination"
         :label="t('flow.destination.select')"
@@ -72,6 +66,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import destinationService from "@/services/alert_destination";
@@ -89,20 +84,24 @@ const emit = defineEmits<{ (e: "expand", value: boolean): void }>();
 const { t } = useI18n();
 const store = useStore();
 
-// Shared schema (same one the pipeline external-destination form uses), so the
-// required rule can't drift between the two canvases.
-const destinationSchema = makeExternalDestinationSchema(t);
-
-const formRef = ref<any>(null);
 const destinations = ref<any[]>([]);
 const createNewDestination = ref(false);
 
-// Seed for `:default-values` (edit prefill / a just-created destination). The
-// form owns the live value once mounted.
-const selectedDestinationSeed = ref<string>(props.initialName || "");
-const defaultValues = computed((): ExternalDestinationForm => ({
-  selectedDestination: selectedDestinationSeed.value,
-}));
+// ── OForm wiring (OWNER pattern) ─────────────────────────────────────────────
+// Owned here via useOForm to match the sibling pickers (ConditionBuilder /
+// FunctionPicker) instead of reaching into an internal form through a template
+// ref. The required rule comes from the shared schema (same one the pipeline
+// external-destination form uses) and renders inline on the select. The form
+// instance outlives the OForm element's v-if remount, so a just-created
+// destination can be pushed in with setFieldValue.
+const validated = ref<ExternalDestinationForm | null>(null);
+const form = useOForm<ExternalDestinationForm>({
+  defaultValues: { selectedDestination: props.initialName || "" },
+  schema: makeExternalDestinationSchema(t),
+  onSubmit: (values) => {
+    validated.value = values;
+  },
+});
 
 watch(createNewDestination, (v) => {
   emit("expand", v);
@@ -140,33 +139,22 @@ const getDestinations = async () => {
 
 onBeforeMount(getDestinations);
 
-const onDestinationCreated = (name: string) => {
-  // Seed it so the form re-mounts (toggling out of create mode) with the value;
-  // if the select form is already mounted, push it in directly.
-  selectedDestinationSeed.value = name;
+const onDestinationCreated = async (name: string) => {
+  // Leave create mode, refresh so the new destination is in the options, then
+  // push it into the (persistent) form as the selection.
   createNewDestination.value = false;
-  if (formRef.value?.form) {
-    formRef.value.form.setFieldValue("selectedDestination", name);
-  }
-  getDestinations();
-};
-
-// Captured on a schema-valid submit so the imperative `submit()` below can hand
-// the values back to the host.
-const validated = ref<ExternalDestinationForm | null>(null);
-const onFormSubmit = (values: ExternalDestinationForm) => {
-  validated.value = values;
+  await getDestinations();
+  form.setFieldValue("selectedDestination", name);
 };
 
 // Host bridge: validate through the schema and return the node payload, or null
-// when invalid (OForm renders the error inline on the field).
+// when invalid (OForm renders the error inline on the field). onSubmit (above)
+// only fires on a schema-valid submit, so `validated` stays null otherwise.
 const submit = async () => {
-  const form = formRef.value;
-  if (!form) return null;
+  if (createNewDestination.value) return null; // still in the inline create form
   validated.value = null;
-  const ok = await form.validate();
-  if (!ok) return null;
-  const name = form.form?.getFieldValue?.("selectedDestination") ?? "";
+  await form.handleSubmit();
+  const name = validated.value?.selectedDestination;
   if (!name) return null;
   return {
     org_id: store.state.selectedOrganization.identifier,
@@ -174,5 +162,5 @@ const submit = async () => {
   };
 };
 
-defineExpose({ submit, createNewDestination, formRef, getDestinations });
+defineExpose({ submit, createNewDestination, getDestinations });
 </script>
