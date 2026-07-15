@@ -965,15 +965,19 @@ fn process_exp_hist_data_point(
         bucket_recs.push(sum_rec);
     }
 
-    let base = 2 ^ (2 ^ -data_point.scale);
-    // add negative bucket records
+    // OTLP exponential histogram bucket boundaries are powers of `base`, where
+    // `base = 2^(2^-scale)`. Bucket index `idx` (offset + array position) covers the
+    // range (base^idx, base^(idx+1)], so its upper bound is `base^(idx+1)`.
+    // NOTE: `^` is bitwise XOR in Rust, not exponentiation -- use `powf`/`powi`.
+    let base = 2f64.powf(2f64.powi(-data_point.scale));
+    // add negative bucket records (negative values, so the boundary is negated)
     if let Some(buckets) = &data_point.negative {
         let offset = buckets.offset;
         for (i, val) in buckets.bucket_counts.iter().enumerate() {
             let mut bucket_rec = rec.clone();
             bucket_rec[NAME_LABEL] = format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
             bucket_rec[VALUE_LABEL] = (*val as f64).into();
-            bucket_rec["le"] = (base ^ (offset + (i as i32) + 1)).to_string().into();
+            bucket_rec["le"] = (-base.powi(offset + (i as i32) + 1)).to_string().into();
             bucket_recs.push(bucket_rec);
         }
     }
@@ -984,7 +988,7 @@ fn process_exp_hist_data_point(
             let mut bucket_rec = rec.clone();
             bucket_rec[NAME_LABEL] = format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
             bucket_rec[VALUE_LABEL] = (*val as f64).into();
-            bucket_rec["le"] = (base ^ (offset + (i as i32) + 1)).to_string().into();
+            bucket_rec["le"] = base.powi(offset + (i as i32) + 1).to_string().into();
             bucket_recs.push(bucket_rec);
         }
     }
@@ -2287,6 +2291,32 @@ mod tests {
                 .find(|r| r["__name__"].as_str().unwrap_or("").ends_with("_sum"));
             assert!(sum_record.is_some());
             assert_eq!(sum_record.unwrap()["value"], 500.0);
+
+            // Bucket boundaries: base = 2^(2^-scale). scale=1 => base = 2^0.5 = sqrt(2).
+            let base = 2f64.powf(2f64.powi(-1));
+
+            // Positive buckets (offset 0): le = base^(idx+1) for idx = 0,1,2.
+            let positive_les: Vec<f64> = result
+                .iter()
+                .filter(|r| r["__name__"].as_str().unwrap_or("").ends_with("_bucket"))
+                .filter_map(|r| r["le"].as_str().and_then(|s| s.parse::<f64>().ok()))
+                .filter(|le| *le > 0.0)
+                .collect();
+            assert_eq!(positive_les.len(), 3);
+            for (i, le) in positive_les.iter().enumerate() {
+                assert!((le - base.powi(i as i32 + 1)).abs() < 1e-9);
+            }
+
+            // Negative buckets (offset -2): le = -base^(idx+1) for idx = -2,-1.
+            let negative_les: Vec<f64> = result
+                .iter()
+                .filter(|r| r["__name__"].as_str().unwrap_or("").ends_with("_bucket"))
+                .filter_map(|r| r["le"].as_str().and_then(|s| s.parse::<f64>().ok()))
+                .filter(|le| *le < 0.0)
+                .collect();
+            assert_eq!(negative_les.len(), 2);
+            assert!((negative_les[0] - (-base.powi(-1))).abs() < 1e-9);
+            assert!((negative_les[1] - (-base.powi(0))).abs() < 1e-9);
         }
     }
 
