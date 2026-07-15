@@ -1407,6 +1407,29 @@ export function useMetricsExplorerGrid() {
 
     const step = computeStepSeconds(rangeSeconds.value, points);
 
+    // Already resolved — reuse it, fire NO query. A card that already has a
+    // SETTLED preview (done/no-data/unavailable) is just being re-triggered
+    // because it scrolled back into view or its body remounted (e.g. flipping
+    // Explore↔Visualize). Re-running would flash a loading state and re-hit the
+    // backend for a result the card already shows — exactly what a dashboard
+    // panel avoids on revisit.
+    //
+    // This is safe without a per-query validity check because previews are
+    // WINDOW-scoped: any time-range change wipes `previews.value` (see
+    // `setTimeRange`), and a ⚙ override re-requests with `skipCache`. So an
+    // existing settled preview is always valid for the current query+window.
+    // `skipCache` (refresh / time-range change / override) still forces a real
+    // re-query, and an `error`/`loading` preview falls through to retry.
+    const settled = previews.value[card.name];
+    if (
+      !opts?.skipCache &&
+      settled &&
+      settled.status !== "loading" &&
+      settled.status !== "error"
+    ) {
+      return;
+    }
+
     // Paint from the persisted result and fire no query at all — the same deal a
     // dashboard panel gets on revisit. Matters more here than there: a first
     // screenful is ~60 queries against a backend that already times out on the

@@ -32,6 +32,7 @@ const defaults = (): ExplorerFilterState => ({
   hideEmptyPanels: true,
   sortBy: "a-z",
   viewMode: "grid",
+  mode: "explore",
 });
 
 describe("explorerUrlState", () => {
@@ -59,6 +60,7 @@ describe("explorerUrlState", () => {
       hideEmptyPanels: false,
       sortBy: "z-a",
       viewMode: "rows",
+      mode: "visualize",
     };
 
     const query = explorerFiltersToQuery(state);
@@ -80,6 +82,22 @@ describe("explorerUrlState", () => {
     expect(restored.hideEmptyPanels).toBe(false);
     expect(restored.sortBy).toBe("z-a");
     expect(restored.viewMode).toBe("rows");
+    expect(restored.mode).toBe("visualize");
+  });
+
+  it("omits mode from the URL in the default Explore mode, restores Visualize", () => {
+    // Explore is the landing default, so it serializes to nothing (bare URL);
+    // only Visualize writes `?mode=visualize`.
+    expect(explorerFiltersToQuery(defaults()).mode).toBeUndefined();
+    expect(
+      explorerFiltersToQuery({ ...defaults(), mode: "visualize" }).mode,
+    ).toBe("visualize");
+    expect(queryToExplorerFilters({ mode: "visualize" }).mode).toBe(
+      "visualize",
+    );
+    // An unknown/absent mode leaves it undefined (caller keeps the default).
+    expect(queryToExplorerFilters({}).mode).toBeUndefined();
+    expect(queryToExplorerFilters({ mode: "bogus" }).mode).toBeUndefined();
   });
 
   it("serializes set params sorted for a stable URL", () => {

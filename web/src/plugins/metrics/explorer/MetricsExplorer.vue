@@ -38,10 +38,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex items-start gap-2 shrink-0 px-4 py-2 border-b border-border-default"
       data-test="metrics-explorer-filter-bar"
     >
-      <!-- One line by default: the bar clips its chips to the first row and
-           collapses the rest behind an "n more filters" button, so the time
-           controls never get shoved onto a second line as filters accumulate. -->
-      <div class="flex flex-1 min-w-0 items-start gap-2">
+      <!-- Page mode toggle at the start of the toolbar — Explore (browse grid)
+           vs Visualize (query workspace). Same OToggleGroup + icon-left pattern
+           the Logs (Search/Visualize) and Traces toolbars use, so the mode
+           switch reads identically across the observability pages. -->
+      <OToggleGroup
+        :model-value="mode"
+        type="single"
+        class="shrink-0"
+        data-test="metrics-explorer-mode"
+        @update:model-value="setMode"
+      >
+        <OToggleGroupItem
+          value="explore"
+          size="sm"
+          data-test="metrics-explorer-mode-explore"
+        >
+          <template #icon-left>
+            <OIcon name="search" size="sm" class="shrink-0" />
+          </template>
+          {{ t("metrics.explorer.modeExplore") }}
+        </OToggleGroupItem>
+        <OToggleGroupItem
+          value="visualize"
+          size="sm"
+          data-test="metrics-explorer-mode-visualize"
+        >
+          <template #icon-left>
+            <OIcon name="timeline" size="sm" class="shrink-0" />
+          </template>
+          {{ t("metrics.explorer.modeVisualize") }}
+        </OToggleGroupItem>
+      </OToggleGroup>
+
+      <!-- Label filters belong to EXPLORE only. In Visualize the PromQL query
+           carries its own matchers, so a separate filter bar is redundant — the
+           same split Logs' visualize uses. A spacer keeps the time controls
+           pinned right when the filters are hidden. -->
+      <div
+        v-if="isExplore"
+        class="flex flex-1 min-w-0 items-start gap-2"
+      >
         <span
           class="text-xs font-medium text-text-secondary shrink-0 leading-7"
         >
@@ -59,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @clear-all="onClearLabelFilters"
         />
       </div>
+      <div v-else class="flex-1" />
 
       <div class="flex items-center gap-2 shrink-0">
         <DateTimePickerDashboard
@@ -86,11 +124,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Body: two columns that START ON THE SAME LINE. The left facet panel and
-         the right column (search row + grid) both begin here, so the panel gets
-         the full height and the search bar starts exactly where the grid cards
-         start — not spanning the page above the panel. -->
-    <div class="flex flex-1 min-h-0">
+    <!-- EXPLORE mode — the browse grid. Body is two columns that START ON THE
+         SAME LINE: the left facet panel and the right column (search row + grid)
+         both begin here, so the panel gets the full height and the search bar
+         starts exactly where the grid cards start. -->
+    <div v-if="isExplore" class="flex flex-1 min-h-0">
       <!-- Left column: the facet selector (Prefix/Suffix/Type) as its OWN header,
            with the always-open facet panel beneath — one self-contained column,
            the same shape as the Dashboards page's Folders panel (header on top,
@@ -434,6 +472,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <!-- VISUALIZE mode — the query-driven workspace. Mounts the constrained
+         pageType="metrics" PanelEditor (same engine as the metrics editor route),
+         where the user writes PromQL and builds a chart. Keyed on mode so it
+         re-initialises its panel state cleanly each time Visualize is entered. -->
+    <MetricsVisualize
+      v-else
+      key="metrics-visualize"
+      class="flex-1 min-h-0"
+      :selected-date-time="selectedDate"
+    />
+
     <FunctionConfigDialog
       v-if="dialogCard && dialogDefaults"
       v-model="dialogOpen"
@@ -479,6 +528,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 
 import MetricCard from "./MetricCard.vue";
+import MetricsVisualize from "./MetricsVisualize.vue";
 import PrefixFilterPanel from "./PrefixFilterPanel.vue";
 import LabelFilterBar from "./LabelFilterBar.vue";
 import FunctionConfigDialog from "./FunctionConfigDialog.vue";
@@ -548,6 +598,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     MetricCard,
+    MetricsVisualize,
     PrefixFilterPanel,
     LabelFilterBar,
     FunctionConfigDialog,
@@ -648,6 +699,16 @@ export default defineComponent({
       },
     });
 
+    // Page mode — the Explore browse grid vs the query-driven Visualize
+    // workspace. Local to the component (it is not grid data), synced to the URL
+    // as `?mode=` like Logs' `logs_visualize_toggle`. The setter ignores the
+    // OToggleGroup deselect (undefined) so a re-click can't leave a blank mode.
+    const mode = ref<"explore" | "visualize">("explore");
+    const isExplore = computed(() => mode.value === "explore");
+    const setMode = (v: string | number | undefined) => {
+      if (v === "explore" || v === "visualize") mode.value = v;
+    };
+
     /* ---------------------------------------------------------- layout */
 
     const containerWidth = ref(1200);
@@ -683,6 +744,22 @@ export default defineComponent({
     );
 
     let resizeObserver: ResizeObserver | null = null;
+
+    // (Re)attach the width observer to the CURRENT scroll element, disconnecting
+    // any previous one. Also sets the width immediately from `clientWidth`, so the
+    // column count is right on the first frame after the body (re)mounts rather
+    // than waiting for the observer's first async callback.
+    const observeScrollWidth = () => {
+      resizeObserver?.disconnect();
+      resizeObserver = null;
+      const el = scrollRef.value;
+      if (!el || typeof ResizeObserver === "undefined") return;
+      containerWidth.value = el.clientWidth || containerWidth.value;
+      resizeObserver = new ResizeObserver((entries) => {
+        containerWidth.value = entries[0]?.contentRect.width ?? 1200;
+      });
+      resizeObserver.observe(el);
+    };
 
     /* ----------------------------------------------------------- rails */
 
@@ -1008,6 +1085,7 @@ export default defineComponent({
         grid.hideEmptyPanels.value = f.hideEmptyPanels;
       if (f.sortBy) grid.sortBy.value = f.sortBy;
       if (f.viewMode) grid.viewMode.value = f.viewMode;
+      if (f.mode) mode.value = f.mode;
       if (f.labelFilters) {
         grid.labelFilters.value = f.labelFilters;
         // Without membership data the chips fail open and narrow nothing.
@@ -1047,6 +1125,7 @@ export default defineComponent({
         hideEmptyPanels: grid.hideEmptyPanels.value,
         sortBy: grid.sortBy.value,
         viewMode: grid.viewMode.value,
+        mode: mode.value,
       });
       const time: any = selectedDateToQueryParams(selectedDate.value);
       // The default window is recoverable from its absence, like the filters.
@@ -1085,6 +1164,7 @@ export default defineComponent({
         grid.hideEmptyPanels.value,
         grid.sortBy.value,
         grid.viewMode.value,
+        mode.value,
         selectedDate.value,
         refreshInterval.value,
       ],
@@ -1127,6 +1207,7 @@ export default defineComponent({
         grid.hideEmptyPanels.value = f.hideEmptyPanels ?? true;
         grid.sortBy.value = f.sortBy ?? "a-z";
         grid.viewMode.value = f.viewMode ?? "grid";
+        mode.value = f.mode ?? "explore";
         if (f.labelFilters?.length) grid.ensureSchemas();
 
         selectedDate.value =
@@ -1320,13 +1401,15 @@ export default defineComponent({
         entry: "direct",
       });
 
-      if (scrollRef.value && typeof ResizeObserver !== "undefined") {
-        resizeObserver = new ResizeObserver((entries) => {
-          containerWidth.value = entries[0]?.contentRect.width ?? 1200;
-        });
-        resizeObserver.observe(scrollRef.value);
-      }
+      observeScrollWidth();
     });
+
+    // The scroll container lives inside the Explore body (`v-if="isExplore"`), so
+    // it UNMOUNTS on switching to Visualize and a NEW element mounts on the way
+    // back. Re-attach the observer to whichever element is current — otherwise the
+    // width stays stale after a round-trip and the grid collapses to one column.
+    // `flush: "post"` so the new element is laid out when we read its clientWidth.
+    watch(scrollRef, () => observeScrollWidth(), { flush: "post" });
 
     onBeforeUnmount(() => {
       resizeObserver?.disconnect();
@@ -1374,6 +1457,9 @@ export default defineComponent({
       viewOptions,
       sortModel,
       viewModel,
+      mode,
+      isExplore,
+      setMode,
       noDataHiddenLabel,
       noMatchDescription,
       noMatchActions,

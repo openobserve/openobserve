@@ -156,6 +156,15 @@ const mountExplorer = () =>
         OTag: {
           template: '<span><slot /></span>',
         },
+        // Pulls in the dashboard PanelEditor (ECharts + useDashboardPanelData),
+        // which needs far more context than this wiring test provides. The
+        // explorer test only cares that it renders in visualize mode; its own
+        // behaviour is covered by MetricsVisualize.spec. Keep the data-test so the
+        // mode-switch assertions still find it.
+        MetricsVisualize: {
+          template:
+            '<div data-test="metrics-explorer-visualize">visualize</div>',
+        },
       },
     },
   });
@@ -341,6 +350,39 @@ describe("MetricsExplorer wiring", () => {
       // (a deselect). selectRail must IGNORE it so the panel never blanks.
       (wrapper.vm as any).selectRail(undefined);
       expect(grid.activeRail.value).toBe("type");
+    });
+  });
+
+  describe("Explore / Visualize mode toggle", () => {
+    it("defaults to Explore — the browse grid, not the Visualize pane", () => {
+      const wrapper = mountExplorer();
+      expect((wrapper.vm as any).isExplore).toBe(true);
+      expect(
+        wrapper.find('[data-test="metrics-explorer-mode-explore"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="metrics-explorer-mode-visualize"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="metrics-explorer-visualize"]').exists(),
+      ).toBe(false);
+    });
+
+    it("switches the body to the Visualize pane when the mode flips", async () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+      expect((wrapper.vm as any).mode).toBe("visualize");
+      expect(
+        wrapper.find('[data-test="metrics-explorer-visualize"]').exists(),
+      ).toBe(true);
+    });
+
+    it("ignores the OToggleGroup deselect so mode never goes blank", () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).setMode("visualize");
+      (wrapper.vm as any).setMode(undefined);
+      expect((wrapper.vm as any).mode).toBe("visualize");
     });
   });
 

@@ -302,6 +302,35 @@ describe("useMetricsExplorerGrid", () => {
       expect(grid.previews.value["http_requests_total"].status).toBe("done");
     });
   });
+  describe("a settled card is reused on re-request, not re-queried", () => {
+    it("fires no new query when a done card is re-requested (scroll-back / mode toggle)", async () => {
+      // The card unmounts and remounts when the Explore body is v-if'd out (e.g.
+      // flipping Explore↔Visualize) or scrolled out and back. The remount
+      // re-triggers requestPreview — but a card that already has a result must
+      // reuse it and hit NO backend, the way a dashboard panel does on revisit.
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+
+      const first = grid.requestPreview(card);
+      await flush();
+      expect(inFlight).toHaveLength(1);
+      inFlight[0].complete(SERIES);
+      await first;
+      expect(grid.previews.value["http_requests_total"].status).toBe("done");
+
+      const before = inFlight.length;
+      // Re-request (as a remount / scroll-back would) — no skipCache.
+      await grid.requestPreview(card);
+      await flush();
+      expect(inFlight.length).toBe(before); // no new query fired
+
+      // But a refresh (skipCache) still forces a real re-query.
+      grid.requestPreview(card, { skipCache: true });
+      await flush();
+      expect(inFlight.length).toBe(before + 1);
+    });
+  });
+
   describe("a label can carry more than one matcher", () => {
     it("keeps both, and both reach the query", async () => {
       // `status=~"5.."` AND `status!="503"` is how you say the useful thing, and

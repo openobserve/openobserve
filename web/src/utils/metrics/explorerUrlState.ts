@@ -38,6 +38,8 @@ export interface ExplorerFilterState {
   hideEmptyPanels: boolean;
   sortBy: "a-z" | "z-a";
   viewMode: "grid" | "rows";
+  /** Page mode — the Explore grid vs the query-driven Visualize workspace. */
+  mode: "explore" | "visualize";
 }
 
 /** Every key this module may write — cleared before each sync so a removed filter leaves the URL. */
@@ -51,6 +53,7 @@ export const EXPLORER_FILTER_PARAM_KEYS = [
   "show_empty",
   "sort",
   "view",
+  "mode",
 ] as const;
 
 const TYPE_IDS = new Set(["counter", "gauge", "histogram", "summary", "other"]);
@@ -89,6 +92,8 @@ export function explorerFiltersToQuery(
   if (!state.hideEmptyPanels) query.show_empty = "true";
   if (state.sortBy === "z-a") query.sort = "z-a";
   if (state.viewMode === "rows") query.view = "rows";
+  // Explore is the default landing mode, so only the non-default is serialized.
+  if (state.mode === "visualize") query.mode = "visualize";
   return query;
 }
 
@@ -124,6 +129,7 @@ export function queryToExplorerFilters(
   if (query.show_empty === "true") out.hideEmptyPanels = false;
   if (query.sort === "z-a") out.sortBy = "z-a";
   if (query.view === "rows") out.viewMode = "rows";
+  if (query.mode === "visualize") out.mode = "visualize";
 
   return out;
 }
