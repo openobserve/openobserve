@@ -73,7 +73,12 @@ test.describe("Alerts UI Operations", () => {
     timeout: FIVE_MINUTES_MS
   }, async ({ page }) => {
     const suffix = pm.alertsPage.generateRandomString();
-    const streamName = 'auto_playwright_stream';
+    // Unique per-run stream (self-ingested below). Avoids the shared fixed-name
+    // 'auto_playwright_stream' fixture, which on the shared cloud org gets deleted by
+    // OTHER concurrent branch runs and — because cloud deletion is async and can take
+    // minutes — sits stuck "being deleted", never re-appearing in the wizard's stream
+    // dropdown and timing this test out. A freshly-named stream is never mid-deletion.
+    const streamName = 'auto_pw_stream_' + suffix;
 
     // Ingest test data for the stream
     await pm.commonActions.ingestTestData(streamName);
@@ -127,7 +132,12 @@ test.describe("Alerts UI Operations", () => {
     timeout: THREE_MINUTES_MS
   }, async ({ page }) => {
     const suffix = pm.alertsPage.generateRandomString();
-    const streamName = 'auto_playwright_stream';
+    // Unique per-run stream (self-ingested below). Avoids the shared fixed-name
+    // 'auto_playwright_stream' fixture, which on the shared cloud org gets deleted by
+    // OTHER concurrent branch runs and — because cloud deletion is async and can take
+    // minutes — sits stuck "being deleted", never re-appearing in the wizard's stream
+    // dropdown and timing this test out. A freshly-named stream is never mid-deletion.
+    const streamName = 'auto_pw_stream_' + suffix;
 
     // Ensure stream has data
     await pm.commonActions.ingestTestData(streamName);
@@ -181,7 +191,12 @@ test.describe("Alerts UI Operations", () => {
     timeout: FIVE_MINUTES_MS
   }, async ({ page }) => {
     const suffix = pm.alertsPage.generateRandomString();
-    const streamName = 'auto_playwright_stream';
+    // Unique per-run stream (self-ingested below). Avoids the shared fixed-name
+    // 'auto_playwright_stream' fixture, which on the shared cloud org gets deleted by
+    // OTHER concurrent branch runs and — because cloud deletion is async and can take
+    // minutes — sits stuck "being deleted", never re-appearing in the wizard's stream
+    // dropdown and timing this test out. A freshly-named stream is never mid-deletion.
+    const streamName = 'auto_pw_stream_' + suffix;
 
     // Ensure stream has data
     await pm.commonActions.ingestTestData(streamName);

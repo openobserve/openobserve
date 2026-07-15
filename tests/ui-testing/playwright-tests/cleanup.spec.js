@@ -305,15 +305,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^dedup_test_/,                                // Dedup test streams (dedup_test_*)
         /^dedup_src_/,                                 // Dedup source streams (dedup_src_*)
         /^alert_validation_stream$/,                   // Alert validation stream
-        // NOTE: auto_playwright_stream is intentionally NOT deleted here. It is a shared,
-        // fixed-name fixture stream (ingested by global-setup-alpha1.js and reused by the
-        // alerts-ui-operations tests). OpenObserve deletes streams asynchronously, so
-        // deleting it at shard start left it stuck in a "being deleted" state; a test's
-        // later re-ingest was then rejected with
-        // 400 "stream [auto_playwright_stream] is being deleted", the stream never
-        // reappeared in the alert wizard's stream dropdown, and the tests timed out.
-        // It is treated as a persistent fixture (see the protected list below), like
-        // e2e_automate / k8s_json.
+        /^auto_pw_stream_/,                            // Per-run alerts-ui-operations streams (auto_pw_stream_<suffix>)
         /^incident_e2e_/,                              // Incident e2e test streams (incident_e2e_*)
         /ellipsis_testing/,                            // Bug #7468 ellipsis test streams (long stream names)
         /^e2e_test_cpu_usage$/,                        // Pipeline regression test metrics stream (Issue #9901)
@@ -326,7 +318,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_time_test_\d+$/                       // e2e_time_test_<timestamp>
       ],
       // Protected streams to never delete
-      ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate', 'k8s_json', 'auto_playwright_stream']
+      ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate', 'k8s_json']
     );
 
     // Note: Pipeline regression test streams (e2e_test_cpu_usage for metrics, e2e_test_traces for traces)
