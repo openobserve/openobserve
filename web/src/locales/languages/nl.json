@@ -5606,7 +5606,11 @@
       "authEditNote": "Inloggegevens kunnen niet worden teruggelezen. Voer de API-sleutel alleen opnieuw in als je deze wilt roteren.",
       "cannotRename": "Kan na het aanmaken niet worden hernoemd.",
       "availableModelsHelp": "Optioneel. Door komma's gescheiden lijst van modellen die beschikbaar zijn op deze provider.",
-      "saveError": "Het opslaan van de provider is mislukt"
+      "saveError": "Het opslaan van de provider is mislukt",
+      "nameRequired": "Provider name is required",
+      "typeRequired": "Provider type is required",
+      "defaultModelRequired": "Default model is required",
+      "apiKeyRequired": "API key is required"
     },
     "scoreConfig": {
       "booleanValues": "true / false",
@@ -5723,6 +5727,12 @@
       "falseIsHealthyHint": "Scores van true veroorzaken kwaliteitsproblemen.",
       "thresholdEmptyHint": "Door dit leeg te laten, draagt deze dimensie niet bij aan kwaliteitsstatussignalen in het product. Scores worden nog steeds geregistreerd, maar veroorzaken geen probleemindicatoren.",
       "saveError": "Het opslaan van de scoreconfiguratie is mislukt",
+      "validation": {
+        "nameRequired": "Name is required",
+        "nameFormat": "Use lowercase letters, numbers, and underscores only",
+        "minRequired": "Min is required",
+        "maxRequired": "Max is required"
+      },
       "empty": {
         "title": "Nog geen scoreconfiguraties",
         "description": "Scoreconfiguraties definiëren de dimensies die je scorers produceren — naam, gegevenstype, waardebereik en gezonde drempelwaarde. Maak er een aan om met online evaluatie te beginnen.",
@@ -5956,6 +5966,20 @@
       },
       "requestBodyLabel": "Bodysjabloon aanvragen",
       "saveError": "Het opslaan van de scorer is mislukt",
+      "validation": {
+        "nameRequired": "Scorer name is required",
+        "scoreConfigRequired": "A score config is required",
+        "providerRequired": "A provider is required",
+        "endpointRequired": "An endpoint URL is required",
+        "bearerTokenRequired": "Token is required",
+        "basicUsernameRequired": "Username is required",
+        "basicPasswordRequired": "Password is required",
+        "apiKeyHeaderRequired": "Header name is required",
+        "apiKeyTokenRequired": "Token is required",
+        "timeoutInvalid": "Timeout must be 0 or greater",
+        "retriesInvalid": "Retries must be 0 or greater",
+        "duplicateFieldName": "Field names must be unique"
+      },
       "versionsLoadError": "Kon de versies van de scoreconfiguratie niet laden",
       "testPanel": {
         "title": "Test deze scorer",
@@ -6135,7 +6159,12 @@
       "selectAtLeastOne": "Selecteer minstens één scorer",
       "saveError": "Kon de evaluatietaak niet opslaan",
       "createdAndActivated": "Evaluatietaak aangemaakt en geactiveerd",
-      "createdButActivateFailed": "Evaluatietaak aangemaakt, maar activeren is mislukt"
+      "createdButActivateFailed": "Evaluatietaak aangemaakt, maar activeren is mislukt",
+      "validation": {
+        "nameRequired": "Job name is required",
+        "streamRequired": "A stream is required",
+        "samplingValueRequired": "A sampling value is required"
+      }
     }
   },
   "llmProviders": {

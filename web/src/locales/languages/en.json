@@ -5704,7 +5704,11 @@
       "authEditNote": "Credentials cannot be read back. Re-enter the API key only if you want to rotate it.",
       "cannotRename": "Cannot be renamed after creation.",
       "availableModelsHelp": "Optional. Comma-separated list of models available on this Provider.",
-      "saveError": "Failed to save provider"
+      "saveError": "Failed to save provider",
+      "nameRequired": "Provider name is required",
+      "typeRequired": "Provider type is required",
+      "defaultModelRequired": "Default model is required",
+      "apiKeyRequired": "API key is required"
     },
     "scoreConfig": {
       "booleanValues": "true / false",
@@ -5760,7 +5764,7 @@
         "type": "Type",
         "rangeValues": "Range / values",
         "healthy": "Healthy",
-        "activeVersion": "version",
+        "activeVersion": "Version",
         "usedBy": "Used by",
         "created": "Created",
         "actions": "Actions"
@@ -5821,6 +5825,12 @@
       "falseIsHealthyHint": "Scores of true trigger quality issues.",
       "thresholdEmptyHint": "Leaving this empty means this dimension won't contribute to quality status signals across the product. Scores will still be recorded but won't trigger issue indicators.",
       "saveError": "Failed to save score config",
+      "validation": {
+        "nameRequired": "Name is required",
+        "nameFormat": "Use lowercase letters, numbers, and underscores only",
+        "minRequired": "Min is required",
+        "maxRequired": "Max is required"
+      },
       "empty": {
         "title": "No Score Configs Yet",
         "description": "Score Configs define the dimensions your scorers produce — name, data type, value range, and healthy threshold. Create one to start wiring online evaluation.",
@@ -6054,6 +6064,20 @@
       },
       "requestBodyLabel": "Request body template",
       "saveError": "Failed to save scorer",
+      "validation": {
+        "nameRequired": "Scorer name is required",
+        "scoreConfigRequired": "A score config is required",
+        "providerRequired": "A provider is required",
+        "endpointRequired": "An endpoint URL is required",
+        "bearerTokenRequired": "Token is required",
+        "basicUsernameRequired": "Username is required",
+        "basicPasswordRequired": "Password is required",
+        "apiKeyHeaderRequired": "Header name is required",
+        "apiKeyTokenRequired": "Token is required",
+        "timeoutInvalid": "Timeout must be 0 or greater",
+        "retriesInvalid": "Retries must be 0 or greater",
+        "duplicateFieldName": "Field names must be unique"
+      },
       "versionsLoadError": "Failed to load score config versions",
       "testPanel": {
         "title": "Test this scorer",
@@ -6233,7 +6257,12 @@
       "selectAtLeastOne": "Select at least one scorer",
       "saveError": "Failed to save eval job",
       "createdAndActivated": "Eval job created and activated",
-      "createdButActivateFailed": "Eval job created, but activation failed"
+      "createdButActivateFailed": "Eval job created, but activation failed",
+      "validation": {
+        "nameRequired": "Job name is required",
+        "streamRequired": "A stream is required",
+        "samplingValueRequired": "A sampling value is required"
+      }
     }
   },
   "llmProviders": {
