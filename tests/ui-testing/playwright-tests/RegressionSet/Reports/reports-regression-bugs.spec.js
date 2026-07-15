@@ -89,12 +89,16 @@ test.describe("Reports Regression Bug Fixes", () => {
 
       // Start Date is REQUIRED + format-checked on the Schedule Later tab
       // (CreateReport.schema date/time rule). ODate is a Reka segmented field
-      // (no native <input>) — type day/month/year into its focused segments.
+      // (no native <input>) whose locale defaults to "en" → en-US segment order
+      // MONTH / DAY / YEAR. Focus the leftmost (month) segment, then type in
+      // M/D/Y order so Reka auto-advances and emits ISO YYYY-MM-DD (2027-12-29).
       const startDateField = page.locator('[data-test="add-report-schedule-start-date-field-group"]');
       await startDateField.click({ force: true });
-      await page.keyboard.type('29');
-      await page.keyboard.type('12');
-      await page.keyboard.type('2027');
+      await page.keyboard.press('ArrowLeft');
+      await page.keyboard.press('ArrowLeft'); // 3 segments -> 2 lefts reaches month from any start
+      await page.keyboard.type('12');   // month
+      await page.keyboard.type('29');   // day
+      await page.keyboard.type('2027'); // year
       await page.keyboard.press('Escape');
 
       // OTime wraps a hidden <input type="time"> inside the role="group" div.

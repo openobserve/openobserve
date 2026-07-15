@@ -277,12 +277,20 @@ export class ReportsPage {
     // "Schedule Later" tab (CreateReport.schema date/time rule), so both must be
     // entered with well-formed values or the save is blocked.
 
-    // ODate is a Reka segmented field (no native <input>) — click to focus and
-    // type digits into the day/month/year segments (emits ISO YYYY-MM-DD).
+    // ODate is a Reka segmented field (no native <input>). reka-ui defaults its
+    // locale to "en", which ICU resolves to en-US → segment order is
+    // MONTH / DAY / YEAR (deterministic; independent of the runner's OS locale).
+    // Click the field, walk to the leftmost (month) segment with ArrowLeft, then
+    // type the segments in M/D/Y order so Reka auto-advances and emits ISO
+    // YYYY-MM-DD (here: 2027-12-29). Typing the day (29) into the month segment
+    // first misplaces the digits and leaves `date` empty/invalid, which blocks
+    // the step-2 -> step-3 advance (goToStep validates date/time).
     await this.scheduleStartDateField.click({ force: true });
-    await this.page.keyboard.type('29');
-    await this.page.keyboard.type('12');
-    await this.page.keyboard.type('2027');
+    await this.page.keyboard.press('ArrowLeft');
+    await this.page.keyboard.press('ArrowLeft'); // 3 segments -> 2 lefts reaches month from any start
+    await this.page.keyboard.type('12');   // month
+    await this.page.keyboard.type('29');   // day
+    await this.page.keyboard.type('2027'); // year
     await this.page.keyboard.press('Escape');
 
     // OTime wraps a (visually hidden) native <input type="time"> inside its field
