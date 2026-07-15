@@ -165,6 +165,14 @@ const mountExplorer = () =>
           template:
             '<div data-test="metrics-explorer-visualize">visualize</div>',
         },
+        // Owns the /savedviews CRUD + dialogs; its own behaviour is covered by
+        // MetricsSavedViews.spec. The explorer test only cares that it is wired
+        // in (present, receives a buildSnapshot, emits apply).
+        MetricsSavedViews: {
+          props: ["buildSnapshot"],
+          emits: ["apply"],
+          template: '<div data-test="metrics-saved-views">saved-views</div>',
+        },
       },
     },
   });
@@ -314,19 +322,46 @@ describe("MetricsExplorer wiring", () => {
       ).toBe(true);
     });
 
-    it("offers Saved Views as a distinct navigation button, not a rail heart", () => {
-      // The old rail heart was really a 'show pinned only' filter jammed into the
-      // facet rail. Saved Views is navigation to named views — it lives with the
-      // list controls, and per-metric favouriting is the pin on each card.
+    it("mounts the Saved Views control, wired to build/apply the explorer snapshot", () => {
+      // Saved Views is its own component (list + dialogs over /savedviews). The
+      // explorer only wires it: hands it a buildSnapshot and listens for apply.
       const wrapper = mountExplorer();
 
+      // The control is mounted; its snapshot build/apply wiring is exercised by
+      // the two tests below (buildSavedViewSnapshot / applySavedViewSnapshot).
       expect(
-        wrapper.find('[data-test="metrics-explorer-saved-views"]').exists(),
+        wrapper.find('[data-test="metrics-saved-views"]').exists(),
       ).toBe(true);
       // The rail heart is gone.
       expect(
         wrapper.find('[data-test="metrics-explorer-rail-favorite"]').exists(),
       ).toBe(false);
+    });
+
+    it("builds a snapshot of filters + pinned metrics (no time range)", () => {
+      // The snapshot a Saved View stores: serialized filters + pinned names, and
+      // deliberately NOT the time range (a view opens against live now).
+      const wrapper = mountExplorer();
+      grid.selectedTypes.value = new Set(["counter"]);
+      grid.favorites.value = ["http_requests_total"];
+
+      const snap = (wrapper.vm as any).buildSavedViewSnapshot();
+      expect(snap.kind).toBe("metrics");
+      expect(snap.filters.type).toBe("counter");
+      expect(snap.pinned).toEqual(["http_requests_total"]);
+      expect(snap.filters.period).toBeUndefined();
+      expect(snap.filters.from).toBeUndefined();
+    });
+
+    it("applies a snapshot back onto the grid (filters + pins)", () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).applySavedViewSnapshot({
+        filters: { type: "gauge", search: "cpu" },
+        pinned: ["node_memory"],
+      });
+      expect([...grid.selectedTypes.value]).toEqual(["gauge"]);
+      expect(grid.searchTerm.value).toBe("cpu");
+      expect(grid.favorites.value).toEqual(["node_memory"]);
     });
 
     it("shows the active facet panel without a click — the panel is always open", () => {

@@ -3950,7 +3950,20 @@
       "tabType": "Type",
       "savedViews": {
         "button": "Saved Views",
-        "tooltip": "Your saved views — filters and pinned metrics you can return to"
+        "tooltip": "Your saved views — filters and pinned metrics you can return to",
+        "listTooltip": "Open your saved views",
+        "createTooltip": "Save the current filters and pinned metrics as a view",
+        "listTitle": "Saved Views",
+        "saveTitle": "Save this view",
+        "saveDesc": "A view remembers your current filters and pinned metrics, so you can return to this exact setup. It opens against live data, not a fixed time range.",
+        "nameLabel": "View name",
+        "nameColumn": "Name",
+        "apply": "Apply",
+        "empty": "No saved views yet",
+        "emptyHint": "Filter the metrics you care about, then save the layout as a view to jump back to it anytime.",
+        "deleteTitle": "Delete saved view",
+        "deleteConfirm": "Delete the saved view ‘{name}’? This cannot be undone.",
+        "deleteAria": "Delete saved view {name}"
       },
       "favorites": "Favorites ({count})",
       "showAllMetrics": "Show all metrics",

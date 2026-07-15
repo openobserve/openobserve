@@ -332,29 +332,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OToggleGroup>
 
-          <!-- Saved Views entry point — NAVIGATION to named views (not a
-               per-metric favourite; that is the pin on each card). The full
-               picker lands in Phase 3 over the /savedviews API; until then it
-               toggles the existing "show pinned only" filter as a stand-in. -->
-          <OButton
-            variant="outline"
-            size="sm-action"
-            icon-left="favorite-border"
-            data-test="metrics-explorer-saved-views"
-            @click="grid.showFavoritesOnly.value = !grid.showFavoritesOnly.value"
-          >
-            {{ t("metrics.explorer.savedViews.button") }}
-            <OTag
-              v-if="grid.favorites.value.length"
-              type="countChip"
-              value="primary"
-              size="xs"
-              class="ml-1"
-              data-test="metrics-explorer-saved-views-count"
-              >{{ grid.favorites.value.length }}</OTag
-            >
-            <OTooltip :content="t('metrics.explorer.savedViews.tooltip')" />
-          </OButton>
+          <!-- Saved Views — named snapshots of the explorer's filters + pinned
+               metrics, persisted through the /savedviews API (mirrors the Logs
+               saved views). Applying one restores the filters and pins. -->
+          <MetricsSavedViews
+            :build-snapshot="buildSavedViewSnapshot"
+            @apply="applySavedViewSnapshot"
+          />
         </div>
 
         <section
@@ -529,6 +513,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 
 import MetricCard from "./MetricCard.vue";
 import MetricsVisualize from "./MetricsVisualize.vue";
+import MetricsSavedViews from "./MetricsSavedViews.vue";
 import PrefixFilterPanel from "./PrefixFilterPanel.vue";
 import LabelFilterBar from "./LabelFilterBar.vue";
 import FunctionConfigDialog from "./FunctionConfigDialog.vue";
@@ -599,6 +584,7 @@ export default defineComponent({
     OToggleGroupItem,
     MetricCard,
     MetricsVisualize,
+    MetricsSavedViews,
     PrefixFilterPanel,
     LabelFilterBar,
     FunctionConfigDialog,
@@ -1135,6 +1121,51 @@ export default defineComponent({
       return query;
     };
 
+    /* ------------------------------------------------------ saved views */
+
+    // The snapshot a Saved View stores: the SAME serialized filter state the URL
+    // uses (via explorerFiltersToQuery) plus the pinned metrics. Deliberately no
+    // time range — a view opens against live "now" — and no showFavoritesOnly (a
+    // transient quick filter, not part of the named view).
+    const buildSavedViewSnapshot = () => ({
+      kind: "metrics" as const,
+      filters: explorerFiltersToQuery({
+        searchTerm: grid.searchTerm.value,
+        selectedPrefixes: grid.selectedPrefixes.value,
+        selectedSuffixes: grid.selectedSuffixes.value,
+        selectedTypes: grid.selectedTypes.value,
+        labelFilters: grid.labelFilters.value,
+        showFavoritesOnly: false,
+        hideEmptyPanels: grid.hideEmptyPanels.value,
+        sortBy: grid.sortBy.value,
+        viewMode: grid.viewMode.value,
+        mode: mode.value,
+      }),
+      pinned: [...grid.favorites.value],
+    });
+
+    // Restore a snapshot onto the grid: the filters via the URL deserializer
+    // (which the sync watcher then reflects into the URL), and the pinned set
+    // directly. Missing keys fall back to defaults, so an older/partial snapshot
+    // degrades cleanly rather than throwing.
+    const applySavedViewSnapshot = (snapshot: {
+      filters?: Record<string, any>;
+      pinned?: string[];
+    }) => {
+      const f = queryToExplorerFilters(snapshot.filters ?? {});
+      grid.searchTerm.value = f.searchTerm ?? "";
+      grid.selectedPrefixes.value = f.selectedPrefixes ?? new Set();
+      grid.selectedSuffixes.value = f.selectedSuffixes ?? new Set();
+      grid.selectedTypes.value = f.selectedTypes ?? new Set();
+      grid.labelFilters.value = f.labelFilters ?? [];
+      grid.hideEmptyPanels.value = f.hideEmptyPanels ?? true;
+      grid.sortBy.value = f.sortBy ?? "a-z";
+      grid.viewMode.value = f.viewMode ?? "grid";
+      mode.value = f.mode ?? "explore";
+      grid.favorites.value = [...(snapshot.pinned ?? [])];
+      if (f.labelFilters?.length) grid.ensureSchemas();
+    };
+
     // State -> URL via replace, so filter changes never stack history entries.
     // Managed keys are wiped first — a cleared filter must leave the URL, and
     // anything else (org_identifier) rides along untouched. Defaults serialize
@@ -1475,6 +1506,8 @@ export default defineComponent({
       runDialogPreview,
       onApplyOverride,
       onRestoreOverride,
+      buildSavedViewSnapshot,
+      applySavedViewSnapshot,
       onSelect,
       onDateChange,
       onRefreshTick,
