@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #cell-email="{ row }">
               <template v-if="row.is_system">
-                <span data-test="service-accounts-system-account-label" class="text-weight-medium">{{ row.first_name }}</span>
+                <span data-test="service-accounts-system-account-label" class="font-medium">{{ row.first_name }}</span>
                 <OTag data-test="service-accounts-system-badge" type="serviceAccountKind" value="system" class="ml-2" />
               </template>
               <template v-else>
@@ -260,17 +260,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OTabPanels v-model="tokenTab" animated>
             <OTabPanel name="curl">
-              <pre class="bg-surface-subtle text-text-primary p-3 rounded text-xs overflow-auto whitespace-pre-wrap">{{
+              <pre class="bg-surface-subtle text-text-primary p-3 rounded-sm text-xs overflow-auto whitespace-pre-wrap">{{
                 tokenCurlSnippet
               }}</pre>
             </OTabPanel>
             <OTabPanel name="header">
-              <pre class="bg-surface-subtle text-text-primary p-3 rounded text-xs overflow-auto whitespace-pre-wrap">{{
+              <pre class="bg-surface-subtle text-text-primary p-3 rounded-sm text-xs overflow-auto whitespace-pre-wrap">{{
                 tokenHeaderSnippet
               }}</pre>
             </OTabPanel>
             <OTabPanel name="env">
-              <pre class="bg-surface-subtle text-text-primary p-3 rounded text-xs overflow-auto whitespace-pre-wrap">{{
+              <pre class="bg-surface-subtle text-text-primary p-3 rounded-sm text-xs overflow-auto whitespace-pre-wrap">{{
                 tokenEnvSnippet
               }}</pre>
             </OTabPanel>
@@ -323,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="showGroupLink"
               name="warning"
               size="sm"
-              class="text-amber-500 mt-0.5"
+              class="text-status-warning-text mt-0.5"
             />
             <span class="text-xs text-text-secondary">{{ tokenNextStepHint }}</span>
           </div>

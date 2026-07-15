@@ -52,18 +52,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div style="max-width: 760px" class="flex flex-col gap-6">
         <!-- ── Model Details Card ── -->
-        <div class="border border-card-glass-border rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
-          <div class="flex flex-row items-center justify-between gap-3 py-[10px] px-4 bg-[rgba(0,0,0,0.025)] border-b border-card-glass-border rounded-t-[10px] dark:bg-[rgba(255,255,255,0.04)]">
+        <div class="border border-card-glass-border rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+          <div class="flex flex-row items-center justify-between gap-3 py-2.5 px-4 bg-[rgba(0,0,0,0.025)] border-b border-card-glass-border rounded-t-[10px] dark:bg-[rgba(255,255,255,0.04)]">
             <div>
-              <div class="form-card-title text-[13px] font-semibold">
+              <div class="form-card-title text-compact font-semibold">
                 {{ t("modelPricing.modelDetails") }}
               </div>
-              <div class="form-card-subtitle text-[11px] opacity-60 mt-px">
+              <div class="form-card-subtitle text-2xs opacity-60 mt-px">
                 {{ t("modelPricing.modelDetailsDesc") }}
               </div>
             </div>
           </div>
-          <div class="form-card-body flex flex-row gap-4 px-4 pt-[10px] pb-2">
+          <div class="form-card-body flex flex-row gap-4 px-4 pt-2.5 pb-2">
             <div class="flex-1">
               <div class="flex items-center gap-1 mb-1 field-label text-xs font-semibold opacity-75 h-5">
                 {{ t("modelPricing.modelNameField") }}
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     name="info"
                     size="xs"
                     :class="
-                      store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'
+                      'text-text-secondary'
                     "
                   />
                   <OTooltip
@@ -99,9 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="info"
                       size="xs"
                       :class="
-                        store.state.theme === 'dark'
-                          ? 'text-gray-400'
-                          : 'text-gray-400'
+                        'text-text-secondary'
                       "
                     />
                     <OTooltip
@@ -145,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sub-title="t('modelPricing.patternExamplesDesc')"
         >
           <div class="examples-table border border-card-glass-border rounded-lg overflow-hidden">
-            <div class="grid grid-cols-[180px_1fr_auto] gap-3 py-[6px] px-3 bg-[rgba(0,0,0,0.03)] border-b border-card-glass-border text-[10px] font-bold uppercase tracking-[0.06em] opacity-45 dark:bg-[rgba(255,255,255,0.05)]">
+            <div class="grid grid-cols-[180px_1fr_auto] gap-3 py-1.5 px-3 bg-[rgba(0,0,0,0.03)] border-b border-card-glass-border text-[10px] font-bold uppercase tracking-[0.06em] opacity-45 dark:bg-[rgba(255,255,255,0.05)]">
               <span>{{ t("modelPricing.patternExamplesModelCol") }}</span>
               <span>{{ t("modelPricing.patternExamplesPatternCol") }}</span>
             </div>
@@ -155,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="examples-table-row grid grid-cols-[180px_1fr_auto] gap-3 items-center py-2 px-3 border-b border-card-glass-border text-xs"
             >
               <span class="examples-model-name font-medium">{{ ex.name }}</span>
-              <code class="font-mono text-[11px] bg-[rgba(0,0,0,0.04)] py-px px-[6px] rounded break-all dark:bg-[rgba(255,255,255,0.08)]">{{ ex.match_pattern }}</code>
+              <code class="font-mono text-2xs bg-[rgba(0,0,0,0.04)] py-px px-1.5 rounded-sm break-all dark:bg-[rgba(255,255,255,0.08)]">{{ ex.match_pattern }}</code>
               <OButton
                 variant="ghost"
                 size="icon-xs-sq"
@@ -172,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="xs"
                   :class="
                     copiedPattern === ex.match_pattern
-                      ? 'text-green-500'
+                      ? 'text-status-positive'
                       : ''
                   "
                 />
@@ -190,23 +188,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODialog>
 
         <!-- ── Pricing Tiers ── -->
-        <div class="border border-card-glass-border rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
-          <div class="flex flex-row items-center justify-between gap-3 py-[10px] px-4 bg-[rgba(0,0,0,0.025)] border-b border-card-glass-border rounded-t-[10px] dark:bg-[rgba(255,255,255,0.04)]">
+        <div class="border border-card-glass-border rounded-lg shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+          <div class="flex flex-row items-center justify-between gap-3 py-2.5 px-4 bg-[rgba(0,0,0,0.025)] border-b border-card-glass-border rounded-t-[10px] dark:bg-[rgba(255,255,255,0.04)]">
             <div>
-              <div class="form-card-title text-[13px] font-semibold">
+              <div class="form-card-title text-compact font-semibold">
                 {{ t("modelPricing.pricingTiers") }}
               </div>
-              <div class="form-card-subtitle text-[11px] opacity-60 mt-px">
+              <div class="form-card-subtitle text-2xs opacity-60 mt-px">
                 {{ t("modelPricing.pricingTiersDesc") }}
               </div>
             </div>
           </div>
 
-          <div class="form-card-body flex flex-col gap-3 px-4 pt-[10px] pb-2">
+          <div class="form-card-body flex flex-col gap-3 px-4 pt-2.5 pb-2">
             <div
               v-for="(tier, idx) in formTiers"
               :key="idx"
-              class="border border-card-glass-border rounded-[10px] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_4px_rgba(0,0,0,0.3)]"
+              class="border border-card-glass-border rounded-lg overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_4px_rgba(0,0,0,0.3)]"
             >
               <!-- Tier Header -->
               <div class="flex items-center justify-between gap-2 py-2 px-4 bg-[rgba(0,0,0,0.025)] border-b border-card-glass-border dark:bg-[rgba(255,255,255,0.04)]">
@@ -239,13 +237,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Condition row (non-default tiers only) -->
                 <div
                   v-if="idx > 0 && tier.condition"
-                  class="py-3 px-[14px] rounded-lg bg-[rgba(0,0,0,0.02)] border border-card-glass-border dark:bg-[rgba(255,255,255,0.03)]"
+                  class="py-3 px-3.5 rounded-lg bg-[rgba(0,0,0,0.02)] border border-card-glass-border dark:bg-[rgba(255,255,255,0.03)]"
                 >
-                  <div class="sub-label mb-2 text-[11px] font-semibold tracking-[0.06em] opacity-65">
+                  <div class="sub-label mb-2 text-2xs font-semibold tracking-[0.06em] opacity-65">
                     {{ t("modelPricing.applyTierWhen") }}
                   </div>
                   <div class="flex gap-2 items-end flex-nowrap">
-                    <div class="flex-1 min-w-[130px]">
+                    <div class="flex-1 min-w-32.5">
                       <OFormInput
                         :name="`tiers[${idx}].condition.usage_key`"
                         :label="t('modelPricing.usageKeyCol')"
@@ -253,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`model-pricing-tier-condition-key-input-${idx}`"
                       />
                     </div>
-                    <div class="w-[90px] flex-shrink-0">
+                    <div class="w-22.5 flex-shrink-0">
                       <OFormSelect
                         :name="`tiers[${idx}].condition.operator`"
                         :options="operators"
@@ -262,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`model-pricing-tier-condition-operator-select-${idx}`"
                       />
                     </div>
-                    <div class="w-[140px] flex-shrink-0">
+                    <div class="w-35 flex-shrink-0">
                       <OFormInput
                         :name="`tiers[${idx}].condition.value`"
                         :label="t('modelPricing.threshold')"
@@ -275,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Quick Setup -->
                 <div class="flex items-center gap-2 flex-wrap">
-                  <span class="sub-label text-[11px] font-semibold tracking-[0.06em] opacity-65">{{
+                  <span class="sub-label text-2xs font-semibold tracking-[0.06em] opacity-65">{{
                     t("modelPricing.quickSetup")
                   }}</span>
                   <OButton
@@ -306,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Price Table -->
                 <div>
-                  <div class="price-table-label mb-2 text-[11px] font-semibold tracking-[0.03em]">
+                  <div class="price-table-label mb-2 text-2xs font-semibold tracking-[0.03em]">
                     {{ t("modelPricing.tokenPrices") }}
                     <span class="price-table-label-sub font-normal opacity-55 tracking-normal">
                       {{ t("modelPricing.tokenPricesUnit") }}</span
@@ -317,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Column headers (only when rows exist) -->
                     <div
                       v-if="tier.prices.length"
-                      class="price-table-head grid grid-cols-[1fr_160px_auto] gap-2 py-[6px] px-3 text-[11px] font-semibold tracking-[0.01em] opacity-45"
+                      class="price-table-head grid grid-cols-[1fr_160px_auto] gap-2 py-1.5 px-3 text-2xs font-semibold tracking-[0.01em] opacity-45"
                     >
                       <span>{{ t("modelPricing.usageKeyCol") }}</span>
                       <span>{{ t("modelPricing.pricePerMillionHeader") }}</span>
@@ -380,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="price-empty-title text-xs font-medium">
                         {{ t("modelPricing.noPricesDefined") }}
                       </div>
-                      <div class="price-empty-sub text-[11px] opacity-55">
+                      <div class="price-empty-sub text-2xs opacity-55">
                         {{ t("modelPricing.noPricesDesc") }}
                       </div>
                     </div>
@@ -425,14 +423,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Price Preview Table -->
                   <div
                     v-if="previewEntries(tier).length"
-                    class="mt-5 border rounded"
+                    class="mt-5 border rounded-sm"
                     style="
                       background: rgba(0, 0, 0, 0.015);
                       border-color: var(--color-card-glass-border);
                     "
                   >
                     <div
-                      class="px-4 py-2 text-xs text-gray-500 font-semibold border-b"
+                      class="px-4 py-2 text-xs text-text-secondary font-semibold border-b"
                       style="border-color: var(--color-card-glass-border)"
                     >
                       {{ t("modelPricing.pricePreview") }}
@@ -443,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <thead>
                         <tr
-                          class="text-left text-gray-400 border-b"
+                          class="text-left text-text-secondary border-b"
                           style="border-color: var(--color-card-glass-border)"
                         >
                           <th class="px-4 py-2 font-medium">
@@ -468,14 +466,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           style="border-color: var(--color-card-glass-border)"
                         >
                           <td
-                            class="px-4 py-2 text-gray-600 font-medium"
+                            class="px-4 py-2 text-text-body font-medium"
                           >
                             {{ entry.key }}
                           </td>
-                          <td class="px-4 py-2 text-gray-600">
+                          <td class="px-4 py-2 text-text-body">
                             ${{ formatPreviewCost(fromPerMillion(entry.value), 1000) }}
                           </td>
-                          <td class="px-4 py-2 text-gray-600">
+                          <td class="px-4 py-2 text-text-body">
                             ${{ formatPreviewCost(fromPerMillion(entry.value), 1000000) }}
                           </td>
                         </tr>
@@ -501,7 +499,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Footer -->
-    <div class="page-footer flex items-center justify-end gap-2 px-6 h-[50px] shrink-0 border-t border-card-glass-border">
+    <div class="page-footer flex items-center justify-end gap-2 px-6 h-12.5 shrink-0 border-t border-card-glass-border">
       <OButton
         variant="outline"
         size="sm-action"

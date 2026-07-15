@@ -30,34 +30,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <div
         v-if="indexData.name"
-        :class="[
-          'flex items-center gap-1.5 px-2 py-1 rounded-md border',
-          store.state.theme === 'dark'
-            ? 'bg-gray-800/50 border-gray-600'
-            : 'bg-gray-50 border-gray-200',
-        ]"
+        class="flex items-center gap-1.5 px-2 py-1 rounded-md border bg-surface-panel border-border-default"
       >
         <img
           :src="getTimelineIcon"
           alt="Timeline Icon"
-          class="w-[14px] h-[14px] opacity-70"
+          class="w-3.5 h-3.5 opacity-70"
         />
         <div class="flex items-center gap-1.5">
           <span
-            :class="[
-              'text-[10px] font-medium px-1.5 py-0.5 rounded',
-              store.state.theme === 'dark'
-                ? 'text-gray-300 bg-gray-700/50'
-                : 'text-gray-600 bg-gray-100',
-            ]"
+            class="text-[10px] font-medium px-1.5 py-0.5 rounded-sm text-text-secondary bg-surface-subtle"
           >
             UTC
           </span>
           <div
-            :class="[
-              'text-xs font-semibold',
-              store.state.theme === 'dark' ? 'text-gray-200' : 'text-gray-800',
-            ]"
+            class="text-xs font-semibold text-text-body"
           >
             {{ indexData.stats.doc_time_min }}
             <span class="text-base leading-none">→</span>
@@ -93,23 +80,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="docs-count-tile"
               >
                 <div
-                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'tile-content-dark border-gray-700'
-                      : 'tile-content-light border-gray-200'
-                  "
+                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between bg-surface-base border-border-default"
                 >
                   <div
                     class="tile-header flex justify-between items-start"
                   >
                     <div
-                      class="tile-title text-xs font-bold text-left"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'text-gray-400'
-                          : 'text-gray-500'
-                      "
+                      class="tile-title text-xs font-bold text-left text-text-secondary"
                     >
                       Events
                     </div>
@@ -122,12 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div
-                    class="tile-value text-lg flex items-end justify-start"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'text-white'
-                        : 'text-gray-900'
-                    "
+                    class="tile-value text-lg flex items-end justify-start text-text-primary"
                   >
                     {{
                       parseInt(indexData.stats.doc_num).toLocaleString("en-US")
@@ -138,23 +110,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Storage Size Tile -->
               <div class="tile" data-test="storage-size-tile">
                 <div
-                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'tile-content-dark border-gray-700'
-                      : 'tile-content-light border-gray-200'
-                  "
+                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between bg-surface-base border-border-default"
                 >
                   <div
                     class="tile-header flex justify-between items-start"
                   >
                     <div
-                      class="tile-title text-xs font-bold text-left"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'text-gray-400'
-                          : 'text-gray-500'
-                      "
+                      class="tile-title text-xs font-bold text-left text-text-secondary"
                     >
                       {{ t("logStream.storageSize") }}
                     </div>
@@ -167,12 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div
-                    class="tile-value text-lg flex items-end justify-start"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'text-white'
-                        : 'text-gray-900'
-                    "
+                    class="tile-value text-lg flex items-end justify-start text-text-primary"
                   >
                     {{ formatSizeFromMB(indexData.stats.storage_size) }}
                   </div>
@@ -185,23 +142,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="compressed-size-tile"
               >
                 <div
-                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'tile-content-dark border-gray-700'
-                      : 'tile-content-light border-gray-200'
-                  "
+                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between bg-surface-base border-border-default"
                 >
                   <div
                     class="tile-header flex justify-between items-start"
                   >
                     <div
-                      class="tile-title text-xs font-bold text-left"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'text-gray-400'
-                          : 'text-gray-500'
-                      "
+                      class="tile-title text-xs font-bold text-left text-text-secondary"
                     >
                       {{ t("logStream.compressedSize") }}
                     </div>
@@ -214,12 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div
-                    class="tile-value text-lg flex items-end justify-start"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'text-white'
-                        : 'text-gray-900'
-                    "
+                    class="tile-value text-lg flex items-end justify-start text-text-primary"
                   >
                     {{ formatSizeFromMB(indexData.stats.compressed_size) }}
                   </div>
@@ -232,23 +174,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="index-size-tile"
               >
                 <div
-                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'tile-content-dark border-gray-700'
-                      : 'tile-content-light border-gray-200'
-                  "
+                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between bg-surface-base border-border-default"
                 >
                   <div
                     class="tile-header flex justify-between items-start"
                   >
                     <div
-                      class="tile-title text-xs font-bold text-left"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'text-gray-400'
-                          : 'text-gray-500'
-                      "
+                      class="tile-title text-xs font-bold text-left text-text-secondary"
                     >
                       {{ t("logStream.indexSize") }}
                     </div>
@@ -261,12 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div
-                    class="tile-value text-lg flex items-end justify-start"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'text-white'
-                        : 'text-gray-900'
-                    "
+                    class="tile-value text-lg flex items-end justify-start text-text-primary"
                   >
                     {{ formatSizeFromMB(indexData.stats.index_size) }}
                   </div>
@@ -276,12 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="w-full flex flex-1 min-h-0 gap-2">
               <!--  left section(includes tabs and schema settings) -->
               <div
-                :class="[
-                  'w-[100%] h-full min-h-0 rounded-lg border shadow-sm p-2 flex flex-col overflow-hidden',
-                  store.state.theme === 'dark'
-                    ? 'bg-[#181A1B] border-gray-700'
-                    : 'bg-white border-gray-200',
-                ]"
+                class="w-[100%] h-full min-h-0 rounded-lg border shadow-sm p-2 flex flex-col overflow-hidden bg-surface-base border-border-default"
               >
                 <div>
                   <div class="flex justify-start">
@@ -336,11 +258,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-if="indexData.defaultFts"
                       style="font-weight: 400"
-                      class="mt-[12px]"
+                      class="mt-3"
                     >
                       <label
                         style="font-weight: 600"
-                        class="bg-[#f9f290] py-1 px-4 rounded border border-[#f5a623] text-[#865300]"
+                        class="bg-banner-warning-bg py-1 px-4 rounded-sm border border-banner-warning-border text-banner-warning-text"
                       >
                         {{ t("logStream.mapping") }} Default FTS keys used (no
                         custom keys set).</label
@@ -383,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OIcon
                           name="info"
                           size="sm"
-                          style="color: #f5a623; cursor: pointer"
+                          style="color: var(--color-status-warning-text); cursor: pointer"
                         />
                         <OTooltip
                           side="right"
@@ -464,12 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- OTable fills the remaining height inside the schemaSettings flex column -->
                   <div
-                    :class="[
-                      'flex-1 min-h-0 flex flex-col overflow-hidden',
-                      store.state.theme === 'dark'
-                        ? 'dark-theme-table'
-                        : 'light-theme-table',
-                    ]"
+                    class="flex-1 min-h-0 flex flex-col overflow-hidden"
                   >
                     <OTable
                       data-test="schema-log-stream-field-mapping-table"
@@ -502,9 +419,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <img
                               :src="quickModeIcon"
                               :alt="t('logStream.envQuickModeMsg')"
-                              class="w-[20px] h-[20px]"
+                              class="w-5 h-5"
                             />
-                            <OTooltip class="text-[12px] w-[200px]">
+                            <OTooltip class="text-xs w-50">
                               {{ t("logStream.envQuickModeMsg") }}
                             </OTooltip>
                           </span>
@@ -535,7 +452,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :options="indexTypeOptionsForRow(row)"
                             label-key="label"
                             value-key="value"
-                            class="min-h-[24px]! max-h-[24px]! h-[24px]! text-[0.813rem]"
+                            class="min-h-6! max-h-6! h-6! text-[0.813rem]"
                             multiple
                             clearable
                             size="sm"
@@ -560,7 +477,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                         >
                           <span
-                            class="text-[#5960B2] cursor-pointer"
+                            class="text-brand-indigo cursor-pointer"
                             :data-test="`schema-field-${row.name}-pattern-action`"
                             @click="openPatternAssociationDialog(row.name)"
                           >
@@ -585,7 +502,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Data Retention -->
                       <div v-if="showDataRetention" class="flex flex-col gap-1 p-3">
-                        <label class="text-[0.8125rem] font-[500]" style="color: var(--color-text-heading)">
+                        <label class="text-compact font-[500]" style="color: var(--color-text-heading)">
                           Data Retention (days)
                         </label>
                         <OInput
@@ -593,7 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="dataRetentionDays"
                           type="number"
                           min="1"
-                          class="max-w-[220px]"
+                          class="max-w-55"
                           @update:model-value="markFormDirty"
                         />
                         <small v-if="dataRetentionDays > 0 && dataRetentionDays != ''">
@@ -606,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Max Query Range -->
                       <div class="flex flex-col gap-1 p-3">
-                        <label class="text-[0.8125rem] font-[500]" style="color: var(--color-text-heading)">
+                        <label class="text-compact font-[500]" style="color: var(--color-text-heading)">
                           Max Query Range (hours)
                         </label>
                         <OInput
@@ -614,7 +531,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="maxQueryRange"
                           type="number"
                           min="0"
-                          class="max-w-[220px]"
+                          class="max-w-55"
                           @update:model-value="markFormDirty"
                         />
                         <small>Maximum time range allowed for queries. Set 0 for unlimited range.</small>
@@ -622,7 +539,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Flatten Level -->
                       <div class="flex flex-col gap-1 p-3">
-                        <label class="text-[0.8125rem] font-[500]" style="color: var(--color-text-heading)">
+                        <label class="text-compact font-[500]" style="color: var(--color-text-heading)">
                           {{ t("logStream.flattenLevel") }}
                         </label>
                         <OInput
@@ -630,14 +547,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="flattenLevel"
                           type="number"
                           min="0"
-                          class="max-w-[220px]"
+                          class="max-w-55"
                           @update:model-value="markFormDirty"
                         />
                         <small>Global is {{ store.state.zoConfig.ingest_flatten_level || 3 }}</small>
                       </div>
 
                       <!-- Toggles -->
-                      <div class="flex items-center justify-between px-3 py-2.5 text-[13px]">
+                      <div class="flex items-center justify-between px-3 py-2.5 text-compact">
                         <span>Use Stream Stats for Partitioning</span>
                         <OSwitch
                           data-test="log-stream-use_approx-toggle-btn"
@@ -646,7 +563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </div>
 
-                      <div v-if="showStoreOriginalDataToggle" class="flex items-center justify-between px-3 py-2.5 text-[13px]">
+                      <div v-if="showStoreOriginalDataToggle" class="flex items-center justify-between px-3 py-2.5 text-compact">
                         <span>Store Original Data</span>
                         <OSwitch
                           data-test="log-stream-store-original-data-toggle-btn"
@@ -655,7 +572,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </div>
 
-                      <div class="flex items-center justify-between px-3 py-2.5 text-[13px]">
+                      <div class="flex items-center justify-between px-3 py-2.5 text-compact">
                         <span>Enable Distinct Values</span>
                         <OSwitch
                           data-test="log-stream-enabled-distinct-values-toggle-btn"
@@ -673,7 +590,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex flex-col h-full min-h-0 overflow-hidden"
                 >
                   <div
-                    class="bg-[#f9f290] py-1 px-4 rounded border border-[#f5a623] text-[#865300] mt-2"
+                    class="bg-banner-warning-bg py-1 px-4 rounded-sm border border-banner-warning-border text-banner-warning-text mt-2"
                     style="width: fit-content"
                   >
                     <span style="font-weight: 600">
@@ -927,6 +844,7 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import {
   convertUnixToDateFormat as convertUnixToFormat,
   formatTimestamp,
@@ -1035,6 +953,7 @@ export default defineComponent({
     };
     const { t } = useI18n();
     const store = useStore();
+    const { isDark } = useTheme();
     const indexData: any = ref(defaultValue());
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
@@ -2596,18 +2515,18 @@ export default defineComponent({
     };
 
     const quickModeIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/quick_mode_light.svg")
         : getImageURL("images/common/quick_mode.svg");
     });
 
     const getConfigIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/streams/config_light.svg")
         : getImageURL("images/streams/config.svg");
     });
     const getTimelineIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/streams/timeline_light.svg")
         : getImageURL("images/streams/timeline.svg");
     });

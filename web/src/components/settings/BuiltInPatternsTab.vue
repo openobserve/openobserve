@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Error State -->
     <div v-else-if="error" class="text-center p-6">
       <OIcon name="error" style="width: 50px; height: 50px;" />
-      <div class="mt-3 text-red-500">{{ error }}</div>
+      <div class="mt-3 text-status-error-text">{{ error }}</div>
       <span class="mt-2">
         <OButton variant="ghost-primary" size="sm" @click="fetchPatterns">
           {{ t("regex_patterns.try_again") }}
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   +{{ pattern.tags.length - 3 }}
                 </OTag>
               </div>
-              <div class="font-mono text-[0.8125rem] leading-[1.4] text-text-secondary break-all line-clamp-1">
+              <div class="font-mono text-compact leading-[1.4] text-text-secondary break-all line-clamp-1">
                 {{ pattern.pattern.substring(0, 100)
                 }}{{ pattern.pattern.length > 100 ? "..." : "" }}
               </div>
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </li>
 
           <li v-if="filteredPatterns.length === 0" class="flex items-center px-3 py-2">
-            <div class="flex flex-col flex-1 min-w-0 text-center text-gray-400">
+            <div class="flex flex-col flex-1 min-w-0 text-center text-text-muted">
               <div class="p-6">
                 <OIcon name="search-off" style="width: 50px; height: 50px;" />
                 <div class="mt-3">
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div style="max-height: 60vh; overflow-y: auto">
         <div class="mb-3">
-          <div class="text-weight-bold mb-1">
+          <div class="font-bold mb-1">
             {{ t('regex_patterns.description') }}
           </div>
           <div>
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="mb-3">
-          <div class="text-weight-bold mb-1">{{ t('regex_patterns.pattern') }}</div>
+          <div class="font-bold mb-1">{{ t('regex_patterns.pattern') }}</div>
           <OTextarea
             :model-value="previewedPattern?.pattern"
             readonly
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="mb-3">
-          <div class="text-weight-bold mb-1">{{ t('regex_patterns.tags') }}</div>
+          <div class="font-bold mb-1">{{ t('regex_patterns.tags') }}</div>
           <div class="flex flex-wrap gap-2">
             <OTag
               v-for="tag in previewedPattern?.tags"
@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="mb-3">
-          <div class="text-weight-bold mb-1">{{ t('regex_patterns.rarity') }}</div>
+          <div class="font-bold mb-1">{{ t('regex_patterns.rarity') }}</div>
           <div>{{ previewedPattern?.rarity }}</div>
         </div>
 
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="previewedPattern?.examples?.Valid?.length > 0"
           class="mb-3"
         >
-          <div class="text-weight-bold mb-1">
+          <div class="font-bold mb-1">
             {{ t('regex_patterns.valid_examples') }}
           </div>
           <ul class="flex flex-col divide-y divide-border border rounded-md">

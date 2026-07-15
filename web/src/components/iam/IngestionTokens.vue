@@ -176,8 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t('ingestion.authHeaderLabel') }}
       </div>
       <div
-        class="p-2.5 border border-dashed rounded border-gray-400 mb-1"
-        :class="store.state.theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'"
+        class="p-2.5 border border-dashed rounded-sm border-border-strong mb-1 bg-surface-subtle"
       >
         <code
           class="break-all font-mono text-sm"

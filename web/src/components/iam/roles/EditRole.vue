@@ -65,8 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="card-container flex flex-col h-full"
         >
           <div
-            class="flex justify-between items-center flex-shrink-0"
-            :class="store.state.theme === 'dark' ? 'bg-surface-base' : 'bg-white'"
+            class="flex justify-between items-center flex-shrink-0 bg-surface-base"
           >
             <div
               v-show="permissionsUiType === 'table'"
@@ -104,8 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OInput
                   v-model="filter.value"
                   :debounce="500"
-                  class="no-border o2-search-input h-[36px] w-[200px]"
-                  :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+                  class="no-border o2-search-input h-9 w-50"
                   :placeholder="`Search Permissions`"
                   @update:model-value="onResourceChange"
                 >
@@ -130,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center gap-2">
               <span
                 data-test="edit-role-permissions-count"
-                class="font-bold text-[14px]"
+                class="font-bold text-sm"
               >
                 {{ selectedPermissionsHash.size }} Permissions
               </span>

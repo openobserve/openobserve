@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="general-settings-scrape-interval"
               style="width: 120px"
             />
-            <span class="individual-setting-description text-[13px] opacity-70">
+            <span class="individual-setting-description text-compact opacity-70">
               {{ t("settings.scrapeIntervalDescription") }}
             </span>
           </div>
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OIcon>
               </template>
             </OFormInput>
-            <span class="individual-setting-description text-[13px] opacity-70">
+            <span class="individual-setting-description text-compact opacity-70">
               {{ t("settings.maxSeriesPerQueryDescription") }}
             </span>
           </div>
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Light Mode Theme -->
               <div
-                class="group/chip inline-flex items-center gap-2 py-[6px] pr-3 pl-[6px] rounded-[20px] cursor-pointer transition-all duration-200 bg-[rgba(0,0,0,0.04)] border border-[rgba(0,0,0,0.1)] hover:bg-[rgba(0,0,0,0.06)] hover:border-accent hover:-translate-y-px hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:bg-[rgba(255,255,255,0.05)] dark:border-[rgba(255,255,255,0.15)] dark:hover:bg-[rgba(255,255,255,0.08)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+                class="group/chip inline-flex items-center gap-2 py-1.5 pr-3 pl-1.5 rounded-full cursor-pointer transition-all duration-200 bg-[rgba(0,0,0,0.04)] border border-[rgba(0,0,0,0.1)] hover:bg-[rgba(0,0,0,0.06)] hover:border-accent hover:-translate-y-px hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:bg-[rgba(255,255,255,0.05)] dark:border-[rgba(255,255,255,0.15)] dark:hover:bg-[rgba(255,255,255,0.08)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
                 @click="handleThemeChipClick('light')"
                 data-test="theme-light-chip"
               >
@@ -99,13 +99,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="opacity-0 transition-opacity duration-200 [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.3))] group-hover/chip:opacity-90"
                   />
                 </div>
-                <span class="chip-label text-[11px] font-semibold opacity-50 tracking-[0.5px]">{{ t("settings.light") }}</span>
-                <span class="chip-value font-['SF_Mono','Monaco','Menlo',monospace] text-[11px] font-medium opacity-70 tracking-[-0.2px]">{{ customLightColor }}</span>
+                <span class="chip-label text-2xs font-semibold opacity-50 tracking-[0.5px]">{{ t("settings.light") }}</span>
+                <span class="chip-value font-['SF_Mono','Monaco','Menlo',monospace] text-2xs font-medium opacity-70 tracking-[-0.2px]">{{ customLightColor }}</span>
               </div>
 
               <!-- Dark Mode Theme -->
               <div
-                class="group/chip inline-flex items-center gap-2 py-[6px] pr-3 pl-[6px] rounded-[20px] cursor-pointer transition-all duration-200 bg-[rgba(0,0,0,0.04)] border border-[rgba(0,0,0,0.1)] hover:bg-[rgba(0,0,0,0.06)] hover:border-accent hover:-translate-y-px hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:bg-[rgba(255,255,255,0.05)] dark:border-[rgba(255,255,255,0.15)] dark:hover:bg-[rgba(255,255,255,0.08)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+                class="group/chip inline-flex items-center gap-2 py-1.5 pr-3 pl-1.5 rounded-full cursor-pointer transition-all duration-200 bg-[rgba(0,0,0,0.04)] border border-[rgba(0,0,0,0.1)] hover:bg-[rgba(0,0,0,0.06)] hover:border-accent hover:-translate-y-px hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:bg-[rgba(255,255,255,0.05)] dark:border-[rgba(255,255,255,0.15)] dark:hover:bg-[rgba(255,255,255,0.08)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
                 @click="handleThemeChipClick('dark')"
                 data-test="theme-dark-chip"
               >
@@ -119,8 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="opacity-0 transition-opacity duration-200 [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.3))] group-hover/chip:opacity-90"
                   />
                 </div>
-                <span class="chip-label text-[11px] font-semibold opacity-50 tracking-[0.5px]">{{ t("settings.dark") }}</span>
-                <span class="chip-value font-['SF_Mono','Monaco','Menlo',monospace] text-[11px] font-medium opacity-70 tracking-[-0.2px]">{{ customDarkColor }}</span>
+                <span class="chip-label text-2xs font-semibold opacity-50 tracking-[0.5px]">{{ t("settings.dark") }}</span>
+                <span class="chip-value font-['SF_Mono','Monaco','Menlo',monospace] text-2xs font-medium opacity-70 tracking-[-0.2px]">{{ customDarkColor }}</span>
               </div>
 
               <!-- Reset Button -->
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="t('settings.resetToDefaultColors')" side="top" />
               </div>
             </div>
-            <span class="individual-setting-description self-start text-[13px] opacity-70">
+            <span class="individual-setting-description self-start text-compact opacity-70">
               {{ t("settings.themeManagementDescription") }}
             </span>
           </div>
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex gap-2 items-center"
           >
             <OInput
-              class="w-[250px] mr-sm"
+              class="w-62.5 mr-sm"
               data-test="settings_ent_logo_custom_text"
               v-model="customText"
             />
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div v-else class="flex items-center">
-            <span class="w-[190px] text-center truncate"
+            <span class="w-47.5 text-center truncate"
               >{{
                 store.state.zoConfig.custom_logo_text ||
                 t("settings.noTextAvailable")
@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="edit"
             />
           </div>
-          <span class="individual-setting-description text-[13px] opacity-70">
+          <span class="individual-setting-description text-compact opacity-70">
             {{ t("settings.customLogoTextDescription") }}
           </span>
         </div>
@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <span class="individual-setting-description -translate-y-[5px] text-[13px] opacity-70">
+          <span class="individual-setting-description -translate-y-[5px] text-compact opacity-70">
               {{ t("settings.customLogoLightDescription") }}
             </span>
           </div>
@@ -366,7 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <span class="individual-setting-description -translate-y-[5px] text-[13px] opacity-70">
+          <span class="individual-setting-description -translate-y-[5px] text-compact opacity-70">
               {{ t("settings.customLogoDarkDescription") }}
             </span>
           </div>
@@ -380,12 +380,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       id="dangerZone"
       v-if="canDeleteOrg"
       data-test="general-settings-danger-zone"
-      class="tw:mt-8"
+      class="mt-8"
     >
       <!-- Red-accented header signals this section is destructive. -->
-      <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-        <OIcon name="warning" size="sm" class="tw:text-error" />
-        <span class="tw:text-base tw:font-bold tw:leading-6 tw:text-error">
+      <div class="flex items-center gap-2 mb-2">
+        <OIcon name="warning" size="sm" class="text-error" />
+        <span class="text-base font-bold leading-6 text-error">
           {{ t("settings.dangerZone") }}
         </span>
       </div>
@@ -394,13 +394,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the settings rows above), then the destructive action on the next line,
            left-aligned to match the Save button. -->
       <div
-        class="tw:rounded-lg tw:border tw:border-error/50 tw:bg-error/[0.06] tw:px-5 tw:py-4"
+        class="rounded-lg border border-error/50 bg-error/[0.06] px-5 py-4"
       >
-        <div class="tw:grid tw:grid-cols-3 tw:gap-4 tw:items-start">
-          <span class="individual-setting-title tw:text-sm tw:font-medium tw:leading-5 tw:col-span-1">
+        <div class="grid grid-cols-3 gap-4 items-start">
+          <span class="individual-setting-title text-sm font-medium leading-5 col-span-1">
             {{ t("settings.deleteOrganization") }}
           </span>
-          <span class="individual-setting-description tw:text-[13px] tw:opacity-70 tw:col-span-2">
+          <span class="individual-setting-description text-compact opacity-70 col-span-2">
             {{ t("settings.deleteOrganizationDescription") }}
           </span>
         </div>
@@ -408,7 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="general-settings-delete-org-btn"
           variant="destructive"
           size="sm-action"
-          class="tw:mt-4"
+          class="mt-4"
           :loading="deleting"
           @click="confirmDeleteOrg = true"
         >
@@ -459,9 +459,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="confirmDeleteOrg = false"
     @click:primary="deleteOrg"
   >
-    <div class="tw:space-y-3">
+    <div class="space-y-3">
       <!-- What will happen -->
-      <p class="tw:text-sm tw:text-text-primary">
+      <p class="text-sm text-text-primary">
         {{
           t("settings.deleteOrganizationConfirm", {
             name: deleteOrgName,
@@ -471,26 +471,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Irreversible-action warning callout -->
       <div
-        class="tw:flex tw:items-start tw:gap-2 tw:rounded tw:border tw:border-error tw:bg-surface-secondary tw:px-3 tw:py-2"
+        class="flex items-start gap-2 rounded-sm border border-error bg-surface-secondary px-3 py-2"
       >
-        <OIcon name="warning" size="sm" class="tw:text-error tw:mt-0.5 tw:shrink-0" />
-        <div class="tw:space-y-1">
-          <p class="tw:text-xs tw:text-text-secondary">
+        <OIcon name="warning" size="sm" class="text-error mt-0.5 shrink-0" />
+        <div class="space-y-1">
+          <p class="text-xs text-text-secondary">
             {{ t("settings.deleteOrganizationWarning") }}
           </p>
-          <p class="tw:text-xs tw:text-text-secondary">
+          <p class="text-xs text-text-secondary">
             {{ t("settings.deleteOrganizationRecoverable") }}
           </p>
         </div>
       </div>
 
       <!-- Type-to-confirm gate -->
-      <div class="tw:space-y-1">
-        <label class="tw:text-xs tw:text-text-secondary tw:block">
+      <div class="space-y-1">
+        <label class="text-xs text-text-secondary block">
           <!-- eslint-disable-next-line @intlify/vue-i18n/no-raw-text -->
           <i18n-t keypath="settings.deleteOrganizationTypeToConfirm" tag="span">
             <template #name>
-              <span class="tw:font-semibold tw:text-text-primary">{{ deleteOrgName }}</span>
+              <span class="font-semibold text-text-primary">{{ deleteOrgName }}</span>
             </template>
           </i18n-t>
         </label>

@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #tree-warning="{ row }">
           <div class="flex items-center gap-2 py-1 text-sm leading-none">
-            <OIcon name="warning-amber" size="sm" class="text-[#f59e0b] opacity-85" />
+            <OIcon name="warning-amber" size="sm" class="text-status-warning-text opacity-85" />
             <span class="leading-tight">
               {{
                 t("modelPricing.shadowedWarningBanner", { name: row.name })
@@ -152,14 +152,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-name="{ row }">
-          <div class="flex items-center flex-nowrap relative z-[2] min-h-[24px]">
+          <div class="flex items-center flex-nowrap relative z-[2] min-h-6">
             <span
               v-if="getSource(row) === 'built_in'"
               class="shrink-0 cursor-default inline-flex mr-1"
             >
               <img
                 :src="ooLogo"
-                class="w-[16px] h-[16px]"
+                class="w-4 h-4"
                 alt="OpenObserve"
               />
               <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="corporate-fare"
                 size="sm"
-                class="text-[#757575] dark:text-[#bdbdbd]"
+                class="text-text-secondary"
                />
               <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
             </span>
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="person"
                 size="sm"
-                class="text-[#757575] dark:text-[#bdbdbd]"
+                class="text-text-secondary"
                />
               <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
             </span>
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-match_pattern="{ row }">
           <div class="flex items-center gap-1 min-w-0">
             <code
-              class="text-xs block max-w-full bg-[rgba(0,0,0,0.04)] border border-card-glass-border py-[2px] px-[6px] rounded text-inherit dark:bg-[rgba(255,255,255,0.05)]"
+              class="text-xs block max-w-full bg-[rgba(0,0,0,0.04)] border border-card-glass-border py-0.5 px-1.5 rounded-sm text-inherit dark:bg-[rgba(255,255,255,0.05)]"
               :class="{ 'opacity-50 [text-decoration:line-through] [text-decoration-color:currentColor]': isChildRow(row) }"
               >{{ row.match_pattern }}</code
             >
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="isChildRow(row)"
               name="warning-amber"
               size="xs"
-              class="shrink-0 text-[#f59e0b] opacity-85"
+              class="shrink-0 text-status-warning-text opacity-85"
             >
               <OTooltip side="top" align="center" :content="t('modelPricing.shadowedTooltip', { name: getParentName(row) })" />
             </OIcon>
@@ -236,8 +236,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("modelPricing.overflowMore") }}
                 <OTooltip>
                   <template #content>
-                    <div class="min-w-[240px]">
-                      <div class="font-bold text-[13px] mb-[3px]">
+                    <div class="min-w-60">
+                      <div class="font-bold text-compact mb-[3px]">
                         {{ row.name }}
                       </div>
                       <table class="w-full border-collapse pricing-breakdown-table">
@@ -333,11 +333,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="w-full flex flex-col items-center justify-center gap-y-3"
           >
-            <OIcon name="monetization-on" style="width: 48px; height: 48px; opacity: 0.2;" class="text-gray-400" />
-            <div class="text-base font-medium text-gray-400 mt-2">
+            <OIcon name="monetization-on" style="width: 48px; height: 48px; opacity: 0.2;" class="text-text-muted" />
+            <div class="text-base font-medium text-text-muted mt-2">
               {{ t("modelPricing.noModels") }}
             </div>
-            <div class="text-xs text-gray-400">
+            <div class="text-xs text-text-muted">
               {{ t("modelPricing.noModelsDesc") }}
             </div>
             <OButton
@@ -353,9 +353,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #bottom="scope">
-          <div class="flex items-center w-full h-[48px] gap-x-2">
+          <div class="flex items-center w-full h-12 gap-x-2">
             <div
-              class="o2-table-footer-title flex items-center w-[100px]"
+              class="o2-table-footer-title flex items-center w-25"
             >
               {{ t("modelPricing.modelsCount", { count: resultTotal }) }}
             </div>
@@ -405,7 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <img
               :src="ooLogo"
-              class="w-[18px] h-[18px]"
+              class="w-4.5 h-4.5"
               alt="OpenObserve"
             />
             <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
@@ -422,7 +422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="corporate-fare"
               size="sm"
-              class="text-[#757575] dark:text-[#bdbdbd]"
+              class="text-text-secondary"
              />
             <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
           </span>
@@ -433,7 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="person"
               size="sm"
-              class="text-[#757575] dark:text-[#bdbdbd]"
+              class="text-text-secondary"
              />
             <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
           </span>
@@ -442,17 +442,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="p-3 flex-1 overflow-y-auto">
         <div v-if="pricingDialogRow">
           <div class="mb-4">
-            <div class="text-xs font-semibold mb-[6px] text-[#555] dark:text-[#aaa]">
+            <div class="text-xs font-semibold mb-1.5 text-text-secondary">
               {{ t("modelPricing.colPattern") }}
             </div>
-            <code class="text-xs block bg-[rgba(0,0,0,0.04)] border border-card-glass-border py-[2px] px-[6px] rounded text-inherit text-[13px] px-[10px] py-[6px] whitespace-pre-wrap break-all max-h-[300px] overflow-y-auto dark:bg-[rgba(255,255,255,0.05)]">{{
+            <code class="text-xs block bg-[rgba(0,0,0,0.04)] border border-card-glass-border py-0.5 px-1.5 rounded-sm text-inherit text-compact px-2.5 py-1.5 whitespace-pre-wrap break-all max-h-75 overflow-y-auto dark:bg-[rgba(255,255,255,0.05)]">{{
               pricingDialogRow.match_pattern
             }}</code>
           </div>
           <OSeparator class="mb-4" />
 
           <div>
-            <div class="text-xs font-semibold mb-[6px] text-[#555] mt-2 pricing-section-label">
+            <div class="text-xs font-semibold mb-1.5 text-text-secondary mt-2 pricing-section-label">
               {{ t("modelPricing.colPricing") }}
             </div>
             <div
@@ -483,7 +483,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </tbody>
               </table>
             </div>
-            <span v-else class="text-gray-400">&mdash;</span>
+            <span v-else class="text-text-muted">&mdash;</span>
           </div>
         </div>
       </div>
@@ -503,6 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onBeforeMount, onActivated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
@@ -528,6 +529,7 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const { t } = useI18n();
 const store = useStore();
+const { isDark } = useTheme();
 const router = useRouter();
 
 const qTableRef = ref<any>(null);
@@ -758,7 +760,7 @@ const orgIdentifier = computed(
 );
 
 const ooLogo = computed(() =>
-  store.state.theme === "dark"
+  isDark.value
     ? getImageURL("openobserve_favicon_dark.ico")
     : getImageURL("images/common/openobserve_favicon.png"),
 );

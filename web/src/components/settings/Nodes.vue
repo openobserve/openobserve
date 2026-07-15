@@ -1116,23 +1116,23 @@ tr.status-row > td:first-child::before {
   width: 5px;
 }
 tr.status-online > td:first-child::before {
-  background: #00a76f;
+  background: var(--color-status-positive);
 }
 tr.status-offline > td:first-child::before {
-  background: #ce2528;
+  background: var(--color-status-negative);
 }
 tr.status-prepare > td:first-child::before {
-  background: #ffab00;
+  background: var(--color-status-warning-text);
 }
 
 /* Legacy span-based status indicator (still used by status filter list) */
 span.status-online {
-  border-left: #00a76f 5px solid !important;
+  border-left: var(--color-status-positive) 5px solid !important;
 }
 span.status-offline {
-  border-left: 5px solid #ce2528 !important;
+  border-left: 5px solid var(--color-status-negative) !important;
 }
 span.status-prepare {
-  border-left: 5px solid #ffab00 !important;
+  border-left: 5px solid var(--color-status-warning-text) !important;
 }
 </style>

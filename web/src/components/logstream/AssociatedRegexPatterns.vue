@@ -1,11 +1,7 @@
 <template>
   <div
     style="width: 60vw; height: calc(100vh - 59px)"
-    :class="
-      store.state.theme === 'dark'
-        ? 'bg-[#1F1F1F] dark-regex-patterns'
-        : 'bg-white light-regex-patterns'
-    "
+    class="bg-surface-base"
   >
     <div
       class="flex items-center flex-nowrap justify-between px-4 py-2"
@@ -16,10 +12,10 @@
           class="flex items-center"
           data-test="associated-regex-patterns-title-text"
         >
-          <span class="breadcrumb-text text-lg font-normal leading-6 cursor-pointer text-[#5960b2]" @click="closeDialog"
+          <span class="breadcrumb-text text-lg font-normal leading-6 cursor-pointer text-brand-indigo" @click="closeDialog"
             >{{ t('regex_patterns.associated_breadcrumb') }} &gt; &nbsp;
           </span>
-          <span class="associated-field-name text-lg font-normal leading-6" :class="store.state.theme === 'dark' ? 'text-[#fff]' : 'text-[#000]'">
+          <span class="associated-field-name text-lg font-normal leading-6 text-text-primary">
             {{ fieldName }}
           </span>
         </div>
@@ -55,12 +51,12 @@
               <OCollapsible
                 v-model="appliedPatternsExpandedRef"
                 :label="t('regex_patterns.applied_patterns_count', { count: appliedPatterns.length })"
-                class="mt-2 text-[14px] font-[600]"
+                class="mt-2 text-sm font-[600]"
                 data-test="associated-regex-patterns-applied-patterns-expansion-item"
               >
                 <div
                   v-if="filteredAppliedPatterns.length === 0"
-                  class="py-3 px-2 text-[12px] opacity-50"
+                  class="py-3 px-2 text-xs opacity-50"
                   data-test="associated-regex-patterns-applied-patterns-table"
                 >
                   {{ t('regex_patterns.no_data_available') }}
@@ -70,7 +66,7 @@
                     v-for="row in filteredAppliedPatterns"
                     :key="row.pattern_id"
                     :data-test="`associated-regex-patterns-applied-patterns-table-row-${row.pattern_id}`"
-                    class="cursor-pointer flex justify-between items-center px-2 py-2.5 border-b text-[13px] font-[600]"
+                    class="cursor-pointer flex justify-between items-center px-2 py-2.5 border-b text-compact font-[600]"
                     :class="checkCurrentUserClickedPattern(row.pattern_name) ? 'text-tab-text-color bg-theme-tab-bg' : ''"
                     @click="handlePatternClick(row)"
                   >
@@ -85,7 +81,7 @@
               <OCollapsible
                 v-model="allPatternsExpandedRef"
                 :label="t('regex_patterns.all_patterns_count', { count: resultTotal })"
-                class="mt-2 text-[14px] font-[600]"
+                class="mt-2 text-sm font-[600]"
                 data-test="associated-regex-patterns-all-patterns-expansion-item"
               >
                 <ul class="list-none p-0 m-0" data-test="associated-regex-patterns-all-patterns-table">
@@ -93,7 +89,7 @@
                     v-for="row in filteredAllPatterns"
                     :key="row.pattern_id"
                     :data-test="`associated-regex-patterns-all-patterns-table-row-${row.pattern_id}`"
-                    class="cursor-pointer flex justify-between items-center px-2 py-2.5 border-b text-[13px] font-[600]"
+                    class="cursor-pointer flex justify-between items-center px-2 py-2.5 border-b text-compact font-[600]"
                     :class="checkCurrentUserClickedPattern(row.pattern_name) ? 'text-tab-text-color bg-theme-tab-bg' : ''"
                     @click="handlePatternClick(row)"
                   >
@@ -137,20 +133,15 @@
           >
             <!-- Pattern Info Card -->
             <div
-              class="section-card p-3 rounded-lg border"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'bg-[#2A2A2A] border-[#3A3A3A]'
-                  : 'bg-[#F9FAFB] border-[#E5E7EB]'
-              "
+              class="section-card p-3 rounded-lg border bg-surface-subtle border-border-default"
             >
               <div class="flex flex-col gap-2">
                 <div class="flex flex-col gap-1">
-                  <span class="individual-section-title text-[12px] font-[500] text-text-secondary">
+                  <span class="individual-section-title text-xs font-[500] text-text-secondary">
                     {{ t('regex_patterns.pattern_name') }}
                   </span>
                   <span
-                    class="individual-section-value text-[15px] font-[700]" :class="store.state.theme === 'dark' ? 'text-[#ffffff]' : 'text-[#000000]'"
+                    class="individual-section-value text-sm font-[700] text-text-primary"
                     data-test="associated-regex-patterns-pattern-name"
                   >
                     {{ userClickedPattern.pattern_name }}
@@ -160,11 +151,11 @@
                 <OSeparator />
 
                 <div class="flex flex-col gap-1">
-                  <span class="individual-section-title text-[12px] font-[500] text-text-secondary">
+                  <span class="individual-section-title text-xs font-[500] text-text-secondary">
                     {{ t('regex_patterns.description') }}
                   </span>
                   <span
-                    class="individual-section-value text-[15px] font-[700]" :class="store.state.theme === 'dark' ? 'text-[#ffffff]' : 'text-[#000000]'"
+                    class="individual-section-value text-sm font-[700] text-text-primary"
                     data-test="associated-regex-patterns-pattern-description"
                   >
                     {{
@@ -179,17 +170,12 @@
 
             <!-- Configuration Card -->
             <div
-              class="section-card p-3 rounded-lg border"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'bg-[#2A2A2A] border-[#3A3A3A]'
-                  : 'bg-[#F9FAFB] border-[#E5E7EB]'
-              "
+              class="section-card p-3 rounded-lg border bg-surface-subtle border-border-default"
             >
               <div class="flex gap-4">
                 <!-- when value matches -->
                 <div class="flex flex-col gap-1.5 flex-1">
-                  <span class="individual-section-title text-[12px] font-[500] text-text-secondary">
+                  <span class="individual-section-title text-xs font-[500] text-text-secondary">
                     {{ t('regex_patterns.when_value_matches') }}
                   </span>
                   <ORadioGroup v-model="policy">
@@ -200,8 +186,8 @@
                           data-test="associated-regex-patterns-redact-radio"
                           size="sm"
                         />
-                        <span class="font-[600] text-[13px]">{{ t('regex_patterns.redact') }}</span>
-                        <span class="font-[400] text-[12px] opacity-60">{{ t('regex_patterns.redact_hint') }}</span>
+                        <span class="font-[600] text-compact">{{ t('regex_patterns.redact') }}</span>
+                        <span class="font-[400] text-xs opacity-60">{{ t('regex_patterns.redact_hint') }}</span>
                       </div>
                       <div class="flex items-center gap-2">
                         <ORadio
@@ -209,8 +195,8 @@
                           data-test="associated-regex-patterns-drop-field-radio"
                           size="sm"
                         />
-                        <span class="font-[600] text-[13px]">{{ t('regex_patterns.drop') }}</span>
-                        <span class="font-[400] text-[12px] opacity-60">{{ t('regex_patterns.drop_hint') }}</span>
+                        <span class="font-[600] text-compact">{{ t('regex_patterns.drop') }}</span>
+                        <span class="font-[400] text-xs opacity-60">{{ t('regex_patterns.drop_hint') }}</span>
                       </div>
                       <div class="flex items-center gap-2">
                         <ORadio
@@ -218,8 +204,8 @@
                           data-test="associated-regex-patterns-hash-radio"
                           size="sm"
                         />
-                        <span class="font-[600] text-[13px]">{{ t('regex_patterns.hash') }}</span>
-                        <span class="font-[400] text-[12px] opacity-60">{{ t('regex_patterns.hash_hint') }}</span>
+                        <span class="font-[600] text-compact">{{ t('regex_patterns.hash') }}</span>
+                        <span class="font-[400] text-xs opacity-60">{{ t('regex_patterns.hash_hint') }}</span>
                       </div>
                     </div>
                   </ORadioGroup>
@@ -228,8 +214,8 @@
                 <OSeparator vertical />
 
                 <!-- detect at section -->
-                <div class="flex flex-col gap-1.5 min-w-[120px]">
-                  <span class="individual-section-title text-[12px] font-[500] text-text-secondary">
+                <div class="flex flex-col gap-1.5 min-w-30">
+                  <span class="individual-section-title text-xs font-[500] text-text-secondary">
                     {{ t('regex_patterns.detect_at') }}
                   </span>
                   <div class="flex flex-col gap-1.5">
@@ -256,17 +242,12 @@
 
             <!-- Test Pattern Card -->
             <div
-              class="section-card p-3 rounded-lg border"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'bg-[#2A2A2A] border-[#3A3A3A]'
-                  : 'bg-[#F9FAFB] border-[#E5E7EB]'
-              "
+              class="section-card p-3 rounded-lg border bg-surface-subtle border-border-default"
             >
               <div class="flex flex-col gap-2.5">
                 <div class="flex items-center justify-between">
                   <span
-                    class="text-[13px] font-bold leading-6"
+                    class="text-compact font-bold leading-6"
                   >
                     {{ t('regex_patterns.test_pattern') }}
                   </span>
@@ -276,26 +257,21 @@
                     size="sm-action"
                     @click="testStringOutput"
                   >
-                    <span class="text-[12px]">{{ t('regex_patterns.test_input') }}</span>
+                    <span class="text-xs">{{ t('regex_patterns.test_input') }}</span>
                   </OButton>
                 </div>
 
                 <div class="flex flex-col gap-1">
                   <span
-                    class="text-[12px] font-medium leading-6 text-text-secondary"
+                    class="text-xs font-medium leading-6 text-text-secondary"
                   >
                     {{ t('regex_patterns.regex_pattern_label') }}
                   </span>
                   <div
-                    class="p-2 rounded font-mono text-[11px] break-all"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'bg-[#1A1A1A]'
-                        : 'bg-[#FFFFFF]'
-                    "
+                    class="p-2 rounded-sm font-mono text-2xs break-all bg-surface-base"
                   >
                     <span
-                      class="regex-pattern-text text-[12px] font-normal leading-6 break-all whitespace-pre-wrap overflow-wrap-anywhere" :class="store.state.theme === 'dark' ? '' : 'text-[#5a5a5a]'"
+                      class="regex-pattern-text text-xs font-normal leading-6 break-all whitespace-pre-wrap overflow-wrap-anywhere text-text-secondary"
                       data-test="associated-regex-patterns-regex-pattern"
                     >
                       {{ userClickedPattern.pattern }}
@@ -311,12 +287,7 @@
                       name="query"
                       v-model:is-expanded="expandState.regexTestString"
                       :label="t('regex_patterns.input_string')"
-                      class="py-md h-[24px]"
-                      :labelClass="
-                        store.state.theme === 'dark'
-                          ? 'dark-test-string-container-label'
-                          : 'light-test-string-container-label'
-                      "
+                      class="py-md h-6"
                     />
                     <div
                       v-if="expandState.regexTestString"
@@ -339,12 +310,7 @@
                       name="output"
                       v-model:is-expanded="expandState.outputString"
                       :label="t('regex_patterns.output')"
-                      class="py-md h-[24px]"
-                      :labelClass="
-                        store.state.theme === 'dark'
-                          ? 'dark-test-string-container-label'
-                          : 'light-test-string-container-label'
-                      "
+                      class="py-md h-6"
                     />
                     <div
                       v-if="expandState.outputString"
@@ -362,30 +328,16 @@
                       />
                       <div
                         v-else
-                        class="flex flex-col items-center justify-center h-[111px]"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'bg-surface-base [border-left:2px_solid_var(--color-surface-base)] [border-right:2px_solid_var(--color-surface-base)] [border-bottom:2px_solid_var(--color-surface-base)]'
-                            : 'bg-[#ffffff] [border-left:1px_solid_#e6e6e6] [border-right:1px_solid_#e6e6e6] [border-bottom:1px_solid_#e6e6e6]'
-                        "
+                        class="flex flex-col items-center justify-center h-[111px] bg-surface-base [border-left:1px_solid_var(--color-border-default)] [border-right:1px_solid_var(--color-border-default)] [border-bottom:1px_solid_var(--color-border-default)]"
                       >
                         <div v-if="!testLoading && outputString.length === 0">
                           <OIcon
                             name="lightbulb"
                             size="md"
-                            :class="
-                              store.state.theme === 'dark'
-                                ? 'text-[#ffffff]'
-                                : 'text-[#A8A8A8]'
-                            "
+                            class="text-icon-color"
                           />
                           <span
-                            class="text-[12px] font-[400] text-center"
-                            :class="
-                              store.state.theme === 'dark'
-                                ? 'text-[#ffffff]'
-                                : 'text-[#4B5563]'
-                            "
+                            class="text-xs font-[400] text-center text-text-secondary"
                           >
                             {{ t('regex_patterns.click_test_input_hint') }}
                           </span>

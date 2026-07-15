@@ -77,6 +77,7 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
 import config from "@/aws-exports";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
@@ -93,6 +94,7 @@ export default defineComponent({
   setup() {
     const { t } = useI18n();
     const store = useStore();
+    const { isDark } = useTheme();
     const router: any = useRouter();
     const route = useRoute();
 
@@ -184,7 +186,7 @@ export default defineComponent({
 
     const regexIcon = computed(() =>
       getImageURL(
-        store.state.theme === "dark"
+        isDark.value
           ? "images/regex_pattern/regex_icon_dark.svg"
           : "images/regex_pattern/regex_icon_light.svg",
       ),

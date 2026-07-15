@@ -59,7 +59,7 @@
                   <div class="flex items-center py-3 px-4 bg-[rgba(34,197,94,0.08)] border border-solid border-[rgba(34,197,94,0.2)] rounded-lg [backdrop-filter:blur(10px)] transition-all duration-200 dark:bg-[rgba(34,197,94,0.15)] dark:border-[rgba(34,197,94,0.3)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
                     <OIcon
                       name="check-circle"
-                      class="text-green-600 mr-2"
+                      class="text-status-positive mr-2"
                       size="md"
                     />
                     <span class="text-sm">{{
@@ -222,7 +222,7 @@
                   <div class="flex items-center py-3 px-4 bg-[rgba(34,197,94,0.08)] border border-solid border-[rgba(34,197,94,0.2)] rounded-lg [backdrop-filter:blur(10px)] transition-all duration-200 dark:bg-[rgba(34,197,94,0.15)] dark:border-[rgba(34,197,94,0.3)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
                     <OIcon
                       name="check-circle"
-                      class="text-green-600 mr-2"
+                      class="text-status-positive mr-2"
                       size="md"
                     />
                     <span class="text-sm">{{
@@ -272,8 +272,8 @@
 
             <div class="flex flex-col gap-2 mt-3">
               <!-- Summary Message -->
-              <div class="ingestion-summary-compact border border-solid rounded-lg py-3 px-[14px] [backdrop-filter:blur(10px)] relative overflow-hidden" :class="store.state.theme === 'dark' ? 'bg-[linear-gradient(135deg,rgba(99,102,241,0.1)_0%,rgba(168,85,247,0.1)_100%)] border-[rgba(99,102,241,0.3)]' : 'border-[rgba(99,102,241,0.2)]'">
-                <div class="summary-text-compact text-sm leading-[1.6] text-inherit text-[13px]">
+              <div class="ingestion-summary-compact border border-solid rounded-lg py-3 px-3.5 [backdrop-filter:blur(10px)] relative overflow-hidden" :class="store.state.theme === 'dark' ? 'bg-[linear-gradient(135deg,rgba(99,102,241,0.1)_0%,rgba(168,85,247,0.1)_100%)] border-[rgba(99,102,241,0.3)]' : 'border-[rgba(99,102,241,0.2)]'">
+                <div class="summary-text-compact text-sm leading-[1.6] text-inherit text-compact">
                   <!-- Line 1: License Info -->
                   <div class="flex items-center gap-2 mb-2">
                     <OIcon name="info" size="sm" class="flex-shrink-0" />
@@ -309,7 +309,7 @@
                       "
                       name="warning"
                       size="sm"
-                      class="text-red-500 flex-shrink-0"
+                      class="text-status-error-text flex-shrink-0"
                     />
                     <OIcon
                       v-else-if="
@@ -318,13 +318,13 @@
                       "
                       name="check-circle"
                       size="sm"
-                      class="text-amber-500 flex-shrink-0"
+                      class="text-status-warning-text flex-shrink-0"
                     />
                     <OIcon
                       v-else
                       name="check-circle"
                       size="sm"
-                      class="text-green-500 flex-shrink-0"
+                      class="text-status-positive flex-shrink-0"
                     />
                     <span>
                       <span
@@ -339,8 +339,8 @@
                               t('about.limit_exceeded_days', {
                                 colorClass:
                                   licenseData?.ingestion_exceeded > 30
-                                    ? 'text-red-500'
-                                    : 'text-amber-500',
+                                    ? 'text-status-error-text'
+                                    : 'text-status-warning-text',
                                 days: licenseData?.ingestion_exceeded,
                                 plural:
                                   licenseData?.ingestion_exceeded > 1
@@ -368,7 +368,7 @@
                         ></span
                         ><span
                           v-else
-                          class="text-[12px] opacity-80 italic"
+                          class="text-xs opacity-80 italic"
                           v-html="
                             DOMPurify.sanitize(
                               t('about.limit_exceeded_info', {
@@ -415,7 +415,7 @@
                   </div>
                   <div
                     v-if="isIngestionUnlimited"
-                    class="text-xs text-gray-400 mt-1 text-center"
+                    class="text-xs text-text-caption mt-1 text-center"
                     style="font-size: 10px"
                   >
                     {{ t("about.usage_shows_zero_unlimited") }}

@@ -99,11 +99,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               data-test="add-regex-pattern-lookaround-note"
             >
-              <div class="text-[12px] font-normal leading-[18px]">
+              <div class="text-xs font-normal leading-4.5">
                 {{ t("regex_patterns.unsupported_lookaround_note") }}
                 {{ t("regex_patterns.unsupported_lookaround_example") }}
                 <code
-                  class="font-mono text-[12px] px-[4px] py-[1px] rounded-[4px] bg-banner-info-border"
+                  class="font-mono text-xs px-1 py-[1px] rounded-sm bg-banner-info-border"
                   >(?=openobserve)\w+</code
                 >
                 <OIcon
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="inline-block align-middle mx-1"
                 />
                 <code
-                  class="font-mono text-[12px] px-[4px] py-[1px] rounded-[4px] bg-banner-info-border"
+                  class="font-mono text-xs px-1 py-[1px] rounded-sm bg-banner-info-border"
                   >openobserve\w*</code
                 >
               </div>
@@ -131,37 +131,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <img
                     :src="goToAILogo"
-                    class="w-[20px] h-[20px] mr-1"
+                    class="w-5 h-5 mr-1"
                   />
                   <span
-                    class="text-[#5960B2] text-sm flex items-center gap-1"
+                    class="text-brand-indigo text-sm flex items-center gap-1"
                   >
                     Try O2 Assistant to write expressions
                   </span>
                   <OIcon
                     size="sm"
                     name="arrow-right-alt"
-                    class="text-[#5960B2] w-[20px] h-[20px] ml-1"
+                    class="text-brand-indigo w-5 h-5 ml-1"
                   />
                 </OButton>
               </div>
               <div class="regex-pattern-input">
-                <div
-                  class="py-[2px] h-[24px]"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'bg-gray-500'
-                      : 'bg-gray-200 '
-                  "
-                >
-                  <div
-                    class="text-[12px] font-[500] px-2"
-                    :class="[
-                      store.state.theme === 'dark'
-                        ? 'text-[#ffffff]'
-                        : 'text-[#6B7280]',
-                    ]"
-                  >
+                <div class="py-0.5 h-6 bg-surface-subtle">
+                  <div class="text-xs font-[500] px-2 text-text-secondary">
                     Write Pattern
                   </div>
                 </div>
@@ -197,11 +183,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="query"
                 v-model:is-expanded="expandState.regexTestString"
                 label="Input string"
-                class="mt-1 py-md h-[24px]"
-                :labelClass="
-                  store.state.theme === 'dark'
-                    ? 'text-white font-medium text-xs leading-[21px]'
-                    : 'text-[#6b7280] font-medium text-xs leading-[21px] -ml-1'"
+                class="mt-1 py-md h-6"
+                labelClass="text-text-secondary font-medium text-xs leading-[21px] -ml-1"
               >
                 <template #right> </template>
               </FullViewContainer>
@@ -225,11 +208,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="output"
                 v-model:is-expanded="expandState.outputString"
                 label="Output"
-                class="mt-1 py-md h-[24px]"
-                :labelClass="
-                  store.state.theme === 'dark'
-                    ? 'text-white font-medium text-xs leading-[21px]'
-                    : 'text-[#6b7280] font-medium text-xs leading-[21px] -ml-1'"
+                class="mt-1 py-md h-6"
+                labelClass="text-text-secondary font-medium text-xs leading-[21px] -ml-1"
               >
               </FullViewContainer>
               <div v-if="expandState.outputString" class="regex-pattern-input">
@@ -252,19 +232,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       name="lightbulb"
                       size="md"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'text-[#ffffff]'
-                          : 'text-[#A8A8A8]'
-                      "
+                      class="text-icon-color"
                     />
                     <span
-                      class="text-[12px] font-[400] text-center"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'text-[#ffffff]'
-                          : 'text-[#4B5563]'
-                      "
+                      class="text-xs font-[400] text-center text-text-secondary"
                     >
                       Please click Test Input to see the results
                     </span>
@@ -317,6 +288,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { computed } from "vue";
+import useTheme from "@/composables/useTheme";
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import FullViewContainer from "../functions/FullViewContainer.vue";
@@ -373,6 +345,7 @@ export default defineComponent({
     const { t } = useI18n();
 
     const store = useStore();
+    const { isDark } = useTheme();
 
 
     const isHovered = ref(false);
@@ -483,7 +456,7 @@ export default defineComponent({
       if (isHovered.value || store.state.isAiChatEnabled) {
         return getImageURL("images/common/ai_icon_dark.svg");
       }
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/ai_icon_dark.svg")
         : getImageURL("images/common/ai_icon_gradient.svg");
     });
@@ -629,7 +602,7 @@ export default defineComponent({
 
 /* The section header strips (Write Pattern / Input string / Output) are flat
    full-width bars. Square the textareas' own border box so each field reads as
-   one connected unit under its strip instead of a detached rounded box. */
+   one connected unit under its strip instead of a detached rounded-sm box. */
 .regex-pattern-input .rounded-md.border,
 .regex-test-string-input .rounded-md.border {
   border-top-left-radius: 0 !important;

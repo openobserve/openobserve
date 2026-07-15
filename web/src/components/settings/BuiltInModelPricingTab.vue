@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="searchQuery"
             :placeholder="t('modelPricing.searchByModelName')"
             clearable
-            class="no-border w-[220px]"
+            class="no-border w-55"
             data-test="built-in-model-pricing-search"
           />
         </div>
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Error State -->
     <div v-if="error" class="text-center p-6">
       <OIcon name="error" style="width: 50px; height: 50px;" />
-      <div class="mt-3 text-red-500">{{ error }}</div>
+      <div class="mt-3 text-status-error-text">{{ error }}</div>
       <span class="mt-2">
         <OButton variant="ghost-primary" size="sm" @click="fetchModels()">
           {{ t("modelPricing.tryAgain") }}
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tier-row py-px"
               :class="{ 'tier-conditional': !!tier.condition }"
             >
-              <div class="tier-name text-[11px] font-semibold text-[#555] mb-px" :class="tier.condition ? 'text-[#888]' : ''">
+              <div class="tier-name text-2xs font-semibold text-text-secondary mb-px" :class="tier.condition ? 'text-text-muted' : ''">
                 <span v-if="tier.condition">
                   {{ tier.name }}
                   <span style="font-weight: 400; color: var(--color-text-muted)">
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span
                   v-for="[key, price] in sortedPriceEntries(tier.prices)"
                   :key="key"
-                  class="inline-flex items-center px-1.5 py-px rounded-[6px] text-[11px] font-semibold whitespace-nowrap text-[#555] border border-[#ccc] dark:text-[#bbb] dark:border-[#555]"
+                  class="inline-flex items-center px-1.5 py-px rounded-md text-2xs font-semibold whitespace-nowrap text-text-secondary border border-border-default"
                 >
                   {{ fmtKey(key) }}: ${{ fmtPrice(price) }}
                 </span>

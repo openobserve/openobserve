@@ -37,12 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="howItWorksOpen"
         icon="help-outline"
         :label="t('settings.correlation.howItWorksTitle')"
-        class="mb-4 rounded-lg border border-solid"
-        :class="
-          store.state.theme === 'dark'
-            ? 'bg-gray-700 border-gray-700'
-            : 'bg-gray-100 border-gray-200'
-        "
+        class="mb-4 rounded-lg border border-solid bg-surface-subtle border-border-default"
       >
         <div class="p-4 text-sm leading-relaxed">
           <div class="mb-3">
@@ -52,8 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>{{ t("settings.correlation.howItWorksDescription") }}</div>
           </div>
           <div
-            class="mb-3 p-3 rounded"
-            :class="store.state.theme === 'dark' ? 'bg-gray-800' : 'bg-white'"
+            class="mb-3 p-3 rounded-sm bg-surface-base"
           >
             <div class="font-semibold text-primary mb-1">
               {{ t("settings.correlation.exampleLabel") }}
@@ -113,12 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon="category"
         :label="t('settings.correlation.semanticFieldTitle')"
         :caption="t('settings.correlation.semanticFieldDescription')"
-        class="mb-4 rounded-lg border border-solid"
-        :class="
-          store.state.theme === 'dark'
-            ? 'border-gray-700'
-            : 'border-gray-200'
-        "
+        class="mb-4 rounded-lg border border-solid border-border-default"
       >
         <div class="p-4">
           <SemanticFieldGroupsConfig

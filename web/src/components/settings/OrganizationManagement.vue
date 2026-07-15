@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs-circle"
               icon-left="cloud-done"
               disabled
-              class="text-green-500"
+              class="text-status-positive"
               data-test="org-management-storage-enabled-btn"
             >
               <OTooltip content="Storage Enabled" />
@@ -167,10 +167,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="page"
               @click="extendedTrial = page"
               :class="[
-                'cursor-pointer px-2 py-1 border border-gray-300',
+                'cursor-pointer px-2 py-1 border border-border-strong',
                 extendedTrial === page
                   ? 'bg-button-primary text-button-primary-foreground border-button-primary'
-                  : 'bg-white text-gray-700 border-gray-300',
+                  : 'bg-surface-base text-text-body border-border-strong',
               ]"
             >
               {{ page }}
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-if="contractMode === 'extend' && contractDataRow?.contract_end_date"
-          class="text-xs text-gray-500"
+          class="text-xs text-text-secondary"
         >
           Current end date: {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
         </div>

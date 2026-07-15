@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSearchInput
           data-test="alert-list-search-input"
           v-model="userSearchKey"
-          class="h-[36px] w-[200px]"
+          class="h-9 w-50"
           placeholder="Search User"
         />
       </div>

@@ -26,12 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
     <template v-else>
       <div
-        class="flex-1 overflow-y-auto rounded-lg border border-solid py-2 m-4"
-        :class="
-          store.state.theme === 'dark'
-            ? 'border-[#374151] bg-surface-base'
-            : 'border-[#e5e7eb] bg-white'
-        "
+        class="flex-1 overflow-y-auto rounded-lg border border-solid py-2 m-4 border-border-default bg-surface-base"
       >
         <OForm
           id="llm-eval-settings-form"
@@ -39,31 +34,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
         >
           <!-- Enable toggle row -->
           <div
-            class="flex items-center justify-between px-4 py-2 text-[0.8125rem] border-b border-b-solid"
-            :class="
-              store.state.theme === 'dark'
-                ? 'border-b-[#4b5563]'
-                : 'border-b-[#e5e7eb]'
-            "
+            class="flex items-center justify-between px-4 py-2 text-compact border-b border-b-solid border-b-border-default"
           >
             <div class="flex flex-col gap-0.5 flex-1 pr-4">
               <span
-                class="text-[0.8125rem] font-semibold"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'text-[#e5e7eb]'
-                    : 'text-[#374151]'
-                "
+                class="text-compact font-semibold text-text-body"
               >
                 {{ t("pipeline.llmEvaluation") }}
               </span>
               <small
-                class="block text-xs italic mt-1"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'text-[#9ca3af]'
-                    : 'text-[#6b7280]'
-                "
+                class="block text-xs italic mt-1 text-text-secondary"
               >
                 {{ t("pipeline.llmEvaluationEnableHelp") }}
               </small>
@@ -92,12 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 @update:model-value="markDirty"
               />
               <small
-                class="block text-xs italic mt-1"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'text-[#9ca3af]'
-                    : 'text-[#6b7280]'
-                "
+                class="block text-xs italic mt-1 text-text-secondary"
               >
                 {{ t("pipeline.llmSpanIdentifierFieldHelp") }}
               </small>
@@ -128,12 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 />
               </div>
               <small
-                class="block text-xs italic mt-1"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'text-[#9ca3af]'
-                    : 'text-[#6b7280]'
-                "
+                class="block text-xs italic mt-1 text-text-secondary"
               >
                 {{ t("pipeline.evaluationTemplateHelp") }}
               </small>
@@ -141,20 +111,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
             <!-- Sampling toggle row -->
             <div
-              class="flex items-center justify-between px-4 py-2 text-[0.8125rem] border-b border-b-solid"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'border-b-[#4b5563]'
-                  : 'border-b-[#e5e7eb]'
-              "
+              class="flex items-center justify-between px-4 py-2 text-compact border-b border-b-solid border-b-border-default"
             >
               <span
-                class="text-[0.8125rem] font-semibold"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'text-[#e5e7eb]'
-                    : 'text-[#374151]'
-                "
+                class="text-compact font-semibold text-text-body"
               >
                 {{ t("pipeline.samplingLabel") }}
               </span>
@@ -172,12 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             >
               <div class="mb-1">
                 <span
-                  class="text-xs"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'text-[#e5e7eb]'
-                      : 'text-[#374151]'
-                  "
+                  class="text-xs text-text-body"
                 >
                   {{
                     t("pipeline.llmEvaluationSamplingRateLabel", {
@@ -195,12 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 @update:model-value="markDirty"
               />
               <small
-                class="block text-xs italic mt-1"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'text-[#9ca3af]'
-                    : 'text-[#6b7280]'
-                "
+                class="block text-xs italic mt-1 text-text-secondary"
               >
                 {{ t("pipeline.llmEvaluationSamplingHelp") }}
               </small>
@@ -217,12 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 @update:model-value="markDirty"
               />
               <small
-                class="block text-xs italic mt-1"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'text-[#9ca3af]'
-                    : 'text-[#6b7280]'
-                "
+                class="block text-xs italic mt-1 text-text-secondary"
               >
                 {{ t("pipeline.llmEvaluationOutputStreamHelp") }}
               </small>
@@ -233,12 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
           <div
             v-else
             data-test="stream-llm-eval-info-banner"
-            class="mx-4 my-3 p-3 rounded border border-solid text-xs"
-            :class="
-              store.state.theme === 'dark'
-                ? 'text-[#fcd34d] border-[#92400e] bg-[rgba(146,64,14,0.15)]'
-                : 'text-[#92400e] border-[#fde68a] bg-[#fffbeb]'
-            "
+            class="mx-4 my-3 p-3 rounded-sm border border-solid text-xs text-banner-warning-text border-banner-warning-border bg-banner-warning-bg"
           >
             {{ t("pipeline.llmEvaluationRemoveWarning") }}
           </div>

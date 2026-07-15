@@ -54,17 +54,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :done="step > 1"
             :navigable="step > 1 && !isEditMode"
           >
-            <div class="text-sm text-gray-500 mb-3">
+            <div class="text-sm text-text-secondary mb-3">
               {{ t("storage_settings.selectProviderDesc") }}
               once configured, all new data for this org will be written to your
               own storage infrastructure.
             </div>
             <div
               v-if="!isEditMode"
-              class="flex items-start gap-[10px] px-3 py-[10px] mb-3 rounded-[10px] border"
-              :class="store.state.theme === 'dark'
-                ? 'bg-amber-950/20 border-amber-400/30'
-                : 'bg-amber-50 border-amber-300'"
+              class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-lg border bg-banner-warning-bg border-banner-warning-border"
             >
               <OIcon name="warning" size="sm" class="flex-shrink-0 mt-px" />
               <div class="text-[0.82rem] leading-[1.55] text-text-primary">
@@ -73,10 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="!isEditMode"
-              class="flex items-start gap-[10px] px-3 py-[10px] mb-3 rounded-[10px] border"
-              :class="store.state.theme === 'dark'
-                ? 'bg-blue-950/20 border-blue-400/20'
-                : 'bg-blue-50 border-blue-200'"
+              class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-lg border bg-banner-info-bg border-banner-info-border"
             >
               <OIcon name="info" size="sm" class="flex-shrink-0 mt-px" />
               <div class="text-[0.82rem] leading-[1.55] text-text-primary">
@@ -94,9 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="group/card relative flex flex-col items-center justify-center py-5 px-3 border-2 rounded-xl cursor-pointer transition-all duration-300 min-h-30 hover:-translate-y-0.5"
                 :class="[
                   { selected: selectedProvider === provider.value },
-                  store.state.theme === 'dark'
-                    ? 'bg-[#1e1e1e] border-[#424242] hover:border-[#5d9cec] hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]'
-                    : 'bg-white border-border-default hover:border-card-glass-border hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
+                  'bg-surface-base border-border-default hover:border-card-glass-border hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
                 ]"
                 :style="selectedProvider === provider.value && store.state.theme !== 'dark'
                   ? 'border-color: var(--color-card-glass-border); background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%); box-shadow: 0 4px 16px rgba(25,118,210,0.2);'
@@ -109,15 +101,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="provider.image"
                   :src="provider.image"
                   :alt="provider.label"
-                  class="card-image w-[48px] h-[48px] mb-2 object-contain"
+                  class="card-image w-12 h-12 mb-2 object-contain"
                 />
                 <OIcon
                   v-else
                   :name="provider.icon"
                   size="lg"
-                  class="mb-2 text-[#666] [transition:color_0.3s_ease] group-[.selected]/card:text-(--color-card-glass-border) dark:group-[.selected]/card:text-[#5d9cec]"
+                  class="mb-2 text-text-secondary [transition:color_0.3s_ease] group-[.selected]/card:text-card-glass-border"
                 />
-                <div class="text-[13px] font-medium text-center [line-height:1.3] mt-1 text-text-primary group-[.selected]/card:text-[#333333] dark:group-[.selected]/card:text-white">{{ provider.label }}</div>
+                <div class="text-compact font-medium text-center [line-height:1.3] mt-1 text-text-primary">{{ provider.label }}</div>
                 <div
                   v-if="selectedProvider === provider.value"
                   class="check-icon absolute top-[0.375rem] right-[0.375rem] w-[1.25rem] h-[1.25rem] rounded-full overflow-hidden bg-status-positive text-white flex items-center justify-center z-[1]"
@@ -263,10 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- AwsRoleArn Fields -->
               <template v-if="selectedProvider === 'AwsRoleArn'">
                 <div
-                  class="flex items-start gap-[10px] px-3 py-[10px] mb-3 rounded-[10px] border"
-                  :class="store.state.theme === 'dark'
-                    ? 'bg-blue-950/20 border-blue-400/20'
-                    : 'bg-blue-50 border-blue-200'"
+                  class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-lg border bg-banner-info-bg border-banner-info-border"
                 >
                   <OIcon name="info" size="sm" class="flex-shrink-0 mt-px" />
                   <div class="text-[0.82rem] leading-[1.55] text-text-primary">
@@ -325,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="step1-cancel-btn"
               variant="outline"
-              class="o2-secondary-button h-[36px] mr-2"
+              class="o2-secondary-button h-9 mr-2"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-secondary-button-dark'
@@ -338,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="step1-continue-btn"
               variant="primary"
-              class="no-border o2-primary-button h-[36px]"
+              class="no-border o2-primary-button h-9"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-primary-button-dark'
@@ -355,7 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isEditMode"
               data-test="step2-back-btn"
               variant="outline"
-              class="o2-secondary-button h-[36px] mr-2"
+              class="o2-secondary-button h-9 mr-2"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-secondary-button-dark'
@@ -368,7 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="step2-cancel-btn"
               variant="outline"
-              class="o2-secondary-button h-[36px]"
+              class="o2-secondary-button h-9"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-secondary-button-dark'
@@ -381,7 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="storage-settings-submit-btn"
               variant="primary"
-              class="no-border ml-2 o2-primary-button h-[36px]"
+              class="no-border ml-2 o2-primary-button h-9"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-primary-button-dark'

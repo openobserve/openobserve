@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Edit is pinned first so it stays column-aligned across every row,
                  regardless of which trailing actions a row shows. It is disabled
                  while the org is being deleted (editing a deleting org is a no-op). -->
-            <div class="tw:flex tw:items-center tw:justify-start tw:gap-1">
+            <div class="flex items-center justify-start gap-1">
               <OButton
                 data-test="organization-name-edit"
                 variant="ghost"
