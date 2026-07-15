@@ -6145,6 +6145,10 @@
       "newButton": "New job",
       "scorersCount": "{count} scorers",
       "scorerCount": "{count} scorer",
+      "deleteBulkButton": "Delete",
+      "deleteBulkTitle": "Delete eval jobs",
+      "deleteBulkConfirm": "Are you sure you want to delete {count} eval jobs? This action cannot be undone.",
+      "deletedBulk": "{count} eval jobs deleted",
       "columns": {
         "name": "Name",
         "status": "Status",
