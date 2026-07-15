@@ -13,13 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! HTTP/gRPC transport frontend, including OpenAPI schema generation.
+//! Management HTTP APIs and authentication helpers.
 
 #![recursion_limit = "256"]
+#![feature(variant_count)]
 
-#[cfg(feature = "enterprise")]
-pub use openobserve_core::cipher;
+// Path-compatibility re-exports: these modules are owned by their source
+// crates; re-exporting them keeps `crate::extractors`, `crate::common`, and
+// `crate::service` paths working in handlers moved from `openobserve-api`.
+pub use openobserve_api_common::extractors;
 pub use openobserve_core::{common, service};
 
-pub mod handler;
-pub mod router;
+pub mod auth;
+pub mod models;
+pub mod request;
