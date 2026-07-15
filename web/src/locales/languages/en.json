@@ -4446,7 +4446,16 @@
     "dimensionWidth": "Width (px)",
     "dimensionHeight": "Height (px)",
     "imagePreview": "Include inline dashboard preview image",
-    "customDimensions": "Custom Dimensions (Advanced)"
+    "customDimensions": "Custom Dimensions (Advanced)",
+    "validation": {
+      "resourceNameInvalid": "Characters like :, ?, /, #, and spaces are not allowed.",
+      "invalidCron": "Invalid cron expression!",
+      "cronSixFields": "Cron expression must have exactly 6 fields: [Second] [Minute] [Hour] [Day of Month] [Month] [Day of Week]",
+      "cronMinInterval": "Frequency should be greater than {seconds} seconds.",
+      "dateFormat": "Date format is incorrect!",
+      "timeFormat": "Time format is incorrect!",
+      "invalidEmails": "Add valid emails!"
+    }
   },
   "queries": {
     "runningQueries": "Running Queries",
