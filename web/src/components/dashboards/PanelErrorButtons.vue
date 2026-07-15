@@ -18,7 +18,7 @@
       icon-left="warning"
       data-test="panel-error-data"
     >
-      <OTooltip side="bottom" align="end" max-width="220px">
+      <OTooltip side="bottom" align="end" max-width="420px" hoverable>
         <template #content><div style="white-space: pre-wrap">{{ error }}</div></template>
       </OTooltip>
     </OButton>
@@ -29,7 +29,7 @@
       icon-left="warning"
       data-test="panel-max-duration-warning"
     >
-      <OTooltip side="bottom" align="end" max-width="220px">
+      <OTooltip side="bottom" align="end" max-width="420px" hoverable>
         <template #content><div data-test="panel-max-duration-warning-content" style="white-space: pre-wrap">{{ maxQueryRangeWarning }}</div></template>
       </OTooltip>
     </OButton>
@@ -42,7 +42,7 @@
       <template #icon-left
         ><OIcon name="data-info-alert" size="sm"
       /></template>
-      <OTooltip side="bottom" align="end">
+      <OTooltip side="bottom" align="end" hoverable>
         <template #content><div style="white-space: pre-wrap">{{ limitNumberOfSeriesWarningMessage }}</div></template>
       </OTooltip>
     </OButton>
@@ -53,7 +53,7 @@
       icon-left="warning"
       data-test="panel-x-alias-inconsistency-warning"
     >
-      <OTooltip side="bottom" align="end" max-width="260px">
+      <OTooltip side="bottom" align="end" max-width="420px" hoverable>
         <template #content>
           <div style="white-space: pre-wrap">{{ t('dashboard.xAliasInconsistencyWarning') }}</div>
         </template>
@@ -68,7 +68,7 @@
       <template #icon-left
         ><OIcon name="running-with-errors" size="sm"
       /></template>
-      <OTooltip side="bottom" align="end" content="The data shown is cached and is different from the selected time range." />
+      <OTooltip side="bottom" align="end" hoverable content="The data shown is cached and is different from the selected time range." />
     </OButton>
     <OButton
       v-if="isPartialData && !isPanelLoading"
@@ -79,7 +79,7 @@
       <template #icon-left
         ><OIcon name="clock-loader-20" size="sm"
       /></template>
-      <OTooltip side="bottom" align="end" content="The data shown is incomplete because the loading was interrupted. Refresh to load complete data." />
+      <OTooltip side="bottom" align="end" hoverable content="The data shown is incomplete because the loading was interrupted. Refresh to load complete data." />
     </OButton>
 
     <!-- Universal Last Refreshed Clock Icon and Time -->
