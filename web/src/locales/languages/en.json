@@ -168,6 +168,12 @@
       "action": "Configure storage",
       "actionDesc": "Connect an S3, GCS, or Azure bucket"
     },
+    "noModelPricing": {
+      "title": "No model pricing definitions",
+      "description": "Add a custom pricing definition to track LLM token costs.",
+      "action": "New model",
+      "actionDesc": "Define custom per-token pricing for a model"
+    },
     "noPipelineHistory": {
       "title": "No pipeline history yet",
       "description": "Pipeline execution history will appear here once your pipelines run."
@@ -339,7 +345,8 @@
       "evalJobs": "evaluation jobs",
       "scoreConfigs": "score configs",
       "pipelineHistory": "pipeline history",
-      "regexPatterns": "regex patterns"
+      "regexPatterns": "regex patterns",
+      "modelPricing": "model pricing definitions"
     }
   },
   "common": {
@@ -4951,6 +4958,25 @@
     "providerTypeRequired": "Provider type is required",
     "algorithmRequired": "Algorithm is required",
     "secretRequired": "Secret is required",
+    "nameRequired": "Name is required",
+    "nameMaxLength": "Name must be 50 characters or less.",
+    "nameInvalidChars": "Only alphanumeric characters, underscores, and hyphens are allowed",
+    "nameInvalidResource": "Characters like :, ?, /, #, and spaces are not allowed.",
+    "typeRequired": "Type is required",
+    "baseURLRequired": "Base URL is required",
+    "baseURLInvalid": "Please provide correct URL.",
+    "baseURLHtmlNotAllowed": "HTML tags are not allowed",
+    "accessIdRequired": "Access ID is required",
+    "accessIdInvalid": "Access ID should be alphanumeric",
+    "authenticationTypeRequired": "Authentication type is required",
+    "secretTypeRequired": "Secret type is required",
+    "accessKeyRequired": "Access Key is required",
+    "ldapUsernameRequired": "LDAP Username is required",
+    "ldapUsernameInvalid": "Username can only contain alphanumeric characters, dots, underscores, and hyphens",
+    "ldapPasswordRequired": "LDAP Password is required",
+    "staticSecretNameRequired": "Static Secret Name is required",
+    "dfcNameRequired": "DFC Name is required",
+    "dfcEncryptedDataRequired": "DFC Encrypted Data is required",
     "storeType": "Store Type",
     "mechanismType": "Mechanism Type",
     "actions": "Actions"
@@ -6178,6 +6204,10 @@
       "newButton": "New job",
       "scorersCount": "{count} scorers",
       "scorerCount": "{count} scorer",
+      "deleteBulkButton": "Delete",
+      "deleteBulkTitle": "Delete eval jobs",
+      "deleteBulkConfirm": "Are you sure you want to delete {count} eval jobs? This action cannot be undone.",
+      "deletedBulk": "{count} eval jobs deleted",
       "columns": {
         "name": "Name",
         "status": "Status",
