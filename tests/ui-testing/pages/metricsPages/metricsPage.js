@@ -2064,7 +2064,7 @@ export class MetricsPage {
 
     async hasErrorIndicator() {
         // Check for actual error indicators in the UI (not false positives)
-        // Focus on Quasar notifications and explicit error messages
+        // Focus on framework notifications and explicit error messages
         // Only check for actual error notifications that indicate a query failure
         const errorSelectors = [
             '[role="alert"][class*="negative"]',   // Reka UI negative notification

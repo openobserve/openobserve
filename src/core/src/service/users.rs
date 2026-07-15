@@ -1165,10 +1165,7 @@ pub async fn list_user_invites(user_id: &str, only_pending: bool) -> Result<Resp
     }
 }
 
-pub(crate) async fn create_root_user(
-    org_id: &str,
-    user_req: UserRequest,
-) -> Result<(), anyhow::Error> {
+pub async fn create_root_user(org_id: &str, user_req: UserRequest) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     let salt = ider::uuid();
     let password = get_hash(&user_req.password, &salt);

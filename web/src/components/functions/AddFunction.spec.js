@@ -64,22 +64,6 @@ vi.mock('vue-router', () => ({
   onBeforeRouteLeave: vi.fn((fn) => fn)
 }));
 
-// Mock quasar
-vi.mock('quasar', async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    useQuasar: vi.fn(() => ({
-      notify: vi.fn(() => vi.fn()),
-      platform: {
-        is: { desktop: true },
-        has: { touch: false }
-      }
-    }))
-  };
-});
-
-
 describe("AddFunction Component", () => {
   let wrapper;
   let mockStore;
@@ -130,15 +114,7 @@ describe("AddFunction Component", () => {
         },
         mocks: {
           $router: mockRouter,
-          $store: mockStore,
-          $q: {
-            notify: vi.fn(() => vi.fn()),
-            dialog: vi.fn(),
-            platform: {
-              is: { desktop: true },
-              has: { touch: false }
-            }
-          }
+          $store: mockStore
         },
         stubs: {
           QForm: true,
@@ -213,15 +189,7 @@ describe("AddFunction Component", () => {
           },
           mocks: {
             $router: mockRouter,
-            $store: mockStore,
-            $q: {
-              notify: vi.fn(() => vi.fn()),
-              dialog: vi.fn(),
-              platform: {
-                is: { desktop: true },
-                has: { touch: false }
-              }
-            }
+            $store: mockStore
           },
           stubs: wrapper.vm.$.appContext.app._context.components
         },
@@ -246,76 +214,13 @@ describe("AddFunction Component", () => {
     });
   });
 
-  describe("Form Validation", () => {
-    it("validates function name format - valid cases", () => {
-      const validNames = ["validName", "valid_name", "$validName", "_validName"];
-      validNames.forEach(name => {
-        wrapper.vm.formData.name = name;
-        expect(wrapper.vm.isValidMethodName()).toBe(true);
-      });
-    });
-
-    it("validates function name format - invalid cases", () => {
-      const invalidNames = ["invalid-name", "123name", "name!", "name@"];
-      invalidNames.forEach(name => {
-        wrapper.vm.formData.name = name;
-        expect(wrapper.vm.isValidMethodName()).toBe("Invalid Function name.");
-      });
-    });
-
-    it("validates params format - valid cases", () => {
-      const validParams = ["param1", "param1,param2", "p1,p2,p3"];
-      validParams.forEach(param => {
-        wrapper.vm.formData.params = param;
-        expect(wrapper.vm.isValidParam()).toBe(true);
-      });
-    });
-
-    it("validates params format - invalid cases", () => {
-      const invalidParams = ["param 1", "param@1", "param,", ",param"];
-      invalidParams.forEach(param => {
-        wrapper.vm.formData.params = param;
-        expect(wrapper.vm.isValidParam()).toBe("Invalid params.");
-      });
-    });
-
-    // Polyfill for isValidFnName: use isValidMethodName or replicate logic
-    it("validates empty function name", () => {
-      wrapper.vm.formData.name = "";
-      // isValidMethodName returns string for invalid, true for valid
-      expect(wrapper.vm.isValidMethodName()).not.toBe(true);
-    });
-
-    it("validates whitespace-only function name", () => {
-      wrapper.vm.formData.name = "   ";
-      expect(wrapper.vm.isValidMethodName()).not.toBe(true);
-    });
-  });
-
-  describe("Editor Content Management", () => {
-    it("updates editor content for transType 0", () => {
-      wrapper.vm.formData.transType = "0";
-      wrapper.vm.formData.function = "test function";
-      wrapper.vm.updateEditorContent();
-      expect(wrapper.vm.formData.function).toContain("test function");
-    });
-
-    it("updates editor content for transType 1 (JavaScript)", () => {
-      wrapper.vm.formData.transType = "1";
-      wrapper.vm.formData.function = "test function";
-      wrapper.vm.updateEditorContent();
-      // JavaScript functions don't get prefix/suffix - written as-is
-      expect(wrapper.vm.prefixCode).toBe("");
-      expect(wrapper.vm.suffixCode).toBe("");
-      expect(wrapper.vm.formData.function).toContain("test function");
-    });
-
-    it("handles editor update event", () => {
-      const event = { target: { value: "new function content" } };
-      wrapper.vm.editorUpdate(event);
-      expect(wrapper.vm.formData.function).toBe("new function content");
-    });
-  });
+  // NOTE: The old "Form Validation" (isValidMethodName / isValidParam) and
+  // "Editor Content Management" (updateEditorContent / prefixCode / suffixCode /
+  // editorUpdate) suites were removed in the OForm+Zod migration. Name/method
+  // validation is now owned by the schema — see AddFunction.schema.spec.ts and
+  // the "Schema wiring" tests in AddFunction.spec.ts. The prefix/suffix wrapping
+  // was a no-op (both empty strings) and is gone; editor content now syncs via
+  // handleFunctionUpdate bound to the editor's @update:query event.
 
   describe("Error Handling", () => {
     it("handles VRL function error", () => {
@@ -433,15 +338,7 @@ describe("AddFunction Component", () => {
           },
           mocks: {
             $router: mockRouter,
-            $store: mockStore,
-            $q: {
-              notify: vi.fn(() => vi.fn()),
-              dialog: vi.fn(),
-              platform: {
-                is: { desktop: true },
-                has: { touch: false }
-              }
-            }
+            $store: mockStore
           },
           stubs: wrapper.vm.$.appContext.app._context.components
         },

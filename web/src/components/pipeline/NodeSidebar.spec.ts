@@ -114,7 +114,7 @@ describe("NodeSidebar - draggable buttons for non-section-header nodes", () => {
   });
 
   it("renders correct number of draggable buttons for non-section-header nodes", () => {
-    // Quasar q-btn renders as <button> in the test environment
+    // Draggable buttons render as <button> in the test environment
     const buttons = wrapper.findAll("button");
     expect(buttons).toHaveLength(3);
   });

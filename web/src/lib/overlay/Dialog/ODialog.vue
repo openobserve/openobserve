@@ -208,7 +208,7 @@ const contentStyle = computed(() => {
 });
 
 // ── Validation reset on cancel-path close ───────────────────────────────────
-/** Reset Quasar q-field validation for every field in the body slot so that
+/** Reset q-field validation for every field in the body slot so that
  *  cancel-path closes (Cancel button, ×, Escape, overlay click) never surface
  *  lazy-rules validation errors to the user. */
 function clearBodyValidation() {

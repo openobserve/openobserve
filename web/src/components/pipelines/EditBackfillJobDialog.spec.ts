@@ -38,18 +38,6 @@ vi.mock("@/components/DateTime.vue", () => ({
   },
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("quasar")>();
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn(),
-      dialog: vi.fn(() => ({ onOk: vi.fn((cb: () => void) => { cb(); return { onCancel: vi.fn() }; }) })),
-      dark: { isActive: false },
-    }),
-  };
-});
-
 import backfillService from "@/services/backfill";
 import type { BackfillJob } from "@/services/backfill";
 import EditBackfillJobDialog from "./EditBackfillJobDialog.vue";

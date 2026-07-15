@@ -314,7 +314,6 @@ describe('TestFunction.vue Branch Coverage', () => {
           plugins: [mockI18n],
           provide: {
             store: mockStore,
-            $q: { notify: vi.fn() },
           },
           stubs: {
             'query-editor': true,
@@ -395,7 +394,6 @@ describe('TestFunction.vue Branch Coverage', () => {
           plugins: [mockI18n],
           provide: {
             store: mockStore,
-            $q: { notify: vi.fn() },
           },
           stubs: {
             'query-editor': true,

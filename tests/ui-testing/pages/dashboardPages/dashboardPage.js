@@ -281,7 +281,7 @@ export class DashboardPage {
     // input it is, so Enter triggers the form's implicit submit → onSave →
     // savePanelChangesToDashboard, which saves the panel and navigates away,
     // detaching the Apply button mid-flow (see reports E2E timeouts on
-    // [data-test="dashboard-apply"]). The legacy Quasar q-input ignored Enter;
+    // [data-test="dashboard-apply"]). The legacy q-input ignored Enter;
     // .fill() already commits the title through OFormInput's reactive binding,
     // so no key press is needed to "commit" the name.
     await expect(this.applyButton).toBeVisible();

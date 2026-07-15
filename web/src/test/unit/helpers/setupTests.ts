@@ -136,7 +136,6 @@ console.warn = (...args) => {
         // Suppress Vue component warnings from test stubs
         message.includes('Failed to resolve component:') ||
         message.includes('Component is missing template or render function') ||
-        message.includes('setup() return property "$q" should not start with "$"') ||
         message.includes('Unhandled error during execution of watcher callback') ||
         message.includes('Unhandled error during execution of native event handler') ||
         message.includes('Unhandled error during execution of activated hook') ||

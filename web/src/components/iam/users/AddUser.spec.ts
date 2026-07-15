@@ -210,7 +210,7 @@ describe("AddUser", () => {
       wrapper = mountComp({
         customRoles: ["admin-role", "editor-role", "viewer"],
       });
-      // update() runs its callback synchronously (the Quasar filter contract).
+      // update() runs its callback synchronously (the filter contract).
       wrapper.vm.filterFn("edit", (fn: () => void) => fn());
       expect(wrapper.vm.filterdOption).toEqual(["editor-role"]);
 

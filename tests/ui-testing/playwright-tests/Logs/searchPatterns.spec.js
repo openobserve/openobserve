@@ -730,7 +730,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
             // Hover over the chip
             await pm.logsPage.hoverWildcardChip(i);
 
-            // Wait for Quasar tooltip (delay is 300ms + render time)
+            // Wait for tooltip (delay is 300ms + render time)
             await page.waitForTimeout(500);
 
             // Check if tooltip appeared

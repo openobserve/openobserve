@@ -80,7 +80,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
   };
 });
 
-// Mock copyToClipboard — migrated from quasar to @/utils/clipboard
+// Mock copyToClipboard
 const { mockCopyToClipboard } = vi.hoisted(() => ({
   mockCopyToClipboard: vi.fn(() => Promise.resolve(true)),
 }));

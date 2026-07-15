@@ -56,7 +56,7 @@ describe("ConfigPanelSearch", () => {
     });
 
     it("renders a search icon", () => {
-      // Quasar renders the prepend slot — OIcon with name 'search'
+      // Renders the prepend slot — OIcon with name 'search'
       expect(wrapper.html()).toContain("search");
     });
   });

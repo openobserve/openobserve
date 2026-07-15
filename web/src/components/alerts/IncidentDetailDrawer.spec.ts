@@ -21,7 +21,7 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
-// Mock toast so tests don't need $q
+// Mock toast
 const mockToast = vi.fn();
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => mockToast(...args),
@@ -57,8 +57,6 @@ import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
-
-// Install Quasar globally
 
 // Test data factory
 const createIncident = (overrides: Partial<Incident> = {}): Incident => ({

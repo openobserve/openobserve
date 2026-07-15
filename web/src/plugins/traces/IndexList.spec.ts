@@ -103,16 +103,6 @@ vi.mock("@/utils/zincutils", async (importOriginal: any) => {
   };
 });
 
-// Mock Quasar (no longer a dependency — provide minimal stub)
-const { mockNotify } = vi.hoisted(() => ({
-  mockNotify: vi.fn(),
-}));
-vi.mock("quasar", () => ({
-  useQuasar: () => ({
-    notify: mockNotify,
-  }),
-}));
-
 // ── Shared mock state — must be defined before the vi.mock factory runs ──────
 // The factory for useTraces references mockSearchObj via closure.
 const mockFieldValues = {
@@ -287,7 +277,6 @@ describe("IndexList Component", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockNotify.mockClear();
 
     // Reset shared mock state to known defaults before each test
     mockSearchObj.data.stream.selectedStream = {

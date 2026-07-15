@@ -1489,7 +1489,7 @@ export class MetricsBuilderPage {
         await this.dashboardDropdownPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
 
         // Click an empty area of the Add-to-Dashboard ODrawer panel to dismiss any
-        // open Quasar menu from prior dropdowns (folder/dashboard).
+        // open menu from prior dropdowns (folder/dashboard).
         if (await this.dashboardDialogEl.isVisible({ timeout: 1000 }).catch(() => false)) {
             await this.dashboardDialogEl.click({ position: { x: 5, y: 5 }, force: true }).catch(() => {});
         }
