@@ -205,6 +205,81 @@ export interface SyntheticBucket {
   failedRuns: number;
 }
 
+// ── Step analysis types (used by aggregateStepStats) ──────────────────────
+
+export interface StepFailure {
+  stepName: string;
+  selector: string | null;
+  failCount: number;
+  totalExecutions: number;
+  failRate: number;
+}
+
+export interface StepDuration {
+  stepName: string;
+  selector: string | null;
+  avgDurationMs: number;
+  maxDurationMs: number;
+  totalExecutions: number;
+}
+
+export interface StepGroup {
+  key: string;
+  name: string;
+  sub: string | null;
+  failRate: number;
+  flakyRate: number;
+  flakyCount: number;
+  failCount: number;
+  totalExecutions: number;
+  avgDurationMs: number;
+  maxDurationMs: number;
+  recentRates: number[];
+  browserStats: StepDimensionStat[];
+  locationStats: StepDimensionStat[];
+}
+
+export interface StepDimensionStat {
+  name: string;
+  total: number;
+  failures: number;
+  flaky: number;
+}
+
+export interface FlakyStep {
+  stepName: string;
+  flakyCount: number;
+  flakyRate: number;
+  failRate: number;
+  recentFlakyRates: number[];
+}
+
+export interface TrendBucket {
+  tsMs: number;
+  stepName: string;
+  avgDurationMs: number;
+}
+
+export interface StepFailureInstance {
+  timestamp: number;
+  stepName: string;
+  isFlaky: boolean;
+  browser: string;
+  location: string;
+  error: string;
+  runId: string;
+  executionId: string;
+}
+
+export interface StepStatsResult {
+  stepFailures: StepFailure[];
+  stepDurations: StepDuration[];
+  stepGroups: StepGroup[];
+  flakySteps: FlakyStep[];
+  trendBuckets: TrendBucket[];
+  failureInstances: StepFailureInstance[];
+}
+
 // ── Internal helpers ───────────────────────────────────────────────────────
 
 function escapeSqlLiteral(value: string): string {
@@ -343,6 +418,16 @@ ORDER BY ts`;
 export function buildRunsSql(monitorId: string, limit: number): string {
   const id = escapeSqlLiteral(monitorId);
   return `SELECT ${F.timestamp} as ts, scheduled_ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, trigger_type, ${F.error} as error, job_id, run_id, execution_id
+FROM ${TABLE}
+WHERE ${F.monitorId} = '${id}'
+ORDER BY ${F.timestamp} DESC
+LIMIT ${limit}`;
+}
+
+/** Runs query that includes the JSON step fields needed for client-side aggregation. */
+export function buildRunsWithStepsSql(monitorId: string, limit: number): string {
+  const id = escapeSqlLiteral(monitorId);
+  return `SELECT ${F.timestamp} as ts, scheduled_ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, trigger_type, ${F.error} as error, job_id, run_id, execution_id, attempts, last_attempt_steps, recorded_steps, retry_history
 FROM ${TABLE}
 WHERE ${F.monitorId} = '${id}'
 ORDER BY ${F.timestamp} DESC
@@ -514,4 +599,384 @@ export function mapHistogram(
   }
 
   return Array.from(buckets.values()).sort((a, b) => a.tsMs - b.tsMs);
+}
+
+// ── Step aggregation (client-side) ───────────────────────────────────────
+
+const MAX_SPARKLINE_POINTS = 24;
+const MAX_FAILURE_INSTANCES = 50;
+const TOP_TREND_STEPS = 8;
+
+interface InternalStepAccumulator {
+  name: string;
+  selector: string | null;
+  totalExecutions: number;
+  failures: number;
+  flakyCount: number;
+  durationSum: number;
+  durationMax: number;
+  recentRunStatuses: ("pass" | "fail" | "flaky")[];
+  browserMap: Map<string, { total: number; failures: number; flaky: number }>;
+  locationMap: Map<string, { total: number; failures: number; flaky: number }>;
+}
+
+interface InternalTrendAccumulator {
+  stepName: string;
+  bucketMap: Map<number, { sum: number; count: number }>;
+}
+
+function timeBucketKey(tsMs: number, bucketMs: number): number {
+  return Math.floor(tsMs / bucketMs) * bucketMs;
+}
+
+export function aggregateStepStats(
+  rawHits: Record<string, unknown>[],
+  startMicros: number,
+  endMicros: number,
+): StepStatsResult {
+  const stepAcc = new Map<string, InternalStepAccumulator>();
+  const failureInstances: StepFailureInstance[] = [];
+  const trendAcc = new Map<string, InternalTrendAccumulator>();
+
+  const interval = bucketInterval(endMicros - startMicros);
+  const bucketMs = intervalSeconds(interval) * 1000;
+
+  // Process runs oldest-first so sparklines reflect chronological order
+  const sorted = [...rawHits].sort(
+    (a, b) => num(a.ts) - num(b.ts),
+  );
+
+  for (const hit of sorted) {
+    const runTimestamp = num(hit.ts);
+    const engine = str(hit.engine);
+    const location = str(hit.location);
+    const error = str(hit.error);
+    const runId = str(hit.run_id);
+    const executionId = str(hit.execution_id);
+    const attempts = num(hit.attempts) || 1;
+    const runTsMs = runTimestamp / 1000;
+    const bucketKey = timeBucketKey(runTsMs, bucketMs);
+
+    const recordedSteps = parseJsonArray(hit.recorded_steps) as any[];
+    const lastAttemptSteps = parseJsonArray(hit.last_attempt_steps) as any[];
+    const retryHistory = parseJsonArray(hit.retry_history) as any[];
+
+    // Build a lookup: step_id → { name, selector } from recorded_steps
+    const stepDefs = new Map<string, { name: string; selector: string | null }>();
+    for (const rs of recordedSteps) {
+      stepDefs.set(str(rs.id), {
+        name: str(rs.name) || str(rs.id),
+        selector: rs.selector ? str(rs.selector) : null,
+      });
+    }
+
+    // Build prior-attempt step statuses for flaky detection
+    const priorStatuses = new Map<string, string>();
+    if (attempts > 1 && retryHistory.length > 0) {
+      for (const retry of retryHistory) {
+        const retrySteps = Array.isArray(retry.steps) ? retry.steps : [];
+        for (const rs of retrySteps as any[]) {
+          const sid = str(rs.step_id ?? rs.id);
+          const s = str(rs.status);
+          // Only record the first failure for this step across retries
+          if (!priorStatuses.has(sid) && (s === "fail" || s === "failed")) {
+            priorStatuses.set(sid, "fail");
+          }
+        }
+      }
+    }
+
+    const processedSteps = new Set<string>();
+
+    for (const step of lastAttemptSteps as any[]) {
+      const stepId = str(step.step_id ?? step.id);
+      processedSteps.add(stepId);
+
+      const def = stepDefs.get(stepId);
+      const stepName = def?.name ?? stepId;
+      const selector = def?.selector ?? null;
+      const stepStatus = str(step.status);
+      const isOk = stepStatus === "ok" || stepStatus === "passed";
+      const stepDuration = num(step.duration_ms);
+      const stepError = str(step.error);
+
+      // Determine flaky
+      const priorFailed = priorStatuses.get(stepId) === "fail";
+      const isFlaky = attempts > 1 && priorFailed && isOk;
+
+      // ── Accumulate step stats ────────────────────────────────────
+      let acc = stepAcc.get(stepName);
+      if (!acc) {
+        acc = {
+          name: stepName,
+          selector,
+          totalExecutions: 0,
+          failures: 0,
+          flakyCount: 0,
+          durationSum: 0,
+          durationMax: 0,
+          recentRunStatuses: [],
+          browserMap: new Map(),
+          locationMap: new Map(),
+        };
+        stepAcc.set(stepName, acc);
+      }
+
+      acc.totalExecutions++;
+      if (!isOk) acc.failures++;
+      if (isFlaky) acc.flakyCount++;
+      acc.durationSum += stepDuration;
+      if (stepDuration > acc.durationMax) acc.durationMax = stepDuration;
+
+      // Browser dimension
+      let bStats = acc.browserMap.get(engine);
+      if (!bStats) { bStats = { total: 0, failures: 0, flaky: 0 }; acc.browserMap.set(engine, bStats); }
+      bStats.total++;
+      if (!isOk) bStats.failures++;
+      if (isFlaky) bStats.flaky++;
+
+      // Location dimension
+      let lStats = acc.locationMap.get(location);
+      if (!lStats) { lStats = { total: 0, failures: 0, flaky: 0 }; acc.locationMap.set(location, lStats); }
+      lStats.total++;
+      if (!isOk) lStats.failures++;
+      if (isFlaky) lStats.flaky++;
+
+      // ── Accumulate trend data ─────────────────────────────────────
+      let tAcc = trendAcc.get(stepName);
+      if (!tAcc) {
+        tAcc = { stepName, bucketMap: new Map() };
+        trendAcc.set(stepName, tAcc);
+      }
+      let bEntry = tAcc.bucketMap.get(bucketKey);
+      if (!bEntry) { bEntry = { sum: 0, count: 0 }; tAcc.bucketMap.set(bucketKey, bEntry); }
+      bEntry.sum += stepDuration;
+      bEntry.count++;
+
+      // ── Record failure instances ──────────────────────────────────
+      if (!isOk || isFlaky) {
+        if (failureInstances.length < MAX_FAILURE_INSTANCES) {
+          failureInstances.push({
+            timestamp: runTsMs,
+            stepName,
+            isFlaky,
+            browser: engine,
+            location,
+            error: stepError || error,
+            runId,
+            executionId,
+          });
+        }
+      }
+    }
+
+    // Also check recorded steps not in last_attempt_steps for flaky detection
+    for (const [stepId, def] of stepDefs) {
+      if (processedSteps.has(stepId)) continue;
+
+      const priorFailed = priorStatuses.get(stepId) === "fail";
+      if (!priorFailed) continue;
+
+      // Step was in recorded_steps and failed in a prior attempt but isn't in
+      // last_attempt_steps — could be a flaky step that resolved on retry.
+      const stepName = def.name || stepId;
+      let acc = stepAcc.get(stepName);
+      if (!acc) {
+        acc = {
+          name: stepName,
+          selector: def.selector,
+          totalExecutions: 0,
+          failures: 0,
+          flakyCount: 0,
+          durationSum: 0,
+          durationMax: 0,
+          recentRunStatuses: [],
+          browserMap: new Map(),
+          locationMap: new Map(),
+        };
+        stepAcc.set(stepName, acc);
+      }
+      acc.flakyCount++;
+    }
+
+    // ── Update recent-run statuses for sparklines ───────────────────
+    for (const acc of stepAcc.values()) {
+      // Determine this run's status for this step
+      const processedInRun = lastAttemptSteps.some(
+        (s: any) => {
+          const sid = str(s.step_id ?? s.id);
+          const def = stepDefs.get(sid);
+          return (def?.name ?? sid) === acc.name;
+        },
+      );
+
+      if (processedInRun) {
+        if (acc.recentRunStatuses.length >= MAX_SPARKLINE_POINTS) {
+          acc.recentRunStatuses.shift();
+        }
+        const stepFromRun = (lastAttemptSteps as any[]).find(
+          (s: any) => {
+            const sid = str(s.step_id ?? s.id);
+            const def = stepDefs.get(sid);
+            return (def?.name ?? sid) === acc.name;
+          },
+        );
+        if (stepFromRun) {
+          const runStepStatus = str(stepFromRun.status);
+          const isRunOk = runStepStatus === "ok" || runStepStatus === "passed";
+          const priorFailedForStep = priorStatuses.get(
+            str(stepFromRun.step_id ?? stepFromRun.id),
+          ) === "fail";
+          if (!isRunOk) {
+            acc.recentRunStatuses.push("fail");
+          } else if (priorFailedForStep && attempts > 1) {
+            acc.recentRunStatuses.push("flaky");
+          } else {
+            acc.recentRunStatuses.push("pass");
+          }
+        }
+      }
+    }
+  }
+
+  // ── Build output arrays ─────────────────────────────────────────────────
+
+  const stepGroups: StepGroup[] = [];
+  const stepFailures: StepFailure[] = [];
+  const stepDurations: StepDuration[] = [];
+  const flakySteps: FlakyStep[] = [];
+
+  for (const [name, acc] of stepAcc) {
+    const failRate = acc.totalExecutions > 0
+      ? Math.round((acc.failures / acc.totalExecutions) * 1000) / 10
+      : 0;
+    const flakyRate = acc.totalExecutions > 0
+      ? Math.round((acc.flakyCount / acc.totalExecutions) * 1000) / 10
+      : 0;
+    const avgDurationMs = acc.totalExecutions > 0
+      ? Math.round(acc.durationSum / acc.totalExecutions)
+      : 0;
+    const failRateFull = acc.totalExecutions > 0
+      ? acc.failures / acc.totalExecutions
+      : 0;
+
+    const recentRates = acc.recentRunStatuses.map((s) =>
+      s === "fail" || s === "flaky" ? 1 : 0,
+    );
+
+    stepGroups.push({
+      key: `step-${name}`,
+      name,
+      sub: acc.selector,
+      failRate: failRateFull,
+      flakyRate,
+      flakyCount: acc.flakyCount,
+      failCount: acc.failures,
+      totalExecutions: acc.totalExecutions,
+      avgDurationMs,
+      maxDurationMs: acc.durationMax,
+      recentRates,
+      browserStats: Array.from(acc.browserMap.entries()).map(([n, s]) => ({
+        name: n,
+        total: s.total,
+        failures: s.failures,
+        flaky: s.flaky,
+      })),
+      locationStats: Array.from(acc.locationMap.entries()).map(([n, s]) => ({
+        name: n,
+        total: s.total,
+        failures: s.failures,
+        flaky: s.flaky,
+      })),
+    });
+
+    stepFailures.push({
+      stepName: name,
+      selector: acc.selector,
+      failCount: acc.failures,
+      totalExecutions: acc.totalExecutions,
+      failRate,
+    });
+
+    stepDurations.push({
+      stepName: name,
+      selector: acc.selector,
+      avgDurationMs,
+      maxDurationMs: acc.durationMax,
+      totalExecutions: acc.totalExecutions,
+    });
+
+    if (acc.flakyCount > 0) {
+      flakySteps.push({
+        stepName: name,
+        flakyCount: acc.flakyCount,
+        flakyRate,
+        failRate,
+        recentFlakyRates: recentRates,
+      });
+    }
+  }
+
+  // Sort outputs
+  stepGroups.sort((a, b) => b.failRate - a.failRate || b.avgDurationMs - a.avgDurationMs);
+  stepFailures.sort((a, b) => b.failCount - a.failCount);
+  stepDurations.sort((a, b) => b.avgDurationMs - a.avgDurationMs);
+  flakySteps.sort((a, b) => b.flakyCount - a.flakyCount);
+  failureInstances.sort((a, b) => b.timestamp - a.timestamp);
+
+  // Build trend buckets (top N steps, aggregated per time bucket)
+  const topSteps = stepDurations.slice(0, TOP_TREND_STEPS).map((s) => s.stepName);
+  const otherStepNames = new Set(
+    stepDurations.slice(TOP_TREND_STEPS).map((s) => s.stepName),
+  );
+
+  // Merge "others" into a single series
+  let othersAcc: InternalTrendAccumulator | null = null;
+  const trendBuckets: TrendBucket[] = [];
+
+  for (const [stepName, tAcc] of trendAcc) {
+    if (topSteps.includes(stepName)) {
+      for (const [bk, entry] of tAcc.bucketMap) {
+        trendBuckets.push({
+          tsMs: bk,
+          stepName,
+          avgDurationMs: entry.count > 0 ? Math.round(entry.sum / entry.count) : 0,
+        });
+      }
+    } else if (otherStepNames.has(stepName)) {
+      if (!othersAcc) {
+        othersAcc = { stepName: "Others", bucketMap: new Map() };
+      }
+      for (const [bk, entry] of tAcc.bucketMap) {
+        const existing = othersAcc.bucketMap.get(bk);
+        if (existing) {
+          existing.sum += entry.sum;
+          existing.count += entry.count;
+        } else {
+          othersAcc.bucketMap.set(bk, { sum: entry.sum, count: entry.count });
+        }
+      }
+    }
+  }
+
+  if (othersAcc) {
+    for (const [bk, entry] of othersAcc.bucketMap) {
+      trendBuckets.push({
+        tsMs: bk,
+        stepName: "Others",
+        avgDurationMs: entry.count > 0 ? Math.round(entry.sum / entry.count) : 0,
+      });
+    }
+  }
+
+  trendBuckets.sort((a, b) => a.tsMs - b.tsMs || a.stepName.localeCompare(b.stepName));
+
+  return {
+    stepFailures,
+    stepDurations,
+    stepGroups,
+    flakySteps,
+    trendBuckets,
+    failureInstances,
+  };
 }

@@ -18,11 +18,13 @@ import {
   SYNTHETIC_FIELDS,
   SYNTHETIC_RESULTS_STREAM,
   STATUS_VALUES,
+  aggregateStepStats,
   bucketInterval,
   buildHistogramSql,
   buildKpiSql,
   buildLastRunSql,
   buildRunsSql,
+  buildRunsWithStepsSql,
   mapHistogram,
   mapKpi,
   mapRun,
@@ -187,5 +189,198 @@ describe("mapHistogram", () => {
     expect(populated?.avgMs).toBe(1500);
     expect(populated?.p95Ms).toBe(2940);
     expect(populated?.uptimePct).toBeCloseTo(80, 5);
+  });
+});
+
+describe("buildRunsWithStepsSql", () => {
+  it("should include the JSON step columns needed for client-side aggregation", () => {
+    const sql = buildRunsWithStepsSql("mon-1", 500);
+    expect(sql).toContain(`FROM "${SYNTHETIC_RESULTS_STREAM}"`);
+    expect(sql).toContain("last_attempt_steps");
+    expect(sql).toContain("recorded_steps");
+    expect(sql).toContain("retry_history");
+    expect(sql).toContain("attempts");
+    expect(sql).toContain("LIMIT 500");
+  });
+});
+
+describe("aggregateStepStats", () => {
+  const HOUR = 60 * 60 * 1_000_000;
+  const start = 1_700_000_000_000_000;
+  const end = start + HOUR;
+
+  function makeHit(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      ts: 1_700_000_000_500_000,
+      engine: "chromium",
+      location: "us-east-1",
+      device: "laptop_large",
+      error: "",
+      run_id: "run-1",
+      execution_id: "exec-1",
+      attempts: 1,
+      recorded_steps: JSON.stringify([
+        { id: "step-1", name: "Open homepage", selector: "css=.hero" },
+        { id: "step-2", name: "Click login", selector: "css=.login-btn" },
+      ]),
+      last_attempt_steps: JSON.stringify([
+        { step_id: "step-1", status: "ok", duration_ms: 200, error: "" },
+        { step_id: "step-2", status: "fail", duration_ms: 5000, error: "Timeout waiting for selector" },
+      ]),
+      retry_history: "[]",
+      ...overrides,
+    };
+  }
+
+  it("should compute correct fail rates and duration per step", () => {
+    const result = aggregateStepStats([makeHit(), makeHit()], start, end);
+
+    expect(result.stepGroups).toHaveLength(2);
+    const login = result.stepGroups.find((g) => g.name === "Click login");
+    expect(login).toBeTruthy();
+    expect(login!.totalExecutions).toBe(2);
+    expect(login!.failCount).toBe(2);
+    expect(login!.failRate).toBeCloseTo(1, 5);
+    expect(login!.avgDurationMs).toBe(5000);
+
+    const home = result.stepGroups.find((g) => g.name === "Open homepage");
+    expect(home).toBeTruthy();
+    expect(home!.totalExecutions).toBe(2);
+    expect(home!.failCount).toBe(0);
+    expect(home!.failRate).toBe(0);
+  });
+
+  it("should detect flaky steps when a retry fixes a prior failure", () => {
+    const hit = makeHit({
+      attempts: 2,
+      last_attempt_steps: JSON.stringify([
+        { step_id: "step-1", status: "ok", duration_ms: 200, error: "" },
+        { step_id: "step-2", status: "ok", duration_ms: 800, error: "" },
+      ]),
+      retry_history: JSON.stringify([
+        {
+          attempt: 1,
+          status: "failed",
+          durationMs: 5200,
+          steps: [
+            { step_id: "step-1", status: "ok", duration_ms: 200, error: "" },
+            { step_id: "step-2", status: "fail", duration_ms: 5000, error: "Timeout" },
+          ],
+        },
+      ]),
+    });
+
+    const result = aggregateStepStats([hit], start, end);
+    const login = result.stepGroups.find((g) => g.name === "Click login");
+    expect(login).toBeTruthy();
+    expect(login!.flakyCount).toBe(1);
+    expect(login!.flakyRate).toBeGreaterThan(0);
+    expect(login!.failCount).toBe(0); // passed on final attempt
+  });
+
+  it("should NOT count step as flaky when it fails on all attempts", () => {
+    const hit = makeHit({
+      attempts: 2,
+      last_attempt_steps: JSON.stringify([
+        { step_id: "step-1", status: "ok", duration_ms: 200, error: "" },
+        { step_id: "step-2", status: "fail", duration_ms: 5000, error: "Timeout" },
+      ]),
+      retry_history: JSON.stringify([
+        {
+          attempt: 1,
+          status: "failed",
+          durationMs: 5200,
+          steps: [
+            { step_id: "step-1", status: "ok", duration_ms: 200, error: "" },
+            { step_id: "step-2", status: "fail", duration_ms: 5000, error: "Timeout" },
+          ],
+        },
+      ]),
+    });
+
+    const result = aggregateStepStats([hit], start, end);
+    const login = result.stepGroups.find((g) => g.name === "Click login");
+    expect(login).toBeTruthy();
+    expect(login!.flakyCount).toBe(0);
+    expect(login!.failCount).toBe(1);
+  });
+
+  it("should break down failures by browser and location", () => {
+    const chrome = makeHit({ engine: "chromium", location: "us-east-1" });
+    const firefox = makeHit({ engine: "firefox", location: "eu-west-1", run_id: "run-2", execution_id: "exec-2" });
+
+    const result = aggregateStepStats([chrome, firefox], start, end);
+    const login = result.stepGroups.find((g) => g.name === "Click login");
+    expect(login).toBeTruthy();
+
+    const chromStats = login!.browserStats.find((s) => s.name === "chromium");
+    expect(chromStats).toBeTruthy();
+    expect(chromStats!.total).toBe(1);
+    expect(chromStats!.failures).toBe(1);
+
+    const ffStats = login!.browserStats.find((s) => s.name === "firefox");
+    expect(ffStats).toBeTruthy();
+    expect(ffStats!.total).toBe(1);
+    expect(ffStats!.failures).toBe(1);
+  });
+
+  it("should generate failure instances for failed and flaky steps", () => {
+    const result = aggregateStepStats([makeHit()], start, end);
+    expect(result.failureInstances.length).toBeGreaterThan(0);
+    const loginFi = result.failureInstances.find((fi) => fi.stepName === "Click login");
+    expect(loginFi).toBeTruthy();
+    expect(loginFi!.isFlaky).toBe(false);
+    expect(loginFi!.browser).toBe("chromium");
+  });
+
+  it("should handle empty input gracefully", () => {
+    const result = aggregateStepStats([], start, end);
+    expect(result.stepGroups).toEqual([]);
+    expect(result.stepFailures).toEqual([]);
+    expect(result.stepDurations).toEqual([]);
+    expect(result.flakySteps).toEqual([]);
+    expect(result.failureInstances).toEqual([]);
+    expect(result.trendBuckets).toEqual([]);
+  });
+
+  it("should fall back to step_id when recorded_steps is missing", () => {
+    const hit = makeHit({
+      recorded_steps: "[]",
+      last_attempt_steps: JSON.stringify([
+        { id: "custom-step", status: "ok", duration_ms: 200, error: "" },
+      ]),
+    });
+
+    const result = aggregateStepStats([hit], start, end);
+    expect(result.stepGroups).toHaveLength(1);
+    expect(result.stepGroups[0].name).toBe("custom-step");
+    expect(result.stepGroups[0].sub).toBeNull();
+  });
+
+  it("should generate flakiest steps ranked by flaky count", () => {
+    const flakyHit = makeHit({
+      run_id: "run-a",
+      execution_id: "exec-a",
+      attempts: 2,
+      last_attempt_steps: JSON.stringify([
+        { step_id: "step-2", status: "ok", duration_ms: 800, error: "" },
+      ]),
+      retry_history: JSON.stringify([
+        { attempt: 1, status: "failed", durationMs: 5200, steps: [{ step_id: "step-2", status: "fail", duration_ms: 5000, error: "Timeout" }] },
+      ]),
+    });
+
+    const result = aggregateStepStats([flakyHit], start, end);
+    expect(result.flakySteps).toHaveLength(1);
+    expect(result.flakySteps[0].stepName).toBe("Click login");
+    expect(result.flakySteps[0].flakyCount).toBe(1);
+  });
+
+  it("should generate trend buckets per step for the duration chart", () => {
+    const result = aggregateStepStats([makeHit()], start, end);
+    expect(result.trendBuckets.length).toBeGreaterThan(0);
+    const loginBuckets = result.trendBuckets.filter((b) => b.stepName === "Click login");
+    expect(loginBuckets.length).toBeGreaterThan(0);
+    expect(loginBuckets[0].avgDurationMs).toBeGreaterThan(0);
   });
 });

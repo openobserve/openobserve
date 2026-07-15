@@ -149,7 +149,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-for="card in kpiCards"
                   :key="card.key"
                   class="card-container rounded-lg flex flex-col px-2 pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
-                  :class="kpiError ? 'border-l-status-error-text border-l-[3px]' : ''"
                   :data-test="`monitor-runs-kpi-${card.key}`"
                 >
                   <div class="flex flex-col gap-[0.25rem]">
