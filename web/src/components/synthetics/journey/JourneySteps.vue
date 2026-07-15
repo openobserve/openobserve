@@ -179,6 +179,7 @@ function handleUpdateExpanded(ids: string[]) {
 
 <template>
   <OTable
+    class="border-t border-table-row-divider"
     :data="data"
     :columns="columns"
     row-key="id"

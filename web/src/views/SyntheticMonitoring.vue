@@ -5,7 +5,7 @@
     <AppPageHeader
       title="Synthetic Checks"
       subtitle="Proactively monitor uptime, performance, and user journeys from global locations"
-      class="px-4"
+      class="px-4 border-b border-border-default"
       icon="radar"
     >
       <template #actions>
@@ -32,7 +32,7 @@
     <!-- CONTENT AREA: sidebar + main -->
     <div class="flex flex-1 overflow-hidden">
       <!-- LEFT SIDEBAR: folder navigation -->
-      <div class="w-[14.375rem] shrink-0 border-r border-border-default overflow-y-auto">
+      <div class="w-[14.375rem] shrink-0 overflow-y-auto">
         <FolderList
           type="synthetics"
           data-test="synthetic-monitoring-folder-list"
