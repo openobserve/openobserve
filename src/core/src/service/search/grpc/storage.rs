@@ -395,7 +395,7 @@ pub async fn cache_files(
     tokio::spawn(async move {
         let files_num = files.len();
         for (id, account, file, size, ts) in files {
-            if let Err(e) = crate::job::queue_download(
+            if let Err(e) = crate::service::file_downloader::queue_download(
                 trace_id.clone(),
                 id,
                 account,

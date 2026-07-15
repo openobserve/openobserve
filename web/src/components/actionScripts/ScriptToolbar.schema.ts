@@ -4,8 +4,8 @@
 // Migrated from the old hand-rolled `isValidMethodName` + `scriptNameError`
 // computed to a single Zod schema on <OForm :schema>.
 //
-// Restores the Quasar BEFORE baseline for the `actionName` field
-// (complete-quasar-validation-inventory-BEFORE.md): `!!v || 'Field is required!'`
+// Restores the BEFORE baseline for the `actionName` field:
+// `!!v || 'Field is required!'`
 // (required) AND `isValidMethodName` (the method-name regex). The truthy guard
 // inverts to a positive Zod constraint, so it is required + regex — not
 // regex-only.

@@ -32,7 +32,7 @@ const i18n = createI18n({
   },
 });
 
-// Stubs for Quasar components not under test
+// Stubs for components not under test
 const qBtnStub = {
   template:
     "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click')\">{{ label }}</button>",

@@ -20,7 +20,7 @@ import i18n from "@/locales";
 import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
-// Mock toast (replaces Quasar $q.notify)
+// Mock toast
 // vi.hoisted ensures mockToast is initialized before the vi.mock factory runs
 const { mockToast } = vi.hoisted(() => ({
   mockToast: vi.fn(() => vi.fn()),

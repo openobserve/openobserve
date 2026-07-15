@@ -43,11 +43,6 @@ vi.mock("@tanstack/vue-virtual", () => ({
   }),
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return { ...actual, debounce: (fn: any) => fn };
-});
-
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: mockCopyToClipboard,
 }));
@@ -855,7 +850,7 @@ describe("TenstackTable", () => {
       expect(style).toContain("min-height: 70px");
     });
 
-    it("should render column labels from Quasar column format", () => {
+    it("should render column labels from legacy column format", () => {
       wrapper = mountTable({
         columns: dashboardColumns,
         rows: dashboardRows,

@@ -1009,7 +1009,7 @@ export default defineComponent({
     const viewSqlEditor = ref(false);
     const showMultiWindowDialog = ref(false);
 
-    // Field-level error refs (replaces Quasar :rules validation)
+    // Field-level error refs
     const triggerThresholdError = ref('');
     const conditionValueError = ref('');
     const checkEveryFrequencyError = ref('');

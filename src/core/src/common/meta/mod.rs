@@ -17,6 +17,7 @@ pub mod authz;
 pub mod grpc;
 pub mod http;
 pub mod ingestion;
+pub mod ingestion_routes;
 pub mod loki;
 pub mod maxmind;
 pub mod middleware_data;

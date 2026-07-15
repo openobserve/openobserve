@@ -65,10 +65,6 @@ const mockUseDashboardPanelData = {
   cleanupDraggingFields: vi.fn(),
 };
 
-const mockQuasar = {
-  notify: vi.fn(),
-};
-
 const mockShowErrorNotification = vi.fn();
 
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({

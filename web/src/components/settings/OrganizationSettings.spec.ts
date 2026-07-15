@@ -20,7 +20,7 @@ import i18n from "@/locales";
 import { nextTick, reactive } from "vue";
 import store from "@/test/unit/helpers/store";
 
-// Mock toast from @/lib/feedback/Toast/useToast (replaces Quasar $q.notify)
+// Mock toast from @/lib/feedback/Toast/useToast
 const { mockToast } = vi.hoisted(() => ({
   mockToast: vi.fn(),
 }));

@@ -44,19 +44,6 @@ vi.mock("vue-router", () => ({
   useRouter: () => mockRouter
 }));
 
-// Mock Quasar
-const mockQuasar = {
-  notify: vi.fn()
-};
-
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...(actual as any),
-    useQuasar: () => mockQuasar
-  };
-});
-
 // Mock window.open
 const mockWindowOpen = vi.fn();
 Object.defineProperty(window, 'open', {

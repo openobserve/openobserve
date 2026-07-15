@@ -109,8 +109,6 @@ const platform = {
   },
 };
 
-// Install Quasar with platform
-
 // ODrawer stub: mirrors props/events from the real component so tests can drive
 // open/close via v-model:open and the @close emit (q-dialog → ODrawer migration).
 // Props are exposed via `data-stub-*` to avoid colliding with the parent's
@@ -391,7 +389,7 @@ describe("ReportList Component", () => {
   });
 
   // The "Date Formatting" block that lived here called
-  // `wrapper.vm.convertUnixToQuasarFormat(...)` directly — asserting the shared
+  // `wrapper.vm.convertUnixToDateFormat(...)` directly — asserting the shared
   // util's null/undefined handling, which `date.spec.ts` owns, and which forced
   // the component to `defineExpose` a function purely so a test could reach it.
   // ReportList's own contribution — the `last_triggered_at` row mapping — is

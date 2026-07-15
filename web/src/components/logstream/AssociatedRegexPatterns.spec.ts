@@ -9,7 +9,7 @@ const mockToast = vi.hoisted(() => vi.fn());
 
 // Mock dependencies
 vi.mock('@/utils/zincutils', () => ({
-  convertUnixToQuasarFormat: vi.fn((timestamp: number) => `formatted-${timestamp}`),
+  convertUnixToDateFormat: vi.fn((timestamp: number) => `formatted-${timestamp}`),
   getImageURL: vi.fn((path: string) => `/mock/${path}`),
 }));
 

@@ -19,16 +19,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="internalOpen"
     @update:open="handleDrawerClose"
     :title="t('pipeline.streamTitle')"
-    size="md"
+    size="lg"
     :show-close="true"
     @keydown.stop
-    form-id="stream-node-form"
-    :primaryButtonLabel="!createNewStream ? t('alerts.save') : undefined"
-    :secondaryButtonLabel="!createNewStream ? t('alerts.cancel') : undefined"
+    :form-id="createNewStream ? 'add-stream-node-form' : 'stream-node-form'"
+    :primaryButtonLabel="t('alerts.save')"
+    :secondaryButtonLabel="t('alerts.cancel')"
     :neutralButtonLabel="!createNewStream && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
     neutralButtonVariant="outline-destructive"
     data-test="input-node-stream-drawer"
-    @click:secondary="openCancelDialog"
+    @click:secondary="handleSecondaryClick"
     @click:neutral="openDeleteDialog"
   >
     <div
@@ -428,6 +428,17 @@ const dialog = ref({
   okCallback: () => {},
 });
 
+// Footer Cancel handler. In "Create new Stream" mode, Cancel just returns to the
+// select-existing form (drawer stays open) — the same behavior AddStream's old
+// inline Cancel had via @close. Otherwise it opens the discard-changes dialog.
+const handleSecondaryClick = () => {
+  if (createNewStream.value) {
+    createNewStream.value = false;
+  } else {
+    openCancelDialog();
+  }
+};
+
 const openCancelDialog = () => {
   dialog.value.show = true;
   dialog.value.title = "Discard Changes";
@@ -493,6 +504,7 @@ defineExpose({
   updateStreams,
   handleCreateStreamName,
   getLogStream,
+  handleSecondaryClick,
   openCancelDialog,
   openDeleteDialog,
   deleteNode,

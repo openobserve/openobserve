@@ -34,9 +34,9 @@ export class PipelinesEP {
         this.destinationFunctionNameInput = '[data-test="pipeline-import-destination-function-name-input"]';
         this.destinationStreamTypeInput = '[data-test="pipeline-import-destination-stream-type-input"]';
         // Stream picker is OSelect (Reka Listbox) post-migration.
-        this.quasarMenuScroll = '[data-test$="-popover"], [role="listbox"]';
-        this.quasarMenuItem = '[data-test$="-option"]';
-        this.quasarVirtualScrollContent = '[data-test$="-popover"] [role="listitem"]';
+        this.menuScroll = '[data-test$="-popover"], [role="listbox"]';
+        this.menuItem = '[data-test$="-option"]';
+        this.virtualScrollContent = '[data-test$="-popover"] [role="listitem"]';
         // OToast: the message text lives in [data-test="o-toast-message"]; the toast <li> root
         // gets a dynamic id like [data-test="o-toast-1"]. The prefix selector [data-test^="o-toast-"]
         // matches both and causes strict mode violations — use the specific message selector.
@@ -200,8 +200,8 @@ export class PipelinesEP {
             // Click to open the dropdown and activate input mode
             await streamDropdown.click();
 
-            // Wait for dropdown menu to appear (Quasar renders dropdown in a portal)
-            const dropdownMenu = this.page.locator(this.quasarMenuScroll);
+            // Wait for dropdown menu to appear (dropdown renders in a portal)
+            const dropdownMenu = this.page.locator(this.menuScroll);
             await dropdownMenu.waitFor({ state: 'visible', timeout: 10000 });
 
             // Wait for options to load
@@ -216,7 +216,7 @@ export class PipelinesEP {
             await this.page.waitForTimeout(1000);
 
             // Look for the stream option in the dropdown
-            let streamOption = this.page.locator(this.quasarMenuItem).filter({ hasText: 'e2e_automate' }).first();
+            let streamOption = this.page.locator(this.menuItem).filter({ hasText: 'e2e_automate' }).first();
             let optionFound = await streamOption.isVisible().catch(() => false);
 
             // If not found with filter, clear and try scrolling
@@ -227,7 +227,7 @@ export class PipelinesEP {
                 await this.page.waitForTimeout(500);
 
                 // Scroll through virtual list to find the stream
-                const scrollContainer = this.page.locator(this.quasarVirtualScrollContent);
+                const scrollContainer = this.page.locator(this.virtualScrollContent);
                 const hasVirtualScroll = await scrollContainer.count() > 0;
 
                 if (hasVirtualScroll) {
@@ -327,7 +327,7 @@ export class PipelinesEP {
         await this.page.waitForTimeout(1000);
 
         // Wait for dropdown menu to be visible
-        const dropdownMenu = this.page.locator(this.quasarMenuScroll);
+        const dropdownMenu = this.page.locator(this.menuScroll);
         await dropdownMenu.waitFor({ state: 'visible', timeout: 5000 });
 
         // Scroll through the virtual scroll dropdown to find the option
@@ -363,7 +363,7 @@ export class PipelinesEP {
         await this.page.waitForTimeout(1000);
 
         // Wait for dropdown menu to be visible
-        const destinationDropdown = this.page.locator(this.quasarMenuScroll);
+        const destinationDropdown = this.page.locator(this.menuScroll);
         await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
 
         // Scroll through the virtual scroll dropdown to find the destination option

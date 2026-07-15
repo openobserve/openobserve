@@ -1225,7 +1225,7 @@ export class AlertTemplatesPage {
     }
 
     async expectValidationErrorVisible(message) {
-        // Quasar OInput shows error in .q-field__messages or .q-field__bottom
+        // OInput shows error in .q-field__messages or .q-field__bottom
         await expect(this.page.getByText(message)).toBeVisible({ timeout: 5000 });
     }
 

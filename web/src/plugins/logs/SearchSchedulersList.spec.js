@@ -74,9 +74,7 @@ vi.mock('vue-i18n', async (importOriginal) => {
 describe("SearchSchedulersList Component", () => {
   let wrapper;
   let mockStore;
-  let notifyMock;
   let routerPushMock;
-  let dialogMock;
 
   beforeEach(() => {
     // Setup mock store
@@ -95,22 +93,6 @@ describe("SearchSchedulersList Component", () => {
         timezone: "UTC",
         theme: 'light'
       }
-    };
-
-    // Setup notify mock
-    notifyMock = vi.fn();
-    dialogMock = {
-      create: vi.fn().mockReturnValue({
-        onOk: vi.fn(callback => {
-          callback();
-          return { onCancel: vi.fn() };
-        }),
-        onCancel: vi.fn()
-      })
-    };
-    const $q = {
-      notify: notifyMock,
-      dialog: dialogMock
     };
 
     // Setup router mock
@@ -156,7 +138,6 @@ describe("SearchSchedulersList Component", () => {
           NoData: true
         },
         mocks: {
-          $q,
           $router: { push: routerPushMock }
         }
       },
@@ -171,7 +152,7 @@ describe("SearchSchedulersList Component", () => {
       formatted: "1 second",
       raw: 1.0
     }));
-    wrapper.vm.convertUnixToQuasarFormat = vi.fn(timestamp => {
+    wrapper.vm.convertUnixToDateFormat = vi.fn(timestamp => {
       const date = new Date(timestamp);
       return date.toISOString().slice(0, 19) + "+00:00";
     });
@@ -363,8 +344,8 @@ describe("SearchSchedulersList Component", () => {
       expect(raw).toBeGreaterThan(0);
     });
 
-    it("converts unix timestamp to quasar format", () => {
-      const result = wrapper.vm.convertUnixToQuasarFormat(1000000000000);
+    it("converts unix timestamp to date format", () => {
+      const result = wrapper.vm.convertUnixToDateFormat(1000000000000);
       expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
     });
   });

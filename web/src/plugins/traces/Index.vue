@@ -659,7 +659,7 @@ function getConsumableDateTime() {
     if (searchObj.data.datetime.tab == "relative") {
       let period = "";
       let periodValue = 0;
-      // quasar does not support arithmetic on weeks. convert to days.
+      // arithmetic on weeks is not supported; convert to days.
 
       if (
         searchObj.data.datetime.relative.period.label.toLowerCase() == "weeks"
