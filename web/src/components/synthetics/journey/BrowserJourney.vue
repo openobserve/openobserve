@@ -14,6 +14,7 @@ import OBadge from '@/lib/core/Badge/OBadge.vue'
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue'
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { toast } from '@/lib/feedback/Toast/useToast'
 import JourneySteps from './JourneySteps.vue'
 import {
   ACTION_LABELS,
@@ -172,33 +173,61 @@ watch([selectedCount, isRecording], ([count, recording]) => {
   emit('selection-changed', { count, isRecording: recording })
 })
 
-// ── Step selector validation ──────────────────────────────────────────────
+// ── Step validation (Continue button + save) ──────────────────────────────
 const selectorErrors = ref<Set<string>>(new Set())
+const firstStepError = ref(false)
 
-function validateStepSelectors(): boolean {
-  const errors = new Set<string>()
+function validateJourneySteps(): boolean {
+  // 1. First step must be "navigate"
+  const first = props.modelValue[0]
+  firstStepError.value = first ? first.action !== 'navigate' : false
+
+  // 2. Selector-requiring steps must have a selector
+  const selErrs = new Set<string>()
   for (const step of props.modelValue) {
     if (
       SELECTOR_ACTIONS_CONST.includes(step.action as any) &&
       (!step.selector || step.selector.trim() === '')
     ) {
-      errors.add(step.id)
+      selErrs.add(step.id)
     }
   }
-  selectorErrors.value = errors
+  selectorErrors.value = selErrs
+
   // Auto-expand errored steps so the inline error is visible
-  if (errors.size > 0) {
+  const erroredIds = [...selErrs]
+  if (firstStepError.value && first) erroredIds.push(first.id)
+  if (erroredIds.length > 0) {
     expandedStepIds.value = [
-      ...new Set([...expandedStepIds.value, ...errors]),
+      ...new Set([...expandedStepIds.value, ...erroredIds]),
     ]
   }
-  return errors.size === 0
+
+  const valid = !firstStepError.value && selErrs.size === 0
+  if (!valid) {
+    // Surface the first error as a toast so the user knows why
+    // navigation was blocked, then expand the step to see inline details.
+    const firstErrId = erroredIds[0]
+    const stepIdx = props.modelValue.findIndex((s) => s.id === firstErrId)
+    const stepLabel = props.modelValue[stepIdx]?.name || `Step ${(stepIdx ?? 0) + 1}`
+    if (firstStepError.value && (!first || first.id === firstErrId)) {
+      toast({ variant: 'error', message: t('synthetics.validation.firstStepMustNavigate') })
+    } else {
+      toast({ variant: 'error', message: t('synthetics.validation.selectorRequired', { step: stepLabel }) })
+    }
+  }
+
+  return valid
 }
 
 function clearSelectorError(stepId: string) {
   const next = new Set(selectorErrors.value)
   next.delete(stepId)
   selectorErrors.value = next
+}
+
+function clearFirstStepError() {
+  firstStepError.value = false
 }
 
 // Expose selection state + validation for the parent's sticky footer
@@ -208,7 +237,7 @@ defineExpose({
   deleteSelectedSteps,
   stopActiveRecording,
   stopActiveReplay,
-  validateStepSelectors,
+  validateStepSelectors: validateJourneySteps,
 })
 
 function startRecording() {
@@ -361,6 +390,15 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
 // ── Dot state wrapper for JourneySteps ────────────────────────────────────
 function dotStateForRow(row: BrowserStep): StepDotState | undefined {
   return stepDotState(row.id)
+}
+
+// ── Row status color: red left border for rows with validation errors ──────
+function getRowStatusColor(row: BrowserStep): string | undefined {
+  const first = props.modelValue[0]
+  const hasFirstStepErr = firstStepError.value && first?.id === row.id
+  const hasSelectorErr = selectorErrors.value.has(row.id)
+  if (hasFirstStepErr || hasSelectorErr) return 'var(--color-status-error-text)'
+  return undefined
 }
 
 // ── Inline editor helpers ──────────────────────────────────────────────────
@@ -702,6 +740,7 @@ function openChromeExtensions() {
       :selection-enabled="multiSelectEnabled"
       :selected-ids="selectedStepIds"
       :expanded-ids="expandedStepIds"
+      :get-row-status-color="getRowStatusColor"
       @update:data="handleRowReorder"
       @update:selected-ids="handleUpdateSelected"
       @update:expanded-ids="handleUpdateExpanded"
@@ -721,8 +760,10 @@ function openChromeExtensions() {
               label="Action"
               :options="actionOptions"
               class="w-50! shrink-0"
+              :error="firstStepError && props.modelValue[0]?.id === row.id"
+              :error-message="firstStepError && props.modelValue[0]?.id === row.id ? t('synthetics.validation.firstStepMustNavigate') : ''"
               data-test="synthetics-journey-step-action-select"
-              @update:model-value="(v: any) => handleStepUpdate(row, { action: v as any })"
+              @update:model-value="(v: any) => { handleStepUpdate(row, { action: v as any }); clearFirstStepError() }"
             />
             <OInput
               :model-value="row.name ?? ''"

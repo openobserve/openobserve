@@ -74,6 +74,16 @@ export const makeBrowserCheckSaveSchema = (t: (_key: string) => string) =>
       .default([]),
   })
   .superRefine((val, ctx) => {
+    // First step must be "navigate"
+    const first = val.journey[0];
+    if (first && first.action !== "navigate") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["journey", 0, "action"],
+        message: t("synthetics.validation.firstStepMustNavigate"),
+      });
+    }
+
     // Validate selectors on steps that require them
     const SELECTOR_ACTIONS = ["click", "type", "select", "hover", "assert"] as const;
     for (let i = 0; i < val.journey.length; i++) {

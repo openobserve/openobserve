@@ -64,6 +64,8 @@ const props = withDefaults(
     getReplayResult?: (row: TData) =>
       | { passed: boolean; durationMs: number; error?: string; structuredError?: any }
       | undefined;
+    /** Returns a CSS color for the 4px left status bar per row (e.g. validation errors). */
+    getRowStatusColor?: (row: TData) => string | undefined;
   }>(),
   {
     actionKey: "action",
@@ -196,6 +198,7 @@ function handleUpdateExpanded(ids: string[]) {
     :default-columns="false"
     :fill-height="false"
     :expand-on-row-click="true"
+    :get-row-status-color="getRowStatusColor"
     @row-reorder="handleRowReorder"
     @update:selected-ids="handleUpdateSelected"
     @update:expanded-ids="handleUpdateExpanded"

@@ -6280,7 +6280,8 @@
       "urlRequired": "Starting URL is required",
       "urlInvalid": "Enter a valid URL starting with http:// or https://",
       "locationsRequired": "Select at least one location",
-      "selectorRequired": "Selector is required for \"{step}\""
+      "selectorRequired": "Selector is required for \"{step}\"",
+      "firstStepMustNavigate": "First step must be \"Navigate\""
     },
     "results": {
       "title": "Monitor Results",

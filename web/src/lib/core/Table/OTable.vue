@@ -306,7 +306,7 @@ const selection = useTableSelection(table, {
 const expansion = useTableExpansion<TData>(
   {
     expansion: props.expansion,
-    expandedIds: props.expandedIds,
+    expandedIds: () => props.expandedIds,
     rowKey: props.rowKey,
     getSubRows: props.getSubRows,
   },
