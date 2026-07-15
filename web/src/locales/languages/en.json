@@ -6354,9 +6354,10 @@
       }
     },
     "protocolRun": {
-      "up": "Up",
-      "down": "Down",
-      "degraded": "Degraded",
+      "passed": "Passed",
+      "failed": "Failed",
+      "warning": "Warning",
+      "error": "Error",
       "notFound": "Run not found",
       "result": "Result",
       "status": "Status",

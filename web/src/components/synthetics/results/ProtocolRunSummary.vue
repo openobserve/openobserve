@@ -76,15 +76,19 @@ watch(
   { immediate: true },
 )
 
-// ── Status display ──────────────────────────────────────────────────────────
+// ── Status display ───────────────────────────────────────────────────────────
+// Canonical vocabulary shared with the browser probe and control plane
+// (config::meta::synthetics::SyntheticStatus): passed|warning|failed|error.
 const statusMeta = computed(() => {
   switch (run.value?.status) {
-    case 'up':
-      return { variant: 'success' as const, icon: 'check-circle', label: t('synthetics.protocolRun.up') }
-    case 'degraded':
-      return { variant: 'warning' as const, icon: 'error', label: t('synthetics.protocolRun.degraded') }
+    case 'passed':
+      return { variant: 'success' as const, icon: 'check-circle', label: t('synthetics.protocolRun.passed') }
+    case 'warning':
+      return { variant: 'warning' as const, icon: 'error', label: t('synthetics.protocolRun.warning') }
+    case 'error':
+      return { variant: 'error-soft' as const, icon: 'error', label: t('synthetics.protocolRun.error') }
     default:
-      return { variant: 'error' as const, icon: 'cancel', label: t('synthetics.protocolRun.down') }
+      return { variant: 'error' as const, icon: 'cancel', label: t('synthetics.protocolRun.failed') }
   }
 })
 
