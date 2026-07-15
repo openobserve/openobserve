@@ -378,13 +378,21 @@ function intervalSeconds(interval: string): number {
 const F = SYNTHETIC_FIELDS;
 const TABLE = `"${SYNTHETIC_RESULTS_STREAM}"`;
 
-export function buildKpiSql(monitorId: string): string {
+export function buildKpiSql(
+  monitorId: string,
+  /** Whether the stream schema includes the `attempts` field. When false
+   * (e.g. on instances where the probe doesn't write this field), the
+   * retried_runs clause is omitted to avoid a schema-mismatch error. */
+  hasAttemptsField = false,
+): string {
   const id = escapeSqlLiteral(monitorId);
+  const retriedClause = hasAttemptsField
+    ? `\n  COUNT(*) FILTER (WHERE attempts > 1) as retried_runs,`
+    : "";
   return `SELECT
   COUNT(*) as total_runs,
   COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.passed}') as passed_runs,
-  COUNT(*) FILTER (WHERE ${F.status} != '${STATUS_VALUES.passed}') as failed_runs,
-  COUNT(*) FILTER (WHERE attempt > 1) as retried_runs,
+  COUNT(*) FILTER (WHERE ${F.status} != '${STATUS_VALUES.passed}') as failed_runs,${retriedClause}
   COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration
 FROM ${TABLE}
 WHERE ${F.monitorId} = '${id}'`;

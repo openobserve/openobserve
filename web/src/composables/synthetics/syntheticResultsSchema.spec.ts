@@ -44,6 +44,18 @@ describe("syntheticResultsSchema query builders", () => {
     expect(sql).toContain(`approx_percentile_cont(${SYNTHETIC_FIELDS.duration}, 0.95)`);
   });
 
+  it("should include retried_runs clause when attempts field exists in schema", () => {
+    const sql = buildKpiSql("mon-1", true);
+    expect(sql).toContain("WHERE attempts > 1");
+    expect(sql).toContain("retried_runs");
+  });
+
+  it("should omit retried_runs clause when attempts field is absent from schema", () => {
+    const sql = buildKpiSql("mon-1", false);
+    expect(sql).not.toContain("attempts");
+    expect(sql).not.toContain("retried_runs");
+  });
+
   it("should order the last-run query by timestamp descending with limit 1", () => {
     const sql = buildLastRunSql("mon-1");
     expect(sql).toContain(`ORDER BY ${SYNTHETIC_FIELDS.timestamp} DESC`);

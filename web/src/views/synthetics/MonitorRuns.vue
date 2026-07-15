@@ -1217,6 +1217,7 @@ const kpiError = computed(() => synthetics.kpiError.value);
 const histogramError = computed(() => synthetics.histogramError.value);
 const runsError = computed(() => synthetics.runsError.value);
 const stepsError = computed(() => synthetics.stepsError.value);
+const effectiveP95Ms = computed(() => synthetics.effectiveP95Ms.value);
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 function fmtDur(ms: number): string {
@@ -1423,11 +1424,11 @@ const totalFails = computed(
 const hasKpiData = computed(() => synthetics.kpi.value.totalRuns > 0);
 
 const p95Label = computed(() =>
-  hasKpiData.value && synthetics.kpi.value.p95Ms > 0
-    ? fmtDur(synthetics.kpi.value.p95Ms)
-    : fmtDur(0),
+  effectiveP95Ms.value > 0
+    ? fmtDur(effectiveP95Ms.value)
+    : hasKpiData.value ? fmtDur(0) : "—",
 );
-const p95Ms = computed(() => synthetics.kpi.value.p95Ms);
+const p95Ms = computed(() => effectiveP95Ms.value);
 const failCount = computed(() => String(synthetics.kpi.value.failedRuns));
 
 interface KpiCard {
@@ -1439,7 +1440,6 @@ interface KpiCard {
 }
 const kpiCards = computed<KpiCard[]>(() => {
   const k = synthetics.kpi.value;
-  console.log("Data ---", hasKpiData.value);
   if (hasKpiData.value) {
     return [
       {
@@ -1463,7 +1463,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       {
         key: "p95-duration",
         label: "p95 Duration",
-        value: k.p95Ms > 0 ? fmtDur(k.p95Ms) : "—",
+        value: effectiveP95Ms.value > 0 ? fmtDur(effectiveP95Ms.value) : "—",
       },
       {
         key: "retry-rate",

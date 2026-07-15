@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import {
@@ -28,6 +28,7 @@ import {
   mapKpi,
   mapRun,
   mapRunDetail,
+  SYNTHETIC_RESULTS_STREAM,
   type StepStatsResult,
   type SyntheticBucket,
   type SyntheticKpi,
@@ -35,6 +36,7 @@ import {
   type SyntheticRunDetail,
 } from "@/composables/synthetics/syntheticResultsSchema";
 import syntheticsService from "@/services/synthetics";
+import useStreams from "@/composables/useStreams";
 
 const EMPTY_KPI: SyntheticKpi = {
   uptimePct: 0,
@@ -52,6 +54,7 @@ const EMPTY_KPI: SyntheticKpi = {
  */
 export function useSyntheticResults() {
   const store = useStore();
+  const { getStream } = useStreams();
   const { executeQuery, cancelAll } = useLLMStreamQuery();
 
   const kpi = ref<SyntheticKpi>({ ...EMPTY_KPI });
@@ -89,6 +92,23 @@ export function useSyntheticResults() {
     flakySteps: [],
     trendBuckets: [],
     failureInstances: [],
+  });
+
+  // ── Effective p95 — falls back to client-side computation from runs ──────
+  //
+  // The SQL approx_percentile_cont may return 0 when the DataFusion fork
+  // can't infer the field type. When that happens and runs data is available,
+  // compute p95 from the in-memory run durations.
+  const effectiveP95Ms = computed(() => {
+    const sqlP95 = kpi.value.p95Ms;
+    if (sqlP95 > 0) return sqlP95;
+    const durations = runs.value
+      .map((r) => r.durationMs)
+      .filter((d) => d > 0)
+      .sort((a, b) => a - b);
+    if (durations.length === 0) return 0;
+    const idx = Math.ceil(durations.length * 0.95) - 1;
+    return durations[Math.max(0, Math.min(idx, durations.length - 1))];
   });
 
   // ── Steps: fetch via REST /runs API ────────────────────────────────────
@@ -175,11 +195,24 @@ export function useSyntheticResults() {
     try {
       const interval = bucketInterval(endTime - startTime);
 
+      // Check stream schema to conditionally include the retried_runs
+      // clause. The "attempts" field may not exist on all instances.
+      let hasAttemptsField = false;
+      try {
+        const stream: any = await getStream(
+          SYNTHETIC_RESULTS_STREAM, "logs", true,
+        );
+        const schema: { name: string }[] = stream?.schema ?? [];
+        hasAttemptsField = schema.some((f) => f.name === "attempts");
+      } catch {
+        // Schema not available — omit the attempts clause, which is safe.
+      }
+
       // Group 1: KPI + last-run — both feed KPI cards. Resolves
       // independently so the KPI section renders as soon as these
       // fast queries complete, without waiting for the runs list.
       const kpiPromise = Promise.all([
-        executeQuery(buildKpiSql(monitorId), startTime, endTime, "logs"),
+        executeQuery(buildKpiSql(monitorId, hasAttemptsField), startTime, endTime, "logs"),
         executeQuery(buildLastRunSql(monitorId), startTime, endTime, "logs"),
       ]).then(([kpiRows, lastRunRows]) => {
         kpi.value = mapKpi(kpiRows[0] ?? null, lastRunRows[0] ?? null);
@@ -312,6 +345,7 @@ export function useSyntheticResults() {
     histogramError,
     runsError,
     stepsError,
+    effectiveP95Ms,
     fetchAll,
     fetchRun,
     fetchSteps,
