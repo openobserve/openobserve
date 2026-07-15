@@ -25,7 +25,8 @@
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
     "lint:ci": "eslint \"src/**/*.vue\" --no-fix",
     "lint:styles": "stylelint \"src/**/*.{css,vue}\"",
-    "lint:tokens": "node scripts/check-css-tokens.mjs"
+    "lint:tokens": "node scripts/check-css-tokens.mjs",
+    "lint:design": "node scripts/check-design-consistency.mjs"
   },
   "dependencies": {
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",

@@ -24,8 +24,18 @@ const EXTS = new Set([".css", ".vue", ".ts"]);
 // runtime via Vue `:style` (OTable tree indents, row status, row height) must be
 // renamed off the `--o2-` namespace. If you find a `--o2-*` here, delete it and
 // fix the usage — never re-exempt it.
-const ALLOW_PREFIXES = [/^--reka-/, /^--tw-/, /^--vf-/, /^--q-/];
+const ALLOW_PREFIXES = [/^--reka-/, /^--tw-/, /^--vf-/];
+// The ONLY real Quasar-injected custom properties (set by Quasar's runtime).
+// The `--q-` prefix is deliberately NOT allowlisted — 18 invented pseudo-Quasar
+// tokens (`--q-text-secondary`, `--q-primary-rgb`, `--q-background`, …) used to
+// hide behind the prefix allowlist and render as *undefined* at runtime
+// (O2_TOKEN_MIGRATION_PLAN §3.F). Only these exact names are legitimate.
+const QUASAR_REAL = [
+  "--q-primary", "--q-secondary", "--q-accent", "--q-positive", "--q-negative",
+  "--q-info", "--q-warning", "--q-dark", "--q-dark-page", "--q-transition-duration",
+];
 const ALLOW_EXACT = new Set([
+  ...QUASAR_REAL,
   // Non-o2 custom properties set per-element at runtime via Vue `:style`
   // bindings — dynamic values with no static `--x:` definition.
   "--node-color", // plugins/pipelines/CustomNode.vue  :style={ '--node-color': ... }

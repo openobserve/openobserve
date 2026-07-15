@@ -94,6 +94,24 @@ export default [
     },
     rules: {
       "local/no-legacy-o2-tokens": ["error"],
+
+      // Dark-mode schema (O2_TOKEN_MIGRATION_PLAN §3.R.3) — warn now, error at Phase G.
+      // The two sanctioned seams (useTheme.ts / chartTheme.ts) turn this off below.
+      "no-restricted-syntax": [
+        "warn",
+        {
+          selector:
+            "BinaryExpression[operator=/^[!=]==?$/] > MemberExpression[property.name='theme']",
+          message:
+            "Dark mode has one JS seam: useTheme().isDark or chartColor(). Do not compare store.state.theme (§3.R).",
+        },
+        {
+          selector: "VariableDeclarator[id.name=/^(isDark|isDarkMode|darkMode)$/]",
+          message: "Import useTheme() instead of a private isDark flag (§3.R).",
+        },
+      ],
+      // Every <style> block must be scoped (§3.H) — warn now, error at Phase F.
+      "vue/enforce-style-attribute": ["warn", { allow: ["scoped", "module"] }],
       // Disable noisy rules inherited from recommended configs
       "prettier/prettier": "off",
       "no-unused-vars": "off",
@@ -404,6 +422,14 @@ export default [
           message: 'Use <OOptionGroup> from "@/lib/forms/OptionGroup/OOptionGroup.vue" instead of <q-option-group>. For form-bound fields use <OFormOptionGroup>.',
         },
       ],
+    },
+  },
+  {
+    // The two sanctioned dark-mode seams (§3.R.1) — the only files allowed to
+    // compare store.state.theme / declare an isDark flag.
+    files: ["src/composables/useTheme.ts", "src/utils/chartTheme.ts"],
+    rules: {
+      "no-restricted-syntax": "off",
     },
   },
   {

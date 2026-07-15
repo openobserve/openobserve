@@ -546,7 +546,6 @@
 .dark :root,
 .dark {
   --q-primary: var(--color-theme-accent);
-  --tw-border-style: #e5e7eb;
 }
 
 /* ToggleGroup — primary variant dark overrides */
@@ -638,7 +637,32 @@
   --color-trace-text-primary: #F0F1F2;
   --color-trace-text-secondary: #B4B8BF;
   --color-warning: #F2C55C;
+  --color-wildcard-bar-blue: #7BA0F5;
   --color-wildcard-bar-green: #5FAD65;
   --color-wildcard-bar-orange: #DB5C5C;
   --color-wildcard-bar-purple: #955AE0;
+
+  /* Field-type chips — dark treatment mirrors the label-chip families by hue
+     (darken pastel bg toward surface, lighten text 1–2 steps). §3.K.2 */
+  --color-field-type-boolean-bg: #5E3838;   /* red family (cf. method chip) */
+  --color-field-type-boolean-text: #F2B1AA;
+  --color-field-type-float-bg: #2F2936;      /* purple family (cf. ts chip) */
+  --color-field-type-float-text: #A571E6;
+  --color-field-type-number-bg: #3D3223;     /* amber family (cf. hex chip) */
+  --color-field-type-number-text: #F7DE8B;
+  --color-field-type-string-bg: #253627;     /* green family (cf. ip chip) */
+  --color-field-type-string-text: #89CC8E;
+  --color-field-type-timestamp-bg: #22264A;  /* blue family (cf. url chip) */
+  --color-field-type-timestamp-text: #A1AFFF;
+
+  /* Service-health — lightened ~1 step for dark-surface contrast (like severity-*). §3.K.2 */
+  --color-service-health-critical: #FF5A5A;
+  --color-service-health-degraded: #FFC53D;
+  --color-service-health-healthy: #73D13D;
+  --color-service-health-warning: #FFA940;
+
+  /* Misc dark overrides. §3.K.2 */
+  --color-cancel-query-bg: #7A3838;
+  --color-highlight-bg: #747474;
+  --color-icon-color: #5e5e5e;   /* merged: single icon token with a dark override */
 }

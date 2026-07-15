@@ -107,14 +107,24 @@
   --color-primary-700: var(--color-primary-700);
   --color-primary-800: var(--color-primary-800);
   --color-primary-900: var(--color-primary-900);
+  --color-primary-950: var(--color-primary-950);
 
   /* Error / Danger (re-exports from base.css) */
   --color-error-50:  var(--color-error-50);
   --color-error-100: var(--color-error-100);
+  --color-error-300: var(--color-error-300);
   --color-error-400: var(--color-error-400);
   --color-error-500: var(--color-error-500);
   --color-error-600: var(--color-error-600);
   --color-error-700: var(--color-error-700);
+
+  /* Success (re-exports from base.css) — registered so text-success-* / bg-success-* compile */
+  --color-success-50:  var(--color-success-50);
+  --color-success-100: var(--color-success-100);
+  --color-success-400: var(--color-success-400);
+  --color-success-500: var(--color-success-500);
+  --color-success-600: var(--color-success-600);
+  --color-success-700: var(--color-success-700);
 
   /* Warning (re-exports from base.css) */
   --color-warning-50:  var(--color-warning-50);
@@ -208,7 +218,6 @@
 /* ── Quasar / Tailwind compat vars (light) ── */
 :root {
   --q-primary: var(--color-theme-accent);
-  --tw-border-style: #e5e7eb;
 }
 
 /* ── Legacy aliases (_legacy-variables.scss) ── */
@@ -222,6 +231,8 @@
   --color-bg-gray: color-mix(in srgb, var(--color-theme-accent) 10%, rgb(237, 237, 237));
   --color-card-glass-border: rgba(0, 0, 0, 0.12);
   --color-cancel-query-bg: #f67a7a;
+  --color-highlight-bg: #e7e6e6;   /* syntax-guide highlight chip (dark: #747474) */
+  --color-brand-indigo: #5960B2;   /* brand indigo — loading bar, AI accents (theme-independent) */
   --color-card-glass-bg: rgba(255, 255, 255, 0.8);
   --color-card-glass-solid: rgba(255, 255, 255);
   --color-dashboard-placeholder-bg: #B3BDF1;
@@ -242,7 +253,6 @@
   --color-hover-gray: color-mix(in srgb, var(--color-theme-accent) 2%, rgb(244, 244, 244));
   --color-hover-shadow: #dddddd;
   --color-icon-color: #808080;
-  --color-icon-color-dark: #5e5e5e;
   --color-info: #4682FA;
   --color-json-boolean: #6D28D9;
   --color-json-key: #B71C1C;

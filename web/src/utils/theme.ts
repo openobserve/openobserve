@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { invalidateChartTheme } from "@/utils/chartTheme";
+
 /**
  * Helper function to convert hex color to rgba
  * @param hex - Hex color code (e.g., "#3F7994")
@@ -284,6 +286,9 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
       document.body.style.removeProperty(t);
     });
   }
+
+  // Invalidate the resolved-token cache so charts read fresh values on theme change.
+  invalidateChartTheme();
 
   // Dispatch event to notify components (like SearchResult) to re-render
   window.dispatchEvent(new CustomEvent('themeColorChanged'));

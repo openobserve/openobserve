@@ -3623,7 +3623,7 @@ button.date-time-button {
   max-height: 20vh;
   overflow-y: auto;
   overflow-x: hidden;
-  background: var(--q-color-dark, #1e1e2e);
+  background: var(--color-surface-base);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
@@ -3835,14 +3835,7 @@ button.date-time-button {
 .bg-highlight {
   padding-left: 5px;
   padding-right: 5px;
-}
-
-.theme-dark .bg-highlight {
-  background-color: #747474;
-}
-
-.theme-light .bg-highlight {
-  background-color: #e7e6e6;
+  background-color: var(--color-highlight-bg);
 }
 
 /* --- tenstack-table.scss --- */
@@ -4276,7 +4269,6 @@ button.date-time-button {
   --color-gray: var(--color-gray);
   --color-hover-gray: var(--color-hover-gray);
   --color-icon-color: var(--color-icon-color);
-  --color-icon-color-dark: var(--color-icon-color-dark);
   /* TODO(tier-integrity): indigo-700 / purple-700 are BASE primitives, exposed
      here only because a few decorative/categorical badges (eval data-type chips,
      the indigo-themed RCA panel) consume them directly. They need proper
@@ -4316,4 +4308,42 @@ button.date-time-button {
   --color-wildcard-bar-green: var(--color-wildcard-bar-green);
   --color-wildcard-bar-orange: var(--color-wildcard-bar-orange);
   --color-wildcard-bar-purple: var(--color-wildcard-bar-purple);
+
+  /* ── Phase A registrations (O2_TOKEN_MIGRATION_PLAN §3.K.3) ── */
+  /* JSON syntax colors (json-key was already registered — complete the family) */
+  --color-json-boolean: var(--color-json-boolean);
+  --color-json-null: var(--color-json-null);
+  --color-json-number: var(--color-json-number);
+  --color-json-object: var(--color-json-object);
+  --color-json-string: var(--color-json-string);
+  /* Trace surface palette */
+  --color-trace-border: var(--color-trace-border);
+  --color-trace-hover: var(--color-trace-hover);
+  --color-trace-selected: var(--color-trace-selected);
+  --color-trace-surface: var(--color-trace-surface);
+  --color-trace-text-primary: var(--color-trace-text-primary);
+  --color-trace-text-secondary: var(--color-trace-text-secondary);
+  /* Field-type chips */
+  --color-field-type-boolean-bg: var(--color-field-type-boolean-bg);
+  --color-field-type-boolean-text: var(--color-field-type-boolean-text);
+  --color-field-type-float-bg: var(--color-field-type-float-bg);
+  --color-field-type-float-text: var(--color-field-type-float-text);
+  --color-field-type-number-bg: var(--color-field-type-number-bg);
+  --color-field-type-number-text: var(--color-field-type-number-text);
+  --color-field-type-string-bg: var(--color-field-type-string-bg);
+  --color-field-type-string-text: var(--color-field-type-string-text);
+  --color-field-type-timestamp-bg: var(--color-field-type-timestamp-bg);
+  --color-field-type-timestamp-text: var(--color-field-type-timestamp-text);
+  /* Misc previously-unregistered semantic tokens */
+  --color-focus-ring: var(--color-focus-ring);
+  --color-text-soft: var(--color-text-soft);
+  --color-log-table-header-bg: var(--color-log-table-header-bg);
+  --color-log-table-row-hover: var(--color-log-table-row-hover);
+  --color-table-actions-bg: var(--color-table-actions-bg);
+  /* Type-scale utilities (§3.J) — text-2xs (11px) / text-compact (13px) */
+  --text-2xs: var(--text-2xs);
+  --text-compact: var(--text-compact);
+  /* Domain tokens (§3.K.4) */
+  --color-highlight-bg: var(--color-highlight-bg);
+  --color-brand-indigo: var(--color-brand-indigo);
 }

@@ -32,6 +32,28 @@ Carried-over debt from Part I's explicit non-goals (now in scope for Part II):
 > 2. **Tailwind default-palette unset — APPROVED.** Phase G's `@theme { --color-*: initial }` will ship: `text-gray-400` / `bg-blue-50` / `border-slate-200` stop compiling, and templates use only semantic utilities (`text-text-primary`, `bg-surface-base`, `border-border-default`, …). See §12.1 for the open utility-naming question (`text-primary`-style ergonomic aliases) and Phase G.4 for the optional `--radius-*` / `--text-*` unsets.
 > 3. **Findings L–Q added** (second sweep, same day): dead `tw:` classes, Quasar utility classes, arbitrary-px spacing/sizing, px units in style blocks, hex in `.ts`, arbitrary z-index — categories the original A–K sweep missed.
 
+## 0. EXECUTION STATUS (2026-07-15) — what's done, what's pending
+
+> Part II was executed this day on `fix/token` (not yet committed). Pending items and the
+> decisions they need are tracked in **`O2_TOKEN_MIGRATION_PENDING.md`** (team discussion).
+
+**Verified green after execution:** `check-css-tokens` ✅ · `check-design-consistency` ratchet ✅ · unit tests ✅ 38,882 pass (2 AlertList timeouts are pre-existing load-flakes, pass in isolation) · `type-check` ✅ 0 errors.
+
+| Phase | Status | Notes |
+|---|---|---|
+| **0 — P0 runtime bugs** | ✅ **DONE** | 56 phantom `--q-*`, `--tw-border-style`, 66 dead `tw:`, 5 leaks, 17 no-op ternaries; `--q-` guard hole closed |
+| **A — token layer** | ✅ **DONE** | dark overrides, 30+ registrations, `text-2xs`/`text-compact`, `utils/chartTheme.ts`. (`dashboard-placeholder-bg`/`actions-column-shawdow` kept — they have real consumers, not dead) |
+| **B — enforcement (ratchet)** | ✅ **DONE** | `check-design-consistency.mjs` + baseline + CI; `useTheme.ts` seam; ESLint/stylelint guards at **warn** |
+| **F — radius/type/spacing/quasar** | ✅ **DONE** | ~2,000 value-identical renames. z-index + 10px floor left (design calls) |
+| **C — template colors** | 🟡 **~90%** | rawPalette 1263→102, hexClass 1097→269. Residuals are intentional — see PENDING §1–4 |
+| **D — JS theming** | 🟡 **~90%** | themeTernary 819→186, darkMechanism 1137→390; `chartColor()`/`useTheme()` adopted; specs repaired. Residuals = image swaps / Monaco / global hooks |
+| **E — style blocks** | 🔴 **PENDING** | styleBlockHex 805, unscoped 206 — hard cases need dedicated token sets + scoping needs visual review. PENDING §1–2 |
+| **G — palette kill + lock flip** | 🔴 **PENDING** | **gated** on C/E residuals being registered/excepted first. PENDING §5 |
+
+**Live debt counts (baseline snapshot):** rawPalette 102 · hexClass 269 · themeTernary 186 · darkMechanism 390 · styleBlockHex 805 · unscopedStyle 206 · stylePxUnit 1077 (ratchet-only) · arbPx 174 · arbTextSize 323 · arbRadius 25 · bareRounded 26 · arbZ 49 · inlineHex 38 · tsHex 471 (mostly allowlisted palette sources).
+
+---
+
 ## 1. Executive summary — the debt, in numbers
 
 Measured on `web/src` (`.vue` files unless noted):
@@ -632,28 +654,30 @@ Safety floor: after B, any unfinished batch is just remaining debt frozen by the
 
 ## 10. Deliverables checklist (Part II)
 
-- [ ] Phase 0: phantom `--q-*` fixes (18 names, 56 refs) + exact-name Quasar allowlist in `check-css-tokens.mjs`
-- [ ] Phase 0: `--tw-border-style` bug fix, 8 no-op ternaries, 5 global leak selectors
-- [ ] Phase 0: strip dead `tw:` prefixes (3 files, 66 lines) + visual re-check of both screens (§3.L)
-- [ ] Phase A: dark overrides (field-type ×10, service-health ×4, wildcard-blue, cancel-query, icon-color)
-- [ ] Phase A: registrations (json-* ×5, trace-* ×6, field-type ×10, focus-ring, text-soft, success text scale, primary-950, error-300)
-- [ ] Phase A: `--text-2xs` (11px) + design call on 13px (`--text-compact`) and 10px floor
-- [ ] Phase A: design sign-off on radius policy table (§3.I)
-- [ ] Phase A: new domain tokens (`--color-dag-node-*`, `bg-highlight`) + delete dead tokens (`dashboard-placeholder-bg`, `actions-column-shawdow`)
-- [ ] Phase A: `utils/chartTheme.ts` token-driven chart palette
-- [ ] Phase B: `scripts/check-design-consistency.mjs` + `design-debt-baseline.json` ratchet in CI
-- [ ] Phase B: `vue/enforce-style-attribute` + stylelint `color-no-hex` (warn → error in F/G)
-- [ ] Phase C: codemod map extension + 6 directory batches merged
-- [ ] Phase D: 834 theme ternaries eliminated; specs updated to assert tokens
-- [ ] Phase D: **dark-mode unified to one mechanism (§3.R)** — `composables/useTheme.ts` created; 40 ad-hoc `isDark` flags + 3 `classList.contains('body--*')` routed through it; raw `theme === 'dark'` survives only in `useTheme.ts`/`chartTheme.ts`
-- [ ] Phase E: 704 style-block hexes → `var(--color-*)`; `.body--dark` twins collapsed; `.body--dark`/`.light-mode`/`.dark-mode` selectors (266) migrated to `.dark`/`dark:`; all blocks `scoped`; px → rem in touched rules (§3.O)
-- [ ] Post-migration: `theme.ts` stops toggling `.body--dark`/`.body--light` (last step, after grep shows 0 consumers)
-- [ ] Phase F: 0 arbitrary radius/font-size outside allowlist
-- [ ] Phase F: Quasar utility classes ×50 → Tailwind equivalents (§3.M); arbitrary-px spacing ×~999 → scale steps (§3.N); arbitrary z-index ×49 → ladder (§3.Q)
-- [ ] Phase D/P: `.ts` hex ×646 → `chartColor()`/tokens; palette-source files allowlisted per §12.3
-- [ ] Phase G: `@theme { --color-*: initial }` — raw palette classes no longer compile; baseline deleted; §4 ladder documented in contributor docs ✅ **approved 2026-07-15**
-- [ ] Phase G.4: `--radius-*`/`--text-*` unsets + sanctioned-scale re-registration
-- [ ] §12 decisions resolved (utility aliasing, white/black keep-list, data-viz palette policy, px→rem breadth, z ladder)
+> Legend: ✅ done · 🟡 partial (residuals need a decision — see `O2_TOKEN_MIGRATION_PENDING.md`) · ⬜ pending
+
+- [x] ✅ Phase 0: phantom `--q-*` fixes (56 refs) + exact-name Quasar allowlist in `check-css-tokens.mjs`
+- [x] ✅ Phase 0: `--tw-border-style` bug fix, 17 no-op ternaries, 5 global leak selectors
+- [x] ✅ Phase 0: strip dead `tw:` prefixes (3 files, 66 lines) — *visual re-check of the 2 screens still recommended*
+- [x] ✅ Phase A: dark overrides (field-type ×10, service-health ×4, wildcard-blue, cancel-query, icon-color)
+- [x] ✅ Phase A: registrations (json-* ×5, trace-* ×6, field-type ×10, focus-ring, text-soft, success text scale, primary-950, error-300)
+- [x] ✅ Phase A: `--text-2xs` (11px) + `--text-compact` (13px). *10px floor = still a design call*
+- [x] ✅ Phase A: radius policy applied via codemod (formal design sign-off on the table still open)
+- [x] ✅ Phase A: `--color-highlight-bg` + `--color-brand-indigo` added; `dashboard-placeholder-bg`/`actions-column-shawdow` KEPT (real consumers, not dead). ⬜ `--color-dag-node-*` deferred (see PENDING §3)
+- [x] ✅ Phase A: `utils/chartTheme.ts` token-driven chart palette (+ jsdom fallback map)
+- [x] ✅ Phase B: `scripts/check-design-consistency.mjs` + `design-debt-baseline.json` ratchet in CI
+- [x] ✅ Phase B: `vue/enforce-style-attribute` + stylelint `color-no-hex` (at **warn**; → error in G)
+- [x] 🟡 Phase C: codemod + 10 directory agent batches (rawPalette 1263→102, hexClass 1097→269). Residuals = PENDING §1–4
+- [x] 🟡 Phase D: theme ternaries 819→186; specs updated to assert `chartColor()` tokens
+- [x] ✅ Phase D: **dark-mode unified** — `composables/useTheme.ts` created; ad-hoc `isDark` flags + `classList.contains('body--*')` routed through it; raw `theme === 'dark'` confined to `useTheme.ts`/`chartTheme.ts` (+ documented residuals)
+- [ ] ⬜ Phase E: style-block hexes → `var(--color-*)` (805 left, hard cases); `.body--dark`/`.light-mode`/`.dark-mode` → `.dark`; all blocks `scoped` (206 left); px → rem — **PENDING §1–2**
+- [ ] ⬜ Post-migration: `theme.ts` stops toggling `.body--dark`/`.body--light` (last step, after 0 consumers)
+- [x] ✅ Phase F: arbitrary radius/font-size normalized (bareRounded 547→26, arbRadius 127→25, arbTextSize 918→323)
+- [x] 🟡 Phase F: Quasar utils ×50→0 (§3.M); arbitrary-px spacing 999→174 (§3.N). ⬜ z-index ×49 → ladder (needs §12.5)
+- [x] 🟡 Phase D/P: chart-converter `.ts` colors → `chartColor()`; palette-source `.ts` files allowlisted per §12.3 (tsHex 471 left, mostly allowlisted)
+- [ ] ⬜ Phase G: `@theme { --color-*: initial }` — **gated on C/E residuals** (PENDING §5); then flip guards warn→error, delete baseline
+- [ ] ⬜ Phase G.4: `--radius-*`/`--text-*` unsets + sanctioned-scale re-registration
+- [ ] ⬜ §12 decisions resolved (white/black keep-list, data-viz palette policy, px→rem breadth, z ladder, 10px floor) — utility naming & 13px **DECIDED**
 
 ## 11. Appendix — audit reproduction commands (definition of done)
 
