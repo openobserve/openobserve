@@ -55,38 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span data-test="dashboard-name-title">{{ currentDashboardData.data?.title }}</span>
           </template>
           <template #actions>
-            <!-- Primary place to set this dashboard as the org-wide home
-                 dashboard: labeled so the action is discoverable (a bare
-                 pushpin icon read as cryptic). Collapses to filled-pin +
-                 "Home dashboard" once set. -->
-            <OButton
-              v-if="!isFullscreen"
-              v-show="store.state.printMode !== true"
-              :variant="isHome(dashboardId) ? 'secondary' : 'outline'"
-              size="sm-toolbar"
-              :class="
-                isHome(dashboardId)
-                  ? 'text-primary border border-button-outline-border'
-                  : ''
-              "
-              @click="toggleHomeDashboard"
-              data-test="dashboard-view-set-home-btn"
-              :icon-left="isHome(dashboardId) ? 'keep' : 'keep-outline'"
-            >
-              {{
-                isHome(dashboardId)
-                  ? t("dashboard.isHomeDashboard")
-                  : t("dashboard.setAsHome")
-              }}
-            </OButton>
-            <OTooltip
-              v-if="!isFullscreen && store.state.printMode !== true"
-              :content="
-                isHome(dashboardId)
-                  ? t('dashboard.removeFromHome')
-                  : t('dashboard.setAsHomeDesc')
-              "
-            />
+            <!-- Add panel is the most-used action, so it leads the toolbar. -->
             <OButton
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
@@ -238,6 +207,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="code"
             >
               <OTooltip :content="t('dashboard.editJson')" />
+            </OButton>
+            <!-- Pin as org-wide home dashboard: a low-frequency, set-once
+                 action, so it sits at the far right, icon-only. Filled pin +
+                 highlighted variant signal the "already home" state. -->
+            <OButton
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              :variant="isHome(dashboardId) ? 'secondary' : 'outline'"
+              size="icon-toolbar"
+              :class="
+                isHome(dashboardId)
+                  ? 'text-primary border border-button-outline-border'
+                  : ''
+              "
+              @click="toggleHomeDashboard"
+              data-test="dashboard-view-set-home-btn"
+              :icon-left="isHome(dashboardId) ? 'keep' : 'keep-outline'"
+            >
+              <OTooltip
+                :content="
+                  isHome(dashboardId)
+                    ? t('dashboard.removeFromHome')
+                    : t('dashboard.setAsHomeDesc')
+                "
+              />
             </OButton>
           </template>
           </AppPageHeader>
