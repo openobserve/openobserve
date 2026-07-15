@@ -62,9 +62,26 @@ vi.mock("echarts", () => ({
   }),
 }));
 
+vi.mock("@/services/synthetics", () => ({
+  default: {
+    getRuns: vi.fn(),
+  },
+}));
+
+vi.mock("vuex", async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    useStore: vi.fn(() => ({
+      state: { selectedOrganization: { identifier: "test-org" } },
+    })),
+  };
+});
+
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import MonitorResultsDashboard from "./MonitorResultsDashboard.vue";
+import syntheticsService from "@/services/synthetics";
 
 function mountDashboard() {
   return mount(MonitorResultsDashboard, {
@@ -76,11 +93,7 @@ function mountDashboard() {
     global: {
       stubs: {
         KpiSparkline: { template: '<div data-test="kpi-sparkline" />' },
-        OTable: {
-          name: "OTableStub",
-          template: '<table data-test="runs-table" />',
-          props: ["columns", "data", "loading"],
-        },
+        RunRowExpansion: { template: '<div class="run-expansion" />' },
       },
     },
   });
@@ -107,6 +120,15 @@ describe("MonitorResultsDashboard", () => {
       { timestamp: Date.now(), status: "passed", durationMs: 1820, location: "us-east-1", device: "desktop", error: "" },
       { timestamp: Date.now(), status: "failed", durationMs: 1760, location: "ap-southeast-1", device: "mobile", error: "Timeout" },
     ];
+    vi.mocked(syntheticsService.getRuns).mockResolvedValue({
+      data: {
+        runs: [
+          { id: "run-1", status: "passed", scheduled_ts: Date.now(), completed_at: Date.now() + 1820, location: "us-east-1", device: "desktop", trigger_type: "scheduled", jobs_done: 1, job_count: 1 },
+          { id: "run-2", status: "failed", scheduled_ts: Date.now(), completed_at: Date.now() + 1760, location: "ap-southeast-1", device: "mobile", trigger_type: "scheduled", jobs_done: 0, job_count: 1, error: "Timeout" },
+        ],
+        total: 2,
+      },
+    } as any);
   });
 
   afterEach(() => {
@@ -132,15 +154,18 @@ describe("MonitorResultsDashboard", () => {
     ).toContain("synthetics.results.passed");
   });
 
-  it("should pass one mapped, id-keyed row per run to the table", () => {
+  it("should render runs after refresh fetches data via REST API", async () => {
     wrapper = mountDashboard();
-    const table = wrapper.findComponent({ name: "OTableStub" });
-    expect(table.exists()).toBe(true);
-    const data = table.props("data") as Array<{ id: string; status: string }>;
-    expect(data).toHaveLength(2);
-    expect(data[0].status).toBe("passed");
-    expect(data[1].status).toBe("failed");
-    expect(data.every((r) => typeof r.id === "string")).toBe(true);
+    // refresh() triggers fetchRuns() which calls syntheticsService.getRuns()
+    await (wrapper.vm as any).refresh();
+    await flushPromises();
+    // After fetchRuns() completes, the custom HTML table renders .runs-row elements
+    const rows = wrapper.findAll(".runs-row");
+    expect(rows).toHaveLength(2);
+    // First run has "passed" status text
+    expect(rows[0].text()).toContain("synthetics.results.passed");
+    // Second run has "failed" status text
+    expect(rows[1].text()).toContain("synthetics.results.failed");
   });
 
   it("should call fetchAll when the exposed refresh() is invoked", async () => {

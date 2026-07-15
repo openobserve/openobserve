@@ -22,7 +22,7 @@ describe('mapRecordedStep', () => {
       value: 'https://app.example.com/login',
       timeout: 10000,
       code: '',
-      wire, // original preserved verbatim
+      wire: { ...wire, id: expect.any(String) }, // wire.id is now the step's own UUID
     })
   })
 
@@ -42,9 +42,8 @@ describe('mapRecordedStep', () => {
       startTime: 1718700003100,
       code: "await page.locator('#login-btn').click();",
     }
-    // Same object reference, untouched — replay sends this back as-is.
-    expect(mapWireStep(wire).wire).toBe(wire)
-    expect(mapWireStep(wire).wire).toEqual(wire)
+    // wire is spread with the step's own UUID assigned to wire.id.
+    expect(mapWireStep(wire).wire).toEqual({ ...wire, id: expect.any(String) })
   })
 
   describe('buildWireFromStep (reverse mapper for manual steps)', () => {
@@ -161,9 +160,9 @@ describe('mapRecordedStep', () => {
     expect(mapWireStep({ id: 's9', action: 'click' }).timeout).toBe(30000)
   })
 
-  it('should generate an id when the wire step has none', () => {
+  it('should generate a compact UUIDv7 id when the wire step has none', () => {
     const mapped = mapWireStep({ id: '', action: 'click' })
-    expect(mapped.id).toMatch(/[0-9a-f-]{36}/)
+    expect(mapped.id).toMatch(/^[0-9a-f]{32}$/)
   })
 
   it('should map a list of wire steps preserving order', () => {

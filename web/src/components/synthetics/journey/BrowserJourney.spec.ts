@@ -2,6 +2,11 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, VueWrapper, flushPromises } from '@vue/test-utils'
+
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({ t: (key: string) => key }),
+}))
+
 import BrowserJourney from './BrowserJourney.vue'
 
 // Stubs emit native-component click so parent @click handlers fire.

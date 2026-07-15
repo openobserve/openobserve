@@ -22,6 +22,24 @@ vi.mock("@/plugins/traces/composables/useLLMStreamQuery", () => ({
   useLLMStreamQuery: () => ({ executeQuery, cancelAll }),
 }));
 
+vi.mock("vuex", () => ({
+  useStore: vi.fn(() => ({
+    state: { selectedOrganization: { identifier: "test-org" } },
+  })),
+}));
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({
+    getStream: vi.fn().mockRejectedValue(new Error("no stream")),
+  }),
+}));
+
+vi.mock("@/services/synthetics", () => ({
+  default: {
+    getRuns: vi.fn().mockResolvedValue({ data: { runs: [] } }),
+  },
+}));
+
 import useSyntheticResults from "./useSyntheticResults";
 
 describe("useSyntheticResults", () => {
@@ -35,12 +53,12 @@ describe("useSyntheticResults", () => {
       .mockResolvedValueOnce([
         { total_runs: 100, passed_runs: 99, failed_runs: 1, p95_duration: 2940 },
       ])
-      .mockResolvedValueOnce([{ status: "up", ts: 1_700_000_000_000_000 }])
+      .mockResolvedValueOnce([{ status: "passed", ts: 1_700_000_000_000_000 }])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
           ts: 1_700_000_000_000_000,
-          status: "down",
+          status: "failed",
           duration: 1760,
           location: "us-east-1",
           device: "desktop",
@@ -81,11 +99,13 @@ describe("useSyntheticResults", () => {
     expect(executeQuery).not.toHaveBeenCalled();
   });
 
-  it("should surface an error message and reset state when a query fails", async () => {
+  it("should surface a per-group error and reset state when a query fails", async () => {
     executeQuery.mockRejectedValue(new Error("boom"));
-    const { error, kpi, runs, fetchAll } = useSyntheticResults();
+    const { kpiError, runsError, kpi, runs, fetchAll } = useSyntheticResults();
     await fetchAll("mon-1", 1, 100);
-    expect(error.value).toBe("boom");
+    // Errors are surfaced per-group, not at the top level
+    expect(kpiError.value).toBe("boom");
+    expect(runsError.value).toBe("boom");
     expect(kpi.value.totalRuns).toBe(0);
     expect(runs.value).toEqual([]);
   });
