@@ -4314,7 +4314,16 @@
     "dimensionWidth": "Larghezza (px)",
     "dimensionHeight": "Altezza (px)",
     "imagePreview": "Includi l'immagine di anteprima della dashboard in linea",
-    "customDimensions": "Dimensioni personalizzate (avanzate)"
+    "customDimensions": "Dimensioni personalizzate (avanzate)",
+    "validation": {
+      "resourceNameInvalid": "Caratteri come :, ?, /, # e gli spazi non sono consentiti.",
+      "invalidCron": "Espressione Cron non valida!",
+      "cronSixFields": "L'espressione Cron deve avere esattamente 6 campi: [Secondo] [Minuto] [Ora] [Giorno del mese] [Mese] [Giorno della settimana]",
+      "cronMinInterval": "La frequenza deve essere maggiore di {seconds} secondi.",
+      "dateFormat": "Il formato della data non è corretto!",
+      "timeFormat": "Il formato dell'ora non è corretto!",
+      "invalidEmails": "Aggiungi indirizzi email validi!"
+    }
   },
   "queries": {
     "runningQueries": "Interrogazioni in esecuzione",
@@ -5625,7 +5634,11 @@
       "authEditNote": "Le credenziali non possono essere rilette. Reinserisci la chiave API solo se vuoi ruotarla.",
       "cannotRename": "Non può essere rinominato dopo la creazione.",
       "availableModelsHelp": "Facoltativo. Elenco di modelli disponibili su questo provider, separati da virgola.",
-      "saveError": "Impossibile salvare il provider"
+      "saveError": "Impossibile salvare il provider",
+      "nameRequired": "Provider name is required",
+      "typeRequired": "Provider type is required",
+      "defaultModelRequired": "Default model is required",
+      "apiKeyRequired": "API key is required"
     },
     "scoreConfig": {
       "booleanValues": "true / false",
@@ -5742,6 +5755,12 @@
       "falseIsHealthyHint": "I punteggi true attivano problemi di qualità.",
       "thresholdEmptyHint": "Lasciare questo campo vuoto significa che questa dimensione non contribuirà ai segnali di stato di qualità nel prodotto. I punteggi verranno comunque registrati ma non attiveranno indicatori di problemi.",
       "saveError": "Impossibile salvare la configurazione della partitura",
+      "validation": {
+        "nameRequired": "Name is required",
+        "nameFormat": "Use lowercase letters, numbers, and underscores only",
+        "minRequired": "Min is required",
+        "maxRequired": "Max is required"
+      },
       "empty": {
         "title": "Nessuna configurazione punteggio ancora",
         "description": "Le configurazioni di punteggio definiscono le dimensioni che i tuoi scorer producono — nome, tipo di dati, intervallo di valori e soglia di integrità. Creane una per iniziare a impostare la valutazione online.",
@@ -5975,6 +5994,20 @@
       },
       "requestBodyLabel": "Template corpo richiesta",
       "saveError": "Impossibile salvare il marcatore",
+      "validation": {
+        "nameRequired": "Scorer name is required",
+        "scoreConfigRequired": "A score config is required",
+        "providerRequired": "A provider is required",
+        "endpointRequired": "An endpoint URL is required",
+        "bearerTokenRequired": "Token is required",
+        "basicUsernameRequired": "Username is required",
+        "basicPasswordRequired": "Password is required",
+        "apiKeyHeaderRequired": "Header name is required",
+        "apiKeyTokenRequired": "Token is required",
+        "timeoutInvalid": "Timeout must be 0 or greater",
+        "retriesInvalid": "Retries must be 0 or greater",
+        "duplicateFieldName": "Field names must be unique"
+      },
       "versionsLoadError": "Impossibile caricare le versioni di configurazione della partitura",
       "testPanel": {
         "title": "Metti alla prova questo marcatore",
@@ -6154,7 +6187,12 @@
       "selectAtLeastOne": "Seleziona almeno un marcatore",
       "saveError": "Impossibile salvare il lavoro di valutazione",
       "createdAndActivated": "Processo di valutazione creato e attivato",
-      "createdButActivateFailed": "Processo di valutazione creato, ma attivazione non riuscita"
+      "createdButActivateFailed": "Processo di valutazione creato, ma attivazione non riuscita",
+      "validation": {
+        "nameRequired": "Job name is required",
+        "streamRequired": "A stream is required",
+        "samplingValueRequired": "A sampling value is required"
+      }
     }
   },
   "llmProviders": {

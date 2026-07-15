@@ -4314,7 +4314,16 @@
     "dimensionWidth": "Breite (px)",
     "dimensionHeight": "Höhe (px)",
     "imagePreview": "Fügen Sie ein Inline-Dashboard-Vorschaubild hinzu",
-    "customDimensions": "Benutzerdefinierte Abmessungen (für Fortgeschrittene)"
+    "customDimensions": "Benutzerdefinierte Abmessungen (für Fortgeschrittene)",
+    "validation": {
+      "resourceNameInvalid": "Zeichen wie :, ?, /, # und Leerzeichen sind nicht zulässig.",
+      "invalidCron": "Ungültiger Cron-Ausdruck!",
+      "cronSixFields": "Der Cron-Ausdruck muss genau 6 Felder haben: [Sekunde] [Minute] [Stunde] [Tag des Monats] [Monat] [Wochentag]",
+      "cronMinInterval": "Die Häufigkeit sollte größer als {seconds} Sekunden sein.",
+      "dateFormat": "Das Datumsformat ist ungültig!",
+      "timeFormat": "Das Zeitformat ist ungültig!",
+      "invalidEmails": "Gültige E-Mail-Adressen hinzufügen!"
+    }
   },
   "queries": {
     "runningQueries": "Abfragen ausführen",
@@ -5625,7 +5634,11 @@
       "authEditNote": "Anmeldedaten können nicht ausgelesen werden. Geben Sie den API-Schlüssel nur erneut ein, wenn Sie ihn rotieren möchten.",
       "cannotRename": "Kann nach der Erstellung nicht umbenannt werden.",
       "availableModelsHelp": "Optional. Kommagetrennte Liste der bei diesem Anbieter verfügbaren Modelle.",
-      "saveError": "Anbieter konnte nicht gespeichert werden"
+      "saveError": "Anbieter konnte nicht gespeichert werden",
+      "nameRequired": "Provider name is required",
+      "typeRequired": "Provider type is required",
+      "defaultModelRequired": "Default model is required",
+      "apiKeyRequired": "API key is required"
     },
     "scoreConfig": {
       "booleanValues": "true / false",
@@ -5742,6 +5755,12 @@
       "falseIsHealthyHint": "Scores von true lösen Qualitätsprobleme aus.",
       "thresholdEmptyHint": "Wenn Sie dieses Feld leer lassen, trägt diese Dimension produktweit nicht zu Qualitätsstatussignalen bei. Scores werden weiterhin erfasst, lösen aber keine Problemindikatoren aus.",
       "saveError": "Die Score-Konfiguration konnte nicht gespeichert werden",
+      "validation": {
+        "nameRequired": "Name is required",
+        "nameFormat": "Use lowercase letters, numbers, and underscores only",
+        "minRequired": "Min is required",
+        "maxRequired": "Max is required"
+      },
       "empty": {
         "title": "Noch keine Score-Konfigurationen",
         "description": "Score-Konfigurationen definieren die Dimensionen, die Ihre Scorer erzeugen – Name, Datentyp, Wertebereich und Schwellenwert für Gesundheit. Erstellen Sie eine, um mit der Online-Bewertung zu beginnen.",
@@ -5975,6 +5994,20 @@
       },
       "requestBodyLabel": "Textvorlage anfordern",
       "saveError": "Der Punktezähler konnte nicht gespeichert werden",
+      "validation": {
+        "nameRequired": "Scorer name is required",
+        "scoreConfigRequired": "A score config is required",
+        "providerRequired": "A provider is required",
+        "endpointRequired": "An endpoint URL is required",
+        "bearerTokenRequired": "Token is required",
+        "basicUsernameRequired": "Username is required",
+        "basicPasswordRequired": "Password is required",
+        "apiKeyHeaderRequired": "Header name is required",
+        "apiKeyTokenRequired": "Token is required",
+        "timeoutInvalid": "Timeout must be 0 or greater",
+        "retriesInvalid": "Retries must be 0 or greater",
+        "duplicateFieldName": "Field names must be unique"
+      },
       "versionsLoadError": "Die Score-Konfigurationsversionen konnten nicht geladen werden",
       "testPanel": {
         "title": "Teste diesen Scorer",
@@ -6154,7 +6187,12 @@
       "selectAtLeastOne": "Wählen Sie mindestens einen Scorer aus",
       "saveError": "Fehler beim Speichern des Evaluierungsauftrags",
       "createdAndActivated": "Bewertungsauftrag erstellt und aktiviert",
-      "createdButActivateFailed": "Bewertungsauftrag erstellt, aber Aktivierung fehlgeschlagen"
+      "createdButActivateFailed": "Bewertungsauftrag erstellt, aber Aktivierung fehlgeschlagen",
+      "validation": {
+        "nameRequired": "Job name is required",
+        "streamRequired": "A stream is required",
+        "samplingValueRequired": "A sampling value is required"
+      }
     }
   },
   "llmProviders": {

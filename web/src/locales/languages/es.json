@@ -4314,7 +4314,16 @@
     "dimensionWidth": "Anchura (px)",
     "dimensionHeight": "Altura (px)",
     "imagePreview": "Incluir una imagen de vista previa del panel de control en línea",
-    "customDimensions": "Dimensiones personalizadas (avanzadas)"
+    "customDimensions": "Dimensiones personalizadas (avanzadas)",
+    "validation": {
+      "resourceNameInvalid": "No se permiten caracteres como :, ?, /, # ni espacios.",
+      "invalidCron": "¡Expresión Cron no válida!",
+      "cronSixFields": "La expresión Cron debe tener exactamente 6 campos: [Segundo] [Minuto] [Hora] [Día del mes] [Mes] [Día de la semana]",
+      "cronMinInterval": "La frecuencia debe ser mayor que {seconds} segundos.",
+      "dateFormat": "¡El formato de fecha es incorrecto!",
+      "timeFormat": "¡El formato de hora es incorrecto!",
+      "invalidEmails": "¡Agregue correos electrónicos válidos!"
+    }
   },
   "queries": {
     "runningQueries": "Consultas en ejecución",
@@ -5625,7 +5634,11 @@
       "authEditNote": "Las credenciales no se pueden volver a leer. Vuelve a introducir la clave de API solo si quieres rotarla.",
       "cannotRename": "No se puede renombrar después de la creación.",
       "availableModelsHelp": "Opcional. Lista separada por comas de los modelos disponibles en este proveedor.",
-      "saveError": "No se pudo guardar el proveedor"
+      "saveError": "No se pudo guardar el proveedor",
+      "nameRequired": "Provider name is required",
+      "typeRequired": "Provider type is required",
+      "defaultModelRequired": "Default model is required",
+      "apiKeyRequired": "API key is required"
     },
     "scoreConfig": {
       "booleanValues": "true / false",
@@ -5742,6 +5755,12 @@
       "falseIsHealthyHint": "Las puntuaciones de true generan problemas de calidad.",
       "thresholdEmptyHint": "Dejar esto vacío significa que esta dimensión no contribuirá a las señales de estado de calidad en todo el producto. Las puntuaciones se seguirán registrando, pero no activarán indicadores de problemas.",
       "saveError": "No se pudo guardar la configuración de la puntuación",
+      "validation": {
+        "nameRequired": "Name is required",
+        "nameFormat": "Use lowercase letters, numbers, and underscores only",
+        "minRequired": "Min is required",
+        "maxRequired": "Max is required"
+      },
       "empty": {
         "title": "Aún no hay configuraciones de puntuación",
         "description": "Las configuraciones de puntuación definen las dimensiones que producen tus evaluadores: nombre, tipo de datos, rango de valores y umbral saludable. Crea una para empezar a configurar la evaluación en línea.",
@@ -5975,6 +5994,20 @@
       },
       "requestBodyLabel": "Plantilla de cuerpo de solicitud",
       "saveError": "No se pudo guardar el marcador",
+      "validation": {
+        "nameRequired": "Scorer name is required",
+        "scoreConfigRequired": "A score config is required",
+        "providerRequired": "A provider is required",
+        "endpointRequired": "An endpoint URL is required",
+        "bearerTokenRequired": "Token is required",
+        "basicUsernameRequired": "Username is required",
+        "basicPasswordRequired": "Password is required",
+        "apiKeyHeaderRequired": "Header name is required",
+        "apiKeyTokenRequired": "Token is required",
+        "timeoutInvalid": "Timeout must be 0 or greater",
+        "retriesInvalid": "Retries must be 0 or greater",
+        "duplicateFieldName": "Field names must be unique"
+      },
       "versionsLoadError": "No se pudieron cargar las versiones de configuración de puntuación",
       "testPanel": {
         "title": "Pon a prueba este marcador",
@@ -6154,7 +6187,12 @@
       "selectAtLeastOne": "Selecciona al menos un anotador",
       "saveError": "No se pudo guardar el trabajo de evaluación",
       "createdAndActivated": "Trabajo de evaluación creado y activado",
-      "createdButActivateFailed": "Trabajo de evaluación creado, pero la activación falló"
+      "createdButActivateFailed": "Trabajo de evaluación creado, pero la activación falló",
+      "validation": {
+        "nameRequired": "Job name is required",
+        "streamRequired": "A stream is required",
+        "samplingValueRequired": "A sampling value is required"
+      }
     }
   },
   "llmProviders": {
