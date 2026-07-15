@@ -130,13 +130,6 @@ pub async fn test_run_function(
         })
         .unwrap_or(0); // Default to VRL for backward compatibility
 
-    // JavaScript functions are only allowed in _meta org (for SSO claim parsing)
-    if trans_type == 1 && org_id != "_meta" {
-        return Ok(MetaHttpResponse::bad_request(
-            "JavaScript functions are only allowed in the '_meta' organization. Please use VRL functions for other organizations.",
-        ));
-    }
-
     match trans_type {
         0 => test_run_vrl_function(org_id, function, events).await,
         1 => test_run_js_function(org_id, function, events).await,
