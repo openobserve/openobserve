@@ -1,312 +1,524 @@
-# O2 Token Removal & CSS-Token Consolidation — Fail-Safe Implementation Plan
+# O2 Design-Token Consolidation — Plan & Consistency Audit
 
-> Goal: eliminate the legacy `--o2-*` token vocabulary, fix all undefined-token bugs,
-> align the theme switcher so it stops emitting legacy tokens, and add lint/CI that
-> **fails the build** on any banned usage — executed safely in a single day with a
-> working, shippable app after every stage.
+> **Part I** (below, condensed): the original `--o2-*` removal plan — **SHIPPED**. `grep -r 'var(--o2-' src` = 0, definitions = 0, theme.ts emits only `--color-*`, stylelint + `check-css-tokens.mjs` guards are live.
+>
+> **Part II** (the bulk of this document): full design-consistency audit of `web/src` (2026-07-15) — every remaining way components bypass the token system, with counts, concrete evidence, root causes, and a phased remediation plan. **The `--o2-*` problem is gone; the "raw colors everywhere" problem is not.** Changing a semantic token today (e.g. secondary text color, default radius) does NOT propagate to most of the app, because ~3,000+ call sites hardcode palette classes, hex values, or hand-rolled dark-mode ternaries.
 
 ---
 
-## 1. Why (the debt, in numbers)
+# Part I — `--o2-*` removal (SHIPPED)
 
-Measured on `web/src` (`.vue` + `.css` + `.ts`):
+Status of the original plan's deliverables:
 
-| Fact | Value |
+| Deliverable | Status |
 |---|---|
-| `--o2-*` unique token names | **239** |
-| `--o2-*` `var()` references | **1673** across **197 files** |
-| `--o2-*` definitions | 367 (light in `semantic.css`, dark in `dark.css`) |
-| `--o2-*` set at **runtime** by `utils/theme.ts` | **20** |
-| Undefined tokens referenced (no fallback) | ~30 (see §3) |
-| Tailwind **arbitrary-value** `var()` usages `[var(--x)]` / `(--x)` | ~2539 |
-| `var()` inside `<style>` blocks (legit) | ~2897 |
-| `.body--dark` / `.body--light` CSS selectors | **197** |
-| JS `classList.contains('body--dark')` checks | **128** |
+| `--o2-*` references / definitions in `src` | ✅ **0 / 0** |
+| `utils/theme.ts` emits only modern `--color-theme-*` tokens | ✅ |
+| `scripts/check-css-tokens.mjs` CI guard (undefined-token check) | ✅ live — "960 tokens defined, 865 refs checked, OK" |
+| `web/.stylelintrc.json` banning `var(--o2-` at ERROR | ✅ |
+| `scripts/o2-token-map.json`, `codemod-o2-refs.mjs`, `codemod-color-utilities.mjs` | ✅ exist |
+| Bucket D domain palettes renamed to `--color-*` | ✅ (label-chip, span-kind, field-type, trace, json, service-health, wildcard, severity all live under `--color-*`) |
 
-**Root problem:** two parallel token vocabularies — the modern `--color-*` / semantic /
-component set (registered in `@theme inline`, drives Tailwind utilities, has proper
-dark overrides) **and** the legacy `--o2-*` set (Quasar-era, `var()`-only, its own
-`.body--dark` dark values that can drift). Nothing enforces which to use, which is how
-the undefined-token bugs appeared.
+Carried-over debt from Part I's explicit non-goals (now in scope for Part II):
+- `.body--dark` compat class still toggled; **131 `.body--dark` selectors** remain in `src` (111 inside `.vue` style blocks across 20 files). Most are collapsible to token-based rules (§II-3.G).
+- `<style>`-block `var()` usage was declared "legitimate" wholesale — Part II refines this: the *var() usage* is fine, but ~704 **hardcoded hex values** in those same blocks are not.
 
 ---
 
-## 2. Goals / Non-Goals
+# Part II — Design-Consistency Audit & Remediation Plan (2026-07-15)
 
-**Goals**
-1. Fix every undefined-token bug (source files + components).
-2. Remove `--o2-*` as a vocabulary developers can use or add to.
-3. Make `utils/theme.ts` drive **only** the modern token set (no new `--o2-*` emitted).
-4. Lint + CI that **fails** on: new `--o2-*` usage, undefined tokens, and (soft) arbitrary-value `var()` where a utility exists.
-5. App is visually identical and fully working after **every** committed stage.
+## 1. Executive summary — the debt, in numbers
 
-**Non-Goals (explicitly out of scope for the day — do NOT attempt)**
-- Removing the `.body--dark` / `.body--light` class. It backs 197 CSS selectors + 128 JS
-  checks. It stays as a compat class that `theme.ts` keeps toggling. Migrating those
-  `.body--dark { … }` scoped overrides to `.dark` is a **separate** future effort.
-- Converting the ~2897 `<style>`-block `var()` usages (they're legitimate).
-- Any redesign of colors/values. This is a **rename/consolidation**, visually a no-op.
+Measured on `web/src` (`.vue` files unless noted):
 
----
-
-## 3. Pre-work — fix the confirmed bugs (do first, ~20 min)
-
-These are wrong at the source and independent of the migration.
-
-| # | File:line | Problem | Fix |
+| # | Finding | Count | Impact |
 |---|---|---|---|
-| 1 | `lib/styles/tokens/component.css:191` | `--color-field-list-label-text: var(--color-grey-text-primary)` — token doesn't exist | → `var(--color-text-primary)` |
-| 2 | `lib/styles/tokens/semantic.css:171-172` | `color-mix(…, var(--o2-theme-elements) 0%, white)` — undefined var voids the declaration | → `white` (intent) |
-| 3 | `lib/styles/tokens/dark.css:520-521` | same as #2 | → `white` |
+| A | Raw Tailwind palette utilities (`text-gray-400`, `bg-gray-800`, `text-red-500`, …) | **1,263 occurrences / 184 files** | Un-themed. Ignore token changes AND dark mode |
+| B | Arbitrary hex utility classes (`text-[#666]`, `bg-[#e7e6e6]`, `border-[#e5e7eb]`) | **1,097 occurrences / 113 files** | Same, plus unreadable |
+| C | `bg-white` / `text-white` / `text-black` etc. on themeable surfaces | **~250 occurrences** | Break in dark mode unless hand-paired |
+| D | JS theme ternaries `theme === 'dark' ? X : Y` in `.vue` | **735** (226 emit raw hex) | Hand-rolled dark mode, drifts from tokens; includes **no-op ternaries** |
+| E | Static `style=""` attributes with hardcoded colors | **188** | Un-themed, highest specificity |
+| F | Phantom `--q-*` tokens that are never defined | **56 `var()` refs to 18 names** | **Silently broken UI today** (transparent bg, invalid colors) — hidden by guard allowlist |
+| G | Hardcoded hex inside `<style>` blocks | **~704** | Duplicates tokens; forces `.body--dark` twin rules |
+| H | Unscoped `<style>` blocks | **210 of 245** | Global leakage risk (5 confirmed leaks) |
+| I | Radius inconsistency (bare `rounded` ×547 vs `-md` ×289 vs `-lg` ×282 vs `xl+` ×34 vs arbitrary ×~95) | **~1,750 sites, 5 vocabularies** | No single knob to change app radius |
+| J | Arbitrary font sizes (`text-[13px]` ×169, `text-[11px]` ×149, `text-[10px]` ×88, …) | **~750+** | Type scale not enforceable |
+| K | Token-system defects (missing dark overrides, unregistered tokens, dead/misspelled tokens, `--tw-border-style` bug) | ~30 items | Root causes of A–J (§4) |
 
-These land in their own commit, verified, before touching anything else.
+**The user-visible consequence** (the exact scenario that motivated this audit): if design changes `--color-text-secondary` today, the **315 `text-gray-400`** and **129 `text-gray-500`** sites don't move. If design changes the app radius from `md` to `lg`, the 547 bare-`rounded` + 95 arbitrary-radius sites don't move. The token system is correct and complete enough — **the consumers bypass it.**
 
----
+## 2. Root causes (why this keeps happening)
 
-## 4. The fail-safe principle: **Alias Bridge, never big-bang**
+These must be fixed or the cleanup will regress within weeks:
 
-The entire migration hinges on one keystone step that is **non-breaking**:
+1. **Tailwind's default palette is still enabled.** `src/styles/tailwind.css` does `@import "tailwindcss"` with **no `--color-*: initial` reset**, so `text-gray-400`, `bg-blue-50`, `text-red-500` all compile happily. The path of least resistance produces un-themed UI. *(Endgame fix: §6.1.)*
+2. **The `grey`/`gray` trap.** The brand neutral scale is `--color-grey-*` (British spelling) and is **not registered** as Tailwind utilities. A developer typing `text-grey-500` gets nothing, types `text-gray-500`, gets Tailwind's *different* gray (`#6b7280` vs brand `#737373`) — and it silently works. The brand primitive scale is effectively unreachable from templates.
+3. **Type-scale gaps.** The app's dense-UI sizes (13px base, 11px captions, 10px micro-labels) have **no registered utility**: `text-sm` is re-pinned to 14px, there is no `text-2xs`. So 750+ sites use `text-[13px]`-style arbitrary values because there is literally no token to reach for.
+4. **`dark:` was never the convention, and tokens arrived late.** Old code hand-rolls dark mode via `store.state.theme === 'dark'` ternaries (735!). New code copies the nearest existing pattern. Nothing bans any of it — stylelint only bans `var(--o2-`.
+5. **The CI token guard allowlists the entire `--q-` prefix** (`check-css-tokens.mjs:27`), so 18 invented pseudo-Quasar tokens (`--q-text-secondary`, `--q-primary-rgb`, `--q-background`, …) pass CI while rendering as *undefined* at runtime.
+6. **No radius/spacing/typography policy exists in writing.** `rounded` vs `rounded-md` vs `rounded-lg` is developer mood; both the project `--radius-*` tokens and Tailwind's default radius scale coexist with identical values, so nobody notices there are two vocabularies.
 
-> **Rewrite every `--o2-*` *definition* to be a thin alias of its modern equivalent**,
-> instead of holding its own hardcoded value.
+## 3. Findings in detail
 
-```css
-/* BEFORE (semantic.css light + dark.css dark — two independent values) */
---o2-text-secondary: #5A5D6B;        /* light */
---o2-text-secondary: #B4B8BF;        /* dark, in .body--dark */
+### A. Raw Tailwind palette utilities — 1,263 occurrences / 184 files
 
-/* AFTER (one source of truth; dark handled by the modern token it points to) */
---o2-text-secondary: var(--color-text-secondary);
+Top offenders: `text-gray-400` ×312, `text-gray-500` ×121, `text-red-500` ×63, `text-gray-600` ×35, `border-gray-200` ×31, `text-gray-300` ×30, `border-gray-700` ×25, `bg-gray-800` ×24, `bg-gray-100` ×21, `text-green-500` ×19, `text-blue-600` ×18, `text-amber-500` ×18, `bg-blue-50` ×18, `ring-primary-500` ×16.
+
+Distribution: `components/` **938** (alerts 295, settings 218, pipelines 77, rum 58, ingestion 58, functions 51, pipeline 39, logstream 32, dashboards 28, anomaly_detection 27), `plugins/` **185**, `views/` **35**, `enterprise/` **13**. Worst single files: `components/settings/ServiceIdentitySetup.vue` (**149**), `plugins/logs/SearchJobInspector.vue` (63), `components/alerts/IncidentDetailDrawer.vue` (60), `plugins/traces/TraceEvaluationsView.vue` (42), `components/alerts/steps/QueryConfig.vue` (36).
+
+*(Nuance: `text-primary-600`-style `primary-*` utilities (~80 of the 1,263) ARE token-backed — theme.ts drives `--color-primary-*` at runtime — so they theme correctly. They should still migrate to semantic wrappers (`text-accent`, `text-text-link`) but are not broken today.)*
+
+**Three sub-patterns, worst first:**
+
+1. **The no-op ternary** — theme-aware-*looking* code that isn't:
+   `anomaly_detection/steps/AnomalyDetectionConfig.vue:172` → `store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'` (both branches identical; repeats at :473, :578; also `AnomalyAlerting.vue:139`, `ServiceIdentitySetup.vue:161,180,261,281,356`). The author reached for a theme conditional and forgot to differentiate — proof the raw class is un-themed while masquerading as themed.
+2. **Bare raw class, no dark handling at all** — broken in dark mode:
+   `views/AwsMarketplaceSetup.vue:37,64,73,…` (8× `text-gray-400` body copy; mirrored in `AzureMarketplaceSetup.vue`), `plugins/traces/TraceDAG.vue:21,30` (loading/empty states), `enterprise/components/billings/proPlan.vue:98,115,133`, `components/TenstackTable.vue:1120` (`bg-[#f5f5f5]` sticky footer).
+3. **Hand-rolled real ternary from raw palette** — works, but drifts from tokens:
+   `plugins/logs/SearchJobInspector.vue:77,97,114,134` → `theme === 'dark' ? 'text-gray-400' : 'text-gray-500'`; `ServiceIdentitySetup.vue:108-134` → `? 'bg-gray-700/60' : 'bg-gray-50'`, `? 'bg-gray-600 text-gray-100' : 'bg-white text-gray-500 shadow-sm'` (60 ternaries in that one file).
+
+Status colors misused the same way: `TraceEvaluationsView.vue:90` → `PASS ? 'text-green-500' : FAIL ? 'text-red-500' : 'text-gray-400'` — should be `text-status-positive` / `text-status-error-text` / `text-text-muted`.
+
+**Fix:** codemod per the canonical map (§7.1), collapsing dark-pair ternaries to a single semantic utility. The token already handles dark mode.
+
+### B. Arbitrary hex classes — 1,097 occurrences / 113 files
+
+Top values: `bg-[#e7e6e6]` ×34, `bg-[#747474]` ×34, `text-[#666]` ×33, `text-[#6b7280]` ×29, `text-[#9ca3af]` ×27, `border-[#e5e7eb]` ×27, `text-[#333]` ×24, `bg-[#f5f5f5]` ×20, `text-[#b0b0b0]` ×16, `text-[#374151]` ×15, `bg-[#1e1e1e]` ×14.
+
+Note that most of these hexes ARE Tailwind gray values written out longhand (`#6b7280` = gray-500, `#9ca3af` = gray-400, `#e5e7eb` = gray-200, `#374151` = gray-700) — i.e. category A wearing a disguise, mapping to the same semantic tokens.
+
+Evidence highlights:
+- `plugins/traces/TraceDAG.vue:446-465` — an entire **hardcoded color map** in JS: 14 node types × hand-authored light+dark hex (`generation: 'border-[#4caf50] bg-[#e8f5e9] dark:border-[#66bb6a] dark:bg-[#1a2e1a]'`, …). This is a domain palette that belongs in the token layer (like the existing `--color-span-kind-*` family).
+- `plugins/metrics/SyntaxGuideMetrics.vue:43-103` — `theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'` repeated ~10× for highlight chips → one `bg-highlight`-style token.
+- `components/alerts/QueryEditorDialog.vue` (~23 hits) — full panel chrome (`border-[#2d3748]`/`border-[#e5e7eb]`, `bg-[#1a1a1a]`/`bg-white`) hand-forked by ternary → `border-border-default` + `bg-surface-base` do this for free.
+- `components/alerts/steps/Advanced.vue:43,84,154,171` — `? 'text-[#9ca3af]' : 'text-[#6b7280]'` → literally `text-text-secondary`.
+- `views/ShortUrl.vue:7` — `text-[#666]` "Redirecting…" — light-only, **snapshot-tested against the hex** (`ShortUrl.spec.ts:126`), so tests actively defend the anti-pattern.
+- `plugins/pipelines/PipelineFlow.vue:26` — mixes vocabularies in one class list: `bg-white text-[#374151] … dark:bg-surface-base dark:text-[#f3f4f6]`.
+
+**Fix:** hex→token map (§7.2) + codemod; new tokens only for the genuine domain palettes (TraceDAG node types).
+
+### C. `bg-white` / `text-white` / `text-black` — ~250 occurrences
+
+`bg-white` ×102 (+ opacity variants), `text-white` ×93, `border-white` ×17, `text-black` ×12, `bg-black` ×6. Legitimate when on top of a fixed-color accent (e.g. white text on a primary button — though that's `text-button-primary-foreground`). Broken when used as a surface: `views/Dashboards/addPanel/AddPanel.vue:177` → `theme === 'dark' ? 'bg-[#1a1a1a]' : 'bg-white'` (→ `bg-surface-base`), `plugins/traces/ThreadView.vue:211` chat bubble `bg-white border-[#e5e7eb]` with **no dark handling**.
+
+**Fix:** manual-review category (not blind codemod): `bg-white`-as-surface → `bg-surface-base`/`bg-surface-overlay`; `text-white`-on-accent → `text-text-inverse` or component foreground token.
+
+### D. JS theme ternaries — 735 in `.vue` (226 emitting hex), plus the chart-utils layer
+
+Four recurring shapes:
+
+1. **Class-string ternaries** (covered in A/B above) — collapse to semantic utility.
+2. **Local ad-hoc CSS-var injection** — `components/shared/HomeViewSkeleton.vue:29-31` (×5 blocks, spec-asserted in `HomeViewSkeleton.spec.ts`):
+   ```
+   theme === 'dark' ? '[--tile-bg:#2b2c2d] [--tile-border:#444444] [--text-primary:#cccfd1]'
+                    : '[--tile-bg:#ffffff] [--tile-border:#e7eaee] [--text-primary:#2e3133]'
+   ```
+   The sibling `plugins/traces/LLMInsightsSkeleton.vue:143-145` defines the *same three local vars* correctly as aliases of `var(--color-surface-base)` etc. Two components, same intent, opposite strategies — the correct one already exists in-repo and the whole ternary deletes.
+3. **`:style` object ternaries** — `components/iam/quota/Quota.vue:160` (`backgroundColor: … ? '#212121' : '#f1f1ee'`), `alerts/IncidentDetailDrawer.vue:336,452,453`, `alerts/steps/QueryConfig.vue:617`, `ServiceIdentitySetup.vue:1366-1483`, SVG strokes in `SearchJobInspector.vue:38-232` (7 icon strokes hand-themed → `stroke="currentColor"` + a text-color class).
+4. **Chart config objects (ECharts/Plotly)** — `views/UsageTab.vue` ×11 (`color: theme === "dark" ? "#B7B7B7" : "#72777B"`), `plugins/traces/Index.vue:1518-1536`, `TraceDetails.vue:1671`, `composables/useStickyColumns.ts:58,74`, and the whole `utils/dashboard/` conversion layer (`convertPromQLData.ts:403,944`, `convertSQLGaugeChart.ts:57`, `convertSQLHeatmapChart.ts:152`, `convertSQLPieDonutChart.ts:58,209`, `heatmapDefaults.ts:41`, …) — all `? "#fff" : "#000"` variants.
+
+**Fix for shape 4 (the only one that can't use CSS):** a single **chart-theme module** (`utils/chartTheme.ts`) that reads resolved token values via `getComputedStyle(document.documentElement).getPropertyValue('--color-text-secondary')` (cached, invalidated on theme change) and exposes `chartTheme.textSecondary`, `chartTheme.surfaceBase`, `chartTheme.axisLine`, etc. Chart builders take colors from it; zero hex in chart code. This also makes charts follow *custom* accent themes, which the ternaries never did.
+
+### E. Static inline `style=""` with hardcoded colors — 188
+
+Concentrations: `components/alerts/IncidentServiceGraph.vue` (legend dots `style="color: #ef4444;"` :36-49 + JS-built tooltip HTML :524-580), `components/traces/FlameGraphView.vue:60,428-439` (tooltip HTML strings), `plugins/traces/TraceDetailsSidebar.vue:1136-1151` (JSON pretty-printer emits `<span style="color: #9ca3af;">` — the `--color-json-*` tokens exist for exactly this), `views/RUM/SessionViewer.vue:56,61`, `components/logstream/schema.vue:386`, `alerts/AlertHistoryTimeline.vue:38`.
+
+**Fix:** convert to classes/tokens. JS-built HTML strings should emit class names styled in (scoped) CSS with `var(--color-*)`, not inline hex.
+
+### F. Phantom `--q-*` tokens — silently broken UI **today** (P0)
+
+Quasar defines only `--q-primary/secondary/accent/dark/dark-page/positive/negative/info/warning/transition-duration` (and the project aliases `--q-primary → var(--color-theme-accent)` in `semantic.css:210`). Everything else `--q-*` is **undefined at runtime** — and invisible to CI because `check-css-tokens.mjs:27` allowlists the whole `/^--q-/` prefix.
+
+18 phantom names, 56 `var()` refs. What actually breaks:
+
+| Phantom token | Refs | Where | Visible breakage |
+|---|---|---|---|
+| `--q-primary-rgb` | 30 | `EnterpriseUpgradeDialog.vue:152-191`, `RUM/SourceMapDropzone.vue:34-37` | `rgba(var(--q-primary-rgb), .1)` = **invalid color → rule dropped**; hover tints/dropzone accents silently missing |
+| `--q-text-secondary` | 18 | `alerts/DestinationTestResult.vue` (10×), `TelemetryCorrelationPanel.vue` (7×), `CorrelationDemo.vue:204` | text falls back to inherited color |
+| `--q-background` | 8 | `RUM/UploadSourceMaps.vue:18`, `SourceMaps.vue`, `AwsMarketplaceSetup.vue:18`, `SearchJobInspector.vue:18`, … | transparent backgrounds |
+| `--q-border-color` | 8 | `alerts/AlertInsights.vue:81,160`, `TelemetryCorrelationPanel.vue` | borders collapse to `currentColor` |
+| `--q-color-text` | 5 | `enterprise/EvalTemplateEditor.vue:46-115` | form labels inherit (black in dark mode) |
+| `--q-text`, `--q-primary-text`, `--q-page-background`, `--q-item-bg`, `--q-color-dark`, `--q-positive-rgb`, `--q-hover-color`, `--q-negative-rgb`, `--q-item-hover-bg`, `--q-header-bg`, `--q-color-text-primary`, `--q-color-separator`, `--q-card-background` | 1–4 each | `AddTemplate.vue:102`, `AddAkeylessType.vue:64,148`, `component.css:3626`, … | assorted transparent/inherited fallthroughs |
+
+**`components/TelemetryCorrelationPanel.vue` is the single worst file** — its entire chrome (`--q-background`, `--q-border-color`, `--q-header-bg`, `--q-text-secondary`, `--q-item-bg`, `--q-item-hover-bg`) rests on tokens that don't exist; the panel renders essentially unstyled in both themes.
+
+**Fix (P0, do first):**
+1. Map each phantom to its modern token (`--q-text-secondary`→`--color-text-secondary`, `--q-background`→`--color-surface-base`, `--q-border-color`→`--color-border-default`, `--q-item-bg`→`--color-surface-panel`, `--q-primary-rgb` consumers → `color-mix(in srgb, var(--q-primary) 10%, transparent)` instead of `rgba(var(--q-primary-rgb), 0.1)`).
+2. In `check-css-tokens.mjs`, **replace the `/^--q-/` prefix allowlist with an exact-name list** of the 10 real Quasar variables so this class of bug can never hide again.
+
+### G. Hardcoded hex inside `<style>` blocks — ~704, and the `.body--dark` twin-rule pattern
+
+Top files: `O2AIChat.vue` (**~122**), `traces/ServiceGraphEdgeSidePanel.vue` (70), `traces/TraceDetailsSidebar.vue` (48), `alerts/IncidentList.vue` (46), `RichTextInput.vue` (38), `ingestion/setupCard/SetupCardRenderer.vue` (35).
+
+Character analysis of the top offenders:
+- **O2AIChat.vue** — mostly neutral greys duplicating text/surface/border tokens (`#1a202c`, `#e2e8f0`, `#191919`) + brand-purple accents duplicating primary; driven by manual `.light-mode`/`.dark-mode` class pairs instead of tokens. Only the gradient stops are genuinely bespoke.
+- **ServiceGraphEdgeSidePanel.vue** — ~40% status colors duplicating `--color-status-*`/service-health tokens (`#10b981`, `#fbbf24`, `#ef4444`), ~40% dark-surface greys (`#242938`, `#1f2937`) that should be surface tokens, ~20% indigo accent.
+- **IncidentList.vue** — 100% status/severity/badge border colors in light+dark pairs — every one collapses to a single token rule.
+- **SetupCardRenderer.vue:813-855** — invents a full **private token vocabulary** (`--clay`, `--panel`, `--border`, `--text-1/2/3`, `--ok`, `--warn`…) with hardcoded light+dark values, all of which have global equivalents.
+
+The `.body--dark` twin-rule pattern (111 occurrences / 20 files in `.vue` blocks): the large majority re-specify colors that a token-based base rule handles automatically. Example collapses:
+- `IncidentList.vue:657` `.status-open { border: 1px solid #dc2626 }` + `:695` `body.body--dark .status-open { border: 1px solid #fca5a5 }` → one rule with `var(--color-status-error-*)` (×23 in this file alone).
+- `TraceDetailsSidebar.vue:2788` `th { background:#f5f5f5 !important }` + `:2792` dark twin `#424242` → `var(--color-surface-panel)`.
+- Legit keepers (minority): scrollbar-thumb colors, vue-flow canvas bg, the theme-picker's own preview chips.
+
+**Fix:** replace hex with `var(--color-*)` in the base rule; delete the `.body--dark` twin. This *shrinks* CSS while fixing themeability.
+
+### H. Unscoped `<style>` blocks — 210 of 245 (86%)
+
+`<style>` ×206 + `<style lang="scss">` ×4 unscoped, vs only 35 scoped. Mitigating fact: the codebase overwhelmingly namespaces rules under a unique per-component root class, so **broad leakage is rare** — but five confirmed genuine leaks exist:
+
+1. `plugins/traces/TraceDetailsSidebar.vue:2758` — bare `.highlight { background-color: yellow; }` global.
+2. `views/UsageTab.vue:1212-1213` — global `a:focus-visible, button:focus-visible { … }`.
+3. `lib/data/Timeline/OTimeline.vue:23` — bare `li:last-child …` descendant.
+4. `TraceDetailsSidebar.vue:2189-2213` — restyles bare `table/th/td` under a generic parent.
+5. `alerts/IncidentList.vue:657-736` — **23 generic global class names** (`.status-open`, `.severity-p1`, `.badge-blue`…) with no root namespace — collide with any same-named class anywhere in the app.
+
+Also: `ServiceGraphEdgeSidePanel.vue` registers global `.slide-enter-*` transition classes and generic `.panel-header`/`.metric-*` roots.
+
+**Why so many are unscoped:** many blocks style Quasar internals (`.q-*`), teleported dialogs/menus, or `v-html` content that scoped CSS can't reach without `:deep()`. That's a reason for *those rules*, not for the whole block.
+
+**Fix policy:** every `<style>` block becomes `scoped`; rules that must escape use explicit `:deep()` / `:global()` so escape hatches are visible and greppable. Convert file-by-file with visual check (adding `scoped` can change effective specificity/reach — this is the one mechanical change in this plan that genuinely needs eyes). New-file enforcement immediately via `vue/enforce-style-attribute` (§6.2).
+
+### I. Radius inconsistency — 5 competing vocabularies
+
+Current spread: bare `rounded` (4px) ×547, `rounded-md` (6px) ×289, `rounded-lg` (8px) ×282, `rounded-full` ×167, `rounded-sm` (4px) ×83, `rounded-none` ×26, `rounded-xl` ×28 / `-2xl` ×4 / `-3xl` ×1, `rounded-xs` ×4, plus ~95 arbitrary (`rounded-[3px]` ×15, `rounded-[0.625rem]` ×14, `rounded-[5px]` ×13, `rounded-[2px]` ×11, `rounded-[10px]` ×11, `rounded-[0.3rem]` ×9, `rounded-[20px]` ×6, `rounded-[3.125rem]` ×5, …).
+
+The project `--radius-*` tokens (sm=4, md=6, lg=8, xl=12, full) are registered and **coincide with Tailwind defaults**, so today `rounded-md` already flows through `--radius-md` — the system works; the 640+ bare-`rounded`/arbitrary sites just bypass it. If design bumps `--radius-md` 6→8, only the 289 `rounded-md` sites move.
+
+**Proposed radius policy (needs a design sign-off, then enforced):**
+
+| Role | Utility | Value |
+|---|---|---|
+| Chips, badges, tags, small inline controls | `rounded-sm` | 4px |
+| **Default** — buttons, inputs, cards, menus, table wrappers | `rounded-md` | 6px |
+| Dialogs, drawers, large panels | `rounded-lg` | 8px |
+| Marketing/hero/empty-state cards only | `rounded-xl` | 12px |
+| Pills, avatars, dots | `rounded-full` | — |
+| **Banned** | bare `rounded`, `rounded-2xl+`, `rounded-[arbitrary]` | |
+
+Migration mapping: bare `rounded` → `rounded-sm` (identical 4px — pure rename, then re-role to `-md` opportunistically during touch-ups); `[2px]/[3px]` → `rounded-sm`; `[5px]/[0.3rem]/[0.375rem]` → `rounded-md`; `[10px]/[0.625rem]` → `rounded-lg` or `-xl` (visual judgment); `[20px]/[3.125rem]` → `rounded-full` (they're pills).
+
+### J. Typography — arbitrary sizes because the scale has holes
+
+`text-[13px]` ×169 + `text-[0.8125rem]` ×53 (= the app's element base size), `text-[11px]` ×149 + `text-[0.6875rem]` ×36 + `text-[11.5px]` ×35, `text-[10px]` ×88, `text-[12px]` ×43 + `text-[0.75rem]` ×29 (duplicate `text-xs`!), `text-[14px]` ×22 (duplicate re-pinned `text-sm`), `text-[15px]` ×26, …
+
+Known quirk to preserve: `:root` `--text-sm`=13px / `--text-base`=14px drive *element-level* rules, but `tailwind.css:34-53` re-pins the `text-sm`/`text-base` **utilities** to 14/16px. (Also: the comment on `--text-base` in `base.css:512` says "16px" but the value is 14px — fix the comment.)
+
+**Fixes:**
+1. Add + register `--text-2xs: 0.6875rem` (11px) → kills 220 arbitrary sites.
+2. Design call for 13px: either accept `text-sm` (14px, +1px visually) at migration time, or add a registered `--text-compact: 0.8125rem` utility for dense data UIs (recommended — 222 sites want it).
+3. `text-[12px]`/`text-[0.75rem]` → `text-xs` (mechanical, ×72).
+4. 10px: keep only for chart axis micro-labels via one token (`--text-3xs: 0.625rem`) or lift to 11px; decide once.
+
+### K. Token-system defects (fix in the token layer itself)
+
+1. **`--tw-border-style: #e5e7eb`** (`semantic.css:211`, `dark.css:549`) — a **hex assigned to Tailwind's internal border-STYLE variable** (expects `solid`/`dashed`). Almost certainly meant to be a default border-*color*. Bug; remove/replace (a proper default border color already exists via `@layer base` in `tailwind.css:85-88`).
+2. **Missing dark overrides** (light value renders on dark surfaces): all 10 `--color-field-type-*` (pastel bg + saturated text — the worst), `--color-service-health-{critical,degraded,healthy,warning}`, `--color-wildcard-bar-blue` (its green/orange/purple siblings HAVE dark overrides — someone forgot blue), `--color-cancel-query-bg`, `--color-icon-color`.
+3. **Defined but unregistered** (no Tailwind utility, `var()`-only): `--color-json-{boolean,null,number,object,string}` (while `json-key` IS registered — split family), all 6 `--color-trace-*`, all `--color-field-type-*`, `--color-focus-ring` (so `ring-primary-500` ×16 gets used instead), `--color-log-table-header-bg`/`-row-hover`, `--color-table-actions-bg`, `--color-text-soft`, `--text-md`.
+4. **Registration gaps in primitives:** `primary-950`, `error-300` unregistered; success scale has no registered text utility (`text-green-500` ×19 + `text-green-600` ×11 exist partly because `text-success-*` doesn't).
+5. **Dead tokens:** `--color-dashboard-placeholder-bg` (0 consumers), `--color-actions-column-shawdow` (0 consumers, and misspelled). Delete.
+6. **Near-dead (1 consumer):** `latency-p95`, `pivot-header-border`, `wildcard-bar-blue`, `icon-color-dark`, `log-table-row-hover`, `status-neutral-text` — review during Phase A.
+7. `--color-icon-color-dark` is a static "dark variant as a second token" anti-pattern — should be one `--color-icon` token with a `.dark` override.
+
+## 4. Canonical decision: what "correct" looks like
+
+For every color/size/radius decision in a `.vue` file, in order of preference:
+
+1. **Registered semantic utility** — `text-text-secondary`, `bg-surface-base`, `border-border-default`, `text-status-error-text`, `rounded-md`, `text-2xs`. *(Default; covers ~90% of sites.)*
+2. **Registered component/domain utility** — `bg-label-chip-ip-bg`, `text-service-health-critical`.
+3. **`var(--color-*)` inside a `scoped` style block** — when the rule can't be a utility (`:deep()`, keyframes, v-html content, complex selectors).
+4. **A new token** — only when the intent genuinely doesn't exist yet (e.g. TraceDAG node-type palette). Added to the token files with light+dark values and `@theme inline` registration, never locally.
+
+Never: raw Tailwind palette classes, hex anywhere in `.vue`, `theme === 'dark'` for colors, unscoped styles, local private color vars, bare `rounded`, arbitrary `text-[..px]`/`rounded-[..]`.
+
+## 5. Remediation plan — phased, executed same-day, each phase independently shippable
+
+Order is dependency order, not a schedule: 0→B are prerequisites and small; C–F are parallelizable mechanical burn-down (codemod + agents can run batches concurrently); G flips the locks. If the day ends mid-C–F, the ratchet from B guarantees nothing regresses and any batch can land alone.
+
+### Phase 0 — P0 runtime bug fixes — *do immediately, independent of everything*
+
+**How:**
+1. `scripts/check-css-tokens.mjs:27` — remove `/^--q-/` from `ALLOW_PREFIXES`; add to `ALLOW_EXACT`: `--q-primary`, `--q-secondary`, `--q-accent`, `--q-positive`, `--q-negative`, `--q-info`, `--q-warning`, `--q-dark`, `--q-dark-page`, `--q-transition-duration`. Now `node scripts/check-css-tokens.mjs` **prints every phantom ref with its file** — fix each one using the §7.3 map (the §3.F table lists all known locations). For `rgba(var(--q-X-rgb), 0.1)` patterns, rewrite the whole expression as `color-mix(in srgb, var(--color-…) 10%, transparent)` — do NOT invent an `-rgb` token.
+2. `--tw-border-style` — delete the declaration at `semantic.css:211` and `dark.css:549` (the app-wide default border color is already correctly set via `@layer base` in `tailwind.css:85-88`; verify borders unchanged after deletion).
+3. No-op ternaries — replace the **entire ternary** with the correct semantic class (not "keep one branch"; the author's intent was themed supporting text): `anomaly_detection/steps/AnomalyDetectionConfig.vue:172,473,578-579`, `anomaly_detection/steps/AnomalyAlerting.vue:139`, `settings/ServiceIdentitySetup.vue:161-162,180-181,261-262,281-282,356-357` → `text-text-label` (metadata/labels) or `text-text-secondary` (descriptions) by reading the surrounding element.
+4. Global leaks: `TraceDetailsSidebar.vue:2758` `.highlight` → rename to `.trace-sidebar-highlight` (update template) and replace `yellow` with a token; `UsageTab.vue:1212-1213` → prefix with the component root class; `OTimeline.vue:23` → prefix `li` with the timeline root class; `TraceDetailsSidebar.vue:2189-2213` keep (parent-namespaced) but note in Phase E; `IncidentList.vue:657-736` → prefix all 23 `.status-*`/`.severity-*`/`.badge-*` classes with `.incident-list ` (or convert to scoped in the same PR — they collapse to tokens in Phase E anyway).
+
+**Verify:**
+```sh
+node scripts/check-css-tokens.mjs                       # green with the tightened allowlist
+grep -rE 'var\(--q-' src --include='*.vue' --include='*.ts' --include='*.css' \
+  | grep -vE '\(--q-(primary|secondary|accent|positive|negative|info|warning|dark|dark-page|transition-duration)[),]' # → 0 lines
+grep -rn 'tw-border-style' src                          # → 0
+grep -rEn "\? '([a-z-]+)' : '\1'" src --include='*.vue' # no-op ternaries → 0
 ```
+Manual: open **TelemetryCorrelationPanel** (correlation UI), **alerts → destination test result**, **EnterpriseUpgradeDialog** (hover the CTA), **RUM → source map upload dropzone** in light + dark — all four were visibly broken and must now show proper backgrounds/borders/hover tints.
 
-After this step:
-- `--o2-*` still resolves everywhere → **zero reference edits needed to be safe**.
-- Drift is eliminated — `--o2-*` now *is* the modern token.
-- The theme switcher's effect flows through automatically.
-- Every later step (codemod refs, retarget theme.ts, delete) becomes a **visual no-op**,
-  because the alias already made `--o2-x` === its target.
+### Phase A — Token-layer completion
 
-This is what makes a 197-file change safe in a day: **the visual convergence happens
-once, in one reviewable commit**, not spread across hundreds of risky edits.
-
----
-
-## 5. Canonical mapping (`--o2-*` → modern token)
-
-Full machine-readable map lives in `web/scripts/o2-token-map.json` (created in Stage 1).
-Families and rules:
-
-### Bucket A — 1:1 semantic equivalents (alias, then codemod refs)
-| Legacy | Modern |
-|---|---|
-| `--o2-text-heading` | `--color-text-heading` |
-| `--o2-text-primary` / `--o2-text-4` | `--color-text-primary` |
-| `--o2-text-body` | `--color-text-body` |
-| `--o2-text-secondary` / `--o2-text-2` | `--color-text-secondary` |
-| `--o2-text-caption` / `--o2-text-1` | `--color-text-caption` |
-| `--o2-text-label` / `--o2-text-3` | `--color-text-label` |
-| `--o2-text-muted` | `--color-text-muted` |
-| `--o2-text-placeholder` | `--color-text-placeholder` |
-| `--o2-text-link` / `--o2-text-link-hover` | `--color-text-link` / `-hover` |
-| `--o2-text-code` | `--color-text-code` |
-| `--o2-text-inverse` | `--color-text-inverse` |
-| `--o2-input-label-text-color` | `--color-input-label` |
-| `--o2-border` / `--o2-border-color` | `--color-border-default` |
-| `--o2-border-2` | `--color-border-subtle` |
-| `--o2-border-input` | `--color-input-border` |
-| `--o2-primary-background` | `--color-surface-base` |
-| `--o2-secondary-background` | `--color-surface-panel` |
-| `--o2-muted-background` | `--color-surface-subtle` |
-| `--o2-card-bg` / `--o2-card-bg-solid` / `--o2-card-background` | `--color-surface-base` ⚠️ (see notes) |
-| `--o2-card-text` | `--color-card-text` |
-| `--o2-popover-background` | `--color-surface-overlay` |
-| `--o2-popover-text` | `--color-text-primary` |
-| `--o2-code-bg` | `--color-code-bg` |
-| `--o2-primary-btn-bg` | `--color-button-primary` |
-| `--o2-primary-btn-text` / `--o2-primary-foreground` | `--color-button-primary-foreground` |
-| `--o2-secondary-btn-bg/text/border` | `--color-button-secondary` / `-foreground` / `-border` |
-| `--o2-hover-accent` / `--o2-interactive-hover` | `--color-interactive-hover-bg` |
-
-### Bucket B — runtime-computed by `theme.ts` (handled in §6, not aliasable to a static token)
-`--o2-theme-color`, `--o2-dark-theme-color`, `--o2-table-header-bg`, `--o2-tab-bg`,
-`--o2-inactive-tab-bg`, `--o2-menu-color`, `--o2-menu-gradient-start/end`,
-`--o2-body-primary-bg`, `--o2-body-secondary-bg`, `--o2-header-menu-bg`.
-→ Some already have modern equivalents (`--color-table-header-bg`,
-`--color-surface-chrome`). Retarget in `theme.ts`; keep computing the genuinely-derived
-ones under a modern name (see §6).
-
-### Bucket C — per-theme semantic set (runtime, from `semanticColors`)
-`--o2-negative`, `--o2-positive`, `--o2-status-error-text/bg`,
-`--o2-status-success-text/bg`. `theme.ts` already dual-writes some to
-`--color-button-outline-*`. Introduce **modern status tokens** and set those instead:
-`--color-status-error-text/-bg`, `--color-status-success-text/-bg`,
-`--color-status-negative`, `--color-status-positive`. (These are consolidation, not new
-concepts — they replace the o2 originals 1:1.)
-
-### Bucket D — domain data-viz palettes (~90 tokens: NO generic equivalent)
-`--o2-label-chip-*` (32), `--o2-span-kind-*` (10), `--o2-field-type-*` (10),
-`--o2-status-*` (13), `--o2-wildcard-*` (15), `--o2-trace-*` (6), `--o2-json-*` (6),
-`--o2-service-health-*` (4), `--o2-latency-*` (2), `--o2-severity-*` (2).
-These are legitimate domain colors, already have light+dark values. **Renamespace** them
-into the component-token layer under `--color-*` (e.g. `--o2-label-chip-ip-bg` →
-`--color-chip-ip-bg`, `--o2-span-kind-client-text` → `--color-span-client-text`,
-`--o2-trace-*` → `--color-trace-*`, `--o2-json-*` → `--color-code-json-*`). Pure rename,
-same values, so visually a no-op. This is the largest chunk — **time-box it**; if the day
-runs out, these stay aliased (Stage 1) and keep working, and the lint allowlists the
-`--color-*`-renamed names only.
-
-### ⚠️ Needs a design call before mapping (do NOT auto-codemod — ~6 tokens)
-- `--o2-primary-color` — light `--color-primary-600`, **dark `--color-primary-400`**. No
-  single static modern token flips like this. Options: (a) map to `--color-text-link`
-  (already 600→400), or (b) add one thin semantic token `--color-accent`. Pick per-usage.
-- `--o2-card-bg` — light value is `rgba(255,255,255,0.8)` (**semi-transparent**); mapping
-  to opaque `--color-surface-base` changes translucency over gradients. Visual-check the
-  95 usages; keep a translucent variant if any rely on it.
-- `--o2-theme-color` used directly in `color-mix()` in scoped styles — ensure the modern
-  replacement is a real color, not an rgba tint, where mixed.
-
----
-
-## 6. Theme switcher alignment (`utils/theme.ts`) — the critical file
-
-Current behaviour (see `applyThemeColors`):
-1. Toggles `.dark` (modern) **and** `.body--dark`/`.body--light` (legacy). — **KEEP BOTH.**
-2. Generates `--color-primary-50…900` from the theme color and sets inline. — **KEEP.**
-   This is the correct, modern mechanism; nothing to change.
-3. `setProperty('--o2-…')` for 20 tokens. — **THIS is the switcher "creating legacy tokens".**
-
-**Changes:**
-- Replace each `setProperty('--o2-X', …)` with the modern target from Bucket B/C
-  (e.g. `--o2-table-header-bg` → `--color-table-header-bg`, `--o2-status-error-text` →
-  `--color-status-error-text`).
-- For genuinely-derived values with no modern name (menu gradient, body bg tint), set
-  them under a modern name (`--color-chrome-menu-*`, `--color-app-bg`).
-- Keep toggling `.body--dark`/`.body--light` (out-of-scope compat — §2).
-- **Order of operations matters:** because Stage 1 aliases `--o2-X: var(--modern)`, you
-  may retarget `theme.ts` to set `--modern` directly while the alias still exists — the
-  alias then reads the freshly-set modern value. This lets §6 land **before** the ref
-  codemod with zero breakage.
-- Update the `semanticTokenNames` cleanup array to the modern names.
-- `utils/theme.spec.ts` and `themeManager.spec.ts` assert on token names → update them in
-  the same commit.
-
-**Verification is mandatory here** because it's runtime logic: exercise all 6 predefined
-themes × {light, dark} + one custom color + live preview (see §9 matrix).
-
----
-
-## 7. Linting & CI guards (must **fail** the build)
-
-Three layers. Add these **early** (Stage 0) so the freeze is enforced while migrating.
-
-### 7a. Stylelint — bans `--o2-*` in CSS + `<style>` + arbitrary values
-No stylelint today (only ESLint). Add `stylelint` + `postcss-html` (parses `<style>` in
-`.vue`). `web/.stylelintrc.json`:
-```json
-{
-  "overrides": [{ "files": ["**/*.vue"], "customSyntax": "postcss-html" }],
-  "rules": {
-    "declaration-property-value-disallowed-list": [
-      { "/.*/": ["/var\\(\\s*--o2-/"] },
-      { "message": "Legacy --o2-* tokens are banned. Use the modern --color-* token or a Tailwind utility." }
-    ]
+**How (all §3.K items):**
+1. **Dark overrides** — add to the `.dark`/`.body--dark` block in `dark.css` (alongside the existing label-chip overrides, which are the pattern to copy): `--color-field-type-*` (10 — follow the label-chip dark treatment: darken the pastel bg toward the surface, lighten the text one-two steps; same hue), `--color-service-health-*` (4 — lighten each ~1 step for dark-surface contrast, like `severity-*` does), `--color-wildcard-bar-blue` (copy the pattern of its green/orange/purple siblings at `dark.css:641-643`), `--color-cancel-query-bg`, `--color-icon-color`. Merge `--color-icon-color-dark` INTO `--color-icon-color`'s dark override and migrate its single consumer.
+2. **Registrations** — add to the `@theme inline` block at `component.css:4252`: `--color-json-{boolean,null,number,object,string}`, `--color-trace-*` (6), `--color-field-type-*` (10), `--color-focus-ring`, `--color-text-soft`, `--color-log-table-header-bg`, `--color-log-table-row-hover`, `--color-table-actions-bg`. In `semantic.css` `@theme inline`: `--color-primary-950`, `--color-error-300`, and the success scale (`--color-success-{50,100,400,500,600,700}` — values already in `base.css`).
+3. **Type scale** — in `base.css` next to `--text-xs`: add `--text-2xs: 0.6875rem;` (11px) and (pending the design call, default YES) `--text-compact: 0.8125rem;` (13px); register both in a `@theme inline` block so `text-2xs`/`text-compact` compile. Fix the wrong `--text-base` comment (`base.css:512` says 16px, value is 14px).
+4. **New domain tokens** — `--color-dag-node-{generation,embedding,…}-{border,bg,text}` (extract the 14-type map from `TraceDAG.vue:446-465` — light values from the current light hexes, dark values from the current `dark:` hexes) and `--color-highlight-bg` (light `#e7e6e6` / dark `#747474` from SyntaxGuideMetrics). Define light in `semantic.css`, dark in `dark.css`, register in `component.css`.
+5. **Delete dead tokens** — `--color-dashboard-placeholder-bg`, `--color-actions-column-shawdow` (both 0 consumers; confirm with grep first).
+6. **`utils/chartTheme.ts`** — token-driven chart palette:
+```ts
+const cache = new Map<string, string>();
+export function chartColor(token: `--color-${string}`): string {
+  let v = cache.get(token);
+  if (v === undefined) {
+    v = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+    cache.set(token, v);
   }
+  return v;
+}
+export function invalidateChartTheme(): void { cache.clear(); }
+```
+Call `invalidateChartTheme()` at the end of `applyThemeColors()` in `utils/theme.ts` (and on `.dark` toggle). Charts re-render on theme change already (they re-run their option builders), so reading fresh values is sufficient. Export convenience getters used by the converters: `chartTextColor()` → `--color-text-secondary`, `chartAxisLine()` → `--color-border-default`, `chartBg()` → `--color-surface-base`.
+
+**Verify:**
+```sh
+node scripts/check-css-tokens.mjs        # still green (all new refs defined)
+npm run build                            # text-2xs / text-compact / new utilities compile
+grep -rn 'icon-color-dark\|dashboard-placeholder-bg\|actions-column-shawdow' src  # → 0
+```
+Manual (dark mode): logs field-type chips (the 10 field-type tokens — pastel-on-dark was the bug), service graph health colors, wildcard blue bar.
+
+### Phase B — Enforcement scaffolding in RATCHET mode
+
+**How:**
+1. New CI script `scripts/check-design-consistency.mjs` (same shape as `check-css-tokens.mjs`). It counts, per `.vue` file, matches for each banned-pattern category:
+
+| Category key | Regex (JS) |
+|---|---|
+| `rawPalette` | `/\b(?:dark:|hover:|focus:)*(?:text\|bg\|border\|ring\|fill\|stroke\|divide\|outline\|decoration\|placeholder\|from\|via\|to)-(?:slate\|gray\|zinc\|neutral\|stone\|red\|orange\|amber\|yellow\|lime\|green\|emerald\|teal\|cyan\|sky\|blue\|indigo\|violet\|purple\|fuchsia\|pink\|rose)-\d{2,3}\b/g` |
+| `hexClass` | `/-\[#[0-9a-fA-F]{3,8}\]/g` |
+| `inlineHex` | `/style="[^"]*#[0-9a-fA-F]{3,8}/g` and `/:style="[^"]*#[0-9a-fA-F]{3,8}/g` |
+| `styleBlockHex` | `#[0-9a-fA-F]{3,8}\b` counted only between `<style` and `</style>` |
+| `themeTernary` | `/theme\s*===?\s*['"]dark['"]/g` |
+| `bareRounded` | `/(?:^\|[\s"'`])rounded(?![-\w])/g` |
+| `arbRadius` | `/rounded(?:-[a-z]+)*-\[[^\]]+\]/g` |
+| `arbTextSize` | `/text-\[[0-9.]+(?:px\|rem)\]/g` |
+| `unscopedStyle` | `/<style(?![^>]*scoped)[^>]*>/g` |
+
+   On `--baseline` it writes `scripts/design-debt-baseline.json` (`{ "<file>": { "<category>": n } }` + per-category totals). Default run: recount, **fail (exit 1) if any file's count in any category exceeds baseline**, print the offending file/category/diff; if counts dropped, print the improvement and instruct to re-run `--baseline` (committed with the PR). Wire into `package.json` (`"lint:design": "node scripts/check-design-consistency.mjs"`) and the CI lint job next to `check-css-tokens`.
+2. ESLint (`.eslintrc` / flat config): `"vue/enforce-style-attribute": ["warn", { "allow": ["scoped", "module"] }]` — flips to `error` in Phase F.
+3. Stylelint (`.stylelintrc.json`): in the existing `**/*.vue` override add `"color-no-hex": [true, { "severity": "warning" }]` (scoped to the `.vue` override so token files stay legal) — flips to `error` in Phase G.
+
+**Verify:** commit the baseline; then in a scratch branch add `class="text-gray-400"` to any component → `npm run lint:design` must fail naming that file/category; revert. CI green on main.
+
+### Phase C — Template codemod: raw classes → semantic utilities (batched)
+
+**How:** extend `scripts/codemod-color-utilities.mjs` (it already parses `@theme inline` registrations, so it can only ever emit utilities that exist) with the §7.1/§7.2 maps in two tiers:
+- **Auto tier** (rewrite in place): exact-value renames — `border-gray-200`→`border-border-default`, `border-gray-300`→`border-border-strong`, `bg-gray-50`→`bg-surface-panel`, `bg-gray-100`→`bg-surface-subtle`, `text-[12px]`/`text-[0.75rem]`→`text-xs`, bare `rounded`→`rounded-sm`, every §7.2 hex whose mapping is 1:1, and **dark-pair collapse**: when a ternary's/`dark:` pair's two values map to the same semantic token (e.g. `? 'border-gray-700' : 'border-gray-200'` → both are "default border") emit the single token utility and delete the conditional.
+- **Review tier** (codemod writes the suggestion as a diff/TODO, human approves per hunk): every gray *text* shade, `bg-gray-700/800`, `bg-white`/`text-white`, status colors. Decision rubric for gray text — read the element: form label / field name / metadata chip → `text-text-label`; description / helper / secondary paragraph → `text-text-secondary`; timestamp / footnote → `text-text-caption`; disabled state → `text-text-disabled`; icon → `text-icon-color`; de-emphasized filler ("No data yet") → `text-text-muted`. For `text-white`: on a colored/accent background → `text-text-inverse`; on a button → the button's foreground token. For `bg-white`: page/card surface → `bg-surface-base`; floating menu/popover → `bg-surface-overlay`.
+
+Batch order = debt order, one commit per batch: `components/alerts` (295) → `components/settings` (218) → `components/pipelines`+`pipeline` (116) → `plugins/traces` → `plugins/logs` → `components/rum`+`ingestion`+`functions` → `views/` → `enterprise/` → rest.
+
+**Verify per batch:**
+```sh
+npm run build && npm run lint:design     # counts strictly lower, none higher
+grep -rEc 'text-gray-[0-9]' src/components/alerts   # trending → 0 for the batch dir
+```
+Manual: open the batch's main screens in light + dark (alerts list, settings pages, …) — text hierarchy should look *unchanged* in light mode (the tokens resolve to near-identical greys) and *fixed* in dark mode where raw classes had no dark twin.
+
+### Phase D — JS theming elimination
+
+**How, by shape (find them all with `grep -rn "theme\s*===\?*\s*['\"]dark" src --include='*.vue' --include='*.ts'`):**
+- **Class ternaries** → single token utility (bulk of the 735; the C-tier rubric applies). If the two branches genuinely differ in intent (rare), use `dark:` variants — never a JS ternary.
+- **Local var-injection** (`HomeViewSkeleton.vue:29-31,61-63,86-88,111-113,163-165`) → replace the whole ternary with static `[--tile-bg:var(--color-surface-base)] [--tile-border:var(--color-border-default)] [--text-primary:var(--color-text-heading)]` exactly as `LLMInsightsSkeleton.vue:143-145` already does — or drop the local vars entirely and use the utilities directly.
+- **`:style` object ternaries** (`Quota.vue:160`, `IncidentDetailDrawer.vue:336,452-453`, `QueryConfig.vue:617`, `ServiceIdentitySetup.vue:1366-1483`) → move to classes with token utilities; where it must stay a style binding (computed values), bind `var(--color-*)` strings, not hex.
+- **Chart builders** (`utils/dashboard/convertPromQLData.ts:403,944`, `convertSQLGaugeChart.ts:57`, `convertSQLHeatmapChart.ts:152`, `convertSQLPieDonutChart.ts:58,209`, `promql/convertPromQLGaugeChart.ts:144`, `convertPromQLHeatmapChart.ts:311,482`, `sql/shared/contextBuilder.ts:483`, `heatmapDefaults.ts:41`, `views/UsageTab.vue` ×11, `plugins/traces/Index.vue:1518-1536`, `TraceDetails.vue:1671`, `composables/useStickyColumns.ts:58,74`, `PanelSchemaRenderer.vue:671`) → replace every `theme === 'dark' ? '#x' : '#y'` with `chartColor('--color-…')` from Phase A's `chartTheme.ts`. ECharts/Plotly need resolved values, which is exactly what `chartColor` returns.
+- **SVG strokes** (`SearchJobInspector.vue:38-232`) → `stroke="currentColor"` + a text-color utility on the svg, or `stroke="var(--color-…)"`.
+- **JS-built HTML strings** (`IncidentServiceGraph.vue:524-580`, `FlameGraphView.vue:428-439`, `TraceDetailsSidebar.vue:1136-1151` JSON printer, `IncidentTimeline.vue:539`) → emit class names, style them in the component's scoped CSS with `var(--color-*)`; the JSON printer uses the (now-registered) `--color-json-*` tokens.
+- **Specs asserting raw values** — update in the same commit as their component: `HomeViewSkeleton.spec.ts:60,82,230-231` (asserts `[--tile-bg:#ffffff]`), `ShortUrl.spec.ts:126` (asserts `text-[#666]`).
+
+**Verify:**
+```sh
+grep -rEn "theme\s*===?\s*['\"]dark['\"][^\n]{0,60}#[0-9a-fA-F]{3}" src --include='*.vue' --include='*.ts'  # → 0
+npm run test:unit  # updated specs green
+```
+Manual: §8 matrix **including one custom accent color** — dashboards/charts must now follow the accent + dark mode live (they never did before); flip theme with a chart on screen and confirm axis/label colors update without reload.
+
+### Phase E — Style-block program (file-batched)
+
+**How — fixed per-file procedure (apply in this order within each file):**
+1. **Tokenize colors:** replace every hex/named color with the matching `var(--color-*)` (use §7.2's hex→token map; the top-file characterizations in §3.G say which family each file's hexes belong to). Where light rule + `.body--dark` twin exist, put the token in the base rule and **delete the twin** — the token's dark override does the work. Keep only the legit `.body--dark` cases (scrollbar thumbs, canvas bg, theme-picker chips) and convert those selectors to `.dark` while touching them.
+2. **Lift trivial rules to utilities:** rules that are pure display/flex/gap/padding/margin/font-size/weight/radius on elements the template owns → delete the rule, add utilities to the template (`display:flex; justify-content:space-between` → `flex justify-between`). Hover/focus one-liners → `hover:`/`focus:` variants.
+3. **Scope the block:** add `scoped`; anything that must reach Quasar internals / teleported content / `v-html` gets explicit `:deep(.q-…)` or `:global(…)`. Watch for two known traps: (a) rules that currently style a **child component's** internals rely on being unscoped — they need `:deep()`; (b) teleported elements (menus, dialogs, tooltips like `CustomNode.vue`'s `.pipeline-error-tooltip`) render outside the component subtree — those need `:global()` or a dedicated global stylesheet entry.
+4. **What stays:** `:deep()` chains, `.q-*` overrides (×53), `@keyframes` (×103 — all EmptyState illustrations are pure animation, leave whole), v-html/markdown content styling (`LLMContentRenderer`, `RichTextInput`, `AlertSummary`), scrollbar pseudo-elements, `@media` — all fine as scoped, token-based CSS.
+
+Priority order: `IncidentList.vue` (pure win: 46 hex + 23 global classes + 23 dark twins all collapse), `TraceDetailsSidebar.vue`, `ServiceGraphEdgeSidePanel.vue` + `ServiceGraphNodeSidePanel.vue`, `SetupCardRenderer.vue` (delete the private `--clay/--panel/--text-1..3` vocabulary at lines 813-855, point consumers at global tokens), `HomeViewSkeleton.vue` (adopt `LLMInsightsSkeleton`'s aliasing), `TraceErrorTab.vue`, `RichTextInput.vue`, `O2AIChat.vue` (biggest — 122 hexes, ~1548-line block; do last, its `.light-mode`/`.dark-mode` class pairs become token rules + `dark:`).
+
+**Verify per file:**
+```sh
+npm run lint:design    # styleBlockHex + unscopedStyle counts drop for the file
+```
+Manual: that file's surface in light + dark, before/after screenshot compare (the change must be a visual no-op in light mode; dark mode may *improve* where hexes were light-only). For scoping changes, exercise the component's dialogs/menus/tooltips specifically (trap 3b).
+
+### Phase F — Radius + typography normalization
+
+**How:**
+- Radius (mostly sed-able, per §3.I): bare `rounded ` → `rounded-sm` (identical 4px, pure rename — regex `(?<![-\w])rounded(?![-\w])`); `rounded-[2px]`/`[3px]` → `rounded-sm`; `[5px]`/`[0.3rem]`/`[0.375rem]` → `rounded-md`; `[10px]`/`[0.625rem]` → `rounded-lg` (visual check the 25 sites; promote to `-xl` only if it looks wrong); `[20px]`/`[3.125rem]` → `rounded-full`; audit the 33 `rounded-xl/2xl/3xl` against the policy table (keep only marketing/empty-state cards).
+- Typography: `text-[11px]`/`[0.6875rem]`/`[11.5px]` → `text-2xs`; `text-[13px]`/`[0.8125rem]` → `text-compact` (or `text-sm` per the design call); `text-[12px]`/`[0.75rem]` → `text-xs`; `text-[14px]`/`[0.875rem]` → `text-sm`; `text-[15px]`/`[0.9375rem]` → `text-sm` or `text-md-…` per design call; `text-[10px]` → `text-2xs` where it fits, else the agreed 10px token for chart micro-labels only.
+- Flip `vue/enforce-style-attribute` to `error` (Phase E made all blocks scoped).
+
+**Verify:**
+```sh
+npm run lint:design   # bareRounded, arbRadius, arbTextSize → 0
+grep -rEoh 'rounded-(xl|2xl|3xl)' src --include='*.vue' | wc -l   # ≤ allowlisted count
+```
+Manual: chips/badges, buttons/inputs, dialogs — corner radii visually consistent per the policy table.
+
+### Phase G — Endgame: make wrong impossible
+
+**How:**
+1. **Disable Tailwind's default palette.** Create `src/lib/styles/tokens/palette-reset.css` containing exactly:
+```css
+@theme {
+  --color-*: initial;
 }
 ```
+   and in `src/styles/tailwind.css` import it **immediately after** `@import "tailwindcss";` and **before** the four token-file imports (their `@theme inline` blocks re-register the sanctioned set, so import order is what brings the approved colors back). From then on `text-gray-400` **does not compile into CSS** — the build itself is the guard. Two follow-ups this forces (good): (a) any surviving legit `bg-white`/`text-black` needs `--color-white`/`--color-black` registered in a `@theme inline` block (add to `semantic.css`; `transparent`/`current`/`inherit` are Tailwind keywords, unaffected); (b) run a full build + grep the output CSS for any class the app uses that stopped resolving — `npm run build` then click through §8; a missing utility shows up as visibly unstyled, and `lint:design` (now at 0) proves no raw classes remain in source.
+2. Flip every remaining warn to `error`: stylelint `color-no-hex`; delete `scripts/design-debt-baseline.json` and make `check-design-consistency.mjs` fail on ANY match (no baseline = zero tolerance).
+3. Document the §4 decision ladder + radius/type policy tables in `web/CONTRIBUTING.md` and the repo `CLAUDE.md` so humans *and* code-gen agents produce compliant code.
 
-### 7b. ESLint — bans `--o2-*` inside `.vue` templates (Tailwind arbitrary values)
-Stylelint won't see class strings in templates. Add a `no-restricted-syntax` /
-regex rule (via `eslint-plugin-vue` template AST or a simple `no-restricted-syntax` on
-`Literal`/`VLiteral` matching `--o2-`). Fails on `class="bg-[var(--o2-card-bg)]"`.
-
-### 7c. CI script — undefined-token guard (root cause) `web/scripts/check-css-tokens.mjs`
-Fails if any referenced `var(--x)` (minus a small runtime/library allowlist:
-`reka|tw|vf|q`, and the JS-`:style` set `o2-tree-*|node-color|chip-color|
-o2-row-status-color|o2-table-row-height`) is undefined **and** has no fallback.
-Validated core:
+**Verify:**
 ```sh
-grep -rhoE '\-\-[A-Za-z0-9_-]+[[:space:]]*:' --include=*.css --include=*.vue --include=*.ts src \
-  | grep -oE '\-\-[A-Za-z0-9_-]+' | sort -u > defined.txt
-grep -rhoE 'var\([[:space:]]*--[A-Za-z0-9_-]+' --include=*.css --include=*.vue --include=*.ts src \
-  | sed -E 's/var\([[:space:]]*//' | sort -u > referenced.txt
-comm -23 referenced.txt defined.txt   # → allowlist-filter → nonempty = fail
+npm run build                                    # compiles with palette reset
+npm run lint:design && npm run lint:css          # zero tolerance, all green
+grep -rE '\btext-gray-[0-9]' src --include='*.vue'   # → 0 (and wouldn't compile anyway)
 ```
-Wire all three into `package.json` scripts + the CI lint job.
+Full §8 matrix + Cypress suite. Then, in a scratch branch, add `class="bg-blue-50"` → build output must NOT contain a `bg-blue-50` rule (proves the palette kill works).
 
----
+## 6. Enforcement summary (what fails the build, when)
 
-## 8. Execution stages (each independently green + revertible)
-
-| Stage | Action | Breaking? | Gate before merge |
-|---|---|---|---|
-| **0** | Add lint 7a/7b/7c (allowlist current `--o2-*` as WARN, not error yet). Capture visual baseline screenshots (6 themes × L/D). | No | CI runs, screenshots archived |
-| **1** | **Alias bridge**: generate `--o2-* : var(--modern)` for Buckets A/C from `o2-token-map.json`; replace the hardcoded light block (`semantic.css:131-322`) and dark block (`dark.css:479-656`) with alias blocks. Fix the 3 §3 bugs. | No (visual convergence — review here) | Visual diff vs baseline; theme matrix §9 |
-| **2** | Retarget `theme.ts` runtime `setProperty` to modern names + update specs (§6). | No | Unit specs green + theme matrix §9 |
-| **3** | Codemod Bucket A refs: `var(--o2-x)`→`var(--color-x)`; `[var(--o2-x)]`/`(--o2-x)`→registered utility if one exists, else `[var(--color-x)]`. Run in **directory batches** (`lib/`, `components/`, `plugins/`, `enterprise/`, `views/`). Build + guard after each batch. | No (alias makes it no-op) | Build passes, guard 0 undefined, spot visual check per batch |
-| **4** | Renamespace Bucket D family-by-family (def + refs in one commit per family). | No (pure rename) | Build + guard per family |
-| **5** | Delete now-unused `--o2-*` alias defs. Flip lint 7a/7b from WARN → **ERROR**. Delete `assets/main.css` + `assets/base.css` (unused scaffolding). | No | `grep -r 'var(--o2-' src` returns 0; full theme matrix §9 |
-
-**If time runs out:** stop after any stage. Stages 0–2 alone (½ day) already: fix all
-bugs, kill drift, stop the switcher emitting legacy tokens, and freeze new `--o2-*` via
-lint. Everything still works because the alias bridge stands. Stages 3–5 are mechanical
-cleanup that can continue another day without risk.
-
----
-
-## 9. Verification matrix (run at gates 1, 2, 5)
-
-Theme switching is the highest-risk surface. For **each** predefined theme
-(O2 Signature, O2 Pulse, O2 Horizon, O2 Beacon, O2 Lens, O2 Crimson Ink) in **both**
-light and dark, plus **one custom color** and **live preview**, sanity-check:
-
-- App chrome (top bar, side rail, content card float) — surfaces correct.
-- Buttons (primary/secondary/outline/ghost/destructive/warning) — colors + hover.
-- Inputs / selects / switches / checkboxes / radios — borders, focus rings, disabled.
-- Tables (header, row hover, selected, zebra, dividers).
-- Badges/toasts/banners (all variants).
-- **Domain viz**: logs severity spines, trace span-kind chips, field-type chips,
-  label chips, JSON syntax colors, service-health, latency (the Bucket D surfaces).
-- Crimson Ink specifically exercises the `semanticColors` runtime path (§6).
-
-Automate what's cheap: run the existing Cypress/unit suites; the token guard (§7c) is the
-programmatic backstop for "did we break a reference".
-
----
-
-## 10. Rollback
-
-- Every stage is one commit (or one commit per batch/family) → `git revert` is clean.
-- The alias bridge (Stage 1) is the safety floor: if a Stage 3/4 codemod misfires, revert
-  that batch; the aliases still resolve `--o2-*`, so the app is never broken.
-- Keep Stages 0–2 and 3–5 as **separate PRs** so the freeze+bugfix half can ship even if
-  the cleanup half needs more time.
-
----
-
-## 11. Time budget (one day)
-
-| Block | Stages | ~Time |
+| Guard | Phase B | Phase G |
 |---|---|---|
-| Morning | 0 (lint+baseline), 3 §-bugs, 1 (alias bridge) | 3h |
-| Midday | 2 (theme.ts + specs) + theme matrix | 2h |
-| Afternoon | 3 (ref codemod, batched) | 2h |
-| Late | 4 (Bucket D, time-boxed) + 5 (delete, flip lint to error) | 2h |
+| `check-css-tokens.mjs` — undefined tokens, no `--q-` prefix hole | error | error |
+| `check-design-consistency.mjs` — per-file ratchet on all §3 patterns | ratchet | error, baseline deleted |
+| Tailwind default palette | enabled | **removed — raw classes don't compile** |
+| stylelint `color-no-hex` in `.vue` styles | warn | error |
+| ESLint `vue/enforce-style-attribute` (scoped) | warn | error |
+| stylelint `var(--o2-` ban | error (already live) | error |
 
-Buckets A/B/C + lint + theme.ts is the committed "must-land" (≈ through Stage 3).
-Bucket D is "land if green, else defer aliased".
+## 7. Canonical mapping tables
 
----
+### 7.1 Raw palette class → semantic utility (top of the codemod map)
 
-## 12. Deliverables checklist
+| Raw (occurrences) | Correct utility | Tier |
+|---|---|---|
+| `text-gray-400` (312) | `text-text-label` or `text-text-secondary` (intent) | review |
+| `text-gray-500` (121) | `text-text-secondary` / `text-text-caption` | review |
+| `text-gray-300` in dark ternaries (30) | collapse ternary → `text-text-secondary` | auto |
+| `text-gray-600/700` (54) | `text-text-body` | review |
+| `text-red-500/600/700` (83) | `text-status-error-text` (status) / `text-error-500` (decor) | review |
+| `text-green-500/600` (30) | `text-status-positive` / `text-status-success-text` | auto |
+| `text-amber-500`/`text-orange-500` (25) | `text-status-warning-text` / `text-warning-500` | review |
+| `text-blue-500/600` (25) | `text-text-link` / `text-status-info-text` | review |
+| `bg-white` as surface (most of 102) | `bg-surface-base` / `bg-surface-overlay` | review |
+| `bg-gray-50` (14) | `bg-surface-panel` | auto |
+| `bg-gray-100` (21) | `bg-surface-subtle` | auto |
+| `bg-gray-700/800` (40) | dark-ternary collapse → surface token | auto (when paired) |
+| `border-gray-200` (31) | `border-border-default` | auto |
+| `border-gray-300` (10) | `border-border-strong` | auto |
+| `border-gray-700` (25) | dark-pair collapse → `border-border-default` | auto (when paired) |
+| `ring-primary-500` (16) | `ring-focus-ring` (after registration) | auto |
+| `text-white` on accent bg (93) | `text-text-inverse` / component foreground token | review |
+| `text-primary-600` etc. (~80) | `text-accent` / `text-text-link` | review (works today) |
 
-- [ ] `web/scripts/o2-token-map.json` — the canonical mapping (source of truth for codemod + alias gen)
-- [ ] `web/scripts/gen-o2-aliases.mjs` — emits the alias block from the map
-- [ ] `web/scripts/codemod-o2-refs.mjs` — ref rewriter (var + arbitrary-value → utility)
-- [ ] `web/scripts/check-css-tokens.mjs` — undefined-token CI guard
-- [ ] `web/.stylelintrc.json` + deps + `package.json` script + CI wiring
-- [ ] ESLint template rule for `--o2-` in `.vue`
-- [ ] `utils/theme.ts` retargeted + specs updated
-- [ ] 3 source-bug fixes (§3)
-- [ ] `grep -r 'var(--o2-' web/src` → **0**
-- [ ] Lint 7a/7b flipped to ERROR
-- [ ] Unused `assets/main.css` + `assets/base.css` removed
+### 7.2 Arbitrary hex → token (top values; they're mostly Tailwind grays longhand)
+
+| Hex class | = Tailwind | Correct utility |
+|---|---|---|
+| `text-[#6b7280]`, `text-[#666]`, `text-[#6c757d]` | gray-500 | `text-text-secondary` |
+| `text-[#9ca3af]`, `text-[#b0b0b0]`, `text-[#a0aec0]` | gray-400 | `text-text-label` (or dark-pair collapse) |
+| `text-[#374151]`, `text-[#333]`, `text-[#4a5568]`, `text-[#2d3748]` | gray-700/800 | `text-text-body` / dark-pair |
+| `border-[#e5e7eb]`, `border-[#e9ecef]` | gray-200 | `border-border-default` |
+| `border-[#2d3748]`, `border-[#374151]`, `border-[#343434]` | gray-700/800 | dark-pair collapse → `border-border-default` |
+| `bg-[#f5f5f5]`, `bg-[#f3f4f6]` | gray-100 | `bg-surface-subtle` / `bg-surface-panel` |
+| `bg-[#1e1e1e]`, `bg-[#1a1a1a]` | — | dark-pair collapse → `bg-surface-base` |
+| `bg-[#e7e6e6]` / `bg-[#747474]` (SyntaxGuide pair ×68) | — | new `bg-highlight` token (Phase A) |
+| `text-[#1976d2]`, `border-[#1976d2]` | — | `text-text-link` / `border-accent` |
+| `bg-[#dc2626]`, `text-[#ef4444]` | red-600/500 | `bg-status-negative` / `text-status-error-text` |
+| TraceDAG node-type map (36 hits) | — | new `--color-dag-node-*` family (Phase A) |
+
+### 7.3 Phantom `--q-*` → modern token (Phase 0)
+
+`--q-text-secondary`→`--color-text-secondary` · `--q-text`/`--q-color-text`/`--q-color-text-primary`→`--color-text-primary` · `--q-background`/`--q-page-background`/`--q-card-background`→`--color-surface-base` · `--q-header-bg`→`--color-surface-panel` · `--q-item-bg`→`--color-surface-panel` · `--q-item-hover-bg`/`--q-hover-color`→`--color-interactive-hover-bg` · `--q-border-color`/`--q-color-separator`→`--color-border-default` · `--q-color-dark`→`--color-surface-base` (dark resolves via token) · `--q-primary-text`→`--color-button-primary-foreground` · `rgba(var(--q-{primary,positive,negative}-rgb), α)`→`color-mix(in srgb, var(--color-{theme-accent,status-positive,status-negative}) α%, transparent)`.
+
+## 8. Verification matrix (gates for phases C–G)
+
+Same surface as Part I §9 — for each predefined theme × {light, dark} + one custom accent + live preview: app chrome, buttons, inputs, tables, badges/toasts, domain viz (severity spines, span-kind chips, field-type chips, label chips, JSON colors, service health). **New additions for Part II:** dashboards/charts must follow the accent theme (Phase D makes this true for the first time); TelemetryCorrelationPanel, DestinationTestResult, EnterpriseUpgradeDialog, SourceMapDropzone (the Phase-0 repairs); IncidentList badges; TraceDAG nodes; O2AIChat panels.
+Cheap automation: Cypress + unit suites, `check-css-tokens.mjs`, `check-design-consistency.mjs` ratchet.
+
+## 9. Same-day execution order
+
+1. **Morning, sequential (prerequisites):** Phase 0 → A → B. These fix everything *visibly broken today*, close the guard holes, and install the ratchet so debt can only shrink from this point.
+2. **Rest of day, parallel:** Phases C, D, E, F are independent mechanical burn-down — run the codemod batches and file conversions concurrently (directory batches don't overlap; each lands as its own commit, ratchet verifies).
+3. **End of day:** Phase G (kill default palette, flip errors) — only if C–F reached zero on raw palette classes; otherwise G's lint-flip lands and the palette kill waits for the last batch.
+
+Safety floor: after B, any unfinished batch is just remaining debt frozen by the ratchet — the app is fully working at every commit.
+
+## 10. Deliverables checklist (Part II)
+
+- [ ] Phase 0: phantom `--q-*` fixes (18 names, 56 refs) + exact-name Quasar allowlist in `check-css-tokens.mjs`
+- [ ] Phase 0: `--tw-border-style` bug fix, 8 no-op ternaries, 5 global leak selectors
+- [ ] Phase A: dark overrides (field-type ×10, service-health ×4, wildcard-blue, cancel-query, icon-color)
+- [ ] Phase A: registrations (json-* ×5, trace-* ×6, field-type ×10, focus-ring, text-soft, success text scale, primary-950, error-300)
+- [ ] Phase A: `--text-2xs` (11px) + design call on 13px (`--text-compact`) and 10px floor
+- [ ] Phase A: design sign-off on radius policy table (§3.I)
+- [ ] Phase A: new domain tokens (`--color-dag-node-*`, `bg-highlight`) + delete dead tokens (`dashboard-placeholder-bg`, `actions-column-shawdow`)
+- [ ] Phase A: `utils/chartTheme.ts` token-driven chart palette
+- [ ] Phase B: `scripts/check-design-consistency.mjs` + `design-debt-baseline.json` ratchet in CI
+- [ ] Phase B: `vue/enforce-style-attribute` + stylelint `color-no-hex` (warn → error in F/G)
+- [ ] Phase C: codemod map extension + 6 directory batches merged
+- [ ] Phase D: 735 theme ternaries eliminated; specs updated to assert tokens
+- [ ] Phase E: 704 style-block hexes → `var(--color-*)`; `.body--dark` twins collapsed; all blocks `scoped`
+- [ ] Phase F: 0 arbitrary radius/font-size outside allowlist
+- [ ] Phase G: `@theme { --color-*: initial }` — raw palette classes no longer compile; baseline deleted; §4 ladder documented in contributor docs
+
+## 11. Appendix — audit reproduction commands (definition of done)
+
+Run from `web/`. These are the exact scans behind every §1 number; each category is DONE when its command returns the target. Re-run any time to measure progress (or let `lint:design` do it — same regexes).
+
+```sh
+# A. Raw palette utilities — target 0 (baseline 1,263 / 184 files)
+grep -rEoh '\b(text|bg|border|ring|fill|stroke|divide|outline|decoration|placeholder|from|via|to)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}\b' --include='*.vue' src | wc -l
+
+# B. Arbitrary hex classes — target 0 (baseline 1,097 / 113 files)
+grep -rEoh '[a-z-]+-\[#[0-9a-fA-F]{3,8}\]' --include='*.vue' src | wc -l
+
+# C. white/black utilities — target: only reviewed/legit sites (baseline ~250)
+grep -rEoh '\b(text|bg|border)-(white|black)(/[0-9]+)?\b' --include='*.vue' src | wc -l
+
+# D. JS theme ternaries — target 0 for color purposes (baseline 735; 226 with hex)
+grep -rE "theme\s*===?\s*['\"]dark" --include='*.vue' src | wc -l
+grep -rE "theme\s*===?\s*['\"]dark['\"].{0,40}#[0-9a-fA-F]{3}" --include='*.vue' --include='*.ts' src | wc -l
+
+# E. Inline style attrs with colors — target 0 (baseline 188)
+grep -rEoh 'style="[^"]*(color|background)[^"]*"' --include='*.vue' src | grep -vE ':style' | wc -l
+
+# F. Phantom --q-* tokens — target 0 (baseline 56 refs / 18 names) — also guarded by check-css-tokens after Phase 0
+grep -rEoh 'var\(--q-[A-Za-z0-9_-]+' --include='*.vue' --include='*.ts' --include='*.css' src \
+  | grep -cvE '\(--q-(primary|secondary|accent|positive|negative|info|warning|dark|dark-page|transition-duration)$'
+
+# G. Hex inside <style> blocks — target 0 (baseline ~704)
+for f in $(grep -rl '<style' --include='*.vue' src); do awk '/<style/{s=1} s{print} /<\/style>/{s=0}' "$f" | grep -cE '#[0-9a-fA-F]{3,8}\b'; done | paste -sd+ | bc
+
+# H. Unscoped style blocks — target 0 (baseline 210/245); .body--dark selectors target ≤ legit keepers (baseline 131)
+grep -rEoh '<style[^>]*>' --include='*.vue' src | grep -cv scoped
+grep -rE '\.body--dark' --include='*.vue' --include='*.css' --include='*.scss' src | wc -l
+
+# I. Radius — bare `rounded` and arbitrary target 0 (baselines 547 / ~95); xl+ ≤ allowlist (baseline 34)
+grep -rEoh '(^|[[:space:]"'"'"'])rounded([[:space:]"'"'"']|$)' --include='*.vue' src | wc -l
+grep -rEoh 'rounded(-[a-z]+)*-\[[^]]+\]' --include='*.vue' src | wc -l
+
+# J. Arbitrary font sizes — target 0 (baseline ~750)
+grep -rEoh 'text-\[[0-9.]+(px|rem)\]' --include='*.vue' src | wc -l
+
+# Always-green invariants (any phase, any commit):
+node scripts/check-css-tokens.mjs          # no undefined tokens, no --o2-, no phantom --q-
+node scripts/check-design-consistency.mjs  # no file above baseline (Phase B+); zero tolerance (Phase G+)
+npm run build
+```
