@@ -41,7 +41,7 @@ Measured on `web/src` (`.vue` files unless noted):
 | A | Raw Tailwind palette utilities (`text-gray-400`, `bg-gray-800`, `text-red-500`, …) | **1,263 occurrences / 184 files** | Un-themed. Ignore token changes AND dark mode |
 | B | Arbitrary hex utility classes (`text-[#666]`, `bg-[#e7e6e6]`, `border-[#e5e7eb]`) | **1,097 occurrences / 113 files** | Same, plus unreadable |
 | C | `bg-white` / `text-white` / `text-black` etc. on themeable surfaces | **~250 occurrences** | Break in dark mode unless hand-paired |
-| D | JS theme ternaries `theme === 'dark' ? X : Y` in `.vue` | **735** (226 emit raw hex) | Hand-rolled dark mode, drifts from tokens; includes **no-op ternaries** |
+| D | JS theme ternaries `theme === 'dark' ? X : Y` (`.vue`+`.ts`) | **834** in **5 spellings** (226 emit raw hex) | Hand-rolled dark mode, drifts from tokens; includes **no-op ternaries** |
 | E | Static `style=""` attributes with hardcoded colors | **188** | Un-themed, highest specificity |
 | F | Phantom `--q-*` tokens that are never defined | **56 `var()` refs to 18 names** | **Silently broken UI today** (transparent bg, invalid colors) — hidden by guard allowlist |
 | G | Hardcoded hex inside `<style>` blocks | **~704** | Duplicates tokens; forces `.body--dark` twin rules |
@@ -55,6 +55,7 @@ Measured on `web/src` (`.vue` files unless noted):
 | O | Multi-digit `px` values inside `<style>` blocks (rem-only rule; `1px` hairlines exempt) | **~3,026 (≥10px alone)** | Not zoom/density-safe; violates CSS-units rule |
 | P | Hardcoded hex in `.ts` files (chart palettes, theme constants, syntax highlighters) | **646 non-spec** | JS-rendered UI ignores tokens & theme |
 | Q | Arbitrary z-index (`z-[1]` … `z-[10001]`) | **49** | Stacking-order roulette; no layering scale |
+| R | **Dark-mode mechanism fragmentation** — 6 different ways to detect/apply dark mode (see §3.R) | **6 mechanisms, ~1,500 sites** | No single way; can't reason about or enforce dark mode |
 
 **The user-visible consequence** (the exact scenario that motivated this audit): if design changes `--color-text-secondary` today, the **315 `text-gray-400`** and **129 `text-gray-500`** sites don't move. If design changes the app radius from `md` to `lg`, the 547 bare-`rounded` + 95 arbitrary-radius sites don't move. The token system is correct and complete enough — **the consumers bypass it.**
 
@@ -281,6 +282,68 @@ Two distinct kinds — do not treat uniformly:
 
 **Fix (Phase F):** adopt a documented ladder — `z-10` raised-in-flow · `z-20` sticky headers · `z-30` dropdowns/popovers · `z-40` overlays/drawers · `z-50` modals · `z-60` toasts (exact values need the §12.5 call, including where Quasar's own stacking contexts sit) — and map all 49 sites onto it. Anything above the ladder exists only for third-party interop and is allowlisted by file. Ratcheted as `arbZ` from Phase B.
 
+### R. Dark-mode mechanism fragmentation — 6 ways to do one thing (**must converge to one schema, hard-enforced**)
+
+Today there is **one source of truth** (correct) but **six downstream mechanisms** reading/applying it — three redundant CSS conventions, JS string-compares written five different ways, and 40 private wrapper flags. This is the reason "change how dark mode works" is currently impossible: there is no single seam. This section defines the **mandatory schema** and the **linter rules that make every other way fail the build.**
+
+#### R.1 — The canonical dark-mode schema (the ONE way; this is the contract)
+
+> **DOM contract:** the *only* signal for dark mode is the class **`.dark` on `<html>`**, owned solely by `utils/theme.ts`. `.body--dark`/`.body--light` on `<body>` are **compat-only, written by `theme.ts`, and read by nobody** (deleted once §R migration hits 0). `store.state.theme` is read in **exactly two files** — `composables/useTheme.ts` and `utils/chartTheme.ts` — and nowhere else, ever.
+
+**Strict decision table — for any dark-mode need, there is exactly one allowed construct:**
+
+| The need | The ONE allowed construct | Never |
+|---|---|---|
+| A color/bg/border that differs light↔dark | **A token** (`text-text-secondary`, `bg-surface-base`, …). Dark is handled automatically by `dark.css` `.dark` overrides — **write no dark handling at all** | any `dark:` on a color, any ternary, any hex pair |
+| A **non-color** dark-only rule in a template (shadow swap, bg-image, opacity) | **Tailwind `dark:` variant** (`dark:shadow-none`) | `.body--dark`, `.light-mode`, JS ternary on class |
+| A dark-only rule inside a `<style>` block (`:deep()`, keyframes, complex selector) | **`:where(.dark) &` / `.dark &`** in a **scoped** block, referencing tokens | `.body--dark`, `body.body--dark`, `.dark-mode` |
+| A **resolved color value** for a JS chart/canvas lib (ECharts/Plotly) | **`chartColor('--color-…')`** (§3.A) | `theme === 'dark' ? '#x' : '#y'` |
+| A **boolean** in JS logic that truly can't be CSS | **`const { isDark } = useTheme()`** | `store.state.theme === 'dark'`, a local `isDark` const, `classList.contains('body--dark')` |
+
+That's it — five needs, five constructs, two of which (`.dark &`, `dark:`) are the same mechanism at different layers. Everything else is banned.
+
+#### R.2 — Current fragmentation (the audit numbers)
+
+| # | Mechanism | Count | Verdict under R.1 |
+|---|---|---|---|
+| 1 | `store.state.theme === 'dark'` JS reads (templates, computeds, `.ts`) | **834**, in **5 spellings** (`===`/`==` × `'dark'`/`"dark"`, +15 `!==`) | **Kill** → tokens / `useTheme()` / `chartColor()` |
+| 2 | `isDark`/`isDarkMode`/`darkMode` local computed flags | **40** | **Consolidate** → the one `useTheme()` |
+| 3 | Tailwind `dark:` variant (keyed to `.dark`) | **293** | ✅ **Canonical.** Keep |
+| 4 | `.dark` selectors in `<style>` | **107** | ✅ Canonical (scoped, `:where(.dark) &`). Keep |
+| 5 | `.body--dark` / `.body--light` selectors | **193** | **Migrate → `.dark`** (mostly deletable, §3.G) |
+| 6 | `classList.contains('body--dark')` JS | **3** | **Migrate → `useTheme()`** |
+| 7 | `.light-mode` / `.dark-mode` pairs (component-invented, e.g. O2AIChat) | **73** | **Delete** — a 3rd ad-hoc convention |
+
+Fragmentation = **3 CSS conventions** + **JS compares in 5 spellings** + **40 private flags**. Target: mechanisms 3+4 are the only survivors on the CSS side; `useTheme()`+`chartColor()` the only survivors on the JS side.
+
+#### R.3 — Enforcement (real linter rules, not just the count ratchet — this is what makes it "strong")
+
+Three independent guards, so a violation fails on at least one:
+
+1. **ESLint** `no-restricted-syntax` banning theme string-compares, with a **file `overrides` allowlist** of `composables/useTheme.ts` + `utils/chartTheme.ts` (only those two may compare `store.state.theme`):
+   ```jsonc
+   // .eslintrc — applies to src/**, overridden to "off" for the 2 sanctioned files
+   "no-restricted-syntax": ["error", {
+     "selector": "BinaryExpression[operator=/^[!=]==?$/] > MemberExpression[property.name='theme']",
+     "message": "Dark mode has one JS seam: useTheme().isDark or chartColor(). Do not compare store.state.theme (§3.R)."
+   }]
+   ```
+   Also ban the wrapper flags: `no-restricted-syntax` on `VariableDeclarator[id.name=/^(isDark|isDarkMode|darkMode)$/]` outside `useTheme.ts` → "import `useTheme()` instead."
+2. **Stylelint** `selector-disallowed-list` (in the `**/*.{vue,css,scss}` override) banning the legacy/ad-hoc CSS conventions:
+   ```json
+   "selector-disallowed-list": [
+     ["/\\.body--(dark|light)/", "/\\.(light|dark)-mode/"],
+     { "message": "Dark mode CSS uses .dark only (Tailwind dark: variant or :where(.dark) &). §3.R" }
+   ]
+   ```
+3. **`check-design-consistency.mjs`** `darkMechanism` category (belt-and-suspenders count ratchet) — counts mechanisms 1,2,5,6,7 per file; can only decrease.
+
+**Rollout:** all three land at **Phase B** as `warn`/ratchet (freezes the debt immediately — no new violation can be added from day one), and flip to **`error`/zero-tolerance at Phase G**. New code is therefore held to the schema *strongly and immediately*; existing violations burn down through Phases D/E without ever blocking a build.
+
+#### R.4 — Migration & scope note (supersedes Part I §2)
+
+Part I explicitly deferred `.body--dark` removal as "a separate future effort." A single enforced mechanism **overrides that** — `.body--dark` migration is now **in scope**: mechanism 1/2 in **Phase D** (introduce `useTheme()`, route JS cases through it, eliminate ternaries), mechanism 5/7 in **Phase E** (`.body--dark` twins collapse to token rules; `.light-mode`/`.dark-mode` → `dark:`+tokens), mechanism 6 in **Phase 0/D**. The `theme.ts` compat toggle of `.body--dark`/`.body--light` is the **last** thing removed, only after grep shows zero consumers.
+
 ## 4. Canonical decision: what "correct" looks like
 
 For every color/size/radius decision in a `.vue` file, in order of preference:
@@ -290,7 +353,9 @@ For every color/size/radius decision in a `.vue` file, in order of preference:
 3. **`var(--color-*)` inside a `scoped` style block** — when the rule can't be a utility (`:deep()`, keyframes, v-html content, complex selectors).
 4. **A new token** — only when the intent genuinely doesn't exist yet (e.g. TraceDAG node-type palette). Added to the token files with light+dark values and `@theme inline` registration, never locally.
 
-Never: raw Tailwind palette classes, hex anywhere in `.vue`, `theme === 'dark'` for colors, unscoped styles, local private color vars, bare `rounded`, arbitrary `text-[..px]`/`rounded-[..]`/`gap-[..px]`-style px values, `tw:` prefixes, Quasar utility classes (`q-pa-*`, `text-weight-*`), arbitrary `z-[..]`, multi-digit `px` in style blocks.
+**Dark mode has exactly one way** (§3.R): tokens handle it automatically; for a genuine dark-only rule use the Tailwind `dark:` variant; in JS-only surfaces use `chartColor()` or the single `useTheme()` composable. Never `.body--dark`/`.body--light`, `.light-mode`/`.dark-mode`, raw `store.state.theme === 'dark'`, or a private `isDark` flag.
+
+Never: raw Tailwind palette classes, hex anywhere in `.vue`, `theme === 'dark'` for colors, unscoped styles, local private color vars, bare `rounded`, arbitrary `text-[..px]`/`rounded-[..]`/`gap-[..px]`-style px values, `tw:` prefixes, Quasar utility classes (`q-pa-*`, `text-weight-*`), arbitrary `z-[..]`, multi-digit `px` in style blocks, and any dark-mode mechanism other than the one above.
 
 ## 5. Remediation plan — phased, executed same-day, each phase independently shippable
 
@@ -373,6 +438,7 @@ Manual (dark mode): logs field-type chips (the 10 field-type tokens — pastel-o
    On `--baseline` it writes `scripts/design-debt-baseline.json` (`{ "<file>": { "<category>": n } }` + per-category totals). Default run: recount, **fail (exit 1) if any file's count in any category exceeds baseline**, print the offending file/category/diff; if counts dropped, print the improvement and instruct to re-run `--baseline` (committed with the PR). Wire into `package.json` (`"lint:design": "node scripts/check-design-consistency.mjs"`) and the CI lint job next to `check-css-tokens`.
 2. ESLint (`.eslintrc` / flat config): `"vue/enforce-style-attribute": ["warn", { "allow": ["scoped", "module"] }]` — flips to `error` in Phase F.
 3. Stylelint (`.stylelintrc.json`): in the existing `**/*.vue` override add `"color-no-hex": [true, { "severity": "warning" }]` (scoped to the `.vue` override so token files stay legal) — flips to `error` in Phase G.
+4. **Dark-mode schema guards (§3.R.3) — land all three now:** (a) ESLint `no-restricted-syntax` banning `store.state.theme` compares + `isDark`/`isDarkMode` flag declarations, with a `.eslintrc` `overrides` block turning the rule `off` for `src/composables/useTheme.ts` and `src/utils/chartTheme.ts` only; (b) Stylelint `selector-disallowed-list` banning `.body--dark`/`.body--light`/`.light-mode`/`.dark-mode`; (c) the `darkMechanism` category in `check-design-consistency.mjs`. All at `warn`/ratchet now → `error` at Phase G. (Create the empty `composables/useTheme.ts` seam in this phase so the allowlist target exists; fill it in Phase D.)
 
 **Verify:** commit the baseline; then in a scratch branch add `class="text-gray-400"` to any component → `npm run lint:design` must fail naming that file/category; revert. CI green on main.
 
@@ -391,10 +457,25 @@ grep -rEc 'text-gray-[0-9]' src/components/alerts   # trending → 0 for the bat
 ```
 Manual: open the batch's main screens in light + dark (alerts list, settings pages, …) — text hierarchy should look *unchanged* in light mode (the tokens resolve to near-identical greys) and *fixed* in dark mode where raw classes had no dark twin.
 
-### Phase D — JS theming elimination
+### Phase D — JS theming elimination + dark-mode mechanism unification (§3.R)
+
+**First, create the single JS seam** `composables/useTheme.ts` — the ONE allowed way to read theme in JS:
+```ts
+import { computed } from "vue";
+import { useStore } from "vuex";
+export function useTheme() {
+  const store = useStore();
+  const isDark = computed(() => store.state.theme === "dark");
+  return { isDark };
+}
+```
+This is the only file (besides `utils/chartTheme.ts`) permitted to string-compare the theme; the `darkMechanism` guard (§6) enforces that. Then eliminate the mechanisms:
+- **The 40 ad-hoc `isDark`/`isDarkMode` consts** → replace each with `const { isDark } = useTheme()`. Pure consolidation, no behavior change.
+- **The 3 `classList.contains('body--dark')` JS reads** → `useTheme().isDark`.
+- **The 834 raw `theme *==* 'dark'` reads** → most become tokens/`dark:` (below); the residual genuinely-JS ones go through `useTheme()`.
 
 **How, by shape (find them all with `grep -rn "theme\s*===\?*\s*['\"]dark" src --include='*.vue' --include='*.ts'`):**
-- **Class ternaries** → single token utility (bulk of the 735; the C-tier rubric applies). If the two branches genuinely differ in intent (rare), use `dark:` variants — never a JS ternary.
+- **Class ternaries** → single token utility (bulk of the 834; the C-tier rubric applies). If the two branches genuinely differ in intent (rare), use `dark:` variants — **never a JS ternary for a class**.
 - **Local var-injection** (`HomeViewSkeleton.vue:29-31,61-63,86-88,111-113,163-165`) → replace the whole ternary with static `[--tile-bg:var(--color-surface-base)] [--tile-border:var(--color-border-default)] [--text-primary:var(--color-text-heading)]` exactly as `LLMInsightsSkeleton.vue:143-145` already does — or drop the local vars entirely and use the utilities directly.
 - **`:style` object ternaries** (`Quota.vue:160`, `IncidentDetailDrawer.vue:336,452-453`, `QueryConfig.vue:617`, `ServiceIdentitySetup.vue:1366-1483`) → move to classes with token utilities; where it must stay a style binding (computed values), bind `var(--color-*)` strings, not hex.
 - **Chart builders** (`utils/dashboard/convertPromQLData.ts:403,944`, `convertSQLGaugeChart.ts:57`, `convertSQLHeatmapChart.ts:152`, `convertSQLPieDonutChart.ts:58,209`, `promql/convertPromQLGaugeChart.ts:144`, `convertPromQLHeatmapChart.ts:311,482`, `sql/shared/contextBuilder.ts:483`, `heatmapDefaults.ts:41`, `views/UsageTab.vue` ×11, `plugins/traces/Index.vue:1518-1536`, `TraceDetails.vue:1671`, `composables/useStickyColumns.ts:58,74`, `PanelSchemaRenderer.vue:671`) → replace every `theme === 'dark' ? '#x' : '#y'` with `chartColor('--color-…')` from Phase A's `chartTheme.ts`. ECharts/Plotly need resolved values, which is exactly what `chartColor` returns.
@@ -405,6 +486,9 @@ Manual: open the batch's main screens in light + dark (alerts list, settings pag
 **Verify:**
 ```sh
 grep -rEn "theme\s*===?\s*['\"]dark['\"][^\n]{0,60}#[0-9a-fA-F]{3}" src --include='*.vue' --include='*.ts'  # → 0
+# dark-mode mechanism: raw theme compares only survive in the 2 sanctioned files
+grep -rEl "theme\s*[=!]==?\s*['\"]dark['\"]" src --include='*.vue' --include='*.ts' | grep -vE 'useTheme\.ts|chartTheme\.ts'  # → 0
+grep -rn "classList\.contains\(['\"]body--" src --include='*.vue' --include='*.ts'  # → 0
 npm run test:unit  # updated specs green
 ```
 Manual: §8 matrix **including one custom accent color** — dashboards/charts must now follow the accent + dark mode live (they never did before); flip theme with a chart on screen and confirm axis/label colors update without reload.
@@ -477,7 +561,10 @@ Full §8 matrix + Cypress suite. Then, in a scratch branch, add `class="bg-blue-
 | Guard | Phase B | Phase G |
 |---|---|---|
 | `check-css-tokens.mjs` — undefined tokens, no `--q-` prefix hole | error | error |
-| `check-design-consistency.mjs` — per-file ratchet on all §3 patterns (A–Q: incl. `twPrefix`, `quasarUtil`, `arbPx`, `tsHex`, `arbZ`) | ratchet | error, baseline deleted |
+| `check-design-consistency.mjs` — per-file ratchet on all §3 patterns (A–R: incl. `twPrefix`, `quasarUtil`, `arbPx`, `tsHex`, `arbZ`, `darkMechanism`) | ratchet | error, baseline deleted |
+| **Dark-mode schema (§3.R), 3 guards:** ESLint `no-restricted-syntax` on `store.state.theme` compares + `isDark` flags (allowlist: `useTheme.ts`, `chartTheme.ts`) | warn | error |
+| — Stylelint `selector-disallowed-list`: `.body--dark`/`.body--light`/`.light-mode`/`.dark-mode` | warn | error |
+| — `check-design-consistency.mjs` `darkMechanism` count ratchet | ratchet | error, baseline deleted |
 | `check-design-consistency.mjs` — `stylePxUnit` (px in style blocks) | ratchet | **ratchet (stays; §12.4)** |
 | Tailwind default palette (`--color-*: initial`) | enabled | **removed — raw classes don't compile** ✅ approved |
 | Tailwind default radius/text scales (`--radius-*`/`--text-*: initial`, G.4) | enabled | removed — only sanctioned steps compile |
@@ -557,8 +644,10 @@ Safety floor: after B, any unfinished batch is just remaining debt frozen by the
 - [ ] Phase B: `scripts/check-design-consistency.mjs` + `design-debt-baseline.json` ratchet in CI
 - [ ] Phase B: `vue/enforce-style-attribute` + stylelint `color-no-hex` (warn → error in F/G)
 - [ ] Phase C: codemod map extension + 6 directory batches merged
-- [ ] Phase D: 735 theme ternaries eliminated; specs updated to assert tokens
-- [ ] Phase E: 704 style-block hexes → `var(--color-*)`; `.body--dark` twins collapsed; all blocks `scoped`; px → rem in touched rules (§3.O)
+- [ ] Phase D: 834 theme ternaries eliminated; specs updated to assert tokens
+- [ ] Phase D: **dark-mode unified to one mechanism (§3.R)** — `composables/useTheme.ts` created; 40 ad-hoc `isDark` flags + 3 `classList.contains('body--*')` routed through it; raw `theme === 'dark'` survives only in `useTheme.ts`/`chartTheme.ts`
+- [ ] Phase E: 704 style-block hexes → `var(--color-*)`; `.body--dark` twins collapsed; `.body--dark`/`.light-mode`/`.dark-mode` selectors (266) migrated to `.dark`/`dark:`; all blocks `scoped`; px → rem in touched rules (§3.O)
+- [ ] Post-migration: `theme.ts` stops toggling `.body--dark`/`.body--light` (last step, after grep shows 0 consumers)
 - [ ] Phase F: 0 arbitrary radius/font-size outside allowlist
 - [ ] Phase F: Quasar utility classes ×50 → Tailwind equivalents (§3.M); arbitrary-px spacing ×~999 → scale steps (§3.N); arbitrary z-index ×49 → ladder (§3.Q)
 - [ ] Phase D/P: `.ts` hex ×646 → `chartColor()`/tokens; palette-source files allowlisted per §12.3
@@ -622,6 +711,17 @@ grep -rEoh "['\"]#[0-9a-fA-F]{3,8}['\"]" --include='*.ts' src | grep -v spec | w
 
 # Q. Arbitrary z-index — target 0 (baseline 49)
 grep -rEoh '\bz-\[[0-9]+\]' --include='*.vue' src | wc -l
+
+# R. Dark-mode mechanism — one way only (§3.R). Targets:
+#   raw theme compares (834) → 0 outside useTheme.ts/chartTheme.ts
+grep -rE "theme\s*[=!]==?\s*['\"]dark['\"]" --include='*.vue' --include='*.ts' src | grep -vE 'useTheme\.ts|chartTheme\.ts' | wc -l
+#   ad-hoc isDark flags (40) → 0 (all via useTheme)
+grep -rEn 'const (isDark|isDarkMode|darkMode)\s*=' --include='*.vue' --include='*.ts' src | grep -v 'useTheme.ts' | wc -l
+#   legacy/ad-hoc CSS conventions: .body--dark/.body--light (193) + .light-mode/.dark-mode (73) → 0
+grep -rEoh '\.body--(dark|light)|\.(light|dark)-mode' --include='*.vue' --include='*.css' --include='*.scss' src | wc -l
+#   classList.contains('body--*') JS reads (3) → 0
+grep -rEn "classList\.contains\(['\"]body--" --include='*.vue' --include='*.ts' src | wc -l
+#   .dark selectors (107) + dark: variant (293) are the KEPT mechanism — should be the ONLY survivors
 
 # Always-green invariants (any phase, any commit):
 node scripts/check-css-tokens.mjs          # no undefined tokens, no --o2-, no phantom --q-
