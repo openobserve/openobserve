@@ -152,9 +152,9 @@ const columns = computed<OTableColumnDef<TData>[]>(() => {
   // Results mode
   return [
     { id: "step", header: "", size: 44 },
-    { id: "screenshot", header: "", size: 80 },
+    { id: "screenshot", header: "", size: 90 },
     { id: "details", header: "Step", size: 200, meta: { autoWidth: true } },
-    { id: "progress", header: "", size: 90 },
+    { id: "progress", header: "", size: 100 },
     { id: "duration", header: "Duration", size: 80 },
   ];
 });
