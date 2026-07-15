@@ -363,6 +363,33 @@ describe("MetricsExplorer wiring", () => {
       expect(grid.searchTerm.value).toBe("cpu");
       expect(grid.favorites.value).toEqual(["node_memory"]);
     });
+  });
+
+  describe("Convert to dashboard", () => {
+    it("builds one panel per pinned metric and opens the dialog", () => {
+      // Each pinned metric becomes its own panel, built from the card's type-based
+      // variant (effectiveVariant + buildPanelDataForCard, as the drill-in does).
+      const wrapper = mountExplorer();
+      grid.cards.value = [
+        { name: "http_requests_total", unsupported: false, cardKind: "counterRate" },
+        { name: "node_memory", unsupported: false, cardKind: "gauge" },
+      ];
+      grid.favorites.value = ["http_requests_total", "node_memory"];
+
+      (wrapper.vm as any).openConvertToDashboard();
+
+      expect(grid.effectiveVariant).toHaveBeenCalledTimes(2);
+      expect((wrapper.vm as any).convertPanels).toHaveLength(2);
+      expect((wrapper.vm as any).convertPanels[0].title).toBe("http_requests_total");
+      expect((wrapper.vm as any).convertDialogOpen).toBe(true);
+    });
+
+    it("does nothing when nothing is pinned", () => {
+      const wrapper = mountExplorer();
+      grid.favorites.value = [];
+      (wrapper.vm as any).openConvertToDashboard();
+      expect((wrapper.vm as any).convertDialogOpen).toBe(false);
+    });
 
     it("shows the active facet panel without a click — the panel is always open", () => {
       // Regression guard for the redesign: the panel used to be gated behind

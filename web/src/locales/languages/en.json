@@ -3965,6 +3965,8 @@
         "deleteConfirm": "Delete the saved view ‘{name}’? This cannot be undone.",
         "deleteAria": "Delete saved view {name}"
       },
+      "convertToDashboard": "Convert to dashboard",
+      "convertToDashboardTooltip": "Add your {count} pinned metrics to a dashboard, one panel each",
       "favorites": "Favorites ({count})",
       "showAllMetrics": "Show all metrics",
       "loading": "Loading metrics…",

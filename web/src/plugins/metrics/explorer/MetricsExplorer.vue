@@ -339,6 +339,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :build-snapshot="buildSavedViewSnapshot"
             @apply="applySavedViewSnapshot"
           />
+
+          <!-- Convert to dashboard — turns the pinned metrics into real dashboard
+               panels (one per pin). Only offered when something is pinned. -->
+          <OButton
+            v-if="grid.favorites.value.length"
+            variant="outline"
+            size="sm-action"
+            icon-left="dashboard-customize"
+            data-test="metrics-explorer-convert-dashboard"
+            @click="openConvertToDashboard"
+          >
+            {{ t("metrics.explorer.convertToDashboard") }}
+            <OTooltip
+              :content="
+                t('metrics.explorer.convertToDashboardTooltip', {
+                  count: grid.favorites.value.length,
+                })
+              "
+            />
+          </OButton>
         </div>
 
         <section
@@ -478,6 +498,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @apply="onApplyOverride"
       @restore="onRestoreOverride"
     />
+
+    <!-- Convert to dashboard: adds every pinned metric as its own panel. Reuses
+         the metrics AddToDashboard dialog in its multi-panel mode. -->
+    <AddToDashboard
+      v-model:open="convertDialogOpen"
+      :dashboard-panel-data="{ data: {} }"
+      :panels="convertPanels"
+    />
   </div>
 </template>
 
@@ -514,6 +542,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import MetricCard from "./MetricCard.vue";
 import MetricsVisualize from "./MetricsVisualize.vue";
 import MetricsSavedViews from "./MetricsSavedViews.vue";
+import AddToDashboard from "../AddToDashboard.vue";
 import PrefixFilterPanel from "./PrefixFilterPanel.vue";
 import LabelFilterBar from "./LabelFilterBar.vue";
 import FunctionConfigDialog from "./FunctionConfigDialog.vue";
@@ -585,6 +614,7 @@ export default defineComponent({
     MetricCard,
     MetricsVisualize,
     MetricsSavedViews,
+    AddToDashboard,
     PrefixFilterPanel,
     LabelFilterBar,
     FunctionConfigDialog,
@@ -1144,6 +1174,35 @@ export default defineComponent({
       pinned: [...grid.favorites.value],
     });
 
+    /* -------------------------------------------- convert to dashboard */
+
+    // Build one panel-schema `data` object per PINNED metric, using the same
+    // type-based variant the card charts (effectiveVariant + buildPanelDataForCard,
+    // as the drill-in does). These become N separate panels on the target
+    // dashboard. Rate windows go over as `$__rate_interval` (PANEL_RATE_WINDOW) so
+    // each panel re-derives against the dashboard's own range.
+    const convertPanels = ref<any[]>([]);
+    const convertDialogOpen = ref(false);
+
+    const openConvertToDashboard = () => {
+      const byName = new Map(grid.cards.value.map((c) => [c.name, c]));
+      const panels: any[] = [];
+      for (const name of grid.favorites.value) {
+        const card = byName.get(name);
+        if (!card) continue;
+        const { defaults, resolved } = grid.effectiveVariant(card, undefined, {
+          rateWindow: PANEL_RATE_WINDOW,
+        });
+        if (!resolved) continue;
+        const data = buildPanelDataForCard(card, resolved, defaults.bucketUnit);
+        data.title = card.name;
+        panels.push(data);
+      }
+      if (!panels.length) return;
+      convertPanels.value = panels;
+      convertDialogOpen.value = true;
+    };
+
     // Restore a snapshot onto the grid: the filters via the URL deserializer
     // (which the sync watcher then reflects into the URL), and the pinned set
     // directly. Missing keys fall back to defaults, so an older/partial snapshot
@@ -1508,6 +1567,9 @@ export default defineComponent({
       onRestoreOverride,
       buildSavedViewSnapshot,
       applySavedViewSnapshot,
+      openConvertToDashboard,
+      convertPanels,
+      convertDialogOpen,
       onSelect,
       onDateChange,
       onRefreshTick,
