@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{Arc, LazyLock};
+use std::sync::LazyLock;
 
 use config::{
     MMDB_ASN_FILE_NAME, MMDB_CITY_FILE_NAME,
@@ -21,18 +21,17 @@ use config::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-use tokio::{sync::Notify, time};
+use tokio::time;
 
 use crate::{
     common::{
         infra::config::{GEOIP_ASN_TABLE, GEOIP_CITY_TABLE, MAXMIND_DB_CLIENT},
         meta::maxmind::MaxmindClient,
     },
-    service::enrichment_table::geoip::{Geoip, GeoipConfig},
+    service::enrichment_table::geoip::{Geoip, GeoipConfig, MMDB_INIT_NOTIFIER},
 };
 
 static CLIENT_INITIALIZED: LazyLock<bool> = LazyLock::new(|| true);
-pub static MMDB_INIT_NOTIFIER: LazyLock<Arc<Notify>> = LazyLock::new(|| Arc::new(Notify::new()));
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let cfg = config::get_config();

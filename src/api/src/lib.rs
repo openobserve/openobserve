@@ -20,7 +20,7 @@
 
 #[cfg(feature = "enterprise")]
 pub use openobserve_core::cipher;
-pub use openobserve_core::{common, job, service};
+pub use openobserve_core::{common, service};
 
 pub mod handler;
 pub mod router;

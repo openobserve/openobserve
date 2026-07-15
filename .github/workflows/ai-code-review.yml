@@ -45,6 +45,16 @@ jobs:
         working-directory: scripts/ai-review
         run: npm ci
 
+      - name: Install opencode
+        env:
+          # Pinned so an upstream opencode release can't silently change review behavior
+          # (agent/tool semantics, prompt handling) underneath this workflow. Bump
+          # deliberately after testing against scripts/ai-review locally.
+          OPENCODE_VERSION: "1.17.13"
+        run: |
+          curl -fsSL https://opencode.ai/install | bash -s -- --version "$OPENCODE_VERSION"
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+
       - name: Set trace ID
         run: echo "O2_TRACE_ID=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
 
@@ -89,7 +99,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
           FORCE_FULL: ${{ steps.skip.outputs.force_full }}
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GLM_API_KEY: ${{ secrets.GLM_API_KEY }}
           O2_TRACE_INGEST_URL: ${{ secrets.O2_TRACE_INGEST_URL }}
           O2_TRACE_ORG: ${{ secrets.O2_TRACE_ORG }}
           O2_TRACE_USERNAME: ${{ secrets.O2_TRACE_USERNAME }}

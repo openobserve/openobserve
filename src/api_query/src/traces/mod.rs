@@ -40,18 +40,14 @@ use crate::service::ingestion::check_ingestion_allowed;
 pub use crate::service::traces::service_graph::{self, get_current_topology, get_edge_history};
 use crate::{
     common::{
-        meta::http::HttpResponse as MetaHttpResponse,
+        meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
         utils::{
             auth::UserEmail,
             http::{get_or_create_trace_id, get_use_cache_from_request},
         },
     },
-    handler::http::{
-        extractors::Headers,
-        request::{
-            CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, search::error_utils::map_error_to_http_response,
-        },
-    },
+    extractors::Headers,
+    search::error_utils::map_error_to_http_response,
     service::{
         search::{self as SearchService, streaming::sorting::TopKHeap},
         traces,
@@ -247,7 +243,7 @@ pub async fn get_latest_traces(
             let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
             let stream_type_str = StreamType::Traces.as_str();
 
-            if !crate::handler::http::auth::validator::check_permissions(
+            if !crate::service::authz::check_permissions(
                 user_id,
                 AuthExtractor {
                     auth: "".to_string(),
@@ -963,7 +959,7 @@ pub async fn get_latest_traces_stream(
             let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
             let stream_type_str = StreamType::Traces.as_str();
 
-            if !crate::handler::http::auth::validator::check_permissions(
+            if !crate::service::authz::check_permissions(
                 user_id,
                 AuthExtractor {
                     auth: "".to_string(),
