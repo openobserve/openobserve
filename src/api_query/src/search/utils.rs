@@ -13,10 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "enterprise")]
-pub use authz::StreamPermissionResourceType;
-#[cfg(feature = "enterprise")]
-use axum::response::Response;
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, INDEX_FIELD_NAME_FOR_ALL, ORIGINAL_DATA_COL_NAME,
     TIMESTAMP_COL_NAME,
@@ -25,32 +21,9 @@ use config::{
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
 
+#[cfg(feature = "enterprise")]
+pub use crate::service::authz::{StreamPermissionResourceType, check_stream_permissions};
 use crate::service::search::sql::Sql;
-#[cfg(feature = "enterprise")]
-use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::authz};
-
-// Check permissions on stream
-#[cfg(feature = "enterprise")]
-pub async fn check_stream_permissions(
-    stream_name: &str,
-    org_id: &str,
-    user_id: &str,
-    stream_type: &StreamType,
-    permission_resource_type: StreamPermissionResourceType,
-) -> Option<Response> {
-    if !authz::check_stream_permissions(
-        stream_name,
-        org_id,
-        user_id,
-        stream_type,
-        permission_resource_type,
-    )
-    .await
-    {
-        return Some(MetaHttpResponse::forbidden("Unauthorized Access"));
-    }
-    None
-}
 
 // ============================================================================
 // Query Validation Helpers

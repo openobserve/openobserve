@@ -13,13 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "enterprise")]
+use axum::response::Response;
 use config::meta::user::UserRole;
 #[cfg(feature = "enterprise")]
 use config::meta::{stream::StreamType, user::User};
 
 use crate::common::utils::auth::AuthExtractor;
 #[cfg(feature = "enterprise")]
-use crate::common::utils::auth::is_root_user;
+use crate::common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::is_root_user};
 
 #[cfg(feature = "enterprise")]
 #[derive(Clone, Copy)]
@@ -29,6 +31,8 @@ pub enum StreamPermissionResourceType {
     Insights,
 }
 
+/// Checks stream permissions, returning `Some(forbidden response)` when the
+/// user is not permitted and `None` when access is allowed.
 #[cfg(feature = "enterprise")]
 pub async fn check_stream_permissions(
     stream_name: &str,
@@ -36,9 +40,9 @@ pub async fn check_stream_permissions(
     user_id: &str,
     stream_type: &StreamType,
     permission_resource_type: StreamPermissionResourceType,
-) -> bool {
+) -> Option<Response> {
     if is_root_user(user_id) {
-        return true;
+        return None;
     }
 
     use o2_openfga::{
@@ -69,7 +73,7 @@ pub async fn check_stream_permissions(
             .map_or(stream_type_str, |model| model.key);
     }
 
-    check_permissions(
+    if check_permissions(
         user_id,
         AuthExtractor {
             auth: "".to_string(),
@@ -86,6 +90,11 @@ pub async fn check_stream_permissions(
         user.is_external,
     )
     .await
+    {
+        None
+    } else {
+        Some(MetaHttpResponse::forbidden("Unauthorized Access"))
+    }
 }
 
 #[cfg(feature = "enterprise")]

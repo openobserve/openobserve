@@ -18,6 +18,9 @@
 #![recursion_limit = "256"]
 #![feature(variant_count)]
 
+// Path-compatibility re-exports: these modules are owned by their source
+// crates; re-exporting them keeps `crate::extractors`, `crate::common`, and
+// `crate::service` paths working in handlers moved from `openobserve-api`.
 pub use openobserve_api_common::extractors;
 pub use openobserve_core::{common, service};
 

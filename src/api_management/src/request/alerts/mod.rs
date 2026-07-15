@@ -1334,7 +1334,7 @@ pub async fn generate_sql(
     #[cfg(feature = "enterprise")]
     {
         // Check stream permissions for enterprise builds
-        if !check_stream_permissions(
+        if let Some(response) = check_stream_permissions(
             &req_body.stream_name,
             &org_id,
             &user_email.user_id,
@@ -1343,7 +1343,7 @@ pub async fn generate_sql(
         )
         .await
         {
-            return MetaHttpResponse::forbidden("Unauthorized Access");
+            return response;
         }
     }
 
