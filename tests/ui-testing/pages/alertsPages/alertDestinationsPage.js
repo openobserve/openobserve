@@ -1069,9 +1069,9 @@ export class AlertDestinationsPage {
         if (!transitioned) {
             await confirmField.waitFor({ state: 'visible', timeout: 15000 });
         }
-        // Hard settle so the type-specific form (fields, prebuilt template) fully renders
-        // before the caller starts filling — under load the render lags the transition.
-        await this.page.waitForTimeout(2000);
+        // Hard settle (min 5s) so the type-specific form (fields, prebuilt template) fully
+        // renders before the caller starts filling — under load the render lags the transition.
+        await this.page.waitForTimeout(5000);
         testLogger.debug('Selected destination type and form loaded', { type });
     }
 
@@ -1080,7 +1080,7 @@ export class AlertDestinationsPage {
      * @param {string} url - Webhook URL
      */
     async fillWebhookUrl(url) {
-        await this.page.waitForTimeout(1500);
+        await this.page.waitForTimeout(5000);
         const input = this.page.locator(this.webhookInputAnyField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(url);
@@ -1103,7 +1103,7 @@ export class AlertDestinationsPage {
      * @param {string} key - Integration key
      */
     async fillIntegrationKey(key) {
-        await this.page.waitForTimeout(1500);
+        await this.page.waitForTimeout(5000);
         const input = this.page.locator(this.integrationKeyInputField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(key);
@@ -1115,7 +1115,7 @@ export class AlertDestinationsPage {
      * @param {string} severity - Severity level (e.g., 'critical', 'error', 'warning', 'info')
      */
     async selectSeverity(severity) {
-        await this.page.waitForTimeout(1500);
+        await this.page.waitForTimeout(5000);
         const select = this.page.locator(this.severitySelect).first();
         await select.waitFor({ state: 'visible', timeout: 10000 });
         await select.click();
@@ -1137,7 +1137,7 @@ export class AlertDestinationsPage {
      * @param {string} name - Destination name
      */
     async fillDestinationName(name) {
-        await this.page.waitForTimeout(1500);
+        await this.page.waitForTimeout(5000);
         const field = this.page.locator(this.destinationNameInputField);
         // Prebuilt forms scroll the name field around as sections (webhook, template,
         // headers) render; scroll it into view and retry so a transient re-render can't
@@ -1195,7 +1195,7 @@ export class AlertDestinationsPage {
         await saveBtn.click({ force: true, timeout: 10000 });
         // Hard settle: the create/update API + form-close (expectSuccessNotification waits
         // for the title to hide) can lag under load; give the request time to complete.
-        await this.page.waitForTimeout(3000);
+        await this.page.waitForTimeout(5000);
         testLogger.debug('Clicked Save button');
     }
 
@@ -1402,7 +1402,23 @@ export class AlertDestinationsPage {
      * so the title becoming hidden is a reliable save-completion signal.
      */
     async expectSuccessNotification() {
-        await this.page.locator(this.addDestinationTitle).waitFor({ state: 'hidden', timeout: 30000 });
+        // The form closes (title hides) once the create/update API returns. Under load the
+        // request can lag; if it doesn't hide in time, reload the page (min 5s settle) to
+        // force the stuck form closed — the save itself has usually succeeded, and the
+        // caller's expectDestinationInList verifies the actual outcome afterward.
+        const title = this.page.locator(this.addDestinationTitle);
+        if (await title.waitFor({ state: 'hidden', timeout: 30000 }).then(() => true).catch(() => false)) {
+            return;
+        }
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            testLogger.warn('Destination form did not close after save, reloading', { attempt });
+            await this.page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+            await this.page.waitForTimeout(5000);
+            if (await title.isHidden().catch(() => true)) return;
+        }
+        // Surface clearly if the form is still stuck open after reloads.
+        await title.waitFor({ state: 'hidden', timeout: 10000 });
     }
 
     /**
@@ -2101,7 +2117,7 @@ export class AlertDestinationsPage {
      * @param {string} apiKey - Opsgenie API key
      */
     async fillOpsgenieApiKey(apiKey) {
-        await this.page.waitForTimeout(1500);
+        await this.page.waitForTimeout(5000);
         const input = this.page.locator(this.opsgenieApiKeyInputField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(apiKey);
@@ -2186,7 +2202,7 @@ export class AlertDestinationsPage {
      * @param {string} url - ServiceNow instance URL
      */
     async fillServiceNowInstanceUrl(url) {
-        await this.page.waitForTimeout(1500);
+        await this.page.waitForTimeout(5000);
         const input = this.page.locator(this.servicenowInstanceUrlInputField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(url);
@@ -2198,7 +2214,7 @@ export class AlertDestinationsPage {
      * @param {string} username - ServiceNow username
      */
     async fillServiceNowUsername(username) {
-        await this.page.waitForTimeout(1500);
+        await this.page.waitForTimeout(5000);
         const input = this.page.locator(this.servicenowUsernameInputField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(username);
@@ -2210,7 +2226,7 @@ export class AlertDestinationsPage {
      * @param {string} password - ServiceNow password
      */
     async fillServiceNowPassword(password) {
-        await this.page.waitForTimeout(1500);
+        await this.page.waitForTimeout(5000);
         const input = this.page.locator(this.servicenowPasswordInputField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(password);

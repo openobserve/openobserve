@@ -88,6 +88,39 @@ export class AlertCreationWizard {
             }
             testLogger.warn('Stream still not visible after wizard re-entry', { streamName, attempt });
         }
+
+        // Page-reload retry: a full reload preserves the current folder URL but forces the
+        // SPA to refetch the stream list from scratch — the strongest way to recover when
+        // a stale/partial cached list keeps the stream out of the dropdown under load.
+        for (let reloadAttempt = 1; reloadAttempt <= 2; reloadAttempt++) {
+            testLogger.warn('Reloading page to refetch stream list', { streamName, reloadAttempt });
+            await this.page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+            await this.page.waitForTimeout(5000);
+
+            const addBtn = this.page.locator(this.locators.addAlertButton);
+            if (!(await addBtn.isVisible({ timeout: 20000 }).catch(() => false))) continue;
+            await expect(addBtn).toBeEnabled({ timeout: 20000 });
+            await addBtn.click();
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+            await this.page.waitForTimeout(2000);
+
+            await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
+            await this.page.locator(this.locators.alertNameInputField).fill(this.currentAlertName);
+            await this.page.locator(this.locators.streamTypeDropdown).click();
+            await expect(this.page.locator(this.locators.streamTypePopover)).toBeVisible({ timeout: 10000 });
+            await this.page.locator(`${this.locators.streamTypeOption}[data-test-value="logs"]`).click();
+            await expect(this.page.locator(this.locators.streamNameDropdown)).toBeEnabled({ timeout: 10000 });
+            await this.page.waitForTimeout(1000);
+
+            await this.page.locator(this.locators.streamNameDropdown).click();
+            if (await this._pickStreamFromOpenDropdown(streamName, scopedOption, popover)) {
+                testLogger.info('Stream selected successfully after page reload', { streamName, reloadAttempt });
+                return;
+            }
+            testLogger.warn('Stream still not visible after page reload', { streamName, reloadAttempt });
+        }
+
         // Final attempt - if it still fails, surface via a scoped click (throws clearly)
         await scopedOption().click();
     }
@@ -101,10 +134,10 @@ export class AlertCreationWizard {
      */
     async _pickStreamFromOpenDropdown(streamName, scopedOption, popover) {
         await popover.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-        // Hard settle: under 5-worker load the shared org's stream-list fetch (fired when
-        // the dropdown opens) is slow; give it a fixed window to land before filtering so
-        // we don't type over an empty list.
-        await this.page.waitForTimeout(4000);
+        // Hard settle (min 5s): under 5-worker load the shared org's stream-list fetch
+        // (fired when the dropdown opens) is slow; give it a fixed window to land before
+        // filtering so we don't type over an empty list.
+        await this.page.waitForTimeout(5000);
         // Type the filter FIRST — the dropdown renders matching options in response to the
         // typed query, so options are not necessarily present before typing. Then wait
         // GENEROUSLY (30s) for the specific option to render: under 5-worker load the
