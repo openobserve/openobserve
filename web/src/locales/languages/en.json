@@ -6271,7 +6271,9 @@
   },
   "synthetics": {
     "createBrowserTest": {
-      "loading": "Loading check…"
+      "loading": "Loading check…",
+      "loadFailed": "Failed to load check configuration.",
+      "loadFailedTitle": "Failed to load"
     },
     "results": {
       "title": "Monitor Results",

@@ -23,6 +23,7 @@ import OStep from '@/lib/navigation/Stepper/OStep.vue'
 import BrowserJourney from '@/components/synthetics/journey/BrowserJourney.vue'
 import CheckConfigure from '@/components/synthetics/configure/CheckConfigure.vue'
 import CreateBrowserTestSkeleton from '@/components/synthetics/CreateBrowserTestSkeleton.vue'
+import OEmptyState from '@/lib/core/EmptyState/OEmptyState.vue'
 import EmptyBrowserCheck from '@/lib/core/EmptyState/illustrations/EmptyBrowserCheck.vue'
 
 const router = useRouter()
@@ -39,6 +40,7 @@ const headerTitle = computed(() => {
   if (phase.value === 'gate') return 'New browser check'
   if (phase.value === 'extension-setup') return 'Set up the recorder'
   if (isLoadingEdit.value) return t('synthetics.createBrowserTest.loading')
+  if (loadError.value) return t('synthetics.createBrowserTest.loadFailedTitle')
   return check.value.name || 'Untitled check'
 })
 const folderName = computed(() => {
@@ -52,6 +54,7 @@ const checkName = ref('')
 const startUrl = ref('')
 const editId = ref<string | null>(null)
 const isLoadingEdit = ref(false)
+const loadError = ref(false)
 
 // Extension setup state — persists across phases in this session.
 // `extensionInstalled` is now driven by a real runtime probe (not a manual click).
@@ -120,20 +123,35 @@ async function fetchDestinations() {
 
 async function loadForEdit(id: string) {
   isLoadingEdit.value = true
+  loadError.value = false
+  editId.value = id
   phase.value = 'editor'
   try {
     const org = store.state.selectedOrganization.identifier
+    if (!org) {
+      throw new Error('Organization not available')
+    }
     const res = await syntheticsService.get(org, id)
     const mapped = mapResponseToBrowserCheck(res.data as Record<string, unknown>)
     check.value = mapped
     checkName.value = mapped.name
     startUrl.value = mapped.url
-    editId.value = id
     journeyStepDone.value = true
   } catch (err) {
     console.error('[synthetics] failed to load check for edit', err)
+    loadError.value = true
+    toast({
+      variant: 'error',
+      message: t('synthetics.createBrowserTest.loadFailed'),
+    })
   } finally {
     isLoadingEdit.value = false
+  }
+}
+
+function onLoadRetry(actionId: string) {
+  if (actionId === 'retry' && editId.value) {
+    loadForEdit(editId.value)
   }
 }
 
@@ -570,6 +588,14 @@ function onClearResults() {
     <!-- ── Editor phase ── -->
     <template v-else>
       <CreateBrowserTestSkeleton v-if="isLoadingEdit" :rows="10" />
+      <div v-else-if="loadError" class="flex-1 flex flex-col items-center justify-center">
+        <OEmptyState
+          preset="load-error"
+          size="block"
+          data-test="synthetics-create-load-error"
+          @action="onLoadRetry"
+        />
+      </div>
       <div v-else class="flex-1 flex flex-col min-h-0">
           <OStepper
             v-model="currentStep"
