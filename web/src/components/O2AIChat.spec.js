@@ -8,8 +8,6 @@ import store from '@/test/unit/helpers/store';
 
 import O2AIChat from '@/components/O2AIChat.vue';
 
-// Ensure Quasar plugin
-
 // Stub clipboard
 // @ts-ignore
 if (!navigator.clipboard) {

@@ -19,8 +19,6 @@ import enterprisePlan from '@/enterprise/components/billings/enterprisePlan.vue'
 import i18n from '@/locales';
 import store from '@/test/unit/helpers/store';
 
-// Install Quasar
-
 const mockEnterpriseFeatures = [
   { name: "Everything in Pay as you go plan, plus:", price: "", is_parent: true },
   { name: "Premium support", price: "", is_parent: true },

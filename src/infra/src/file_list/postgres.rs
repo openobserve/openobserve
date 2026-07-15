@@ -2726,6 +2726,26 @@ async fn apply_autovacuum_tuning(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     Ok(())
 }
 
+const FILE_COLUMN_TARGET_WIDTH: i32 = 1024;
+
+/// Return the declared max length of a VARCHAR column, if the column exists.
+async fn get_varchar_column_width(
+    pool: &sqlx::Pool<Postgres>,
+    table: &str,
+    column: &str,
+) -> Result<Option<i32>> {
+    let width: Option<i32> = sqlx::query_scalar(
+        "SELECT character_maximum_length FROM information_schema.columns \
+         WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2",
+    )
+    .bind(table)
+    .bind(column)
+    .fetch_optional(pool)
+    .await?
+    .flatten();
+    Ok(width)
+}
+
 /// Apply column width compatibility for VARCHAR(file).
 async fn apply_column_width_compat(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     let tables = [
@@ -2735,7 +2755,19 @@ async fn apply_column_width_compat(pool: &sqlx::Pool<Postgres>) -> Result<()> {
         "file_list_dump_stats",
     ];
     for table in &tables {
-        let sql = format!("ALTER TABLE IF EXISTS {table} ALTER COLUMN file TYPE VARCHAR(1024)");
+        match get_varchar_column_width(pool, table, "file").await? {
+            Some(width) if width >= FILE_COLUMN_TARGET_WIDTH => {
+                log::info!(
+                    "[POSTGRES] Skipping file column widen for {table}: already VARCHAR({width})"
+                );
+                continue;
+            }
+            _ => {}
+        }
+
+        let sql = format!(
+            "ALTER TABLE IF EXISTS {table} ALTER COLUMN file TYPE VARCHAR({FILE_COLUMN_TARGET_WIDTH})"
+        );
         if let Err(e) = sqlx::query(&sql).execute(pool).await {
             log::warn!("[POSTGRES] Failed to widen file column for {table}: {e}");
         }

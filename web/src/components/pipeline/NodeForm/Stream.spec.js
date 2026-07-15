@@ -237,7 +237,7 @@ describe("Stream Component", () => {
       await flushPromises();
       const fns = [
         "sanitizeStreamName", "sanitizeStaticPart", "getStreamList", "updateStreams",
-        "handleCreateStreamName", "getLogStream",
+        "handleCreateStreamName", "getLogStream", "handleSecondaryClick",
         "openCancelDialog", "openDeleteDialog", "deleteNode", "onSubmit",
         "filterColumns",
       ];
@@ -525,7 +525,7 @@ describe("Stream Component", () => {
   // -------------------------------------------------------------------------
   // Submit / schema validation (real OForm). The select-existing branch is
   // gated by the Zod schema: BOTH stream_type AND stream_name are required
-  // (the stream_type rule is RESTORED from the Quasar BEFORE baseline).
+  // (the stream_type rule is RESTORED from the BEFORE baseline).
   describe("schema validation + submit", () => {
     it("blocks submit and does NOT call addNode when stream_name is empty", async () => {
       const wrapper = createWrapper();

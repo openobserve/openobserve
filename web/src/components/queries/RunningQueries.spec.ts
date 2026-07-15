@@ -145,9 +145,6 @@ describe("RunningQueries", () => {
         },
         mocks: {
           $store: store,
-          $q: {
-            notify: vi.fn(() => vi.fn()), // Returns a dismiss function
-          },
         },
         stubs: {
           "q-table": true,

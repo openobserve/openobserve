@@ -243,8 +243,8 @@ export const isInvalidDate = (date: any) => {
 // ---------------------------------------------------------------------------
 
 /**
- * Normalize Quasar-style format tokens to date-fns (Unicode CLDR) tokens.
- * Quasar uses YYYY/DD whereas date-fns uses yyyy/dd.
+ * Normalize legacy uppercase format tokens to date-fns (Unicode CLDR) tokens.
+ * Legacy formats use YYYY/DD whereas date-fns uses yyyy/dd.
  */
 function normalizeFormat(format: string): string {
   return format
@@ -338,7 +338,7 @@ export function subtractRelativeTime(
 // ---------------------------------------------------------------------------
 
 /** The format every caller used before this took a parameter. */
-export const QUASAR_TIMESTAMP_FORMAT = "YYYY-MM-DDTHH:mm:ssZ";
+export const DATE_TIMESTAMP_FORMAT = "YYYY-MM-DDTHH:mm:ssZ";
 
 /**
  * Render a microsecond timestamp as a local-time string.
@@ -355,9 +355,9 @@ export const QUASAR_TIMESTAMP_FORMAT = "YYYY-MM-DDTHH:mm:ssZ";
  * columns, which a user reads in their own timezone. The tests pin TZ=UTC for
  * exactly that reason (see vitest.config.ts).
  */
-export const convertUnixToQuasarFormat = (
+export const convertUnixToDateFormat = (
   unixMicroseconds: any,
-  format: string = QUASAR_TIMESTAMP_FORMAT,
+  format: string = DATE_TIMESTAMP_FORMAT,
 ) => {
   try {
     if (!unixMicroseconds) return "";
@@ -366,7 +366,7 @@ export const convertUnixToQuasarFormat = (
     const formattedDate = dateToFormat.toISOString();
     return formatDate(formattedDate, format);
   } catch (error) {
-    console.log("Error converting unix to quasar format");
+    console.log("Error converting unix to date format");
     return "";
   }
 };

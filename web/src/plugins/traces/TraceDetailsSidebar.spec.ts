@@ -1604,7 +1604,7 @@ describe("TraceDetailsSidebar", async () => {
   describe("apply-filter-immediately emit — getFilterValue called at the emit site", () => {
     // This describe block mounts a separate wrapper with JsonPreview stubbed to render
     // its #field-dropdown slot directly in the DOM (no q-btn-dropdown popup layer).
-    // This lets us click the filter q-item without needing Quasar popup mechanics.
+    // This lets us click the filter item without needing popup mechanics.
     //
     // start_time and end_time are provided as nanosecond strings to reflect the real
     // runtime type after NS-field patching in the search pipeline.
@@ -1745,7 +1745,7 @@ describe("TraceDetailsSidebar", async () => {
         await copyBtn.trigger("click");
 
         // Check that the copy function was called
-        // Since we're using Quasar's copyToClipboard, we can't easily mock it
+        // Since copy uses the clipboard API, we can't easily mock it
         // But we can check that the component didn't crash
         expect(wrapper.exists()).toBe(true);
         // Check if clipboard.writeText was called

@@ -64,7 +64,7 @@ const dropIndicatorClass = computed<string>(() => {
     : 'right-0 top-1 bottom-1 w-0.5'
 })
 
-/** True when the icon prop uses Quasar's `img:` prefix (renders as <img>) */
+/** True when the icon prop uses the `img:` prefix (renders as <img>) */
 const isImgIcon = computed<boolean>(() => Boolean(props.icon?.startsWith('img:')))
 /** The resolved src URL (stripped of `img:` prefix) */
 const imgSrc = computed<string>(() => (props.icon?.startsWith('img:') ? props.icon.slice(4) : ''))
@@ -184,7 +184,7 @@ const heightClasses = computed<string>(() => {
       -->
       <template v-if="label || icon">
         <slot name="icon">
-          <!-- img: prefix (Quasar compat) → render as <img> -->
+          <!-- img: prefix → render as <img> -->
           <img
             v-if="icon && isImgIcon"
             :src="imgSrc"
@@ -199,7 +199,7 @@ const heightClasses = computed<string>(() => {
             size="sm"
             class="o-tab__icon shrink-0"
           />
-          <!-- Fallback: Material icon font glyph (Quasar-compat underscore names) -->
+          <!-- Fallback: Material icon font glyph (legacy underscore names) -->
           <span
             v-else-if="icon"
             class="o-tab__icon text-base leading-none shrink-0 material-icons-outlined"

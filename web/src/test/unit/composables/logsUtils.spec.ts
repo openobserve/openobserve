@@ -53,16 +53,6 @@ vi.mock("vue-router", () => ({
   useRouter: () => mockRouter,
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn(),
-    }),
-  };
-});
-
 // Mock searchState to return our mock object
 vi.mock("@/composables/useLogs/searchState", () => ({
   searchState: () => ({

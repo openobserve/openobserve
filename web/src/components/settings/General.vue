@@ -1071,7 +1071,7 @@ export default defineComponent({
 
     /**
      * Toggle between light and dark theme modes
-     * Updates the store, Quasar dark mode, and applies the corresponding theme color
+     * Updates the store, dark mode, and applies the corresponding theme color
      * @param mode - 'light' or 'dark' theme mode to switch to
      */
     const toggleThemeMode = (mode: "light" | "dark") => {
@@ -1221,8 +1221,6 @@ export default defineComponent({
       filesMaxTotalSize: ref(null),
       filesMaxNumber: ref(null),
       onRejected(rejectedEntries: string | any[]) {
-        //  plugin needs to be installed
-        // https://quasar.dev/quasar-plugins/notify#Installation
         toast({
           variant: "error",
           message: t("settings.filesValidationFailed", {

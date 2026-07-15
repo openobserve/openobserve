@@ -679,7 +679,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
-import { convertUnixToQuasarFormat as convertUnixToFormat } from "@/utils/date";
+import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
 import { useI18n } from "vue-i18n";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
@@ -1197,10 +1197,10 @@ export default defineComponent({
       frequency: anomaly.trigger_condition?.frequency ?? "",
       frequency_type: anomaly.trigger_condition?.frequency_type ?? "minutes",
       last_triggered_at: anomaly.last_triggered_at
-        ? convertUnixToQuasarFormat(anomaly.last_triggered_at)
+        ? convertUnixToDateFormat(anomaly.last_triggered_at)
         : "",
       last_satisfied_at: anomaly.last_satisfied_at
-        ? convertUnixToQuasarFormat(anomaly.last_satisfied_at)
+        ? convertUnixToDateFormat(anomaly.last_satisfied_at)
         : "",
       detection_window: (() => {
         const mins = anomaly.trigger_condition?.period_minutes;
@@ -1213,7 +1213,7 @@ export default defineComponent({
         return `${mins} mins`;
       })(),
       last_trained_at: anomaly.last_trained_at
-        ? convertUnixToQuasarFormat(anomaly.last_trained_at)
+        ? convertUnixToDateFormat(anomaly.last_trained_at)
         : "",
       total_evaluations: anomaly.total_evaluations ?? "--",
       firing_count: anomaly.firing_count ?? "--",
@@ -1337,10 +1337,10 @@ export default defineComponent({
             period: data.is_real_time ? "" : data?.trigger_condition?.period,
             frequency: data.is_real_time ? "" : frequency,
             frequency_type: data?.trigger_condition?.frequency_type,
-            last_triggered_at: convertUnixToQuasarFormat(
+            last_triggered_at: convertUnixToDateFormat(
               data.last_triggered_at,
             ),
-            last_satisfied_at: convertUnixToQuasarFormat(
+            last_satisfied_at: convertUnixToDateFormat(
               data.last_satisfied_at,
             ),
             last_trained_at: "",
@@ -1684,7 +1684,7 @@ export default defineComponent({
     });
 
     // No timezone suffix in this table, unlike the other lists.
-    const convertUnixToQuasarFormat = (unixMicroseconds: any) =>
+    const convertUnixToDateFormat = (unixMicroseconds: any) =>
       convertUnixToFormat(unixMicroseconds, "YYYY-MM-DD HH:mm:ss");
 
     const addAlert = () => {

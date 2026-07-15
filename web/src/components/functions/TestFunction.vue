@@ -41,14 +41,14 @@
           </template>
         </FullViewContainer>
         <div
-          class="flex items-center flex-wrap py-2 w-[100%]"
+          class="flex items-center flex-wrap gap-x-3 py-2 w-[100%]"
           :class="
             store.state.theme === 'dark' ? 'bg-gray-950' : ' bg-white'
           "
           v-show="expandState.query"
           data-test="test-function-query-editor-section"
         >
-          <div class="function-stream-select-input w-[120px] pr-3">
+          <div class="function-stream-select-input w-[100px]">
             <div
               class="text-[12px]"
               :class="
@@ -129,7 +129,7 @@
             {{ t("common.query") + " *" }}
           </div>
           <div
-            class="border-[1px] border-gray-200 relative w-[100%]"
+            class="relative w-[100%]"
           >
             <query-editor
               data-test="vrl-function-test-sql-editor"
@@ -206,7 +206,7 @@
       </FullViewContainer>
       <div
         v-show="expandState.events"
-        class="border-[1px] border-gray-200 relative"
+        class="relative"
         data-test="test-function-input-editor-section"
       >
         <query-editor
@@ -257,7 +257,7 @@
 
       <div
         v-show="expandState.output"
-        class="border-[1px] border-gray-200 relative"
+        class="relative"
         data-test="test-function-output-editor-section"
       >
         <div

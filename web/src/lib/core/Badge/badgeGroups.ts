@@ -678,7 +678,7 @@ export const BADGE_GROUPS = {
 
   // Field-name chips (ImportSemanticGroups dialogs) — decorative chips listing
   // field names. `highlight` = a group's member fields (primary), `muted` = the
-  // "current/old" side of a compare (light grey). Replaces dead Quasar
+  // "current/old" side of a compare (light grey). Replaces dead
   // `color="primary"/text-color/color="grey-4"` props that OTag silently ignored
   // (so these had been rendering default). pill + sm.
   fieldNameChip: {

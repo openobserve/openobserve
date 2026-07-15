@@ -291,7 +291,7 @@ defineExpose({
 </script>
 
 <style>
-/* Deep Quasar override — must stay in CSS */
+/* Deep override — must stay in CSS */
 :deep(
   .operation-label-selector.q-field--labeled.showLabelOnTop.q-select
     .q-field__control-container

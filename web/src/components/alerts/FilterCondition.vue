@@ -173,7 +173,7 @@ const store = useStore();
 
 const { t } = useI18n();
 
-// Inline error state (replaces Quasar :rules)
+// Inline error state
 const columnError = ref('');
 const operatorError = ref('');
 const valueError = ref('');

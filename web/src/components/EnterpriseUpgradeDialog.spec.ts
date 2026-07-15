@@ -59,7 +59,7 @@ vi.mock("vue-router", () => ({
   useRouter: () => ({ push: mockRouterPush }),
 }));
 
-// Mock toast (replaces quasar useQuasar/notify — exercised by navigateToLicense error path).
+// Mock toast (exercised by navigateToLicense error path).
 const mockNotify = vi.fn();
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => mockNotify(...args),

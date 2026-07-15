@@ -727,7 +727,7 @@ describe("SyntaxGuideMetrics — q-menu theme class binding", () => {
   it("q-menu has theme-dark class when store theme is 'dark'", () => {
     store.state.theme = "dark";
     wrapper = createWrapper();
-    // Quasar renders q-menu as a portal; verify via vm that the binding resolves correctly
+    // The menu renders as a portal; verify via vm that the binding resolves correctly
     expect(wrapper.vm.store.state.theme).toBe("dark");
   });
 

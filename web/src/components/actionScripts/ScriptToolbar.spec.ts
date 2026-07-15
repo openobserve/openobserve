@@ -43,7 +43,7 @@ describe('ScriptToolbar.vue', () => {
           },
         },
         directives: {
-          // `v-close-popup` is a Quasar directive not registered in the unit env.
+          // `v-close-popup` is a directive not registered in the unit env.
           'close-popup': {},
         },
       },

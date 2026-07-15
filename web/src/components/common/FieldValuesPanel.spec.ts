@@ -44,11 +44,6 @@ vi.mock("@/components/icons/NotEqualIcon.vue", () => ({
   default: { template: "<span class='not-equal-icon' />" },
 }));
 
-vi.mock("@quasar/extras/material-icons-outlined", () => ({
-  "arrow-back-ios": "arrow_back_ios",
-  "arrow-forward-ios": "arrow_forward_ios",
-}));
-
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 const buildFieldValues = (count = 3, extra: Partial<any> = {}) => ({
@@ -148,8 +143,8 @@ describe("FieldValuesPanel.vue", () => {
       wrapper = createWrapper({
         fieldValues: { isLoading: true, values: [], errMsg: "" },
       });
-      // After Quasar -> native HTML migration the values list is a <ul> that's
-      // always rendered, but its <li> children come from v-for over displayValues.
+      // The values list is a <ul> that's always rendered, but its <li>
+      // children come from v-for over displayValues.
       // With no cached values during loading, no row items should be present.
       const valueRows = wrapper.findAll('[data-test^="logs-search-subfield-add-"]');
       expect(valueRows.length).toBe(0);

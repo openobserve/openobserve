@@ -17,22 +17,10 @@ vi.mock('vue-i18n', () => ({
   })
 }));
 
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn()
-    })
-  };
-});
-
-
 describe('AddCipherKey.vue', () => {
   let wrapper: VueWrapper;
   let store: any;
   let router: any;
-  let mockQuasar: any;
 
   beforeEach(() => {
     // Mock router
@@ -53,11 +41,6 @@ describe('AddCipherKey.vue', () => {
       mutations: {},
       actions: {}
     });
-
-    // Mock Quasar
-    mockQuasar = {
-      notify: vi.fn()
-    };
   });
 
   afterEach(() => {
@@ -74,9 +57,6 @@ describe('AddCipherKey.vue', () => {
     return mount(AddCipherKey, {
       global: {
         plugins: [store, router],
-        provide: {
-          $q: mockQuasar
-        },
         stubs: {
           'OIcon': {
             template: '<div class="OIcon-stub">{{ name }}</div>',

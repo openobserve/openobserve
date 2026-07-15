@@ -87,33 +87,6 @@ vi.mock("@/composables/useLogs/searchState", () => ({
 // Import logsUtils after mocking dependencies
 import logsUtils from "@/composables/useLogs/logsUtils";
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn(),
-    }),
-    date: {
-      formatDate: vi.fn((date, format) => {
-        // Simple mock implementation
-        if (format === "MMM DD, YYYY") return "Jan 01, 2024";
-        if (format === "HH:mm:ss") return "12:34:56";
-        return new Date(date).toISOString();
-      }),
-      subtractFromDate: vi.fn((date, obj) => {
-        const result = new Date(date);
-        if (obj.seconds) result.setSeconds(result.getSeconds() - obj.seconds);
-        if (obj.minutes) result.setMinutes(result.getMinutes() - obj.minutes);
-        if (obj.hours) result.setHours(result.getHours() - obj.hours);
-        if (obj.days) result.setDate(result.getDate() - obj.days);
-        if (obj.months) result.setMonth(result.getMonth() - obj.months);
-        return result;
-      })
-    }
-  };
-});
-
 vi.mock("@/utils/dashboard/colorPalette", () => ({
   getColorPalette: vi.fn(() => ["#FF5733", "#33FF57", "#3357FF", "#F333FF", "#33F3FF"])
 }));

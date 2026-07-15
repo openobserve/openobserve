@@ -368,17 +368,11 @@ export default defineComponent({
               timeout: 0,
 });
       loading.value = true;
-      // Pick the endpoint by the selected-org CONTEXT (not by a client-side role):
-      // - In the _meta admin context, use the admin endpoint (all_organizations),
-      //   which returns ALL orgs WITH deletion status so admins can track progress.
-      //   It deliberately does NOT dispatch setOrganizations, so the navbar switcher
-      //   keeps its own filtered (non-deleting) list.
-      // - Otherwise, use the regular list — the user's own orgs (original behavior).
-      // This is a UX branch only. Access is enforced server-side: the _meta endpoint
-      // requires OFGA LIST on _meta (root bypasses), validated in the auth layer
-      // before the handler runs, so a spoofed client just gets 403 — no data leak,
-      // no IDOR (the {org} path is pinned to "_meta"; you cannot enumerate other orgs).
-      const request = isMetaOrg.value
+      // In the _meta admin context on cloud, use the admin endpoint so admins can
+      // track org deletion status; otherwise use the regular list. Access is always
+      // enforced server-side.
+      const useAdminEndpoint = isMetaOrg.value && config.isCloud === "true";
+      const request = useAdminEndpoint
         ? organizationsService.get_admin_org("_meta")
         : organizationsService.list(0, 1000000, "name", false, "");
       request.then((res) => {
