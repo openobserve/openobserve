@@ -451,17 +451,41 @@ async function loadMonitors(folderId?: string) {
   }
 }
 
-onMounted(() => {
-  getFoldersListByType(store, 'synthetics').catch(console.error)
-  loadMonitors(activeFolderId.value)
-    .then(() => {
-      const editId = route.query.edit
-      if (typeof editId === 'string' && editId) {
-        const monitor = monitors.value.find((m) => String(m.id) === editId)
-        if (monitor) openEdit(monitor)
-      }
+async function initPage() {
+  // Load folders first so the sidebar tablist renders with data.
+  try {
+    await getFoldersListByType(store, 'synthetics')
+  } catch (err) {
+    console.error('[synthetics] failed to load folders', err)
+  }
+
+  // Wait for the organisation identifier to be resolved before making API
+  // calls.  On browser back-navigation the store may not be ready
+  // synchronously, and loadMonitors silently returns when orgIdentifier is
+  // empty — the table skeleton stays forever because loading is never
+  // cleared.
+  if (!orgIdentifier.value) {
+    await new Promise<void>((resolve) => {
+      const stop = watch(orgIdentifier, (val) => {
+        if (val) {
+          stop()
+          resolve()
+        }
+      })
     })
-    .catch(console.error)
+  }
+
+  await loadMonitors(activeFolderId.value)
+
+  const editId = route.query.edit
+  if (typeof editId === 'string' && editId) {
+    const monitor = monitors.value.find((m) => String(m.id) === editId)
+    if (monitor) openEdit(monitor)
+  }
+}
+
+onMounted(() => {
+  initPage()
 })
 
 const areMultiTypeTestEnabled = false;
@@ -488,9 +512,13 @@ watch(activeFolderId, async (newFolderId) => {
   if (searchAcrossFolders.value) {
     searchAcrossFolders.value = false
   }
-  router.push({
-    query: { ...route.query, folder: newFolderId },
-  })
+  // Only push when the folder is not already in the URL to avoid a
+  // redundant history entry during initial mount.
+  if (route.query.folder !== newFolderId) {
+    router.push({
+      query: { ...route.query, folder: newFolderId },
+    }).catch(() => {})
+  }
   await loadMonitors(newFolderId)
 })
 
