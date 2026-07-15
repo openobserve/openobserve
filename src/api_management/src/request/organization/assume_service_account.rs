@@ -29,7 +29,7 @@ use crate::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::auth::{AuthExtractor, UserEmail},
     },
-    handler::http::extractors::Headers,
+    extractors::Headers,
 };
 
 /// Assume a service account in a target organization

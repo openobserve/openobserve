@@ -25,7 +25,7 @@ use utoipa::{IntoParams, ToSchema};
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::extractors::Headers,
+    extractors::Headers,
 };
 
 /// Query parameters for listing incidents

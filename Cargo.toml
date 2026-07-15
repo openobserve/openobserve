@@ -23,10 +23,27 @@ publish = false
 
 [features]
 default = []
-enterprise = ["openobserve-api/enterprise", "openobserve-core/enterprise", "openobserve-jobs/enterprise"]
-vectorscan = ["openobserve-api/vectorscan", "openobserve-core/vectorscan", "openobserve-jobs/vectorscan"]
-cloud = ["openobserve-api/cloud", "openobserve-core/cloud", "openobserve-jobs/cloud"]
-vortex = ["config/vortex", "openobserve-api/vortex", "openobserve-core/vortex", "openobserve-jobs/vortex"]
+enterprise = [
+    "openobserve-api/enterprise",
+    "openobserve-core/enterprise",
+    "openobserve-jobs/enterprise",
+]
+vectorscan = [
+    "openobserve-api/vectorscan",
+    "openobserve-core/vectorscan",
+    "openobserve-jobs/vectorscan",
+]
+cloud = [
+    "openobserve-api/cloud",
+    "openobserve-core/cloud",
+    "openobserve-jobs/cloud",
+]
+vortex = [
+    "config/vortex",
+    "openobserve-api/vortex",
+    "openobserve-core/vortex",
+    "openobserve-jobs/vortex",
+]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = [
@@ -63,7 +80,6 @@ inherits = "release"
 debug = true
 strip = false
 codegen-units = 4
-split-debuginfo = "packed"
 
 # tikv-jemalloc-sys is a link-time dependency: it forces the "profiling"
 # feature on the jemalloc sys crate that jemalloc_pprof requires.
@@ -219,6 +235,7 @@ rcgen.workspace = true
 [workspace]
 members = [
     "src/api",
+    "src/api_management",
     "src/api_query",
     "src/api_common",
     "src/core",
@@ -250,6 +267,7 @@ flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
 openobserve-core = { path = "src/core" }
 openobserve-api = { path = "src/api" }
+openobserve-api-management = { path = "src/api_management" }
 openobserve-api-query = { path = "src/api_query" }
 openobserve-api-common = { path = "src/api_common" }
 openobserve-jobs = { path = "src/jobs" }
@@ -286,7 +304,11 @@ promql-parser = { version = "0.6", git = "https://github.com/openobserve/promql-
 rcgen = "0.14.4"
 rust-embed-for-web = "11.3"
 sourcemap = "9.3.2"
-tikv-jemalloc-ctl = { version = "0.6", features = ["use_std", "stats", "profiling"] }
+tikv-jemalloc-ctl = { version = "0.6", features = [
+    "use_std",
+    "stats",
+    "profiling",
+] }
 tikv-jemalloc-sys = { version = "0.6", features = ["profiling"] }
 tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.6", features = [

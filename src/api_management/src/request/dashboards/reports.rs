@@ -30,11 +30,9 @@ use serde::Deserialize;
 use crate::common::utils::auth::check_permissions;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::{
-        extractors::Headers,
-        models::reports::{ListReportsResponseBody, ListReportsResponseBodyItem},
-        request::{BulkDeleteRequest, BulkDeleteResponse, dashboards::get_folder},
-    },
+    extractors::Headers,
+    models::reports::{ListReportsResponseBody, ListReportsResponseBodyItem},
+    request::{BulkDeleteRequest, BulkDeleteResponse, dashboards::get_folder},
     service::{
         dashboards::reports::{self, ReportError},
         db::scheduler,
@@ -197,7 +195,7 @@ pub async fn list_reports(
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        match crate::handler::http::auth::validator::list_objects_for_user(
+        match crate::auth::validator::list_objects_for_user(
             &org_id,
             &user_email.user_id,
             "GET",
@@ -578,7 +576,7 @@ pub async fn list_reports_v2(
     let mut _permitted = None;
     #[cfg(feature = "enterprise")]
     {
-        match crate::handler::http::auth::validator::list_objects_for_user(
+        match crate::auth::validator::list_objects_for_user(
             &org_id,
             &user_email.user_id,
             "GET",

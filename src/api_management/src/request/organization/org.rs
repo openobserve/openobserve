@@ -52,7 +52,7 @@ use crate::{
         },
         utils::auth::{UserEmail, check_permissions, is_root_user},
     },
-    handler::http::extractors::Headers,
+    extractors::Headers,
     service::organization::{self, get_passcode, get_rum_token, update_passcode, update_rum_token},
 };
 

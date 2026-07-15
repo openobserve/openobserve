@@ -25,15 +25,13 @@ use hashbrown::HashMap;
 use crate::common::utils::auth::check_permissions;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::{
-        extractors::Headers,
-        models::dashboards::{
-            DashboardRequestBody, DashboardResponseBody, DeletePanelResponseBody,
-            ListDashboardsQuery, ListDashboardsResponseBody, MoveDashboardRequestBody,
-            MoveDashboardsRequestBody, PanelRequestBody, PanelResponseBody,
-        },
-        request::{BulkDeleteRequest, BulkDeleteResponse},
+    extractors::Headers,
+    models::dashboards::{
+        DashboardRequestBody, DashboardResponseBody, DeletePanelResponseBody, ListDashboardsQuery,
+        ListDashboardsResponseBody, MoveDashboardRequestBody, MoveDashboardsRequestBody,
+        PanelRequestBody, PanelResponseBody,
     },
+    request::{BulkDeleteRequest, BulkDeleteResponse},
     service::{dashboards, db::dashboards as dashboards_db},
 };
 

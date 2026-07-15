@@ -31,35 +31,31 @@ use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
     crate::common::utils::auth::check_permissions,
-    crate::handler::http::request::search::utils::{
-        StreamPermissionResourceType, check_stream_permissions,
-    },
+    crate::service::authz::{StreamPermissionResourceType, check_stream_permissions},
 };
 
 #[cfg(feature = "enterprise")]
-use crate::handler::http::models::alerts::requests::UpdateAnomalyAlertFields;
+use crate::models::alerts::requests::UpdateAnomalyAlertFields;
 #[cfg(feature = "enterprise")]
-use crate::handler::http::models::alerts::responses::anomaly_config_to_list_item;
+use crate::models::alerts::responses::anomaly_config_to_list_item;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::{
-        extractors::Headers,
-        models::alerts::{
-            requests::{
-                AlertBulkEnableRequest, CloneAlertRequestBody, CreateAlertRequestBody,
-                EnableAlertQuery, GenerateSqlRequestBody, ListAlertsQuery, MoveAlertsRequestBody,
-                UpdateAlertRequestBody,
-            },
-            responses::{
-                AlertBulkEnableResponse, EnableAlertResponseBody, GenerateSqlMetadata,
-                GenerateSqlResponseBody, GetAlertResponseBody, ListAlertsResponseBody,
-                ListAlertsResponseBodyItem,
-            },
+    extractors::Headers,
+    models::alerts::{
+        requests::{
+            AlertBulkEnableRequest, CloneAlertRequestBody, CreateAlertRequestBody,
+            EnableAlertQuery, GenerateSqlRequestBody, ListAlertsQuery, MoveAlertsRequestBody,
+            UpdateAlertRequestBody,
         },
-        request::{
-            BulkDeleteRequest, BulkDeleteResponse,
-            dashboards::{get_folder, is_overwrite},
+        responses::{
+            AlertBulkEnableResponse, EnableAlertResponseBody, GenerateSqlMetadata,
+            GenerateSqlResponseBody, GetAlertResponseBody, ListAlertsResponseBody,
+            ListAlertsResponseBodyItem,
         },
+    },
+    request::{
+        BulkDeleteRequest, BulkDeleteResponse,
+        dashboards::{get_folder, is_overwrite},
     },
     service::{
         alerts::{
@@ -143,7 +139,7 @@ async fn create_anomaly_alert(
     req_body: CreateAlertRequestBody,
     query_folder_id: &str,
 ) -> Response {
-    use crate::handler::http::request::anomaly_detection::CreateAnomalyConfigRequest;
+    use crate::service::anomaly_detection::CreateAnomalyConfigRequest;
 
     let Some(anomaly_fields) = req_body.anomaly_fields() else {
         return MetaHttpResponse::bad_request(
@@ -548,9 +544,9 @@ async fn build_and_run_anomaly_update(
     anomaly_id: &str,
     user_id: String,
     fields: UpdateAnomalyAlertFields,
-    alert: crate::handler::http::models::alerts::Alert,
+    alert: crate::models::alerts::Alert,
 ) -> Response {
-    use crate::handler::http::request::anomaly_detection::UpdateAnomalyConfigRequest;
+    use crate::service::anomaly_detection::UpdateAnomalyConfigRequest;
 
     let owner = fields
         .owner
@@ -937,7 +933,7 @@ pub async fn enable_alert(
             #[cfg(feature = "enterprise")]
             {
                 // Fall back to anomaly detection config
-                use crate::handler::http::request::anomaly_detection::UpdateAnomalyConfigRequest;
+                use crate::service::anomaly_detection::UpdateAnomalyConfigRequest;
                 let req = UpdateAnomalyConfigRequest {
                     enabled: Some(should_enable),
                     ..Default::default()
@@ -1045,7 +1041,7 @@ pub async fn enable_alert_bulk(
                 #[cfg(feature = "enterprise")]
                 {
                     // Fall back to anomaly detection config
-                    use crate::handler::http::request::anomaly_detection::UpdateAnomalyConfigRequest;
+                    use crate::service::anomaly_detection::UpdateAnomalyConfigRequest;
                     let req = UpdateAnomalyConfigRequest {
                         enabled: Some(should_enable),
                         ..Default::default()
@@ -1258,7 +1254,7 @@ pub async fn move_alerts(
     // regular alerts have not yet been relocated (reduces partial-move risk).
     #[cfg(feature = "enterprise")]
     for id in anomaly_ids {
-        use crate::handler::http::request::anomaly_detection::UpdateAnomalyConfigRequest;
+        use crate::service::anomaly_detection::UpdateAnomalyConfigRequest;
         let req = UpdateAnomalyConfigRequest {
             folder_id: Some(req_body.dst_folder_id.clone()),
             ..Default::default()

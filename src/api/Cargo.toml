@@ -15,12 +15,14 @@ enterprise = [
     "dep:o2_enterprise",
     "dep:o2_openfga",
     "dep:o2_ratelimit",
+    "openobserve-api-management/enterprise",
     "openobserve-api-query/enterprise",
     "openobserve-core/enterprise",
 ]
 cloud = [
     "enterprise",
     "o2_enterprise/cloud",
+    "openobserve-api-management/cloud",
     "openobserve-api-query/cloud",
     "openobserve-core/cloud",
 ]
@@ -47,6 +49,7 @@ ignored = ["tikv-jemalloc-sys"]
 
 [dependencies]
 openobserve-core.workspace = true
+openobserve-api-management.workspace = true
 openobserve-api-query.workspace = true
 openobserve-api-common.workspace = true
 axum.workspace = true
@@ -71,7 +74,6 @@ futures.workspace = true
 hashbrown.workspace = true
 http-auth-basic.workspace = true
 itertools.workspace = true
-jsonwebtoken.workspace = true
 log.workspace = true
 o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
@@ -87,7 +89,6 @@ rand.workspace = true
 regex.workspace = true
 reqwest.workspace = true
 rust-embed-for-web.workspace = true
-sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 snap.workspace = true
