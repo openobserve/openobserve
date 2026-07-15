@@ -2,26 +2,13 @@
   <div class="flex flex-col h-full overflow-hidden relative">
 
     <!-- PAGE HEADER -->
-    <div class="flex items-center justify-between px-5 py-3 border-b border-border-default shrink-0 bg-surface-base">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-primary-600 dark:bg-white/10 bg-black/5">
-          <OIcon name="radar" size="md" />
-        </div>
-        <div>
-          <div class="text-sm font-bold leading-tight">Synthetic Checks</div>
-          <div class="text-xs text-text-secondary mt-px">Proactively monitor uptime, performance, and user journeys from global locations</div>
-        </div>
-      </div>
-      <div class="flex items-center gap-2.5">
-        <OButton v-if="false" variant="ghost" size="sm" :class="{ 'geo-hdr-btn--alert': geoIssues.length }" @click="showIssuesModal = true">
-          <template #icon-left><OIcon :name="geoIssues.length ? 'error' : 'check-circle'" size="xs" /></template>
-          Active Issues
-          <span v-if="geoIssues.length" class="geo-hdr-badge">{{ geoIssues.length }}</span>
-        </OButton>
-        <OButton v-if="false" variant="ghost" size="sm" @click="showHeatmapModal = true">
-          <template #icon-left><OIcon name="language" size="xs" /></template>
-          Geo Map
-        </OButton>
+    <AppPageHeader
+      title="Synthetic Checks"
+      subtitle="Proactively monitor uptime, performance, and user journeys from global locations"
+      class="px-4"
+      icon="radar"
+    >
+      <template #actions>
         <ODropdown align="end">
           <template #trigger>
             <OButton size="sm" variant="primary" data-test="synthetic-monitoring-new-check-dropdown">
@@ -39,8 +26,8 @@
             {{ t(`synthetics.newCheck.${ct}`) }}
           </ODropdownItem>
         </ODropdown>
-      </div>
-    </div>
+      </template>
+    </AppPageHeader>
 
     <!-- CONTENT AREA: sidebar + main -->
     <div class="flex flex-1 overflow-hidden">
@@ -340,6 +327,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import * as echarts from "echarts";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

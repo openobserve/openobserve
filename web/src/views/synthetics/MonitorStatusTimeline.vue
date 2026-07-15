@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+    class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
     data-test="monitor-status-timeline"
   >
     <div
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ passCount }} Passed
       </span>
     </div>
-    <div class="border-t border-[var(--o2-border-color)]" />
+    <div class="border-t border-border-default" />
     <div class="flex flex-col gap-1 py-2 px-[0.875rem]">
       <div class="flex items-center gap-1">
         <button
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="seg in segments"
             :key="seg.runId"
             class="shrink-0 h-full min-w-[3px] cursor-pointer transition-all duration-100 hover:scale-y-[1.35]"
-            :style="{ width: 100 / MAX_VISIBLE + '%' }"
+            :style="{ width: segmentWidthPct }"
             :class="seg.color"
           >
             <OTooltip side="top" :delay="0" :max-width="'auto'">
@@ -179,6 +179,13 @@ import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";
 defineOptions({ name: "MonitorStatusTimeline" });
 
 const MAX_VISIBLE = 30;
+
+/**
+ * Width-per-segment as a percentage string.
+ * :style binding is required because the width is a fractional percentage
+ * computed from MAX_VISIBLE, not a fixed class value.
+ */
+const segmentWidthPct = computed(() => `${100 / MAX_VISIBLE}%`);
 
 interface TimelineExecution {
   location: string;

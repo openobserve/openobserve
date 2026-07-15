@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="runsLoading || !runsHasLoadedOnce">
               <div class="px-2">
                 <div
-                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                  class="card-container rounded-lg flex flex-col bg-[var(--color-surface-base)] border border-[var(--color-border-default)] overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <SkeletonBox width="50px" height="12px" rounded />
                     <SkeletonBox width="45px" height="12px" rounded />
                   </div>
-                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="border-t border-[var(--color-border-default)]" />
                   <div class="flex flex-col gap-1 py-2 px-[0.875rem]">
                     <div class="flex items-center gap-1">
                       <div class="w-5 h-5 shrink-0" />
@@ -78,8 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div
                           v-for="n in 26"
                           :key="n"
-                          class="flex-1 h-full rounded-[2px]"
-                          style="background: var(--o2-border-color); opacity: 0.4"
+                          class="flex-1 h-full rounded-[2px] bg-border-default opacity-40"
                         />
                       </div>
                       <div class="w-5 h-5 shrink-0" />
@@ -97,14 +96,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-else-if="runsError">
               <div class="px-2">
                 <div
-                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                  class="card-container rounded-lg flex flex-col bg-[var(--color-surface-base)] border border-[var(--color-border-default)] overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
                   >
                     <span class="font-bold text-sm text-text-heading">Status Timeline</span>
                   </div>
-                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="border-t border-[var(--color-border-default)]" />
                   <div class="flex items-center justify-center py-6 text-[0.75rem] text-status-error-text">
                     <span class="flex items-center gap-1">
                       <OIcon name="error" size="xs" />
@@ -134,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="n in 5"
                     :key="n"
-                    class="card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-2 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
+                    class="card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-2 bg-[var(--color-surface-base)] border border-[var(--color-border-default)]"
                   >
                     <SkeletonBox width="60%" height="11px" rounded />
                     <SkeletonBox width="55%" height="22px" rounded />
@@ -148,12 +147,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="card in kpiCards"
                   :key="card.key"
-                  class="card-container rounded-lg flex flex-col px-2 pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+                  class="card-container rounded-lg flex flex-col px-2 pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--color-surface-base)] border border-[var(--color-border-default)] transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
                   :data-test="`monitor-runs-kpi-${card.key}`"
                 >
                   <div class="flex flex-col gap-[0.25rem]">
                     <div
-                      class="kpi-label text-[0.7rem] font-semibold text-[var(--o2-text-muted)]"
+                      class="kpi-label text-[0.7rem] font-semibold text-[var(--color-text-muted)]"
                     >
                       {{ card.label }}
                       <span v-if="card.unit"> ({{ card.unit }}) </span>
@@ -168,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       <template v-else>
                         <span
-                          class="text-[1.4rem] font-bold leading-none text-[var(--o2-text-primary)]"
+                          class="text-[1.4rem] font-bold leading-none text-[var(--color-text-primary)]"
                           :class="card.valueClass"
                         >
                           {{ card.value }}
@@ -186,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="px-2">
               <div class="grid grid-cols-2 gap-2">
                 <div
-                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                  class="card-container rounded-lg flex flex-col bg-[var(--color-surface-base)] border border-[var(--color-border-default)] overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
@@ -195,13 +194,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="flex-1" />
                     <SkeletonBox width="80px" height="20px" rounded />
                   </div>
-                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="border-t border-[var(--color-border-default)]" />
                   <div class="p-4">
                     <SkeletonBox width="100%" height="160px" rounded />
                   </div>
                 </div>
                 <div
-                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                  class="card-container rounded-lg flex flex-col bg-[var(--color-surface-base)] border border-[var(--color-border-default)] overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
@@ -210,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="flex-1" />
                     <SkeletonBox width="90px" height="20px" rounded />
                   </div>
-                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="border-t border-[var(--color-border-default)]" />
                   <div class="p-4">
                     <SkeletonBox width="100%" height="160px" rounded />
                   </div>
@@ -222,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="px-2">
               <div class="grid grid-cols-2 gap-2">
                 <div
-                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                  class="card-container rounded-lg flex flex-col bg-[var(--color-surface-base)] border border-[var(--color-border-default)] overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
@@ -242,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Error
                     </span>
                   </div>
-                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="border-t border-[var(--color-border-default)]" />
                   <div class="min-h-[180px] p-0">
                     <ChartRenderer
                       v-if="!histogramError"
@@ -256,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div
-                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                  class="card-container rounded-lg flex flex-col bg-[var(--color-surface-base)] border border-[var(--color-border-default)] overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
@@ -276,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Error
                     </span>
                   </div>
-                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="border-t border-[var(--color-border-default)]" />
                   <div class="min-h-[180px] p-0">
                     <ChartRenderer
                       v-if="!histogramError"
@@ -300,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="n in 3"
                   :key="n"
-                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                  class="card-container rounded-lg flex flex-col bg-[var(--color-surface-base)] border border-[var(--color-border-default)] overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
@@ -312,12 +311,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <SkeletonBox width="110px" height="14px" rounded />
                   </div>
-                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="border-t border-[var(--color-border-default)]" />
                   <div class="px-2 py-[0.5rem] flex flex-col">
                     <div
                       v-for="row in 3"
                       :key="row"
-                      class="flex items-center gap-3 py-[9px] border-b border-[var(--o2-border-color)] last:border-b-0"
+                      class="flex items-center gap-3 py-[9px] border-b border-[var(--color-border-default)] last:border-b-0"
                     >
                       <SkeletonBox
                         width="16px"
@@ -326,8 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <SkeletonBox width="70px" height="12px" rounded />
                       <div
-                        class="flex-1 h-1.5 rounded-full"
-                        style="background: var(--o2-border-color); opacity: 0.3"
+                        class="flex-1 h-1.5 rounded-full bg-border-default opacity-30"
                       />
                       <SkeletonBox width="36px" height="12px" rounded />
                     </div>
@@ -343,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="dim in ['Browser','Location','Device']"
                   :key="dim"
-                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                  class="card-container rounded-lg flex flex-col bg-[var(--color-surface-base)] border border-[var(--color-border-default)] overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
@@ -352,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Pass Rate by {{ dim }}
                     </span>
                   </div>
-                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="border-t border-[var(--color-border-default)]" />
                   <div class="flex items-center justify-center py-8 text-[0.75rem] text-status-error-text">
                     <span class="flex items-center gap-1">
                       <OIcon name="error" size="xs" />
@@ -367,7 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="px-2">
               <div class="grid grid-cols-3 gap-2">
                 <div
-                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                  class="card-container rounded-lg flex flex-col bg-[var(--color-surface-base)] border border-[var(--color-border-default)] overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
@@ -377,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Pass Rate by Browser
                     </span>
                   </div>
-                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="border-t border-[var(--color-border-default)]" />
                   <div class="px-2 py-[0.5rem]">
                     <div
                       v-for="b in browserBreakdown"
@@ -397,6 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-[40px]"
                       >
+                        <!-- :style for dynamic bar width + computed color — inline required for per-breakdown values -->
                         <div
                           class="h-full rounded-full"
                           :style="{ width: b.pct, background: b.barColor }"
@@ -412,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div
-                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                  class="card-container rounded-lg flex flex-col bg-[var(--color-surface-base)] border border-[var(--color-border-default)] overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
@@ -426,7 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Pass Rate by Location
                     </span>
                   </div>
-                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="border-t border-[var(--color-border-default)]" />
                   <div class="px-2 py-[0.5rem]">
                     <div
                       v-for="l in locationBreakdown"
@@ -461,7 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div
-                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                  class="card-container rounded-lg flex flex-col bg-[var(--color-surface-base)] border border-[var(--color-border-default)] overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
@@ -471,7 +470,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Pass Rate by Device
                     </span>
                   </div>
-                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="border-t border-[var(--color-border-default)]" />
                   <div class="px-2 py-[0.5rem]">
                     <div
                       v-for="d in deviceBreakdown"
@@ -786,23 +785,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Loading skeleton -->
             <template v-if="stepsLoading || !stepsHasLoadedOnce">
               <div class="grid grid-cols-2 gap-2">
-                <div class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden">
+                <div class="card-container rounded-lg flex flex-col bg-[var(--color-surface-base)] border border-[var(--color-border-default)] overflow-hidden">
                   <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
                     <SkeletonBox width="100px" height="14px" rounded />
                   </div>
-                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="border-t border-[var(--color-border-default)]" />
                   <div class="p-4"><SkeletonBox width="100%" height="160px" rounded /></div>
                 </div>
-                <div class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden">
+                <div class="card-container rounded-lg flex flex-col bg-[var(--color-surface-base)] border border-[var(--color-border-default)] overflow-hidden">
                   <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
                     <SkeletonBox width="100px" height="14px" rounded />
                   </div>
-                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="border-t border-[var(--color-border-default)]" />
                   <div class="p-4"><SkeletonBox width="100%" height="160px" rounded /></div>
                 </div>
               </div>
               <div v-for="n in 5" :key="n" class="card-container rounded-lg overflow-hidden">
-                <div class="h-10 bg-[var(--o2-border-color)] opacity-20" />
+                <div class="h-10 bg-[var(--color-border-default)] opacity-20" />
               </div>
             </template>
 
@@ -833,7 +832,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Panel 1: Failed Steps Bar Chart -->
                 <div
                   v-if="stepFailures.length > 0"
-                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                  class="card-container rounded-lg flex flex-col bg-[var(--color-surface-base)] border border-[var(--color-border-default)] overflow-hidden"
                 >
                   <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
                     <span class="font-bold text-sm text-text-heading">
@@ -844,7 +843,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("synthetics.results.steps.failedStepsDescription") }}
                     </span>
                   </div>
-                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="border-t border-[var(--color-border-default)]" />
                   <div class="min-h-[160px] p-0">
                     <ChartRenderer
                       :data="{ options: failedStepsChartOption }"
@@ -854,7 +853,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-else
-                  class="card-container rounded-lg flex items-center justify-center py-8 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
+                  class="card-container rounded-lg flex items-center justify-center py-8 bg-[var(--color-surface-base)] border border-[var(--color-border-default)]"
                 >
                   <OBadge variant="success" size="md">
                     {{ t("synthetics.results.steps.noFailures") }}
@@ -864,7 +863,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Panel 2: Slowest Steps Bar Chart -->
                 <div
                   v-if="stepDurations.length > 0"
-                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                  class="card-container rounded-lg flex flex-col bg-[var(--color-surface-base)] border border-[var(--color-border-default)] overflow-hidden"
                 >
                   <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
                     <span class="font-bold text-sm text-text-heading">
@@ -875,7 +874,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("synthetics.results.steps.slowestStepsDescription") }}
                     </span>
                   </div>
-                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="border-t border-[var(--color-border-default)]" />
                   <div class="min-h-[160px] p-0">
                     <ChartRenderer
                       :data="{ options: slowestStepsChartOption }"
@@ -885,7 +884,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-else
-                  class="card-container rounded-lg flex items-center justify-center py-8 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
+                  class="card-container rounded-lg flex items-center justify-center py-8 bg-[var(--color-surface-base)] border border-[var(--color-border-default)]"
                 >
                   <span class="text-sm text-text-secondary">No step duration data</span>
                 </div>
@@ -1017,7 +1016,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="grid grid-cols-2 gap-2">
                 <!-- Panel 4: Recent Step Failures -->
                 <div
-                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                  class="card-container rounded-lg flex flex-col bg-[var(--color-surface-base)] border border-[var(--color-border-default)] overflow-hidden"
                 >
                   <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
                     <span class="font-bold text-sm text-text-heading">
@@ -1028,7 +1027,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("synthetics.results.steps.recentFailuresDescription") }}
                     </span>
                   </div>
-                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="border-t border-[var(--color-border-default)]" />
                   <div v-if="failureInstances.length > 0" class="max-h-[320px] overflow-y-auto">
                     <div
                       v-for="fi in failureInstances"
@@ -1059,7 +1058,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Panel 5: Flakiest Steps -->
                 <div
-                  class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                  class="card-container rounded-lg flex flex-col bg-[var(--color-surface-base)] border border-[var(--color-border-default)] overflow-hidden"
                 >
                   <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
                     <span class="font-bold text-sm text-text-heading">
@@ -1070,7 +1069,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("synthetics.results.steps.flakiestStepsDescription") }}
                     </span>
                   </div>
-                  <div class="border-t border-[var(--o2-border-color)]" />
+                  <div class="border-t border-[var(--color-border-default)]" />
                   <div v-if="flakyStepsDisplay.length > 0" class="max-h-[320px] overflow-y-auto">
                     <div
                       v-for="fs in flakyStepsDisplay"
@@ -1111,7 +1110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Panel 6: Step Duration Trend Chart -->
               <div
                 v-if="trendBuckets.length > 0"
-                class="card-container rounded-lg flex flex-col bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] overflow-hidden"
+                class="card-container rounded-lg flex flex-col bg-[var(--color-surface-base)] border border-[var(--color-border-default)] overflow-hidden"
               >
                 <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
                   <span class="font-bold text-sm text-text-heading">
@@ -1122,7 +1121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("synthetics.results.steps.stepDurationTrendDescription") }}
                   </span>
                 </div>
-                <div class="border-t border-[var(--o2-border-color)]" />
+                <div class="border-t border-[var(--color-border-default)]" />
                 <div class="min-h-[200px] p-0">
                   <ChartRenderer
                     :data="{ options: stepDurationTrendOption }"
@@ -1788,8 +1787,8 @@ const browserBreakdown = computed<BreakdownItem[]>(() => {
       name,
       icon: browserIconMap[name] || "open-in-browser",
       pct: pct + "%",
-      barColor: "var(--o2-status-success-text)",
-      textColor: "var(--o2-success-700)",
+      barColor: "var(--color-status-success-text)",
+      textColor: "var(--color-success-700)",
     };
     return entry;
   });
@@ -1824,8 +1823,8 @@ const locationBreakdown = computed<BreakdownItem[]>(() => {
       name,
       icon: getIconForRegion(name),
       pct: pct + "%",
-      barColor: "var(--o2-status-success-text)",
-      textColor: "var(--o2-success-700)",
+      barColor: "var(--color-status-success-text)",
+      textColor: "var(--color-success-700)",
     };
     return entry;
   });
@@ -1845,17 +1844,17 @@ const deviceBreakdown = computed<BreakdownItem[]>(() => {
       name: deviceLabel(id),
       icon: deviceIconName(id),
       pct: pct + "%",
-      barColor: "var(--o2-status-success-text)",
-      textColor: "var(--o2-success-700)",
+      barColor: "var(--color-status-success-text)",
+      textColor: "var(--color-success-700)",
     };
   });
   });
 
 // ── Status filter options ────────────────────────────────────────────────
 const statusOptions = [
-  { key: "all", label: "All", dot: "var(--o2-text-secondary)" },
-  { key: "pass", label: "Passed", dot: "var(--o2-status-success-text)" },
-  { key: "fail", label: "Failed", dot: "var(--o2-status-error-text)" },
+  { key: "all", label: "All", dot: "var(--color-text-secondary)" },
+  { key: "pass", label: "Passed", dot: "var(--color-status-success-text)" },
+  { key: "fail", label: "Failed", dot: "var(--color-status-error-text)" },
 ];
 
 // ── Mock fallback data (used by Overview/Errors tabs when no real data) ────
@@ -2055,24 +2054,24 @@ const trendBuckets = computed(() => synthetics.stepStats.value.trendBuckets);
 
 function colorForRate(pct: number): string {
   return pct >= 15
-    ? "var(--o2-status-error-text)"
+    ? "var(--color-status-error-text)"
     : pct >= 5
-      ? "var(--o2-warning-600)"
-      : "var(--o2-text-secondary)";
+      ? "var(--color-warning-600)"
+      : "var(--color-text-secondary)";
 }
 function barColorForRate(pct: number): string {
   return pct >= 15
-    ? "var(--o2-status-error-text)"
+    ? "var(--color-status-error-text)"
     : pct >= 5
-      ? "var(--o2-warning-500)"
-      : "var(--o2-status-success-text)";
+      ? "var(--color-warning-500)"
+      : "var(--color-status-success-text)";
 }
 function chipColorForRate(pct: number) {
   return pct >= 15
-    ? { bg: "var(--o2-error-50)", color: "var(--o2-status-error-text)" }
+    ? { bg: "var(--color-error-50)", color: "var(--color-status-error-text)" }
     : pct >= 5
-      ? { bg: "var(--o2-warning-50)", color: "var(--o2-warning-700)" }
-      : { bg: "var(--o2-success-50)", color: "var(--o2-success-700)" };
+      ? { bg: "var(--color-warning-50)", color: "var(--color-warning-700)" }
+      : { bg: "var(--color-success-50)", color: "var(--color-success-700)" };
 }
 function sparklinePts(rates: number[], width: number, height: number): string {
   if (rates.length < 2) {
@@ -2100,9 +2099,9 @@ function engineShortLabel(engine: string): string {
 // ── Panel 1 + 2: Bar chart options ───────────────────────────────────────
 
 const failedStepsChartOption = computed(() => {
-  const errorColor = cssVar("--o2-status-error-text", "#dc2626");
-  const axisColor = cssVar("--o2-text-caption", "#6c707e");
-  const splitColor = cssVar("--o2-border-color", "#e2e8f0");
+  const errorColor = cssVar("--color-status-error-text", "#dc2626");
+  const axisColor = cssVar("--color-text-caption", "#6c707e");
+  const splitColor = cssVar("--color-border-default", "#e2e8f0");
   const data = stepFailures.value
     .slice(0, 15)
     .map((s) => ({ name: s.stepName, value: s.failCount }))
@@ -2136,9 +2135,9 @@ const failedStepsChartOption = computed(() => {
 });
 
 const slowestStepsChartOption = computed(() => {
-  const primaryColor = cssVar("--o2-primary-color", "#3b82f6");
-  const axisColor = cssVar("--o2-text-caption", "#6c707e");
-  const splitColor = cssVar("--o2-border-color", "#e2e8f0");
+  const primaryColor = cssVar("--color-primary-600", "#3b82f6");
+  const axisColor = cssVar("--color-text-caption", "#6c707e");
+  const splitColor = cssVar("--color-border-default", "#e2e8f0");
   const data = stepDurations.value
     .slice(0, 15)
     .map((s) => ({ name: s.stepName, value: s.avgDurationMs }))
@@ -2215,15 +2214,15 @@ const stepGroupsDisplay = computed<StepGroupDisplayRow[]>(() => {
       failRateDisplay: failPct + "%",
       flakyRateDisplay: g.flakyRate.toFixed(1) + "%",
       failColor: colorForRate(failPct),
-      flakyColor: g.flakyRate >= 5 ? "var(--o2-status-warning-text)" : "var(--o2-text-secondary)",
+      flakyColor: g.flakyRate >= 5 ? "var(--color-status-warning-text)" : "var(--color-text-secondary)",
       failRateBarPct: failBarWidth + "%",
       failBarColor: barColorForRate(failPct),
       avgDuration: fmtDur(g.avgDurationMs),
       durationBarPct: Math.round((g.avgDurationMs / maxDuration) * 100) + "%",
       trendPts: sparklinePts(g.recentRates, 90, 24),
       trendColor: g.failRate >= 0.1
-        ? "var(--o2-status-error-text)"
-        : "var(--o2-primary-500)",
+        ? "var(--color-status-error-text)"
+        : "var(--color-primary-500)",
       browserChips: g.browserStats.map((bs) => {
         const failPct = bs.total > 0 ? Math.round((bs.failures / bs.total) * 100) : 0;
         const c = chipColorForRate(failPct);
@@ -2260,22 +2259,28 @@ const flakyStepsDisplay = computed(() => {
     failRateDisplay: fs.failRate.toFixed(1) + "%",
     trendPts: sparklinePts(fs.recentFlakyRates, 60, 16),
     trendColor: fs.flakyRate >= 10
-      ? "var(--o2-status-warning-text)"
-      : "var(--o2-primary-500)",
+      ? "var(--color-status-warning-text)"
+      : "var(--color-primary-500)",
   }));
 });
 
 // ── Panel 6: Step Duration Trend chart option ────────────────────────────
 
 const STEP_TREND_COLORS = [
-  "#3b82f6", "#ef4444", "#22c55e", "#f59e0b",
-  "#8b5cf6", "#06b6d4", "#ec4899", "#f97316",
-  "#94a3b8",
+  cssVar("--color-primary-600", "#3b82f6"),
+  cssVar("--color-status-error-text", "#ef4444"),
+  cssVar("--color-status-success-text", "#22c55e"),
+  cssVar("--color-status-warning-text", "#f59e0b"),
+  cssVar("--color-primary-400", "#8b5cf6"),
+  cssVar("--color-primary-300", "#06b6d4"),
+  cssVar("--color-error-400", "#ec4899"),
+  cssVar("--color-error-300", "#f97316"),
+  cssVar("--color-text-muted", "#94a3b8"),
 ];
 
 const stepDurationTrendOption = computed(() => {
-  const axisColor = cssVar("--o2-text-caption", "#6c707e");
-  const splitColor = cssVar("--o2-border-color", "#e2e8f0");
+  const axisColor = cssVar("--color-text-caption", "#525252");
+  const splitColor = cssVar("--color-border-default", "#e5e5e5");
   const buckets = trendBuckets.value;
   if (buckets.length === 0) return {};
 
@@ -2332,10 +2337,10 @@ function cssVar(name: string, fallback: string): string {
 }
 
 const responseChartOption = computed(() => {
-  const lineColor = cssVar("--o2-primary-color", "#3b82f6");
-  const axisColor = cssVar("--o2-text-caption", "#6c707e");
-  const splitColor = cssVar("--o2-border-color", "#e2e8f0");
-  const p95Color = cssVar("--o2-status-warning-text", "#f59e0b");
+  const lineColor = cssVar("--color-primary-600", "#3b82f6");
+  const axisColor = cssVar("--color-text-caption", "#6c707e");
+  const splitColor = cssVar("--color-border-default", "#e2e8f0");
+  const p95Color = cssVar("--color-status-warning-text", "#f59e0b");
 
   let seriesData: [number, number][];
   if (synthetics.buckets.value.length > 0) {
@@ -2402,9 +2407,9 @@ const responseChartOption = computed(() => {
 });
 
 const errorChartOption = computed(() => {
-  const axisColor = cssVar("--o2-text-caption", "#6c707e");
-  const splitColor = cssVar("--o2-border-color", "#e2e8f0");
-  const errorColor = cssVar("--o2-status-error-text", "#dc2626");
+  const axisColor = cssVar("--color-text-caption", "#6c707e");
+  const splitColor = cssVar("--color-border-default", "#e2e8f0");
+  const errorColor = cssVar("--color-status-error-text", "#dc2626");
 
   let categories: string[];
   let data: number[];

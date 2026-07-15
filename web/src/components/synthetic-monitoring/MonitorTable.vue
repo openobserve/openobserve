@@ -44,7 +44,7 @@
       <OTooltip
         v-if="(row as any).name"
         :content="(row as any).name"
-        content-class="max-w-[400px] whitespace-normal break-words text-xs"
+        content-class="max-w-[25rem] whitespace-normal break-words text-xs"
       />
     </template>
 
@@ -122,7 +122,7 @@
             class="flex-1"
           />
           <span
-            :class="'font-mono text-sm font-semibold min-w-[44px] text-right text-xs '
+            :class="'font-mono text-sm font-semibold min-w-[2.75rem] text-right text-xs '
               + ((row as any).uptime >= 99 ? 'text-success-600' : (row as any).uptime >= 95 ? 'text-amber-600' : 'text-error-600')"
           >{{ (row as any).uptime }}%</span>
         </div>
@@ -133,7 +133,7 @@
     <!-- Locations with tooltip (monitors mode) -->
     <template #cell-locations="{ row }">
       <div class="flex items-center gap-1 cursor-default" @mouseenter="showLoc($event, (row as any).locations)" @mouseleave="hideLoc">
-        <span class="text-xs truncate max-w-[70px]">{{ (row as any).locations[0] }}</span>
+        <span class="text-xs truncate max-w-[4.375rem]">{{ (row as any).locations[0] }}</span>
         <span v-if="(row as any).locations.length > 1" class="text-xs font-bold px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 whitespace-nowrap shrink-0">+{{ (row as any).locations.length - 1 }}</span>
       </div>
     </template>
@@ -560,54 +560,3 @@ onUnmounted(() => {
 
 
 </script>
-
-<style scoped>
-/* Sparkbar — container, bar shape, hover/dim interaction (kept: :has() can't be expressed in Tailwind) */
-.spark { display:flex; align-items:flex-end; gap:2px; height:20px; }
-.spark-bar {
-  width:7px; height:18px; border-radius:2px; flex-shrink:0; cursor:pointer;
-  transition:height .1s, opacity .1s, filter .1s;
-}
-.spark-bar:hover { height:20px; filter:brightness(1.25); }
-.spark:has(.spark-bar:hover) .spark-bar:not(:hover) { opacity:.45; }
-
-/* Locations tooltip */
-.loc-float-tip  { position:fixed; z-index:9999; background:#1e293b; color:#f1f5f9; border-radius:8px; padding:9px 13px; box-shadow:0 8px 24px rgba(0,0,0,.28); min-width:150px; pointer-events:none; }
-.loc-float-item { display:flex; align-items:center; gap:7px; font-size:12px; padding:3px 0; border-bottom:1px solid rgba(255,255,255,.07); }
-.loc-float-item:last-child { border-bottom:none; }
-.loc-float-dot  { width:6px; height:6px; border-radius:50%; background:#22c55e; flex-shrink:0; }
-
-/* Spark tooltip */
-.spark-tooltip {
-  position:fixed; z-index:10000;
-  background:#1e293b; color:#f1f5f9;
-  border-radius:9px; padding:10px 13px;
-  box-shadow:0 10px 32px rgba(0,0,0,.4);
-  min-width:210px; max-width:280px;
-  pointer-events:auto;
-  transform:translateX(-50%) translateY(-100%);
-  font-size:12px;
-}
-.stt-header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:7px; }
-.stt-time   { font-size:11px; opacity:.65; white-space:nowrap; }
-.stt-badge  { font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px; white-space:nowrap; }
-.stt-badge--up   { background:rgba(34,197,94,.2);  color:#4ade80; }
-.stt-badge--down { background:rgba(239,68,68,.2);  color:#f87171; }
-.stt-badge--deg  { background:rgba(245,158,11,.2); color:#fbbf24; }
-.stt-divider { height:1px; background:rgba(255,255,255,.08); margin-bottom:8px; }
-.stt-checks  { display:flex; flex-direction:column; gap:5px; margin-bottom:8px; }
-.stt-check   { display:flex; align-items:center; gap:7px; }
-.stt-dot     { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
-.stt-dot--up   { background:#22c55e; box-shadow:0 0 5px rgba(34,197,94,.5); }
-.stt-dot--down { background:#ef4444; box-shadow:0 0 5px rgba(239,68,68,.5); }
-.stt-loc     { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.stt-ms      { font-size:11px; color:rgba(241,245,249,.55); white-space:nowrap; font-family:monospace; }
-.stt-avg     { font-size:11px; color:rgba(241,245,249,.5); border-top:1px solid rgba(255,255,255,.08); padding-top:6px; font-family:monospace; }
-.stt-arrow   {
-  position:absolute; bottom:-7px; left:50%; transform:translateX(-50%);
-  width:0; height:0;
-  border-left:7px solid transparent;
-  border-right:7px solid transparent;
-  border-top:7px solid #1e293b;
-}
-</style>
