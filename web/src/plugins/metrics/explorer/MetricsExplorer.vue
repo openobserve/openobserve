@@ -103,12 +103,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              Clear does NOT live here (it collided with the tabs in a 240px
              column); it sits in each facet's search row below instead. -->
         <div
-          class="shrink-0 flex items-center px-2 py-2 border-b border-border-default"
+          class="shrink-0 flex items-center px-2 py-2"
         >
+          <!-- Natural, content-sized segmented control (not forced full-width —
+               that fought the component and clumped the labels). The count sits
+               in a FIXED-WIDTH slot that is always present (empty when there is
+               no selection), so a count appearing or changing 2→12 never nudges
+               the label. Right-aligned + tabular-nums so every count width is the
+               same. -->
           <OToggleGroup
             :model-value="grid.activeRail.value"
             type="single"
-            class="flex w-full"
             data-test="metrics-explorer-rail-toggle"
             @update:model-value="selectRail"
           >
@@ -117,18 +122,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="rail.id"
               :value="rail.id"
               size="sm"
-              class="flex-1"
               :data-test="`metrics-explorer-rail-${rail.id}`"
             >
-              <span class="flex items-center gap-1.5">
+              <span class="flex items-center gap-1">
                 <span>{{ rail.label }}</span>
-                <OTag
-                  v-if="rail.count"
-                  type="countChip"
-                  value="primary"
-                  size="xs"
+                <span
+                  class="w-4 shrink-0 text-right text-[0.6875rem] font-semibold tabular-nums text-primary"
                   :data-test="`metrics-explorer-rail-count-${rail.id}`"
-                  >{{ rail.count }}</OTag
+                  >{{ rail.count || "" }}</span
                 >
               </span>
             </OToggleGroupItem>
@@ -183,17 +184,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("metrics.explorer.facets.clearFilters") }}
             </OButton>
           </div>
-          <div class="flex flex-col gap-1 px-3 pb-2 overflow-y-auto">
+          <!-- OCheckboxGroup owns the checked-state and toggling; each OCheckbox
+               is a member via its `value`. `selectedTypes` stays a Set across the
+               composable / URL state — the array<->Set conversion is confined to
+               this one binding (`selectedTypesArray`). -->
+          <OCheckboxGroup
+            :model-value="selectedTypesArray"
+            class="px-3 pb-2 overflow-y-auto"
+            @update:model-value="onSelectedTypesChange"
+          >
             <OCheckbox
               v-for="facet in grid.typeFacets.value"
               :key="facet.id"
               size="xs"
-              :model-value="grid.selectedTypes.value.has(facet.id)"
+              :value="facet.id"
               :label="`${badgeLabels[facet.id]} (${facet.count})`"
               :data-test="`metrics-explorer-type-${facet.id}`"
-              @update:model-value="toggleType(facet.id)"
             />
-          </div>
+          </OCheckboxGroup>
         </div>
       </aside>
 
@@ -460,6 +468,7 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OCheckboxGroup from "@/lib/forms/Checkbox/OCheckboxGroup.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -530,6 +539,7 @@ export default defineComponent({
     OButton,
     OIcon,
     OCheckbox,
+    OCheckboxGroup,
     OSearchInput,
     OSpinner,
     OEmptyState,
@@ -830,11 +840,12 @@ export default defineComponent({
       }
     };
 
-    const toggleType = (id: string) => {
-      const next = new Set(grid.selectedTypes.value);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      grid.selectedTypes.value = next;
+    // The type facet uses OCheckboxGroup, which speaks arrays; selectedTypes is a
+    // Set everywhere else (composable filtering, URL state). These two adapters
+    // are the ONLY place the two representations meet.
+    const selectedTypesArray = computed(() => [...grid.selectedTypes.value]);
+    const onSelectedTypesChange = (next: (string | number | boolean)[]) => {
+      grid.selectedTypes.value = new Set(next.map(String));
       trackFilter("type");
     };
 
@@ -1351,7 +1362,8 @@ export default defineComponent({
       railHasSelection,
       clearActiveRail,
       onClearAllFilters,
-      toggleType,
+      selectedTypesArray,
+      onSelectedTypesChange,
       onPrefixChange,
       onSuffixChange,
       onAddLabelFilter,

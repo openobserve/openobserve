@@ -343,4 +343,25 @@ describe("MetricsExplorer wiring", () => {
       expect(grid.activeRail.value).toBe("type");
     });
   });
+
+  describe("the type facet uses OCheckboxGroup over a Set<->array boundary", () => {
+    it("exposes selectedTypes as an array for the group, and writes back a Set", () => {
+      // The composable keeps selectedTypes as a Set (URL state + filtering depend
+      // on it); OCheckboxGroup speaks arrays. The two adapters must round-trip.
+      grid.selectedTypes.value = new Set(["counter", "gauge"]);
+      const wrapper = mountExplorer();
+
+      // Set -> array, for the group's model-value.
+      expect((wrapper.vm as any).selectedTypesArray).toEqual([
+        "counter",
+        "gauge",
+      ]);
+
+      // array -> Set, on the group's update. A NEW Set (not a mutation) so the
+      // composable's watchers fire.
+      (wrapper.vm as any).onSelectedTypesChange(["histogram"]);
+      expect(grid.selectedTypes.value).toBeInstanceOf(Set);
+      expect([...grid.selectedTypes.value]).toEqual(["histogram"]);
+    });
+  });
 });

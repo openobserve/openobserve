@@ -22,7 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- The rail's own search — narrows the facet LIST, not the grid. Its own
          inline ✕ clears the SEARCH TEXT only. Clearing the selected FILTERS is a
          separate, explicitly-labelled row below, so the two are never confused. -->
-    <div class="px-3 pb-2">
+    <!-- px-2 matches the facet toggle's horizontal padding above, so the search
+         box's edges line up with the Prefix/Suffix/Type control. -->
+    <div class="px-2 pb-2">
       <OInput
         v-model="search"
         size="sm"
