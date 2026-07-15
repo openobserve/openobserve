@@ -27,6 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :initial-name="savedData.name || ''"
     :initial-after-flatten="savedData.after_flatten ?? true"
     :sample-events="sampleEvents"
+    language="javascript"
+    :default-code="JS_DEFAULT_CODE"
     @expand="onExpand"
   />
 </template>
@@ -39,6 +41,29 @@ import { buildTestSample } from "@/plugins/workflows/testSample";
 
 const savedData: any = workflowObj.currentSelectedNodeData?.data || {};
 const picker = ref<any>(null);
+
+// Seed code for a brand-new workflow function. Workflow functions are
+// JavaScript: the whole fired-alert event arrives as `row`; mutate it and
+// return it. The example (in comments) mirrors the sample payload fields.
+const JS_DEFAULT_CODE = `// Transform the fired-alert payload before it continues to the next step.
+// \`row\` is the whole event: { meta: {...}, data: [ ...records ] }.
+// Mutate it and return it.
+//
+// Example — derive a severity from the alert, then enrich each record that
+// tripped it:
+//   row.meta.severity =
+//     row.meta.alert_count >= 100 ? "critical" : "warning";
+//
+//   row.data = row.data.map((record) => {
+//     record.env = "production";
+//     if (record.status_code >= 500) record.needs_attention = true;
+//     return record;
+//   });
+//
+//   // drop a field you don't want forwarded downstream
+//   delete row.meta.alert_operator;
+
+return row;`;
 
 // Seed the inline function editor's "Events" panel with the same fired-alert
 // sample the Test drawer uses, so the VRL author sees the real payload shape.

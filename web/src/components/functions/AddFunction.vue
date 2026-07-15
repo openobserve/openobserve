@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="functionsToolbarRef"
       :disable-name="beingUpdated"
       :transform-type-options="transformTypeOptions"
+      :hide-trans-type="!!forcedLanguage"
       @test="onTestFunction"
       @save="onSubmit"
       @back="closeAddFunction"
@@ -84,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @generation-success="handleGenerationSuccess"
                     />
                     <div
-                      v-if="!formData.function && functionEditorPlaceholderFlag"
+                      v-if="!formData.function && functionEditorPlaceholderFlag && !forcedLanguage"
                       class="absolute inset-0 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
                     >
                       <span class="[font-family:monospace] text-[var(--text-base)] [line-height:1.3125rem] text-[#a0aec0] dark:text-[#718096] whitespace-nowrap overflow-hidden [text-overflow:ellipsis]">{{
@@ -216,6 +217,18 @@ export default defineComponent({
     sampleEvents: {
       type: Array,
       default: undefined,
+    },
+    // When set ('vrl' | 'javascript'), the language is locked to this value and
+    // the VRL/JS toggle is hidden (workflow function nodes force 'javascript').
+    forcedLanguage: {
+      type: String,
+      default: "",
+    },
+    // Seed code for a fresh function editor (replaces the typewriter placeholder
+    // with ready-to-edit boilerplate + a worked example in comments).
+    defaultCode: {
+      type: String,
+      default: "",
     },
   },
   components: {
@@ -649,6 +662,16 @@ export default defineComponent({
       // Ensure transType is a string for radio button binding
       if (this.formData.transType !== undefined) {
         this.formData.transType = String(this.formData.transType);
+      }
+    }
+
+    // Host-forced language (e.g. workflow function nodes are JS-only) — lock the
+    // transType and seed the editor with ready-to-edit boilerplate. Only for a
+    // fresh function; an existing one keeps its saved language + code.
+    if (this.forcedLanguage && !this.beingUpdated) {
+      this.formData.transType = this.forcedLanguage === "javascript" ? "1" : "0";
+      if (this.defaultCode && !this.formData.function) {
+        this.formData.function = this.defaultCode;
       }
     }
   },

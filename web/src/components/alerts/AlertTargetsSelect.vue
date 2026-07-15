@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex items-center">
     <OSelect
-      :model-value="combined"
+      :model-value="model"
       :options="options"
       multiple
       :error="error"
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -113,11 +113,28 @@ const { t } = useI18n();
 const DEST = "dest:";
 const WF = "wf:";
 
-// Current selection as one tagged array (what the OSelect binds to).
-const combined = computed<string[]>(() => [
+// The selection as one tagged array, derived from the two backend fields.
+const propsCombined = computed<string[]>(() => [
   ...(props.destinations || []).map((d) => `${DEST}${d}`),
   ...(props.workflows || []).map((w) => `${WF}${w}`),
 ]);
+
+// Internal ORDERED model the OSelect binds to. We keep our own copy so the
+// round-trip (onUpdate → parent → props → propsCombined) doesn't feed a
+// reordered array back into the control. `propsCombined` forces "destinations
+// first, then workflows", which differs from the user's click order; binding
+// that directly makes reka re-reconcile every change — the visible "shake" once
+// both groups have a selection. So we sync from props only when the value SET
+// actually changes (external reset / edit load), never on our own echo.
+const model = ref<string[]>(propsCombined.value);
+const sameSet = (a: string[], b: string[]) => {
+  if (a.length !== b.length) return false;
+  const s = new Set(a);
+  return b.every((v) => s.has(v));
+};
+watch(propsCombined, (next) => {
+  if (!sameSet(next, model.value)) model.value = next;
+});
 
 // Grouped, type-tagged options. Headers + Workflows group only when enterprise;
 // in OSS this is a plain destinations list (unchanged behavior).
@@ -145,9 +162,11 @@ const options = computed(() => {
   ];
 });
 
-// Split the tagged selection back into the two backend fields.
+// Split the tagged selection back into the two backend fields. Keep the control's
+// own order in `model` so the chips don't jump when props round-trip back.
 const onUpdate = (vals: unknown) => {
   const arr = Array.isArray(vals) ? (vals as string[]) : [];
+  model.value = arr;
   const dests = arr
     .filter((v) => v.startsWith(DEST))
     .map((v) => v.slice(DEST.length));

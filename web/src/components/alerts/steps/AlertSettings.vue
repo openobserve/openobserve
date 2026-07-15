@@ -103,42 +103,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>{{ t("alerts.destination") }} *</span>
             </div>
             <div class="flex flex-col">
-              <div class="flex items-center">
-                <OSelect
-                  v-model="localDestinations"
-                  :options="formattedDestinations"
-                  data-test="alert-destinations-select"
-                  multiple
-                  class="min-w-[180px] max-w-[300px]"
-                  @update:model-value="emitDestinationsUpdate"
-                >
-                  <template #empty>{{
-                    t("alerts.alertSettings.noDestinationsAvailable")
-                  }}</template>
-                </OSelect>
-                <OButton
-                  data-test="alert-settings-refresh-destinations-btn"
-                  class="ml-1"
-                  variant="ghost"
-                  size="icon-circle-sm"
-                  :title="t('alerts.alertSettings.refreshDestinations')"
-                  @click="$emit('refresh:destinations')"
-                >
-                  <OIcon name="refresh" size="sm" />
-                </OButton>
-                <OButton
-                  data-test="create-destination-btn"
-                  variant="outline"
-                  size="sm"
-                  class="ml-2"
-                  @click="routeToCreateDestination"
-                  >{{ t("alerts.alertSettings.addNewDestination") }}</OButton
-                >
-              </div>
+              <AlertTargetsSelect
+                :destinations="localDestinations"
+                :workflows="localWorkflows"
+                :destination-options="formattedDestinations"
+                :workflow-options="workflowOptions"
+                :is-enterprise="isEnterprise"
+                @update:destinations="onTargetsDestinations"
+                @update:workflows="onTargetsWorkflows"
+                @refresh="refreshTargets"
+                @create-destination="routeToCreateDestination"
+                @create-workflow="routeToCreateWorkflow"
+              />
               <div
                 v-if="
                   destinationsTouched &&
-                  (!localDestinations || localDestinations.length === 0)
+                  (!localDestinations || localDestinations.length === 0) &&
+                  (!localWorkflows || localWorkflows.length === 0)
                 "
                 class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
@@ -282,47 +263,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
             </div>
             <div>
-              <div class="flex items-center">
-                <OSelect
-                  ref="destinationsFieldRef"
-                  v-model="localDestinations"
-                  :options="formattedDestinations"
-                  data-test="alert-destinations-select"
-                  multiple
-                  :error="destinationError"
-                  class="min-w-[180px] max-w-[300px]"
-                  @update:model-value="
-                    destinationError = false;
-                    emitDestinationsUpdate();
-                  "
-                >
-                  <template #empty>{{
-                    t("alerts.alertSettings.noDestinationsAvailable")
-                  }}</template>
-                </OSelect>
-                <OButton
-                  data-test="alert-settings-refresh-destinations-btn"
-                  class="ml-1"
-                  variant="ghost"
-                  size="icon-circle-sm"
-                  :title="t('alerts.alertSettings.refreshDestinations')"
-                  @click="$emit('refresh:destinations')"
-                >
-                  <OIcon name="refresh" size="sm" />
-                </OButton>
-                <OButton
-                  data-test="create-destination-btn"
-                  variant="outline"
-                  size="sm"
-                  class="ml-2"
-                  @click="routeToCreateDestination"
-                  >{{ t("alerts.alertSettings.addNewDestination") }}</OButton
-                >
-              </div>
+              <AlertTargetsSelect
+                ref="destinationsFieldRef"
+                :destinations="localDestinations"
+                :workflows="localWorkflows"
+                :destination-options="formattedDestinations"
+                :workflow-options="workflowOptions"
+                :is-enterprise="isEnterprise"
+                :error="destinationError"
+                @update:destinations="onTargetsDestinations"
+                @update:workflows="onTargetsWorkflows"
+                @refresh="refreshTargets"
+                @create-destination="routeToCreateDestination"
+                @create-workflow="routeToCreateWorkflow"
+              />
               <div
                 v-if="
                   destinationsTouched &&
-                  (!localDestinations || localDestinations.length === 0)
+                  (!localDestinations || localDestinations.length === 0) &&
+                  (!localWorkflows || localWorkflows.length === 0)
                 "
                 class="text-red-8 pt-1"
                 style="font-size: 11px; line-height: 12px"
@@ -363,14 +322,15 @@ import {
   computed,
   watch,
   nextTick,
+  onMounted,
   type PropType,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import OButton from "@/lib/core/Button/OButton.vue";
+import workflowService from "@/services/workflows";
+import config from "@/aws-exports";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
@@ -379,10 +339,11 @@ import {
   convertMinutesToCron,
 } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import AlertTargetsSelect from "@/components/alerts/AlertTargetsSelect.vue";
 
 export default defineComponent({
   name: "Step3AlertConditions",
-  components: { OButton, OInput, OSelect, OSwitch, OTooltip, OIcon },
+  components: { OInput, OSwitch, OTooltip, OIcon, AlertTargetsSelect },
   props: {
     formData: {
       type: Object as PropType<any>,
@@ -408,6 +369,10 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       default: () => [],
     },
+    workflows: {
+      type: Array as PropType<any[]>,
+      default: () => [],
+    },
   },
   emits: [
     "update:trigger",
@@ -415,6 +380,7 @@ export default defineComponent({
     "update:isAggregationEnabled",
     "update:destinations",
     "refresh:destinations",
+    "update:workflows",
     "update:promqlCondition",
   ],
   setup(props, { emit }) {
@@ -439,6 +405,35 @@ export default defineComponent({
     const localDestinations = ref(props.destinations);
     const destinationsTouched = ref(false);
     const destinationError = ref(false);
+    // Workflows linked to the alert (optional; "at least one of destination or
+    // workflow" — see validate()). Options are self-fetched here (unlike
+    // destinations, which are threaded down as props) to avoid plumbing a second
+    // list through the whole alert-form chain. `value` = workflow id.
+    // Workflows are an enterprise/cloud-only feature. In OSS the section is
+    // hidden, no list is fetched, and — because localWorkflows stays [] — the
+    // "at least one" validation naturally reduces to the original "destination
+    // required" behavior.
+    const isEnterprise = computed(() => config.isEnterprise === "true");
+    const localWorkflows = ref(props.workflows);
+    const workflowOptions = ref<{ label: string; value: string }[]>([]);
+    const fetchWorkflows = async () => {
+      if (!isEnterprise.value) return;
+      try {
+        const res = await workflowService.listWorkflows(
+          store.state.selectedOrganization.identifier,
+        );
+        const list = Array.isArray(res.data)
+          ? res.data
+          : (res.data?.list ?? []);
+        workflowOptions.value = list.map((wf: any) => ({
+          label: wf.name,
+          value: wf.id,
+        }));
+      } catch (e) {
+        workflowOptions.value = [];
+      }
+    };
+    onMounted(fetchWorkflows);
 
     // Timezone management
     const browserTimezone = ref("");
@@ -517,6 +512,13 @@ export default defineComponent({
       () => props.destinations,
       (newVal) => {
         localDestinations.value = newVal;
+      },
+    );
+
+    watch(
+      () => props.workflows,
+      (newVal) => {
+        localWorkflows.value = newVal;
       },
     );
 
@@ -734,6 +736,43 @@ export default defineComponent({
       emit("update:destinations", localDestinations.value);
     };
 
+    const emitWorkflowsUpdate = () => {
+      // Touch destinations too so the "at least one" error clears once a workflow
+      // is chosen (the inline error lives under the Destinations select).
+      destinationsTouched.value = true;
+      destinationError.value = false;
+      emit("update:workflows", localWorkflows.value);
+    };
+
+    // Combined AlertTargetsSelect handlers. The child splits the tagged selection
+    // into the two arrays and emits them separately; we mirror each into its local
+    // model and reuse the existing emit helpers so payload/validation are unchanged.
+    const onTargetsDestinations = (value: string[]) => {
+      localDestinations.value = value;
+      destinationError.value = false;
+      emitDestinationsUpdate();
+    };
+    const onTargetsWorkflows = (value: string[]) => {
+      localWorkflows.value = value;
+      emitWorkflowsUpdate();
+    };
+    // The combined field's single refresh reloads both lists.
+    const refreshTargets = () => {
+      emit("refresh:destinations");
+      fetchWorkflows();
+    };
+
+    const routeToCreateWorkflow = () => {
+      const url = router.resolve({
+        name: "createWorkflow",
+        query: {
+          trigger: "alert_fired",
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      }).href;
+      window.open(url, "_blank");
+    };
+
     const emitPromqlConditionUpdate = () => {
       emit(
         "update:promqlCondition",
@@ -777,13 +816,18 @@ export default defineComponent({
           };
         }
 
-        // Check destinations (required for both real-time and scheduled)
-        if (!localDestinations.value || localDestinations.value.length === 0) {
+        // Require at least one delivery: a destination OR a linked workflow.
+        if (
+          (!localDestinations.value || localDestinations.value.length === 0) &&
+          (!localWorkflows.value || localWorkflows.value.length === 0)
+        ) {
           destinationsTouched.value = true;
           destinationError.value = true;
           return {
             valid: false,
-            message: "At least one destination is required.",
+            message: isEnterprise.value
+              ? "Add at least one destination or workflow."
+              : "At least one destination is required.",
             focusDestination: true,
           };
         }
@@ -918,13 +962,18 @@ export default defineComponent({
         };
       }
 
-      // Check destinations (required for both real-time and scheduled)
-      if (!localDestinations.value || localDestinations.value.length === 0) {
+      // Require at least one delivery: a destination OR a linked workflow.
+      if (
+        (!localDestinations.value || localDestinations.value.length === 0) &&
+        (!localWorkflows.value || localWorkflows.value.length === 0)
+      ) {
         destinationsTouched.value = true;
         destinationError.value = true;
         return {
           valid: false,
-          message: "At least one destination is required.",
+          message: isEnterprise.value
+            ? "Add at least one destination or workflow."
+            : "At least one destination is required.",
           focusDestination: true,
         };
       }
@@ -953,6 +1002,10 @@ export default defineComponent({
       localDestinations,
       destinationsTouched,
       destinationError,
+      localWorkflows,
+      workflowOptions,
+      fetchWorkflows,
+      isEnterprise,
       aggFunctions,
       triggerOperators,
       filteredNumericColumns,
@@ -961,6 +1014,11 @@ export default defineComponent({
       emitAggregationUpdate,
       emitDestinationsUpdate,
       routeToCreateDestination,
+      emitWorkflowsUpdate,
+      routeToCreateWorkflow,
+      onTargetsDestinations,
+      onTargetsWorkflows,
+      refreshTargets,
       handlePeriodChange,
       // Timezone
       browserTimezone,

@@ -1857,12 +1857,10 @@
     "test": {
       "button": "Test",
       "title": "Test Workflow",
-      "intro": "Run this workflow against a sample alert payload to see which steps succeed or error. A destination step actually sends, so you see real behavior.",
       "runFrom": "Run From",
       "runFromBeginning": "Beginning (Trigger)",
       "runFromNote": "Only steps from here down will run.",
       "inputLabel": "Sample Input",
-      "resetSample": "Reset To Sample",
       "invalidJson": "Enter a valid JSON array of records.",
       "resultHint": "After running, each step shows a check or an error icon on the canvas.",
       "notVerified": "Not verified — an earlier step errored, so records may not have reached this one.",

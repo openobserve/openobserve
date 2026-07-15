@@ -77,6 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-updated="false"
           :height-offset="75"
           :sample-events="sampleEvents"
+          :forced-language="language"
+          :default-code="defaultCode"
           @update:list="onFunctionCreation"
           @cancel:hideform="cancelFunctionCreation"
         />
@@ -217,6 +219,11 @@ const props = withDefaults(
     // Sample events to seed the inline function editor's "Events" panel (e.g. the
     // workflow alert payload). Omitted → the generic log sample.
     sampleEvents?: any[];
+    // Lock the inline editor to one language ('vrl' | 'javascript'), hiding the
+    // toggle. Workflow function nodes pass 'javascript'. Omitted → normal toggle.
+    language?: string;
+    // Seed code for a fresh inline function (replaces the typewriter placeholder).
+    defaultCode?: string;
   }>(),
   {
     initialName: "",
@@ -225,6 +232,8 @@ const props = withDefaults(
     isUpdating: false,
     duplicateNames: () => [],
     sampleEvents: undefined,
+    language: "",
+    defaultCode: "",
   },
 );
 

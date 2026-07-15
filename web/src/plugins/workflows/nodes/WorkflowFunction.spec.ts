@@ -36,7 +36,13 @@ const pickerSubmit = vi.fn();
 vi.mock("@/components/flow/forms/FunctionPicker.vue", () => ({
   default: {
     name: "FunctionPicker",
-    props: ["initialName", "initialAfterFlatten", "sampleEvents"],
+    props: [
+      "initialName",
+      "initialAfterFlatten",
+      "sampleEvents",
+      "language",
+      "defaultCode",
+    ],
     emits: ["expand"],
     methods: {
       submit: (...args: any[]) => pickerSubmit(...args),
@@ -106,6 +112,17 @@ describe("WorkflowFunction", () => {
       // the envelope the trigger emits: { meta: {...}, data: [ row ] }
       expect(events[0]).toHaveProperty("meta.alert_name");
       expect(Array.isArray(events[0].data)).toBe(true);
+    });
+
+    it("locks the inline editor to JavaScript and seeds default code", () => {
+      const wrapper = createWrapper();
+      expect(picker(wrapper).props("language")).toBe("javascript");
+      const code = picker(wrapper).props("defaultCode");
+      // ready-to-edit boilerplate, not the typewriter placeholder
+      expect(code).toContain("return row;");
+      // the worked example touches both halves of the envelope
+      expect(code).toContain("row.meta");
+      expect(code).toContain("row.data");
     });
   });
 

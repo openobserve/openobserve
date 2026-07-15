@@ -15,17 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  Workflow Test input popup. Collects the sample alert payload + optional
+  Workflow Test input panel. Collects the sample alert payload + optional
   run-from node, runs the SAVED workflow, and stores the per-node result on
   `workflowObj.testRun.result`. Results are then rendered as ✓ / error badges on
-  the canvas nodes (WorkflowNode), not in this dialog — so it stays a compact
-  input form. A Destination step genuinely dispatches during a run.
+  the canvas nodes (WorkflowNode), not in this panel. A right-side drawer (not a
+  centered dialog) so the JSON sample editor gets full drawer height instead of a
+  cramped 240px box. A Destination step genuinely dispatches during a run.
 -->
 <template>
-  <ODialog
+  <ODrawer
     v-model:open="open"
-    data-test="workflow-test-dialog"
-    size="lg"
+    data-test="workflow-test-drawer"
+    size="xl"
     :title="t('workflow.test.title')"
     :primary-button-label="t('workflow.test.run')"
     :primary-button-disabled="!canRun"
@@ -34,9 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="run"
     @click:secondary="close"
   >
-    <div class="flex flex-col gap-4 text-left">
-      <OText variant="meta" as="p">{{ t("workflow.test.intro") }}</OText>
-
+    <div class="flex flex-col gap-4 text-left h-full p-4">
       <!-- Run-from selector -->
       <div class="flex flex-col gap-1">
         <OText as="label" class="text-[12px] font-medium">
@@ -52,23 +51,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OText>
       </div>
 
-      <!-- Sample input editor -->
-      <div class="flex flex-col gap-1">
+      <!-- Sample input editor — fills the remaining drawer height -->
+      <div class="flex flex-col gap-1 flex-1 min-h-0">
         <div class="flex items-center justify-between">
           <OText as="label" class="text-[12px] font-medium">
             {{ t("workflow.test.inputLabel") }}
           </OText>
           <OButton
-            variant="ghost"
+            variant="outline"
             size="sm"
             data-test="workflow-test-reset-sample"
             @click="resetSample"
           >
-            {{ t("workflow.test.resetSample") }}
+            {{ t("common.reset") }}
           </OButton>
         </div>
         <div
-          class="h-[240px] rounded-md border border-border-default overflow-hidden"
+          class="flex-1 min-h-0 rounded-md border border-border-default overflow-hidden"
         >
           <CodeQueryEditor
             editor-id="workflow-test-input"
@@ -86,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OText>
       </div>
     </div>
-  </ODialog>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
@@ -94,7 +93,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

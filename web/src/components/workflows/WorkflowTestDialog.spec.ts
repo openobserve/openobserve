@@ -42,8 +42,8 @@ import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 import { buildTestSampleText } from "@/plugins/workflows/testSample";
 
 // ── stubs ────────────────────────────────────────────────────────────────────
-const ODialogStub = {
-  name: "ODialog",
+const ODrawerStub = {
+  name: "ODrawer",
   props: [
     "open",
     "size",
@@ -55,7 +55,7 @@ const ODialogStub = {
   ],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `
-    <div class="o-dialog" :data-open="String(open)">
+    <div class="o-drawer" :data-open="String(open)">
       <button class="dlg-primary" data-test="dlg-primary"
         :disabled="primaryButtonDisabled"
         :data-loading="String(!!primaryButtonLoading)"
@@ -95,7 +95,7 @@ const CodeQueryEditorStub = {
 const globalConfig = {
   plugins: [i18n, store],
   stubs: {
-    ODialog: ODialogStub,
+    ODrawer: ODrawerStub,
     OSelect: OSelectStub,
     OButton: OButtonStub,
     OText: OTextStub,
@@ -165,7 +165,7 @@ describe("WorkflowTestDialog", () => {
       expect(workflowObj.testRun.input).toBe(VALID_INPUT);
     });
 
-    it('"Reset To Sample" restores the generated sample', async () => {
+    it('"Reset" restores the generated sample', async () => {
       workflowObj.testRun.input = "garbage";
       const wrapper = mountDialog();
       await wrapper
@@ -430,10 +430,10 @@ describe("WorkflowTestDialog", () => {
 
     it("mirrors testRun.show into the dialog's open prop", async () => {
       const wrapper = mountDialog();
-      expect(wrapper.findComponent(ODialogStub as any).props("open")).toBe(true);
+      expect(wrapper.findComponent(ODrawerStub as any).props("open")).toBe(true);
       workflowObj.testRun.show = false;
       await nextTick();
-      expect(wrapper.findComponent(ODialogStub as any).props("open")).toBe(
+      expect(wrapper.findComponent(ODrawerStub as any).props("open")).toBe(
         false,
       );
     });
