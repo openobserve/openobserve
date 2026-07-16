@@ -2263,6 +2263,14 @@ export default defineComponent({
     }
 
     const dateChangeValue = (value) => {
+      // Ignore programmatic / mount-replay emits from <date-time>. On mount (and
+      // on every remount triggered by loadingState toggling), DateTime emits an
+      // `on:date-change` for its default range with `userChangedValue: false`.
+      // Acting on it here would push today's date into redDaysList and call
+      // onSubmit(), which toggles loadingState → remounts <date-time> → emits
+      // again → infinite updateSettings/getStream loop. Only a genuine user
+      // Apply carries `userChangedValue: true`.
+      if (value.userChangedValue === false) return;
       const selectedFromDate =
         value.hasOwnProperty("selectedDate") &&
         formatDate(value.selectedDate.from);

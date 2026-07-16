@@ -4,13 +4,13 @@
     "darkMechanism": 390,
     "unscopedStyle": 206,
     "styleBlockHex": 805,
-    "stylePxUnit": 1077,
+    "stylePxUnit": 1082,
     "arbPx": 174,
     "arbZ": 49,
     "arbTextSize": 323,
     "arbRadius": 25,
     "hexClass": 269,
-    "rawPalette": 102,
+    "rawPalette": 100,
     "inlineHexStyle": 27,
     "inlineHexBind": 11,
     "bareRounded": 26,
@@ -717,7 +717,7 @@
       "arbTextSize": 1
     },
     "components/reports/CreateReport.vue": {
-      "rawPalette": 8,
+      "rawPalette": 7,
       "themeTernary": 1,
       "darkMechanism": 1
     },
@@ -881,6 +881,9 @@
     },
     "composables/useServiceGraphTree.ts": {
       "tsHex": 8
+    },
+    "enterprise/components/EvalTemplateEditor.vue": {
+      "stylePxUnit": 5
     },
     "enterprise/components/OnlineEvals.vue": {
       "unscopedStyle": 1,
@@ -1214,7 +1217,7 @@
       "rawPalette": 5
     },
     "plugins/correlation/TelemetryCorrelationDashboard.vue": {
-      "rawPalette": 5,
+      "rawPalette": 4,
       "unscopedStyle": 1
     },
     "plugins/correlation/TimeRangeEditor.vue": {

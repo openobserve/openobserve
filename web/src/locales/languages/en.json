@@ -168,6 +168,12 @@
       "action": "Configure storage",
       "actionDesc": "Connect an S3, GCS, or Azure bucket"
     },
+    "noModelPricing": {
+      "title": "No model pricing definitions",
+      "description": "Add a custom pricing definition to track LLM token costs.",
+      "action": "New model",
+      "actionDesc": "Define custom per-token pricing for a model"
+    },
     "noPipelineHistory": {
       "title": "No pipeline history yet",
       "description": "Pipeline execution history will appear here once your pipelines run."
@@ -339,7 +345,8 @@
       "evalJobs": "evaluation jobs",
       "scoreConfigs": "score configs",
       "pipelineHistory": "pipeline history",
-      "regexPatterns": "regex patterns"
+      "regexPatterns": "regex patterns",
+      "modelPricing": "model pricing definitions"
     }
   },
   "common": {
@@ -4439,7 +4446,16 @@
     "dimensionWidth": "Width (px)",
     "dimensionHeight": "Height (px)",
     "imagePreview": "Include inline dashboard preview image",
-    "customDimensions": "Custom Dimensions (Advanced)"
+    "customDimensions": "Custom Dimensions (Advanced)",
+    "validation": {
+      "resourceNameInvalid": "Characters like :, ?, /, #, and spaces are not allowed.",
+      "invalidCron": "Invalid cron expression!",
+      "cronSixFields": "Cron expression must have exactly 6 fields: [Second] [Minute] [Hour] [Day of Month] [Month] [Day of Week]",
+      "cronMinInterval": "Frequency should be greater than {seconds} seconds.",
+      "dateFormat": "Date format is incorrect!",
+      "timeFormat": "Time format is incorrect!",
+      "invalidEmails": "Add valid emails!"
+    }
   },
   "queries": {
     "runningQueries": "Running Queries",
@@ -5704,7 +5720,11 @@
       "authEditNote": "Credentials cannot be read back. Re-enter the API key only if you want to rotate it.",
       "cannotRename": "Cannot be renamed after creation.",
       "availableModelsHelp": "Optional. Comma-separated list of models available on this Provider.",
-      "saveError": "Failed to save provider"
+      "saveError": "Failed to save provider",
+      "nameRequired": "Provider name is required",
+      "typeRequired": "Provider type is required",
+      "defaultModelRequired": "Default model is required",
+      "apiKeyRequired": "API key is required"
     },
     "scoreConfig": {
       "booleanValues": "true / false",
@@ -5760,7 +5780,7 @@
         "type": "Type",
         "rangeValues": "Range / values",
         "healthy": "Healthy",
-        "activeVersion": "version",
+        "activeVersion": "Version",
         "usedBy": "Used by",
         "created": "Created",
         "actions": "Actions"
@@ -5821,6 +5841,12 @@
       "falseIsHealthyHint": "Scores of true trigger quality issues.",
       "thresholdEmptyHint": "Leaving this empty means this dimension won't contribute to quality status signals across the product. Scores will still be recorded but won't trigger issue indicators.",
       "saveError": "Failed to save score config",
+      "validation": {
+        "nameRequired": "Name is required",
+        "nameFormat": "Use lowercase letters, numbers, and underscores only",
+        "minRequired": "Min is required",
+        "maxRequired": "Max is required"
+      },
       "empty": {
         "title": "No Score Configs Yet",
         "description": "Score Configs define the dimensions your scorers produce — name, data type, value range, and healthy threshold. Create one to start wiring online evaluation.",
@@ -6054,6 +6080,20 @@
       },
       "requestBodyLabel": "Request body template",
       "saveError": "Failed to save scorer",
+      "validation": {
+        "nameRequired": "Scorer name is required",
+        "scoreConfigRequired": "A score config is required",
+        "providerRequired": "A provider is required",
+        "endpointRequired": "An endpoint URL is required",
+        "bearerTokenRequired": "Token is required",
+        "basicUsernameRequired": "Username is required",
+        "basicPasswordRequired": "Password is required",
+        "apiKeyHeaderRequired": "Header name is required",
+        "apiKeyTokenRequired": "Token is required",
+        "timeoutInvalid": "Timeout must be 0 or greater",
+        "retriesInvalid": "Retries must be 0 or greater",
+        "duplicateFieldName": "Field names must be unique"
+      },
       "versionsLoadError": "Failed to load score config versions",
       "testPanel": {
         "title": "Test this scorer",
@@ -6145,6 +6185,10 @@
       "newButton": "New job",
       "scorersCount": "{count} scorers",
       "scorerCount": "{count} scorer",
+      "deleteBulkButton": "Delete",
+      "deleteBulkTitle": "Delete eval jobs",
+      "deleteBulkConfirm": "Are you sure you want to delete {count} eval jobs? This action cannot be undone.",
+      "deletedBulk": "{count} eval jobs deleted",
       "columns": {
         "name": "Name",
         "status": "Status",
@@ -6233,7 +6277,12 @@
       "selectAtLeastOne": "Select at least one scorer",
       "saveError": "Failed to save eval job",
       "createdAndActivated": "Eval job created and activated",
-      "createdButActivateFailed": "Eval job created, but activation failed"
+      "createdButActivateFailed": "Eval job created, but activation failed",
+      "validation": {
+        "nameRequired": "Job name is required",
+        "streamRequired": "A stream is required",
+        "samplingValueRequired": "A sampling value is required"
+      }
     }
   },
   "llmProviders": {
