@@ -1120,9 +1120,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const focusOnFirstError = () => {
     nextTick(() => {
-      const errorField = document.querySelector(
-        ".q-field--error input, .q-field--error .q-select__dropdown-icon",
-      );
+      // O2 fields mark their invalid state with aria-invalid (OInput's <input>,
+      // OSelect's combobox trigger, and the other lib form controls). This used
+      // to query Quasar's `.q-field--error`, which matches nothing post-Quasar —
+      // so focus-on-first-error silently did nothing.
+      const errorField = document.querySelector('[aria-invalid="true"]');
       if (errorField) {
         (errorField as HTMLElement).focus();
         errorField.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1415,7 +1417,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   };
 
   const navigateToErrorField = (formRef: any) => {
-    const errorField = formRef.$el.querySelector(".q-field--error");
+    // See focusOnFirstError — `.q-field--error` is dead post-Quasar.
+    const errorField = formRef.$el.querySelector('[aria-invalid="true"]');
     if (errorField) {
       errorField.scrollIntoView({ behavior: "smooth", block: "center" });
     }

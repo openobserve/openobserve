@@ -322,6 +322,10 @@
      needs to stay legible on the near-white banner. */
   --color-promo-webinar-accent:      var(--color-amber-400);
   --color-promo-webinar-accent-text: var(--color-amber-700);
+  /* Global scrollbar treatment (consumed by styles/base-elements.css). Semantic
+     names for what were raw palette refs; values are unchanged. Dark steps in dark.css. */
+  --color-scrollbar-thumb:       var(--color-grey-300);
+  --color-scrollbar-thumb-hover: var(--color-grey-400);
   /* Secondary section-header accent bar. The alert/query editors mark most
      sections with a --color-theme-accent bar and VRL-editor sections with a
      deliberately DIFFERENT hue; this token carries that distinction (it rode on

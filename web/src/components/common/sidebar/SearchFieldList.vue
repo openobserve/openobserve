@@ -45,9 +45,9 @@
         <!-- Field row: render field name with expand chevron + actions inside OFieldRow -->
         <template #field-row="{ row }">
           <OFieldRow>
-            <span class="field-type-container w-[0.55rem] shrink-0 flex items-center justify-center">
+            <span class="field-type-container relative w-[0.55rem] h-4 mr-[0.3rem] ml-[0.2rem] shrink-0 flex items-center justify-center">
               <OIcon
-                class="field-expand-icon inline-flex items-center justify-center shrink-0 w-4 text-text-muted"
+                class="field-expand-icon absolute inline-flex items-center justify-center shrink-0 w-4 text-text-muted"
                 :name="expandedRows[row.name] ? 'expand-more' : 'chevron-right'"
                 size="sm"
               />
@@ -761,21 +761,5 @@ const copyContentValue = (value: string) => {
     width: 100%;
   }
 
-  .field-type-container {
-    width: 0.55rem;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .field-expand-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: 1rem;
-    color: var(--color-text-muted);
-  }
 }
 </style>

@@ -26,7 +26,7 @@
         <div
           class="absolute inset-0 bg-gradient-to-r from-transparent to-transparent via-white/40 dark:via-gray-300/40"
           :style="{
-            animation: 'shimmer 1.5s infinite linear',
+            animation: 'loading-progress-shimmer 1.5s infinite linear',
             width: '200%',
             left: '-200%',
           }"
@@ -46,7 +46,7 @@
         }"
       >
         <div
-          class="absolute inset-0 rounded-full animate-pulse bg-white/20 dark:bg-gray-300/20"
+          class="absolute inset-0 rounded-full bg-white/20 dark:bg-gray-300/20 [animation:loading-progress-pulse_1.5s_cubic-bezier(0.4,0,0.6,1)_infinite]"
         ></div>
       </div>
     </div>
@@ -128,7 +128,17 @@ export default defineComponent({
 </script>
 
 <style>
-@keyframes shimmer {
+/* keep(keyframes): @keyframes cannot be expressed as Tailwind utilities, and the
+   names must stay global because they are referenced from arbitrary `animation:`
+   utilities in the template (Vue rewrites keyframe names inside `scoped` blocks,
+   which would break that reference). Both names are component-prefixed.
+
+   These were previously named `shimmer` / `pulse` and sat alongside a global
+   `.animate-pulse { … }` rule. Because this block is unscoped, that rule and the
+   generic `pulse` name overrode Tailwind's own `animate-pulse` utility and its
+   keyframes for the WHOLE app (MenuLink, OSkeleton, OTable, sparklines, …)
+   whenever this component happened to be loaded. Namespaced to end the collision. */
+@keyframes loading-progress-shimmer {
   0% {
     transform: translateX(-200%);
   }
@@ -137,7 +147,7 @@ export default defineComponent({
   }
 }
 
-@keyframes pulse {
+@keyframes loading-progress-pulse {
   0%,
   100% {
     opacity: 0.2;
@@ -145,9 +155,5 @@ export default defineComponent({
   50% {
     opacity: 0.4;
   }
-}
-
-.animate-pulse {
-  animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 </style>

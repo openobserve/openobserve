@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton data-test="add-cipher-key-akeyless-access-id-input-cancel" variant="outline" size="sm-action" class="mt-2" v-if="isUpdate && accessId != ''" @click="isUpdateAccessID = false">{{ t('common.cancel') }}</OButton>
     </div>
     <div v-else>
-      <label class="flex q-field mb-3">
+      <label class="flex mb-3">
         <b>{{ t('cipherKey.accessId') }}</b>
       </label>
       <pre class="[text-wrap:auto] break-words border border-input-border p-[5px] mb-[5px]">{{ accessId }}</pre>
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton data-test="add-cipher-key-akeyless-access-key-input-cancel" variant="outline" size="sm-action" class="mt-2" v-if="isUpdate && accessKey != ''" @click="isUpdateAccessKey = false">{{ t('common.cancel') }}</OButton>
         </div>
         <div v-else>
-          <label class="flex q-field mb-3">
+          <label class="flex mb-3">
             <b>{{ t('cipherKey.accessKey') }}</b>
           </label>
           <pre class="[text-wrap:auto] break-words border border-input-border p-[5px] mb-[5px]">{{ accessKey }}</pre>
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton data-test="add-cipher-key-akeyless-ldap-username-input-cancel" variant="outline" size="sm-action" class="mt-2" v-if="isUpdate && ldapUsername != ''" @click="isUpdateLDAPUsername = false">{{ t('common.cancel') }}</OButton>
         </div>
         <div v-else>
-          <label class="flex q-field mb-3">
+          <label class="flex mb-3">
             <b>{{ t('cipherKey.ldapUsername') }}</b>
           </label>
           <pre class="[text-wrap:auto] break-words border border-input-border p-[5px] mb-[5px]">{{ ldapUsername }}</pre>
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton data-test="add-cipher-key-akeyless-ldap-password-input-cancel" variant="outline" size="sm-action" class="mt-2" v-if="isUpdate && ldapPassword != ''" @click="isUpdateLDAPPass = false">{{ t('common.cancel') }}</OButton>
         </div>
         <div v-else>
-          <label class="flex q-field mb-3">
+          <label class="flex mb-3">
             <b>{{ t('cipherKey.ldapPassword') }}</b>
           </label>
           <pre class="[text-wrap:auto] break-words border border-input-border p-[5px] mb-[5px]">{{ ldapPassword }}</pre>

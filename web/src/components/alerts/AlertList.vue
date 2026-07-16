@@ -904,39 +904,14 @@ export default defineComponent({
       showAlertDetailsDrawer.value = true;
     };
 
-    // Handle ESC key and click outside to close drawer
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && showAlertDetailsDrawer.value) {
-        showAlertDetailsDrawer.value = false;
-      }
-    };
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!showAlertDetailsDrawer.value) return;
-
-      const target = event.target as HTMLElement;
-
-      // Check if clicked element is the backdrop or outside drawer content
-      if (
-        target.classList.contains("q-drawer__backdrop") ||
-        target.classList.contains("q-layout__shadow")
-      ) {
-        showAlertDetailsDrawer.value = false;
-        return;
-      }
-
-      // Check if the click is outside the drawer content
-      const drawerElement = document.querySelector(
-        ".alert-details-drawer .q-drawer__content",
-      );
-      if (drawerElement && !drawerElement.contains(target)) {
-        showAlertDetailsDrawer.value = false;
-      }
-    };
+    // ESC and click-outside dismissal are handled by ODrawer itself (reka-ui
+    // DismissableLayer → @escape-key-down / @interact-outside), which also knows
+    // to ignore clicks inside portaled dropdowns opened from within the drawer.
+    // The hand-rolled handlers that used to live here targeted Quasar DOM
+    // (.q-drawer__backdrop / .q-drawer__content) and matched nothing after the
+    // Quasar exit, so click-outside was silently dead.
 
     onMounted(() => {
-      document.addEventListener("keydown", handleKeyDown);
-      document.addEventListener("click", handleClickOutside, true);
       window.addEventListener("resize", onWindowResize);
     });
 
@@ -966,11 +941,6 @@ export default defineComponent({
     );
 
     const filteredResults: Ref<any[]> = ref([]);
-
-    onBeforeUnmount(() => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("click", handleClickOutside, true);
-    });
 
     const activeFolderToMove = ref("default");
 

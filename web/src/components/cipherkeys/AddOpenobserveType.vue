@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Read-only display branch (edit mode, secret present, not editing): pure
          UI outside the form (R1) — not an editable field. -->
     <div v-else>
-      <label class="flex q-field mb-3">
+      <label class="flex mb-3">
         <b>{{ t('cipherKey.secret') }}</b>
       </label>
       <pre class="[text-wrap:auto] break-words border border-input-border p-[5px] mb-[5px]">{{ localValue }}</pre>

@@ -2089,3 +2089,132 @@ export default defineComponent({
 });
 </script>
 
+
+<style lang="scss" scoped>
+/* keep(generated-content): pin-breakdown tooltip. Moved verbatim out of the
+   token layer (W1.a, F11) — SearchResult.vue is its only consumer. The rows are
+   built from data via v-for with per-row inline colours, and the whole tooltip is
+   <Teleport to="body">; Vue still stamps the scope id onto teleported nodes, so
+   `scoped` reaches it. Values are UNCHANGED from component.css on purpose: this
+   move is behaviour-neutral by design. The hex/rgba → --color-* tokenisation and
+   px → rem pass belong to W2.c, where the logs pin tooltip gets eyeballed in both
+   themes (plan §7.4) — the include/exclude actions map onto --color-status-info-*
+   / --color-status-error-*, which are already theme-aware and would collapse the
+   `:root:not(.dark) &` / `.dark &` twins. */
+.oo-pin-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+}
+
+.oo-pin-tooltip {
+  position: fixed;
+  z-index: 9999;
+  min-width: 200px;
+  max-height: 20vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--color-surface-base);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  padding: 8px 0;
+  font-size: 12px;
+  outline: none;
+
+  :root:not(.dark) & {
+    background: #fff;
+    border-color: rgba(0, 0, 0, 0.12);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    color: #222;
+  }
+
+  &__time {
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0.65;
+    padding: 0 10px 4px;
+    margin-bottom: 0;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.15);
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 1px 10px;
+    transition: background 0.1s;
+
+    &:hover {
+      background: rgba(128, 128, 128, 0.12);
+    }
+  }
+
+  &__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  &__name {
+    flex: 1;
+    white-space: nowrap;
+  }
+
+  &__count {
+    font-weight: 600;
+    min-width: 32px;
+    text-align: right;
+    transition: opacity 0.1s;
+  }
+
+  &__row-actions {
+    display: flex;
+    gap: 3px;
+    flex-shrink: 0;
+    margin-left: 4px;
+  }
+
+  &__action {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+
+    &--include {
+      background: rgba(25, 118, 210, 0.12);
+      color: #1976D2;
+
+      .dark & {
+        color: #64B5F6;
+        background: rgba(100, 181, 246, 0.15);
+      }
+
+      &:hover {
+        background: rgba(25, 118, 210, 0.25);
+      }
+    }
+
+    &--exclude {
+      background: rgba(198, 40, 40, 0.08);
+      color: #c62828;
+
+      .dark & {
+        color: #EF9A9A;
+        background: rgba(239, 154, 154, 0.12);
+      }
+
+      &:hover {
+        background: rgba(198, 40, 40, 0.2);
+      }
+    }
+  }
+}
+</style>

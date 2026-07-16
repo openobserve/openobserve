@@ -631,6 +631,10 @@
 .dark {
   --color-actions-column-shawdow: rgba(125, 125, 125, 0.694);
   --color-bg-gray: color-mix(in srgb, var(--color-theme-accent) 5%, rgb(42, 42, 42));
+  /* Global scrollbar treatment — dark steps (values unchanged from the raw
+     palette refs that styles/base-elements.css replaced). */
+  --color-scrollbar-thumb:       var(--color-grey-700);
+  --color-scrollbar-thumb-hover: var(--color-grey-600);
   /* Lighter teal step so the VRL section bar stays visible on dark surfaces.
      (--color-promo-* is deliberately NOT overridden — promo art is theme-independent.) */
   --color-section-accent-secondary: var(--color-teal-400);

@@ -1377,32 +1377,10 @@
 }
 
 /* ── Menu animations ── */
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-@keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(168, 85, 247, 0.3); }
-  50% { box-shadow: 0 0 16px rgba(168, 85, 247, 0.6); }
-}
 
-/* ── Field type badges ── */
-.field-type-container {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1rem;
-  height: 1rem;
-  margin-right: 0.3rem;
-  margin-left: 0.2rem;
-  flex-shrink: 0;
-  vertical-align: middle;
-}
-
-.field-expand-icon {
-  position: absolute;
-}
+/* ── Field type badges ──
+   .field-type-container / .field-expand-icon → colocated as template utilities
+   in components/common/sidebar/SearchFieldList.vue (W1.a, F2 — single consumer). */
 
 /* ── sdr-fields ── */
 @theme inline {
@@ -1961,19 +1939,6 @@ html.dark [data-destructive-icon="true"]:hover,
   }
 }
 
-.field-value-key {
-  width: calc(100% - 3.125rem);
-  border-radius: 0.5rem;
-}
-
-.field-value-count {
-  display: contents;
-
-  &--with-actions {
-    width: 3.125rem;
-  }
-}
-
 .field-loading {
   height: 3.75rem;
   border-radius: 0.5rem;
@@ -2233,230 +2198,9 @@ html.dark [data-destructive-icon="true"]:hover,
 
 /* ── RCA Report ── */
 
-.rca-report-content {
-  --rca-bg-primary: #eff6ff;
-  --rca-bg-secondary: #eff6ff;
-  --rca-bg-code: #f3f4f6;
-  --rca-bg-table-even: #eff6ff;
-  --rca-bg-table-hover: #dbeafe;
-  --rca-bg-section: rgba(37, 99, 235, 0.05);
-  --rca-bg-blockquote: #eff6ff;
-
-  --rca-text-primary: #1e293b;
-  --rca-text-secondary: #334155;
-  --rca-text-tertiary: #475569;
-  --rca-text-heading: #2563eb;
-  --rca-text-code: #be185d;
-  --rca-text-blockquote: #1e40af;
-  --rca-text-strong: #1e40af;
-  --rca-text-em: #475569;
-  --rca-text-list: #1f2937;
-
-  --rca-border-primary: #cbd5e1;
-  --rca-border-secondary: #bfdbfe;
-  --rca-border-tertiary: #d1d5db;
-  --rca-border-table: #bfdbfe;
-  --rca-border-accent: #3b82f6;
-
-  --rca-icon-color: #334155;
-  --rca-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
-
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-  line-height: 1.6;
-  color: var(--rca-text-secondary);
-}
-
-.dark .rca-report-content {
-  --rca-bg-primary: #1f2937;
-  --rca-bg-secondary: #1e293b;
-  --rca-bg-code: #1f2937;
-  --rca-bg-table-even: #1a2332;
-  --rca-bg-table-hover: #2d3748;
-  --rca-bg-section: rgba(96, 165, 250, 0.08);
-  --rca-bg-blockquote: #1e3a5f;
-
-  --rca-text-primary: #e5e7eb;
-  --rca-text-secondary: #cbd5e1;
-  --rca-text-tertiary: #94a3b8;
-  --rca-text-heading: #67a6ff;
-  --rca-text-code: #fda4af;
-  --rca-text-blockquote: #67a6ff;
-  --rca-text-strong: #639ced;
-  --rca-text-em: #cbd5e1;
-  --rca-text-list: #d1d5db;
-
-  --rca-border-primary: #4b5563;
-  --rca-border-secondary: #374151;
-  --rca-border-tertiary: #374151;
-  --rca-border-table: #334155;
-  --rca-border-accent: #60a5fa;
-
-  --rca-icon-color: #cbd5e1;
-  --rca-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
-}
-
-.rca-report-content {
-  .rca-h1 {
-    color: var(--rca-text-primary);
-    border-bottom-color: var(--rca-border-primary);
-  }
-
-  .rca-h2 {
-    color: var(--rca-text-heading);
-    border-left-color: var(--rca-text-heading);
-  }
-
-  .rca-section-bg {
-    background-color: var(--rca-bg-section);
-  }
-
-  .rca-h3 {
-    color: var(--rca-text-secondary);
-    position: relative;
-    padding-left: 1rem;
-
-    &::before {
-      content: '»';
-      position: absolute;
-      left: 0rem;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--rca-icon-color);
-      font-size: 20px;
-      line-height: 1;
-    }
-  }
-
-  .rca-h4 {
-    color: var(--rca-text-tertiary);
-  }
-
-  .rca-ul,
-  .rca-ol {
-    list-style-position: outside;
-  }
-
-  .rca-ul {
-    list-style-type: disc;
-  }
-
-  .rca-list-item {
-    color: var(--rca-text-list);
-  }
-
-  .rca-ol-item {
-    color: var(--rca-text-list);
-  }
-
-  .rca-code-block {
-    background-color: var(--rca-bg-code);
-    border-color: var(--rca-border-tertiary);
-
-    pre {
-      color: var(--rca-text-list);
-    }
-  }
-
-  .rca-inline-code {
-    background-color: var(--rca-bg-code);
-    color: var(--rca-text-code);
-  }
-
-  .rca-table-wrapper {
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: var(--rca-shadow);
-  }
-
-  .rca-table {
-    border-collapse: separate;
-    border-spacing: 0;
-    background-color: var(--rca-bg-primary);
-    border: 1px solid var(--rca-border-secondary);
-
-    thead {
-      background: linear-gradient(to bottom, var(--rca-bg-secondary) 0%, var(--rca-bg-secondary) 100%);
-      border-bottom: 2px solid var(--rca-border-primary);
-    }
-
-    th {
-      padding: 8px 12px;
-      color: var(--rca-text-primary);
-      font-weight: 700;
-      text-transform: uppercase;
-      font-size: 10px;
-      letter-spacing: 0.8px;
-      text-align: left;
-      border-right: 1px solid var(--rca-border-secondary);
-
-      &:last-child {
-        border-right: none;
-      }
-    }
-
-    td {
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--rca-border-table);
-      border-right: 1px solid var(--rca-border-table);
-      color: var(--rca-text-secondary);
-      font-size: 13px;
-      line-height: 1.6;
-      vertical-align: top;
-
-      &:last-child {
-        border-right: none;
-      }
-    }
-
-    tbody {
-      tr {
-        &:last-child td {
-          border-bottom: none;
-        }
-
-        &:hover {
-          background-color: var(--rca-bg-table-hover);
-        }
-      }
-    }
-
-    td:first-child,
-    td.rca-first-cell {
-      font-weight: 600;
-      color: var(--rca-text-tertiary);
-      white-space: nowrap;
-      background-color: var(--rca-bg-secondary);
-      min-width: 160px;
-    }
-
-    tbody tr:hover td:first-child,
-    tbody tr:hover td.rca-first-cell {
-      background-color: var(--rca-bg-table-hover);
-    }
-  }
-
-  .rca-blockquote {
-    background-color: var(--rca-bg-blockquote);
-    border-left-color: var(--rca-border-accent);
-    color: var(--rca-text-blockquote);
-  }
-
-  hr {
-    border-top-color: var(--rca-border-tertiary);
-  }
-
-  strong {
-    color: var(--rca-text-strong);
-  }
-
-  em {
-    color: var(--rca-text-em);
-  }
-
-  p {
-    color: var(--rca-text-secondary);
-  }
-}
+/* .rca-report-content → colocated (verbatim) into components/alerts/IncidentDetailDrawer.vue,
+   its single consumer (W1.a, F9). It styles v-html markdown, so it is sanctioned
+   keeper CSS (ladder step 5), not convertible to utilities. */
 
 /* ── Logs page ── */
 
@@ -2466,10 +2210,6 @@ html.dark [data-destructive-icon="true"]:hover,
   padding: 0 !important;
   margin: 0 !important;
   box-sizing: border-box !important;
-}
-
-.full-width {
-  width: 100%;
 }
 
 .full-height {
@@ -3361,28 +3101,6 @@ html.dark [data-destructive-icon="true"]:hover,
   overflow: hidden;
 }
 
-.scrollable-content {
-  width: 100%;
-  overflow-y: auto;
-  padding: 10px;
-  border: 1px solid #ddd;
-  height: 100%;
-  max-height: 200px;
-  text-wrap: normal;
-  background-color: #e8e8e8;
-  color: black;
-}
-
-.copy-btn-sql {
-  border: #7a54a2 1px solid;
-  color: #7a54a2;
-}
-
-.copy-btn-function {
-  border: #0a7ebc 1px solid;
-  color: #0a7ebc;
-}
-
 .warning-text {
   color: #f5a623;
   border: 1px solid #f5a623;
@@ -3444,14 +3162,6 @@ button.date-time-button {
 .wrap-content-btn--active:hover {
   background: var(--color-theme-accent) !important;
   opacity: 0.85;
-}
-
-.expanded-sql {
-  border-left: #7a54a2 3px solid;
-}
-
-.expanded-function {
-  border-left: #0a7ebc 3px solid;
 }
 
 .report-list-tabs {
@@ -3619,122 +3329,8 @@ button.date-time-button {
   transition: opacity 0.2s ease-in-out;
 }
 
-.oo-pin-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 9998;
-}
-
-.oo-pin-tooltip {
-  position: fixed;
-  z-index: 9999;
-  min-width: 200px;
-  max-height: 20vh;
-  overflow-y: auto;
-  overflow-x: hidden;
-  background: var(--color-surface-base);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
-  padding: 8px 0;
-  font-size: 12px;
-  outline: none;
-
-  :root:not(.dark) & {
-    background: #fff;
-    border-color: rgba(0, 0, 0, 0.12);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    color: #222;
-  }
-
-  &__time {
-    font-size: 11px;
-    font-weight: 500;
-    opacity: 0.65;
-    padding: 0 10px 4px;
-    margin-bottom: 0;
-    border-bottom: 1px solid rgba(128, 128, 128, 0.15);
-  }
-
-  &__row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 1px 10px;
-    transition: background 0.1s;
-
-    &:hover {
-      background: rgba(128, 128, 128, 0.12);
-    }
-  }
-
-  &__dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  &__name {
-    flex: 1;
-    white-space: nowrap;
-  }
-
-  &__count {
-    font-weight: 600;
-    min-width: 32px;
-    text-align: right;
-    transition: opacity 0.1s;
-  }
-
-  &__row-actions {
-    display: flex;
-    gap: 3px;
-    flex-shrink: 0;
-    margin-left: 4px;
-  }
-
-  &__action {
-    width: 22px;
-    height: 22px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 700;
-    line-height: 1;
-
-    &--include {
-      background: rgba(25, 118, 210, 0.12);
-      color: #1976D2;
-
-      .dark & {
-        color: #64B5F6;
-        background: rgba(100, 181, 246, 0.15);
-      }
-
-      &:hover {
-        background: rgba(25, 118, 210, 0.25);
-      }
-    }
-
-    &--exclude {
-      background: rgba(198, 40, 40, 0.08);
-      color: #c62828;
-
-      .dark & {
-        color: #EF9A9A;
-        background: rgba(239, 154, 154, 0.12);
-      }
-
-      &:hover {
-        background: rgba(198, 40, 40, 0.2);
-      }
-    }
-  }
-}
+/* .oo-pin-* pin tooltip → colocated (verbatim) into plugins/logs/SearchResult.vue,
+   its single consumer (W1.a, F11). */
 
 /* --- search-schedulerlist.scss --- */
 
@@ -3887,17 +3483,6 @@ button.date-time-button {
   align-self: stretch;
 }
 
-.cursor-pointer {
-  cursor: pointer;
-}
-
-.select-none {
-  user-select: none;
-}
-
-.text-left {
-  text-align: left;
-}
 
 /* Scoped to .logs-table (TenstackTable). In main these bare-element rules lived
    in a <style scoped> block and only affected this component; keep them scoped
@@ -4121,45 +3706,7 @@ button.date-time-button {
   transition: filter 0.3s ease;
 }
 
-::-webkit-scrollbar {
-  width: 0.5625rem;
-  height: 0.5625rem;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--color-grey-300);
-  border-radius: 0.375rem;
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-grey-400);
-  background-clip: content-box;
-}
-
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-grey-300) transparent;
-}
-
-.dark ::-webkit-scrollbar-thumb {
-  background: var(--color-grey-700);
-  background-clip: content-box;
-}
-
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-grey-600);
-  background-clip: content-box;
-}
-
-.dark * {
-  scrollbar-color: var(--color-grey-700) transparent;
-}
+/* Global scrollbar theming moved to styles/base-elements.css (W1.a, F16). */
 
 .splitter-icon-collapse {
   min-height: 3em !important;
@@ -4227,26 +3774,7 @@ button.date-time-button {
   color: var(--color-button-primary);
 }
 
-@media print {
-  .h-full,
-  .h-\[calc\(100vh-105px\)\],
-  .overflow-y-auto,
-  .overflow-auto,
-  .overflow-hidden,
-  .min-h-0,
-  .flex-1 {
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    overflow: visible !important;
-  }
-
-  .o2-app-header,
-  .o2-sidebar,
-  .o2-sidebar-right {
-    display: none !important;
-  }
-}
+/* @media print overrides moved to styles/base-elements.css (W1.a, F18). */
 
 /* ── Register component/domain tokens used in class utilities ──
    These tokens were previously only reachable via arbitrary class values

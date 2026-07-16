@@ -21,3 +21,71 @@
    - Imported from tailwind.css at component.css's original position so the
      cascade order is unchanged (plan risk R10).
    ============================================================ */
+
+/* ── F16 — global scrollbar theming (from component.css, W1.a) ──────────────
+   Safe to sit in `@layer base`: no Tailwind utility targets scrollbars, so
+   nothing in a later layer can outrank these. Values are unchanged; the raw
+   `--color-grey-*` refs became semantic `--color-scrollbar-*` tokens.
+   The ~21 per-file `::-webkit-scrollbar` copies in .vue style blocks are
+   redundant with this and get deleted in W2.b. */
+@layer base {
+  ::-webkit-scrollbar {
+    width: 0.5625rem;
+    height: 0.5625rem;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-scrollbar-thumb);
+    border-radius: 0.375rem;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-scrollbar-thumb-hover);
+    background-clip: content-box;
+  }
+
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-scrollbar-thumb) transparent;
+  }
+
+  /* The dark thumb/hover colours come from the tokens above; only the Firefox
+     shorthand needs re-stating, since it takes the colour as a value. */
+  .dark * {
+    scrollbar-color: var(--color-scrollbar-thumb) transparent;
+  }
+}
+
+/* ── F18 — print overrides (from component.css, W1.a) ───────────────────────
+   Verbatim move. Printable dashboards/reports are a product requirement (§9.3).
+   These are `!important`, so they outrank normal utility declarations
+   regardless of which layer they sit in. */
+@layer base {
+  @media print {
+    .h-full,
+    .h-\[calc\(100vh-105px\)\],
+    .overflow-y-auto,
+    .overflow-auto,
+    .overflow-hidden,
+    .min-h-0,
+    .flex-1 {
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      overflow: visible !important;
+    }
+
+    .o2-app-header,
+    .o2-sidebar,
+    .o2-sidebar-right {
+      display: none !important;
+    }
+  }
+}

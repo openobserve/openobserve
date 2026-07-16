@@ -1,6 +1,6 @@
 # O2 Style Migration — Style Blocks → Tailwind & Token-Layer Class Evacuation
 
-> **Status: POLICY APPROVED 2026-07-16 (§3 ruling). P0 ✅ DONE · PQ ✅ DONE (2026-07-16). W1 / W2 not started.**
+> **Status: POLICY APPROVED 2026-07-16 (§3 ruling). P0 ✅ · PQ ✅ · PQ2 ✅ · W1.a ✅ (2026-07-16). W1.b–e / W2 not started.**
 > Execution log, findings that CORRECT this plan, and the remaining queue: **§10**.
 > ⚠ §1 counts and some §5/§9 claims are pre-execution estimates — several proved wrong; see §10.2.
 >
@@ -554,3 +554,121 @@ which are independent and can run in parallel.
 Open design calls: §9 #2 (D6 light code-bg `#ffffff` vs `#f6f8fa`) is still open — blocks only the
 O2AIChat/OCodeBlock/TraceErrorTab syntax-theme PRs. §9 #1 (EmptyState → wrapper component) and #3
 (F10 → colocate) confirmed as the plan's own recommended defaults. §9 #4 resolved: promo amber.
+
+---
+
+## 11. Execution log — PQ2 + W1.a (2026-07-16)
+
+### 11.1 PQ2 — dead Quasar JS retired (complete)
+
+| Site | Was | Now |
+|---|---|---|
+| `AlertList.vue` click-outside + ESC | Queried `.q-drawer__backdrop` / `.alert-details-drawer .q-drawer__content` — **matched nothing, so click-outside-to-close was entirely dead** | Both hand-rolled handlers **deleted**. ODrawer already wires `@escape-key-down` + `@interact-outside` (reka-ui DismissableLayer), and its version is *better* — it ignores clicks inside portaled dropdowns |
+| `JsonPreview.vue:622` | `closest(".q-btn")` → always null → `!null` → **context menu closed on EVERY click, including its own items** | `closest(".context-menu")` — items close it via their own handlers |
+| `useAlertForm.ts` ×2 | `.q-field--error` → null → **focus-on-first-error and scroll-to-error both silently did nothing** | `[aria-invalid="true"]` |
+| `focusManager.ts:154` | `.q-field__native` in a fallback selector list | removed (no-op — `input`/`select`/`textarea` entries already cover it) |
+| 5 cipherkeys `q-field` labels | `<label class="flex q-field">` | class removed — they are plain `<label><b>text</b></label>` with no focusable content and no `resetValidation` on their parent, i.e. provably inert |
+
+Supporting lib change: **`OInput` and `OSelect` now emit `:aria-invalid="hasError || undefined"`**, matching the
+convention 6 other lib form components (OFile/OColor/ODate/OSlider/OTime/ORange) already followed. This is both an
+a11y fix and what gives `useAlertForm` a real, queryable error marker — the role Quasar's `.q-field--error` used to play.
+
+**Zero `q-*` classes remain in any template.**
+
+> **Still open (deliberately NOT fixed here — a behavioural change, not a styling one):**
+> `ODialog`/`ODrawer.clearBodyValidation()` queries `.q-field` and calls
+> `__vueParentComponent.ctx.resetValidation` — an API only Quasar's QField exposed. **Nothing in the app
+> carries `.q-field` any more and only `OForm` exposes `resetValidation`, so "reset validation on
+> cancel-close" is dead.** Its specs pass because they hand-build `<div class="q-field">` fixtures with fake
+> `__vueParentComponent` — false confidence. The real fix is to target OForm's `<form>` root, but that
+> changes *when* dialog validation resets app-wide and needs its own PR + spec rewrite.
+
+### 11.2 W1.a — component.css quick wins (complete)
+
+**Token purity: 249 → 220 constructs (−29).** Baseline re-committed at each step.
+All `@media` and all but one `@keyframes` are now out of the token layer.
+
+| Family | Done | Notes |
+|---|---|---|
+| F15 | partial — **plan corrected** | `.cursor-pointer` / `.select-none` / `.text-left` deleted (verified byte-identical to Tailwind's own; live-checked that the utilities still deliver the same computed values). `.full-width` deleted (0 consumers). **`.full-height` NOT deleted** — see §11.3.1 |
+| F12 | ✅ — **plan corrected** | Only **7** selectors were genuinely identical. Deleted the *earlier* copy of each (cascade-safe: the later already wins; deleting the later could hand a win to an intervening rule). See §11.3.2 |
+| F1 | ✅ | `glow-pulse` deleted (0 consumers). `pulse` deleted — see §11.3.3, it was an app-wide bug. `histogram-bar-shimmer` stays: it is referenced only by an F10 logs rule, so it travels with F10 in W1.d |
+| F18 | ✅ | `@media print` → `base-elements.css`, verbatim. Safe in `@layer base`: the rules are `!important`, so they outrank normal utility declarations regardless of layer |
+| F16 | ✅ | Scrollbars → `base-elements.css` `@layer base`. Safe: no Tailwind utility targets scrollbars. Raw `--color-grey-*` refs became semantic `--color-scrollbar-thumb` / `-hover` (light + dark), values unchanged and verified live in both themes |
+| F2 | ✅ | `.field-type-container` / `.field-expand-icon` → template utilities in `SearchFieldList.vue`. Also deleted that file's own scoped copies, which duplicated the template utilities. See §11.3.4 — the ordering here was a trap |
+| F9 | ✅ verbatim | RCA report → `IncidentRCAAnalysis.vue`, `<style scoped>` + `:deep()`. **Plan corrected:** the single consumer is *IncidentRCAAnalysis.vue* (which v-html's it), not IncidentDetailDrawer.vue (which only builds the string) |
+| F11 | ✅ verbatim | Pin tooltip → `SearchResult.vue`, `<style scoped>` |
+
+**F9/F11 were moved VERBATIM on purpose.** W1's goal is token-layer purity; both are now out of the token
+layer with **zero visual risk**. Their hex→token and px→rem passes are deferred to W2.c, where the plan (§7.4)
+requires eyeballing the logs pin tooltip and the incident RCA report in both themes — verification that needs a
+logged-in app. Both carry keep-comments recording the intended token mapping
+(`--color-status-info-*` / `--color-status-error-*`, already theme-aware, which will collapse their dark twins).
+
+### 11.3 Findings that CORRECT this plan (continued from §10.2)
+
+1. **F15 mis-classifies `.full-height`.** It is not a Tailwind duplicate — it is a real 6-declaration rule
+   (`height/max-height/padding/margin/box-sizing/overflow`, all `!important`) with **22 usages across 10 files**.
+   Deleting it per §1.2 would have broken all of them. Reclassified: it needs the ladder (→ utilities at call
+   sites), and the plan's own R2 says every `!important` rule is review-tier, never auto-tier.
+2. **F12 mis-classifies `.expanded-content`.** §1.2 names it as a dead duplicate, but its two copies are
+   **DIFFERENT** — it is a live override, not dead weight. Of 18 duplicated selectors only 7 are byte-identical
+   (`copy-btn-sql`, `copy-btn-function`, `expanded-sql`, `expanded-function`, `scrollable-content`,
+   `field-value-key`, `field-value-count`). The rest (`.expanded-content`, `.warning-text` ×3, `.search-list`,
+   `.searchdetaildialog`, `.indexDetailsContainer`, `.field-value-container`, `.report-list-tabs`, `.dark`)
+   all differ and must be resolved by hand in W1.d, not swept.
+3. **`@keyframes pulse` was an app-wide bug, not just "F1 keyframes to move".** FOUR competing global `pulse`
+   definitions existed: Tailwind's own (`50%{opacity:.5}`), component.css's (`0.7`), and — from **unscoped**
+   `<style>` blocks — `LoadingProgress.vue`'s (`0.2/0.4`) and `QueryEditorDialog.vue`'s (`0.3`). Worse,
+   **`LoadingProgress.vue` also redefined the `.animate-pulse` *utility class* globally.** Because SFC styles
+   are unlayered they outrank Tailwind's layered utilities, so every `animate-pulse` in the app (MenuLink,
+   OSkeleton, OTable, sparklines, ErrorTrendCell) was being driven by LoadingProgress's timing/opacity —
+   *if and only if that component happened to be loaded*, making the animation load-order dependent.
+   Fixed: component.css's copy deleted; both SFC copies namespaced (`loading-progress-pulse`,
+   `query-editor-dot-pulse`); the `.animate-pulse` override deleted. **Verified live: `@keyframes pulse` now
+   resolves to Tailwind's canonical `50% { opacity: 0.5 }`.** This is a worked example of the R1 risk and a
+   preview of what W2.a will keep finding in the other 198 unscoped blocks.
+4. **F2 hid a cascade trap worth remembering for W2.a.** `SearchFieldList` had the class in *three* places:
+   component.css (unlayered, global), its own scoped rules, and template utilities. Because unlayered CSS beats
+   layered, component.css's `width:1rem` was beating the `w-[0.55rem]` **utility** — the scoped rule (higher
+   specificity) was the only reason the icon rendered at 0.55rem. Deleting rules in the naive order would have
+   silently resized it. The `position:relative`/`position:absolute` pair that makes the 1rem chevron overflow
+   its 0.55rem container lived **only** in the global rule and had to be moved onto the template explicitly.
+   *Lesson: when a class exists in both a style block and the token layer, resolve the computed value first.*
+5. **F9's stated consumer is wrong** — see §11.2. Also: `scoped` alone would NOT have worked, because the
+   wrapper *and* all children come from `v-html` and never receive the scope id; `:deep()` anchored on the
+   template-owned `.rca-content` is required. This is the R3/R4 pair, live.
+
+### 11.4 Pre-existing test failures (NOT caused by this work — verified by stashing / checking out HEAD~1)
+
+- `IncidentTimeline.spec.ts` — **9 failures**, identical before and after my changes. Specs assert hex
+  (`'#059669'`) against a component that already returns `var(--color-success-600)`.
+- `alerts/steps/Advanced.spec.ts`, `CompareWithPast.spec.ts`, `Deduplication.spec.ts` — assert `light-mode` /
+  `dark-mode` root classes that the components no longer render. **Confirmed failing at `HEAD~1`, i.e. before
+  the Quasar commit** — fallout from the branch's earlier dark-mechanism work (D19/D20 territory).
+
+These 4 spec files are stale and should be fixed or `it.skip`-ed with a reason; they make `npm run test:unit`
+red independently of this migration.
+
+### 11.5 Verification performed
+
+`lint:tokens` · `lint:token-purity` (220, re-baselined) · `type-check` clean · `stylelint` 0 errors
+(174 warnings, unchanged) · `eslint` on all changed files: 0 errors · unit tests for every touched area
+(AlertList, JsonPreview, AddAlert, ODialog, ODrawer, OInput, OSelect, AddAkeylessType, SearchResult,
+SearchFieldList, LoadingProgress, QueryEditorDialog, IncidentRCAAnalysis, IncidentDetailDrawer) — all pass ·
+brace-balance + SFC tag-balance checks on every edited file · **live probes in the running dev server**
+confirming: the F15 deletions still resolve via Tailwind's own utilities; F16 scrollbar rules still apply
+after the `@layer base` move and their tokens match the old palette values in both themes; and
+`@keyframes pulse` now resolves to Tailwind's canonical definition.
+
+### 11.6 Next up
+
+**W1.b** (F4 element typography + F7 form rules + F5 app-shell + F3 `.o2-table*` → base-elements/lib) —
+note §10.2.5: `.card-container` (F5) has **178 consumers across 102 files**, so §5.2's "inline utilities at
+call sites" must be re-scoped to a component first. Then **W1.c**, **W1.d** (F8/F14/F10 — carries
+`histogram-bar-shimmer` and the 11 DIFFERENT duplicates from §11.3.2), **W1.e** (delete
+`token-purity-baseline.json` → checker becomes zero-tolerance), and the **W2.a** batches (independent — can
+run in parallel from now).
+
+Remaining open design call: **D6 light code-bg** (`#ffffff` vs `#f6f8fa`) — blocks only the
+O2AIChat/OCodeBlock/TraceErrorTab syntax-theme PRs.

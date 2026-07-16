@@ -1050,6 +1050,7 @@ const fieldWidthClass = computed(() => {
             :tabindex="inputTabindex"
             role="combobox"
             :aria-expanded="popoverOpen"
+            :aria-invalid="hasError || undefined"
             @keydown="handleTriggerKeydown"
             :data-test="
               parentDataTest ? `${parentDataTest}-trigger` : undefined

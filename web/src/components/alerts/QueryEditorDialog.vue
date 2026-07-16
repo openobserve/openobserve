@@ -376,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <!-- Running indicator -->
                   <div v-if="runFnQueryLoading" class="flex items-center gap-1">
-                    <span class="w-1.5 h-1.5 rounded-full bg-status-positive [animation:pulse_1.5s_ease-in-out_infinite]" />
+                    <span class="w-1.5 h-1.5 rounded-full bg-status-positive [animation:query-editor-dot-pulse_1.5s_ease-in-out_infinite]" />
                     <span class="text-3xs font-semibold text-status-positive">Running</span>
                   </div>
                 </div>
@@ -1175,7 +1175,12 @@ const getBtnLogo = computed(() => {
 </script>
 
 <style>
-@keyframes pulse {
+/* keep(keyframes): not expressible as a Tailwind utility. Name is component-
+   prefixed and must stay global — it is referenced from an arbitrary
+   `[animation:…]` utility in the template, and Vue rewrites keyframe names
+   inside `scoped` blocks. Was the generic `pulse`, which (from this unscoped
+   block) collided with Tailwind's own `animate-pulse` keyframes app-wide. */
+@keyframes query-editor-dot-pulse {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.3; }
 }

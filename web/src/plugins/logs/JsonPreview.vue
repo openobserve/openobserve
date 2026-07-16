@@ -619,7 +619,11 @@ export default {
       // Handler for closing menu on outside click
       //because when user clicks on the log content with right click, the context menu is shown and when user clicks outside the log content, the context menu is closed
       const handleOutsideClick = (e: MouseEvent) => {
-        if (!(e.target as HTMLElement).closest(".q-btn")) {
+        // Guard on the menu itself: its items close it via their own handlers.
+        // This used to test `.closest(".q-btn")` — post-Quasar that is always
+        // null, so the menu was being closed by *every* click, including clicks
+        // on its own items.
+        if (!(e.target as HTMLElement).closest(".context-menu")) {
           showMenu.value = false;
         }
       };
