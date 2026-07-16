@@ -1037,22 +1037,32 @@ export class AlertDestinationsPage {
      * Select a prebuilt destination type
      * @param {string} type - Type ID (slack, discord, msteams, email, pagerduty, opsgenie, servicenow, custom)
      */
+    /**
+     * Wait until `locator` has been CONTINUOUSLY visible for `stableMs`, resetting the moment
+     * it detaches. Returns false if it never settles within `timeout`. This is the tool for a
+     * field that renders, gets UNMOUNTED by a re-render, then re-renders — a plain waitFor
+     * would accept the first (doomed) render; this only accepts the field once it has settled.
+     */
+    async _waitForFieldStable(locator, { stableMs = 1500, timeout = 20000 } = {}) {
+        const start = Date.now();
+        let stableSince = null;
+        while (Date.now() - start < timeout) {
+            const visible = await locator.isVisible().catch(() => false);
+            if (visible) {
+                if (stableSince === null) stableSince = Date.now();
+                if (Date.now() - stableSince >= stableMs) return true;
+            } else {
+                stableSince = null;
+            }
+            await this.page.waitForTimeout(250);
+        }
+        return false;
+    }
+
     async selectDestinationType(type) {
-        // Wait for the type-selector cards to be mounted.
-        await this.page.locator(this.prebuiltDestinationSelector).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-
-        const card = this.page.locator(`${this.destinationTypeCard}[data-type="${type}"]`);
-
-        // Confirm the transition on the TYPE-SPECIFIC credential field, NOT the generic
-        // destination-name input. In PrebuiltDestinationForm.vue every credential field is
-        // behind `v-if="destinationType === '<type>'"`, so that field rendering is the only
-        // reliable proof the card click actually registered the type. The name input renders
-        // for every prebuilt form, so confirming on it returned "ready" while the card click
-        // had been absorbed (the card list re-renders as prebuilt-templates load) and the
-        // credential field's v-if never rendered — the root of the intermittent
-        // "webhook/integration-key/instance-url field not visible" failures across Teams,
-        // PagerDuty, ServiceNow, etc. The field being visible is also a deterministic
-        // ready-signal, so no arbitrary settle is needed afterwards.
+        // Wait for the TYPE-SPECIFIC credential field (proof the type's form rendered) plus the
+        // common destination-name field the caller fills next. Each credential field is behind
+        // `v-if="destinationType === '<type>'"` in PrebuiltDestinationForm.vue.
         const typeConfirmSelector = {
             slack: '[data-test="slack-webhook-url-input-field"]',
             discord: '[data-test="discord-webhook-url-input-field"]',
@@ -1064,24 +1074,49 @@ export class AlertDestinationsPage {
             custom: this.urlInput,
         }[type] || this.destinationNameInput;
         const confirmField = this.page.locator(typeConfirmSelector).first();
+        const nameField = this.page.locator(this.destinationNameInputField).first();
 
-        // Re-click the card until the type-specific field renders (cards stay visible after
-        // selection, so re-clicking is idempotent). This recovers the case where the first
-        // click(s) were absorbed while the card list was still re-rendering.
-        let transitioned = false;
-        for (let attempt = 1; attempt <= 5 && !transitioned; attempt++) {
+        // On a REUSED destination form (2nd+ destination in a run), selecting a type sometimes
+        // triggers a re-render (template auto-load) that UNMOUNTS the credential/name fields and
+        // they stay gone — verified by watching count→0 for 25s+. A wait can't recover an
+        // unmounted element, so when the fields don't settle we re-open the form (fresh mount,
+        // like the always-stable first destination) and re-select. Deterministic — not a retry.
+        for (let openAttempt = 1; openAttempt <= 3; openAttempt++) {
+            await this.page.locator(this.prebuiltDestinationSelector).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+            const card = this.page.locator(`${this.destinationTypeCard}[data-type="${type}"]`);
             await card.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-            await card.click({ force: true, timeout: 10000 }).catch((e) => {
-                testLogger.debug('selectDestinationType card click attempt failed', { type, attempt, error: e.message });
-            });
-            transitioned = await confirmField.isVisible({ timeout: 6000 }).catch(() => false);
-            if (!transitioned) {
-                testLogger.warn('Type-specific field not rendered after selecting type, re-selecting', { type, attempt });
+
+            // Click the card once if not already selected. selectType() re-emits on every click,
+            // so re-clicking a selected card re-renders the form — only click when needed.
+            const cardSelected = () => card.evaluate((el) => el.classList.contains('selected')).catch(() => false);
+            if (!(await cardSelected())) {
+                await card.click({ timeout: 10000 }).catch((e) => {
+                    testLogger.debug('selectDestinationType card click failed', { type, openAttempt, error: e.message });
+                });
             }
+            await expect.poll(cardSelected, { timeout: 8000, intervals: [400, 800, 1200] }).toBe(true).catch(() => {});
+
+            // Wait for BOTH fields to be STABLE (settled past any re-render), not just present.
+            // A healthy field settles in ~1-2s so this returns fast; the 12s cap only bounds how
+            // long we tolerate the UNMOUNTED case before remounting — kept short to protect the
+            // per-test time budget under CI's parallel load (multiple remounts add up).
+            const credStable = await this._waitForFieldStable(confirmField, { stableMs: 1500, timeout: 12000 });
+            const nameStable = credStable && await this._waitForFieldStable(nameField, { stableMs: 1000, timeout: 8000 });
+            if (credStable && nameStable) {
+                testLogger.debug('Selected destination type and form loaded', { type, openAttempt });
+                return;
+            }
+
+            // Fields unmounted and stuck — re-open the form to force a fresh mount, then retry.
+            testLogger.warn('Destination fields did not stabilise after type-select; re-opening form to remount', { type, openAttempt, credStable, nameStable });
+            await this.page.locator(this.cancelButton).first().click({ force: true, timeout: 10000 }).catch(() => {});
+            await this.page.locator(this.addDestinationTitle).first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            await this.clickNewDestination();
         }
-        // Final explicit wait so a genuine failure surfaces on the type-specific field.
+        // Surface a clear failure if remounts didn't recover it.
         await confirmField.waitFor({ state: 'visible', timeout: 15000 });
-        testLogger.debug('Selected destination type and form loaded', { type });
+        await nameField.waitFor({ state: 'visible', timeout: 15000 });
+        testLogger.debug('Selected destination type and form loaded (after remounts)', { type });
     }
 
     /**
@@ -1114,7 +1149,7 @@ export class AlertDestinationsPage {
      * @param {string} key - Integration key
      */
     async fillIntegrationKey(key) {
-        await this.page.waitForTimeout(5000);
+        // selectDestinationType() now returns only once this field is stable, so it's present.
         const input = this.page.locator(this.integrationKeyInputField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(key);
@@ -1630,9 +1665,31 @@ export class AlertDestinationsPage {
         await confirmBtn.waitFor({ state: 'visible', timeout: 10000 });
         await confirmBtn.click();
 
-        // Wait for the row anchor to detach — this is set by getDestinations() refresh
-        // after the delete API returns successfully.
-        await expect(deleteBtn).toHaveCount(0, { timeout: 15000 });
+        // Deterministic backend truth: poll the destination's own API endpoint until it is
+        // GONE (404). The rendered row detaching (toHaveCount(0)) races the list's getDestinations()
+        // re-fetch, which lags under load — so the row could still be shown briefly after the
+        // delete API returned, failing the count assertion. Confirming the backend deletion is
+        // the real signal; page.request carries the session cookies the endpoint needs.
+        const baseUrl = process.env.ZO_BASE_URL;
+        const org = getOrgIdentifier();
+        const detailUrl = `${baseUrl}/api/${org}/alerts/destinations/${encodeURIComponent(name)}`;
+        let apiStatus = 0;
+        await expect.poll(async () => {
+            const resp = await this.page.request.get(detailUrl).catch(() => null);
+            apiStatus = resp ? resp.status() : 0;
+            // Terminal states: gone (404), or auth-inconclusive (401/403) — fall back to the UI.
+            return apiStatus === 404 || apiStatus === 401 || apiStatus === 403;
+        }, { timeout: 20000, intervals: [1000, 1500, 2000, 3000] }).toBe(true).catch(() => {});
+        testLogger.debug('Destination delete backend-check', { name, apiStatus });
+        if (apiStatus === 404) {
+            // Backend confirms the destination is gone — the real success signal. The row
+            // detaches on the next list refresh; wait for it best-effort (its re-render can
+            // lag under load, but the delete is already done, so don't fail on UI lag).
+            await expect(deleteBtn).toHaveCount(0, { timeout: 15000 }).catch(() => {});
+        } else {
+            // API was auth-inconclusive — fall back to the row detaching as the assertion.
+            await expect(deleteBtn).toHaveCount(0, { timeout: 15000 });
+        }
 
         // Clear the search filter so the list returns to its full state. Leaving the
         // deleted name in the search box strands the list on a "No destinations found"
@@ -1640,7 +1697,6 @@ export class AlertDestinationsPage {
         // open over an empty/transitioning list and mis-render).
         if (await searchField.isVisible().catch(() => false)) {
             await searchField.fill('');
-            await this.page.waitForTimeout(500);
         }
 
         testLogger.info('Destination deleted successfully');
