@@ -169,7 +169,7 @@
               size="icon-panel"
               :disabled="bottomProps.isFirstPage"
               @click="bottomProps.firstPage"
-              class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! rounded! overflow-visible!"
+              class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! rounded-sm! overflow-visible!"
             >
               <OIcon name="fast-rewind" size="sm" />
             </OButton>
@@ -182,7 +182,7 @@
                   bottomProps.currentPage === page ? 'primary' : 'ghost'
                 "
                 size="icon-panel"
-                class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! text-xs! font-medium leading-none text-text-primary! rounded! overflow-visible!"
+                class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! text-xs! font-medium leading-none text-text-primary! rounded-sm! overflow-visible!"
                 @click="setPage(page)"
                 >{{ page }}</OButton
               >
@@ -192,7 +192,7 @@
               size="icon-panel"
               :disabled="bottomProps.isLastPage"
               @click="bottomProps.lastPage"
-              class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! rounded! overflow-visible!"
+              class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! rounded-sm! overflow-visible!"
             >
               <OIcon name="fast-forward" size="sm" />
             </OButton>

@@ -110,8 +110,14 @@ baseline for zero-tolerance. Safe to do only after E is done.
 
 ## 7. Known follow-ups (not blocking, FYI)
 
-- **`utils/theme.ts` local `isDarkMode`** trips the new `no-restricted-syntax` *warning* (it's a
-  param-derived local, not a store read). Resolve at Phase G: allowlist `theme.ts` or rename the var.
+- ✅ **DONE — `utils/theme.ts` local `isDarkMode`** renamed to `darkModeActive` (it's a param-derived
+  local, not a store read), so it no longer trips the `no-restricted-syntax` warning. The two-seam
+  contract (`useTheme.ts` / `chartTheme.ts`) stays pure — no allowlist entry needed.
+- ✅ **DONE — genuine bare `rounded!` utilities** (CustomNode, ThreadView, SearchFieldList) → `rounded-sm!`
+  (value-identical, decided radius policy). The remaining `bareRounded` ratchet count is all **false
+  positives** — the regex matches the word "rounded" in comments, JS object keys (`rounded: "rounded-md"`),
+  and prop defaults (`rounded?: boolean`). **Team follow-up:** tighten the `bareRounded` regex in
+  `check-design-consistency.mjs` to skip comments / non-class contexts before Phase G flips it to error.
 - **2 AlertList tests** (`tab scheduled shows only matching rows`, `importAlert sets dialog`) fail
   under full-suite parallel load (21s timeout) but **pass in isolation** — pre-existing flakiness,
   not a migration regression.

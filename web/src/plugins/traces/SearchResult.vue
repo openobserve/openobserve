@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-error-count-badge"
           variant="error"
           :clickable="true"
-          class="text-xs rounded! py-[0.4rem]! px-[0.625rem]! text-xs!"
+          class="text-xs rounded-sm! py-[0.4rem]! px-[0.625rem]! text-xs!"
           :class="showErrorOnly
             ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'
             : 'bg-error-tag-bg! text-error-tag-text!'"

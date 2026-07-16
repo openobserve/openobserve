@@ -112,16 +112,16 @@ const syncO2LibraryTokens = (themeColor: string): void => {
  * @param isDefault - Whether this is the default theme
  */
 export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isDefault: boolean = false, semanticColors?: SemanticColors) => {
-  const isDarkMode = mode === "dark";
+  const darkModeActive = mode === "dark";
 
   // Toggle .dark class on <html> for the O2 component library (Tailwind dark variant)
-  document.documentElement.classList.toggle('dark', isDarkMode);
+  document.documentElement.classList.toggle('dark', darkModeActive);
 
   // Toggle the legacy `body.body--dark` / `body.body--light` compat classes so existing
   // selectors (~200 across SCSS/Vue) and `document.body.classList.contains('body--dark')`
   // JS checks continue to work.
-  document.body.classList.toggle('body--dark', isDarkMode);
-  document.body.classList.toggle('body--light', !isDarkMode);
+  document.body.classList.toggle('body--dark', darkModeActive);
+  document.body.classList.toggle('body--light', !darkModeActive);
 
   // Sync O2 library tokens with the custom theme color.
   // When using the default theme, clear any previously-set inline primary palette so
@@ -135,7 +135,7 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
     syncO2LibraryTokens(themeColor);
   }
 
-  if (isDarkMode) {
+  if (darkModeActive) {
     // Apply dark mode theme color (single source — the light + dark theme-color
     // tokens were consolidated into one --color-theme-accent, so one write covers both)
     const rgbaColor = hexToRgba(themeColor, 10);
@@ -267,7 +267,7 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
       document.body.style.removeProperty(t);
       document.documentElement.style.removeProperty(t);
     });
-    const target = isDarkMode ? document.body : document.documentElement;
+    const target = darkModeActive ? document.body : document.documentElement;
     target.style.setProperty('--color-status-negative', semanticColors.error);
     target.style.setProperty('--color-status-error-text', semanticColors.errorText);
     target.style.setProperty('--color-status-error-bg', semanticColors.errorBg);

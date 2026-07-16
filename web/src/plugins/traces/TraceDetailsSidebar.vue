@@ -498,7 +498,7 @@ class="h-full overflow-y-auto">
         >
           <!-- View mode toggle toolbar -->
           <div class="flex items-center justify-start pb-1.5! h-fit!">
-            <OToggleGroup v-model="attributesViewMode" class="rounded!">
+            <OToggleGroup v-model="attributesViewMode" class="rounded-sm!">
               <OToggleGroupItem value="json"
 size="xs"
 class="h-5! text-xs!">

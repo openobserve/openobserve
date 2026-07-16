@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="props.showSummary" class="thread-summary flex flex-wrap items-center gap-[0.4rem] py-2 px-4 bg-(--color-surface-base,transparent) border-b border-border-default">
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--steps h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded! text-xs! text-text-body! border-l-[3px]! border-l-[#cc785c]!"
+        class="thread-chip thread-chip--steps h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-sm! text-xs! text-text-body! border-l-[3px]! border-l-[#cc785c]!"
         :title="`${summary.turnCount} LLM step${summary.turnCount === 1 ? '' : 's'}`"
       >
         <template #icon><OIcon name="auto-awesome" size="xs" /></template>
@@ -43,13 +43,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="thread-chip__value text-text-body font-semibold text-xs">{{ summary.turnCount }}</span>
       </OTag>
 
-      <OTag type="metricChip" class="thread-chip thread-chip--tools h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded! text-xs! text-text-body! border-l-[3px]! border-l-[#0ea5e9]!">
+      <OTag type="metricChip" class="thread-chip thread-chip--tools h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-sm! text-xs! text-text-body! border-l-[3px]! border-l-[#0ea5e9]!">
         <template #icon><OIcon name="build" size="xs" /></template>
         <span class="thread-chip__label text-text-secondary font-medium mr-[5px] tracking-normal text-2xs">Tools</span>
         <span class="thread-chip__value text-text-body font-semibold text-xs">{{ summary.toolCallCount }}</span>
       </OTag>
 
-      <OTag type="metricChip" class="thread-chip thread-chip--duration h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded! text-xs! text-text-body! border-l-[3px]! border-l-[#64748b]!">
+      <OTag type="metricChip" class="thread-chip thread-chip--duration h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-sm! text-xs! text-text-body! border-l-[3px]! border-l-[#64748b]!">
         <template #icon><OIcon name="schedule" size="xs" /></template>
         <span class="thread-chip__label text-text-secondary font-medium mr-[5px] tracking-normal text-2xs">Duration</span>
         <span class="thread-chip__value text-text-body font-semibold text-xs">
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </OTag>
 
-      <OTag type="metricChip" class="thread-chip thread-chip--cost h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded! text-xs! text-text-body! border-l-[3px]! border-l-[#16a34a]!">
+      <OTag type="metricChip" class="thread-chip thread-chip--cost h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-sm! text-xs! text-text-body! border-l-[3px]! border-l-[#16a34a]!">
         <template #icon><OIcon name="payments" size="xs" /></template>
         <span class="thread-chip__label text-text-secondary font-medium mr-[5px] tracking-normal text-2xs">Cost</span>
         <span class="thread-chip__value text-text-body font-semibold text-xs">
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="summary.dominantModel"
         type="metricChip"
-        class="thread-chip thread-chip--model h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded! text-xs! text-text-body! border-l-[3px]! border-l-[#8b5cf6]!"
+        class="thread-chip thread-chip--model h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-sm! text-xs! text-text-body! border-l-[3px]! border-l-[#8b5cf6]!"
         :title="summary.dominantModel"
       >
         <template #icon><OIcon name="bolt" size="xs" /></template>
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="summary.errorCount > 0"
         type="metricChip"
-        class="thread-chip thread-chip--error h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded! text-xs! text-text-body! border-l-[3px]! border-l-error-600!"
+        class="thread-chip thread-chip--error h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-sm! text-xs! text-text-body! border-l-[3px]! border-l-error-600!"
       >
         <template #icon><OIcon name="error-outline" size="xs" /></template>
         <span class="thread-chip__label text-text-secondary font-medium mr-[5px] tracking-normal text-2xs">Errors</span>

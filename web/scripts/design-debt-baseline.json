@@ -1,7 +1,7 @@
 {
   "totals": {
     "themeTernary": 186,
-    "darkMechanism": 390,
+    "darkMechanism": 389,
     "unscopedStyle": 206,
     "styleBlockHex": 805,
     "stylePxUnit": 1082,
@@ -13,8 +13,8 @@
     "rawPalette": 100,
     "inlineHexStyle": 27,
     "inlineHexBind": 11,
-    "bareRounded": 26,
-    "tsHex": 471
+    "tsHex": 471,
+    "bareRounded": 9
   },
   "files": {
     "App.vue": {
@@ -361,9 +361,6 @@
     },
     "components/common/sidebar/InlineSelectFolderDropdown.vue": {
       "stylePxUnit": 7
-    },
-    "components/common/sidebar/SearchFieldList.vue": {
-      "bareRounded": 3
     },
     "components/cross-linking/CrossLinkUserGuide.vue": {
       "themeTernary": 1,
@@ -1319,7 +1316,6 @@
     },
     "plugins/pipelines/CustomNode.vue": {
       "inlineHexStyle": 1,
-      "bareRounded": 6,
       "arbRadius": 1,
       "arbTextSize": 1,
       "unscopedStyle": 1,
@@ -1373,9 +1369,6 @@
     "plugins/traces/SearchBar.vue": {
       "arbPx": 1,
       "arbZ": 1
-    },
-    "plugins/traces/SearchResult.vue": {
-      "bareRounded": 1
     },
     "plugins/traces/ServiceGraph.vue": {
       "arbTextSize": 3,
@@ -1433,7 +1426,6 @@
     "plugins/traces/ThreadView.vue": {
       "hexClass": 17,
       "themeTernary": 1,
-      "bareRounded": 6,
       "arbRadius": 1,
       "arbTextSize": 19,
       "unscopedStyle": 1,
@@ -1459,7 +1451,6 @@
     },
     "plugins/traces/TraceDetailsSidebar.vue": {
       "inlineHexStyle": 1,
-      "bareRounded": 1,
       "arbTextSize": 2,
       "unscopedStyle": 3,
       "darkMechanism": 28,
@@ -1612,7 +1603,7 @@
     },
     "utils/theme.ts": {
       "tsHex": 23,
-      "darkMechanism": 4
+      "darkMechanism": 3
     },
     "utils/themeManager.ts": {
       "darkMechanism": 1
