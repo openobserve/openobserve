@@ -3090,6 +3090,25 @@
     "SearchSQLCancelled": "오류: 검색 SQL이 취소되었습니다."
   },
   "alerts": {
+    "validation": {
+      "streamTypeRequired": "Stream 유형은 필수입니다.",
+      "streamNameRequired": "Stream 이름은 필수입니다.",
+      "fieldRequired": "필드는 필수입니다!",
+      "fieldRequiredPlain": "필드는 필수입니다",
+      "nameInvalidChars": ":, ?, /, # 및 공백과 같은 문자는 허용되지 않습니다.",
+      "templateRequired": "템플릿은 필수입니다!",
+      "validEmails": "유효한 이메일을 추가하세요!",
+      "silenceNonNegative": "알림 침묵은 0 이상이어야 합니다",
+      "periodPositive": "기간은 0보다 커야 합니다",
+      "destinationRequired": "하나 이상의 대상이 필요합니다.",
+      "thresholdPositive": "임계값은 0보다 커야 합니다",
+      "frequencyPositive": "빈도는 0보다 커야 합니다",
+      "groupByRequired": "하나 이상의 그룹화 필드가 필요합니다",
+      "minimumOneDay": "최소 1일",
+      "detectionFunctionRequired": "탐지 함수는 필수입니다",
+      "timestampAliasBanned": "{column}은(는) 열 별칭으로 사용할 수 없습니다. 대신 time_bucket을 사용하세요.",
+      "credentialFieldRequired": "{field}은(는) 필수입니다"
+    },
     "header": "알림",
     "subtitle": "경고 규칙 및 알림 채널",
     "searchThisFolder": "이 폴더",

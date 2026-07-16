@@ -2055,6 +2055,25 @@
     "SearchSQLCancelled": "Error: Search SQL was cancelled."
   },
   "alerts": {
+    "validation": {
+      "streamTypeRequired": "Stream प्रकार आवश्यक है।",
+      "streamNameRequired": "Stream नाम आवश्यक है।",
+      "fieldRequired": "फ़ील्ड आवश्यक है!",
+      "fieldRequiredPlain": "फ़ील्ड आवश्यक है",
+      "nameInvalidChars": ":, ?, /, # और स्पेस जैसे वर्ण अनुमत नहीं हैं।",
+      "templateRequired": "टेम्पलेट आवश्यक है!",
+      "validEmails": "मान्य ईमेल जोड़ें!",
+      "silenceNonNegative": "सूचना साइलेंस 0 से अधिक या उसके बराबर होना चाहिए",
+      "periodPositive": "अवधि 0 से अधिक होनी चाहिए",
+      "destinationRequired": "कम से कम एक गंतव्य आवश्यक है।",
+      "thresholdPositive": "थ्रेशोल्ड 0 से अधिक होना चाहिए",
+      "frequencyPositive": "आवृत्ति 0 से अधिक होनी चाहिए",
+      "groupByRequired": "कम से कम एक ग्रुप बाय फ़ील्ड आवश्यक है",
+      "minimumOneDay": "न्यूनतम 1 दिन",
+      "detectionFunctionRequired": "डिटेक्शन फ़ंक्शन आवश्यक है",
+      "timestampAliasBanned": "{column} को कॉलम उपनाम के रूप में उपयोग नहीं किया जा सकता। इसके बजाय time_bucket का उपयोग करें।",
+      "credentialFieldRequired": "{field} आवश्यक है"
+    },
     "header": "अलर्ट्स",
     "add": "अलर्ट जोड़ें",
     "edit": "संपादित करें",

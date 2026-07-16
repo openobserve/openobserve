@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:model-value="(val) => {
                           userSelectedTemplates[index] = val;
                           updateDestinationTemplate(val, index);
-                          templateErrors[index] = val ? '' : 'Field is required!';
+                          templateErrors[index] = getCorrectionRequiredError(val);
                         }"
                         :options="filteredTemplates"
                         label="Templates *"
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:model-value="(val) => {
                           userSelectedActionId[index] = val;
                           updateDestinationAction(val, index);
-                          actionErrors[index] = val ? '' : 'Field is required!';
+                          actionErrors[index] = getCorrectionRequiredError(val);
                         }"
                         :options="filteredActions"
                         label="Actions *"
@@ -551,13 +551,19 @@ export default defineComponent({
       destinationErrorsToDisplay.value.forEach((errorGroup, idx) => {
         for (const msg of errorGroup) {
           if (typeof msg === 'object') {
-            if (msg.field === 'template_name' && !userSelectedTemplates.value[idx]) {
-              templateErrors[idx] = 'Field is required!';
-              hasCorrectionErrors = true;
+            if (msg.field === 'template_name') {
+              const requiredError = getCorrectionRequiredError(userSelectedTemplates.value[idx]);
+              if (requiredError) {
+                templateErrors[idx] = requiredError;
+                hasCorrectionErrors = true;
+              }
             }
-            if (msg.field === 'action_id' && !userSelectedActionId.value[idx]) {
-              actionErrors[idx] = 'Field is required!';
-              hasCorrectionErrors = true;
+            if (msg.field === 'action_id') {
+              const requiredError = getCorrectionRequiredError(userSelectedActionId.value[idx]);
+              if (requiredError) {
+                actionErrors[idx] = requiredError;
+                hasCorrectionErrors = true;
+              }
             }
           }
         }
@@ -648,6 +654,13 @@ export default defineComponent({
         return false;
       }
     };
+
+    // Single source of truth for the correction "required" rule. The template
+    // and action correction controls plus the pre-import correction gate below
+    // all defer to this instead of re-deriving `val ? '' : 'Field is required!'`
+    // inline, so the destination JS validator owns the rule in one place.
+    const getCorrectionRequiredError = (value: any): string =>
+      value ? "" : "Field is required!";
 
     const validateDestinationInputs = async (input: any, index: number) => {
       let destinationErrors: (string | { message: string; field: string })[] =
@@ -900,6 +913,7 @@ export default defineComponent({
       filterTemplates,
       filterActions,
       getServiceActions,
+      getCorrectionRequiredError,
       arrowBackFn,
       isDestinationImporting,
       store,

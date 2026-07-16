@@ -3090,6 +3090,25 @@
     "SearchSQLCancelled": "Fehler: Die Suche in SQL wurde abgebrochen."
   },
   "alerts": {
+    "validation": {
+      "streamTypeRequired": "Stream-Typ ist erforderlich.",
+      "streamNameRequired": "Stream-Name ist erforderlich.",
+      "fieldRequired": "Feld ist erforderlich!",
+      "fieldRequiredPlain": "Feld ist erforderlich",
+      "nameInvalidChars": "Zeichen wie :, ?, /, # und Leerzeichen sind nicht erlaubt.",
+      "templateRequired": "Vorlage ist erforderlich!",
+      "validEmails": "Bitte gültige E-Mail-Adressen hinzufügen!",
+      "silenceNonNegative": "Benachrichtigungsstummschaltung muss größer als oder gleich 0 sein",
+      "periodPositive": "Zeitraum muss größer als 0 sein",
+      "destinationRequired": "Mindestens ein Ziel ist erforderlich.",
+      "thresholdPositive": "Schwellenwert muss größer als 0 sein",
+      "frequencyPositive": "Häufigkeit muss größer als 0 sein",
+      "groupByRequired": "Mindestens ein Gruppierungsfeld ist erforderlich",
+      "minimumOneDay": "Mindestens 1 Tag",
+      "detectionFunctionRequired": "Erkennungsfunktion ist erforderlich",
+      "timestampAliasBanned": "{column} kann nicht als Spaltenalias verwendet werden. Verwenden Sie stattdessen time_bucket.",
+      "credentialFieldRequired": "{field} ist erforderlich"
+    },
     "header": "Warnmeldungen",
     "subtitle": "Alarmregeln und Benachrichtigungskanäle",
     "searchThisFolder": "Dieser Ordner",

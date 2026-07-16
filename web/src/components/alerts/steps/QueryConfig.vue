@@ -25,6 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="section-header-accent w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-[var(--q-primary)]" />
         <span class="section-header-title text-[13px] font-semibold tracking-[0.01em] text-[var(--color-text-primary)]">{{ t('alerts.queryConfig.sectionTitle') }}</span>
       </div>
+      <!-- DESCENDANT step (Rule ③): the AddAlert orchestrator owns the ONE
+           <OForm> and provides FORM_CONTEXT_KEY. The OForm* fields below bind by
+           nested `name=` (trigger_condition.*, query_condition.*, logGroupBy[])
+           into that form; the composed schema in AddAlert.schema.ts (which
+           reuses makeQueryConfigSchema) validates them on save. Non-form widgets
+           (tabs / editors / VRL / FilterGroup) live inside and are bridged. -->
       <div class="px-3 py-2 min-w-0 w-full box-border">
       <!-- Query Mode Tabs (hidden for real-time alerts) -->
       <div v-if="shouldShowTabs" class="mb-2 flex items-center justify-between">
@@ -87,37 +93,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- "of [field]" shown for measure modes -->
                   <template v-if="selectedFunction !== 'total_events'">
                     <span class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.conditionOf') }}</span>
-                    <OSelect
-                      v-model="logMeasureColumn"
+                    <OFormSelect
+                      name="query_condition.aggregation.having.column"
                       :options="numericColumns"
                       searchable
                       :placeholder="t('alerts.placeholders.selectColumn')"
-                      :error="columnSelectError"
                       :class="['min-w-[140px] max-w-[200px]']"
-                      @update:model-value="columnSelectError = false; onLogMeasureColumnChange($event)"
+                      @update:model-value="onLogMeasureColumnChange($event)"
                     />
                   </template>
 
                   <!-- COUNT mode -->
                   <template v-if="selectedFunction === 'total_events'">
-                    <OSelect
-                      v-model="triggerOperator"
+                    <OFormSelect
+                      name="trigger_condition.operator"
                       :options="numericOperators"
                       class="min-w-[70px] max-w-[120px]"
                       data-test="alert-trigger-operator-select"
                       :searchable="false"
                       @update:model-value="onTriggerOperatorChange"
                     />
-                    <OInput
-                      v-model="triggerThreshold"
+                    <OFormInput
+                      name="trigger_condition.threshold"
                       type="number"
                       data-test="alert-trigger-threshold-input"
                       @blur="restoreDefaultThreshold"
                       class="min-w-[60px] max-w-[80px]"
                       min="1"
-                      :error="!!triggerThresholdError"
-                      :error-message="triggerThresholdError"
-                      @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
+                      @update:model-value="onTriggerThresholdChange($event)"
                     />
                     <span v-if="streamName" class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.matchingTypeFound', { type: streamType === 'traces' ? 'traces' : 'logs' }) }}</span>
                   </template>
@@ -125,22 +128,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- MEASURE mode -->
                   <template v-else>
                     <span class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.conditionIs') }}</span>
-                    <OSelect
-                      v-model="conditionOperator"
+                    <OFormSelect
+                      name="query_condition.aggregation.having.operator"
                       :options="numericOperators"
                       :searchable="false"
                       class="min-w-[70px] max-w-[120px]"
                       data-test="alert-condition-operator-select"
                       @update:model-value="onConditionOperatorChange"
                     />
-                    <OInput
-                      v-model="conditionValue"
+                    <OFormInput
+                      name="query_condition.aggregation.having.value"
                       type="number"
                       :placeholder="t('alerts.placeholders.value')"
                       class="min-w-[80px] max-w-[120px]"
-                      :error="!!conditionValueError"
-                      :error-message="conditionValueError"
-                      @update:model-value="conditionValueError = ''; onConditionValueChange($event)"
+                      @update:model-value="onConditionValueChange($event)"
                     />
                   </template>
                 </div>
@@ -154,12 +155,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <div class="flex items-center gap-2 flex-wrap">
                   <template
-                    v-for="(group, index) in logGroupBy"
+                    v-for="(group, index) in logGroupByRows"
                     :key="index"
                   >
                     <div class="flex items-center gap-1">
-                      <OSelect
-                        v-model="logGroupBy[index]"
+                      <OFormSelect
+                        :name="`logGroupBy[${index}]`"
                         :options="columns"
                         searchable
                         :placeholder="t('alerts.placeholders.selectColumn')"
@@ -196,19 +197,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" :delay="300" side="top" />
                 </span>
                 <div class="flex flex-nowrap items-center gap-2">
-                  <OSelect
-                    v-model="triggerOperator"
+                  <OFormSelect
+                    name="trigger_condition.operator"
                     :options="numericOperators"
                     :searchable="false"
                     class="min-w-[70px] max-w-[120px]"
                     @update:model-value="onTriggerOperatorChange"
                   />
-                  <OInput
-                    v-model="triggerThreshold"
+                  <OFormInput
+                    name="trigger_condition.threshold"
                     type="number"
                     class="min-w-[60px] max-w-[80px]"
                     min="1"
-                    @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
+                    @update:model-value="onTriggerThresholdChange($event)"
                     @blur="restoreDefaultThreshold"
                   />
                 </div>
@@ -236,59 +237,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-if="selectedFunction !== 'total_events'">
                     <span class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.conditionOf') }}</span>
                     <div style="position: relative; display: inline-flex;">
-                      <OSelect
-                        v-model="inputData.aggregation.having.column"
+                      <OFormSelect
+                        name="query_condition.aggregation.having.column"
                         :options="columns"
                         searchable
                         :placeholder="t('alerts.placeholders.selectColumn')"
-                        :error="columnSelectError"
-                        :readonly="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
-                        :disable="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
-                        @update:model-value="columnSelectError = false; emitAggregationUpdate()"
+                        :readonly="inputData.aggregation?.having?.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
+                        :disable="inputData.aggregation?.having?.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
+                        @update:model-value="onLogMeasureColumnChange($event)"
                         style="min-width: 140px; max-width: 200px;"
                       />
-                      <OTooltip v-if="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')" :content="t('alerts.metricsValueFieldTooltip')" :delay="300" side="bottom" />
+                      <OTooltip v-if="inputData.aggregation?.having?.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')" :content="t('alerts.metricsValueFieldTooltip')" :delay="300" side="bottom" />
                     </div>
                     <span class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.conditionIs') }}</span>
                   </template>
 
                   <!-- Count mode for metrics -->
                   <template v-if="selectedFunction === 'total_events'">
-                    <OSelect
-                      v-model="triggerOperator"
+                    <OFormSelect
+                      name="trigger_condition.operator"
                       :options="numericOperators"
                       :searchable="false"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onTriggerOperatorChange"
                     />
-                    <OInput
-                      v-model="triggerThreshold"
+                    <OFormInput
+                      name="trigger_condition.threshold"
                       type="number"
                       style="min-width: 80px; max-width: 120px;"
-                      :error="!!triggerThresholdError"
-                      :error-message="triggerThresholdError"
-                      @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
+                      @update:model-value="onTriggerThresholdChange($event)"
                     />
                     <span class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.matchingMetricsFound') }}</span>
                   </template>
 
                   <!-- Measure mode for metrics -->
                   <template v-else>
-                    <OSelect
-                      v-model="conditionOperator"
+                    <OFormSelect
+                      name="query_condition.aggregation.having.operator"
                       :options="numericOperators"
                       :searchable="false"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onConditionOperatorChange"
                     />
-                    <OInput
-                      v-model="conditionValue"
+                    <OFormInput
+                      name="query_condition.aggregation.having.value"
                       type="number"
                       :placeholder="t('alerts.placeholders.value')"
                       style="min-width: 80px; max-width: 120px;"
-                      :error="!!conditionValueError"
-                      :error-message="conditionValueError"
-                      @update:model-value="conditionValueError = ''; onConditionValueChange($event)"
+                      @update:model-value="onConditionValueChange($event)"
                     />
                   </template>
                 </div>
@@ -302,17 +298,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <div class="flex items-center gap-2 flex-wrap">
                   <template
-                    v-for="(group, index) in inputData.aggregation.group_by"
+                    v-for="(group, index) in metricGroupByRows"
                     :key="index"
                   >
                     <div class="flex items-center gap-1">
-                      <OSelect
-                        v-model="inputData.aggregation.group_by[index]"
+                      <OFormSelect
+                        :name="`query_condition.aggregation.group_by[${index}]`"
                         :options="columns"
                         searchable
                         :placeholder="t('alerts.placeholders.selectColumn')"
                         style="min-width: 120px; max-width: 180px;"
-                        @update:model-value="emitAggregationUpdate"
+                        @update:model-value="syncMetricGroupByToProps"
                       />
                       <OButton
                         variant="ghost"
@@ -342,19 +338,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" :delay="300" side="top" />
                 </span>
                 <div class="flex flex-nowrap items-center gap-2">
-                  <OSelect
-                    v-model="triggerOperator"
+                  <OFormSelect
+                    name="trigger_condition.operator"
                     :options="numericOperators"
                     :searchable="false"
                     class="min-w-[70px] max-w-[120px]"
                     @update:model-value="onTriggerOperatorChange"
                   />
-                  <OInput
-                    v-model="triggerThreshold"
+                  <OFormInput
+                    name="trigger_condition.threshold"
                     type="number"
                     class="min-w-[60px] max-w-[80px]"
                     min="1"
-                    @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
+                    @update:model-value="onTriggerThresholdChange($event)"
                     @blur="restoreDefaultThreshold"
                   />
                 </div>
@@ -372,21 +368,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex items-center gap-2">
                   <!-- Minutes/hours mode: number input -->
                   <template v-if="frequencyMode !== 'cron'">
-                    <OInput
-                      v-model="checkEveryFrequency"
+                    <OFormInput
+                      name="_ui.checkEvery"
                       type="number"
                       style="min-width: 100px; max-width: 100px;"
                       min="1"
-                      :error="!!checkEveryFrequencyError"
-                      :error-message="checkEveryFrequencyError"
-                      @update:model-value="checkEveryFrequencyError = ''; onCheckEveryChange($event)"
+                      @update:model-value="onCheckEveryChange($event)"
                       @blur="restoreDefaultFrequency"
                     />
                   </template>
-                  <!-- Cron mode: expression input + timezone -->
+                  <!-- Cron mode: expression input + timezone (Rule ②: form-owned
+                       by `name=`, no v-model mirror). -->
                   <template v-else>
-                    <OInput
-                      v-model="cronExpression"
+                    <OFormInput
+                      name="trigger_condition.cron"
                       placeholder="0 */10 * * * *"
                       style="min-width: 100px; max-width: 100px;"
                       @update:model-value="onCronExpressionChange"
@@ -407,8 +402,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Timezone (only for cron, inline) -->
                   <template v-if="frequencyMode === 'cron'">
                     <span class="inline-block" style="min-width: 150px; max-width: 150px;">
-                      <OSelect
-                        v-model="cronTimezone"
+                      <OFormSelect
+                        name="trigger_condition.timezone"
                         :options="filteredTimezones"
                         searchable
                         placeholder="timezone"
@@ -489,6 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :group="inputData.conditions"
                 :depth="0"
                 module="alerts"
+                name-prefix="query_condition.conditions"
                 @add-condition="updateGroup"
                 @add-group="updateGroup"
                 @remove-group="removeConditionGroup"
@@ -549,6 +545,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :group="inputData.conditions"
                 :depth="0"
                 module="alerts"
+                name-prefix="query_condition.conditions"
                 @add-condition="updateGroup"
                 @add-group="updateGroup"
                 @remove-group="removeConditionGroup"
@@ -703,20 +700,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex flex-col gap-1">
                 <div class="flex items-center gap-2">
                   <template v-if="frequencyMode !== 'cron'">
-                    <OInput
-                      v-model="checkEveryFrequency"
+                    <OFormInput
+                      name="_ui.checkEvery"
                       type="number"
                       style="min-width: 100px; max-width: 100px;"
                       min="1"
-                      :error="!!checkEveryFrequencyError"
-                      :error-message="checkEveryFrequencyError"
-                      @update:model-value="checkEveryFrequencyError = ''; onCheckEveryChange($event)"
+                      @update:model-value="onCheckEveryChange($event)"
                       @blur="restoreDefaultFrequency"
                     />
                   </template>
                   <template v-else>
-                    <OInput
-                      v-model="cronExpression"
+                    <OFormInput
+                      name="trigger_condition.cron"
                       placeholder="0 */10 * * * *"
                       style="min-width: 100px; max-width: 100px;"
                       @update:model-value="onCronExpressionChange"
@@ -733,8 +728,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <template v-if="frequencyMode === 'cron'">
                     <span class="inline-block" style="min-width: 150px; max-width: 150px;">
-                      <OSelect
-                        v-model="cronTimezone"
+                      <OFormSelect
+                        name="trigger_condition.timezone"
                         :options="filteredTimezones"
                         searchable
                         placeholder="timezone"
@@ -764,23 +759,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="localTab === 'sql'" class="flex items-center gap-3 py-2 px-3 rounded-md text-[13px]">
               <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[160px] w-[160px] shrink-0">{{ t('alerts.alertIfNoOfEvents') }} *</span>
               <div class="flex items-center gap-2">
-                <OSelect
-                  v-model="triggerOperator"
+                <OFormSelect
+                  name="trigger_condition.operator"
                   :options="numericOperators"
                   :searchable="false"
                   data-test="alert-trigger-operator-select"
                   style="min-width: 70px; max-width: 120px;"
                   @update:model-value="onTriggerOperatorChange"
                 />
-                <OInput
-                  v-model="triggerThreshold"
+                <OFormInput
+                  name="trigger_condition.threshold"
                   type="number"
                   data-test="alert-trigger-threshold-input"
                   style="min-width: 60px; max-width: 80px;"
                   min="1"
-                  :error="!!triggerThresholdError"
-                  :error-message="triggerThresholdError"
-                  @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
+                  @update:model-value="onTriggerThresholdChange($event)"
                   @blur="restoreDefaultThreshold"
                 />
               </div>
@@ -793,25 +786,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip content="Alert when the PromQL expression evaluates to this condition for a time series. Example: &gt;= 100 triggers when the result is 100 or more." :delay="300" side="top" />
                 </span>
                 <div class="flex items-center gap-2">
-                  <OSelect
-                    v-model="promqlCondition.operator"
+                  <OFormSelect
+                    name="query_condition.promql_condition.operator"
                     :options="numericOperators"
                     :searchable="false"
                     data-test="alert-threshold-operator-select"
                     style="min-width: 70px; max-width: 120px;"
-                    :error="!!promqlOperatorError"
-                    :error-message="promqlOperatorError"
-                    @update:model-value="promqlOperatorError = ''; emitPromqlConditionUpdate()"
+                    @update:model-value="onPromqlOperatorChange"
                   />
-                  <OInput
-                    v-model.number="promqlCondition.value"
+                  <OFormInput
+                    name="query_condition.promql_condition.value"
                     type="number"
                     data-test="alert-threshold-value-input"
                     style="min-width: 60px; max-width: 120px;"
                     :debounce="300"
-                    :error="!!promqlValueError"
-                    :error-message="promqlValueError"
-                    @update:model-value="promqlValueError = ''; emitPromqlConditionUpdate()"
+                    @update:model-value="onPromqlValueChange"
                   />
                 </div>
               </div>
@@ -820,21 +809,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip content="Minimum number of time series that must satisfy the condition above to trigger the alert." :delay="300" side="top" />
                 </span>
                 <div class="flex items-center gap-2">
-                  <OSelect
-                    v-model="triggerOperator"
+                  <OFormSelect
+                    name="trigger_condition.operator"
                     :options="numericOperators"
                     :searchable="false"
                     style="min-width: 70px; max-width: 120px;"
                     @update:model-value="onTriggerOperatorChange"
                   />
-                  <OInput
-                    v-model="triggerThreshold"
+                  <OFormInput
+                    name="trigger_condition.threshold"
                     type="number"
                     style="min-width: 60px; max-width: 80px;"
                     min="1"
-                    :error="!!triggerThresholdError"
-                    :error-message="triggerThresholdError"
-                    @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
+                    @update:model-value="onTriggerThresholdChange($event)"
                     @blur="restoreDefaultThreshold"
                   />
                 </div>
@@ -879,7 +866,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, type PropType, defineAsyncComponent, nextTick, watch } from "vue";
+import { defineComponent, ref, computed, type PropType, defineAsyncComponent, nextTick, watch, inject } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { b64EncodeUnicode, getUUID, convertMinutesToCron, getCronIntervalDifferenceInSeconds, isAboveMinRefreshInterval, describeCron, getImageURL } from "@/utils/zincutils";
@@ -903,7 +890,10 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
+import { type QueryConfigMeta } from "./QueryConfig.schema";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue")
@@ -928,6 +918,8 @@ export default defineComponent({
     OSwitch,
     OTooltip,
     OIcon,
+    OFormInput,
+    OFormSelect,
   },
   props: {
     tab: {
@@ -1004,17 +996,71 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
 
+    // DESCENDANT step (Rule ③): the AddAlert orchestrator owns the ONE form and
+    // provides FORM_CONTEXT_KEY. All field reads/writes below go through it; the
+    // composed AddAlert schema (which reuses makeQueryConfigSchema) validates on
+    // save.
+    const form: any = inject(FORM_CONTEXT_KEY, null);
+
+    // ── Initial values for the discriminator refs below (the form itself is
+    // seeded by useAlertForm's defaults; `_meta` is kept fresh by the syncMeta
+    // watcher). Mirrors the pre-migration ref initializers verbatim. ──────────
+    const isEventBasedInit = props.streamType !== "metrics";
+    const initialSelectedFunction = isEventBasedInit
+      ? (props.isAggregationEnabled && props.inputData.aggregation?.function
+          ? props.inputData.aggregation.function
+          : "total_events")
+      : (!props.isAggregationEnabled
+          ? "total_events"
+          : (props.inputData.aggregation?.function || "avg"));
+    const initialFreqRaw = props.triggerCondition?.frequency ?? 10;
+    const initialFrequencyMode: "minutes" | "hours" | "cron" =
+      props.triggerCondition?.frequency_type === "cron"
+        ? "cron"
+        : initialFreqRaw >= 60 && initialFreqRaw % 60 === 0
+          ? "hours"
+          : "minutes";
+    const hasInitialGroupBy =
+      (props.inputData.aggregation?.group_by || []).filter(
+        (g: string) => g?.trim(),
+      ).length > 0;
+
+    // Field get/set helpers — the form is the single source of truth for the
+    // validated scalars; props.* stay a write-through copy for the SQL-gen path
+    // (mutated in place at each handler + emitted, unchanged from pre-migration).
+    const fv = (name: string): any => form?.getFieldValue?.(name);
+    const setFV = (name: string, value: any): void => {
+      form?.setFieldValue?.(name, value);
+    };
+
+    // Build a fresh aggregation object off the CURRENT form value (NEVER the
+    // readonly `props.inputData`), apply `mutate`, and write it back through the
+    // form. The pre-migration handlers mutated `props.inputData.aggregation` in
+    // place — that silently fails now the prop is the readonly form read-view
+    // ("Set operation … target is readonly"), so aggregation edits were lost and
+    // the stale object got re-seeded. Cloning + setFV keeps the form the single
+    // source of truth.
+    const writeAggregation = (mutate: (agg: any) => void): any => {
+      const current = fv("query_condition.aggregation");
+      const next = current
+        ? JSON.parse(JSON.stringify(current))
+        : {
+            group_by: [],
+            function: "avg",
+            having: { column: "", operator: ">=", value: "" },
+          };
+      if (!next.having) next.having = { column: "", operator: ">=", value: "" };
+      mutate(next);
+      setFV("query_condition.aggregation", next);
+      return next;
+    };
+
     const localTab = ref(props.tab);
-    const columnSelectError = ref(false);
     const viewSqlEditor = ref(false);
     const showMultiWindowDialog = ref(false);
 
-    // Field-level error refs (replaces Quasar :rules validation)
-    const triggerThresholdError = ref('');
-    const conditionValueError = ref('');
-    const checkEveryFrequencyError = ref('');
-    const promqlOperatorError = ref('');
-    const promqlValueError = ref('');
+    // (No field-level error refs: every rule lives in the composed schema and is
+    // surfaced by the OForm* wrapper bound to that field.)
     const pendingTab = ref<string | null>(null);
 
     // Field refs for focus manager
@@ -1152,23 +1198,15 @@ export default defineComponent({
         // total_events selected — no aggregation, same path as logs
         localIsAggregationEnabled.value = false;
       } else {
-        // Metrics: aggregation-enabled
+        // Metrics: aggregation-enabled. Initialize the aggregation in the form,
+        // defaulting the column to "value" only if the stream has that field.
         localIsAggregationEnabled.value = true;
-        // Initialize aggregation object if missing
-        if (!props.inputData.aggregation) {
-          props.inputData.aggregation = {
-            group_by: [],
-            function: "avg",
-            having: { column: "", operator: ">=", value: "" },
-          };
-        }
-        // Default column to "value" only if the stream actually has a "value" field
-        if (!props.inputData.aggregation?.having?.column) {
-          const hasValueField = props.columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value');
-          if (hasValueField && props.inputData.aggregation?.having) {
-            props.inputData.aggregation.having.column = 'value';
+        writeAggregation((agg) => {
+          if (!agg.having.column) {
+            const hasValueField = props.columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value');
+            if (hasValueField) agg.having.column = 'value';
           }
-        }
+        });
       }
     } else {
       // Logs/Traces: event-based, no aggregation
@@ -1194,40 +1232,34 @@ export default defineComponent({
     // Numeric-only operators (no Contains/NotContains for thresholds)
     const numericOperators = ["=", "!=", ">=", ">", "<=", "<"];
 
-    // Selected function — defaults to 'total_events' when no aggregation, 'avg' otherwise
-    const selectedFunction = ref(
-      isEventBased.value
-        ? (props.isAggregationEnabled && props.inputData.aggregation?.function
-            ? props.inputData.aggregation.function
-            : 'total_events')
-        : (!props.isAggregationEnabled
-            ? 'total_events'
-            : (props.inputData.aggregation?.function || 'avg'))
-    );
+    // Selected function — bare mode-discriminator (drives conditional rendering
+    // + the aggregation payload). Stays a ref (bridged into `_meta` for the
+    // schema). Seeded from the shared initial const.
+    const selectedFunction = ref(initialSelectedFunction);
 
-    // Log-specific: measure column and group-by
-    const logMeasureColumn = ref(
-      props.inputData.aggregation?.having?.column || ''
-    );
-    const logGroupBy = ref<string[]>(
-      props.inputData.aggregation?.group_by?.filter((g: string) => g)?.length
-        ? [...props.inputData.aggregation.group_by.filter((g: string) => g)]
-        : []
-    );
-
-    // Condition operator and value
-    // Logs/Traces: maps to trigger_condition (event count threshold)
-    // Metrics: maps to aggregation.having (aggregated value threshold)
-    const conditionOperator = ref(
-      isEventBased.value
-        ? (props.triggerCondition?.operator || '>=')
-        : (props.inputData.aggregation?.having?.operator || '>=')
-    );
-    const conditionValue = ref(
-      isEventBased.value
-        ? (props.triggerCondition?.threshold || '')
-        : (props.inputData.aggregation?.having?.value || '')
-    );
+    // ── Form-backed scalar accessors (Rule ②: the form is the single source of
+    // truth; these writable computeds let the pre-migration handlers/watchers and
+    // the specs read/write the field values without a parallel ref). The `.vue`
+    // controls are name=-owned OForm* — these never drive a v-model. ──────────
+    // Log/metric MEASURE column → aggregation.having.column.
+    const logMeasureColumn = computed<any>({
+      get: () => fv("query_condition.aggregation.having.column") ?? "",
+      set: (v) => setFV("query_condition.aggregation.having.column", v),
+    });
+    // Log group-by field array (metrics group-by lives on aggregation.group_by).
+    const logGroupBy = computed<string[]>({
+      get: () => (fv("logGroupBy") as string[]) ?? [],
+      set: (v) => setFV("logGroupBy", [...(v ?? [])]),
+    });
+    // Measure "value is" operator/value → aggregation.having.{operator,value}.
+    const conditionOperator = computed<any>({
+      get: () => fv("query_condition.aggregation.having.operator") ?? ">=",
+      set: (v) => setFV("query_condition.aggregation.having.operator", v),
+    });
+    const conditionValue = computed<any>({
+      get: () => fv("query_condition.aggregation.having.value") ?? "",
+      set: (v) => setFV("query_condition.aggregation.having.value", v),
+    });
 
     // Watch stream type changes to restore saved state or set new-alert defaults.
     // Fires when stream type prop changes (e.g. async load on edit, or user switching stream type).
@@ -1264,109 +1296,154 @@ export default defineComponent({
           selectedFunction.value = 'avg';
           localIsAggregationEnabled.value = true;
           emit("update:isAggregationEnabled", true);
-          if (!props.inputData.aggregation) {
-            props.inputData.aggregation = {
-              group_by: [],
-              function: "avg",
-              having: { column: "", operator: ">=", value: "" },
-            };
-          } else {
-            props.inputData.aggregation.function = 'avg';
-            if (!props.inputData.aggregation.having?.column) {
+          writeAggregation((agg) => {
+            agg.function = 'avg';
+            if (!agg.having.column) {
               const hasValueField = props.columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value');
-              if (hasValueField) {
-                props.inputData.aggregation.having.column = 'value';
-              }
+              if (hasValueField) agg.having.column = 'value';
             }
-          }
+          });
           emitAggregationUpdate();
         }
       }
     });
 
-    // Trigger threshold — only meaningful when group-by fields exist.
-    // If loading an alert with no group-by, reset to defaults so stale values don't show.
-    const hasInitialGroupBy =
-      (props.inputData.aggregation?.group_by || []).filter((g: string) => g?.trim()).length > 0;
-    const triggerOperator = ref(hasInitialGroupBy ? (props.triggerCondition?.operator || '>=') : '>=');
-    const triggerThreshold = ref(hasInitialGroupBy ? (props.triggerCondition?.threshold || 1) : 1);
-    // Sync reset to parent so saving also persists the corrected value
-    if (!hasInitialGroupBy && props.triggerCondition) {
-      props.triggerCondition.threshold = 1;
-      props.triggerCondition.operator = '>=';
-      emit("update:triggerCondition", { ...props.triggerCondition });
-    }
+    // Trigger threshold/operator — shared "no. of events" / "having groups" /
+    // "having series" scalar (ONE logical value across all 6 render sites).
+    // Form-backed (name="trigger_condition.threshold" / ".operator").
+    const triggerOperator = computed<any>({
+      get: () => fv("trigger_condition.operator") ?? ">=",
+      set: (v) => setFV("trigger_condition.operator", v),
+    });
+    const triggerThreshold = computed<any>({
+      get: () => fv("trigger_condition.threshold"),
+      set: (v) => setFV("trigger_condition.threshold", v),
+    });
+    // (Removed a mount-time `props.triggerCondition.threshold = 1` reset that
+    // mutated the readonly form read-view — it silently failed (no-op) and only
+    // logged a warning. The measure-mode "reset to >= 1 when group-by is empty"
+    // rule is enforced by the function-change handlers and the trigger_condition
+    // watcher; count mode keeps its default threshold of 3.)
 
+    // Reactive views of the two group-by field arrays (form store) so the
+    // template v-if / schema `_meta` stay live.
+    const logGroupByStore = form.useStore(
+      (s: any) => (s.values?.logGroupBy ?? []) as string[],
+    );
+    const metricGroupByStore = form.useStore(
+      (s: any) =>
+        (s.values?.query_condition?.aggregation?.group_by ?? []) as string[],
+    );
     // Whether log/trace group-by has at least one non-empty field
     const hasLogGroupByFields = computed(
-      () => logGroupBy.value.filter((f: string) => f?.trim()).length > 0
+      () => logGroupByStore.value.filter((f: string) => f?.trim()).length > 0
     );
-
     // Whether metric group-by has at least one non-empty field
     const hasMetricGroupByFields = computed(
-      () => (props.inputData.aggregation?.group_by || []).filter((f: string) => f?.trim()).length > 0
+      () => metricGroupByStore.value.filter((f: string) => f?.trim()).length > 0
     );
 
-    const onTriggerOperatorChange = (value: string) => {
-      triggerOperator.value = value;
-      if (props.triggerCondition) {
-        props.triggerCondition.operator = value;
-        emit("update:triggerCondition", { ...props.triggerCondition });
-      }
+    // name="trigger_condition.operator" already wrote the value; refresh preview.
+    const onTriggerOperatorChange = (_value: string) => {
+      emitTriggerUpdate();
     };
 
+    // name="trigger_condition.threshold" wrote the raw (string) input; re-write the
+    // Number-coerced value so the payload stays numeric (mirrors `v-model.number`).
     const onTriggerThresholdChange = (value: any) => {
       isUserTriggerChange.value = true;
       triggerThreshold.value = value === '' || value === null || value === undefined ? null : Number(value);
-      if (props.triggerCondition) {
-        props.triggerCondition.threshold = triggerThreshold.value;
-        emit("update:triggerCondition", { ...props.triggerCondition });
-      }
+      emitTriggerUpdate();
     };
 
     const restoreDefaultThreshold = () => {
       if (triggerThreshold.value === null || triggerThreshold.value === '' || triggerThreshold.value === undefined || Number.isNaN(Number(triggerThreshold.value))) {
         triggerThreshold.value = 3;
-        if (props.triggerCondition) {
-          props.triggerCondition.threshold = 3;
-          emit("update:triggerCondition", { ...props.triggerCondition });
-        }
+        emitTriggerUpdate();
       }
     };
 
-    // Check every — evaluation frequency
-    const checkEveryFrequency = ref(props.triggerCondition?.frequency || 10);
-    // Determine initial unit: if frequency_type is 'cron' use cron, else check if frequency >= 60 for hours
-    const initFrequencyUnit = (): 'minutes' | 'hours' | 'cron' => {
-      if (props.triggerCondition?.frequency_type === 'cron') return 'cron';
-      const freq = props.triggerCondition?.frequency || 10;
-      // If frequency is >= 60 and divisible by 60, show as hours
-      if (freq >= 60 && freq % 60 === 0) return 'hours';
-      return 'minutes';
+    // Check every — evaluation frequency.
+    //
+    // TWO values, deliberately separate (pre-migration parity):
+    //   • checkEveryFrequency → `_ui.checkEvery` = the DISPLAY value. 2 in hours
+    //     mode. Form-backed so the schema's ≥1 + org-floor rules render inline on
+    //     the input, but `_ui` is display-only and never reaches the payload
+    //     (stripped in getAlertPayload next to _meta/logGroupBy).
+    //   • trigger_condition.frequency = the STORED value, ALWAYS MINUTES (120).
+    //     Sent raw to the backend by alertPayload.ts; frequency_type is
+    //     'minutes' for BOTH minutes and hours display modes — "hours" is
+    //     purely a display unit.
+    // Collapsing these corrupts data: a display 2 written into the stored field
+    // means "every 2 minutes", and the deep sync watch below would then flip the
+    // mode back to minutes — silently rewriting a saved 2-hour alert to 2 min.
+    // Write stored minutes ONLY through setStoredFrequency.
+    const checkEveryFrequency = computed<any>({
+      get: () => fv("_ui.checkEvery"),
+      set: (v) => setFV("_ui.checkEvery", v),
+    });
+
+    /** Bridge DISPLAY → STORED MINUTES. The single writer of
+     *  trigger_condition.frequency in this component. */
+    const setStoredFrequency = (display: number | null): void => {
+      const mins =
+        display != null
+          ? frequencyMode.value === 'hours'
+            ? display * 60
+            : display
+          : null;
+      setFV("trigger_condition.frequency", mins);
     };
-    const frequencyMode = ref<'minutes' | 'hours' | 'cron'>(initFrequencyUnit());
+
+    const frequencyMode = ref<'minutes' | 'hours' | 'cron'>(initialFrequencyMode);
+
+    // Seed the DISPLAY from the stored minutes at setup. The sync watcher below
+    // is `immediate: false`, so loading a saved alert (frequency: 120) would
+    // otherwise leave the input showing the default until trigger_condition next
+    // changed. initialFrequencyMode already applied the >=60-and-whole-hours
+    // rule to the same value, so this just divides when it said "hours".
+    // The STORED value is NOT touched here — 120 stays 120.
+    checkEveryFrequency.value =
+      initialFrequencyMode === 'hours'
+        ? Number(initialFreqRaw) / 60
+        : initialFreqRaw;
+
     const isUserTriggerChange = ref(false);
-    const cronExpression = ref(props.triggerCondition?.cron || '');
-    const cronTimezone = ref(props.triggerCondition?.timezone || '');
+    // Rule ②: `cron` + `timezone` are SAVED alert fields, so the ONE form owns
+    // them — no local-ref mirror. The visible controls bind by `name=`; these
+    // computeds are the read/write seam for the NON-control consumers
+    // (cronDescription, validateCron, onFrequencyUnitChange, the tooltips).
+    // Writing through the setter goes straight to the form, so there is exactly
+    // one source of truth.
+    const cronExpression = computed<string>({
+      get: () => fv("trigger_condition.cron") ?? "",
+      set: (v) => setFV("trigger_condition.cron", v ?? ""),
+    });
+    const cronTimezone = computed<string>({
+      get: () => fv("trigger_condition.timezone") ?? "",
+      set: (v) => setFV("trigger_condition.timezone", v ?? ""),
+    });
     const cronError = ref('');
     const cronDescription = computed(() => describeCron(cronExpression.value, cronTimezone.value));
     const filteredTimezones = ref<string[]>([]);
 
     // Initialize timezone
+    // Populate the timezone OPTIONS only. This must NOT seed the timezone value:
+    // `cronTimezone` is now form-owned, so writing here would push a browser
+    // timezone into the SAVED payload at mount — pre-migration seeded a local
+    // display ref, leaving the stored value untouched until the user entered cron
+    // mode (onFrequencyUnitChange still seeds it there). defaultAlertValue()
+    // already seeds `timezone: "UTC"`, so the control is never blank anyway.
     const initTimezones = () => {
       try {
-        if (!cronTimezone.value) {
-          cronTimezone.value = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        }
         // @ts-ignore
         if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
           // @ts-ignore
           filteredTimezones.value = Intl.supportedValuesOf("timeZone");
         } else {
-          filteredTimezones.value = [cronTimezone.value];
+          filteredTimezones.value = [cronTimezone.value || 'UTC'];
         }
       } catch {
-        cronTimezone.value = cronTimezone.value || 'UTC';
         filteredTimezones.value = ['UTC'];
       }
     };
@@ -1401,89 +1478,90 @@ export default defineComponent({
       isUserTriggerChange.value = true;
       frequencyMode.value = unit as 'minutes' | 'hours' | 'cron';
 
-      if (!props.triggerCondition) return;
-
       if (unit === 'cron') {
-        props.triggerCondition.frequency_type = 'cron';
+        setFV("trigger_condition.frequency_type", 'cron');
         // Auto-convert current frequency to cron if no expression yet
+        // cronExpression / cronTimezone are form-backed computeds — assigning
+        // them IS the form write, so the explicit setFV calls that used to
+        // shadow them here are gone (they were the Rule-② double-write).
         if (!cronExpression.value) {
           let mins = Number(checkEveryFrequency.value);
           if (prevMode === 'hours') mins = mins * 60;
           if (mins > 0) {
             cronExpression.value = convertMinutesToCron(mins);
-            props.triggerCondition.cron = cronExpression.value;
           }
+          // Entering cron mode is where a timezone first gets SAVED (parity:
+          // pre-migration seeded it here, not at mount).
           if (!cronTimezone.value) {
             cronTimezone.value = Intl.DateTimeFormat().resolvedOptions().timeZone;
           }
-          props.triggerCondition.timezone = cronTimezone.value;
         }
         validateCron();
       } else {
-        props.triggerCondition.frequency_type = 'minutes';
-        // Convert between minutes and hours
+        setFV("trigger_condition.frequency_type", 'minutes');
+        // Convert between minutes and hours. checkEveryFrequency is the DISPLAY
+        // value; the stored field always gets MINUTES (frequencyMode is already
+        // the NEW unit here, so setStoredFrequency converts correctly).
         if (unit === 'hours' && prevMode === 'minutes') {
           // Converting minutes to hours: round up
           const hrs = Math.max(1, Math.round(Number(checkEveryFrequency.value) / 60));
           checkEveryFrequency.value = hrs;
-          props.triggerCondition.frequency = hrs * 60;
+          setStoredFrequency(hrs); // → hrs * 60 minutes
         } else if (unit === 'minutes' && prevMode === 'hours') {
           // Converting hours to minutes
           const mins = Number(checkEveryFrequency.value) * 60;
           checkEveryFrequency.value = mins;
-          props.triggerCondition.frequency = mins;
+          setStoredFrequency(mins); // → mins, unchanged
         } else if (unit === 'minutes' && prevMode === 'cron') {
-          // Coming back from cron, restore sensible default
-          checkEveryFrequency.value = props.triggerCondition.frequency || 10;
+          // Coming back from cron, restore sensible default. Stored is already
+          // minutes — adopt it as the display value verbatim.
+          checkEveryFrequency.value = fv("trigger_condition.frequency") || 10;
         } else if (unit === 'hours' && prevMode === 'cron') {
-          const mins = props.triggerCondition.frequency || 60;
-          checkEveryFrequency.value = Math.max(1, Math.round(mins / 60));
-          props.triggerCondition.frequency = checkEveryFrequency.value * 60;
+          const mins = fv("trigger_condition.frequency") || 60;
+          const hrs = Math.max(1, Math.round(mins / 60));
+          checkEveryFrequency.value = hrs;
+          setStoredFrequency(hrs); // → re-round stored to whole hours
         }
       }
-      emit("update:triggerCondition", { ...props.triggerCondition });
+      emitTriggerUpdate();
     };
 
+    // The `name=` binding owns the write, but this handler runs BEFORE the
+    // wrapper's own field.handleChange (merged listeners fire in declaration
+    // order — see R6), so write through the computed FIRST: validateCron() and
+    // emitTriggerUpdate() both re-read the form and would otherwise see the
+    // STALE cron. Writing the same value twice targets the ONE form, so this is
+    // ordering insurance — not a second source of truth.
     const onCronExpressionChange = (value: any) => {
       isUserTriggerChange.value = true;
       cronExpression.value = value;
-      if (props.triggerCondition) {
-        props.triggerCondition.cron = value;
-        validateCron();
-        emit("update:triggerCondition", { ...props.triggerCondition });
-      }
+      validateCron();
+      emitTriggerUpdate();
     };
 
     const onCronTimezoneChange = (value: any) => {
       isUserTriggerChange.value = true;
       cronTimezone.value = value;
-      if (props.triggerCondition) {
-        props.triggerCondition.timezone = value;
-        validateCron();
-        emit("update:triggerCondition", { ...props.triggerCondition });
-      }
+      validateCron();
+      emitTriggerUpdate();
     };
 
     const onCheckEveryChange = (value: any) => {
       isUserTriggerChange.value = true;
       const parsed = value === '' || value === null || value === undefined ? null : Number(value);
       checkEveryFrequency.value = parsed;
-      if (props.triggerCondition) {
-        // Store as minutes internally (hours mode: multiply by 60)
-        const mins = parsed != null ? (frequencyMode.value === 'hours' ? parsed * 60 : parsed) : null;
-        props.triggerCondition.frequency = mins;
-        emit("update:triggerCondition", { ...props.triggerCondition });
-      }
+      // Store as minutes internally (hours mode: multiply by 60).
+      setStoredFrequency(parsed);
+      emitTriggerUpdate();
     };
 
     const restoreDefaultFrequency = () => {
       if (checkEveryFrequency.value === null || checkEveryFrequency.value === '' || checkEveryFrequency.value === undefined || Number.isNaN(Number(checkEveryFrequency.value))) {
         const defaultVal = frequencyMode.value === 'hours' ? 1 : 10;
         checkEveryFrequency.value = defaultVal;
-        if (props.triggerCondition) {
-          props.triggerCondition.frequency = frequencyMode.value === 'hours' ? 60 : 10;
-          emit("update:triggerCondition", { ...props.triggerCondition });
-        }
+        // hours → display 1 / stored 60; minutes → display 10 / stored 10.
+        setStoredFrequency(defaultVal);
+        emitTriggerUpdate();
       }
     };
 
@@ -1593,6 +1671,8 @@ export default defineComponent({
     };
 
     // Helper function to remove a single empty condition if that's the only condition present
+    // READS `conditionsObj` (the readonly form read-view via props.inputData) but
+    // WRITES through the form — see the empty-out below.
     const removeSingleEmptyCondition = (conditionsObj: any) => {
       if (!conditionsObj || !conditionsObj.conditions || !Array.isArray(conditionsObj.conditions)) {
         return;
@@ -1607,9 +1687,13 @@ export default defineComponent({
           const hasColumn = singleItem.column && singleItem.column.trim() !== '';
           const hasValue = singleItem.value !== undefined && singleItem.value !== '' && singleItem.value !== null;
 
-          // If both column and value are empty, remove this condition
+          // If both column and value are empty, remove this condition.
+          // Written through the form: `conditionsObj` is props.inputData.conditions,
+          // i.e. part of the DEEP-READONLY `form.useStore` read-view, so the
+          // pre-migration in-place `conditionsObj.conditions = []` silently
+          // no-ops now (same failure mode as writeAggregation above).
           if (!hasColumn && !hasValue) {
-            conditionsObj.conditions = [];
+            setFV("query_condition.conditions.conditions", []);
           }
         }
       }
@@ -1635,6 +1719,14 @@ export default defineComponent({
       showMultiWindowDialog.value = false;
     };
 
+    // ── Conditions tree ↔ form bridge ────────────────────────────────────────
+    // The 2 <FilterGroup> usages carry name-prefix="query_condition.conditions"
+    // so FilterCondition binds each row's column/operator/value into THIS form.
+    // Structural changes (add/remove/toggle/reorder) arrive as a NEW immutable
+    // tree from FilterGroup and are written to the form by the ancestor
+    // (useAlertForm.updateGroup/removeConditionGroup → setFieldValue). We just
+    // forward the events. (The old code mutated the readonly `props.inputData`
+    // read-view in place, which silently failed — nothing was added.)
     const updateGroup = (data: any) => {
       emit("update-group", data);
     };
@@ -1687,15 +1779,12 @@ export default defineComponent({
         localIsAggregationEnabled.value = false;
         emit("update:isAggregationEnabled", false);
       } else {
-        // Measure mode — aggregation, always reset "having groups" to >= 1 on switch
+        // Measure mode — aggregation, always reset "having groups" to >= 1 on switch.
+        // trigger_condition.threshold/operator are form-backed computeds (they also
+        // drive the name= inputs) — no direct prop mutation / re-emit needed.
         localIsAggregationEnabled.value = true;
         triggerThreshold.value = 1;
         triggerOperator.value = '>=';
-        if (props.triggerCondition) {
-          props.triggerCondition.threshold = 1;
-          props.triggerCondition.operator = '>=';
-          emit("update:triggerCondition", { ...props.triggerCondition });
-        }
         emit("update:isAggregationEnabled", true);
         onFunctionChange(value);
       }
@@ -1706,139 +1795,112 @@ export default defineComponent({
       localIsAggregationEnabled.value = true;
       emit("update:isAggregationEnabled", true);
 
-      // Initialize aggregation object if needed
-      if (!props.inputData.aggregation) {
-        props.inputData.aggregation = {
-          group_by: [],
-          function: value,
-          having: {
-            column: "",
-            operator: conditionOperator.value || ">=",
-            value: conditionValue.value || "",
-          },
-        };
-      } else {
-        props.inputData.aggregation.function = value;
-        props.inputData.aggregation.having.operator = conditionOperator.value;
-        props.inputData.aggregation.having.value = conditionValue.value;
-      }
+      // Seed the whole aggregation subtree into the form so the name-owned
+      // measure controls (column / operator / value / group_by) render it.
+      writeAggregation((agg) => {
+        agg.function = value;
+        agg.having.operator = conditionOperator.value || ">=";
+        agg.having.value = conditionValue.value ?? "";
+      });
       emitAggregationUpdate();
     };
 
     // When log function mode changes (count / unique_count / avg / etc.)
     const onLogFunctionChange = (value: string) => {
       if (value === 'total_events') {
-        // total_events (COUNT(*)) — no aggregation, trigger threshold shown inline
+        // total_events (COUNT(*)) — no aggregation, trigger threshold shown inline.
+        // threshold/operator are form-backed computeds (also drive the name= inputs).
         localIsAggregationEnabled.value = false;
         emit("update:isAggregationEnabled", false);
         logMeasureColumn.value = '';
         // Restore default threshold for count mode
         triggerThreshold.value = 3;
         triggerOperator.value = '>=';
-        if (props.triggerCondition) {
-          props.triggerCondition.threshold = 3;
-          props.triggerCondition.operator = '>=';
-          emit("update:triggerCondition", { ...props.triggerCondition });
-        }
       } else {
         // Measure mode — uses aggregation, always reset "having groups" to >= 1 on switch
         localIsAggregationEnabled.value = true;
         triggerThreshold.value = 1;
         triggerOperator.value = '>=';
-        if (props.triggerCondition) {
-          props.triggerCondition.threshold = 1;
-          props.triggerCondition.operator = '>=';
-          emit("update:triggerCondition", { ...props.triggerCondition });
-        }
         emit("update:isAggregationEnabled", true);
-        const aggFunction = value;
-        if (!props.inputData.aggregation) {
-          props.inputData.aggregation = {
-            group_by: logGroupBy.value.length ? [...logGroupBy.value] : [],
-            function: aggFunction,
-            having: {
-              column: logMeasureColumn.value || "",
-              operator: conditionOperator.value || ">=",
-              value: conditionValue.value || "",
-            },
-          };
-        } else {
-          props.inputData.aggregation.function = aggFunction;
-          props.inputData.aggregation.having.operator = conditionOperator.value;
-          props.inputData.aggregation.having.value = conditionValue.value;
-          props.inputData.aggregation.having.column = logMeasureColumn.value || "";
-          props.inputData.aggregation.group_by = logGroupBy.value.length ? [...logGroupBy.value] : [];
-        }
+        writeAggregation((agg) => {
+          agg.function = value;
+          agg.having.operator = conditionOperator.value || ">=";
+          agg.having.value = conditionValue.value ?? "";
+          agg.having.column = logMeasureColumn.value || "";
+          agg.group_by = logGroupBy.value.length ? [...logGroupBy.value] : [];
+        });
         emitAggregationUpdate();
       }
     };
 
-    // When log measure column changes (for unique count / measure modes)
+    // When log measure column changes (for unique count / measure modes).
+    // name="query_condition.aggregation.having.column" already wrote the value.
+    // R6 PARITY: use the $event ARG, never a form re-read.
+    // This handler is bound via `@update:model-value` on an <OFormSelect>, whose
+    // inner OSelect declares `v-bind="$attrs"` BEFORE `@update:model-value=
+    // "field.handleChange"`. Vue fires merged listeners in declaration order, so
+    // THIS handler runs BEFORE the form is written — `fv(...)` would read the
+    // STALE column and emit it (the SQL preview then lagged one edit).
+    // Pre-migration did `aggregation.having.column = value; emitAggregationUpdate()`
+    // i.e. it emitted an object that ALREADY carried the new column. The `name=`
+    // binding now owns the write, so we only override the emitted copy.
     const onLogMeasureColumnChange = (value: string) => {
-      if (props.inputData.aggregation) {
-        props.inputData.aggregation.having.column = value;
-        emitAggregationUpdate();
+      const aggregation = fv("query_condition.aggregation");
+      if (aggregation) {
+        emitAggregationUpdate({
+          having: { ...(aggregation.having ?? {}), column: value },
+        });
       }
     };
 
-    // Log group-by management
+    // Log group-by management — form-owned field array (Rule ①, :key=index).
+    // add/remove via the form so the RENDERED inputs track the array; each change
+    // is bridged into props.inputData.aggregation.group_by (in place) + emitted,
+    // preserving the SQL-gen cadence.
     const addLogGroupByColumn = () => {
-      logGroupBy.value.push("");
+      form?.pushFieldValue?.("logGroupBy", "");
     };
     const deleteLogGroupByColumn = (index: number) => {
-      logGroupBy.value.splice(index, 1);
+      form?.removeFieldValue?.("logGroupBy", index);
       onLogGroupByChange();
-      // Reset threshold to 1 when last group-by field is removed
-      if (logGroupBy.value.filter((f: string) => f?.trim()).length === 0) {
+      // Reset threshold to 1 when last group-by field is removed (form-backed
+      // computeds; no direct prop mutation / re-emit).
+      if (((fv("logGroupBy") as string[]) ?? []).filter((f: string) => f?.trim()).length === 0) {
         triggerThreshold.value = 1;
         triggerOperator.value = '>=';
-        if (props.triggerCondition) {
-          props.triggerCondition.threshold = 1;
-          props.triggerCondition.operator = '>=';
-          emit("update:triggerCondition", { ...props.triggerCondition });
-        }
       }
     };
     const onLogGroupByChange = () => {
-      if (props.inputData.aggregation) {
-        props.inputData.aggregation.group_by = [...logGroupBy.value];
+      if (!fv("query_condition.aggregation")) return;
+      writeAggregation((agg) => {
+        agg.group_by = [...((fv("logGroupBy") as string[]) ?? [])];
+      });
+      emitAggregationUpdate();
+    };
+
+    // When condition operator changes. The value is already written by the name=
+    // binding (trigger_condition.operator in count mode, aggregation.having.operator
+    // in measure mode) — just refresh the relevant preview payload.
+    const onConditionOperatorChange = (_value: string) => {
+      if (isEventBased.value && selectedFunction.value === 'total_events') {
+        emitTriggerUpdate();
+      } else {
         emitAggregationUpdate();
       }
     };
 
-    // When condition operator changes
-    const onConditionOperatorChange = (value: string) => {
-      if (isEventBased.value && selectedFunction.value === 'total_events') {
-        // Logs count mode: maps to trigger_condition
-        if (props.triggerCondition) {
-          props.triggerCondition.operator = value;
-          emitTriggerUpdate();
-        }
-      } else {
-        // Metrics or logs measure/unique count: maps to aggregation.having
-        if (props.inputData.aggregation) {
-          props.inputData.aggregation.having.operator = value;
-          emitAggregationUpdate();
-        }
-      }
-    };
-
-    // When condition value changes
+    // When condition value changes. The name= binding writes the raw (string)
+    // input; re-write the Number-coerced value through the form-backed computed so
+    // the payload stays numeric (mirrors the old `v-model.number`).
     const onConditionValueChange = (value: any) => {
       const parsed = value === '' || value === null || value === undefined ? null : Number(value);
       if (isEventBased.value && selectedFunction.value === 'total_events') {
-        // Logs count mode: maps to trigger_condition
-        if (props.triggerCondition) {
-          isUserTriggerChange.value = true;
-          props.triggerCondition.threshold = parsed;
-          emitTriggerUpdate();
-        }
+        isUserTriggerChange.value = true;
+        triggerThreshold.value = parsed;
+        emitTriggerUpdate();
       } else {
-        // Metrics or logs measure/unique count: maps to aggregation.having
-        if (props.inputData.aggregation) {
-          props.inputData.aggregation.having.value = parsed;
-          emitAggregationUpdate();
-        }
+        conditionValue.value = parsed;
+        emitAggregationUpdate();
       }
     };
 
@@ -1847,43 +1909,85 @@ export default defineComponent({
       emit("update:isAggregationEnabled", localIsAggregationEnabled.value);
     };
 
+    // Metric group-by field array (form-owned; name="query_condition.aggregation.
+    // group_by[i]"). form is the source; props.inputData.aggregation.group_by is
+    // the write-through copy that feeds SQL-gen.
+    const syncMetricGroupByToProps = () => {
+      // group_by is form-owned via the name= bindings; just refresh the preview.
+      if (fv("query_condition.aggregation")) {
+        emitAggregationUpdate();
+      }
+    };
+
     // Add group by column
     const addGroupByColumn = () => {
-      if (props.inputData.aggregation) {
-        props.inputData.aggregation.group_by.push("");
-        emitAggregationUpdate();
+      if (fv("query_condition.aggregation")) {
+        form?.pushFieldValue?.("query_condition.aggregation.group_by", "");
+        syncMetricGroupByToProps();
       }
     };
 
     // Delete group by column
     const deleteGroupByColumn = (index: string | number) => {
       const idx = typeof index === 'string' ? parseInt(index) : index;
-      if (props.inputData.aggregation) {
-        props.inputData.aggregation.group_by.splice(idx, 1);
-        emitAggregationUpdate();
-        // Reset threshold to 1 when last group-by field is removed
-        const remaining = (props.inputData.aggregation.group_by || []).filter((f: string) => f?.trim()).length;
-        if (remaining === 0) {
-          triggerThreshold.value = 1;
-          triggerOperator.value = '>=';
-          if (props.triggerCondition) {
-            props.triggerCondition.threshold = 1;
-            props.triggerCondition.operator = '>=';
-            emit("update:triggerCondition", { ...props.triggerCondition });
-          }
-        }
+      if (!fv("query_condition.aggregation")) return;
+      form?.removeFieldValue?.("query_condition.aggregation.group_by", idx);
+      syncMetricGroupByToProps();
+      // Reset threshold to 1 when last group-by field is removed (form-backed
+      // computeds; no direct prop mutation / re-emit).
+      const remaining = ((fv("query_condition.aggregation.group_by") as string[]) || []).filter((f: string) => f?.trim()).length;
+      if (remaining === 0) {
+        triggerThreshold.value = 1;
+        triggerOperator.value = '>=';
       }
     };
 
-    // Emit aggregation update
-    const emitAggregationUpdate = () => {
-      emit("update:aggregation", props.inputData.aggregation);
+    // Emit aggregation update — read the fresh value off the form (props.inputData
+    // is the readonly read-view and can lag / be stale after writeAggregation).
+    // `overrides` (R6): for callers that run BEFORE the form is written — i.e. an
+    // `@update:model-value` handler on an OForm* control, which fires ahead of the
+    // wrapper's own `field.handleChange` — so the emit still carries that control's
+    // NEW value instead of the stale one still sitting in the form.
+    const emitAggregationUpdate = (overrides?: Record<string, any>) => {
+      const aggregation = fv("query_condition.aggregation");
+      emit(
+        "update:aggregation",
+        overrides ? { ...(aggregation ?? {}), ...overrides } : aggregation,
+      );
     };
 
-    // Emit PromQL condition update
+    // Emit PromQL condition update — read the fresh value off the form.
     const emitPromqlConditionUpdate = () => {
-      emit("update:promqlCondition", props.promqlCondition);
+      emit("update:promqlCondition", fv("query_condition.promql_condition"));
     };
+
+    // PromQL operator/value — name-owned OForm*. Write through the form (never the
+    // readonly props.promqlCondition read-view) + emit for the SQL-preview.
+    const onPromqlOperatorChange = (val: any) => {
+      if (fv("query_condition.promql_condition")) {
+        setFV("query_condition.promql_condition.operator", val);
+        emitPromqlConditionUpdate();
+      }
+    };
+    const onPromqlValueChange = (val: any) => {
+      if (fv("query_condition.promql_condition")) {
+        // Zero-safe numeric coercion (mirrors the old `v-model.number`).
+        setFV(
+          "query_condition.promql_condition.value",
+          val === "" || val === null || val === undefined ? val : Number(val),
+        );
+        emitPromqlConditionUpdate();
+      }
+    };
+    // Seed the form when the parent creates/replaces promql_condition async
+    // (useAlertForm builds it on the first switch to the PromQL tab).
+    watch(
+      () => props.promqlCondition,
+      (pc) => {
+        if (pc) setFV("query_condition.promql_condition", pc);
+      },
+      { deep: true, immediate: false },
+    );
 
     // Watch for SQL editor dialog state changes
     // Sync local state when parent props update (e.g. after loading an existing alert async)
@@ -1938,25 +2042,23 @@ export default defineComponent({
     watch(
       () => props.columns,
       (newCols) => {
-        if (!isEventBased.value && props.inputData.aggregation?.having) {
-          const currentCol = props.inputData.aggregation.having.column;
+        const agg = fv("query_condition.aggregation");
+        if (!isEventBased.value && agg?.having) {
+          const currentCol = agg.having.column;
           const colExistsInNewStream = currentCol
             ? newCols.some((c: any) => (typeof c === 'string' ? c : c.value) === currentCol)
             : false;
+          const hasValue = newCols.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value');
 
           if (currentCol && !colExistsInNewStream) {
             // Stream changed — previously selected column is no longer valid, clear it
             // and auto-set to "value" only if the new stream has it
-            const hasValue = newCols.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value');
-            props.inputData.aggregation.having.column = hasValue ? 'value' : '';
+            writeAggregation((a) => { a.having.column = hasValue ? 'value' : ''; });
             emitAggregationUpdate();
-          } else if (!currentCol) {
+          } else if (!currentCol && hasValue) {
             // Column not set yet — auto-set to "value" if new stream has it
-            const hasValue = newCols.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value');
-            if (hasValue) {
-              props.inputData.aggregation.having.column = 'value';
-              emitAggregationUpdate();
-            }
+            writeAggregation((a) => { a.having.column = 'value'; });
+            emitAggregationUpdate();
           }
         }
       }
@@ -1995,10 +2097,10 @@ export default defineComponent({
       () => props.inputData.aggregation,
       (agg) => {
         if (isEventBased.value) return; // Only for metrics
-        if (agg?.having) {
-          conditionOperator.value = agg.having.operator || '>=';
-          conditionValue.value = agg.having.value || '';
-        }
+        // conditionOperator/conditionValue are form-backed computeds that already
+        // reflect aggregation.having — writing them back here just re-triggers
+        // this same deep watcher (setFieldValue doesn't dedup identical values),
+        // looping. Only selectedFunction (a plain ref discriminator) needs syncing.
         if (agg?.function) {
           selectedFunction.value = agg.function;
         }
@@ -2022,17 +2124,29 @@ export default defineComponent({
           ? !hasLogGroupByFields.value
           : !hasMetricGroupByFields.value;
         if (inMeasureMode && groupByEmpty) {
-          triggerOperator.value = '>=';
-          triggerThreshold.value = 1;
-          if (tc.operator !== '>=' || tc.threshold !== 1) {
-            tc.operator = '>=';
-            tc.threshold = 1;
-            emit("update:triggerCondition", { ...tc });
+          // Force ">= 1" (the disabled field can't be user-edited). Write through
+          // the FORM and ONLY when the value actually differs. The old code mutated
+          // the readonly form read-view (`tc`) and re-emitted a fresh object here;
+          // because the readonly write silently fails, the guard never settled and
+          // this deep watcher re-fired forever ("Maximum recursive updates").
+          if (fv("trigger_condition.operator") !== '>=') {
+            setFV("trigger_condition.operator", '>=');
           }
-        } else {
-          triggerOperator.value = tc.operator ?? '>=';
-          triggerThreshold.value = tc.threshold ?? 3;
+          if (fv("trigger_condition.threshold") !== 1) {
+            setFV("trigger_condition.threshold", 1);
+          }
         }
+        // (triggerOperator / triggerThreshold are form-backed computeds — they
+        //  already reflect the stored value, so no read-back sync is needed.)
+        // Sync the DISPLAY value from the stored MINUTES. This is a READ of
+        // trigger_condition and a WRITE to `_ui.checkEvery` ONLY — never write
+        // the stored field here: this watcher watches trigger_condition DEEPLY,
+        // so writing it back re-fires this same watcher ("Maximum recursive
+        // updates"), and writing a DISPLAY value into it (e.g. 2 for "2 hours")
+        // both corrupts the stored minutes and makes the next pass re-read
+        // 2 < 60 → flip the mode to minutes, silently rewriting a saved 2-hour
+        // alert to 2 minutes. `_ui` is outside trigger_condition, so this is
+        // recursion-safe by construction.
         const freq = tc.frequency ?? 10;
         if (tc.frequency_type === 'cron') {
           frequencyMode.value = 'cron';
@@ -2044,8 +2158,10 @@ export default defineComponent({
           frequencyMode.value = 'minutes';
           checkEveryFrequency.value = freq;
         }
-        cronExpression.value = tc.cron || '';
-        cronTimezone.value = tc.timezone || '';
+        // cron/timezone need NO sync here: they are form-owned (name=-bound), so
+        // the controls already read `tc`. Re-assigning them would write straight
+        // back into the deeply-watched trigger_condition and re-trigger THIS
+        // watcher (the "Maximum recursive updates" trap noted above).
       },
       { deep: true, immediate: false }
     );
@@ -2057,124 +2173,55 @@ export default defineComponent({
         ? !hasLogGroupByFields.value
         : !hasMetricGroupByFields.value;
       if (groupByEmpty) {
+        // form-backed computeds; no direct prop mutation / re-emit.
         triggerThreshold.value = 1;
         triggerOperator.value = '>=';
-        if (props.triggerCondition) {
-          props.triggerCondition.threshold = 1;
-          props.triggerCondition.operator = '>=';
-          emit("update:triggerCondition", { ...props.triggerCondition });
-        }
       }
     });
 
-    // Validation function for Step 2
-    const validate = async () => {
-      // Custom mode: Check if conditions have empty columns or values
-      if (localTab.value === 'custom') {
-        // Aggregation column required when a measure function is selected
-        if (selectedFunction.value !== 'total_events') {
-          const col = isEventBased.value
-            ? logMeasureColumn.value
-            : props.inputData?.aggregation?.having?.column;
-          if (!col || col.trim() === '') {
-            columnSelectError.value = true;
-            toast({ variant: "error", message: 'Column is required when using an aggregate function.' });
-            return false;
-          }
-        }
-        columnSelectError.value = false;
-        return await validateCustomMode();
-      }
-
-      // SQL mode
-      if (localTab.value === 'sql') {
-        const sqlQuery = props.sqlQuery;
-        if (!sqlQuery || sqlQuery.trim() === '') {
-          toast({ variant: "error", message: 'SQL query cannot be empty.' });
-          await nextTick();
-          inlineQueryEditorRef.value?.focus?.();
-          return false;
-        }
-        if (props.sqlQueryErrorMsg && props.sqlQueryErrorMsg.trim() !== '') {
-          toast({ variant: "error", message: 'Please fix the SQL error before saving.' });
-          await nextTick();
-          inlineQueryEditorRef.value?.focus?.();
-          return false;
-        }
-        return true;
-      }
-
-      // PromQL mode
-      if (localTab.value === 'promql') {
-        const promqlQuery = localPromqlQuery.value;
-        if (!promqlQuery || promqlQuery.trim() === '') {
-          toast({ variant: "error", message: 'PromQL query cannot be empty.' });
-          await nextTick();
-          inlineQueryEditorRef.value?.focus?.();
-          return false;
-        }
-        return true;
-      }
-
-      return true;
+    // ── `_meta` discriminator bridge ─────────────────────────────────────────
+    // Push the current bare mode-selectors into the form so the schema's
+    // superRefine fires each rule only in the branch that applies (the sanctioned
+    // watch → setFieldValue bridge for NON-input discriminators).
+    const syncMeta = () => {
+      const meta: QueryConfigMeta = {
+        tab: localTab.value as any,
+        isRealTime: props.isRealTime,
+        isEventBased: isEventBased.value,
+        selectedFunction: selectedFunction.value,
+        frequencyMode: frequencyMode.value,
+        hasConditions: !!props.inputData.conditions?.conditions?.length,
+        hasGroupBy: isEventBased.value
+          ? hasLogGroupByFields.value
+          : hasMetricGroupByFields.value,
+        aggregationEnabled: localIsAggregationEnabled.value,
+        // SECONDS, raw from zoConfig — the schema derives ceil(secs/60) itself.
+        minAutoRefreshInterval:
+          Number(store.state?.zoConfig?.min_auto_refresh_interval) || 0,
+      };
+      setFV("_meta", meta);
     };
+    watch(
+      [
+        localTab,
+        () => props.isRealTime,
+        isEventBased,
+        selectedFunction,
+        frequencyMode,
+        () => props.inputData.conditions,
+        localIsAggregationEnabled,
+        hasLogGroupByFields,
+        hasMetricGroupByFields,
+      ],
+      () => syncMeta(),
+      { deep: true, immediate: true },
+    );
 
-    // Validate custom mode conditions
-    const validateCustomMode = async () => {
-      const conditions = props.inputData.conditions;
-
-      // If no conditions added at all, allow navigation
-      if (!conditions || !conditions.conditions || conditions.conditions.length === 0) {
-        return true;
-      }
-
-      let isValid = true;
-
-      // Validate triggerThreshold (count mode and having-groups rows)
-      if (selectedFunction.value === 'total_events' || hasLogGroupByFields.value || hasMetricGroupByFields.value) {
-        triggerThresholdError.value = !triggerThreshold.value ? 'Required' : '';
-        if (triggerThresholdError.value) isValid = false;
-      }
-
-      // Validate conditionValue (measure mode)
-      if (selectedFunction.value !== 'total_events') {
-        conditionValueError.value = !conditionValue.value ? 'Field is required!' : '';
-        if (conditionValueError.value) isValid = false;
-      }
-
-      // Validate checkEveryFrequency (when not in cron mode)
-      if (frequencyMode.value !== 'cron') {
-        checkEveryFrequencyError.value = !checkEveryFrequency.value ? 'Required' : '';
-        if (checkEveryFrequencyError.value) isValid = false;
-      }
-
-      if (!isValid) {
-        await nextTick();
-        const firstErrorField = document.querySelector('[data-o2-error] input, [data-o2-error] textarea') as HTMLElement;
-        if (firstErrorField) {
-          firstErrorField.focus();
-        }
-      }
-
-      return isValid;
-    };
-
-    // Validate SQL mode
-    const validateSqlMode = () => {
-      const sqlQuery = props.sqlQuery;
-
-      // Check if SQL query is empty
-      if (!sqlQuery || sqlQuery.trim() === '') {
-        return false;
-      }
-
-      // Check if there's a backend validation error
-      if (props.sqlQueryErrorMsg && props.sqlQueryErrorMsg.trim() !== '') {
-        return false;
-      }
-
-      return true;
-    };
+    // NOTE: the old exposed validate() (the wizard's step2Ref contract) is gone.
+    // The field rules run through the composed AddAlert schema on save
+    // (handleSave → form.handleSubmit), and the imperative query-text gates
+    // (empty SQL / SQL error / empty PromQL / aggregate-column toast) are
+    // re-homed in useAlertForm.runImperativeQueryChecks (same messages).
 
     const highlightedSqlQuery = computed(() => {
       if (!props.generatedSqlQuery) return "";
@@ -2203,7 +2250,6 @@ export default defineComponent({
       handleVrlFunctionUpdate,
       handleValidateSql,
       functionsList,
-      validate,
       // Field refs for focus manager
       customPreviewRef,
       sqlPromqlPreviewRef,
@@ -2250,7 +2296,6 @@ export default defineComponent({
       onCronExpressionChange,
       onCronTimezoneChange,
       logMeasureColumn,
-      columnSelectError,
       logGroupBy,
       onFunctionChange,
       onMetricFunctionChange,
@@ -2280,12 +2325,12 @@ export default defineComponent({
       autoCompleteSuggestions,
       handleInlineQueryUpdate,
       inlineEditorPlaceholder,
-      // Field error state (for inline :error/:error-message)
-      triggerThresholdError,
-      conditionValueError,
-      checkEveryFrequencyError,
-      promqlOperatorError,
-      promqlValueError,
+      onPromqlOperatorChange,
+      onPromqlValueChange,
+      syncMetricGroupByToProps,
+      // Reactive views of the group-by field arrays (render source, Rule ①)
+      logGroupByRows: logGroupByStore,
+      metricGroupByRows: metricGroupByStore,
     };
   },
 });

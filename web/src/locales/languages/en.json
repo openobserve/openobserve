@@ -3095,6 +3095,25 @@
     "SearchSQLCancelled": "Error: Search SQL was cancelled."
   },
   "alerts": {
+    "validation": {
+      "streamTypeRequired": "Stream type is required.",
+      "streamNameRequired": "Stream name is required.",
+      "fieldRequired": "Field is required!",
+      "fieldRequiredPlain": "Field is required",
+      "nameInvalidChars": "Characters like :, ?, /, #, and spaces are not allowed.",
+      "templateRequired": "Template is required!",
+      "validEmails": "Add valid emails!",
+      "silenceNonNegative": "Silence notification should be greater than or equal to 0",
+      "periodPositive": "Period should be greater than 0",
+      "destinationRequired": "At least one destination is required.",
+      "thresholdPositive": "Threshold should be greater than 0",
+      "frequencyPositive": "Frequency should be greater than 0",
+      "groupByRequired": "At least one group by field is required",
+      "minimumOneDay": "Minimum 1 day",
+      "detectionFunctionRequired": "Detection function is required",
+      "timestampAliasBanned": "{column} cannot be used as a column alias. Use time_bucket instead.",
+      "credentialFieldRequired": "{field} is required"
+    },
     "header": "Alerts",
     "subtitle": "Alert rules and notification channels",
     "searchThisFolder": "This folder",

@@ -3090,6 +3090,25 @@
     "SearchSQLCancelled": "Erreur : Search SQL a été annulé."
   },
   "alerts": {
+    "validation": {
+      "streamTypeRequired": "Le type de Stream est requis.",
+      "streamNameRequired": "Le nom du Stream est requis.",
+      "fieldRequired": "Le champ est requis !",
+      "fieldRequiredPlain": "Le champ est requis",
+      "nameInvalidChars": "Les caractères comme :, ?, /, # et les espaces ne sont pas autorisés.",
+      "templateRequired": "Le modèle est requis !",
+      "validEmails": "Ajoutez des e-mails valides !",
+      "silenceNonNegative": "La mise en sourdine des notifications doit être supérieure ou égale à 0",
+      "periodPositive": "La période doit être supérieure à 0",
+      "destinationRequired": "Au moins une destination est requise.",
+      "thresholdPositive": "Le seuil doit être supérieur à 0",
+      "frequencyPositive": "La fréquence doit être supérieure à 0",
+      "groupByRequired": "Au moins un champ de regroupement est requis",
+      "minimumOneDay": "Minimum 1 jour",
+      "detectionFunctionRequired": "La fonction de détection est requise",
+      "timestampAliasBanned": "{column} ne peut pas être utilisé comme alias de colonne. Utilisez time_bucket à la place.",
+      "credentialFieldRequired": "{field} est requis"
+    },
     "header": "Alertes",
     "subtitle": "Règles d'alerte et canaux de notification",
     "searchThisFolder": "Ce dossier",

@@ -15,232 +15,197 @@ limitations under the License.
 
 <template>
   <div data-test="prebuilt-destination-form" class="prebuilt-destination-form">
-    <!-- Slack Fields -->
-    <template v-if="destinationType === 'slack'">
-      <div class="w-1/2 py-1">
-        <OInput
-          v-model="credentials.webhookUrl"
-          data-test="slack-webhook-url-input"
-          label="Slack Webhook URL *"
-          helpText="Get your webhook URL from Slack App settings"
-          tabindex="0"
-          :error="!!fieldErrors.webhookUrl"
-          :error-message="fieldErrors.webhookUrl"
-        />
-      </div>
-      <div class="w-1/2 py-1">
-        <OInput
-          v-model="credentials.channel"
-          data-test="slack-channel-input"
-          label="Channel (optional)"
-          helpText="e.g., #alerts"
-          tabindex="0"
-        />
-      </div>
-    </template>
+    <!-- OWNER of this embedded <OForm> (Rule ③): the credential fields are
+         config-driven per destinationType, validated by the dynamically-built
+         schema. The parent submits this form by its id (`form-id` bridge, R4). -->
+    <OForm :form="form" id="prebuilt-destination-form">
+      <!-- Slack Fields -->
+      <template v-if="destinationType === 'slack'">
+        <div class="w-1/2 py-1">
+          <OFormInput
+            name="webhookUrl"
+            data-test="slack-webhook-url-input"
+            label="Slack Webhook URL"
+            required
+            helpText="Get your webhook URL from Slack App settings"
+            tabindex="0"
+          />
+        </div>
+        <div class="w-1/2 py-1">
+          <OFormInput
+            name="channel"
+            data-test="slack-channel-input"
+            label="Channel (optional)"
+            helpText="e.g., #alerts"
+            tabindex="0"
+          />
+        </div>
+      </template>
 
-    <!-- Discord Fields -->
-    <template v-if="destinationType === 'discord'">
-      <div class="w-1/2 py-1">
-        <OInput
-          v-model="credentials.webhookUrl"
-          data-test="discord-webhook-url-input"
-          label="Discord Webhook URL *"
-          helpText="Get your webhook URL from Discord channel settings"
-          tabindex="0"
-          :error="!!fieldErrors.webhookUrl"
-          :error-message="fieldErrors.webhookUrl"
-        />
-      </div>
-      <div class="w-1/2 py-1">
-        <OInput
-          v-model="credentials.username"
-          data-test="discord-username-input"
-          label="Bot Username (optional)"
-          helpText="Custom username for the webhook bot"
-          tabindex="0"
-        />
-      </div>
-    </template>
+      <!-- Discord Fields -->
+      <template v-if="destinationType === 'discord'">
+        <div class="w-1/2 py-1">
+          <OFormInput
+            name="webhookUrl"
+            data-test="discord-webhook-url-input"
+            label="Discord Webhook URL"
+            required
+            helpText="Get your webhook URL from Discord channel settings"
+            tabindex="0"
+          />
+        </div>
+        <div class="w-1/2 py-1">
+          <OFormInput
+            name="username"
+            data-test="discord-username-input"
+            label="Bot Username (optional)"
+            helpText="Custom username for the webhook bot"
+            tabindex="0"
+          />
+        </div>
+      </template>
 
-    <!-- MS Teams Fields -->
-    <template v-if="destinationType === 'msteams'">
-      <div class="w-1/2 py-1">
-        <OInput
-          v-model="credentials.webhookUrl"
-          data-test="msteams-webhook-url-input"
-          label="Microsoft Teams Webhook URL *"
-          helpText="Get your webhook URL from Teams channel connectors"
-          tabindex="0"
-          :error="!!fieldErrors.webhookUrl"
-          :error-message="fieldErrors.webhookUrl"
-        />
-      </div>
-    </template>
+      <!-- MS Teams Fields -->
+      <template v-if="destinationType === 'msteams'">
+        <div class="w-1/2 py-1">
+          <OFormInput
+            name="webhookUrl"
+            data-test="msteams-webhook-url-input"
+            label="Microsoft Teams Webhook URL"
+            required
+            helpText="Get your webhook URL from Teams channel connectors"
+            tabindex="0"
+          />
+        </div>
+      </template>
 
-    <!-- PagerDuty Fields -->
-    <template v-if="destinationType === 'pagerduty'">
-      <div class="w-1/2 py-1">
-        <OInput
-          v-model="credentials.integrationKey"
-          data-test="pagerduty-integration-key-input"
-          label="Integration Key *"
-          type="password"
-          helpText="Get your integration key from PagerDuty service settings"
-          tabindex="0"
-          :error="!!fieldErrors.integrationKey"
-          :error-message="fieldErrors.integrationKey"
-        />
-      </div>
-      <div class="w-1/2 py-1">
-        <OSelect
-          v-model="credentials.severity"
-          data-test="pagerduty-severity-select"
-          :options="severityOptions"
-          label="Default Severity *"
-          labelKey="label"
-          valueKey="value"
-          helpText="Select the default severity for PagerDuty incidents"
-          tabindex="0"
-        />
-      </div>
-    </template>
+      <!-- PagerDuty Fields -->
+      <template v-if="destinationType === 'pagerduty'">
+        <div class="w-1/2 py-1">
+          <OFormInput
+            name="integrationKey"
+            data-test="pagerduty-integration-key-input"
+            label="Integration Key"
+            required
+            type="password"
+            helpText="Get your integration key from PagerDuty service settings"
+            tabindex="0"
+          />
+        </div>
+        <div class="w-1/2 py-1">
+          <OFormSelect
+            name="severity"
+            data-test="pagerduty-severity-select"
+            :options="severityOptions"
+            label="Default Severity"
+            required
+            labelKey="label"
+            valueKey="value"
+            helpText="Select the default severity for PagerDuty incidents"
+            tabindex="0"
+          />
+        </div>
+      </template>
 
-    <!-- ServiceNow Fields -->
-    <template v-if="destinationType === 'servicenow'">
-      <div class="w-1/2 py-1">
-        <OInput
-          v-model="credentials.instanceUrl"
-          data-test="servicenow-instance-url-input"
-          label="ServiceNow Instance URL *"
-          helpText="https://your-instance.service-now.com/api/now/table/incident"
-          tabindex="0"
-          :error="!!fieldErrors.instanceUrl"
-          :error-message="fieldErrors.instanceUrl"
-        />
-      </div>
-      <div class="w-1/2 py-1">
-        <OInput
-          v-model="credentials.username"
-          data-test="servicenow-username-input"
-          label="Username *"
-          helpText="ServiceNow username with incident creation permissions"
-          tabindex="0"
-          :error="!!fieldErrors.username"
-          :error-message="fieldErrors.username"
-        />
-      </div>
-      <div class="w-1/2 py-1">
-        <OInput
-          v-model="credentials.password"
-          data-test="servicenow-password-input"
-          label="Password *"
-          type="password"
-          helpText="ServiceNow password or API token"
-          tabindex="0"
-          :error="!!fieldErrors.password"
-          :error-message="fieldErrors.password"
-        />
-      </div>
-      <div class="w-1/2 py-1">
-        <OInput
-          v-model="credentials.assignmentGroup"
-          data-test="servicenow-assignment-group-input"
-          label="Assignment Group (optional)"
-          helpText="Group to assign incidents to (e.g., IT Operations)"
-          tabindex="0"
-        />
-      </div>
-    </template>
+      <!-- ServiceNow Fields -->
+      <template v-if="destinationType === 'servicenow'">
+        <div class="w-1/2 py-1">
+          <OFormInput
+            name="instanceUrl"
+            data-test="servicenow-instance-url-input"
+            label="ServiceNow Instance URL"
+            required
+            helpText="https://your-instance.service-now.com/api/now/table/incident"
+            tabindex="0"
+          />
+        </div>
+        <div class="w-1/2 py-1">
+          <OFormInput
+            name="username"
+            data-test="servicenow-username-input"
+            label="Username"
+            required
+            helpText="ServiceNow username with incident creation permissions"
+            tabindex="0"
+          />
+        </div>
+        <div class="w-1/2 py-1">
+          <OFormInput
+            name="password"
+            data-test="servicenow-password-input"
+            label="Password"
+            required
+            type="password"
+            helpText="ServiceNow password or API token"
+            tabindex="0"
+          />
+        </div>
+        <div class="w-1/2 py-1">
+          <OFormInput
+            name="assignmentGroup"
+            data-test="servicenow-assignment-group-input"
+            label="Assignment Group (optional)"
+            helpText="Group to assign incidents to (e.g., IT Operations)"
+            tabindex="0"
+          />
+        </div>
+      </template>
 
-    <!-- Email Fields -->
-    <template v-if="destinationType === 'email'">
-      <div class="w-1/2 py-1">
-        <OInput
-          v-model="credentials.recipients"
-          data-test="email-recipients-input"
-          label="Recipient Email Addresses *"
-          helpText="Comma-separated email addresses"
-          tabindex="0"
-          :error="!!fieldErrors.recipients"
-          :error-message="fieldErrors.recipients"
-        />
-      </div>
-      <!-- CC and Subject fields hidden - not supported by backend Email struct -->
-      <!-- <div class="w-1/2 py-1">
-        <OInput
-          v-model="credentials.ccRecipients"
-          data-test="email-cc-input"
-          label="CC Recipients (optional)"
-          class="showLabelOnTop"
-          tabindex="0"
-        >
-          <template v-slot:hint>
-            <span class="text-xs text-gray-400">
-              Comma-separated CC email addresses
-            </span>
-          </template>
-        </OInput>
-      </div>
-      <div class="w-1/2 py-1">
-        <OInput
-          v-model="credentials.subject"
-          data-test="email-subject-input"
-          label="Email Subject (optional)"
-          class="showLabelOnTop"
-          tabindex="0"
-        >
-          <template v-slot:hint>
-            <span class="text-xs text-gray-400">
-              Custom subject line (defaults to alert name)
-            </span>
-          </template>
-        </OInput>
-      </div> -->
-    </template>
+      <!-- Email Fields -->
+      <template v-if="destinationType === 'email'">
+        <div class="w-1/2 py-1">
+          <OFormInput
+            name="recipients"
+            data-test="email-recipients-input"
+            label="Recipient Email Addresses"
+            required
+            helpText="Comma-separated email addresses"
+            tabindex="0"
+          />
+        </div>
+        <!-- CC and Subject fields hidden - not supported by backend Email struct -->
+      </template>
 
-    <!-- Opsgenie Fields -->
-    <template v-if="destinationType === 'opsgenie'">
-      <div class="w-1/2 py-1">
-        <OInput
-          v-model="credentials.apiKey"
-          data-test="opsgenie-api-key-input"
-          label="Opsgenie API Key *"
-          type="password"
-          helpText="Get your API key from Opsgenie integration settings"
-          tabindex="0"
-          :error="!!fieldErrors.apiKey"
-          :error-message="fieldErrors.apiKey"
-        />
-      </div>
-      <div class="w-1/2 py-1">
-        <OSelect
-          v-model="credentials.priority"
-          data-test="opsgenie-priority-select"
-          :options="priorityOptions"
-          label="Default Priority"
-          labelKey="label"
-          valueKey="value"
-          helpText="Select the default priority for Opsgenie alerts"
-          tabindex="0"
-        />
-      </div>
-      <div class="w-full py-1">
-        <OSwitch
-          v-model="credentials.euRegion"
-          data-test="opsgenie-eu-region-toggle"
-          label="EU Region"
-        >
-          <template v-slot:hint>
-            <span class="text-xs text-gray-400">
-              Enable for EU-based Opsgenie instances
-            </span>
-          </template>
-        </OSwitch>
-      </div>
-    </template>
+      <!-- Opsgenie Fields -->
+      <template v-if="destinationType === 'opsgenie'">
+        <div class="w-1/2 py-1">
+          <OFormInput
+            name="apiKey"
+            data-test="opsgenie-api-key-input"
+            label="Opsgenie API Key"
+            required
+            type="password"
+            helpText="Get your API key from Opsgenie integration settings"
+            tabindex="0"
+          />
+        </div>
+        <div class="w-1/2 py-1">
+          <OFormSelect
+            name="priority"
+            data-test="opsgenie-priority-select"
+            :options="priorityOptions"
+            label="Default Priority"
+            labelKey="label"
+            valueKey="value"
+            helpText="Select the default priority for Opsgenie alerts"
+            tabindex="0"
+          />
+        </div>
+        <div class="w-full py-1">
+          <OFormSwitch
+            name="euRegion"
+            data-test="opsgenie-eu-region-toggle"
+            label="EU Region"
+          />
+          <span class="text-xs text-gray-400">
+            Enable for EU-based Opsgenie instances
+          </span>
+        </div>
+      </template>
+    </OForm>
 
-    <!-- Test and Preview Actions -->
+    <!-- Test and Preview Actions (kept OUTSIDE <OForm>; they are plain
+         event-emitting buttons, not form fields). -->
     <div v-if="!hideActions" class="w-full py-3">
       <div class="flex items-center gap-2">
         <OButton
@@ -268,14 +233,19 @@ limitations under the License.
 </template>
 
 <script lang="ts" setup>
-import { computed, reactive } from 'vue';
-import OButton from '@/lib/core/Button/OButton.vue';
-import OInput from '@/lib/forms/Input/OInput.vue';
-import OSelect from '@/lib/forms/Select/OSelect.vue';
-import OSwitch from '@/lib/forms/Switch/OSwitch.vue';
+import { watch } from 'vue';
 import type { PropType } from 'vue';
-import { getPrebuiltConfig } from '@/utils/prebuilt-templates';
-import type { PrebuiltTypeId } from '@/utils/prebuilt-templates/types';
+import OButton from '@/lib/core/Button/OButton.vue';
+import OForm from '@/lib/forms/Form/OForm.vue';
+import OFormInput from '@/lib/forms/Input/OFormInput.vue';
+import OFormSelect from '@/lib/forms/Select/OFormSelect.vue';
+import OFormSwitch from '@/lib/forms/Switch/OFormSwitch.vue';
+import { useI18n } from 'vue-i18n';
+import { useOForm } from '@/lib/forms/Form/useOForm';
+import {
+  makePrebuiltDestinationSchema,
+  prebuiltDestinationDefaults,
+} from './PrebuiltDestinationForm.schema';
 
 const props = defineProps({
   destinationType: {
@@ -296,36 +266,36 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['update:modelValue', 'preview', 'test']);
+const emit = defineEmits(['update:modelValue', 'preview', 'test', 'submit']);
 
-// Computed credentials that sync with modelValue
-const credentials = computed({
-  get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value)
+const { t } = useI18n();
+
+// OWNER pattern (Rule ③): create the form here so the credential fields are
+// name=-owned by the single TanStack form. The schema + defaults are built for
+// the ACTIVE type from the shared getPrebuiltConfig() config (single source of
+// truth). The parent remounts this component on type change (:key), so setup()
+// re-runs with a fresh schema for the new type.
+const form = useOForm<Record<string, unknown>>({
+  defaultValues: prebuiltDestinationDefaults(
+    props.destinationType,
+    props.modelValue,
+  ),
+  schema: makePrebuiltDestinationSchema(t, props.destinationType),
+  // Fires only once the credential schema passes → tell the parent to save.
+  onSubmit: (value) => {
+    emit('submit', value);
+  },
 });
 
-const fieldErrors = reactive<Record<string, string>>({});
-
-function validate(): boolean {
-  Object.keys(fieldErrors).forEach((k) => delete fieldErrors[k]);
-  const config = getPrebuiltConfig(props.destinationType as PrebuiltTypeId);
-  if (!config) return true;
-  for (const field of config.credentialFields) {
-    const value = credentials.value[field.key];
-    if (field.required && (!value || value.toString().trim() === '')) {
-      fieldErrors[field.key] = `${field.label} is required`;
-      continue;
-    }
-    if (!field.required && (!value || value.toString().trim() === '')) continue;
-    if (field.validator && value) {
-      const result = field.validator(value.toString());
-      if (result !== true) fieldErrors[field.key] = result as string;
-    }
-  }
-  return Object.keys(fieldErrors).length === 0;
-}
-
-defineExpose({ validate });
+// Egress to the parent (Rule ③): keep the parent's v-model (`prebuiltCredentials`)
+// in sync by watching the form store — NEVER form.store.subscribe. Used by the
+// parent's Preview/Test buttons.
+const values = form.useStore((s: any) => s.values);
+watch(
+  values,
+  (v) => emit('update:modelValue', { ...(v as Record<string, unknown>) }),
+  { deep: true },
+);
 
 // PagerDuty severity options
 const severityOptions = [
@@ -344,4 +314,3 @@ const priorityOptions = [
   { label: 'P5 (Informational)', value: 'P5' }
 ];
 </script>
-

@@ -66,6 +66,7 @@
             :condition-input-width="props.conditionInputWidth"
             :allow-custom-columns="props.allowCustomColumns"
             :module="props.module"
+            :name-prefix="childNamePrefix(index)"
             @input:update="(name, field) => inputUpdate(name, field)"
           />
           <div
@@ -84,6 +85,7 @@
                 :is-first-in-group="index === 0"
                 :allow-custom-columns="props.allowCustomColumns"
                 :module="props.module"
+                :name-prefix="childNamePrefix(index)"
             />
                 <OButton data-test="alert-conditions-delete-condition-btn" size="icon-xs-circle" variant="ghost" @click="removeCondition(item.id)">
                   <OIcon name="close" size="sm" />
@@ -144,6 +146,7 @@
 
   <script setup lang="ts">
     import { computed, ref, watch } from 'vue';
+    import { cloneDeep } from 'lodash-es';
     import FilterCondition from './FilterCondition.vue';
     import { useStore } from 'vuex';
     import OButton from '@/lib/core/Button/OButton.vue';
@@ -209,8 +212,27 @@
         required: false,
         validator: (value: string) => ['alerts', 'pipelines'].includes(value),
     },
+    /**
+     * Dual-mode switch (alerts-migration.md §A). When set, this group passes
+     * the prefix down recursively — the child at index i (leaf condition OR
+     * nested group) gets `${namePrefix}.conditions[${i}]` — so every
+     * FilterCondition binds its OForm* fields into the injected TanStack form
+     * at the exact nested path. When empty (default): today's BARE behavior,
+     * unchanged (pipeline's NodeForm/Condition.vue consumes it bare —
+     * a permanent, sanctioned mode).
+     *
+     * 🔑 The v-for `:key` MUST stay the array INDEX: the OForm* fields bind by
+     * index-based name and do NOT re-bind when the name changes — a stable-id
+     * key would leave rendered inputs shifted/blank after a mid-list delete
+     * (START-HERE Rule ①).
+     */
+    namePrefix: {
+        type: String,
+        default: '',
+        required: false,
+    },
     });
-  
+
   const emit = defineEmits<{
     (e: 'add-condition', groupId: any): void;
     (e: 'add-group', groupId: any): void;
@@ -220,7 +242,10 @@
   }>();
   
   const isOpen = ref(true);
-  const groups = ref(props.group);
+  // Mutable deep clone — props.group is the readonly form read-view in alerts
+  // mode; the handlers mutate this clone and emit it, and the ancestor writes it
+  // back through the form (which re-syncs via the watch below).
+  const groups = ref(cloneDeep(props.group));
   const showPreview = ref(true);
 
   const store = useStore();
@@ -237,12 +262,25 @@
     okCallback: () => {},
   });
 
-  // Watch for prop changes to keep groups in sync with parent
+  // Keep the local working copy in sync with the parent. The clone is required:
+  // props.group is the form's READONLY read-view and this component mutates
+  // `groups` in place (performRemoveCondition et al) — assigning it raw makes
+  // those writes silently fail ("target is readonly").
+  //
+  // NOT deep. `deep: true` was correct pre-migration, when formData was a plain
+  // `ref()` mutated IN PLACE — the object identity never changed, so a deep watch
+  // was the only way to see an edit. The form store replaces values IMMUTABLY on
+  // every change, so props.group already arrives as a new reference and a
+  // reference watch sees every edit.
+  //
+  // Keeping both was the worst of the two models: deep fired on every nested
+  // mutation, and each firing cloneDeep'd the whole subtree — once per nested
+  // FilterGroup. That is what put ~213ms of scripting into a single click.
   watch(() => props.group, (newGroup) => {
-    groups.value = newGroup;
+    groups.value = cloneDeep(newGroup);
     // V2: Use logicalOperator instead of label
     label.value = newGroup.logicalOperator?.toLowerCase() || 'and';
-  }, { deep: true });
+  });
 
   const tabOptions = computed(() => [
     {
@@ -254,6 +292,14 @@
       value: "and",
     },
   ]);
+
+  // Dual-mode: the child at index i — a leaf FilterCondition OR a nested
+  // FilterGroup — binds under `${namePrefix}.conditions[${i}]`. Empty prefix
+  // (bare mode) propagates as empty so every descendant stays bare.
+  // (index is `number | string` because the template's v-for iterates an
+  // Object-typed prop — same pre-existing looseness as `:index="index"`.)
+  const childNamePrefix = (index: number | string) =>
+    props.namePrefix ? `${props.namePrefix}.conditions[${index}]` : '';
 
   function isGroup(item: any) {
     // V2: Check for filterType === "group" with conditions array
@@ -267,6 +313,11 @@
     return false;
   }
   
+  // NOTE: `groups` is a MUTABLE deep clone of `props.group` (which is the READONLY
+  // form read-view in alerts mode). The handlers mutate the clone in place and
+  // emit it; the ancestor writes it back through the form (setFieldValue), which
+  // re-syncs `props.group` → the clone via the watch below. Mutating the readonly
+  // prop directly silently fails ("target is readonly") so add/remove did nothing.
   const addCondition = (groupId: string) => {
     // V2: Create condition with filterType and logicalOperator
     const newCondition = {
@@ -281,7 +332,7 @@
     groups.value.conditions.push(newCondition);
     emit('add-condition', groups.value);
   };
-  
+
   const addGroup = (groupId: string) => {
     // V2: Create group with filterType, logicalOperator, and conditions array
     const newGroup = {
@@ -303,7 +354,7 @@
     groups.value.conditions.push(newGroup);
     emit('add-group', groups.value);
   };
-  
+
   // Toggle AND/OR
   const toggleLabel = (newLabel?: string) => {
     // V2: Use logicalOperator instead of label

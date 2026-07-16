@@ -369,6 +369,35 @@ describe("ImportDestination", () => {
     });
   });
 
+  // ─── getCorrectionRequiredError — single source for the "required" rule ─────
+  describe("getCorrectionRequiredError (folded correction required rule)", () => {
+    it("returns 'Field is required!' for an empty/falsy correction value", () => {
+      expect(wrapper.vm.getCorrectionRequiredError("")).toBe("Field is required!");
+      expect(wrapper.vm.getCorrectionRequiredError(undefined)).toBe("Field is required!");
+      expect(wrapper.vm.getCorrectionRequiredError(null)).toBe("Field is required!");
+    });
+
+    it("returns an empty string once a correction value is supplied", () => {
+      expect(wrapper.vm.getCorrectionRequiredError("template1")).toBe("");
+      expect(wrapper.vm.getCorrectionRequiredError("action1")).toBe("");
+    });
+
+    it("validateDestinationInputs surfaces a template_name error for a missing template (single validation source)", async () => {
+      wrapper.vm.destinationErrorsToDisplay = [];
+      const result = await wrapper.vm.validateDestinationInputs(
+        { name: "no-tpl", type: "http", url: "https://x.com", method: "post", skip_tls_verify: false },
+        1,
+      );
+      expect(result).toBe(false);
+      const flatErrors = wrapper.vm.destinationErrorsToDisplay.flat();
+      expect(
+        flatErrors.some(
+          (e: any) => typeof e === "object" && e.field === "template_name",
+        ),
+      ).toBe(true);
+    });
+  });
+
   // ─── importJson — JSON parsing edge cases ─────────────────────────────────
   describe("importJson — JSON parsing edge cases", () => {
     beforeEach(() => {

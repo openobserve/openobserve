@@ -71,6 +71,60 @@ describe('alertPayload', () => {
       expect(payload.context_attributes.env).toBe('production');
     });
 
+    // ── Form-only keys must NOT reach the backend ───────────────────────────
+    // getAlertPayload cloneDeep()s the WHOLE form value set, so every key the
+    // OForm migration seeded into the form leaks unless explicitly dropped.
+    // Pre-migration formData had none of these (Rule ④ payload parity).
+    it('strips the form-only keys (_ui / _meta / logGroupBy)', () => {
+      const formData: any = {
+        ...createBaseFormData(),
+        // Display-only: the "Check every" value the user sees (2 = 2 hours).
+        // The real value is trigger_condition.frequency (120 minutes).
+        _ui: { checkEvery: 2 },
+        _meta: {
+          tab: 'sql',
+          isRealTime: 'false',
+          isEventBased: true,
+          selectedFunction: 'total_events',
+          frequencyMode: 'hours',
+          hasConditions: false,
+          hasGroupBy: false,
+          aggregationEnabled: false,
+          minAutoRefreshInterval: 300,
+        },
+        logGroupBy: ['field1'],
+      };
+      const context = createBaseContext();
+
+      const payload = getAlertPayload(formData, context);
+
+      expect(payload._ui).toBeUndefined();
+      expect(payload._meta).toBeUndefined();
+      expect(payload.logGroupBy).toBeUndefined();
+      expect(Object.keys(payload)).not.toContain('_ui');
+      expect(Object.keys(payload)).not.toContain('_meta');
+      expect(Object.keys(payload)).not.toContain('logGroupBy');
+      // The real (stored, MINUTES) frequency still ships.
+      expect(payload.trigger_condition.frequency).toBe(60);
+    });
+
+    it('does not mutate the caller form data when stripping form-only keys', () => {
+      const formData: any = {
+        ...createBaseFormData(),
+        _ui: { checkEvery: 2 },
+        _meta: { frequencyMode: 'hours' },
+        logGroupBy: ['field1'],
+      };
+
+      getAlertPayload(formData, createBaseContext());
+
+      // The form is the source of truth — the payload build must not strip the
+      // live form's own display state.
+      expect(formData._ui).toEqual({ checkEvery: 2 });
+      expect(formData._meta).toEqual({ frequencyMode: 'hours' });
+      expect(formData.logGroupBy).toEqual(['field1']);
+    });
+
     it('should convert string trigger conditions to integers', () => {
       const formData = createBaseFormData();
       const context = createBaseContext();

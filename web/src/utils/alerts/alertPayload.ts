@@ -69,6 +69,20 @@ export const getAlertPayload = (
   // Deleting uuid from payload as it was added for reference of frontend
   if (payload.uuid) delete payload.uuid;
 
+  // Same reason: these are FORM-ONLY keys added by the OForm migration, not part
+  // of the alert resource. `payload` is a cloneDeep of the whole form value set,
+  // so anything seeded into the form leaks to the backend unless dropped here.
+  //   _ui        → display-only state (the "Check every" hours/minutes value the
+  //                user sees; the real value is trigger_condition.frequency)
+  //   _meta      → schema discriminators (tab / mode / org floor)
+  //   logGroupBy → the logs group-by field array (mirrored into
+  //                query_condition.aggregation.group_by)
+  // Pre-migration formData had none of these, so dropping them restores the
+  // pre-migration payload shape exactly (Rule ④).
+  delete (payload as any)._ui;
+  delete (payload as any)._meta;
+  delete (payload as any).logGroupBy;
+
   payload.is_real_time = payload.is_real_time === "true";
 
   payload.context_attributes = {} as any;

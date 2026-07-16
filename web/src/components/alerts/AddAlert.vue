@@ -15,7 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full h-full">
+  <!-- AddAlert OWNS the ONE form (Rule ③ owner pattern): `form` is created in
+       setup() via useAlertForm's useOForm and handed to <OForm :form> so the
+       topbar OForm* fields and the already-migrated descendant steps
+       (QueryConfig / AlertSettings) bind by nested `name=` into it. -->
+  <OForm :form="form" class="w-full h-full">
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
@@ -69,15 +73,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else>
             <div class="flex items-center gap-1.5 shrink-0">
               <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="text-text-primary">*</span></div>
-              <OInput
+              <OFormInput
                 v-if="!isAnomalyMode"
                 ref="step1Ref"
-                v-model="formData.name"
+                name="name"
                 data-test="add-alert-name-input"
                 :placeholder="t('alerts.alertNamePlaceholder')"
                 class="topbar-name-input text-sm h-[28px]! min-h-[28px]! min-w-[120px] max-w-[150px]"
-                :class="alertNameError ? 'field-error' : ''"
-                @update:model-value="alertNameError = false"
               />
               <OInput
                 v-else
@@ -119,32 +121,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Stream Type -->
         <div class="flex items-center gap-1.5">
           <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t("alerts.streamType") }} <span class="text-text-primary">*</span></div>
-          <OSelect
+          <OFormSelect
             ref="streamTypeRef"
+            name="stream_type"
             data-test="add-alert-stream-type-select-dropdown"
-            v-model="formData.stream_type"
             :options="streamTypes"
             :searchable="false"
-            class="stream-type-select h-[28px]! min-h-[28px]!"
-            :class="streamTypeError ? 'field-error' : ''"
+            class="stream-type-select"
             :disabled="beingUpdated || anomalyEditMode"
-            @update:model-value="streamTypeError = false; updateStreams()"
+            @update:model-value="onStreamTypeChange"
           />
         </div>
 
         <!-- Stream Name -->
         <div class="flex items-center gap-1.5">
           <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t("alerts.stream_name") }} <span class="text-text-primary">*</span></div>
-          <OSelect
+          <OFormSelect
             ref="streamNameRef"
+            name="stream_name"
             data-test="add-alert-stream-name-select-dropdown"
-            v-model="formData.stream_name"
             :options="indexOptions"
             :loading="isFetchingStreams"
-            class="stream-name-select h-[28px]! min-h-[28px]!"
-            :class="streamNameError ? 'field-error' : ''"
+            class="stream-name-select"
             :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
-            @update:model-value="streamNameError = false; updateStreamFields($event)"
+            @update:model-value="updateStreamFields($event)"
           />
           <OTooltip v-if="!formData.stream_type" :content="t('alerts.selectStreamTypeFirst')" />
         </div>
@@ -152,12 +152,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Alert Type -->
         <div class="flex items-center gap-1.5">
           <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t("alerts.alertType") || 'Alert Type' }}</div>
-          <OSelect
+          <OFormSelect
             data-test="add-alert-type-select-dropdown"
-            v-model="formData.is_real_time"
+            name="is_real_time"
             :options="alertTypeOptions"
             :disabled="beingUpdated || anomalyEditMode"
-            class="alert-type-select h-[28px]! min-h-[28px]!"
+            class="alert-type-select"
             :searchable="false"
           />
         </div>
@@ -217,17 +217,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update-group="updateGroup"
               @remove-group="removeConditionGroup"
               @input:update="onInputUpdate"
-              @update:sqlQuery="(value) => (formData.query_condition.sql = value)"
-              @update:promqlQuery="(value) => (formData.query_condition.promql = value)"
-              @update:vrlFunction="(value) => (formData.query_condition.vrl_function = value)"
+              @update:sqlQuery="updateSqlQuery"
+              @update:promqlQuery="updatePromqlQuery"
+              @update:vrlFunction="updateVrlFunction"
               @validate-sql="validateSqlQuery"
               @clear-multi-windows="clearMultiWindows"
               @editor-closed="handleEditorClosed"
               @editor-state-changed="handleEditorStateChanged"
               @update:isAggregationEnabled="(value) => (isAggregationEnabled = value)"
-              @update:aggregation="(value) => (formData.query_condition.aggregation = value)"
-              @update:promqlCondition="(val) => (formData.query_condition.promql_condition = val)"
-              @update:triggerCondition="(val) => (formData.trigger_condition = val)"
+              @update:aggregation="updateAggregation"
+              @update:promqlCondition="updatePromqlCondition"
+              @update:triggerCondition="updateTriggerCondition"
             />
             </div>
 
@@ -240,10 +240,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :isAggregationEnabled="isAggregationEnabled"
               :destinations="formData.destinations"
               :formattedDestinations="getFormattedDestinations"
-              @update:trigger="(val) => (formData.trigger_condition = val)"
-              @update:aggregation="(val) => (formData.query_condition.aggregation = val)"
+              @update:trigger="updateTriggerCondition"
+              @update:aggregation="updateAggregation"
               @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
-              @update:promqlCondition="(val) => (formData.query_condition.promql_condition = val)"
+              @update:promqlCondition="updatePromqlCondition"
               @update:destinations="updateDestinations"
               @refresh:destinations="refreshDestinations"
             />
@@ -268,12 +268,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :streamType="formData.stream_type"
                 :triggerCondition="formData.trigger_condition"
                 :streamFields="filteredColumns"
-                @update:template="(val) => (formData.template = val)"
+                @update:template="updateTemplate"
                 @refresh:templates="refreshTemplates"
-                @update:contextAttributes="(val) => (formData.context_attributes = val)"
-                @update:description="(val) => (formData.description = val)"
-                @update:rowTemplate="(val) => (formData.row_template = val)"
-                @update:rowTemplateType="(val) => (formData.row_template_type = val)"
+                @update:contextAttributes="updateContextAttributes"
+                @update:description="updateDescription"
+                @update:rowTemplate="updateRowTemplate"
+                @update:rowTemplateType="updateRowTemplateType"
               />
             </div>
 
@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :frequencyType="formData.trigger_condition.frequency_type"
                 :cron="formData.trigger_condition.cron"
                 :selectedTab="formData.query_condition.type || 'custom'"
-                @update:multiTimeRange="(val) => (formData.query_condition.multi_time_range = val)"
+                @update:multiTimeRange="updateMultiTimeRange"
               />
             </div>
 
@@ -296,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <Deduplication
                 :deduplication="formData.deduplication"
                 :columns="filteredColumns"
-                @update:deduplication="(val) => (formData.deduplication = val)"
+                @update:deduplication="updateDeduplication"
               />
             </div>
           </div>
@@ -333,7 +333,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="primary"
           size="sm-action"
           :loading="isAnomalyMode ? anomalySaving : false"
-          :disabled="isAnomalyMode ? !canSaveAlert : false"
           @click="handleSave"
         >{{ isAnomalyMode && !anomalyEditMode ? t('alerts.saveAndTrain') : t('alerts.save') }}</OButton>
       </div>
@@ -414,7 +413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       </div>
       </div>
-  </div>
+  </OForm>
 
   <ODrawer data-test="add-alert-json-editor-drawer"
     v-model:open="showJsonEditorDialog"
@@ -458,7 +457,9 @@ import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
@@ -510,7 +511,9 @@ export default defineComponent({
     OTag,
     OTooltip,
     OInput,
-    OSelect,
+    OForm,
+    OFormInput,
+    OFormSelect,
     AppPageHeader,
   },
   setup(props, { emit }) {
@@ -579,6 +582,15 @@ export default defineComponent({
       });
     };
 
+    // Stream-type change: write the value into the ONE form explicitly (so the
+    // synchronous form store is current before updateStreams reads it — not
+    // relying on the OFormSelect field-change flush order), then refresh streams
+    // (which also resets stream_name via setF).
+    const onStreamTypeChange = (value: any) => {
+      alertForm.setF("stream_type", value);
+      alertForm.updateStreams();
+    };
+
     return {
       ...alertForm,
       isAnomalyDetectionEnabled,
@@ -586,6 +598,7 @@ export default defineComponent({
       alertTabs,
       activeFolderName,
       goBackToAlertsList,
+      onStreamTypeChange,
       activeEvaluationStatus,
     };
   },
@@ -594,6 +607,37 @@ export default defineComponent({
 </script>
 
 <style>
+/* Compact rows: float the validation message so it never resizes the row.
+   A class passed to OInput/OSelect lands on the ROOT wrapper — the flex-col
+   holding the control AND its message — so an in-flow message would grow these
+   fixed-height rows, escape the card, and be painted over by the next card.
+   Out of flow, the row keeps its height and the message renders under the
+   control, above the neighbouring card.
+
+   `top:100%` resolves against the wrapper, so a wrapper whose height understates
+   the control it contains would tuck the message UNDER that control. The
+   topbar's h-[28px] genuinely compresses its input, so it anchors correctly; the
+   selects had to drop their (inert) clamp for the same to hold — see below.
+   pointer-events:none so the floating text can't swallow clicks on the tab bar
+   it overlaps. */
+.topbar-name-input,
+.stream-type-select,
+.stream-name-select {
+  position: relative;
+}
+
+.topbar-name-input [role="alert"],
+.stream-type-select [role="alert"],
+.stream-name-select [role="alert"] {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 2px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+}
+
 @container topbar (max-width: 1300px) {
   .topbar-name-input  { min-width: 100px; }
 }
@@ -619,6 +663,9 @@ export default defineComponent({
   cursor: pointer;
 }
 
+/* No h-[28px] clamp on these three: it only ever shrank the wrapper BOX, never
+   the trigger (which keeps its 34px design-system height and simply overflowed),
+   so it ate the row's bottom padding and mis-anchored the floating message. */
 .stream-type-select { width: 150px; }
 .stream-name-select { width: 160px; }
 .alert-type-select  { min-width: 110px; }
